@@ -270,9 +270,6 @@ public sealed class EventLocationPrivacyMcpContractTests
                     RoomName = "PRIVATE-MANAGEMENT-ROOM"
                 }
             });
-        mediator.Send(Arg.Any<GetManagedEventAgendaItemsByEventRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new List<EventAgendaItemListDto>());
-
         var assembler = Substitute.For<IResourceAssembler<EventDto, EventListDto>>();
         assembler.ToResource(eventDto, Arg.Any<HttpContext>())
             .Returns(new HalResource<EventDto>(eventDto, new Dictionary<string, HalLink>
@@ -293,9 +290,6 @@ public sealed class EventLocationPrivacyMcpContractTests
         await mediator.Received(1).Send(
             Arg.Any<GetManagedEventSessionGroupsByEventRequest>(),
             Arg.Any<CancellationToken>());
-        await mediator.Received(1).Send(
-            Arg.Any<GetManagedEventAgendaItemsByEventRequest>(),
-            Arg.Any<CancellationToken>());
         await Assert.That(result).Contains("PRIVATE-DRAFT-TRACK");
         await Assert.That(result).DoesNotContain("LocationName");
         await Assert.That(result).DoesNotContain("RoomName");
@@ -313,9 +307,13 @@ public sealed class EventLocationPrivacyMcpContractTests
         var days = Substitute.For<IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>>();
         days.QueryAsync(Arg.Any<GetManagedEventDaysByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(new List<EventDayListDto>());
+        var agenda = Substitute.For<IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>>();
+        agenda.QueryAsync(Arg.Any<GetManagedEventAgendaItemsByEventRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new List<EventAgendaItemListDto>());
         var dependencies = new Dictionary<Type, object>
         {
             [typeof(IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>)] = days,
+            [typeof(IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>)] = agenda,
             [typeof(IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>)] = summaryQuery
                 ?? Substitute.For<IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>>(),
             [typeof(IMediator)] = mediator,

@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventAgendaItems.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Commands;
 
-public class DeleteEventAgendaItemCommandHandler : IRequestHandler<DeleteEventAgendaItemCommand, BaseCommandResponse<Guid>>
+public class DeleteEventAgendaItemCommandHandler : ICommandHandler<DeleteEventAgendaItemCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -22,7 +22,7 @@ public class DeleteEventAgendaItemCommandHandler : IRequestHandler<DeleteEventAg
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteEventAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteEventAgendaItemCommand request, CancellationToken cancellationToken)
     {
         var agendaItem = await _eventAgendaItemRepository.GetById(request.Id);
         if (agendaItem == null)

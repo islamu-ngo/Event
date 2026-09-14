@@ -23,7 +23,7 @@ public class GetEventAgendaItemsByEventRequestHandlerTests
         var repository = Substitute.For<IEventAgendaItemRepository>();
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns(items);
         var handler = new GetEventAgendaItemsByEventRequestHandler(repository, Substitute.For<IEventLocationDisclosureService>());
-        var result = await handler.Handle(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None);
         items[0].Title = "Changed";
         items.Clear();
         await Assert.That(result.Count).IsEqualTo(3);
@@ -39,7 +39,7 @@ public class GetEventAgendaItemsByEventRequestHandlerTests
         var repository = Substitute.For<IEventAgendaItemRepository>();
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns(new List<EventAgendaItem>());
         var handler = new GetEventAgendaItemsByEventRequestHandler(repository, Substitute.For<IEventLocationDisclosureService>());
-        var result = await handler.Handle(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None);
         await Assert.That(result).IsNotNull();
         await Assert.That(result.Count).IsEqualTo(0);
     }

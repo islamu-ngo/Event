@@ -214,6 +214,44 @@ unpublished days, deleted items and event/tenant isolation. The original failure
 was a direct summary-path prerequisite, not unrelated suite rot.
 No route, schema, generated-client, configuration or migration change is required.
 
+### Native Event Agenda Item Operations
+
+The seven `Features/EventAgendaItems` operations use closed native command/query
+ports, discovered under authorization -> performance -> handler composition.
+`EventAgendaItemController` injects all seven; `EventManagementMcpTools` injects
+only the managed agenda-list port alongside its existing native Day/Program
+ports. The separate `Features/Agenda` projection still uses MediatR and reads
+repositories directly. DTO assemblers, routes, response types and generated
+contracts are unchanged.
+
+`EventAgendaItemAuthorizationContextEnricher` is explicitly registered for the
+three writes. It loads the agenda item's persisted source parent (or create's
+target parent), rejects missing/deleted/foreign-tenant rows, and supplies
+`EventScopedAuthorizationFacts` to the existing AgendaItem create/update/delete
+capabilities. This fixes legitimate owner writes denied for missing event
+context without adding grants. A reparenting update separately checks the
+persisted destination's `Event:update` authority before attachment or mutation;
+submitted destination authority never replaces source authority.
+
+Public list/detail retain canonical eligibility and policy-filtered location
+disclosure; managed list/detail retain `Event:ViewManagement`, parent binding
+and private/no-store HTTP responses. Managed detail alone retains exact location
+IDs. MCP management descriptors omit physical location information. Nullable
+detail results still map to 404. PATCH preserves required strong `If-Match`,
+409 stale-write responses and explicit field-operation semantics.
+
+Handlers retain manual validators, UTC rescheduling, destination timezone/day
+reprojection, transaction-owned location attachment/detachment and post-commit
+update cache invalidation. The existing unit of work rolls back placement and
+agenda changes together and translates optimistic conflicts. Real SQLite tests
+exercise seven registered ports, HTTP and MCP transport, denied/forged/foreign
+access, positive moves, venue review suppression, storage failure rollback and
+two previously authorized snapshots with one durable winner. The concurrency
+fixture gates actual provider decisions with signals; it never grants authority.
+Inherited tokenless repository methods remain tokenless; full in-flight
+cancellation of those reads is not claimed. No provider matrix or performance
+claim accompanies this slice.
+
 ### Event Session Status Lookup Absence
 
 `GetEventSessionStatusDetailsQuery` and its native handler/closed controller port

@@ -128,6 +128,26 @@ metadata was lost. Location policy, reveal restrictions and pending privacy
 review still govern disclosure; managed summaries still omit location envelopes.
 No data rewrite, database migration or configuration change is required.
 
+## Agenda item management
+
+Authorized organizers can create, edit and delete agenda items through
+`/api/eventagendaitem` without the former missing-event-context denial. Existing
+permissions remain authoritative: moving an item requires permission on both
+its current event and the destination. Supplying an event ID never grants access
+to another organizer's item or another tenant's event.
+
+PATCH requires the current strong `If-Match` concurrency stamp. Invalid or
+missing stamps return 400; stale edits return 409. Successful moves preserve UTC
+instants and recalculate local times and day assignments for the destination.
+Failed writes roll back agenda and location-placement changes together.
+
+Public agenda reads retain publication and venue-disclosure restrictions.
+Authorized management reads remain private/no-store; exact venue IDs are only
+available through management detail. The MCP
+`get_event_program_management_context` tool retains these permission boundaries
+and omits physical location details. No routes, payload shapes, database
+migrations, configuration changes or client regeneration are required.
+
 ## Duplicate session language assignments
 
 `POST /api/eventsessionlanguage` returns `400` with the endpoint's existing JSON validation ProblemDetails body, `code: validation_failed`, and an `errors.program` entry when the language is already assigned to that session. Concurrent submissions retain exactly one assignment: the winning create returns `201`, and the duplicate receives the same controlled validation response. A language may still be assigned to a different session. Existing authorization and tenant boundaries apply before mutation.

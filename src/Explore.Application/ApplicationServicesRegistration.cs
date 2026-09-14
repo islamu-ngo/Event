@@ -20,6 +20,8 @@ using Explore.Application.Features.Authentication.Atproto.Services;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.CustomPropertyDefinitions.Authorization;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
+using Explore.Application.Features.EventAgendaItems.Authorization;
+using Explore.Application.Features.EventAgendaItems.Requests.Commands;
 using Explore.Application.Features.EventCategories.Authorization;
 using Explore.Application.Features.EventCategories.Requests.Commands;
 using Explore.Application.Features.EventCustomProperties.Authorization;
@@ -134,6 +136,9 @@ public static class ApplicationServicesRegistration
         services.AddTransient<IAuthorizationContextEnricher<CreateEventDayCommand>, EventDayAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventDayCommand>, EventDayAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<DeleteEventDayCommand>, EventDayAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<CreateEventAgendaItemCommand>, EventAgendaItemAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<UpdateEventAgendaItemCommand>, EventAgendaItemAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<DeleteEventAgendaItemCommand>, EventAgendaItemAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateCustomPropertyDefinitionCommand>, UpdateCustomPropertyDefinitionAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventCustomPropertyDefinitionCommand>, UpdateEventCustomPropertyDefinitionAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionCustomPropertyDefinitionCommand>, UpdateEventSessionCustomPropertyDefinitionAuthorizationContextEnricher>();

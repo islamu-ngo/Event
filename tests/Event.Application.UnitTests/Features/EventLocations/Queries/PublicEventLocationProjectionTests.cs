@@ -125,9 +125,9 @@ public sealed class PublicEventLocationProjectionTests
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([item]);
 
         EventAgendaItemDto? detail = await new GetEventAgendaItemDetailRequestHandler(repository, disclosureService)
-            .Handle(new GetEventAgendaItemDetailRequest(item.Id), CancellationToken.None);
+            .QueryAsync(new GetEventAgendaItemDetailRequest(item.Id), CancellationToken.None);
         EventAgendaItemListDto byEvent = (await new GetEventAgendaItemsByEventRequestHandler(repository, disclosureService)
-            .Handle(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None)).Single();
+            .QueryAsync(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: true);
         await AssertPublicLocationAsync(byEvent.EventLocation, eventLocationId, expectRoom: true);

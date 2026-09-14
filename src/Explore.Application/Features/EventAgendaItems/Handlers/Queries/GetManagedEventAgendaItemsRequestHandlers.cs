@@ -2,15 +2,15 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.Features.EventAgendaItems.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Queries;
 
 public sealed class GetManagedEventAgendaItemsByEventRequestHandler(
     IEventAgendaItemRepository repository)
-    : IRequestHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>
+    : IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>
 {
-    public async Task<List<EventAgendaItemListDto>> Handle(
+    public async Task<List<EventAgendaItemListDto>> QueryAsync(
         GetManagedEventAgendaItemsByEventRequest request,
         CancellationToken cancellationToken)
     {
@@ -21,9 +21,9 @@ public sealed class GetManagedEventAgendaItemsByEventRequestHandler(
 
 public sealed class GetManagedEventAgendaItemDetailRequestHandler(
     IEventAgendaItemRepository repository)
-    : IRequestHandler<GetManagedEventAgendaItemDetailRequest, EventAgendaItemDto?>
+    : IQueryHandler<GetManagedEventAgendaItemDetailRequest, EventAgendaItemDto?>
 {
-    public async Task<EventAgendaItemDto?> Handle(
+    public async Task<EventAgendaItemDto?> QueryAsync(
         GetManagedEventAgendaItemDetailRequest request,
         CancellationToken cancellationToken)
     {

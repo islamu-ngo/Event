@@ -3,6 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Agenda;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.Features.Agenda.Requests.Queries;
@@ -48,15 +49,36 @@ public class EventAgendaItemController : EventControllerBase
         "Event agenda projection not found.");
 
     private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>> _create;
+    private readonly ICommandHandler<UpdateEventAgendaItemCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteEventAgendaItemCommand, BaseCommandResponse<Guid>> _delete;
+    private readonly IQueryHandler<GetEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> _publicList;
+    private readonly IQueryHandler<GetEventAgendaItemDetailRequest, EventAgendaItemDto?> _publicDetail;
+    private readonly IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> _managedList;
+    private readonly IQueryHandler<GetManagedEventAgendaItemDetailRequest, EventAgendaItemDto?> _managedDetail;
     private readonly ILogger<EventAgendaItemController> _logger;
     private readonly IResourceAssembler<EventAgendaItemDto, EventAgendaItemListDto> _resourceAssembler;
 
     public EventAgendaItemController(
         IMediator mediator,
+        ICommandHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>> create,
+        ICommandHandler<UpdateEventAgendaItemCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteEventAgendaItemCommand, BaseCommandResponse<Guid>> delete,
+        IQueryHandler<GetEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> publicList,
+        IQueryHandler<GetEventAgendaItemDetailRequest, EventAgendaItemDto?> publicDetail,
+        IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedList,
+        IQueryHandler<GetManagedEventAgendaItemDetailRequest, EventAgendaItemDto?> managedDetail,
         ILogger<EventAgendaItemController> logger,
         IResourceAssembler<EventAgendaItemDto, EventAgendaItemListDto> resourceAssembler)
     {
         _mediator = mediator;
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _publicList = publicList;
+        _publicDetail = publicDetail;
+        _managedList = managedList;
+        _managedDetail = managedDetail;
         _logger = logger;
         _resourceAssembler = resourceAssembler;
     }
@@ -72,7 +94,7 @@ public class EventAgendaItemController : EventControllerBase
     [ProducesResponseType(typeof(HalCollectionResource<EventAgendaItemListDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<HalCollectionResource<EventAgendaItemListDto>>> GetByEvent(Guid eventId, CancellationToken cancellationToken = default)
     {
-        var items = await _mediator.Send(new GetEventAgendaItemsByEventRequest(eventId), cancellationToken);
+        var items = await _publicList.QueryAsync(new GetEventAgendaItemsByEventRequest(eventId), cancellationToken);
 
         var halResource = await _resourceAssembler.ToCollectionResource(
             items,
@@ -95,7 +117,7 @@ public class EventAgendaItemController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<EventAgendaItemDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var item = await _mediator.Send(new GetEventAgendaItemDetailRequest(id), cancellationToken);
+        var item = await _publicDetail.QueryAsync(new GetEventAgendaItemDetailRequest(id), cancellationToken);
         if (item == null)
             return this.ToNotFoundProblem(AgendaItemNotFoundProblem);
 
@@ -116,7 +138,7 @@ public class EventAgendaItemController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var items = await _mediator.Send(
+        var items = await _managedList.QueryAsync(
             new GetManagedEventAgendaItemsByEventRequest { EventId = eventId },
             cancellationToken);
 
@@ -144,7 +166,7 @@ public class EventAgendaItemController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var item = await _mediator.Send(new GetManagedEventAgendaItemDetailRequest
+        var item = await _managedDetail.QueryAsync(new GetManagedEventAgendaItemDetailRequest
         {
             EventId = eventId,
             Id = id
@@ -193,7 +215,7 @@ public class EventAgendaItemController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateEventAgendaItemDto agendaItem, CancellationToken cancellationToken = default)
     {
         var command = new CreateEventAgendaItemCommand { EventAgendaItemDto = agendaItem };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _create.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -240,7 +262,7 @@ public class EventAgendaItemController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             EventAgendaItemDto = agendaItem
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _update.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -266,7 +288,7 @@ public class EventAgendaItemController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventAgendaItemCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _delete.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

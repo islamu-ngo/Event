@@ -6,11 +6,11 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventAgendaItems.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Queries;
 
-public class GetEventAgendaItemDetailRequestHandler : IRequestHandler<GetEventAgendaItemDetailRequest, EventAgendaItemDto?>
+public class GetEventAgendaItemDetailRequestHandler : IQueryHandler<GetEventAgendaItemDetailRequest, EventAgendaItemDto?>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
     private readonly IEventLocationDisclosureService _disclosureService;
@@ -23,7 +23,7 @@ public class GetEventAgendaItemDetailRequestHandler : IRequestHandler<GetEventAg
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventAgendaItemDto?> Handle(GetEventAgendaItemDetailRequest request, CancellationToken cancellationToken)
+    public async Task<EventAgendaItemDto?> QueryAsync(GetEventAgendaItemDetailRequest request, CancellationToken cancellationToken)
     {
         var agendaItem = await _eventAgendaItemRepository.GetPublicByIdAsync(request.Id, cancellationToken);
         return await PublicEventAgendaItemLocationProjector.ProjectAsync(

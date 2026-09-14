@@ -72,7 +72,7 @@ public sealed class EventAgendaMapperTests
             return entity;
         });
         var attachment = new EventLocationAttachmentService(locations, Substitute.For<IUserContext>(), Substitute.For<ITenantContext>(), TimeProvider.System);
-        var result = await new CreateEventAgendaItemCommandHandler(items, events, days, new EventScheduleProjectionCalculator(), transaction, attachment).Handle(new CreateEventAgendaItemCommand { EventAgendaItemDto = new CreateEventAgendaItemDto { EventId = EventId, Title = "Opening", Description = "", StartTime = Start, EndTime = Start.AddHours(1), LocationId = LocationId, RoomId = DayId, KindId = 7, SortOrder = 4 } }, CancellationToken.None);
+        var result = await new CreateEventAgendaItemCommandHandler(items, events, days, new EventScheduleProjectionCalculator(), transaction, attachment).ExecuteAsync(new CreateEventAgendaItemCommand { EventAgendaItemDto = new CreateEventAgendaItemDto { EventId = EventId, Title = "Opening", Description = "", StartTime = Start, EndTime = Start.AddHours(1), LocationId = LocationId, RoomId = DayId, KindId = 7, SortOrder = 4 } }, CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(saved).IsNotNull();
         await Assert.That(saved!.TenantId).IsEqualTo(TenantId);

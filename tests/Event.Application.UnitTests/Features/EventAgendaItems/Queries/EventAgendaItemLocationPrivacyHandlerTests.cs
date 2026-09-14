@@ -19,7 +19,7 @@ public sealed class EventAgendaItemLocationPrivacyHandlerTests
         var entity = CreateEntity();
         repository.GetPublicByIdAsync(entity.Id, Arg.Any<CancellationToken>()).Returns(entity);
         var handler = new GetEventAgendaItemDetailRequestHandler(repository, Substitute.For<IEventLocationDisclosureService>());
-        var result = await handler.Handle(new GetEventAgendaItemDetailRequest(entity.Id), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetEventAgendaItemDetailRequest(entity.Id), CancellationToken.None);
         await Assert.That(result!.LocationId).IsNull();
         await Assert.That(result.RoomId).IsNull();
     }
@@ -31,7 +31,7 @@ public sealed class EventAgendaItemLocationPrivacyHandlerTests
         var entity = CreateEntity();
         repository.GetPublicByEventAsync(entity.EventId, Arg.Any<CancellationToken>()).Returns([entity]);
         var handler = new GetEventAgendaItemsByEventRequestHandler(repository, Substitute.For<IEventLocationDisclosureService>());
-        var result = await handler.Handle(new GetEventAgendaItemsByEventRequest(entity.EventId), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetEventAgendaItemsByEventRequest(entity.EventId), CancellationToken.None);
         string json = JsonSerializer.Serialize(result);
         await Assert.That(result.Count).IsEqualTo(1);
         await Assert.That(json.Contains("locationId", StringComparison.OrdinalIgnoreCase)).IsFalse();
@@ -47,7 +47,7 @@ public sealed class EventAgendaItemLocationPrivacyHandlerTests
         var entity = CreateEntity();
         repository.GetById(entity.Id).Returns(entity);
         var handler = new GetManagedEventAgendaItemDetailRequestHandler(repository);
-        var result = await handler.Handle(new GetManagedEventAgendaItemDetailRequest { EventId = entity.EventId, Id = entity.Id }, CancellationToken.None);
+        var result = await handler.QueryAsync(new GetManagedEventAgendaItemDetailRequest { EventId = entity.EventId, Id = entity.Id }, CancellationToken.None);
         await Assert.That(result!.LocationId).IsEqualTo(Guid.Parse("01900000-0000-7000-8000-000000000003"));
         await Assert.That(result.RoomId).IsEqualTo(Guid.Parse("01900000-0000-7000-8000-000000000004"));
     }

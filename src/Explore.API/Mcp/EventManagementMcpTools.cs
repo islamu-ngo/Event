@@ -60,7 +60,8 @@ public sealed class EventManagementMcpTools(
     IHttpContextAccessor httpContextAccessor,
     EventMcpLocationDisclosureGuard locationDisclosureGuard,
     IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays,
-    IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary)
+    IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
+    IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems)
 {
 
     [McpServerTool(
@@ -895,7 +896,7 @@ public sealed class EventManagementMcpTools(
         var days = await managedEventDays.QueryAsync(
             new GetManagedEventDaysByEventRequest { EventId = eventDto.Id },
             cancellationToken);
-        var agendaItems = await mediator.Send(
+        var agendaItems = await managedAgendaItems.QueryAsync(
             new GetManagedEventAgendaItemsByEventRequest { EventId = eventDto.Id },
             cancellationToken);
 
@@ -1460,4 +1461,3 @@ public sealed class EventManagementMcpTools(
             => new(true, null, diff);
     }
 }
-

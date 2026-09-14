@@ -6,11 +6,11 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Commands;
 
-public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>>
+public class CreateEventAgendaItemCommandHandler : ICommandHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
     private readonly IEventRepository _eventRepository;
@@ -35,7 +35,7 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventAgendaItemCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventAgendaItemDtoValidator(_eventRepository);
         var validationResult = await validator.ValidateAsync(request.EventAgendaItemDto, cancellationToken);

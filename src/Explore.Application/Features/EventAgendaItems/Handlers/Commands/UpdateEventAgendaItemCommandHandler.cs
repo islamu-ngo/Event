@@ -1,4 +1,6 @@
 using Explore.Application.Caching;
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventAgendaItem.Validators;
@@ -9,12 +11,12 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Commands;
 
-public class UpdateEventAgendaItemCommandHandler : IRequestHandler<UpdateEventAgendaItemCommand, BaseCommandResponse<Guid>>
+public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAgendaItemCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
     private readonly IEventRepository _eventRepository;
@@ -26,6 +28,8 @@ public class UpdateEventAgendaItemCommandHandler : IRequestHandler<UpdateEventAg
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
     private readonly HybridCache _cache;
+    private readonly IAuthorizationProvider _authorizationProvider;
+    private readonly AuthorizationResourceContextResolver _authorizationResourceContextResolver;
 
     public UpdateEventAgendaItemCommandHandler(
         IEventAgendaItemRepository eventAgendaItemRepository,
@@ -37,7 +41,9 @@ public class UpdateEventAgendaItemCommandHandler : IRequestHandler<UpdateEventAg
         IEventScheduleProjectionCalculator scheduleProjectionCalculator,
         IUnitOfWork unitOfWork,
         EventLocationAttachmentService eventLocationAttachmentService,
-        HybridCache cache)
+        HybridCache cache,
+        IAuthorizationProvider authorizationProvider,
+        AuthorizationResourceContextResolver authorizationResourceContextResolver)
     {
         _eventAgendaItemRepository = eventAgendaItemRepository;
         _eventRepository = eventRepository;
@@ -49,9 +55,11 @@ public class UpdateEventAgendaItemCommandHandler : IRequestHandler<UpdateEventAg
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
         _cache = cache;
+        _authorizationProvider = authorizationProvider;
+        _authorizationResourceContextResolver = authorizationResourceContextResolver;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventAgendaItemCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventAgendaItemDtoValidator(
             _eventRepository,
@@ -102,6 +110,10 @@ public class UpdateEventAgendaItemCommandHandler : IRequestHandler<UpdateEventAg
 
         Guid? previousEventLocationId = agendaItem.EventLocationId;
         var eventChanged = previousEventId != parentEvent.Id;
+        if (eventChanged)
+        {
+            await AuthorizeDestinationAsync(request, parentEvent.Id, cancellationToken);
+        }
 
         await _unitOfWork.ExecuteInTransactionAsync(async token =>
         {
@@ -146,6 +158,34 @@ public class UpdateEventAgendaItemCommandHandler : IRequestHandler<UpdateEventAg
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
 
         return BaseCommandResponse.Success(agendaItem.Id, "Event agenda item updated successfully.");
+    }
+
+    private async Task AuthorizeDestinationAsync(
+        UpdateEventAgendaItemCommand request,
+        Guid eventId,
+        CancellationToken cancellationToken)
+    {
+        var resourceId = eventId.ToString();
+        var context = await _authorizationResourceContextResolver.ResolveAsync(
+            request, ResourceKinds.Event, AuthorizationActions.Update, resourceId, null, cancellationToken);
+        if (context.Facts is null)
+        {
+            throw new AuthorizationException(ResourceKinds.Event, AuthorizationActions.Update);
+        }
+
+        var decision = await _authorizationProvider.AuthorizeAsync(new AuthorizationRequest(
+            AuthorizationCapabilityCatalog.Require(ResourceKinds.Event, AuthorizationActions.Update),
+            resourceId,
+            Facts: context.Facts), cancellationToken);
+        if (!decision.IsAllowed)
+        {
+            if (decision.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+            {
+                throw new AuthorizationProviderUnavailableException(ResourceKinds.Event, AuthorizationActions.Update);
+            }
+
+            throw new AuthorizationException(ResourceKinds.Event, AuthorizationActions.Update);
+        }
     }
 
     private async Task<(bool Success, string Message, Guid? LocationId, Guid? RoomId)> ValidateLocationRoomRelationshipAsync(

@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Permission;
-using MediatR;
 
 namespace Explore.Application.Features.Permissions.Requests.Queries;
 
-public sealed record GetPermissionListRequest : IRequest<List<PermissionListDto>>
+public sealed record GetPermissionListRequest : IQuery<List<PermissionListDto>>
 {
     /// <summary>
     /// Optional normalized role scope lookup ID filter.

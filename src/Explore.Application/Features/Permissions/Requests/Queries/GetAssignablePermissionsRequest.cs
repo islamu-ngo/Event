@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Permission;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Permissions.Requests.Queries;
 
-public sealed record GetAssignablePermissionsRequest : IRequest<List<PermissionListDto>>
+public sealed record GetAssignablePermissionsRequest : IQuery<List<PermissionListDto>>
 {
     /// <summary>
     /// The caller's role IDs (from their memberships).

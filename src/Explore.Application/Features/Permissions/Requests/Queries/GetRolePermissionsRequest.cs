@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Permission;
-using MediatR;
 
 namespace Explore.Application.Features.Permissions.Requests.Queries;
 
-public sealed record GetRolePermissionsRequest(int RoleId = default) : IRequest<List<RolePermissionDto>>;
+public sealed record GetRolePermissionsRequest(int RoleId = default) : IQuery<List<RolePermissionDto>>;

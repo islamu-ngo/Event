@@ -1,0 +1,30 @@
+Change-Id: CHG-01M2EMYYQ39H0DJT0QP96G0RFD
+Title: "Use native operations for event public actions"
+Type: refactor
+Scope: events
+Summary: "Move event public-action reads, management writes and redirect engagement recording to closed native operation ports while preserving public eligibility and HTTP contracts."
+Group: event-public-actions
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/EVENT_PUBLIC_ACTIONS.md#operation-boundary
+    Disposition: documented
+    Detail: Internal callers use closed native query and command handlers instead of MediatR. Engagement recording is a non-generic Task command with no Unit response or compatibility adapter. HTTP contracts are unchanged.
+  Security:
+    Reference: docs/internal/EVENT_PUBLIC_ACTIONS.md#authority-and-state
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Existing event capability checks, persisted association authority, public eligibility and bounded non-identifying engagement metrics are retained and exercised through SQLite-backed protected ports and HTTP.
+  Migration:
+    Reference: docs/internal/EVENT_PUBLIC_ACTIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/EVENT_PUBLIC_ACTIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/EVENT_PUBLIC_ACTIONS.md#transport-metrics-and-cancellation
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/features/event-public-actions.md
+    Disposition: documented
+    Detail: No operator action is required. Pending-review lifecycle, conditional writes, public filtering and stored-destination redirect behavior remain unchanged.

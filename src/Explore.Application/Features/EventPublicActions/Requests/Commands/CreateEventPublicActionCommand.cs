@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventPublicAction;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManagePublicActions)]
-public sealed record CreateEventPublicActionCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record CreateEventPublicActionCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public required ManageEventPublicActionDto Action { get; init; }

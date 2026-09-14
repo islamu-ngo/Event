@@ -6,7 +6,7 @@ using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Commands;
 
@@ -16,9 +16,9 @@ public sealed class UpdateEventPublicActionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<UpdateEventPublicActionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateEventPublicActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateEventPublicActionCommand request,
         CancellationToken cancellationToken)
     {

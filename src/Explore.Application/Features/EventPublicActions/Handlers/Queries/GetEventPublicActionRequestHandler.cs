@@ -4,16 +4,16 @@ using Explore.Application.DTOs.Event;
 using Explore.Application.Features.EventPublicActions.Requests.Queries;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Queries;
 
 public sealed class GetEventPublicActionRequestHandler(
     IEventRepository eventRepository,
     IEventPublicActionRepository actionRepository)
-    : IRequestHandler<GetEventPublicActionRequest, EventPublicActionDto?>
+    : IQueryHandler<GetEventPublicActionRequest, EventPublicActionDto?>
 {
-    public async Task<EventPublicActionDto?> Handle(
+    public async Task<EventPublicActionDto?> QueryAsync(
         GetEventPublicActionRequest request,
         CancellationToken cancellationToken)
     {

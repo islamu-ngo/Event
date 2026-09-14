@@ -2,7 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventPublicActions.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Commands;
 
@@ -10,9 +10,9 @@ public sealed class DeleteEventPublicActionCommandHandler(
     IEventPublicActionRepository actionRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<DeleteEventPublicActionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteEventPublicActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         DeleteEventPublicActionCommand request,
         CancellationToken cancellationToken)
     {

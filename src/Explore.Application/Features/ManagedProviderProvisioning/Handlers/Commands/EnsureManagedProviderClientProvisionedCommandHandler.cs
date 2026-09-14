@@ -16,12 +16,12 @@ using Explore.Application.Management;
 using Explore.Application.Settings.Groups;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Modules;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Documents;
-using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -65,17 +65,17 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     ISettingMutationLock mutationLock,
     IUnitOfWork unitOfWork,
     ILogger<EnsureManagedProviderClientProvisionedCommandHandler> logger)
-    : IRequestHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>,
+    : ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>>,
         IManagedProviderClientProvisioner
 {
-    public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> Handle(
-        EnsureManagedProviderClientProvisionedCommand request,
+    public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> ExecuteAsync(
+        EnsureManagedProviderClientProvisionedCommand command,
         CancellationToken cancellationToken) =>
         await EnsureAsync(
-            request.ProvisioningDto,
-            request.ManagementRequest,
-            request.OperationId,
-            request.ExpectedOutboxMessageId,
+            command.ProvisioningDto,
+            command.ManagementRequest,
+            command.OperationId,
+            command.ExpectedOutboxMessageId,
             cancellationToken);
 
     public async Task<BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> EnsureAsync(

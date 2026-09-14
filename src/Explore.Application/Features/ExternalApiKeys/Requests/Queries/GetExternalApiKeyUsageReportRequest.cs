@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.ExternalApiKey;
-using MediatR;
 
 namespace Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 
-public sealed record GetExternalApiKeyUsageReportRequest : IRequest<List<ExternalApiKeyUsageReportDto>>
+public sealed record GetExternalApiKeyUsageReportRequest : IQuery<List<ExternalApiKeyUsageReportDto>>
 {
     public DateOnly From { get; init; }
     public DateOnly To { get; init; }

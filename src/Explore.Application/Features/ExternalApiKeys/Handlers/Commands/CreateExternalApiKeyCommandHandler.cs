@@ -11,12 +11,12 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 
-public class CreateExternalApiKeyCommandHandler : IRequestHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>
+public class CreateExternalApiKeyCommandHandler : ICommandHandler<CreateExternalApiKeyCommand, CreateExternalApiKeyCommandResponse>
 {
     private readonly IExternalApiKeyRepository _externalApiKeyRepository;
     private readonly IOrganizationRepository _organizationRepository;
@@ -53,7 +53,7 @@ public class CreateExternalApiKeyCommandHandler : IRequestHandler<CreateExternal
         _logger = logger;
     }
 
-    public async Task<CreateExternalApiKeyCommandResponse> Handle(CreateExternalApiKeyCommand request, CancellationToken cancellationToken)
+    public async Task<CreateExternalApiKeyCommandResponse> ExecuteAsync(CreateExternalApiKeyCommand request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
         var dto = request.ExternalApiKeyDto;

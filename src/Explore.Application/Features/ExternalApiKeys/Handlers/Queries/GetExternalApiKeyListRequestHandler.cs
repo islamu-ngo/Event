@@ -1,15 +1,15 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 using Explore.Application.Lookups;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 
-public class GetExternalApiKeyListRequestHandler : IRequestHandler<GetExternalApiKeyListRequest, List<ExternalApiKeyListDto>>
+public class GetExternalApiKeyListRequestHandler : IQueryHandler<GetExternalApiKeyListRequest, List<ExternalApiKeyListDto>>
 {
     private readonly IExternalApiKeyRepository _externalApiKeyRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
@@ -31,7 +31,7 @@ public class GetExternalApiKeyListRequestHandler : IRequestHandler<GetExternalAp
         _userContext = userContext;
     }
 
-    public async Task<List<ExternalApiKeyListDto>> Handle(GetExternalApiKeyListRequest request, CancellationToken cancellationToken)
+    public async Task<List<ExternalApiKeyListDto>> QueryAsync(GetExternalApiKeyListRequest request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
         var visibleKeys = new List<Explore.Domain.ExternalApiKey>();

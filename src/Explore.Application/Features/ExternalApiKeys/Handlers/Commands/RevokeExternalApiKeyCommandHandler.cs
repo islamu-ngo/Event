@@ -1,15 +1,15 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ExternalApiKeys.Requests.Commands;
 using Explore.Application.Telemetry;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 
-public class RevokeExternalApiKeyCommandHandler : IRequestHandler<RevokeExternalApiKeyCommand, bool>
+public class RevokeExternalApiKeyCommandHandler : ICommandHandler<RevokeExternalApiKeyCommand, bool>
 {
     private readonly IExternalApiKeyRepository _externalApiKeyRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
@@ -37,7 +37,7 @@ public class RevokeExternalApiKeyCommandHandler : IRequestHandler<RevokeExternal
         _logger = logger;
     }
 
-    public async Task<bool> Handle(RevokeExternalApiKeyCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(RevokeExternalApiKeyCommand request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
         var externalApiKey = await _externalApiKeyRepository.GetByIdIgnoringTenantFilter(request.Id, cancellationToken);

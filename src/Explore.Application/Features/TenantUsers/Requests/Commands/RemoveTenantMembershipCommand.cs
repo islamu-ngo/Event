@@ -1,10 +1,10 @@
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TenantUsers.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.User, AuthorizationActions.Update)]
-public sealed record RemoveTenantMembershipCommand(Guid TenantId, Guid UserId) : IRequest<bool>, ISecureRequest
+public sealed record RemoveTenantMembershipCommand(Guid TenantId, Guid UserId) : ICommand<bool>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => UserId.ToString("D");
 

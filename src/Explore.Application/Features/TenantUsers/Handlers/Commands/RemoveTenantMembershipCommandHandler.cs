@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.TenantUsers.Requests.Commands;
 using Explore.Application.Features.TenantUsers.Validators;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.TenantUsers.Handlers.Commands;
 
@@ -15,9 +15,9 @@ public sealed class RemoveTenantMembershipCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUser,
-    TimeProvider timeProvider) : IRequestHandler<RemoveTenantMembershipCommand, bool>
+    TimeProvider timeProvider) : ICommandHandler<RemoveTenantMembershipCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         RemoveTenantMembershipCommand request,
         CancellationToken cancellationToken)
     {

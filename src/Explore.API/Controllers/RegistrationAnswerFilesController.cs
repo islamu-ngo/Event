@@ -5,12 +5,12 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Registration;
 using Explore.Application.Features.RegistrationAnswerFiles.Commands;
 using Explore.Application.Features.RegistrationAnswerFiles.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -24,7 +24,8 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Admin)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class RegistrationAnswerFilesController(
-    IMediator mediator,
+    IQueryHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?> getQuery,
+    ICommandHandler<ReleaseRegistrationAnswerFileCommand, BaseCommandResponse<Guid>> releaseCommand,
     ITenantContext tenantContext,
     IResourceAssembler<RegistrationAnswerFileDto, RegistrationAnswerFileDto> resourceAssembler) : ControllerBase
 {
@@ -45,7 +46,7 @@ public sealed class RegistrationAnswerFilesController(
         Guid id,
         CancellationToken cancellationToken)
     {
-        RegistrationAnswerFileDto? file = await mediator.Send(
+        RegistrationAnswerFileDto? file = await getQuery.QueryAsync(
             new GetRegistrationAnswerFileQuery(tenantContext.TenantId, id), cancellationToken);
         return file is null
             ? this.ToNotFoundProblem(NotFoundProblem)
@@ -64,7 +65,7 @@ public sealed class RegistrationAnswerFilesController(
         RegistrationAnswerFileReleaseInputDto input,
         CancellationToken cancellationToken)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await releaseCommand.ExecuteAsync(
             new ReleaseRegistrationAnswerFileCommand(tenantContext.TenantId, id, input.Reason), cancellationToken);
         if (!response.IsSuccess)
         {
@@ -73,7 +74,7 @@ public sealed class RegistrationAnswerFilesController(
                 : this.ToCommandValidationProblem(response, ReleaseValidationProblem);
         }
 
-        RegistrationAnswerFileDto file = await mediator.Send(
+        RegistrationAnswerFileDto file = await getQuery.QueryAsync(
             new GetRegistrationAnswerFileQuery(tenantContext.TenantId, id), cancellationToken)
             ?? throw new InvalidOperationException("Released registration answer file could not be reloaded.");
         return Ok(await resourceAssembler.ToResource(file, HttpContext));

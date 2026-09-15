@@ -3,16 +3,16 @@ using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Application.Features.RegistrationForms.Validators;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationForms.Handlers.Queries;
 
 public sealed class ListRegistrationFormTemplatesQueryHandler(IRegistrationFormTemplateRepository repository)
-    : IRequestHandler<ListRegistrationFormTemplatesQuery, IReadOnlyList<RegistrationFormTemplateDto>>
+    : IQueryHandler<ListRegistrationFormTemplatesQuery, IReadOnlyList<RegistrationFormTemplateDto>>
 {
-    public async Task<IReadOnlyList<RegistrationFormTemplateDto>> Handle(
+    public async Task<IReadOnlyList<RegistrationFormTemplateDto>> QueryAsync(
         ListRegistrationFormTemplatesQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         await new RegistrationFormTemplateQueryValidator<ListRegistrationFormTemplatesQuery>()
             .ValidateAndThrowAsync(request, cancellationToken);
@@ -21,11 +21,11 @@ public sealed class ListRegistrationFormTemplatesQueryHandler(IRegistrationFormT
 }
 
 public sealed class GetRegistrationFormTemplateQueryHandler(IRegistrationFormTemplateRepository repository)
-    : IRequestHandler<GetRegistrationFormTemplateQuery, RegistrationFormTemplateDto?>
+    : IQueryHandler<GetRegistrationFormTemplateQuery, RegistrationFormTemplateDto?>
 {
-    public async Task<RegistrationFormTemplateDto?> Handle(
+    public async Task<RegistrationFormTemplateDto?> QueryAsync(
         GetRegistrationFormTemplateQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         await new RegistrationFormTemplateQueryValidator<GetRegistrationFormTemplateQuery>()
             .ValidateAndThrowAsync(request, cancellationToken);

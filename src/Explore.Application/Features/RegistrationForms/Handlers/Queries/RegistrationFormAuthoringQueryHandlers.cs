@@ -4,14 +4,14 @@ using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Application.Features.RegistrationForms.Validators;
 using Explore.Application.Services.Registration;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationForms.Handlers.Queries;
 
 public sealed class GetRegistrationWorkflowQueryHandler(IRegistrationFormAuthoringRepository repository)
-    : IRequestHandler<GetRegistrationWorkflowQuery, RegistrationWorkflowDto?>
+    : IQueryHandler<GetRegistrationWorkflowQuery, RegistrationWorkflowDto?>
 {
-    public async Task<RegistrationWorkflowDto?> Handle(GetRegistrationWorkflowQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationWorkflowDto?> QueryAsync(GetRegistrationWorkflowQuery request, CancellationToken cancellationToken = default)
     {
         await new RegistrationFormAuthoringQueryValidator<GetRegistrationWorkflowQuery>()
             .ValidateAndThrowAsync(request, cancellationToken);
@@ -28,9 +28,9 @@ public sealed class GetRegistrationWorkflowQueryHandler(IRegistrationFormAuthori
 }
 
 public sealed class GetRegistrationFormQueryHandler(IRegistrationFormAuthoringRepository repository)
-    : IRequestHandler<GetRegistrationFormQuery, RegistrationFormDto?>
+    : IQueryHandler<GetRegistrationFormQuery, RegistrationFormDto?>
 {
-    public async Task<RegistrationFormDto?> Handle(GetRegistrationFormQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationFormDto?> QueryAsync(GetRegistrationFormQuery request, CancellationToken cancellationToken = default)
     {
         await new RegistrationFormAuthoringQueryValidator<GetRegistrationFormQuery>()
             .ValidateAndThrowAsync(request, cancellationToken);
@@ -41,11 +41,11 @@ public sealed class GetRegistrationFormQueryHandler(IRegistrationFormAuthoringRe
 }
 
 public sealed class GetRegistrationFormVersionQueryHandler(IRegistrationFormAuthoringRepository repository)
-    : IRequestHandler<GetRegistrationFormVersionQuery, RegistrationFormVersionDto?>
+    : IQueryHandler<GetRegistrationFormVersionQuery, RegistrationFormVersionDto?>
 {
-    public async Task<RegistrationFormVersionDto?> Handle(
+    public async Task<RegistrationFormVersionDto?> QueryAsync(
         GetRegistrationFormVersionQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         await new RegistrationFormAuthoringQueryValidator<GetRegistrationFormVersionQuery>()
             .ValidateAndThrowAsync(request, cancellationToken);
@@ -58,11 +58,11 @@ public sealed class GetRegistrationFormVersionQueryHandler(IRegistrationFormAuth
 public sealed class GetRegistrationFormPublishPreflightQueryHandler(
     IRegistrationFormAuthoringRepository repository,
     RegistrationFormPublishPreflightService preflight)
-    : IRequestHandler<GetRegistrationFormPublishPreflightQuery, RegistrationFormPublishPreflightDto?>
+    : IQueryHandler<GetRegistrationFormPublishPreflightQuery, RegistrationFormPublishPreflightDto?>
 {
-    public async Task<RegistrationFormPublishPreflightDto?> Handle(
+    public async Task<RegistrationFormPublishPreflightDto?> QueryAsync(
         GetRegistrationFormPublishPreflightQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         await new RegistrationFormAuthoringQueryValidator<GetRegistrationFormPublishPreflightQuery>()
             .ValidateAndThrowAsync(request, cancellationToken);

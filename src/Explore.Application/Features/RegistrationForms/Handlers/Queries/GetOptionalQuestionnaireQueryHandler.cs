@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationForms.Handlers.Queries;
 
@@ -12,25 +12,25 @@ public sealed class GetOptionalQuestionnaireQueryHandler(
     IParticipationRequirementAttachmentRepository repository,
     IEventRepository events,
     ITenantContext tenantContext)
-    : IRequestHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?>
+    : IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?>
 {
-    public async Task<OptionalQuestionnaireDto?> Handle(
-        GetOptionalQuestionnaireQuery request,
-        CancellationToken cancellationToken)
+    public async Task<OptionalQuestionnaireDto?> QueryAsync(
+        GetOptionalQuestionnaireQuery query,
+        CancellationToken cancellationToken = default)
     {
-        if (request.EventId == Guid.Empty)
+        if (query.EventId == Guid.Empty)
         {
             return null;
         }
 
         if (!await events.IsPubliclyEligibleAsync(
-                tenantContext.TenantId, request.EventId, cancellationToken))
+                tenantContext.TenantId, query.EventId, cancellationToken))
         {
             return null;
         }
 
         EventParticipationConfiguration? configuration = await repository.GetOptionalQuestionnaireAsync(
-            request.EventId, tenantContext.TenantId, cancellationToken);
+            query.EventId, tenantContext.TenantId, cancellationToken);
         ParticipationRequirementAttachment? attachment = configuration?.RequirementAttachments.SingleOrDefault(value =>
             !value.IsDeleted && value.IsStandaloneQuestionnaire);
         RegistrationRequirement? requirement = attachment?.RegistrationRequirement;
@@ -49,7 +49,7 @@ public sealed class GetOptionalQuestionnaireQueryHandler(
         }
 
         return new OptionalQuestionnaireDto(
-            request.EventId,
+            query.EventId,
             attachment!.RegistrationWorkflowId,
             attachment.RegistrationRequirementId,
             version.RegistrationFormId,

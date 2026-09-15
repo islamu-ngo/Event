@@ -1,26 +1,26 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationAnalytics;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationAnalytics;
 
 public sealed class GetRegistrationAnswerAnalyticsQueryHandler(
     IRegistrationAnswerAnalyticsRepository repository,
     ITenantContext tenantContext)
-    : IRequestHandler<GetRegistrationAnswerAnalyticsQuery, RegistrationAnswerAnalyticsDto?>
+    : IQueryHandler<GetRegistrationAnswerAnalyticsQuery, RegistrationAnswerAnalyticsDto?>
 {
     private const int MinimumCellSize = 3;
 
-    public async Task<RegistrationAnswerAnalyticsDto?> Handle(
-        GetRegistrationAnswerAnalyticsQuery request,
-        CancellationToken cancellationToken)
+    public async Task<RegistrationAnswerAnalyticsDto?> QueryAsync(
+        GetRegistrationAnswerAnalyticsQuery query,
+        CancellationToken cancellationToken = default)
     {
         var projection = await repository.GetEventFormVersionAnalyticsAsync(
             tenantContext.TenantId,
-            request.EventId,
-            request.FormId,
-            request.FormVersionId,
+            query.EventId,
+            query.FormId,
+            query.FormVersionId,
             MinimumCellSize,
             cancellationToken);
 

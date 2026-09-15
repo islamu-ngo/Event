@@ -49,7 +49,7 @@ public sealed class EventVisitorCapabilityGateTests
         var participation = EventVisitorCapabilitySqliteFixture.Participation();
         BaseCommandResponse<Guid> response = command switch
         {
-            "configure" => await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
+            "configure" => await fixture.ExecuteCommandAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
             {
                 EventId = entity.Id,
                 ExpectedConcurrencyStamp = configurationStamp,
@@ -191,7 +191,7 @@ public sealed class EventVisitorCapabilityGateTests
             [new(null, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, VisitorAccessSettingMutationKind.SetValue,
                 "\"DirectoryListingOnly\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();
-        var response = await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
+        var response = await fixture.ExecuteCommandAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
         {
             EventId = entity.Id,
             ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,
@@ -218,7 +218,7 @@ public sealed class EventVisitorCapabilityGateTests
              new(null, GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, VisitorAccessSettingMutationKind.SetValue, "\"https://accounts.example.test/signup\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();
         var entity = await fixture.SeedEventAsync();
-        var response = await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
+        var response = await fixture.ExecuteCommandAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
         {
             EventId = entity.Id,
             ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,

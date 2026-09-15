@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -176,6 +177,10 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     internal Task<TResponse> ExecuteAsync<TCommand, TResponse>(TCommand command)
         where TCommand : IRequest<TResponse> =>
         Services.GetRequiredService<IRequestHandler<TCommand, TResponse>>().Handle(command, CancellationToken.None);
+
+    internal Task<TResponse> ExecuteCommandAsync<TCommand, TResponse>(TCommand command)
+        where TCommand : ICommand<TResponse> =>
+        Services.GetRequiredService<ICommandHandler<TCommand, TResponse>>().ExecuteAsync(command, CancellationToken.None);
 
     internal async Task<Explore.Domain.Event> SeedEventAsync(bool accountRequired = false, bool published = false)
     {

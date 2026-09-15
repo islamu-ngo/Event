@@ -5,6 +5,7 @@ using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.RegistrationForms.Handlers.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
@@ -844,7 +845,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
         return new(
             context.Database.ProviderName,
             services.GetRequiredService<IMediator>().GetType(),
-            services.GetRequiredService<IRequestHandler<
+            services.GetRequiredService<ICommandHandler<
                 AttachRegistrationRequirementCommand,
                 Explore.Application.Responses.BaseCommandResponse<Guid>>>().GetType(),
             services.GetRequiredService<IParticipationRequirementAttachmentRepository>().GetType(),

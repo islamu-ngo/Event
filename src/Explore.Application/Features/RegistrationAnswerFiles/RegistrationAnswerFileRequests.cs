@@ -1,24 +1,24 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Registration;
 using Explore.Domain;
 using Explore.Domain.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationAnswerFiles.Queries;
 
 public sealed record GetRegistrationAnswerFileQuery(Guid TenantId, Guid Id)
-    : IRequest<RegistrationAnswerFileDto?>;
+    : IQuery<RegistrationAnswerFileDto?>;
 
 public sealed class GetRegistrationAnswerFileQueryHandler(
     IRegistrationAnswerFileRepository repository,
     TimeProvider timeProvider)
-    : IRequestHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>
+    : IQueryHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>
 {
-    public async Task<RegistrationAnswerFileDto?> Handle(
-        GetRegistrationAnswerFileQuery request,
-        CancellationToken cancellationToken)
+    public async Task<RegistrationAnswerFileDto?> QueryAsync(
+        GetRegistrationAnswerFileQuery query,
+        CancellationToken cancellationToken = default)
     {
-        RegistrationAnswerFile? file = await repository.GetAsync(request.TenantId, request.Id, cancellationToken);
+        RegistrationAnswerFile? file = await repository.GetAsync(query.TenantId, query.Id, cancellationToken);
         if (file is null)
         {
             return null;
@@ -26,7 +26,7 @@ public sealed class GetRegistrationAnswerFileQueryHandler(
 
         RegistrationOrder? order = await repository.GetOrderAsync(file, cancellationToken);
         RegistrationAnswerFileRelease? release = file.IsReleased
-            ? await repository.GetReleaseAsync(request.TenantId, request.Id, cancellationToken)
+            ? await repository.GetReleaseAsync(query.TenantId, query.Id, cancellationToken)
             : null;
         DateTime utcNow = timeProvider.GetUtcNow().UtcDateTime;
         bool allowed = order is not null && AnonymousRegistrationRetentionPolicy.CanDisclose(order, null, utcNow);

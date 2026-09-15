@@ -5,6 +5,7 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.EventParticipation.Requests.Commands;
@@ -12,7 +13,6 @@ using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +24,12 @@ namespace Explore.API.Controllers;
 [Route("api/events/{eventId:guid}/participation")]
 [ApiController]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
-public sealed class EventParticipationController : EventControllerBase
+public sealed class EventParticipationController(
+    ICommandHandler<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>> configureCommand,
+    ICommandHandler<AttachRegistrationRequirementCommand, BaseCommandResponse<Guid>> attachCommand,
+    ICommandHandler<DetachRegistrationRequirementCommand, BaseCommandResponse<Guid>> detachCommand,
+    IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> questionnaireQuery,
+    IResourceAssembler<OptionalQuestionnaireDto, OptionalQuestionnaireDto> questionnaireAssembler) : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor ConfigureValidationProblem = new(
         "eventParticipation",
@@ -43,17 +48,6 @@ public sealed class EventParticipationController : EventControllerBase
     private static readonly ApiNotFoundProblemDescriptor OptionalQuestionnaireNotFoundProblem = new(
         "Optional questionnaire not found",
         "Optional questionnaire was not found.");
-
-    private readonly IMediator _mediator;
-    private readonly IResourceAssembler<OptionalQuestionnaireDto, OptionalQuestionnaireDto> _questionnaireAssembler;
-
-    public EventParticipationController(
-        IMediator mediator,
-        IResourceAssembler<OptionalQuestionnaireDto, OptionalQuestionnaireDto> questionnaireAssembler)
-    {
-        _mediator = mediator;
-        _questionnaireAssembler = questionnaireAssembler;
-    }
 
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -81,7 +75,7 @@ public sealed class EventParticipationController : EventControllerBase
                 "If-Match header is required and must contain the current event participation concurrency stamp.");
         }
 
-        var response = await _mediator.Send(new ConfigureEventParticipationCommand
+        var response = await configureCommand.ExecuteAsync(new ConfigureEventParticipationCommand
         {
             EventId = eventId,
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
@@ -133,7 +127,7 @@ public sealed class EventParticipationController : EventControllerBase
                 "If-Match must be a strong quoted non-empty GUID concurrency stamp.");
         }
 
-        BaseCommandResponse<Guid> response = await _mediator.Send(
+        BaseCommandResponse<Guid> response = await attachCommand.ExecuteAsync(
             new AttachRegistrationRequirementCommand(
                 eventId,
                 input.WorkflowId,
@@ -171,7 +165,7 @@ public sealed class EventParticipationController : EventControllerBase
                 "If-Match must be a strong quoted non-empty GUID concurrency stamp.");
         }
 
-        BaseCommandResponse<Guid> response = await _mediator.Send(
+        BaseCommandResponse<Guid> response = await detachCommand.ExecuteAsync(
             new DetachRegistrationRequirementCommand(eventId, requirementId, stamp),
             cancellationToken);
         return ToRequirementResult(response);
@@ -189,14 +183,14 @@ public sealed class EventParticipationController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken)
     {
-        OptionalQuestionnaireDto? dto = await _mediator.Send(
+        OptionalQuestionnaireDto? dto = await questionnaireQuery.QueryAsync(
             new GetOptionalQuestionnaireQuery(eventId), cancellationToken);
         if (dto is null)
         {
             return this.ToNotFoundProblem(OptionalQuestionnaireNotFoundProblem);
         }
 
-        var result = new ObjectResult(await _questionnaireAssembler.ToResource(dto, HttpContext))
+        var result = new ObjectResult(await questionnaireAssembler.ToResource(dto, HttpContext))
         {
             StatusCode = StatusCodes.Status200OK
         };

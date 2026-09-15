@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationForms.Requests.Commands;
 
@@ -12,7 +12,7 @@ public sealed record AttachRegistrationRequirementCommand(
     bool StandaloneQuestionnaire,
     Guid? RegistrationFormId,
     Guid? RegistrationFormVersionId,
-    Guid ExpectedConcurrencyStamp) : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    Guid ExpectedConcurrencyStamp) : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => RequirementId == Guid.Empty ? null : RequirementId.ToString();
 
@@ -24,7 +24,7 @@ public sealed record AttachRegistrationRequirementCommand(
 public sealed record DetachRegistrationRequirementCommand(
     Guid EventId,
     Guid RequirementId,
-    Guid ExpectedConcurrencyStamp) : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    Guid ExpectedConcurrencyStamp) : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => RequirementId == Guid.Empty ? null : RequirementId.ToString();
 

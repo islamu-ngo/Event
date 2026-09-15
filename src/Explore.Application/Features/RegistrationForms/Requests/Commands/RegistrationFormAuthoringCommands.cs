@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationForms.Requests.Commands;
 
-public interface IRegistrationFormAuthoringCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public interface IRegistrationFormAuthoringCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     Guid EventId { get; }
 

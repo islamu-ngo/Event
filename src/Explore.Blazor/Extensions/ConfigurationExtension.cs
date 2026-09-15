@@ -127,7 +127,7 @@ public static class ConfigurationExtensions
         authorityBuilder.AddInfisical(bootstrapConfig, source =>
         {
             source.Paths.Clear();
-            source.Paths.AddRange(["/keycloak", "/blazor", "/atproto", "/api"]);
+            source.Paths.AddRange(["/keycloak", "/blazor", "/atproto"]);
             source.ThrowOnFirstLoadFailure = true;
         }, environmentName);
         ApplyBlazorMapping(configBuilder, authorityBuilder.Build(), fromInfisical: true);
@@ -152,7 +152,7 @@ public static class ConfigurationExtensions
         var rawGoogleClientId = config[fromInfisical ? "Blazor:GoogleClientId" : "GOOGLE_CLIENT_ID"];
         var rawGoogleClientSecret = config[fromInfisical ? "Blazor:GoogleClientSecret" : "GOOGLE_CLIENT_SECRET"];
         var rawApiUrl = config[fromInfisical ? "Blazor:ApiEndpoint" : "API_ENDPOINT"];
-        var rawAuthProvider = config[fromInfisical ? "Api:AuthenticationProvider" : "AUTHENTICATION_PROVIDER"]
+        var rawAuthProvider = config[fromInfisical ? "Blazor:AuthenticationProvider" : "AUTHENTICATION_PROVIDER"]
             ?? config["AUTHENTICATION_PROVIDER"]
             ?? config["Authentication:Provider"];
         var rawAtprotoOAuthClientPrivateJwks = config[

@@ -394,7 +394,7 @@ Each host reads a bounded folder list at startup. A key placed outside the folde
 | Host | Folders read at startup |
 |---|---|
 | `Explore.API` | `/keycloak`, `/database`, `/database/erasure`, `/database/identity`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/integrations/listmonk` |
-| `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto`, `/api` |
+| `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto` |
 | `Explore.AppHost` (Aspire) | `/keycloak`, `/database`, `/database/erasure`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
 | Migration and design-time factories | `/database`, `/database/erasure`, `/database/identity` |
 

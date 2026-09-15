@@ -7,6 +7,7 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.Promotions.Requests.Commands;
@@ -23,10 +24,11 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Explore.API.Controllers;
 
 /// <summary>
-/// Authenticated checkout: account-scoped registration for the signed-in caller's current order.
+/// Authenticated checkout door of the registration flow.
 /// </summary>
 /// <remarks>
-/// Split out of RegistrationOrderController by route capability. The route template and every
+/// Partitions <c>RegistrationOrderController</c> to give the authenticated path its own explicit
+/// class-level authorization surface. Every action attribute, route template, and
 /// <c>Name = RouteNames.*</c> are carried over verbatim, so URLs, operationIds, and the generated
 /// client are unchanged by the split.
 /// </remarks>
@@ -35,7 +37,9 @@ namespace Explore.API.Controllers;
 [ApiController]
 public sealed class AuthenticatedRegistrationOrderController(
     IMediator mediator,
-    IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> assembler) : RegistrationOrderControllerBase
+    IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> assembler,
+    ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto> applyPromotionHandler,
+    ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removePromotionHandler) : RegistrationOrderControllerBase
 {
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -322,7 +326,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid orderId,
         [FromBody] PromotionCodeRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapPromotionRedemption(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapPromotionRedemption(await applyPromotionHandler.ExecuteAsync(
         new ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand(eventId, orderId, request.Code), cancellationToken));
 
     [Authorize]
@@ -338,8 +342,9 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid eventId,
         Guid orderId,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapPromotionRedemption(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapPromotionRedemption(await removePromotionHandler.ExecuteAsync(
         new RemoveAuthenticatedPromotionFromRegistrationOrderCommand(eventId, orderId), cancellationToken));
+
 
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]

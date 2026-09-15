@@ -4,9 +4,9 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +19,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Tags("GuestRegistrationOrder")]
 public sealed class GuestRegistrationOrderPromotionsController(
-    IMediator mediator) : RegistrationOrderControllerBase
+    ICommandHandler<ApplyGuestPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto> applyGuestPromotionHandler,
+    ICommandHandler<RemoveGuestPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removeGuestPromotionHandler) : RegistrationOrderControllerBase
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
@@ -38,7 +39,7 @@ public sealed class GuestRegistrationOrderPromotionsController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         [FromBody] PromotionCodeRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapPromotionRedemption(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapPromotionRedemption(await applyGuestPromotionHandler.ExecuteAsync(
         new ApplyGuestPromotionCodeToRegistrationOrderCommand(eventId, orderId, capability, request.Code), cancellationToken));
 
     [AllowAnonymous]
@@ -56,6 +57,7 @@ public sealed class GuestRegistrationOrderPromotionsController(
         Guid orderId,
         [FromHeader(Name = CapabilityHeader)] string? capability,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapPromotionRedemption(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapPromotionRedemption(await removeGuestPromotionHandler.ExecuteAsync(
         new RemoveGuestPromotionFromRegistrationOrderCommand(eventId, orderId, capability), cancellationToken));
 }
+

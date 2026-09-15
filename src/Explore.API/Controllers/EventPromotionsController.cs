@@ -8,12 +8,12 @@ using Explore.API.Hateoas.Policies;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Promotions;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Features.Promotions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -27,7 +27,13 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class EventPromotionsController(
-    IMediator mediator,
+    IQueryHandler<ListPromotionManagementQuery, IReadOnlyList<PromotionManagementDto>> listPromotionsHandler,
+    IQueryHandler<GetPromotionManagementQuery, PromotionManagementDto?> getPromotionHandler,
+    ICommandHandler<CreatePromotionDraftCommand, PromotionCodeIssuedCommandResponseDto> createDraftHandler,
+    ICommandHandler<RevisePromotionCommand, PromotionManagementCommandResponseDto> reviseHandler,
+    ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto> publishHandler,
+    ICommandHandler<RevokePromotionCommand, PromotionManagementCommandResponseDto> revokeHandler,
+    ICommandHandler<RotatePromotionCodeCommand, PromotionCodeIssuedCommandResponseDto> rotateCodeHandler,
     ITenantContext tenantContext,
     IResourceAssembler<PromotionManagementDto, PromotionManagementDto> assembler) : ControllerBase
 {
@@ -57,7 +63,7 @@ public sealed class EventPromotionsController(
         [FromQuery] Guid ticketCatalogVersionId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<PromotionManagementDto> promotions = await mediator.Send(
+        IReadOnlyList<PromotionManagementDto> promotions = await listPromotionsHandler.QueryAsync(
             new ListPromotionManagementQuery(eventId, ticketCatalogVersionId), cancellationToken);
         var resource = await assembler.ToCollectionResource(
             promotions,
@@ -78,7 +84,7 @@ public sealed class EventPromotionsController(
         Guid promotionDefinitionId,
         CancellationToken cancellationToken = default)
     {
-        PromotionManagementDto? promotion = await mediator.Send(
+        PromotionManagementDto? promotion = await getPromotionHandler.QueryAsync(
             new GetPromotionManagementQuery(eventId, promotionDefinitionId), cancellationToken);
         if (promotion is null)
         {
@@ -108,7 +114,7 @@ public sealed class EventPromotionsController(
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        PromotionCodeIssuedCommandResponseDto response = await mediator.Send(new CreatePromotionDraftCommand(
+        PromotionCodeIssuedCommandResponseDto response = await createDraftHandler.ExecuteAsync(new CreatePromotionDraftCommand(
             eventId,
             request.TicketCatalogVersionId,
             request.DisplayLabel,
@@ -141,7 +147,7 @@ public sealed class EventPromotionsController(
         Guid promotionDefinitionId,
         [FromBody] RevisePromotionRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapManagementSuccess(await mediator.Send(new RevisePromotionCommand(
+        CancellationToken cancellationToken = default) => MapManagementSuccess(await reviseHandler.ExecuteAsync(new RevisePromotionCommand(
         eventId,
         promotionDefinitionId,
         request.DisplayLabel,
@@ -169,7 +175,7 @@ public sealed class EventPromotionsController(
         Guid promotionDefinitionId,
         [FromBody] PromotionCodeRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapManagementSuccess(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapManagementSuccess(await publishHandler.ExecuteAsync(
         new PublishPromotionCommand(eventId, promotionDefinitionId, request.Code), cancellationToken));
 
     [HttpPost("{promotionDefinitionId:guid}/revoke", Name = RouteNames.RevokeEventPromotion)]
@@ -186,7 +192,7 @@ public sealed class EventPromotionsController(
         Guid promotionDefinitionId,
         [FromBody] RevokePromotionRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapManagementSuccess(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapManagementSuccess(await revokeHandler.ExecuteAsync(
         new RevokePromotionCommand(eventId, promotionDefinitionId), cancellationToken));
 
     [HttpPost("{promotionDefinitionId:guid}/code:rotate", Name = RouteNames.RotateEventPromotionCode)]
@@ -203,7 +209,7 @@ public sealed class EventPromotionsController(
         Guid promotionDefinitionId,
         [FromBody] PromotionCodeRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapManagementSuccess(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapManagementSuccess(await rotateCodeHandler.ExecuteAsync(
         new RotatePromotionCodeCommand(eventId, promotionDefinitionId, request.Code), cancellationToken));
 
     private ActionResult<TResponse> MapManagementSuccess<TResponse>(TResponse response)

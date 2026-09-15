@@ -1,7 +1,7 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Promotions;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Promotions.Requests.Commands;
 
@@ -13,8 +13,9 @@ public abstract record PromotionManagementCommandBase(Guid EventId) : ISecureReq
         new EventScopedAuthorizationFacts(Guid.Empty, EventId);
 }
 
-public abstract record PromotionManagementCommandBase<TResponse>(Guid EventId) : PromotionManagementCommandBase(EventId), IRequest<TResponse>
+public abstract record PromotionManagementCommandBase<TResponse>(Guid EventId) : PromotionManagementCommandBase(EventId), ICommand<TResponse>
     where TResponse : BaseCommandResponse<Guid>;
+
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManagePaidEventCommerce)]
 public sealed record CreatePromotionDraftCommand(

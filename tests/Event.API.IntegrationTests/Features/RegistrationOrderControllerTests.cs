@@ -8,6 +8,7 @@ using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.API.OpenApi;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
@@ -273,17 +274,29 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task PromotionRoutes_DispatchCapabilityAndCurrentAccountWrappersAndGenericFailures()
     {
-        var mediator = Substitute.For<IMediator>();
         var eventId = Guid.CreateVersion7();
         var orderId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<ApplyGuestPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
-        mediator.Send(Arg.Any<RemoveGuestPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
-        mediator.Send(Arg.Any<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
-        mediator.Send(Arg.Any<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
+        var applyGuestHandler = Substitute.For<ICommandHandler<ApplyGuestPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+        var removeGuestHandler = Substitute.For<ICommandHandler<RemoveGuestPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+        var applyAuthHandler = Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+        var removeAuthHandler = Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+
+        applyGuestHandler.ExecuteAsync(Arg.Any<ApplyGuestPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
+        removeGuestHandler.ExecuteAsync(Arg.Any<RemoveGuestPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
+        applyAuthHandler.ExecuteAsync(Arg.Any<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
+        removeAuthHandler.ExecuteAsync(Arg.Any<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
+
         // Guest and authenticated promotion now live on their own capability controllers; this test asserts
         // both doors behave identically, so it drives both.
-        var guestController = CreateController<GuestRegistrationOrderPromotionsController>(mediator);
-        var authenticatedController = CreateController<AuthenticatedRegistrationOrderController>(mediator);
+        var guestController = new GuestRegistrationOrderPromotionsController(applyGuestHandler, removeGuestHandler);
+        guestController.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var authenticatedController = new AuthenticatedRegistrationOrderController(
+            Substitute.For<IMediator>(),
+            Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>(),
+            applyAuthHandler,
+            removeAuthHandler);
+        authenticatedController.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var guestApply = await guestController.ApplyGuestPromotion(eventId, orderId, "guest-capability", new PromotionCodeRequest("SAVE10"), Guid.CreateVersion7().ToString("N"));
         var guestRemove = await guestController.RemoveGuestPromotion(eventId, orderId, "guest-capability", Guid.CreateVersion7().ToString("N"));
@@ -294,10 +307,10 @@ public sealed class RegistrationOrderControllerTests
         await Assert.That(JsonSerializer.Serialize((guestRemove.Result as ObjectResult)?.Value)).DoesNotContain("guest-capability");
         await Assert.That((authenticatedApply.Result as OkObjectResult)?.Value).IsTypeOf<PromotionRedemptionResponseDto>();
         await Assert.That((authenticatedRemove.Result as OkObjectResult)?.Value).IsTypeOf<PromotionRedemptionResponseDto>();
-        _ = mediator.Received(1).Send(Arg.Is<ApplyGuestPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.CapabilityToken == "guest-capability" && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<RemoveGuestPromotionFromRegistrationOrderCommand>(command => command.CapabilityToken == "guest-capability"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId), Arg.Any<CancellationToken>());
+        _ = applyGuestHandler.Received(1).ExecuteAsync(Arg.Is<ApplyGuestPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.CapabilityToken == "guest-capability" && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
+        _ = removeGuestHandler.Received(1).ExecuteAsync(Arg.Is<RemoveGuestPromotionFromRegistrationOrderCommand>(command => command.CapabilityToken == "guest-capability"), Arg.Any<CancellationToken>());
+        _ = applyAuthHandler.Received(1).ExecuteAsync(Arg.Is<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
+        _ = removeAuthHandler.Received(1).ExecuteAsync(Arg.Is<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId), Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -522,6 +535,10 @@ public sealed class RegistrationOrderControllerTests
             assembler ?? Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         object[] arguments = typeof(TController) == typeof(GuestRegistrationOrderController)
             ? [mediator, TimeProvider.System]
+            : typeof(TController) == typeof(AuthenticatedRegistrationOrderController)
+                ? [mediator, effectiveAssembler,
+                   Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
+                   Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>()]
             : typeof(TController).GetConstructors().Single().GetParameters().Length == 1
                 ? [mediator]
                 : [mediator, effectiveAssembler];

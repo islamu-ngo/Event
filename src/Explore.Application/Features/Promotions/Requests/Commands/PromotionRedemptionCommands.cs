@@ -1,39 +1,40 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
-using MediatR;
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.Features.Promotions.Requests.Commands;
 
 public sealed record ApplyPromotionCodeToRegistrationOrderCommand(Guid OrderId, string Code)
-    : IRequest<PromotionRedemptionResponseDto>;
+    : ICommand<PromotionRedemptionResponseDto>;
 
 public sealed record RemovePromotionFromRegistrationOrderCommand(Guid OrderId)
-    : IRequest<PromotionRedemptionResponseDto>;
+    : ICommand<PromotionRedemptionResponseDto>;
 
 public sealed record ApplyGuestPromotionCodeToRegistrationOrderCommand(
     Guid EventId,
     Guid OrderId,
     string? CapabilityToken,
     string Code)
-    : IRequest<PromotionRedemptionResponseDto>, IGuestRegistrationOrderAccessCommand;
+    : ICommand<PromotionRedemptionResponseDto>, IGuestRegistrationOrderAccessCommand;
 
 public sealed record RemoveGuestPromotionFromRegistrationOrderCommand(
     Guid EventId,
     Guid OrderId,
     string? CapabilityToken)
-    : IRequest<PromotionRedemptionResponseDto>, IGuestRegistrationOrderAccessCommand;
+    : ICommand<PromotionRedemptionResponseDto>, IGuestRegistrationOrderAccessCommand;
 
 public sealed record ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand(
     Guid EventId,
     Guid OrderId,
     string Code)
-    : IRequest<PromotionRedemptionResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<PromotionRedemptionResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record RemoveAuthenticatedPromotionFromRegistrationOrderCommand(Guid EventId, Guid OrderId)
-    : IRequest<PromotionRedemptionResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<PromotionRedemptionResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record PromotionRedemptionResponseDto : BaseCommandResponse<Guid>
+
 {
     private PromotionRedemptionResponseDto(
         BaseCommandResponse<Guid> state,

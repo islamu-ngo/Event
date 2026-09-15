@@ -552,7 +552,7 @@ services:
       context: .
       dockerfile: src/Explore.Blazor/Dockerfile
     environment:
-      <<: [*keycloak-env, *authentication-selection-env, *secrets-env, *database-env, *database-runtime-env]
+      <<: [*keycloak-env, *authentication-selection-env, *secrets-env]
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: Production
       API_ENDPOINT: ${API_ENDPOINT:-http://islamu-event-api:8080/}

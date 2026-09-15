@@ -415,16 +415,6 @@ if (hostingTopology == HostingTopology.Split)
         .WithReference(migrations)
         .WaitForCompletion(migrations);
 
-    if (database is not null)
-    {
-        exploreBlazor = WithLocalPrimaryDatabase(exploreBlazor, database, PrimaryDatabaseRole.Runtime)
-            .WaitFor(database);
-    }
-    else
-    {
-        exploreBlazor = WithExternalPrimaryDatabase(builder, exploreBlazor, PrimaryDatabaseRole.Runtime);
-    }
-
     if (cache is not null)
     {
         exploreBlazor = exploreBlazor

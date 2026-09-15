@@ -19,8 +19,8 @@ public static class ConfigurationExtensions
         IConfiguration authority = SecretAuthorityConfiguration.Build(
             bootstrapConfig,
             environmentName,
-            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api", "/blazor",
-            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/integrations/listmonk");
+            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api",
+            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/integrations/listmonk");
         var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
         PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
         ApplyMapping(configBuilder, isolatedAuthority.Build());

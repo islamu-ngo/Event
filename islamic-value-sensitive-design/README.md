@@ -45,6 +45,7 @@ Substantive, deep design investigations into specific product capabilities, ethi
 | Domain | Document | Core Scope |
 |---|---|---|
 | **Commerce & Payments** | [`consultations/i-vsd-paid-event-payments-consultation.md`](consultations/i-vsd-paid-event-payments-consultation.md) | Stripe Connect `OrganizerDirect`, non-custodial payouts, anti-riba invariants, and immutable refund fee protections. |
+| **Commerce & Payments** | [`consultations/i-vsd-payment-identity-and-stripe-secrets-consultation.md`](consultations/i-vsd-payment-identity-and-stripe-secrets-consultation.md) | Instance-operator Connect credentials, tenant-secret prohibition, merchant-of-record disclosure, and the full fail-closed Stripe setup inventory. |
 | **Commerce & Payments** | [`consultations/i-vsd-event-ticketing-lifecycle.md`](consultations/i-vsd-event-ticketing-lifecycle.md) | Capacity governance, ticket hold reservations, and purchase allocation truth. |
 | **Commerce & Payments** | [`consultations/i-vsd-paid-events-deactivation-consultancy-report.md`](consultations/i-vsd-paid-events-deactivation-consultancy-report.md) | Deactivation lifecycles, grace periods, and attendee protection against abrupt cancellation. |
 | **Commerce & Payments** | [`consultations/i-vsd-minimum-attendee-threshold-consultation.md`](consultations/i-vsd-minimum-attendee-threshold-consultation.md) | Event quorum thresholds, conditional ticketing, and automatic full-refund triggers. |

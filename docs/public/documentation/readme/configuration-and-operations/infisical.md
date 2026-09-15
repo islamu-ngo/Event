@@ -70,6 +70,7 @@ Create the following folders at the root of the selected environment. Folder nam
 │   └── identity
 ├── integrations
 │   └── listmonk
+├── keycloak
 ├── mcp
 ├── smtp
 ├── storage
@@ -100,13 +101,48 @@ Instance-level platform credentials read by `Explore.API`.
 
 | Key | Purpose |
 |---|---|
-| `SETUP_SECRET` | Pre-shared secret that unlocks `/setup`. Leave unset to generate a single-use secret in the volume on first boot. |
-| `SETUP_SECRET_REQUIRED` | `true` (default) or `false`; whether the setup surface demands the secret. |
+| `AUTHENTICATION_PROVIDER` | Primary authentication authority: `local`, `keycloak`, or `atproto`. Defaults to `local`. |
+| `ATPROTO_LOGIN_ENABLED` | `true` or `false`; enables AT Protocol sign-in. Required `true` when `AUTHENTICATION_PROVIDER=atproto`. |
 | `AUTHENTICATION_LOCAL_JWT_KEY` | HMAC signing key for embedded Local Identity access tokens. |
-| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | Initial password for headless Local administrator bootstrap. |
-| `CONTROL_PLANE_REGISTRATION_CREDENTIALS` | Managed control-plane registration credential. |
+| `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | Consecutive failed Local Identity attempts before lockout (default: `5`). |
+| `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | Local Identity lockout duration in minutes (default: `15`). |
 | `AUTHORIZATION_PROVIDER` | `local` or `cerbos`. Blank keeps interactive Local-first onboarding. |
 | `DEPLOYMENT_MODE` | `SingleTenant` or `MultiTenant`. |
+| `SETUP_SECRET` | Pre-shared secret that unlocks `/setup`. Leave unset to generate a single-use secret in the volume on first boot. |
+| `SETUP_SECRET_REQUIRED` | `true` (default) or `false`; whether the setup surface demands the secret. |
+| `INSTANCE_BOOTSTRAP_MODE` | `Interactive` (default web setup wizard) or `ConfiguredAdministrator` (headless bootstrap). |
+| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | Headless bootstrap provider: `local`, `keycloak`, or `atproto`. |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Headless bootstrap subject: canonical UUIDv7 username, Keycloak `sub`, or ATProto DID. |
+| `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | Headless bootstrap generation counter (positive integer). |
+| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | Optional administrator account email. |
+| `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | Optional administrator first name. |
+| `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | Optional administrator last name. |
+| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | Initial password for headless Local administrator bootstrap. |
+| `INSTANCE__OPERATORIDENTITY__OPERATORID` | UUIDv7 unique identifier for the operating legal entity. |
+| `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | Public brand name of the deploying organization. |
+| `INSTANCE__OPERATORIDENTITY__LEGALNAME` | Full legal registered entity name. |
+| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | `true` only for the canonical upstream project deployment. |
+| `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN` | Canonical origin URL for official instances. |
+| `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | Operator-kind code (e.g., `community`). |
+| `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | Two-letter jurisdiction country code (`US`, `GB`, `FR`, etc.). |
+| `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | Public contact email for legal and privacy inquiries. |
+| `INSTANCE__OPERATORIDENTITY__WEBSITEURL` | Public website URL of the operating organization. |
+| `INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL` | Public URL for legal notice / imprint. |
+| `INSTANCE__OPERATORIDENTITY__TERMSURL` | Public URL for Terms of Service. |
+| `INSTANCE__OPERATORIDENTITY__PRIVACYURL` | Public URL for Privacy Policy. |
+| `INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER` | Optional company or charity registration number. |
+| `CONTROL_PLANE_MANAGED_MODE` | `true` or `false`; enables managed control-plane mode. |
+| `CONTROL_PLANE_URL` | Public base URL of the managed control plane. |
+| `CONTROL_PLANE_INSTANCE_ID` | Registered instance UUID in the control plane. |
+| `CONTROL_PLANE_REGISTRATION_TOKEN` | Token used for control-plane registration. |
+| `CONTROL_PLANE_REGISTRATION_CREDENTIALS` | Managed control-plane registration credential. |
+| `CONTROL_PLANE_MAXIMUM_TENANT_COUNT` | Maximum allowed tenants under managed tier. |
+| `CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL` | Hosted sign-in URL for tenant administrators. |
+| `RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT` | Per-IP permit limit for anonymous registration (default: `10`). |
+| `RATELIMITING__ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT` | Per-subnet permit limit (default: `40`). |
+| `RATELIMITING__ANONYMOUSREGISTRATION__WINDOWSECONDS` | Rate limit window in seconds (default: `60`). |
+| `RATELIMITING__ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | Concurrency limit (default: `8`). |
+| `RATELIMITING__ANONYMOUSREGISTRATION__QUEUELIMIT` | Queue limit (default: `0`). |
 | `VAPID_SUBJECT` | Web Push contact subject (`mailto:` or origin URL). |
 | `VAPID_PUBLIC_KEY` | Web Push public key. Intentionally public; served to browsers. |
 | `VAPID_PRIVATE_KEY` | Web Push private key. Server-only; never leaves the API process. |
@@ -124,6 +160,7 @@ Read by the `Explore.Blazor` BFF.
 | Key | Purpose |
 |---|---|
 | `API_ENDPOINT` | Absolute base URL the BFF uses to reach `Explore.API`. |
+| `BFF_ADMIN_HOSTS` | Optional comma-separated list of dedicated admin hostnames (e.g. `admin.example.org`). |
 | `GOOGLE_CLIENT_ID` | Optional Google SSO client identifier. |
 | `GOOGLE_CLIENT_SECRET` | Optional Google SSO client secret. |
 
@@ -134,14 +171,32 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | Key | Purpose |
 |---|---|
 | `KEYCLOAK_ENDPOINT` | Public base URL of Keycloak. |
+| `KEYCLOAK_INTERNAL_URL` | Optional internal base URL when Keycloak is reached across private container networks. |
 | `KEYCLOAK_REALM` | Realm name. |
-| `KEYCLOAK_CLIENT_ID` | Browser/BFF client metadata used for onboarding detection. |
+| `KEYCLOAK_CLIENT_ID` | Browser/BFF client metadata used for onboarding detection (alias: `KEYCLOAK_BLAZOR_CLIENT_ID`). |
 | `KEYCLOAK_BLAZOR_CLIENT_SECRET` | Confidential client secret for the Blazor BFF. |
 | `KEYCLOAK_API_CLIENT_SECRET` | Optional; only for deployments that make the API resource-server client confidential. |
-| `KEYCLOAK_ADMIN_USERNAME` | Keycloak administrator username used by bootstrap sync. |
+| `KEYCLOAK_ADMIN_USERNAME` | Keycloak administrator username used by bootstrap sync (alias: `KEYCLOAK_ADMIN`). |
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak administrator password used by bootstrap sync. |
+| `KEYCLOAK_REQUIRE_HTTPS_METADATA` | `true` (default) or `false`; enforce HTTPS metadata validation for OIDC endpoints. |
+| `KEYCLOAK_DB_DATABASE` | Database name for Keycloak container (default: `keycloak`). |
+| `KEYCLOAK_DB_USERNAME` | Database username for Keycloak container (default: `keycloak`). |
 | `KEYCLOAK_DB_PASSWORD` | Password for the Keycloak database container. |
-| `KEYCLOAK_SMTP_*` | Optional realm SMTP bootstrap for Keycloak's own verification mail. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak settings. |
+| `KEYCLOAK_BLAZOR_REDIRECT_URIS` | Optional comma-separated allowed redirect URIs. |
+| `KEYCLOAK_BLAZOR_WEB_ORIGINS` | Optional allowed CORS web origins. |
+| `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` | Optional allowed post-logout redirect URIs. |
+| `KEYCLOAK_SMTP_HOST` | Optional realm SMTP host for Keycloak verification emails. |
+| `KEYCLOAK_SMTP_PORT` | Optional realm SMTP port. |
+| `KEYCLOAK_SMTP_FROM` | Optional realm sender address. |
+| `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | Optional realm sender display name. |
+| `KEYCLOAK_SMTP_AUTH` | `true` or `false`; requires authentication for Keycloak SMTP. |
+| `KEYCLOAK_SMTP_USER` | Optional authentication username. |
+| `KEYCLOAK_SMTP_PASSWORD` | Optional authentication password. |
+| `KEYCLOAK_SMTP_SSL` | `true` or `false`; enables SSL. |
+| `KEYCLOAK_SMTP_STARTTLS` | `true` or `false`; enables STARTTLS. |
+| `KEYCLOAK_SMTP_REPLY_TO` | Optional reply-to address. |
+| `KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME` | Optional reply-to display name. |
+| `KEYCLOAK_SMTP_ENVELOPE_FROM` | Optional envelope-from address. |
 
 Keycloak's own account emails are configured here and are separate from ISLAMU Event's `/smtp` delivery.
 
@@ -164,6 +219,9 @@ Primary application database. Every key maps into the structured `Database:*` co
 | `DATABASE_TRUST_SERVER_CERTIFICATE` | `false` for strict CA verification; `true` only for local self-signed certificates. |
 | `DATABASE_SERVER_VERSION` | Optional MariaDB/MySQL version override. |
 | `ERASURE_DATABASE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, or `ExternalDatabase`. |
+| `ERASURE_EMBEDDED_PATH` | Persisted SQLite file path when `ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite` (default: `/app/data/privacy_erasure_authority.db`). |
+| `ERASURE_WRITER_REPLICA_COUNT` | Concurrency write limit for embedded SQLite (default: `1`). |
+| `ERASURE_BUSY_TIMEOUT_SECONDS` | SQLite busy timeout seconds before retry (default: `30`). |
 | `IDENTITY_DATABASE_TOPOLOGY` | Identity database topology: `colocated` or `external`. |
 
 Runtime and migrator logins must be distinct. Never give runtime services the migrator role, and never expose either to the Blazor client.
@@ -234,6 +292,10 @@ Required only when `AUTHORIZATION_PROVIDER=cerbos`.
 | `CERBOS_ADMIN_USERNAME` | Admin API username used by server-side policy package sync. |
 | `CERBOS_ADMIN_PASSWORD` | Admin API password used by server-side policy package sync. |
 | `CERBOS_ADMIN_PASSWORD_HASH` | The verifier the Cerbos server itself is configured with. |
+| `CERBOS_PG_URL` | PostgreSQL connection string for Cerbos storage backend. |
+| `CERBOS_POSTGRES_USER` | Database username for Cerbos PostgreSQL container. |
+| `CERBOS_POSTGRES_PASSWORD` | Database password for Cerbos PostgreSQL container. |
+| `CERBOS_POSTGRES_DB` | Database name for Cerbos PostgreSQL container. |
 
 The browser never receives these values; it sees only configured/ownership metadata.
 
@@ -262,16 +324,24 @@ Instance mail transport. Supplying these values does **not** enable delivery; th
 
 ### `/storage`
 
-Required only when the storage governance setting selects S3.
+Instance file storage configurations for local disk or cloud S3 providers.
 
 | Key | Purpose |
 |---|---|
+| `LOCAL_STORAGE_ROOT_PATH` | Filesystem directory used when local storage is selected (default: `/app/storage-data/local`). |
+| `LOCAL_STORAGE_CREATE_ROOT_IF_MISSING` | `true` or `false`; automatically create local directory if absent. |
 | `STORAGE_S3_ENDPOINT` | S3 API endpoint (AWS, MinIO, Cloudflare R2). |
 | `STORAGE_S3_PUBLIC_ENDPOINT` | Optional public-facing endpoint for presented URLs. |
 | `STORAGE_S3_BUCKET_NAME` | Bucket dedicated to platform uploads. |
 | `STORAGE_S3_ACCESS_KEY_ID` | Access key identifier. |
 | `STORAGE_S3_SECRET_ACCESS_KEY` | Secret access key. |
 | `STORAGE_S3_REGION` | Region identifier. |
+| `STORAGE_S3_FORCE_PATH_STYLE` | `true` for MinIO / self-hosted S3; `false` for AWS S3. |
+| `STORAGE_RECONCILIATION_ENABLED` | `true` or `false`; enables background object storage reconciliation. |
+| `STORAGE_RECONCILIATION_DRY_RUN` | `true` or `false`; audit only without modifying objects. |
+| `STORAGE_RECONCILIATION_QUARANTINE_MISSING_OBJECTS` | `true` or `false`. |
+| `STORAGE_RECONCILIATION_QUARANTINE_ORPHAN_LOCAL_FILES` | `true` or `false`. |
+| `STORAGE_RECONCILIATION_DELETE_QUARANTINED_OBJECTS` | `true` or `false`. |
 
 ### `/integrations/listmonk`
 
@@ -291,8 +361,19 @@ Instance-scoped, server-only, and optional while paid events are disabled.
 
 | Key | Purpose |
 |---|---|
+| `PAYMENTS_STRIPE_MODE` | Mode selection: `Test` or `Live`. |
 | `STRIPE_PLATFORM_SECRET_KEY` | Platform secret key. `Test` mode requires an `sk_test_` prefix; `Live` requires `sk_live_`. |
 | `STRIPE_WEBHOOK_SECRET` | Endpoint signing secret. The Connect endpoint uses only this binding. |
+| `PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE` | Provider code for organizer-direct ticketing checkouts. |
+| `PAYMENTS_ORGANIZER_DIRECT_CONNECT_PLATFORM_ID` | Connect platform client ID. |
+| `PAYMENTS__CHECKOUTGOVERNANCE__COMPLAINTOWNER` | Governance owner for checkout complaints (`Platform` or `Organizer`). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__REFUNDOWNER` | Governance owner for checkout refunds (`Platform` or `Organizer`). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__DISPUTEOWNER` | Governance owner for checkout disputes (`Platform` or `Organizer`). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__RECONCILIATIONOWNER` | Governance owner for checkout reconciliations (`Platform` or `Organizer`). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__ACTIVATIONSTATUS` | Payment subsystem activation status (`Active` or `Inactive`). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__REFUNDPOLICYLANGUAGETAG` | Default language tag for refund policy notices. |
+| `PAYMENTS__CHECKOUTGOVERNANCE__STATEMENTDESCRIPTOR` | Card statement descriptor prefix. |
+| `PAYMENTS__CHECKOUTGOVERNANCE__CHARGETYPE` | Checkout charge type: `Direct` or `Destination`. |
 
 ### `/atproto`
 
@@ -313,7 +394,7 @@ Each host reads a bounded folder list at startup. A key placed outside the folde
 | Host | Folders read at startup |
 |---|---|
 | `Explore.API` | `/keycloak`, `/database`, `/database/erasure`, `/database/identity`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/integrations/listmonk` |
-| `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto` |
+| `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto`, `/api` |
 | `Explore.AppHost` (Aspire) | `/keycloak`, `/database`, `/database/erasure`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
 | Migration and design-time factories | `/database`, `/database/erasure`, `/database/identity` |
 
@@ -328,17 +409,57 @@ Beyond startup bootstrap, individual credentials are resolved on demand through 
 | Folder | Keys |
 |---|---|
 | `/setup` | `SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY` |
-| `/webhook` | `WEBHOOKS_SVIX_AUTH_TOKEN`, `WEBHOOKS_SVIX_OPERATIONAL_WEBHOOK_SECRET` |
-| `/promotions` | `PROMOTIONS_CODE_LOOKUP_HMAC_KEY` (each binding uses a `v{version}` qualifier) |
-| `/admissions` | `ADMISSIONS_CREDENTIAL_LOOKUP_HMAC_KEY`, `ADMISSIONS_SCANNER_CAPABILITY_HMAC_KEY`, `ADMISSIONS_RECOVERY_CAPABILITY_HMAC_KEY` |
-| `/ticketing/recovery` | `TICKETING_RECOVERY_MANIFEST_HMAC_KEY` |
+| `/webhook` | `WEBHOOKS_ENABLED`, `WEBHOOKS_PROVIDER`, `WEBHOOKS_SVIX_BASE_URL`, `WEBHOOKS_SVIX_AUTH_TOKEN`, `WEBHOOKS_SVIX_OPERATIONAL_WEBHOOK_SECRET`, `WEBHOOKS_SVIX_ENVIRONMENT`, `WEBHOOKS_SVIX_PROVIDER_VERSION`, `WEBHOOKS_SVIX_CAPABILITY_POLICY_VERSION`, `SVIX_SERVER_URL`, `SVIX_AUTH_TOKEN`, `SVIX_QUEUE_TYPE`, `SVIX_CACHE_TYPE`, `SVIX_REDIS_DSN`, `SVIX_JWT_SECRET` |
+| `/promotions` | `PROMOTIONS_CODE_LOOKUP_HMAC_KEY` (each binding uses a `v{version}` qualifier), `PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION` |
+| `/admissions` | `ADMISSIONS_CREDENTIAL_LOOKUP_HMAC_KEY`, `ADMISSIONS_SCANNER_CAPABILITY_HMAC_KEY`, `ADMISSIONS_RECOVERY_CAPABILITY_HMAC_KEY`, `ADMISSIONS__CREDENTIALLOOKUP__ACTIVEKEYVERSION`, `ADMISSIONS__RECOVERY__ACTIVEKEYVERSION`, `ADMISSIONS__RECOVERY__CAPABILITYLIFETIMEMINUTES`, `ADMISSIONS__RECOVERY__RATELIMITBUCKETCOUNT`, `ADMISSIONS__RECOVERY__RATELIMITPERMITCOUNT`, `ADMISSIONS__RECOVERY__RATELIMITWINDOWSECONDS` |
+| `/ticketing/recovery` | `TICKETING_RECOVERY_MANIFEST_HMAC_KEY`, `TICKETING__RECOVERY__ENABLED`, `TICKETING__RECOVERY__EXPECTEDRELEASEREVISION`, `TICKETING__RECOVERY__EXPECTEDSCHEMAREVISION`, `TICKETING__RECOVERY__MINIMUMRETAINEDKEYVERSION`, `TICKETING__RECOVERY__MINIMUMAUTHORITYFLOOR`, `TICKETING__RECOVERY__MINIMUMPROVIDERCURSOR`, `TICKETING__RECOVERY__MINIMUMIDEMPOTENCYFLOOR`, `TICKETING__RECOVERY__MINIMUMWORKERFENCE`, `TICKETING__RECOVERY__WARNINGOLDESTDUESECONDS`, `TICKETING__RECOVERY__UNHEALTHYOLDESTDUESECONDS`, `TICKETING__RECOVERY__BACKLOGTHRESHOLD`, `TICKETING__RECOVERY__DECLAREDRPOMINUTES`, `TICKETING__RECOVERY__DECLAREDRTOMINUTES`, `TICKETING__RECOVERY__MANIFESTSIGNINGKEYREFERENCE` |
+| `/messaging` | `MESSAGING_URI`, `EMAIL_DISPATCH_RABBITMQ_ENABLED`, `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING`, `EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME`, `EMAIL_DISPATCH_RABBITMQ_DISPATCH_QUEUE_NAME`, `EMAIL_DISPATCH_RABBITMQ_DISPATCH_ROUTING_KEY`, `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_EXCHANGE_NAME`, `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_QUEUE_NAME`, `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_ROUTING_KEY`, `EMAIL_DISPATCH_RABBITMQ_PARKING_QUEUE_NAME`, `EMAIL_DISPATCH_RABBITMQ_PARKING_ROUTING_KEY`, `EMAIL_DISPATCH_RABBITMQ_CLIENT_PROVIDED_NAME`, `EMAIL_DISPATCH_RABBITMQ_CONSUMER_ID`, `EMAIL_DISPATCH_RABBITMQ_PREFETCH_COUNT`, `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_ENABLED`, `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_CONSUMER_ID`, `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_PREFETCH_COUNT`, `EMAIL_DISPATCH_RABBITMQ_PUBLISH_TIMEOUT_SECONDS`, `EMAIL_DISPATCH_RABBITMQ_PUBLISHER_POLLING_INTERVAL_SECONDS`, `EMAIL_DISPATCH_RABBITMQ_PUBLISHER_BATCH_SIZE`, `EMAIL_DISPATCH_RABBITMQ_PUBLISHER_RETRY_DELAY_SECONDS` |
 | `/analytics` | `ANALYTICS_POSTHOG_PUBLIC_KEY`, `ANALYTICS_POSTHOG_HOST`, `ANALYTICS_PERSONAL_API_KEY` |
 | `/localization` | `LOCALIZATION_TMS_API_KEY` |
 | `/registration-providers` | `REGISTRATION_PROVIDER_API_TOKEN`, `REGISTRATION_PROVIDER_WEBHOOK_SECRET` |
 
 Registration-provider credentials are tenant-scoped. When several tenant connections need distinct tokens for the same key, distinguish them with the binding's `Qualifier` field rather than by inventing new key names.
 
-External moderation credentials (`REPORTING_COOP_API_KEY`, `REPORTING_OSPREY_API_KEY`, `REPORTING_COOP_WEBHOOK_SECRET`) have no Infisical binding folder. Supply them through the deployment environment alongside the rest of the `REPORTING_*` dials.
+### Auxiliary Compose Profiles & Integration Extensions
+
+Deployments running optional Compose profiles (`--profile formbricks`, `--profile localization`, `--profile moderation`) can store their container and operational secrets in Infisical or via direct environment injection:
+
+#### Formbricks (`--profile formbricks`)
+
+| Key | Purpose |
+|---|---|
+| `FORMBRICKS_DATABASE_NAME` | Database name for Formbricks state (default: `formbricks`). |
+| `FORMBRICKS_DATABASE_USER` | Database username for Formbricks container. |
+| `FORMBRICKS_DATABASE_PASSWORD` | Database password for Formbricks container. |
+| `FORMBRICKS_NEXTAUTH_SECRET` | NextAuth encryption secret (`openssl rand -hex 32`). |
+| `FORMBRICKS_ENCRYPTION_KEY` | Formbricks data encryption key (`openssl rand -hex 32`). |
+| `FORMBRICKS_CRON_SECRET` | Internal cron secret for periodic survey triggers. |
+| `FORMBRICKS_HUB_API_KEY` | Formbricks hub API key. |
+| `FORMBRICKS_CUBEJS_API_SECRET` | CubeJS analytics API secret. |
+| `FORMBRICKS_WEBAPP_URL` | Public web application URL for Formbricks app. |
+
+#### Weblate (`--profile localization`)
+
+| Key | Purpose |
+|---|---|
+| `WEBLATE_SITE_DOMAIN` | Domain name for Weblate interface. |
+| `WEBLATE_ADMIN_NAME` | Initial Weblate administrator username. |
+| `WEBLATE_ADMIN_EMAIL` | Initial Weblate administrator email. |
+| `WEBLATE_ADMIN_PASSWORD` | Initial Weblate administrator password. |
+| `WEBLATE_POSTGRES_USER` | Database user for Weblate container. |
+| `WEBLATE_POSTGRES_PASSWORD` | Database password for Weblate container. |
+| `WEBLATE_POSTGRES_DB` | Database name for Weblate container. |
+
+#### External Moderation (`--profile moderation`: Coop & Osprey)
+
+| Key | Purpose |
+|---|---|
+| `REPORTING_MODE` | Moderation mode: `LocalOnly` (built-in), `Coop`, `Osprey`, or `Composite`. |
+| `REPORTING_COOP_ENDPOINT_URL` | Endpoint URL of Coop moderation server. |
+| `REPORTING_COOP_API_KEY` | API key for Coop authentication. |
+| `REPORTING_COOP_WEBHOOK_SECRET` | Secret for signing Coop incoming webhooks. |
+| `REPORTING_OSPREY_ENDPOINT_URL` | Endpoint URL of Osprey coordinator. |
+| `REPORTING_OSPREY_API_KEY` | API key for Osprey coordinator. |
 
 > [!NOTE]
 > `SVIX_CONFORMANCE_MANAGED_*` variables belong to the managed-webhook conformance test harness, not to a running instance. Do not store them in Infisical; supply them to the test environment when running that suite.

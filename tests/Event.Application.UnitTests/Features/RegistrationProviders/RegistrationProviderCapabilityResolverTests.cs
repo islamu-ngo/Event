@@ -128,7 +128,7 @@ public sealed class RegistrationProviderCapabilityResolverTests
         };
         var handler = new GetRegistrationProviderHealthQueryHandler(repository, new Registry(), TimeProviderFrom(Now));
 
-        RegistrationProviderBindingHealthDto dto = (await handler.Handle(new GetRegistrationProviderHealthQuery(binding.TenantId, Guid.CreateVersion7()), CancellationToken.None)).Single();
+        RegistrationProviderBindingHealthDto dto = (await handler.QueryAsync(new GetRegistrationProviderHealthQuery(binding.TenantId, Guid.CreateVersion7()), CancellationToken.None)).Single();
 
         await Assert.That(dto.LastCallbackAt).IsEqualTo(Now.AddMinutes(-5));
         await Assert.That(dto.ParkedQueueDepth).IsEqualTo(2);
@@ -147,7 +147,7 @@ public sealed class RegistrationProviderCapabilityResolverTests
         };
         var handler = new GetRegistrationProviderQueueQueryHandler(repository);
 
-        RegistrationProviderParkedQueueItemDto dto = (await handler.Handle(new GetRegistrationProviderQueueQuery(binding.TenantId, Guid.CreateVersion7(), 50), CancellationToken.None)).Single();
+        RegistrationProviderParkedQueueItemDto dto = (await handler.QueryAsync(new GetRegistrationProviderQueueQuery(binding.TenantId, Guid.CreateVersion7(), 50), CancellationToken.None)).Single();
         string json = JsonSerializer.Serialize(dto);
 
         await Assert.That(dto.EffectOutboxId).IsEqualTo(effect.Id);
@@ -205,10 +205,10 @@ public sealed class RegistrationProviderCapabilityResolverTests
         using CancellationTokenSource source = new();
         await source.CancelAsync();
 
-        await Assert.That(() => handler.Handle(new(binding.TenantId, binding.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), source.Token))
+        await Assert.That(() => handler.ExecuteAsync(new(binding.TenantId, binding.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), source.Token))
             .Throws<OperationCanceledException>();
 
-        var blocked = await handler.Handle(new(binding.TenantId, binding.Id, RegistrationProviderSchemaDriftClass.TypeChanged, Now), CancellationToken.None);
+        var blocked = await handler.ExecuteAsync(new(binding.TenantId, binding.Id, RegistrationProviderSchemaDriftClass.TypeChanged, Now), CancellationToken.None);
         await Assert.That(blocked.IsSuccess).IsFalse();
         await Assert.That(blocked.FailureCode).IsEqualTo("registration_provider_drift_blocks_publication");
     }
@@ -221,17 +221,17 @@ public sealed class RegistrationProviderCapabilityResolverTests
         ReplaceDraftRegistrationProviderMappingsCommandHandler firstReplace = new(new FakeProviderRepository(first));
         ReplaceDraftRegistrationProviderMappingsCommandHandler secondReplace = new(new FakeProviderRepository(second));
 
-        await firstReplace.Handle(new(first.TenantId, first.Id,
+        await firstReplace.ExecuteAsync(new(first.TenantId, first.Id,
             [new("name", "full_name", true), new("email", "email", true)],
             [new("name", "legal", "full"), new("email", "primary", "main")]), CancellationToken.None);
-        await secondReplace.Handle(new(second.TenantId, second.Id,
+        await secondReplace.ExecuteAsync(new(second.TenantId, second.Id,
             [new("email", "email", true), new("name", "full_name", true)],
             [new("email", "primary", "main"), new("name", "legal", "full")]), CancellationToken.None);
 
         await new PublishRegistrationProviderBindingCommandHandler(new FakeProviderRepository(first))
-            .Handle(new(first.TenantId, first.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), CancellationToken.None);
+            .ExecuteAsync(new(first.TenantId, first.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), CancellationToken.None);
         await new PublishRegistrationProviderBindingCommandHandler(new FakeProviderRepository(second))
-            .Handle(new(second.TenantId, second.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), CancellationToken.None);
+            .ExecuteAsync(new(second.TenantId, second.Id, RegistrationProviderSchemaDriftClass.NoDrift, Now), CancellationToken.None);
 
         await Assert.That(first.PublishedMappingRevisionHash).IsNotNull();
         await Assert.That(first.PublishedMappingRevisionHash).IsEqualTo(second.PublishedMappingRevisionHash);
@@ -244,7 +244,7 @@ public sealed class RegistrationProviderCapabilityResolverTests
         FakeProviderRepository repository = new(binding) { HasSubmission = true };
         ReplaceDraftRegistrationProviderMappingsCommandHandler handler = new(repository);
 
-        var result = await handler.Handle(new(binding.TenantId, binding.Id,
+        var result = await handler.ExecuteAsync(new(binding.TenantId, binding.Id,
             [new("attendee.email", "email", true)], []), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
@@ -273,7 +273,7 @@ public sealed class RegistrationProviderCapabilityResolverTests
                 [new("email", "email", true)], [new("email", "yes", "1"), new(" email ", "yes", "2")])
         };
 
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo(expectedFailureCode);

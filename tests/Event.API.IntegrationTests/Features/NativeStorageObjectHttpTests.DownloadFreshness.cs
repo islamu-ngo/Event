@@ -20,9 +20,8 @@ using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Application.Contracts.Operations;
 using Grpc.Core;
-using MediatR;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -127,8 +126,9 @@ public sealed partial class NativeStorageObjectHttpTests
         if (manualImport)
         {
             accessor.HttpContext = FinalizationPrincipal(owner.UserId);
-            import = consumerScope.ServiceProvider.GetRequiredService<ISender>().Send(new QueueManualRegistrationProviderImportCommand(
-                owner.TenantId, eventId, bindingId, objectId.ToString("D"), "metadata-race"));
+            import = consumerScope.ServiceProvider.GetRequiredService<ICommandHandler<QueueManualRegistrationProviderImportCommand, BaseCommandResponse<Guid>>>()
+                .ExecuteAsync(new QueueManualRegistrationProviderImportCommand(
+                    owner.TenantId, eventId, bindingId, objectId.ToString("D"), "metadata-race"));
         }
         else http = client.GetAsync($"{Root}/{objectId}/content");
         try

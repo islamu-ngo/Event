@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +26,14 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 [Tags("RegistrationProviderManagement")]
 public sealed class RegistrationProviderBindingsController(
-    IMediator mediator,
+    ICommandHandler<ImportExternalRegistrationProviderFormVersionCommand, BaseCommandResponse<Guid>> importHandler,
+    IQueryHandler<GetRegistrationProviderBindingsQuery, IReadOnlyList<RegistrationProviderBindingDto>> bindingsQueryHandler,
+    IQueryHandler<GetRegistrationProviderBindingQuery, RegistrationProviderBindingDto?> bindingQueryHandler,
+    ICommandHandler<CreateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>> createBindingHandler,
+    ICommandHandler<UpdateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>> updateBindingHandler,
+    ICommandHandler<DeleteRegistrationProviderBindingCommand, BaseCommandResponse<Guid>> deleteBindingHandler,
+    ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>> publishBindingHandler,
+    ICommandHandler<ReplaceEventDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>> replaceMappingsHandler,
     IResourceAssembler<RegistrationProviderBindingDto, RegistrationProviderBindingDto> bindingAssembler)
     : EventControllerBase
 {
@@ -44,7 +51,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ImportExternalFormVersion(Guid tenantId, Guid eventId, Guid connectionId, [FromBody] ImportExternalRegistrationProviderFormVersionRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new ImportExternalRegistrationProviderFormVersionCommand(tenantId, eventId, connectionId, request), cancellationToken));
+        ToActionResult(await importHandler.ExecuteAsync(new ImportExternalRegistrationProviderFormVersionCommand(tenantId, eventId, connectionId, request), cancellationToken));
 
     [HttpGet("bindings", Name = RouteNames.GetRegistrationProviderBindings)]
     [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
@@ -55,7 +62,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalCollectionResource<RegistrationProviderBindingDto>>> GetBindings(Guid tenantId, Guid eventId, CancellationToken cancellationToken = default) =>
-        Ok(await bindingAssembler.ToCollectionResource(await mediator.Send(new GetRegistrationProviderBindingsQuery(tenantId, eventId), cancellationToken), RouteNames.GetRegistrationProviderBindings, new RegistrationProviderEventCollectionContext(tenantId, eventId), HttpContext));
+        Ok(await bindingAssembler.ToCollectionResource(await bindingsQueryHandler.QueryAsync(new GetRegistrationProviderBindingsQuery(tenantId, eventId), cancellationToken), RouteNames.GetRegistrationProviderBindings, new RegistrationProviderEventCollectionContext(tenantId, eventId), HttpContext));
 
     [HttpGet("bindings/{bindingId:guid}", Name = RouteNames.GetRegistrationProviderBinding)]
     [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
@@ -67,7 +74,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<RegistrationProviderBindingDto>>> GetBinding(Guid tenantId, Guid eventId, Guid bindingId, CancellationToken cancellationToken = default) =>
-        await mediator.Send(new GetRegistrationProviderBindingQuery(tenantId, eventId, bindingId), cancellationToken) is { } result ? Ok(await bindingAssembler.ToResource(result, HttpContext)) : NotFound();
+        await bindingQueryHandler.QueryAsync(new GetRegistrationProviderBindingQuery(tenantId, eventId, bindingId), cancellationToken) is { } result ? Ok(await bindingAssembler.ToResource(result, HttpContext)) : NotFound();
 
     [HttpPost("bindings", Name = RouteNames.CreateRegistrationProviderBinding)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -78,7 +85,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> CreateBinding(Guid tenantId, Guid eventId, [FromBody] RegistrationProviderBindingRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new CreateRegistrationProviderBindingCommand(tenantId, eventId, request), cancellationToken));
+        ToActionResult(await createBindingHandler.ExecuteAsync(new CreateRegistrationProviderBindingCommand(tenantId, eventId, request), cancellationToken));
 
     [HttpPut("bindings/{bindingId:guid}", Name = RouteNames.UpdateRegistrationProviderBinding)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -89,7 +96,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateBinding(Guid tenantId, Guid eventId, Guid bindingId, [FromBody] RegistrationProviderBindingRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new UpdateRegistrationProviderBindingCommand(tenantId, eventId, bindingId, request), cancellationToken));
+        ToActionResult(await updateBindingHandler.ExecuteAsync(new UpdateRegistrationProviderBindingCommand(tenantId, eventId, bindingId, request), cancellationToken));
 
     [HttpDelete("bindings/{bindingId:guid}", Name = RouteNames.DeleteRegistrationProviderBinding)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -100,7 +107,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> DeleteBinding(Guid tenantId, Guid eventId, Guid bindingId, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new DeleteRegistrationProviderBindingCommand(tenantId, eventId, bindingId), cancellationToken));
+        ToActionResult(await deleteBindingHandler.ExecuteAsync(new DeleteRegistrationProviderBindingCommand(tenantId, eventId, bindingId), cancellationToken));
 
     [HttpPost("bindings/{bindingId:guid}/publish", Name = RouteNames.PublishRegistrationProviderBinding)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -111,7 +118,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> PublishBinding(Guid tenantId, Guid eventId, Guid bindingId, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new PublishEventRegistrationProviderBindingCommand(tenantId, eventId, bindingId), cancellationToken));
+        ToActionResult(await publishBindingHandler.ExecuteAsync(new PublishEventRegistrationProviderBindingCommand(tenantId, eventId, bindingId), cancellationToken));
 
     [HttpPut("bindings/{bindingId:guid}/mappings", Name = RouteNames.ReplaceRegistrationProviderMappings)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -122,7 +129,7 @@ public sealed class RegistrationProviderBindingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ReplaceMappings(Guid tenantId, Guid eventId, Guid bindingId, [FromBody] ReplaceRegistrationProviderMappingsRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new ReplaceEventDraftRegistrationProviderMappingsCommand(tenantId, eventId, bindingId, request), cancellationToken));
+        ToActionResult(await replaceMappingsHandler.ExecuteAsync(new ReplaceEventDraftRegistrationProviderMappingsCommand(tenantId, eventId, bindingId, request), cancellationToken));
 
     private ActionResult<BaseCommandResponse<Guid>> ToActionResult(BaseCommandResponse<Guid> result) => result.IsSuccess
         ? Ok(result)

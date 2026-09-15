@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +26,10 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 [Tags("RegistrationProviderManagement")]
 public sealed class RegistrationProviderChannelsController(
-    IMediator mediator,
+    IQueryHandler<GetRegistrationProviderLaunchDescriptorQuery, RegistrationProviderLaunchDescriptorDto> launchDescriptorQueryHandler,
+    IQueryHandler<GetRegistrationChannelsQuery, IReadOnlyList<RegistrationChannelDto>> channelsQueryHandler,
+    ICommandHandler<UpsertRegistrationChannelCommand, BaseCommandResponse<Guid>> upsertChannelHandler,
+    ICommandHandler<DeleteRegistrationChannelCommand, BaseCommandResponse<Guid>> deleteChannelHandler,
     IResourceAssembler<RegistrationChannelDto, RegistrationChannelDto> channelAssembler,
     IResourceAssembler<RegistrationProviderLaunchDescriptorDto, RegistrationProviderLaunchDescriptorDto> launchDescriptorAssembler)
     : EventControllerBase
@@ -46,7 +49,7 @@ public sealed class RegistrationProviderChannelsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<RegistrationProviderLaunchDescriptorDto>>> GetLaunchDescriptor(Guid tenantId, Guid eventId, Guid workflowId, Guid requirementId, Guid channelId, Guid bindingId, CancellationToken cancellationToken = default) =>
-        Ok(await launchDescriptorAssembler.ToResource(await mediator.Send(new GetRegistrationProviderLaunchDescriptorQuery(tenantId, eventId, workflowId, requirementId, channelId, bindingId), cancellationToken), HttpContext));
+        Ok(await launchDescriptorAssembler.ToResource(await launchDescriptorQueryHandler.QueryAsync(new GetRegistrationProviderLaunchDescriptorQuery(tenantId, eventId, workflowId, requirementId, channelId, bindingId), cancellationToken), HttpContext));
 
     [HttpGet("workflows/{workflowId:guid}/requirements/{requirementId:guid}/channels", Name = RouteNames.GetRegistrationChannels)]
     [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
@@ -57,7 +60,7 @@ public sealed class RegistrationProviderChannelsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalCollectionResource<RegistrationChannelDto>>> GetChannels(Guid tenantId, Guid eventId, Guid workflowId, Guid requirementId, CancellationToken cancellationToken = default) =>
-        Ok(await channelAssembler.ToCollectionResource(await mediator.Send(new GetRegistrationChannelsQuery(tenantId, eventId, workflowId, requirementId), cancellationToken), RouteNames.GetRegistrationChannels, new RegistrationProviderChannelCollectionContext(tenantId, eventId, workflowId, requirementId), HttpContext));
+        Ok(await channelAssembler.ToCollectionResource(await channelsQueryHandler.QueryAsync(new GetRegistrationChannelsQuery(tenantId, eventId, workflowId, requirementId), cancellationToken), RouteNames.GetRegistrationChannels, new RegistrationProviderChannelCollectionContext(tenantId, eventId, workflowId, requirementId), HttpContext));
 
     [HttpPost("workflows/{workflowId:guid}/requirements/{requirementId:guid}/channels", Name = RouteNames.CreateRegistrationChannel)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -68,7 +71,7 @@ public sealed class RegistrationProviderChannelsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> CreateChannel(Guid tenantId, Guid eventId, Guid workflowId, Guid requirementId, [FromBody] RegistrationChannelRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new UpsertRegistrationChannelCommand(tenantId, eventId, workflowId, requirementId, null, request), cancellationToken));
+        ToActionResult(await upsertChannelHandler.ExecuteAsync(new UpsertRegistrationChannelCommand(tenantId, eventId, workflowId, requirementId, null, request), cancellationToken));
 
     [HttpPut("workflows/{workflowId:guid}/requirements/{requirementId:guid}/channels/{channelId:guid}", Name = RouteNames.UpdateRegistrationChannel)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -79,7 +82,7 @@ public sealed class RegistrationProviderChannelsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateChannel(Guid tenantId, Guid eventId, Guid workflowId, Guid requirementId, Guid channelId, [FromBody] RegistrationChannelRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new UpsertRegistrationChannelCommand(tenantId, eventId, workflowId, requirementId, channelId, request), cancellationToken));
+        ToActionResult(await upsertChannelHandler.ExecuteAsync(new UpsertRegistrationChannelCommand(tenantId, eventId, workflowId, requirementId, channelId, request), cancellationToken));
 
     [HttpDelete("workflows/{workflowId:guid}/requirements/{requirementId:guid}/channels/{channelId:guid}", Name = RouteNames.DeleteRegistrationChannel)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -90,7 +93,7 @@ public sealed class RegistrationProviderChannelsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> DeleteChannel(Guid tenantId, Guid eventId, Guid workflowId, Guid requirementId, Guid channelId, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new DeleteRegistrationChannelCommand(tenantId, eventId, workflowId, requirementId, channelId), cancellationToken));
+        ToActionResult(await deleteChannelHandler.ExecuteAsync(new DeleteRegistrationChannelCommand(tenantId, eventId, workflowId, requirementId, channelId), cancellationToken));
 
     private ActionResult<BaseCommandResponse<Guid>> ToActionResult(BaseCommandResponse<Guid> result) => result.IsSuccess
         ? Ok(result)

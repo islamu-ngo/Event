@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +26,12 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 [Tags("RegistrationProviderManagement")]
 public sealed class RegistrationProviderOperationsController(
-    IMediator mediator,
+    IQueryHandler<GetRegistrationProviderHealthQuery, IReadOnlyList<RegistrationProviderBindingHealthDto>> healthQueryHandler,
+    IQueryHandler<GetRegistrationProviderQueueQuery, IReadOnlyList<RegistrationProviderParkedQueueItemDto>> queueQueryHandler,
+    ICommandHandler<PollRegistrationProviderReconciliationCommand, BaseCommandResponse<Guid>> pollReconciliationHandler,
+    ICommandHandler<QueueManualRegistrationProviderImportCommand, BaseCommandResponse<Guid>> queueManualImportHandler,
+    ICommandHandler<RetryRegistrationProviderParkedItemCommand, BaseCommandResponse<Guid>> retryQueueItemHandler,
+    ICommandHandler<ResolveRegistrationProviderQueueItemCommand, BaseCommandResponse<Guid>> resolveQueueItemHandler,
     IResourceAssembler<RegistrationProviderBindingHealthDto, RegistrationProviderBindingHealthDto> healthAssembler,
     IResourceAssembler<RegistrationProviderParkedQueueItemDto, RegistrationProviderParkedQueueItemDto> queueAssembler)
     : EventControllerBase
@@ -50,7 +55,7 @@ public sealed class RegistrationProviderOperationsController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<RegistrationProviderBindingHealthDto> result = await mediator.Send(new GetRegistrationProviderHealthQuery(tenantId, eventId), cancellationToken);
+        IReadOnlyList<RegistrationProviderBindingHealthDto> result = await healthQueryHandler.QueryAsync(new GetRegistrationProviderHealthQuery(tenantId, eventId), cancellationToken);
         return Ok(healthAssembler.ToCollectionResource(result, RouteNames.GetRegistrationProviderHealth, new { eventId, tenantId }, HttpContext));
     }
 
@@ -70,7 +75,7 @@ public sealed class RegistrationProviderOperationsController(
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<RegistrationProviderParkedQueueItemDto> result = await mediator.Send(new GetRegistrationProviderQueueQuery(tenantId, eventId, limit), cancellationToken);
+        IReadOnlyList<RegistrationProviderParkedQueueItemDto> result = await queueQueryHandler.QueryAsync(new GetRegistrationProviderQueueQuery(tenantId, eventId, limit), cancellationToken);
         return Ok(queueAssembler.ToCollectionResource(result, RouteNames.GetRegistrationProviderQueue, new RegistrationProviderEventCollectionContext(tenantId, eventId), HttpContext));
     }
 
@@ -87,7 +92,7 @@ public sealed class RegistrationProviderOperationsController(
         Guid eventId,
         Guid bindingId,
         [FromQuery] DateTime sinceUtc,
-        CancellationToken cancellationToken = default) => ToActionResult(await mediator.Send(new PollRegistrationProviderReconciliationCommand(tenantId, eventId, bindingId, DateTime.SpecifyKind(sinceUtc, DateTimeKind.Utc)), cancellationToken));
+        CancellationToken cancellationToken = default) => ToActionResult(await pollReconciliationHandler.ExecuteAsync(new PollRegistrationProviderReconciliationCommand(tenantId, eventId, bindingId, DateTime.SpecifyKind(sinceUtc, DateTimeKind.Utc)), cancellationToken));
 
     [HttpPost("manual-imports", Name = RouteNames.QueueManualRegistrationProviderImport)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -101,7 +106,7 @@ public sealed class RegistrationProviderOperationsController(
         Guid tenantId,
         Guid eventId,
         [FromBody] ManualRegistrationProviderImportRequestDto request,
-        CancellationToken cancellationToken = default) => ToActionResult(await mediator.Send(new QueueManualRegistrationProviderImportCommand(tenantId, eventId, request.BindingId, request.StorageReference, request.SourceReference), cancellationToken));
+        CancellationToken cancellationToken = default) => ToActionResult(await queueManualImportHandler.ExecuteAsync(new QueueManualRegistrationProviderImportCommand(tenantId, eventId, request.BindingId, request.StorageReference, request.SourceReference), cancellationToken));
 
     [HttpPost("queue/retry", Name = RouteNames.RetryRegistrationProviderParkedItem)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -115,7 +120,7 @@ public sealed class RegistrationProviderOperationsController(
         Guid tenantId,
         Guid eventId,
         [FromBody] RetryRegistrationProviderParkedItemRequestDto request,
-        CancellationToken cancellationToken = default) => ToActionResult(await mediator.Send(new RetryRegistrationProviderParkedItemCommand(tenantId, eventId, request.SubmissionId, request.EffectOutboxId, request.ExpectedProcessingGeneration, request.Reason), cancellationToken));
+        CancellationToken cancellationToken = default) => ToActionResult(await retryQueueItemHandler.ExecuteAsync(new RetryRegistrationProviderParkedItemCommand(tenantId, eventId, request.SubmissionId, request.EffectOutboxId, request.ExpectedProcessingGeneration, request.Reason), cancellationToken));
 
     [HttpPost("queue/resolve", Name = RouteNames.ResolveRegistrationProviderQueueItem)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -129,7 +134,7 @@ public sealed class RegistrationProviderOperationsController(
         Guid tenantId,
         Guid eventId,
         [FromBody] ResolveRegistrationProviderQueueItemRequestDto request,
-        CancellationToken cancellationToken = default) => ToActionResult(await mediator.Send(new ResolveRegistrationProviderQueueItemCommand(tenantId, eventId, request.SubmissionId, request.EffectOutboxId, request.DecisionCode, request.NoteReference), cancellationToken));
+        CancellationToken cancellationToken = default) => ToActionResult(await resolveQueueItemHandler.ExecuteAsync(new ResolveRegistrationProviderQueueItemCommand(tenantId, eventId, request.SubmissionId, request.EffectOutboxId, request.DecisionCode, request.NoteReference), cancellationToken));
 
     private ActionResult<BaseCommandResponse<Guid>> ToActionResult(BaseCommandResponse<Guid> result) => result.IsSuccess
         ? Ok(result)

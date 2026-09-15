@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +26,11 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 [Tags("RegistrationProviderManagement")]
 public sealed class RegistrationProviderConnectionsController(
-    IMediator mediator,
+    IQueryHandler<GetRegistrationProviderConnectionsQuery, IReadOnlyList<RegistrationProviderConnectionDto>> connectionsQueryHandler,
+    IQueryHandler<GetRegistrationProviderConnectionQuery, RegistrationProviderConnectionDto?> connectionQueryHandler,
+    ICommandHandler<UpsertRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>> upsertConnectionHandler,
+    ICommandHandler<DeleteRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>> deleteConnectionHandler,
+    ICommandHandler<ReplaceRegistrationProviderApprovedOriginsCommand, BaseCommandResponse<Guid>> replaceOriginsHandler,
     IResourceAssembler<RegistrationProviderConnectionDto, RegistrationProviderConnectionDto> connectionAssembler)
     : EventControllerBase
 {
@@ -44,7 +48,7 @@ public sealed class RegistrationProviderConnectionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalCollectionResource<RegistrationProviderConnectionDto>>> GetConnections(Guid tenantId, Guid eventId, CancellationToken cancellationToken = default) =>
-        Ok(await connectionAssembler.ToCollectionResource(await mediator.Send(new GetRegistrationProviderConnectionsQuery(tenantId, eventId), cancellationToken), RouteNames.GetRegistrationProviderConnections, new RegistrationProviderEventCollectionContext(tenantId, eventId), HttpContext));
+        Ok(await connectionAssembler.ToCollectionResource(await connectionsQueryHandler.QueryAsync(new GetRegistrationProviderConnectionsQuery(tenantId, eventId), cancellationToken), RouteNames.GetRegistrationProviderConnections, new RegistrationProviderEventCollectionContext(tenantId, eventId), HttpContext));
 
     [HttpGet("connections/{connectionId:guid}", Name = RouteNames.GetRegistrationProviderConnection)]
     [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
@@ -56,7 +60,7 @@ public sealed class RegistrationProviderConnectionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<RegistrationProviderConnectionDto>>> GetConnection(Guid tenantId, Guid eventId, Guid connectionId, CancellationToken cancellationToken = default) =>
-        await mediator.Send(new GetRegistrationProviderConnectionQuery(tenantId, eventId, connectionId), cancellationToken) is { } result ? Ok(await connectionAssembler.ToResource(result, HttpContext)) : NotFound();
+        await connectionQueryHandler.QueryAsync(new GetRegistrationProviderConnectionQuery(tenantId, eventId, connectionId), cancellationToken) is { } result ? Ok(await connectionAssembler.ToResource(result, HttpContext)) : NotFound();
 
     [HttpPost("connections", Name = RouteNames.CreateRegistrationProviderConnection)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -67,7 +71,7 @@ public sealed class RegistrationProviderConnectionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> CreateConnection(Guid tenantId, Guid eventId, [FromBody] RegistrationProviderConnectionRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new UpsertRegistrationProviderConnectionCommand(tenantId, eventId, null, request), cancellationToken));
+        ToActionResult(await upsertConnectionHandler.ExecuteAsync(new UpsertRegistrationProviderConnectionCommand(tenantId, eventId, null, request), cancellationToken));
 
     [HttpPut("connections/{connectionId:guid}", Name = RouteNames.UpdateRegistrationProviderConnection)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -78,7 +82,7 @@ public sealed class RegistrationProviderConnectionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateConnection(Guid tenantId, Guid eventId, Guid connectionId, [FromBody] RegistrationProviderConnectionRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new UpsertRegistrationProviderConnectionCommand(tenantId, eventId, connectionId, request), cancellationToken));
+        ToActionResult(await upsertConnectionHandler.ExecuteAsync(new UpsertRegistrationProviderConnectionCommand(tenantId, eventId, connectionId, request), cancellationToken));
 
     [HttpDelete("connections/{connectionId:guid}", Name = RouteNames.DeleteRegistrationProviderConnection)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -89,7 +93,7 @@ public sealed class RegistrationProviderConnectionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> DeleteConnection(Guid tenantId, Guid eventId, Guid connectionId, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new DeleteRegistrationProviderConnectionCommand(tenantId, eventId, connectionId), cancellationToken));
+        ToActionResult(await deleteConnectionHandler.ExecuteAsync(new DeleteRegistrationProviderConnectionCommand(tenantId, eventId, connectionId), cancellationToken));
 
     [HttpPut("connections/{connectionId:guid}/approved-origins", Name = RouteNames.ReplaceRegistrationProviderApprovedOrigins)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -100,7 +104,7 @@ public sealed class RegistrationProviderConnectionsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ReplaceApprovedOrigins(Guid tenantId, Guid eventId, Guid connectionId, [FromBody] ReplaceRegistrationProviderApprovedOriginsRequestDto request, CancellationToken cancellationToken = default) =>
-        ToActionResult(await mediator.Send(new ReplaceRegistrationProviderApprovedOriginsCommand(tenantId, eventId, connectionId, request.Origins), cancellationToken));
+        ToActionResult(await replaceOriginsHandler.ExecuteAsync(new ReplaceRegistrationProviderApprovedOriginsCommand(tenantId, eventId, connectionId, request.Origins), cancellationToken));
 
     private ActionResult<BaseCommandResponse<Guid>> ToActionResult(BaseCommandResponse<Guid> result) => result.IsSuccess
         ? Ok(result)

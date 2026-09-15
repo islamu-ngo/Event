@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Waitlist;
 using Explore.Application.DTOs.Waitlist;
 using Explore.Application.Features.Waitlist.Handlers.Commands;
 using Explore.Application.Features.Waitlist.Requests.Queries;
 using Explore.Application.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.Waitlist.Handlers.Queries;
 
@@ -15,25 +15,26 @@ public sealed class GetFairReturnWaitlistQueryHandler(
     ICurrentUserService currentUser,
     IGuestCapabilityTokenService capabilityTokens,
     IPaidCheckoutActivationService activation) :
-    IRequestHandler<GetFairReturnWaitlistQuery, FairReturnWaitlistDto?>
+    IQueryHandler<GetFairReturnWaitlistQuery, FairReturnWaitlistDto?>
 {
-    public async Task<FairReturnWaitlistDto?> Handle(
-        GetFairReturnWaitlistQuery request,
+    public async Task<FairReturnWaitlistDto?> QueryAsync(
+        GetFairReturnWaitlistQuery query,
         CancellationToken cancellationToken)
     {
         FairReturnWaitlistAccessContext? access =
             await repository.GetAccessAsync(
                 tenantContext.TenantId,
-                request.EventId,
-                request.RegistrationOrderId,
-                request.RegistrationOrderLineId,
+                query.EventId,
+                query.RegistrationOrderId,
+                query.RegistrationOrderLineId,
                 cancellationToken);
         if (access is null
             || !FairReturnWaitlistMapping.HasReadAuthority(
                 access,
                 currentUser.UserId,
-                request.CapabilityToken,
+                query.CapabilityToken,
                 capabilityTokens))
+
         {
             return null;
         }

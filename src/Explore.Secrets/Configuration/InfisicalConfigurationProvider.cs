@@ -136,8 +136,12 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 var secretValue = secret.SecretValue;
                 if (string.IsNullOrWhiteSpace(secretValue)) continue;
 
+                var effectivePath = !string.IsNullOrWhiteSpace(secret.SecretPath)
+                    ? secret.SecretPath
+                    : path;
+
                 // Convert to .NET configuration key format
-                var configKey = ConvertToConfigurationKey(secret.SecretKey, path);
+                var configKey = ConvertToConfigurationKey(secret.SecretKey, effectivePath);
                 newData[configKey] = secretValue;
 
                 // Also store with original key for direct access
@@ -152,6 +156,81 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                     var suffix = configKey["Database:Erasure:".Length..];
                     newData[$"PrivacyErasureAuthorityDatabase:{suffix}"] = secretValue;
                     newData[$"DatabaseErasure:{suffix}"] = secretValue;
+                }
+                else if (configKey.StartsWith("Instance:OperatorIdentity:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var suffix = configKey["Instance:OperatorIdentity:".Length..];
+                    newData[$"INSTANCE__OPERATORIDENTITY__{suffix.ToUpperInvariant()}"] = secretValue;
+                }
+                else if (configKey.StartsWith("Instance:Bootstrap:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var suffix = configKey["Instance:Bootstrap:".Length..];
+                    var screamingSuffix = ToScreamingSnakeCase(suffix);
+                    newData[$"INSTANCE_BOOTSTRAP_{screamingSuffix}"] = secretValue;
+                }
+                else if (configKey.StartsWith("ManagedControlPlane:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var suffix = configKey["ManagedControlPlane:".Length..];
+                    switch (suffix)
+                    {
+                        case "Enabled":
+                            newData["CONTROL_PLANE_MANAGED_MODE"] = secretValue;
+                            newData["CONTROL_PLANE_ENABLED"] = secretValue;
+                            break;
+                        case "ControlPlaneUrl":
+                            newData["CONTROL_PLANE_URL"] = secretValue;
+                            break;
+                        case "ManagedInstanceId":
+                            newData["CONTROL_PLANE_INSTANCE_ID"] = secretValue;
+                            break;
+                        case "RegistrationToken":
+                            newData["CONTROL_PLANE_REGISTRATION_TOKEN"] = secretValue;
+                            break;
+                        case "RegistrationCredentials":
+                            newData["CONTROL_PLANE_REGISTRATION_CREDENTIALS"] = secretValue;
+                            break;
+                        case "MaximumTenantCount":
+                            newData["CONTROL_PLANE_MAXIMUM_TENANT_COUNT"] = secretValue;
+                            break;
+                        case "TenantAdministratorSignInUrl":
+                            newData["CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL"] = secretValue;
+                            break;
+                        case "CredentialLifetime":
+                            newData["CONTROL_PLANE_CREDENTIAL_LIFETIME"] = secretValue;
+                            break;
+                    }
+                }
+                else if (configKey.StartsWith("WebPush:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var suffix = configKey["WebPush:".Length..];
+                    switch (suffix)
+                    {
+                        case "Enabled":
+                            newData["WEB_PUSH_ENABLED"] = secretValue;
+                            break;
+                        case "VapidPublicKey":
+                            newData["VAPID_PUBLIC_KEY"] = secretValue;
+                            break;
+                        case "VapidPrivateKey":
+                            newData["VAPID_PRIVATE_KEY"] = secretValue;
+                            break;
+                        case "VapidSubject":
+                            newData["VAPID_SUBJECT"] = secretValue;
+                            break;
+                    }
+                }
+                else if (configKey.StartsWith("Licensing:LuckyPenny:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var suffix = configKey["Licensing:LuckyPenny:".Length..];
+                    switch (suffix)
+                    {
+                        case "Enabled":
+                            newData["USE_COMMERCIAL_LUCKYPENNY"] = secretValue;
+                            break;
+                        case "LicenseKey":
+                            newData["LUCKYPENNY_LICENSE_KEY"] = secretValue;
+                            break;
+                    }
                 }
 
             }
@@ -237,6 +316,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     internal sealed record InfisicalRawSecret(
         [property: JsonPropertyName("secretKey")] string? SecretKey,
         [property: JsonPropertyName("secretValue")] string? SecretValue,
+        [property: JsonPropertyName("secretPath")] string? SecretPath = null,
         [property: JsonPropertyName("version")] int? Version = null);
 
     /// <summary>
@@ -315,13 +395,227 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             };
         }
 
-        // 4. Special mappings for common patterns
+        // 4. Instance Operator Identity (/api/operator-identity or /api/operatoridentity)
+        if (normalizedPath.Equals("api/operator-identity", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/operatoridentity", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = secretKey.ToUpperInvariant();
+            if (key.StartsWith("INSTANCE__OPERATORIDENTITY__", StringComparison.Ordinal))
+                key = key["INSTANCE__OPERATORIDENTITY__".Length..];
+            else if (key.StartsWith("OPERATOR_IDENTITY_", StringComparison.Ordinal))
+                key = key["OPERATOR_IDENTITY_".Length..];
+            else if (key.StartsWith("OPERATORIDENTITY_", StringComparison.Ordinal))
+                key = key["OPERATORIDENTITY_".Length..];
+
+            return key switch
+            {
+                "OPERATOR_ID" or "OPERATORID" => "Instance:OperatorIdentity:OperatorId",
+                "PUBLIC_NAME" or "PUBLICNAME" => "Instance:OperatorIdentity:PublicName",
+                "LEGAL_NAME" or "LEGALNAME" => "Instance:OperatorIdentity:LegalName",
+                "IS_OFFICIAL_INSTANCE" or "ISOFFICIALINSTANCE" => "Instance:OperatorIdentity:IsOfficialInstance",
+                "OFFICIAL_ORIGIN" or "OFFICIALORIGIN" => "Instance:OperatorIdentity:OfficialOrigin",
+                "OPERATOR_KIND_CODE" or "OPERATORKINDCODE" => "Instance:OperatorIdentity:OperatorKindCode",
+                "JURISDICTION_COUNTRY_CODE" or "JURISDICTIONCOUNTRYCODE" => "Instance:OperatorIdentity:JurisdictionCountryCode",
+                "REGISTRATION_IDENTIFIER" or "REGISTRATIONIDENTIFIER" => "Instance:OperatorIdentity:RegistrationIdentifier",
+                "PUBLIC_CONTACT_EMAIL" or "PUBLICCONTACTEMAIL" => "Instance:OperatorIdentity:PublicContactEmail",
+                "WEBSITE_URL" or "WEBSITEURL" => "Instance:OperatorIdentity:WebsiteUrl",
+                "LEGAL_NOTICE_URL" or "LEGALNOTICEURL" => "Instance:OperatorIdentity:LegalNoticeUrl",
+                "TERMS_URL" or "TERMSURL" => "Instance:OperatorIdentity:TermsUrl",
+                "PRIVACY_URL" or "PRIVACYURL" => "Instance:OperatorIdentity:PrivacyUrl",
+                _ => $"Instance:OperatorIdentity:{ToPascalCase(key)}"
+            };
+        }
+
+        // 5. Instance Bootstrap (/api/bootstrap, /api/instance-bootstrap, or /api/instancebootstrap)
+        if (normalizedPath.Equals("api/bootstrap", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/instance-bootstrap", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/instancebootstrap", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = secretKey.ToUpperInvariant();
+            if (key.StartsWith("INSTANCE_BOOTSTRAP_", StringComparison.Ordinal))
+                key = key["INSTANCE_BOOTSTRAP_".Length..];
+            else if (key.StartsWith("BOOTSTRAP_", StringComparison.Ordinal))
+                key = key["BOOTSTRAP_".Length..];
+
+            return key switch
+            {
+                "MODE" => "Instance:Bootstrap:Mode",
+                "ADMIN_PROVIDER" or "PROVIDER" => "Instance:Bootstrap:AdminProvider",
+                "ADMIN_SUBJECT" or "SUBJECT" => "Instance:Bootstrap:AdminSubject",
+                "BINDING_GENERATION" or "GENERATION" => "Instance:Bootstrap:BindingGeneration",
+                "ADMIN_EMAIL" or "EMAIL" => "Instance:Bootstrap:AdminEmail",
+                "ADMIN_FIRST_NAME" or "FIRST_NAME" => "Instance:Bootstrap:AdminFirstName",
+                "ADMIN_LAST_NAME" or "LAST_NAME" => "Instance:Bootstrap:AdminLastName",
+                "LOCAL_PASSWORD" or "PASSWORD" => "Instance:Bootstrap:LocalPassword",
+                _ => $"Instance:Bootstrap:{ToPascalCase(key)}"
+            };
+        }
+
+        // 6. Control Plane (/api/controlplane or /api/control-plane) -> ManagedControlPlane:*
+        if (normalizedPath.Equals("api/controlplane", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/control-plane", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = secretKey.ToUpperInvariant();
+            if (key.StartsWith("CONTROL_PLANE_", StringComparison.Ordinal))
+                key = key["CONTROL_PLANE_".Length..];
+            else if (key.StartsWith("CONTROLPLANE_", StringComparison.Ordinal))
+                key = key["CONTROLPLANE_".Length..];
+
+            return key switch
+            {
+                "MANAGED_MODE" or "ENABLED" => "ManagedControlPlane:Enabled",
+                "URL" => "ManagedControlPlane:ControlPlaneUrl",
+                "INSTANCE_ID" or "INSTANCEID" => "ManagedControlPlane:ManagedInstanceId",
+                "REGISTRATION_TOKEN" or "REGISTRATIONTOKEN" => "ManagedControlPlane:RegistrationToken",
+                "REGISTRATION_CREDENTIALS" or "REGISTRATIONCREDENTIALS" => "ManagedControlPlane:RegistrationCredentials",
+                "MAXIMUM_TENANT_COUNT" or "MAXIMUMTENANTCOUNT" => "ManagedControlPlane:MaximumTenantCount",
+                "TENANT_ADMINISTRATOR_SIGN_IN_URL" or "TENANTADMINISTRATORSIGNINURL" => "ManagedControlPlane:TenantAdministratorSignInUrl",
+                "CREDENTIAL_LIFETIME" or "CREDENTIALLIFETIME" => "ManagedControlPlane:CredentialLifetime",
+                _ => $"ManagedControlPlane:{ToPascalCase(key)}"
+            };
+        }
+
+        // 7. Web Push (/api/webpush or /api/web-push) -> WebPush:*
+        if (normalizedPath.Equals("api/webpush", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/web-push", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = secretKey.ToUpperInvariant();
+            if (key.StartsWith("WEBPUSH_", StringComparison.Ordinal))
+                key = key["WEBPUSH_".Length..];
+            else if (key.StartsWith("WEB_PUSH_", StringComparison.Ordinal))
+                key = key["WEB_PUSH_".Length..];
+
+            return key switch
+            {
+                "ENABLED" => "WebPush:Enabled",
+                "VAPID_PUBLIC_KEY" or "PUBLIC_KEY" => "WebPush:VapidPublicKey",
+                "VAPID_PRIVATE_KEY" or "PRIVATE_KEY" => "WebPush:VapidPrivateKey",
+                "VAPID_SUBJECT" or "SUBJECT" => "WebPush:VapidSubject",
+                _ => $"WebPush:{ToPascalCase(key)}"
+            };
+        }
+
+        // 8. Rate Limiting (/api/ratelimiting or /api/rate-limiting) -> RateLimiting:*
+        if (normalizedPath.Equals("api/ratelimiting", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/rate-limiting", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = secretKey;
+            if (key.StartsWith("RATELIMITING__", StringComparison.OrdinalIgnoreCase))
+                key = key["RATELIMITING__".Length..];
+            else if (key.StartsWith("RATE_LIMITING__", StringComparison.OrdinalIgnoreCase))
+                key = key["RATE_LIMITING__".Length..];
+
+            var rateLimitingParts = key.Split("__", StringSplitOptions.RemoveEmptyEntries);
+            var rateLimitingConfigParts = rateLimitingParts.Select(NormalizeRateLimitingPart);
+            return $"RateLimiting:{string.Join(":", rateLimitingConfigParts)}";
+        }
+
+        // 9. Licensing (/licensing or /api/licensing) -> Licensing:LuckyPenny:*
+        if (normalizedPath.Equals("licensing", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/licensing", StringComparison.OrdinalIgnoreCase))
+        {
+            var key = secretKey.ToUpperInvariant();
+            if (key.StartsWith("LICENSING_", StringComparison.Ordinal))
+                key = key["LICENSING_".Length..];
+
+            return key switch
+            {
+                "USE_COMMERCIAL_LUCKYPENNY" or "LUCKYPENNY_ENABLED" or "COMMERCIAL_ENABLED" => "Licensing:LuckyPenny:Enabled",
+                "LUCKYPENNY_LICENSE_KEY" or "LUCKYPENNY_KEY" or "LICENSE_KEY" => "Licensing:LuckyPenny:LicenseKey",
+                _ => $"Licensing:{ToPascalCase(key)}"
+            };
+        }
+
+        // 10. Legacy /api folder aliases for backwards compatibility
+        if (normalizedPath.Equals("api", StringComparison.OrdinalIgnoreCase))
+        {
+            var upper = secretKey.ToUpperInvariant();
+            if (upper.StartsWith("INSTANCE__OPERATORIDENTITY__", StringComparison.Ordinal))
+            {
+                var clean = upper["INSTANCE__OPERATORIDENTITY__".Length..];
+                return clean switch
+                {
+                    "OPERATOR_ID" or "OPERATORID" => "Instance:OperatorIdentity:OperatorId",
+                    "PUBLIC_NAME" or "PUBLICNAME" => "Instance:OperatorIdentity:PublicName",
+                    "LEGAL_NAME" or "LEGALNAME" => "Instance:OperatorIdentity:LegalName",
+                    "IS_OFFICIAL_INSTANCE" or "ISOFFICIALINSTANCE" => "Instance:OperatorIdentity:IsOfficialInstance",
+                    "OFFICIAL_ORIGIN" or "OFFICIALORIGIN" => "Instance:OperatorIdentity:OfficialOrigin",
+                    "OPERATOR_KIND_CODE" or "OPERATORKINDCODE" => "Instance:OperatorIdentity:OperatorKindCode",
+                    "JURISDICTION_COUNTRY_CODE" or "JURISDICTIONCOUNTRYCODE" => "Instance:OperatorIdentity:JurisdictionCountryCode",
+                    "REGISTRATION_IDENTIFIER" or "REGISTRATIONIDENTIFIER" => "Instance:OperatorIdentity:RegistrationIdentifier",
+                    "PUBLIC_CONTACT_EMAIL" or "PUBLICCONTACTEMAIL" => "Instance:OperatorIdentity:PublicContactEmail",
+                    "WEBSITE_URL" or "WEBSITEURL" => "Instance:OperatorIdentity:WebsiteUrl",
+                    "LEGAL_NOTICE_URL" or "LEGALNOTICEURL" => "Instance:OperatorIdentity:LegalNoticeUrl",
+                    "TERMS_URL" or "TERMSURL" => "Instance:OperatorIdentity:TermsUrl",
+                    "PRIVACY_URL" or "PRIVACYURL" => "Instance:OperatorIdentity:PrivacyUrl",
+                    _ => $"Instance:OperatorIdentity:{ToPascalCase(clean)}"
+                };
+            }
+
+            if (upper.StartsWith("INSTANCE_BOOTSTRAP_", StringComparison.Ordinal))
+            {
+                var clean = upper["INSTANCE_BOOTSTRAP_".Length..];
+                return clean switch
+                {
+                    "MODE" => "Instance:Bootstrap:Mode",
+                    "ADMIN_PROVIDER" or "PROVIDER" => "Instance:Bootstrap:AdminProvider",
+                    "ADMIN_SUBJECT" or "SUBJECT" => "Instance:Bootstrap:AdminSubject",
+                    "BINDING_GENERATION" or "GENERATION" => "Instance:Bootstrap:BindingGeneration",
+                    "ADMIN_EMAIL" or "EMAIL" => "Instance:Bootstrap:AdminEmail",
+                    "ADMIN_FIRST_NAME" or "FIRST_NAME" => "Instance:Bootstrap:AdminFirstName",
+                    "ADMIN_LAST_NAME" or "LAST_NAME" => "Instance:Bootstrap:AdminLastName",
+                    "LOCAL_PASSWORD" or "PASSWORD" => "Instance:Bootstrap:LocalPassword",
+                    _ => $"Instance:Bootstrap:{ToPascalCase(clean)}"
+                };
+            }
+
+            if (upper.StartsWith("CONTROL_PLANE_", StringComparison.Ordinal))
+            {
+                var clean = upper["CONTROL_PLANE_".Length..];
+                return clean switch
+                {
+                    "MANAGED_MODE" or "ENABLED" => "ManagedControlPlane:Enabled",
+                    "URL" => "ManagedControlPlane:ControlPlaneUrl",
+                    "INSTANCE_ID" or "INSTANCEID" => "ManagedControlPlane:ManagedInstanceId",
+                    "REGISTRATION_TOKEN" or "REGISTRATIONTOKEN" => "ManagedControlPlane:RegistrationToken",
+                    "REGISTRATION_CREDENTIALS" or "REGISTRATIONCREDENTIALS" => "ManagedControlPlane:RegistrationCredentials",
+                    "MAXIMUM_TENANT_COUNT" or "MAXIMUMTENANTCOUNT" => "ManagedControlPlane:MaximumTenantCount",
+                    "TENANT_ADMINISTRATOR_SIGN_IN_URL" or "TENANTADMINISTRATORSIGNINURL" => "ManagedControlPlane:TenantAdministratorSignInUrl",
+                    "CREDENTIAL_LIFETIME" or "CREDENTIALLIFETIME" => "ManagedControlPlane:CredentialLifetime",
+                    _ => $"ManagedControlPlane:{ToPascalCase(clean)}"
+                };
+            }
+
+            if (upper.StartsWith("RATELIMITING__", StringComparison.Ordinal))
+            {
+                var clean = upper["RATELIMITING__".Length..];
+                var legacyRateLimitingParts = clean.Split("__", StringSplitOptions.RemoveEmptyEntries);
+                var legacyRateLimitingConfigParts = legacyRateLimitingParts.Select(NormalizeRateLimitingPart);
+                return $"RateLimiting:{string.Join(":", legacyRateLimitingConfigParts)}";
+            }
+
+            if (upper is "VAPID_PUBLIC_KEY" or "PUBLIC_KEY")
+                return "WebPush:VapidPublicKey";
+            if (upper is "VAPID_PRIVATE_KEY" or "PRIVATE_KEY")
+                return "WebPush:VapidPrivateKey";
+            if (upper is "VAPID_SUBJECT" or "SUBJECT")
+                return "WebPush:VapidSubject";
+            if (upper is "WEB_PUSH_ENABLED")
+                return "WebPush:Enabled";
+
+            if (upper is "USE_COMMERCIAL_LUCKYPENNY")
+                return "Licensing:LuckyPenny:Enabled";
+            if (upper is "LUCKYPENNY_LICENSE_KEY")
+                return "Licensing:LuckyPenny:LicenseKey";
+        }
+
+        // 11. Special mappings for common patterns
         if (secretKey.Equals("AI_TOOL_PROPOSALS_ENABLED", StringComparison.OrdinalIgnoreCase))
         {
             return "AiProvider:ToolProposalsEnabled";
         }
 
-        // 5. Default path to section conversion
+        // 12. Default path to section conversion
         var pathSegments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var section = pathSegments.Length == 0 ? string.Empty : string.Join(":", pathSegments.Select(ToPascalCase)) + ":";
 
@@ -360,6 +654,56 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
         });
 
         return string.Join("", pascalParts);
+    }
+
+    /// <summary>
+    /// Converts PascalCase to SCREAMING_SNAKE_CASE.
+    /// </summary>
+    private static string ToScreamingSnakeCase(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+        {
+            return input;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < input.Length; i++)
+        {
+            var c = input[i];
+            if (char.IsUpper(c) && i > 0 && input[i - 1] != '_')
+            {
+                sb.Append('_');
+            }
+            sb.Append(char.ToUpperInvariant(c));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string NormalizeRateLimitingPart(string part)
+    {
+        var upper = part.ToUpperInvariant().Replace("_", "");
+        return upper switch
+        {
+            "ANONYMOUSREGISTRATION" => "AnonymousRegistration",
+            "IPPERMITLIMIT" => "IpPermitLimit",
+            "SUBNETPERMITLIMIT" => "SubnetPermitLimit",
+            "WINDOWSECONDS" => "WindowSeconds",
+            "CONCURRENCYLIMIT" => "ConcurrencyLimit",
+            "QUEUELIMIT" => "QueueLimit",
+            "TOKENLIMIT" => "TokenLimit",
+            "REPLENISHPERIODSECONDS" => "ReplenishPeriodSeconds",
+            "TOKENSPERPERIOD" => "TokensPerPeriod",
+            "PERMITLIMIT" => "PermitLimit",
+            "SEGMENTSPERWINDOW" => "SegmentsPerWindow",
+            "PUBLICINGESTION" => "PublicIngestion",
+            "PUBLICTRANSACTIONAL" => "PublicTransactional",
+            "CONTROLPLANE" => "ControlPlane",
+            "GLOBAL" => "Global",
+            "AUTHENTICATED" => "Authenticated",
+            "WRITE" => "Write",
+            _ => ToPascalCase(part)
+        };
     }
 
     /// <inheritdoc />

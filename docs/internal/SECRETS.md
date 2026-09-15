@@ -20,7 +20,7 @@ The subject, DID, issuer pairing and generation are selectors, not authenticatio
 proof. External identities still require a real sign-in with the exact provider
 claim. Configured Local bootstrap additionally resolves
 `authentication.local.bootstrap_password` from
-`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api`); it is instance-only,
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api/bootstrap` or `/api`); it is instance-only,
 bootstrap-classified and has no live-rotation path or source default.
 
 That secret creates only the initial temporary credential during incomplete
@@ -528,7 +528,7 @@ Reporting provider secrets are server-side tenant settings. API keys and webhook
 
 Current migrated surface: Cerbos authorization settings expose endpoint and Admin API credential ownership metadata. `AUTHORIZATION_PROVIDER` is non-secret deployment intent, while `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are server-side deployment secrets resolved from environment configuration or Infisical. The browser normally sees only configured flags and ownership metadata. During an explicit setup sync, an operator may instead submit a complete one-time pair; it exists only in the Blazor server circuit and request pipeline, overrides deployment credentials for that call, is cleared after the call, and is never written to `SystemSetting`, returned by an API, or logged. `CERBOS_ADMIN_PASSWORD_HASH` is the Cerbos server verifier and cannot authenticate an Admin API client; keep the matching plaintext password only in deployment secrets or enter it for one sync. Reporting provider secret keys are registered as sensitive hierarchical settings for the moderation routing foundation. Listmonk API username/key values are registered server-side secret bindings; admin updates are write-only and browser DTOs expose configured flags only. Stripe `payments.stripe.platform_secret_key` and `payments.stripe.webhook_secret` are instance/server-only definitions for self-hoster-owned platform credentials. Promotion lookup resolves the qualified instance-only `promotions.code_lookup_hmac_key` binding for every digest operation. SMTP, S3, OAuth, localization/TMS, and AI keys still have area-specific storage/UI paths and must not be documented as fully migrated until their resolvers use the shared ownership metadata consistently.
 
-Web Push VAPID keys are deployment configuration. Infisical `/api/VAPID_PRIVATE_KEY` maps to `WebPush:VapidPrivateKey`; it is a server-only secret and must never appear in browser configuration, API responses, HAL links, logs, traces, health data, screenshots, or support artifacts. `VAPID_PUBLIC_KEY` is intentionally public and is returned by `GET /vapid-public-key` as plain text and by `GET /api/notification/web-push/config`. Browser subscription endpoints and `p256dh`/`auth` material are stored tenant-scoped and are never echoed by subscription status DTOs.
+Web Push VAPID keys are deployment configuration. Infisical `/api/webpush` (or legacy `/api`) `PRIVATE_KEY` / `VAPID_PRIVATE_KEY` maps to `WebPush:VapidPrivateKey`; it is a server-only secret and must never appear in browser configuration, API responses, HAL links, logs, traces, health data, screenshots, or support artifacts. `VAPID_PUBLIC_KEY` is intentionally public and is returned by `GET /vapid-public-key` as plain text and by `GET /api/notification/web-push/config`. Browser subscription endpoints and `p256dh`/`auth` material are stored tenant-scoped and are never echoed by subscription status DTOs.
 
 ## ISecretProvider Interface
 

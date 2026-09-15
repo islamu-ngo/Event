@@ -106,6 +106,7 @@ public static class ConfigurationExtensions
         var managedControlPlaneEnabled = NormalizeBoolean(ReadFirst(
             config,
             "CONTROL_PLANE_MANAGED_MODE",
+            "CONTROL_PLANE_ENABLED",
             "ManagedControlPlane:Enabled"));
         var managedControlPlaneUrl = ReadFirst(
             config,
@@ -119,6 +120,10 @@ public static class ConfigurationExtensions
             config,
             "CONTROL_PLANE_REGISTRATION_TOKEN",
             "ManagedControlPlane:RegistrationToken");
+        var managedRegistrationCredentials = ReadFirst(
+            config,
+            "CONTROL_PLANE_REGISTRATION_CREDENTIALS",
+            "ManagedControlPlane:RegistrationCredentials");
         var managedMaximumTenantCount = ReadFirst(
             config,
             "CONTROL_PLANE_MAXIMUM_TENANT_COUNT",
@@ -233,6 +238,7 @@ public static class ConfigurationExtensions
             ["PrivacyErasureAuthorityDatabase:TlsMode"] = null,
             ["PrivacyErasureAuthorityDatabase:TrustServerCertificate"] = null,
             ["ManagedControlPlane:RegistrationToken"] = null,
+            ["ManagedControlPlane:RegistrationCredentials"] = null,
             ["AiProvider:ApiKey"] = null,
             [SecretDefinitionRegistry.Keys.Integrations.Listmonk.ApiUsername] = null,
             [SecretDefinitionRegistry.Keys.Integrations.Listmonk.ApiKey] = null,
@@ -410,6 +416,7 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "ManagedControlPlane:ControlPlaneUrl", managedControlPlaneUrl);
         TrySet(mappedConfig, config, "ManagedControlPlane:ManagedInstanceId", managedInstanceId);
         TrySet(mappedConfig, config, "ManagedControlPlane:RegistrationToken", managedRegistrationToken);
+        TrySet(mappedConfig, config, "ManagedControlPlane:RegistrationCredentials", managedRegistrationCredentials);
         TrySet(mappedConfig, config, "ManagedControlPlane:MaximumTenantCount", managedMaximumTenantCount);
         TrySet(mappedConfig, config, "ManagedControlPlane:TenantAdministratorSignInUrl", managedTenantAdministratorSignInUrl);
 
@@ -464,6 +471,52 @@ public static class ConfigurationExtensions
             NormalizeBoolean(ReadFirst(config, "USE_COMMERCIAL_LUCKYPENNY", "Licensing:LuckyPenny:Enabled")));
         TrySet(mappedConfig, config, "Licensing:LuckyPenny:LicenseKey",
             ReadFirst(config, "LUCKYPENNY_LICENSE_KEY", "Licensing:LuckyPenny:LicenseKey"));
+
+        // Instance Operator Identity (/api/operator-identity, /api/operatoridentity, or flat /api)
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:OperatorId",
+            ReadFirst(config, "Instance:OperatorIdentity:OperatorId", "INSTANCE__OPERATORIDENTITY__OPERATORID"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:PublicName",
+            ReadFirst(config, "Instance:OperatorIdentity:PublicName", "INSTANCE__OPERATORIDENTITY__PUBLICNAME"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:LegalName",
+            ReadFirst(config, "Instance:OperatorIdentity:LegalName", "INSTANCE__OPERATORIDENTITY__LEGALNAME"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:IsOfficialInstance",
+            NormalizeBoolean(ReadFirst(config, "Instance:OperatorIdentity:IsOfficialInstance", "INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE")));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:OfficialOrigin",
+            ReadFirst(config, "Instance:OperatorIdentity:OfficialOrigin", "INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:OperatorKindCode",
+            ReadFirst(config, "Instance:OperatorIdentity:OperatorKindCode", "INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:JurisdictionCountryCode",
+            ReadFirst(config, "Instance:OperatorIdentity:JurisdictionCountryCode", "INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:RegistrationIdentifier",
+            ReadFirst(config, "Instance:OperatorIdentity:RegistrationIdentifier", "INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:PublicContactEmail",
+            ReadFirst(config, "Instance:OperatorIdentity:PublicContactEmail", "INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:WebsiteUrl",
+            ReadFirst(config, "Instance:OperatorIdentity:WebsiteUrl", "INSTANCE__OPERATORIDENTITY__WEBSITEURL"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:LegalNoticeUrl",
+            ReadFirst(config, "Instance:OperatorIdentity:LegalNoticeUrl", "INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:TermsUrl",
+            ReadFirst(config, "Instance:OperatorIdentity:TermsUrl", "INSTANCE__OPERATORIDENTITY__TERMSURL"));
+        TrySet(mappedConfig, config, "Instance:OperatorIdentity:PrivacyUrl",
+            ReadFirst(config, "Instance:OperatorIdentity:PrivacyUrl", "INSTANCE__OPERATORIDENTITY__PRIVACYURL"));
+
+        // Instance Bootstrap (/api/bootstrap, /api/instance-bootstrap, or flat /api)
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_MODE",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_MODE", "Instance:Bootstrap:Mode"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "Instance:Bootstrap:AdminProvider"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "Instance:Bootstrap:AdminSubject"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_BINDING_GENERATION", "Instance:Bootstrap:BindingGeneration"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_ADMIN_EMAIL",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_ADMIN_EMAIL", "Instance:Bootstrap:AdminEmail"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME", "Instance:Bootstrap:AdminFirstName"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME", "Instance:Bootstrap:AdminLastName"));
+        TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
+            ReadFirst(config, "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD", "Instance:Bootstrap:LocalPassword"));
 
         // Secret Provider Options
         var secretProvider = config[$"{SecretProviderOptions.SectionName}:Provider"];

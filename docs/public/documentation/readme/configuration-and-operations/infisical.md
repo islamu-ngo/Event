@@ -60,44 +60,42 @@ Create the following folders at the root of the selected environment. Folder nam
 
 ```
 /
-├── ai
 ├── api
-├── atproto
+│   ├── bootstrap           (optional: headless administrator bootstrap)
+│   ├── operator-identity   (optional: headless operator legal identity)
+│   ├── controlplane        (optional: managed SaaS control plane)
+│   ├── webpush             (optional: browser Web Push / VAPID)
+│   └── ratelimiting        (optional: rate limiting & anti-abuse thresholds)
 ├── blazor
-├── cerbos
 ├── database
-│   ├── erasure
-│   └── identity
+│   ├── erasure             (optional: external privacy erasure authority)
+│   └── identity            (optional: external local identity store)
+├── licensing               (optional: commercial license keys)
+├── ai                      (optional: assistant provider)
+├── atproto                 (optional: Bluesky / AT Protocol OAuth)
+├── cerbos                  (optional: authorization PDP)
 ├── integrations
-│   └── listmonk
-├── keycloak
-├── mcp
-├── smtp
-├── storage
-└── stripe
+│   └── listmonk            (optional: subscriber sync)
+├── keycloak                (optional: OIDC identity)
+├── mcp                     (optional: Model Context Protocol)
+├── smtp                    (optional: transactional mail)
+├── storage                 (optional: S3 / local uploads)
+└── stripe                  (optional: paid event ticketing)
 ```
 
 Additional runtime-only folders (`/setup`, `/webhook`, `/promotions`, `/admissions`, `/ticketing/recovery`, `/analytics`, `/localization`, `/reporting`, `/registration-providers`) are described in [Runtime Secret Bindings](#6-runtime-secret-bindings) and are created only when you enable the matching feature.
 
-### `/ai`
-
-Optional. Configures the assistant provider.
-
-| Key | Purpose |
-|---|---|
-| `AI_PROVIDER` | Provider selection: `NONE`, `FAKE`, `OPENAI_COMPATIBLE`, `ANTHROPIC_COMPATIBLE`, `OPENAI`, `AZURE_OPENAI`, or `ANTHROPIC`. |
-| `AI_ENDPOINT` | Base URL for compatible/self-hosted providers. |
-| `AI_MODEL_ID` | Model identifier passed to the provider. |
-| `AI_API_KEY` | Provider API credential. |
-| `AI_TOOL_PROPOSALS_ENABLED` | `true` or `false`; enables assistant tool proposals. |
-| `AI_OPENAI_API_KEY` | Registry-bound OpenAI credential for tenant-scoped bindings. |
-| `AI_ANTHROPIC_API_KEY` | Registry-bound Anthropic credential for tenant-scoped bindings. |
-
-`OPENAI` and `ANTHROPIC` need `AI_API_KEY` plus `AI_MODEL_ID`. Every other provider needs `AI_ENDPOINT` plus `AI_MODEL_ID`.
-
 ### `/api`
 
-Instance-level platform credentials read by `Explore.API`.
+Core instance-level platform credentials read by `Explore.API`.
+
+> [!NOTE]
+> Modular subfolders under `/api` keep the core folder lean and focused:
+> - `/api/bootstrap`: Headless administrator bootstrap (see [Headless & GitOps Provisioning](#headless--gitops-provisioning))
+> - `/api/operator-identity`: Legal operator disclosure (see [Headless & GitOps Provisioning](#headless--gitops-provisioning))
+> - `/api/controlplane`: Managed SaaS control plane connection (see [/api/controlplane](#apicontrolplane))
+> - `/api/webpush`: Browser Web Push notification credentials (see [/api/webpush](#apiwebpush))
+> - `/api/ratelimiting`: Anti-abuse and permit limit overrides (see [/api/ratelimiting](#apiratelimiting))
 
 | Key | Purpose |
 |---|---|
@@ -110,43 +108,50 @@ Instance-level platform credentials read by `Explore.API`.
 | `DEPLOYMENT_MODE` | `SingleTenant` or `MultiTenant`. |
 | `SETUP_SECRET` | Pre-shared secret that unlocks `/setup`. Leave unset to generate a single-use secret in the volume on first boot. |
 | `SETUP_SECRET_REQUIRED` | `true` (default) or `false`; whether the setup surface demands the secret. |
-| `INSTANCE_BOOTSTRAP_MODE` | `Interactive` (default web setup wizard) or `ConfiguredAdministrator` (headless bootstrap). |
-| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | Headless bootstrap provider: `local`, `keycloak`, or `atproto`. |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Headless bootstrap subject: canonical UUIDv7 username, Keycloak `sub`, or ATProto DID. |
-| `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | Headless bootstrap generation counter (positive integer). |
-| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | Optional administrator account email. |
-| `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | Optional administrator first name. |
-| `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | Optional administrator last name. |
-| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | Initial password for headless Local administrator bootstrap. |
-| `INSTANCE__OPERATORIDENTITY__OPERATORID` | UUIDv7 unique identifier for the operating legal entity. |
-| `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | Public brand name of the deploying organization. |
-| `INSTANCE__OPERATORIDENTITY__LEGALNAME` | Full legal registered entity name. |
-| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | `true` only for the canonical upstream project deployment. |
-| `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN` | Canonical origin URL for official instances. |
-| `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | Operator-kind code (e.g., `community`). |
-| `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | Two-letter jurisdiction country code (`US`, `GB`, `FR`, etc.). |
-| `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | Public contact email for legal and privacy inquiries. |
-| `INSTANCE__OPERATORIDENTITY__WEBSITEURL` | Public website URL of the operating organization. |
-| `INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL` | Public URL for legal notice / imprint. |
-| `INSTANCE__OPERATORIDENTITY__TERMSURL` | Public URL for Terms of Service. |
-| `INSTANCE__OPERATORIDENTITY__PRIVACYURL` | Public URL for Privacy Policy. |
-| `INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER` | Optional company or charity registration number. |
-| `CONTROL_PLANE_MANAGED_MODE` | `true` or `false`; enables managed control-plane mode. |
-| `CONTROL_PLANE_URL` | Public base URL of the managed control plane. |
-| `CONTROL_PLANE_INSTANCE_ID` | Registered instance UUID in the control plane. |
-| `CONTROL_PLANE_REGISTRATION_TOKEN` | Token used for control-plane registration. |
-| `CONTROL_PLANE_REGISTRATION_CREDENTIALS` | Managed control-plane registration credential. |
-| `CONTROL_PLANE_MAXIMUM_TENANT_COUNT` | Maximum allowed tenants under managed tier. |
-| `CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL` | Hosted sign-in URL for tenant administrators. |
-| `RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT` | Per-IP permit limit for anonymous registration (default: `10`). |
-| `RATELIMITING__ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT` | Per-subnet permit limit (default: `40`). |
-| `RATELIMITING__ANONYMOUSREGISTRATION__WINDOWSECONDS` | Rate limit window in seconds (default: `60`). |
-| `RATELIMITING__ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | Concurrency limit (default: `8`). |
-| `RATELIMITING__ANONYMOUSREGISTRATION__QUEUELIMIT` | Queue limit (default: `0`). |
-| `VAPID_SUBJECT` | Web Push contact subject (`mailto:` or origin URL). |
-| `VAPID_PUBLIC_KEY` | Web Push public key. Intentionally public; served to browsers. |
-| `VAPID_PRIVATE_KEY` | Web Push private key. Server-only; never leaves the API process. |
-| `WEB_PUSH_ENABLED` | `true` or `false`. Defaults to enabled when all three VAPID values are present. |
+
+### `/api/controlplane`
+
+Optional configuration when connecting this instance to a central managed SaaS control plane. Both clean keys and legacy `CONTROL_PLANE_*` prefixes are accepted (aliases `/api/control-plane` or `/api/controlplane`).
+
+| Key | Alternative / Legacy | Purpose |
+|---|---|---|
+| `MANAGED_MODE` | `CONTROL_PLANE_MANAGED_MODE`, `ENABLED` | `true` or `false`; enables managed control-plane mode. |
+| `URL` | `CONTROL_PLANE_URL` | Public base URL of the managed control plane. |
+| `INSTANCE_ID` | `CONTROL_PLANE_INSTANCE_ID` | Registered instance UUID in the control plane. |
+| `REGISTRATION_TOKEN` | `CONTROL_PLANE_REGISTRATION_TOKEN` | Token used for control-plane registration. |
+| `REGISTRATION_CREDENTIALS` | `CONTROL_PLANE_REGISTRATION_CREDENTIALS` | Managed control-plane registration credential secret. |
+| `MAXIMUM_TENANT_COUNT` | `CONTROL_PLANE_MAXIMUM_TENANT_COUNT` | Maximum allowed tenants under managed tier. |
+| `TENANT_ADMINISTRATOR_SIGN_IN_URL` | `CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL` | Hosted sign-in URL for tenant administrators. |
+
+### `/api/webpush`
+
+Optional browser Web Push notification credentials (VAPID). When all three VAPID values are present, Web Push is automatically enabled (aliases `/api/web-push` or `/api/webpush`).
+
+| Key | Alternative / Legacy | Purpose |
+|---|---|---|
+| `ENABLED` | `WEB_PUSH_ENABLED` | `true` or `false`; explicitly enables or disables Web Push. |
+| `SUBJECT` | `VAPID_SUBJECT` | Web Push contact subject (`mailto:` or origin URL). |
+| `PUBLIC_KEY` | `VAPID_PUBLIC_KEY` | Web Push public key (served to browsers). |
+| `PRIVATE_KEY` | `VAPID_PRIVATE_KEY` | Web Push private key (server-only; sensitive secret). |
+
+### `/api/ratelimiting`
+
+Optional rate-limiting overrides for DDoS and anti-abuse protection (aliases `/api/rate-limiting` or `/api/ratelimiting`).
+
+| Key | Purpose |
+|---|---|
+| `ANONYMOUSREGISTRATION__IPPERMITLIMIT` | Per-IP permit limit for anonymous registration (default: `10`). |
+| `ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT` | Per-subnet permit limit (default: `40`). |
+| `ANONYMOUSREGISTRATION__WINDOWSECONDS` | Rate limit window in seconds (default: `60`). |
+| `ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | Concurrency limit (default: `8`). |
+| `ANONYMOUSREGISTRATION__QUEUELIMIT` | Queue limit (default: `0`). |
+
+### `/licensing`
+
+Commercial module licensing (also accepted under `/api/licensing` or legacy `/api`).
+
+| Key | Purpose |
+|---|---|
 | `USE_COMMERCIAL_LUCKYPENNY` | `true` or `false`; selects the commercial Lucky Penny licensing path. |
 | `LUCKYPENNY_LICENSE_KEY` | Lucky Penny commercial license key. |
 
@@ -370,10 +375,10 @@ Instance-scoped, server-only, and optional while paid events are disabled.
 | `PAYMENTS__CHECKOUTGOVERNANCE__REFUNDOWNER` | Governance owner for checkout refunds (`Platform` or `Organizer`). |
 | `PAYMENTS__CHECKOUTGOVERNANCE__DISPUTEOWNER` | Governance owner for checkout disputes (`Platform` or `Organizer`). |
 | `PAYMENTS__CHECKOUTGOVERNANCE__RECONCILIATIONOWNER` | Governance owner for checkout reconciliations (`Platform` or `Organizer`). |
-| `PAYMENTS__CHECKOUTGOVERNANCE__ACTIVATIONSTATUS` | Payment subsystem activation status (`Active` or `Inactive`). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__ACTIVATIONSTATUS` | Payment subsystem activation status (`approved` or `suspended`; defaults to `suspended`). |
 | `PAYMENTS__CHECKOUTGOVERNANCE__REFUNDPOLICYLANGUAGETAG` | Default language tag for refund policy notices. |
-| `PAYMENTS__CHECKOUTGOVERNANCE__STATEMENTDESCRIPTOR` | Card statement descriptor prefix. |
-| `PAYMENTS__CHECKOUTGOVERNANCE__CHARGETYPE` | Checkout charge type: `Direct` or `Destination`. |
+| `PAYMENTS__CHECKOUTGOVERNANCE__STATEMENTDESCRIPTOR` | Card statement descriptor prefix (≤22 chars). |
+| `PAYMENTS__CHECKOUTGOVERNANCE__CHARGETYPE` | Checkout charge type: fixed to `direct-charge` (`OrganizerDirect` zero-custody; destination charges are rejected). |
 
 ### `/atproto`
 
@@ -385,6 +390,70 @@ Required only when AT Protocol login is enabled.
 | `ATPROTO_SESSION_ENCRYPTION_KEYRING` | Session-envelope encryption keyring. |
 | `ATPROTO_SESSION_JWT_PRIVATE_JWKS` | First-party session JWT signing key set. |
 
+### `/ai`
+
+Optional. Configures the assistant provider.
+
+| Key | Purpose |
+|---|---|
+| `AI_PROVIDER` | Provider selection: `NONE`, `FAKE`, `OPENAI_COMPATIBLE`, `ANTHROPIC_COMPATIBLE`, `OPENAI`, `AZURE_OPENAI`, or `ANTHROPIC`. |
+| `AI_ENDPOINT` | Base URL for compatible/self-hosted providers. |
+| `AI_MODEL_ID` | Model identifier passed to the provider. |
+| `AI_API_KEY` | Provider API credential. |
+| `AI_TOOL_PROPOSALS_ENABLED` | `true` or `false`; enables assistant tool proposals. |
+| `AI_OPENAI_API_KEY` | Registry-bound OpenAI credential for tenant-scoped bindings. |
+| `AI_ANTHROPIC_API_KEY` | Registry-bound Anthropic credential for tenant-scoped bindings. |
+
+`OPENAI` and `ANTHROPIC` need `AI_API_KEY` plus `AI_MODEL_ID`. Every other provider needs `AI_ENDPOINT` plus `AI_MODEL_ID`.
+
+---
+
+## Headless & GitOps Provisioning
+
+> [!TIP]
+> **Interactive Web Wizard vs. Headless Infisical Configuration**
+> If you are setting up ISLAMU Event through the browser (the standard self-hosting path), you **do not** need to create `/api/bootstrap` or `/api/operator-identity`. When you visit the web interface on first launch, you will configure your administrator account and organization/legal identity directly in the interactive setup wizard.
+>
+> The folders below are strictly for **automated, zero-touch headless deployments** (`INSTANCE_BOOTSTRAP_MODE=ConfiguredAdministrator`) or GitOps pipelines where no human interacts with the browser wizard.
+
+### `/api/bootstrap`
+
+Configures the headless administrator account when `INSTANCE_BOOTSTRAP_MODE=ConfiguredAdministrator`.
+
+| Key | Purpose |
+|---|---|
+| `MODE` | Headless bootstrap mode: `ConfiguredAdministrator`. |
+| `ADMIN_PROVIDER` | Headless bootstrap provider: `local`, `keycloak`, or `atproto`. |
+| `ADMIN_SUBJECT` | Headless bootstrap subject: canonical UUIDv7 username, Keycloak `sub`, or ATProto DID. |
+| `BINDING_GENERATION` | Headless bootstrap generation counter (positive integer). |
+| `ADMIN_EMAIL` | Optional administrator account email. |
+| `ADMIN_FIRST_NAME` | Optional administrator first name. |
+| `ADMIN_LAST_NAME` | Optional administrator last name. |
+| `LOCAL_PASSWORD` | Initial password for headless Local administrator bootstrap. |
+
+### `/api/operator-identity`
+
+Configures legal and branding metadata for the deploying entity in headless deployments.
+
+| Key | Purpose |
+|---|---|
+| `OPERATOR_ID` | UUIDv7 unique identifier for the operating legal entity. |
+| `PUBLIC_NAME` | Public brand name of the deploying organization. |
+| `LEGAL_NAME` | Full legal registered entity name. |
+| `IS_OFFICIAL_INSTANCE` | `true` only for the canonical upstream project deployment. |
+| `OFFICIAL_ORIGIN` | Canonical origin URL for official instances. |
+| `OPERATOR_KIND_CODE` | Operator-kind code (e.g., `community`). |
+| `JURISDICTION_COUNTRY_CODE` | Two-letter jurisdiction country code (`US`, `GB`, `FR`, etc.). |
+| `PUBLIC_CONTACT_EMAIL` | Public contact email for legal and privacy inquiries. |
+| `WEBSITE_URL` | Public website URL of the operating organization. |
+| `LEGAL_NOTICE_URL` | Public URL for legal notice / imprint. |
+| `TERMS_URL` | Public URL for Terms of Service. |
+| `PRIVACY_URL` | Public URL for Privacy Policy. |
+| `REGISTRATION_IDENTIFIER` | Optional company or charity registration number. |
+
+> [!NOTE]
+> For backwards compatibility, legacy flat keys (`INSTANCE_BOOTSTRAP_*` and `INSTANCE__OPERATORIDENTITY__*`) placed in `/api` remain supported and map to the same configuration models.
+
 ---
 
 ## 5. Which Service Reads Which Folder
@@ -393,12 +462,12 @@ Each host reads a bounded folder list at startup. A key placed outside the folde
 
 | Host | Folders read at startup |
 |---|---|
-| `Explore.API` | `/keycloak`, `/database`, `/database/erasure`, `/database/identity`, `/api`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
+| `Explore.API` | `/keycloak`, `/database`, `/database/erasure`, `/database/identity`, `/api` (including subfolders `/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`), `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
 | `Explore.Blazor` (BFF) | `/keycloak`, `/blazor`, `/atproto` |
 | `Explore.AppHost` (Aspire) | `/keycloak`, `/database`, `/database/erasure`, `/api`, `/blazor`, `/cerbos`, `/mcp`, `/ai`, `/storage`, `/smtp`, `/stripe`, `/integrations/listmonk` |
 | Migration and design-time factories | `/database`, `/database/erasure`, `/database/identity` |
 
-Folder reads are recursive, so a request for `/database` also returns the secrets stored under `/database/erasure` and `/database/identity`. This is why subfolder key names must stay distinct from their parent's key names.
+Folder reads are recursive, so a request for `/database` also returns the secrets stored under `/database/erasure` and `/database/identity`, and a request for `/api` also returns its subfolders (`/api/controlplane`, `/api/operator-identity`, `/api/bootstrap`, `/api/webpush`, `/api/ratelimiting`). This is why subfolder key names must stay distinct from their parent's key names.
 
 ---
 

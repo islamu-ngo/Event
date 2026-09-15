@@ -8,6 +8,8 @@ using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using MediatR;
 
+using Explore.Application.Contracts.Operations;
+
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
 
 public sealed class GetCurrentRegistrationOrderQueryHandler(
@@ -34,7 +36,7 @@ public sealed class GetAuthenticatedNativeRegistrationRequirementProgressQueryHa
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
+    IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler)
     : IRequestHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
     public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
@@ -52,7 +54,7 @@ public sealed class GetAuthenticatedNativeRegistrationRequirementProgressQueryHa
             return null;
         }
 
-        return await sender.Send(new GetNativeRegistrationRequirementProgressQuery(
+        return await progressHandler.QueryAsync(new GetNativeRegistrationRequirementProgressQuery(
             tenant.TenantId, request.EventId, request.OrderId), cancellationToken);
     }
 }

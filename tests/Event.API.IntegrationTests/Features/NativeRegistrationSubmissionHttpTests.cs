@@ -18,8 +18,11 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Services.Webhooks;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -424,11 +427,21 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task ProviderCallback_DuplicateEffectClaim_DispatchesFencedCommandOnce()
     {
-        var mediator = new CapturingMediator();
+        var capturingHandler = new CapturingProviderSubmissionHandler();
         await using WebApplicationFactory<Program> factory = CreateCallbackFactory<FakeRegistrationProviderCallbackVerifier>(services =>
         {
-            services.RemoveAll<IMediator>();
-            services.AddSingleton<IMediator>(mediator);
+            services.RemoveAll<IIncomingWebhookEffectProcessingService>();
+            services.AddScoped<IIncomingWebhookEffectProcessingService>(sp =>
+                new IncomingWebhookEffectProcessingService(
+                    sp.GetRequiredService<IIncomingWebhookEffectOutboxRepository>(),
+                    sp.GetRequiredService<IIncomingWebhookMessageRepository>(),
+                    sp.GetRequiredService<IIncomingWebhookEffectReceiptRepository>(),
+                    sp.GetRequiredService<IRegistrationProviderSubscriptionStateRepository>(),
+                    sp.GetRequiredService<IUnitOfWork>(),
+                    sp.GetRequiredService<IMediator>(),
+                    capturingHandler,
+                    sp.GetRequiredService<IOptions<IncomingWebhookProcessingSettings>>(),
+                    sp.GetRequiredService<TimeProvider>()));
         });
         Guid bindingId = await SeedRegistrationProviderBindingAsync(factory, "external-form");
         using HttpClient client = factory.CreateClient();
@@ -457,7 +470,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
         ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await Assert.That(first.Outcome).IsEqualTo(IncomingWebhookClaimExecutionOutcome.Completed);
         await Assert.That(duplicate.Outcome).IsEqualTo(IncomingWebhookClaimExecutionOutcome.LeaseLost);
-        await Assert.That(mediator.ProviderSubmissionDispatches).IsEqualTo(1);
+        await Assert.That(capturingHandler.ProviderSubmissionDispatches).IsEqualTo(1);
         await Assert.That(await db.IncomingWebhookEffectReceipts.CountAsync()).IsEqualTo(1);
         await Assert.That(await db.IncomingWebhookEffectOutboxes.CountAsync(pointer => pointer.Status == OutboxMessageStatus.Completed)).IsEqualTo(1);
     }
@@ -1018,37 +1031,16 @@ public sealed class NativeRegistrationSubmissionHttpTests
             CancellationToken cancellationToken) => throw new System.Security.Cryptography.CryptographicException("bad signature envelope");
     }
 
-    private sealed class CapturingMediator : IMediator
+    private sealed class CapturingProviderSubmissionHandler : ICommandHandler<ProcessProviderSubmissionEffectCommand, ProviderSubmissionEffectResult>
     {
         public int ProviderSubmissionDispatches { get; private set; }
 
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        public Task<ProviderSubmissionEffectResult> ExecuteAsync(
+            ProcessProviderSubmissionEffectCommand command,
+            CancellationToken cancellationToken = default)
         {
-            if (request is ProcessProviderSubmissionEffectCommand)
-            {
-                ProviderSubmissionDispatches++;
-                return Task.FromResult((TResponse)(object)ProviderSubmissionEffectResult.Completed());
-            }
-
-            throw new InvalidOperationException("Unexpected mediator request: " + request.GetType().Name);
+            ProviderSubmissionDispatches++;
+            return Task.FromResult(ProviderSubmissionEffectResult.Completed());
         }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-            => throw new InvalidOperationException("Unexpected mediator request: " + typeof(TRequest).Name);
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("Unexpected mediator request: " + request.GetType().Name);
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => AsyncEnumerable.Empty<TResponse>();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => AsyncEnumerable.Empty<object?>();
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
     }
 }

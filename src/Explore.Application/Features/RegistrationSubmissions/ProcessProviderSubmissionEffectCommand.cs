@@ -6,7 +6,7 @@ using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
 
@@ -16,7 +16,7 @@ public sealed record ProcessProviderSubmissionEffectCommand(
     Guid BindingId,
     string Provider,
     ReadOnlyMemory<byte> PayloadBytes,
-    IReadOnlyDictionary<string, string> Headers) : IRequest<ProviderSubmissionEffectResult>;
+    IReadOnlyDictionary<string, string> Headers) : ICommand<ProviderSubmissionEffectResult>;
 
 public sealed record ProviderSubmissionEffectResult(ProviderSubmissionEffectOutcome Outcome, string Code)
 {
@@ -53,16 +53,15 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
     IEventParticipationConfigurationRepository participationConfigurationRepository,
     IRegistrationParticipantRepository participantRepository,
     IRegistrationSensitiveValueProtector protector,
-    ISender sender,
     IRegistrationProviderRegistry providerRegistry,
     IRegistrationProviderCallbackReceiptProtector receiptProtector,
     IGuestCapabilityTokenService capabilities,
     TimeProvider timeProvider)
-    : IRequestHandler<ProcessProviderSubmissionEffectCommand, ProviderSubmissionEffectResult>
+    : ICommandHandler<ProcessProviderSubmissionEffectCommand, ProviderSubmissionEffectResult>
 {
     public const string StableEffectKind = "registration.provider_submission";
 
-    public async Task<ProviderSubmissionEffectResult> Handle(
+    public async Task<ProviderSubmissionEffectResult> ExecuteAsync(
         ProcessProviderSubmissionEffectCommand request,
         CancellationToken cancellationToken)
     {

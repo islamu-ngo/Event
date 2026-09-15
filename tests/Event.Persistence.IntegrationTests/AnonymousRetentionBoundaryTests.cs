@@ -1,5 +1,5 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
 using System.Text.Json;
 using Explore.Domain.Constants;
 using System.Security.Cryptography;
@@ -201,8 +201,8 @@ public sealed class AnonymousRetentionBoundaryTests
         var request = new NormalizeRegistrationSubmissionCommand(fixture.TenantId, submission.Id,
             [new(plain.Id, RegistrationAnswerSubjectTypeEnum.RegistrationOrder, order.Id, null, JsonSerializer.SerializeToElement("Entry")),
              new(sensitive.Id, RegistrationAnswerSubjectTypeEnum.RegistrationOrder, order.Id, null, JsonSerializer.SerializeToElement("Private"))]);
-        var handler = fixture.Services.GetRequiredService<IRequestHandler<NormalizeRegistrationSubmissionCommand, RegistrationSubmissionNormalizationResult>>();
-        var result = await handler.Handle(request, CancellationToken.None);
+        var handler = fixture.Services.GetRequiredService<ICommandHandler<NormalizeRegistrationSubmissionCommand, RegistrationSubmissionNormalizationResult>>();
+        var result = await handler.ExecuteAsync(request, CancellationToken.None);
         await Assert.That(result.IsValid).IsTrue();
         await Assert.That(result.AnswerCount).IsEqualTo(2);
         var answers = await fixture.Context.RegistrationAnswers.AsNoTracking().ToArrayAsync();
@@ -211,7 +211,7 @@ public sealed class AnonymousRetentionBoundaryTests
         await Assert.That(ciphertext.RetentionUntil).IsEqualTo(held ? (DateTime?)null : Bound);
         await Assert.That(answers.Single(answer => answer.RegistrationFormFieldId == sensitive.Id).TextValue).IsNull();
         fixture.Clock.Now = new DateTimeOffset(Bound);
-        var expired = await handler.Handle(request, CancellationToken.None);
+        var expired = await handler.ExecuteAsync(request, CancellationToken.None);
         await Assert.That(expired.IsValid).IsFalse();
         await Assert.That(expired.AnswerCount).IsEqualTo(0);
         await Assert.That(expired.Issues.Any(issue => issue.Code == "ANONYMOUS_RETENTION_EXPIRED")).IsTrue();

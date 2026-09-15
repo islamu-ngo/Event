@@ -7,6 +7,7 @@ using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationOrders.Validators;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using MediatR;
 
@@ -48,7 +49,7 @@ public sealed class GetGuestNativeRegistrationRequirementProgressQueryHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
+    IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler)
     : IRequestHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
     public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
@@ -68,7 +69,7 @@ public sealed class GetGuestNativeRegistrationRequirementProgressQueryHandler(
             return null;
         }
 
-        return await sender.Send(new GetNativeRegistrationRequirementProgressQuery(
+        return await progressHandler.QueryAsync(new GetNativeRegistrationRequirementProgressQuery(
             tenant.TenantId, request.EventId, request.OrderId), cancellationToken);
     }
 }

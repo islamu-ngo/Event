@@ -8,6 +8,7 @@ using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
@@ -172,7 +173,7 @@ public sealed class LaunchAuthenticatedNativeRegistrationAttemptCommandHandler(
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
+    ICommandHandler<LaunchNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult> launchHandler)
     : IRequestHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
 {
     public async Task<NativeRegistrationAttemptResult> Handle(
@@ -185,7 +186,7 @@ public sealed class LaunchAuthenticatedNativeRegistrationAttemptCommandHandler(
             return Missing(request.RequirementId, request.ChannelId, request.FormId, request.FormVersionId);
         }
 
-        return await sender.Send(new LaunchNativeRegistrationAttemptCommand(
+        return await launchHandler.ExecuteAsync(new LaunchNativeRegistrationAttemptCommand(
             tenant.TenantId, request.EventId, request.OrderId, request.RequirementId,
             request.ChannelId, request.FormId, request.FormVersionId, request.BindingId,
             request.SupersededAttemptId), cancellationToken);
@@ -201,7 +202,7 @@ public sealed class SubmitAuthenticatedNativeRegistrationAttemptCommandHandler(
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
+    ICommandHandler<SubmitNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult> submitHandler)
     : IRequestHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
 {
     public async Task<NativeRegistrationSubmissionResult> Handle(
@@ -214,7 +215,7 @@ public sealed class SubmitAuthenticatedNativeRegistrationAttemptCommandHandler(
             return new(false, Guid.Empty, [], "registration_order_not_found");
         }
 
-        return await sender.Send(new SubmitNativeRegistrationAttemptCommand(
+        return await submitHandler.ExecuteAsync(new SubmitNativeRegistrationAttemptCommand(
             tenant.TenantId, request.EventId, request.OrderId, request.RequirementId, request.AttemptId,
             request.AttemptCapabilityToken, request.IdempotencyKey, request.Answers), cancellationToken);
     }
@@ -224,7 +225,7 @@ public sealed class LaunchAuthenticatedRegistrationProviderAttemptCommandHandler
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
+    ICommandHandler<LaunchRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult> launchProviderHandler)
     : IRequestHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
 {
     public async Task<RegistrationProviderAttemptResult> Handle(
@@ -237,7 +238,7 @@ public sealed class LaunchAuthenticatedRegistrationProviderAttemptCommandHandler
             return new(false, Guid.Empty, null, "registration_order_not_found");
         }
 
-        return await sender.Send(new LaunchRegistrationProviderAttemptCommand(
+        return await launchProviderHandler.ExecuteAsync(new LaunchRegistrationProviderAttemptCommand(
             tenant.TenantId, request.EventId, request.OrderId, request.RequirementId,
             request.ChannelId, request.BindingId, request.FormId, request.FormVersionId,
             request.SupersededAttemptId), cancellationToken);
@@ -248,7 +249,7 @@ public sealed class SkipAuthenticatedNativeRegistrationRequirementCommandHandler
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
+    ICommandHandler<SkipNativeRegistrationRequirementCommand, NativeRegistrationSkipResult> skipHandler)
     : IRequestHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
 {
     public async Task<NativeRegistrationSkipResult> Handle(
@@ -261,7 +262,7 @@ public sealed class SkipAuthenticatedNativeRegistrationRequirementCommandHandler
             return new(false, null, "registration_order_not_found");
         }
 
-        return await sender.Send(new SkipNativeRegistrationRequirementCommand(
+        return await skipHandler.ExecuteAsync(new SkipNativeRegistrationRequirementCommand(
             tenant.TenantId,
             request.EventId,
             request.OrderId,

@@ -6,6 +6,7 @@ using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
@@ -101,7 +102,7 @@ public sealed class LaunchGuestNativeRegistrationAttemptCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
+    ICommandHandler<LaunchNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult> launchHandler)
     : IRequestHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
 {
     public async Task<NativeRegistrationAttemptResult> Handle(
@@ -116,7 +117,7 @@ public sealed class LaunchGuestNativeRegistrationAttemptCommandHandler(
                 default, null, [], null, false, null, "registration_order_not_found");
         }
 
-        return await sender.Send(new LaunchNativeRegistrationAttemptCommand(
+        return await launchHandler.ExecuteAsync(new LaunchNativeRegistrationAttemptCommand(
             tenant.TenantId, request.EventId, request.OrderId, request.RequirementId,
             request.ChannelId, request.FormId, request.FormVersionId, request.BindingId,
             request.SupersededAttemptId), cancellationToken);
@@ -128,7 +129,7 @@ public sealed class SubmitGuestNativeRegistrationAttemptCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
+    ICommandHandler<SubmitNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult> submitHandler)
     : IRequestHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
 {
     public async Task<NativeRegistrationSubmissionResult> Handle(
@@ -142,7 +143,7 @@ public sealed class SubmitGuestNativeRegistrationAttemptCommandHandler(
             return new(false, Guid.Empty, [], "registration_order_not_found");
         }
 
-        return await sender.Send(new SubmitNativeRegistrationAttemptCommand(
+        return await submitHandler.ExecuteAsync(new SubmitNativeRegistrationAttemptCommand(
             tenant.TenantId, request.EventId, request.OrderId, request.RequirementId, request.AttemptId,
             request.AttemptCapabilityToken, request.IdempotencyKey, request.Answers), cancellationToken);
     }
@@ -153,7 +154,7 @@ public sealed class LaunchGuestRegistrationProviderAttemptCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
+    ICommandHandler<LaunchRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult> launchProviderHandler)
     : IRequestHandler<LaunchGuestRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
 {
     public async Task<RegistrationProviderAttemptResult> Handle(
@@ -167,7 +168,7 @@ public sealed class LaunchGuestRegistrationProviderAttemptCommandHandler(
             return new(false, Guid.Empty, null, "registration_order_not_found");
         }
 
-        return await sender.Send(new LaunchRegistrationProviderAttemptCommand(
+        return await launchProviderHandler.ExecuteAsync(new LaunchRegistrationProviderAttemptCommand(
             tenant.TenantId, request.EventId, request.OrderId, request.RequirementId,
             request.ChannelId, request.BindingId, request.FormId, request.FormVersionId,
             request.SupersededAttemptId), cancellationToken);
@@ -179,7 +180,7 @@ public sealed class SkipGuestNativeRegistrationRequirementCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
+    ICommandHandler<SkipNativeRegistrationRequirementCommand, NativeRegistrationSkipResult> skipHandler)
     : IRequestHandler<SkipGuestNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
 {
     public async Task<NativeRegistrationSkipResult> Handle(
@@ -193,7 +194,7 @@ public sealed class SkipGuestNativeRegistrationRequirementCommandHandler(
             return new(false, null, "registration_order_not_found");
         }
 
-        return await sender.Send(new SkipNativeRegistrationRequirementCommand(
+        return await skipHandler.ExecuteAsync(new SkipNativeRegistrationRequirementCommand(
             tenant.TenantId,
             request.EventId,
             request.OrderId,

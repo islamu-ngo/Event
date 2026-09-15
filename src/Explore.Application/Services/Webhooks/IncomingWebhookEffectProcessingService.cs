@@ -9,6 +9,7 @@ using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Serialization;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using MediatR;
 using Microsoft.Extensions.Options;
@@ -22,6 +23,7 @@ public sealed class IncomingWebhookEffectProcessingService(
     IRegistrationProviderSubscriptionStateRepository subscriptionStateRepository,
     IUnitOfWork unitOfWork,
     IMediator mediator,
+    ICommandHandler<ProcessProviderSubmissionEffectCommand, ProviderSubmissionEffectResult> providerSubmissionEffectHandler,
     IOptions<IncomingWebhookProcessingSettings> settings,
     TimeProvider timeProvider) : IIncomingWebhookEffectProcessingService
 {
@@ -39,6 +41,7 @@ public sealed class IncomingWebhookEffectProcessingService(
         new MissingRegistrationProviderSubscriptionStateRepository(),
         unitOfWork,
         mediator,
+        providerSubmissionEffectHandler: null!,
         settings,
         timeProvider)
     {
@@ -407,7 +410,7 @@ public sealed class IncomingWebhookEffectProcessingService(
         {
             Guid bindingId = ParseBindingId(pointer.ProviderDecisionId);
             string provider = ReadSafeHeader(message.HeadersJson, "X-Registration-Callback-Provider") ?? "registration-provider";
-            ProviderSubmissionEffectResult result = await mediator.Send(
+            ProviderSubmissionEffectResult result = await providerSubmissionEffectHandler.ExecuteAsync(
                 new ProcessProviderSubmissionEffectCommand(
                     pointer.TenantId,
                     pointer.IncomingWebhookMessageId,

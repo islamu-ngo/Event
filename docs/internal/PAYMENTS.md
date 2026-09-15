@@ -494,8 +494,8 @@ Create an incoming webhook verifier and handler in `src/Explore.Infrastructure/P
 
 | Secret Key | Registry Binding Key | Scope | Description |
 |---|---|---|---|
-| `PAYMENTS_STRIPE_PLATFORM_API_KEY` | `payments.stripe.platform_api_key` | Instance (Server-only) | Platform secret API key (`sk_test_...` or `sk_live_...`). |
-| `PAYMENTS_STRIPE_WEBHOOK_SECRET` | `payments.stripe.webhook_secret` | Instance (Server-only) | Signing secret for verifying raw webhook signatures (`whsec_...`). |
+| `STRIPE_PLATFORM_SECRET_KEY` | `payments.stripe.platform_secret_key` | Instance (Server-only) | Platform secret API key (`sk_test_...` or `sk_live_...`). |
+| `STRIPE_WEBHOOK_SECRET` | `payments.stripe.webhook_secret` | Instance (Server-only) | Signing secret for verifying raw webhook signatures (`whsec_...`). |
 
 ---
 

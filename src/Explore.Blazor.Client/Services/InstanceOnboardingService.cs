@@ -125,11 +125,15 @@ public sealed class InstanceOnboardingService(
         catch (ApiException ex) when (ex.StatusCode == 429)
         {
             logger.LogWarning("Setup secret validation rate-limited (429).");
-            return new SetupSecretValidationResultDto { Valid = false };
+            var result = new SetupSecretValidationResultDto { Valid = false };
+            result.AdditionalProperties["Error"] = "Too many attempts. Please wait a minute before trying again.";
+            return result;
         }
         catch (ApiException ex) when (ex.StatusCode == 410)
         {
-            return new SetupSecretValidationResultDto { Valid = false };
+            var result = new SetupSecretValidationResultDto { Valid = false };
+            result.AdditionalProperties["Error"] = "Setup is already completed.";
+            return result;
         }
         catch (Exception ex)
         {

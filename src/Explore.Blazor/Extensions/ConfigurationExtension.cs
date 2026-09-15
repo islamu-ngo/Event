@@ -127,7 +127,7 @@ public static class ConfigurationExtensions
         authorityBuilder.AddInfisical(bootstrapConfig, source =>
         {
             source.Paths.Clear();
-            source.Paths.AddRange(["/keycloak", "/blazor", "/atproto"]);
+            source.Paths.AddRange(["/keycloak", "/blazor", "/atproto", "/api"]);
             source.ThrowOnFirstLoadFailure = true;
         }, environmentName);
         ApplyBlazorMapping(configBuilder, authorityBuilder.Build(), fromInfisical: true);
@@ -152,6 +152,9 @@ public static class ConfigurationExtensions
         var rawGoogleClientId = config[fromInfisical ? "Blazor:GoogleClientId" : "GOOGLE_CLIENT_ID"];
         var rawGoogleClientSecret = config[fromInfisical ? "Blazor:GoogleClientSecret" : "GOOGLE_CLIENT_SECRET"];
         var rawApiUrl = config[fromInfisical ? "Blazor:ApiEndpoint" : "API_ENDPOINT"];
+        var rawAuthProvider = config[fromInfisical ? "Api:AuthenticationProvider" : "AUTHENTICATION_PROVIDER"]
+            ?? config["AUTHENTICATION_PROVIDER"]
+            ?? config["Authentication:Provider"];
         var rawAtprotoOAuthClientPrivateJwks = config[
             fromInfisical ? "Atproto:OauthClientPrivateJwks" : "ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS"];
         var hasAspireApiReference =
@@ -217,6 +220,9 @@ public static class ConfigurationExtensions
         {
             TrySet(mappedConfig, config, "ExploreApi:BaseUrl", rawApiUrl);
         }
+
+        // Authentication Provider
+        TrySet(mappedConfig, config, "Authentication:Provider", rawAuthProvider);
 
         configBuilder.AddInMemoryCollection(mappedConfig);
     }

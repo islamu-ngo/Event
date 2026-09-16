@@ -4,11 +4,11 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +18,10 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/events/{eventId:guid}/refund-campaigns")]
 [ApiController]
-public sealed class RefundCampaignController(IMediator mediator) : ControllerBase
+public sealed class RefundCampaignController(
+    IQueryHandler<GetRefundCampaignsQuery, IReadOnlyList<RefundCampaignDto>> getListQueryHandler,
+    IQueryHandler<GetRefundCampaignQuery, RefundCampaignDto?> getQueryHandler,
+    ICommandHandler<ResumeRefundCampaignCommand, RefundCampaignDto?> resumeCommandHandler) : ControllerBase
 {
     private static readonly ApiNotFoundProblemDescriptor NotFoundProblem = new(
         "Refund campaign not found", "Refund campaign was not found.");
@@ -34,7 +37,7 @@ public sealed class RefundCampaignController(IMediator mediator) : ControllerBas
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<RefundCampaignDto> campaigns = await mediator.Send(
+        IReadOnlyList<RefundCampaignDto> campaigns = await getListQueryHandler.QueryAsync(
             new GetRefundCampaignsQuery(eventId), cancellationToken);
         HalResource<RefundCampaignDto>[] resources = campaigns.Select(campaign => ToResource(campaign, eventId)).ToArray();
         return Ok(HalCollectionResource<RefundCampaignDto>.Create(
@@ -61,7 +64,7 @@ public sealed class RefundCampaignController(IMediator mediator) : ControllerBas
         Guid campaignId,
         CancellationToken cancellationToken = default)
     {
-        RefundCampaignDto? campaign = await mediator.Send(
+        RefundCampaignDto? campaign = await getQueryHandler.QueryAsync(
             new GetRefundCampaignQuery(eventId, campaignId), cancellationToken);
         return campaign is null ? this.ToNotFoundProblem(NotFoundProblem) : Ok(ToResource(campaign, eventId));
     }
@@ -84,7 +87,7 @@ public sealed class RefundCampaignController(IMediator mediator) : ControllerBas
         CancellationToken cancellationToken = default)
     {
         _ = idempotencyKey;
-        RefundCampaignDto? campaign = await mediator.Send(
+        RefundCampaignDto? campaign = await resumeCommandHandler.ExecuteAsync(
             new ResumeRefundCampaignCommand(eventId, campaignId), cancellationToken);
         return campaign is null
             ? this.ToNotFoundProblem(NotFoundProblem)

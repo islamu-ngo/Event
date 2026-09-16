@@ -13,6 +13,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.Promotions.Requests.Commands;
+using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
@@ -534,7 +535,7 @@ public sealed class RegistrationOrderControllerTests
         IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> effectiveAssembler =
             assembler ?? Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         object[] arguments = typeof(TController) == typeof(GuestRegistrationOrderController)
-            ? [mediator, TimeProvider.System]
+            ? [mediator, TimeProvider.System, Substitute.For<IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>>()]
             : typeof(TController) == typeof(AuthenticatedRegistrationOrderController)
                 ? [mediator, effectiveAssembler,
                    Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
@@ -553,7 +554,10 @@ public sealed class RegistrationOrderControllerTests
 
     private static GuestRegistrationOrderController CreateGuestController(IMediator mediator, TimeProvider timeProvider)
     {
-        var controller = new GuestRegistrationOrderController(mediator, timeProvider);
+        var controller = new GuestRegistrationOrderController(
+            mediator,
+            timeProvider,
+            Substitute.For<IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         var url = Substitute.For<IUrlHelper>();
         url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");

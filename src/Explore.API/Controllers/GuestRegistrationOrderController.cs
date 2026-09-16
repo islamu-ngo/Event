@@ -6,6 +6,7 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Middleware;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
@@ -25,7 +26,8 @@ namespace Explore.API.Controllers;
 [Tags("GuestRegistrationOrder")]
 public sealed class GuestRegistrationOrderController(
     IMediator mediator,
-    TimeProvider timeProvider) : RegistrationOrderControllerBase
+    TimeProvider timeProvider,
+    IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?> getStatusQueryHandler) : RegistrationOrderControllerBase
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
@@ -103,7 +105,7 @@ public sealed class GuestRegistrationOrderController(
         return response is null
             ? this.ToNotFoundProblem(RegistrationOrderNotFoundProblem)
             : Ok(GuestRegistrationOrderHalResourceFactory.Create(response, Url, timeProvider,
-                await mediator.Send(new GetGuestRegistrationStatusQuery(eventId, orderId, capability), cancellationToken)));
+                await getStatusQueryHandler.QueryAsync(new GetGuestRegistrationStatusQuery(eventId, orderId, capability), cancellationToken)));
     }
 
     [AllowAnonymous]
@@ -188,7 +190,7 @@ public sealed class GuestRegistrationOrderController(
         }
 
         var resource = new HalResource<GuestRegistrationOrderLifecycleResponseDto>(response);
-        GuestRegistrationStatusDto? status = await mediator.Send(
+        GuestRegistrationStatusDto? status = await getStatusQueryHandler.QueryAsync(
             new GetGuestRegistrationStatusQuery(eventId, orderId, capability), cancellationToken);
         if (status is not null)
         {

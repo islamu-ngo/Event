@@ -1,15 +1,15 @@
 
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Handlers;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Queries;
 
 public sealed record GetGuestRegistrationStatusQuery(Guid EventId, Guid OrderId, string? CapabilityToken)
-    : IRequest<GuestRegistrationStatusDto?>
+    : IQuery<GuestRegistrationStatusDto?>
 {
     public override string ToString() => "GetGuestRegistrationStatusQuery { Redacted = true }";
 }
@@ -21,12 +21,12 @@ public sealed class GetGuestRegistrationStatusQueryHandler(
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
-    : IRequestHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>
+    : IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>
 {
-    public async Task<GuestRegistrationStatusDto?> Handle(GetGuestRegistrationStatusQuery request, CancellationToken cancellationToken)
+    public async Task<GuestRegistrationStatusDto?> QueryAsync(GetGuestRegistrationStatusQuery query, CancellationToken cancellationToken = default)
     {
         if (!GuestRegistrationStatusAccessGuard.IsWellFormed(
-            tenant.TenantId, request.EventId, request.OrderId, request.CapabilityToken))
+            tenant.TenantId, query.EventId, query.OrderId, query.CapabilityToken))
         {
             return null;
         }
@@ -36,8 +36,8 @@ public sealed class GetGuestRegistrationStatusQueryHandler(
             var result = await unitOfWork.ExecuteSerializableAsync<GuestRegistrationStatusDto?>(async token =>
             {
                 var snapshot = await GuestRegistrationStatusAccessGuard.GetAsync(
-                    guestRegistrations, events, capabilities, tenant.TenantId, request.EventId, request.OrderId,
-                    request.CapabilityToken!, timeProvider, token);
+                    guestRegistrations, events, capabilities, tenant.TenantId, query.EventId, query.OrderId,
+                    query.CapabilityToken!, timeProvider, token);
                 if (snapshot is not { } authorized || authorized.Deadline <= timeProvider.GetUtcNow().UtcDateTime)
                 {
                     return null;

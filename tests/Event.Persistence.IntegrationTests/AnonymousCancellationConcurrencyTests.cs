@@ -6,6 +6,7 @@ using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -204,10 +205,10 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         services.GetRequiredService<ExploreDbContext>().TenantContext = missing ? null : foreignTenant;
 
         // Even a valid proof and exact explicit tenant predicate cannot replace ambient isolation.
-        await Assert.That(await services.GetRequiredService<IRequestHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
-            .Handle(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None)).IsNull();
-        var denied = await services.GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-            .Handle(command, CancellationToken.None);
+        await Assert.That(await services.GetRequiredService<IQueryHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
+            .QueryAsync(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None)).IsNull();
+        var denied = await services.GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(command, CancellationToken.None);
         await Assert.That(denied.FailureCode).IsEqualTo("registration_order_not_found");
         await Assert.That((await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync()).ConcurrencyStamp)
             .IsEqualTo(order.ConcurrencyStamp);
@@ -461,15 +462,15 @@ public sealed partial class AnonymousCancellationConcurrencyTests
     private static async Task<BaseCommandResponse<Guid>> CancelAsync(EventVisitorCapabilitySqliteFixture fixture, CancelConfirmedGuestRegistrationCommand command)
     {
         await using var scope = fixture.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-            .Handle(command, CancellationToken.None);
+        return await scope.ServiceProvider.GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(command, CancellationToken.None);
     }
 
     private static async Task<bool?> EligibleAsync(EventVisitorCapabilitySqliteFixture fixture, CancelConfirmedGuestRegistrationCommand command)
     {
         await using var scope = fixture.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<IRequestHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
-            .Handle(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None);
+        return await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
+            .QueryAsync(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None);
     }
 
     private sealed class Clock : TimeProvider

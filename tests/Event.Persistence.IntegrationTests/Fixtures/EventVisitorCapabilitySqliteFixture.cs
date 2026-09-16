@@ -182,6 +182,10 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         where TCommand : ICommand<TResponse> =>
         Services.GetRequiredService<ICommandHandler<TCommand, TResponse>>().ExecuteAsync(command, CancellationToken.None);
 
+    internal Task<TResponse> ExecuteQueryAsync<TQuery, TResponse>(TQuery query)
+        where TQuery : IQuery<TResponse> =>
+        Services.GetRequiredService<IQueryHandler<TQuery, TResponse>>().QueryAsync(query, CancellationToken.None);
+
     internal async Task<Explore.Domain.Event> SeedEventAsync(bool accountRequired = false, bool published = false)
     {
         var entity = new Explore.Domain.Event(published ? EventStatusEnum.Published : EventStatusEnum.Draft)

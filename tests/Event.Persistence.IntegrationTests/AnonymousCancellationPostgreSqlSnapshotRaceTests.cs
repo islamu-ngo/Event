@@ -4,6 +4,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
@@ -57,8 +58,8 @@ public sealed class AnonymousCancellationPostgreSqlSnapshotRaceTests(PostgreSqlC
         IServiceProvider cancellationServices = cancellationScope.ServiceProvider;
         barrier.Arm(cancellationServices.GetRequiredService<ExploreDbContext>().ContextId.InstanceId);
         Task<BaseCommandResponse<Guid>> cancellation = cancellationServices
-            .GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-            .Handle(command, CancellationToken.None);
+            .GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(command, CancellationToken.None);
 
         try
         {

@@ -3,6 +3,7 @@ using System.Data.Common;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -144,7 +145,7 @@ public sealed class GuestRegistrationStatusTests
                         services.GetRequiredService<IEventRepository>(),
                         services.GetRequiredService<IGuestCapabilityTokenService>(), foreignTenant,
                         services.GetRequiredService<IUnitOfWork>(), clock);
-                    await Assert.That(await handler.Handle(query, CancellationToken.None)).IsNull();
+                    await Assert.That(await handler.QueryAsync(query, CancellationToken.None)).IsNull();
                 }
                 return;
             case "expired-state":
@@ -307,7 +308,7 @@ public sealed class GuestRegistrationStatusTests
             await context.Events.Where(target => target.Id == query.EventId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(target => target.LastSessionEndUtc, EventEnd.AddDays(10)));
         }
-        var current = await fixture.ExecuteAsync<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>(query);
+        var current = await fixture.ExecuteQueryAsync<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>(query);
         await Assert.That(current!.StatusAccessUntil).IsEqualTo(Deadline.AddDays(10));
         await using (var writer = fixture.CreateScope())
         {
@@ -315,7 +316,7 @@ public sealed class GuestRegistrationStatusTests
             await context.RegistrationOrders.Where(order => order.Id == query.OrderId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(order => order.IsDeleted, true));
         }
-        await Assert.That(await fixture.ExecuteAsync<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>(query)).IsNull();
+        await Assert.That(await fixture.ExecuteQueryAsync<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>(query)).IsNull();
     }
 
     [Test]
@@ -385,8 +386,8 @@ public sealed class GuestRegistrationStatusTests
         GetGuestRegistrationStatusQuery query)
     {
         await using var scope = fixture.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<IRequestHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>>()
-            .Handle(query, CancellationToken.None);
+        return await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>>()
+            .QueryAsync(query, CancellationToken.None);
     }
 
     private static async Task<(Guid CatalogId, Guid TicketId)> SeedPaidTicketAsync(

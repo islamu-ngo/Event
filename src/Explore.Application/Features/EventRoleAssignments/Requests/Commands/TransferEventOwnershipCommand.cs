@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 
-public sealed record TransferEventOwnershipCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record TransferEventOwnershipCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public Guid TenantId { get; init; }
     public Guid EventId { get; init; }

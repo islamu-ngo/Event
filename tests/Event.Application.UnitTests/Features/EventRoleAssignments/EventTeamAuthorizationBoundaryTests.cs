@@ -1,8 +1,9 @@
 using System.Reflection;
 using Explore.Application.Authorization;
-using Explore.Application.Behaviors;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Operations.Decorators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
@@ -61,23 +62,21 @@ public sealed class EventTeamAuthorizationBoundaryTests
                 captured = call.Arg<AuthorizationRequest>();
                 return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Runtime);
             });
-        var behavior = new AuthorizationBehavior<AssignEventRoleCommand, BaseCommandResponse<Guid>>(
+        var authorization = new RequestAuthorization<AssignEventRoleCommand>(
             provider,
-            Substitute.For<ILogger<AuthorizationBehavior<AssignEventRoleCommand, BaseCommandResponse<Guid>>>>(),
             new AuthorizationResourceContextResolver(eventRepository, tenantContext: tenantContext));
-        var request = new AssignEventRoleCommand { TenantId = tenantId, EventId = eventId };
-        var handlerRan = false;
+        var innerHandler = Substitute.For<ICommandHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>>>();
+        var decorator = new AuthorizationCommandHandlerDecorator<AssignEventRoleCommand, BaseCommandResponse<Guid>>(
+            innerHandler,
+            authorization,
+            Substitute.For<ILogger<RequestAuthorization<AssignEventRoleCommand>>>());
+        var command = new AssignEventRoleCommand { TenantId = tenantId, EventId = eventId };
 
-        await Assert.ThrowsAsync<AuthorizationException>(() => behavior.Handle(
-            request,
-            _ =>
-            {
-                handlerRan = true;
-                return Task.FromResult(BaseCommandResponse.Validation<Guid>(["Handler should not run."]));
-            },
+        await Assert.ThrowsAsync<AuthorizationException>(() => decorator.ExecuteAsync(
+            command,
             CancellationToken.None));
 
-        await Assert.That(handlerRan).IsFalse();
+        await innerHandler.DidNotReceive().ExecuteAsync(Arg.Any<AssignEventRoleCommand>(), Arg.Any<CancellationToken>());
         await Assert.That(captured).IsNotNull();
         await Assert.That(captured!.ResourceKind).IsEqualTo(ResourceKinds.Event);
         await Assert.That(captured.Action).IsEqualTo(AuthorizationActions.Events.ManageTeam);

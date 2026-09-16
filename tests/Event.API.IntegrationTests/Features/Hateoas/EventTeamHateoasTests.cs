@@ -10,11 +10,13 @@ using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventRoleAssignment;
+using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,8 +33,8 @@ public sealed class EventTeamHateoasTests
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         EventTeamMemberDto member = Member(tenantId, eventId);
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetEventTeamListRequest>(), Arg.Any<CancellationToken>())
+        var getTeamHandler = Substitute.For<IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>>>();
+        getTeamHandler.QueryAsync(Arg.Any<GetEventTeamListRequest>(), Arg.Any<CancellationToken>())
             .Returns([member]);
         var assembler = Substitute.For<IResourceAssembler<EventTeamMemberDto, EventTeamMemberDto>>();
         var collection = new HalCollectionResource<EventTeamMemberDto>();
@@ -45,7 +47,11 @@ public sealed class EventTeamHateoasTests
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(tenantId);
         var controller = new EventTeamController(
-            mediator,
+            getTeamHandler,
+            Substitute.For<IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto>>(),
+            Substitute.For<IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>>>(),
+            Substitute.For<ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<RevokeEventRoleAssignmentCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<IAdminContext>(),
             tenantContext,
             assembler)
@@ -56,7 +62,7 @@ public sealed class EventTeamHateoasTests
         ActionResult<HalCollectionResource<EventTeamMemberDto>> result = await controller.GetTeam(eventId);
 
         await Assert.That((result.Result as OkObjectResult)?.Value).IsEqualTo(collection);
-        _ = mediator.Received(1).Send(
+        _ = getTeamHandler.Received(1).QueryAsync(
             Arg.Is<GetEventTeamListRequest>(query =>
                 query.TenantId == tenantId && query.EventId == eventId && !query.IncludeInactive),
             Arg.Any<CancellationToken>());

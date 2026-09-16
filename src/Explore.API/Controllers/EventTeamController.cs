@@ -5,12 +5,12 @@ using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,18 +22,30 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public class EventTeamController : ControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>> _getTeamHandler;
+    private readonly IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> _getMyPermissionsHandler;
+    private readonly IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> _getAssignablePresetsHandler;
+    private readonly ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>> _assignRoleHandler;
+    private readonly ICommandHandler<RevokeEventRoleAssignmentCommand, BaseCommandResponse<Guid>> _revokeRoleHandler;
     private readonly IAdminContext _adminContext;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<EventTeamMemberDto, EventTeamMemberDto> _resourceAssembler;
 
     public EventTeamController(
-        IMediator mediator,
+        IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>> getTeamHandler,
+        IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> getMyPermissionsHandler,
+        IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> getAssignablePresetsHandler,
+        ICommandHandler<AssignEventRoleByEmailCommand, BaseCommandResponse<Guid>> assignRoleHandler,
+        ICommandHandler<RevokeEventRoleAssignmentCommand, BaseCommandResponse<Guid>> revokeRoleHandler,
         IAdminContext adminContext,
         ITenantContext tenantContext,
         IResourceAssembler<EventTeamMemberDto, EventTeamMemberDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _getTeamHandler = getTeamHandler;
+        _getMyPermissionsHandler = getMyPermissionsHandler;
+        _getAssignablePresetsHandler = getAssignablePresetsHandler;
+        _assignRoleHandler = assignRoleHandler;
+        _revokeRoleHandler = revokeRoleHandler;
         _adminContext = adminContext;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
@@ -52,7 +64,7 @@ public class EventTeamController : ControllerBase
         [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEventTeamListRequest
+        var result = await _getTeamHandler.QueryAsync(new GetEventTeamListRequest
         {
             TenantId = _tenantContext.TenantId,
             EventId = eventId,
@@ -82,7 +94,7 @@ public class EventTeamController : ControllerBase
         if (userId is null)
             return this.ToAuthenticationRequiredProblem();
 
-        var result = await _mediator.Send(new GetCurrentUserEventPermissionsRequest
+        var result = await _getMyPermissionsHandler.QueryAsync(new GetCurrentUserEventPermissionsRequest
         {
             TenantId = _tenantContext.TenantId,
             EventId = eventId,
@@ -106,7 +118,7 @@ public class EventTeamController : ControllerBase
         if (userId is null)
             return this.ToAuthenticationRequiredProblem();
 
-        var result = await _mediator.Send(new GetAssignableEventRolePresetsRequest
+        var result = await _getAssignablePresetsHandler.QueryAsync(new GetAssignableEventRolePresetsRequest
         {
             TenantId = _tenantContext.TenantId,
             EventId = eventId,
@@ -133,7 +145,7 @@ public class EventTeamController : ControllerBase
         if (actorUserId is null)
             return this.ToAuthenticationRequiredProblem();
 
-        var result = await _mediator.Send(new AssignEventRoleByEmailCommand
+        var result = await _assignRoleHandler.ExecuteAsync(new AssignEventRoleByEmailCommand
         {
             TenantId = _tenantContext.TenantId,
             EventId = eventId,
@@ -161,7 +173,7 @@ public class EventTeamController : ControllerBase
         if (actorUserId is null)
             return this.ToAuthenticationRequiredProblem();
 
-        var result = await _mediator.Send(new RevokeEventRoleAssignmentCommand
+        var result = await _revokeRoleHandler.ExecuteAsync(new RevokeEventRoleAssignmentCommand
         {
             TenantId = _tenantContext.TenantId,
             EventId = eventId,

@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Queries;
 
 public sealed class GetEventTeamListRequestHandler
-    : IRequestHandler<GetEventTeamListRequest, List<EventTeamMemberDto>>
+    : IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>>
 {
     private readonly IEventRoleAssignmentRepository _eventRoleAssignmentRepository;
 
@@ -15,14 +15,14 @@ public sealed class GetEventTeamListRequestHandler
         _eventRoleAssignmentRepository = eventRoleAssignmentRepository;
     }
 
-    public async Task<List<EventTeamMemberDto>> Handle(
-        GetEventTeamListRequest request,
-        CancellationToken cancellationToken)
+    public async Task<List<EventTeamMemberDto>> QueryAsync(
+        GetEventTeamListRequest query,
+        CancellationToken cancellationToken = default)
     {
         var assignments = await _eventRoleAssignmentRepository.GetTeamMembersForEventAsync(
-            request.TenantId,
-            request.EventId,
-            request.IncludeInactive,
+            query.TenantId,
+            query.EventId,
+            query.IncludeInactive,
             cancellationToken);
 
         var utcNow = DateTime.UtcNow;

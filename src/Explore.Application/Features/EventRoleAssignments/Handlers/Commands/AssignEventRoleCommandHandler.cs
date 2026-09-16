@@ -1,18 +1,18 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class AssignEventRoleCommandHandler
     : EventRoleAssignmentCommandHandlerBase,
-      IRequestHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>>
+      ICommandHandler<AssignEventRoleCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRoleAssignmentRepository _assignmentRepository;
     private readonly IEventRepository _eventRepository;
@@ -40,7 +40,7 @@ public sealed class AssignEventRoleCommandHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(AssignEventRoleCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AssignEventRoleCommand request, CancellationToken cancellationToken = default)
     {
         if (request.RoleId == (int)RoleEnum.EventOwner)
         {

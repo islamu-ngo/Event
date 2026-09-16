@@ -1,18 +1,18 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class RevokeEventRoleAssignmentCommandHandler
     : EventRoleAssignmentCommandHandlerBase,
-      IRequestHandler<RevokeEventRoleAssignmentCommand, BaseCommandResponse<Guid>>
+      ICommandHandler<RevokeEventRoleAssignmentCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRoleAssignmentRepository _assignmentRepository;
     private readonly IEventRepository _eventRepository;
@@ -37,7 +37,7 @@ public sealed class RevokeEventRoleAssignmentCommandHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(RevokeEventRoleAssignmentCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RevokeEventRoleAssignmentCommand request, CancellationToken cancellationToken = default)
     {
         var assignment = await _assignmentRepository.GetById(request.AssignmentId);
         if (assignment is null || assignment.TenantId != request.TenantId || assignment.EventId != request.EventId)

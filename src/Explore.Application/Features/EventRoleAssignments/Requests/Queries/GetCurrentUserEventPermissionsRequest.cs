@@ -1,8 +1,8 @@
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 
-public sealed record GetCurrentUserEventPermissionsRequest : IRequest<CurrentUserEventPermissionsDto>
+public sealed record GetCurrentUserEventPermissionsRequest : IQuery<CurrentUserEventPermissionsDto>
 {
     public Guid TenantId { get; init; }
     public Guid EventId { get; init; }

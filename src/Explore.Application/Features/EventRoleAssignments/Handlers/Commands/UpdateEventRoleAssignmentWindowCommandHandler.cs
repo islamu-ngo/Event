@@ -1,17 +1,17 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class UpdateEventRoleAssignmentWindowCommandHandler
     : EventRoleAssignmentCommandHandlerBase,
-      IRequestHandler<UpdateEventRoleAssignmentWindowCommand, BaseCommandResponse<Guid>>
+      ICommandHandler<UpdateEventRoleAssignmentWindowCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRoleAssignmentRepository _assignmentRepository;
     private readonly IEventRepository _eventRepository;
@@ -36,7 +36,7 @@ public sealed class UpdateEventRoleAssignmentWindowCommandHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventRoleAssignmentWindowCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventRoleAssignmentWindowCommand request, CancellationToken cancellationToken = default)
     {
         var assignment = await _assignmentRepository.GetById(request.AssignmentId);
         if (assignment is null || assignment.TenantId != request.TenantId || assignment.EventId != request.EventId)

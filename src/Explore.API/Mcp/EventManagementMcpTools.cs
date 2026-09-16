@@ -65,7 +65,10 @@ public sealed class EventManagementMcpTools(
     IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
     IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> customPropertyDefinitions,
     IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues,
-    IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler)
+    IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler,
+    IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>> eventTeamListHandler,
+    IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> currentUserEventPermissionsHandler,
+    IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> assignableEventRolePresetsHandler)
 {
 
     [McpServerTool(
@@ -999,7 +1002,7 @@ public sealed class EventManagementMcpTools(
 
         var eventDto = gate.Event!;
         var userId = userContext.GetRequiredUserId();
-        var teamMembers = await mediator.Send(
+        var teamMembers = await eventTeamListHandler.QueryAsync(
             new GetEventTeamListRequest
             {
                 TenantId = tenantContext.TenantId,
@@ -1007,7 +1010,7 @@ public sealed class EventManagementMcpTools(
                 IncludeInactive = includeInactive
             },
             cancellationToken);
-        var permissions = await mediator.Send(
+        var permissions = await currentUserEventPermissionsHandler.QueryAsync(
             new GetCurrentUserEventPermissionsRequest
             {
                 TenantId = tenantContext.TenantId,
@@ -1015,7 +1018,7 @@ public sealed class EventManagementMcpTools(
                 UserId = userId
             },
             cancellationToken);
-        var assignablePresets = await mediator.Send(
+        var assignablePresets = await assignableEventRolePresetsHandler.QueryAsync(
             new GetAssignableEventRolePresetsRequest
             {
                 TenantId = tenantContext.TenantId,

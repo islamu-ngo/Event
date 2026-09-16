@@ -19,6 +19,7 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Operations;
 using Explore.Application.Services.Webhooks;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
@@ -67,7 +68,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task AuthenticatedLaunchRequiresAuthenticationAndReturnsBoundedAttemptCapability()
     {
-        var mediator = Substitute.For<IMediator>();
+        var launchHandler = Substitute.For<ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
         Guid requirementId = Guid.CreateVersion7();
@@ -76,10 +77,13 @@ public sealed class NativeRegistrationSubmissionHttpTests
         Guid versionId = Guid.CreateVersion7();
         Guid attemptId = Guid.CreateVersion7();
         const string attemptToken = "attempt-token-secret";
-        mediator.Send(Arg.Any<LaunchAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        launchHandler.ExecuteAsync(Arg.Any<LaunchAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(CreateAttemptResult(
                 attemptId, requirementId, channelId, formId, versionId, attemptToken));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, launchHandler);
+        });
         using HttpClient client = factory.CreateClient();
         object body = new { requirementId, channelId, formId, formVersionId = versionId };
 
@@ -103,8 +107,8 @@ public sealed class NativeRegistrationSubmissionHttpTests
     public async Task GuestLaunchRequiresMatchingOrderCapability()
     {
         const string validCapability = "valid-order-capability";
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<LaunchGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        var launchHandler = Substitute.For<ICommandHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>();
+        launchHandler.ExecuteAsync(Arg.Any<LaunchGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().CapabilityToken == validCapability
                 ? new NativeRegistrationAttemptResult(
                     true, Guid.CreateVersion7(), call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().RequirementId,
@@ -120,7 +124,10 @@ public sealed class NativeRegistrationSubmissionHttpTests
                     call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().FormId,
                     call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().FormVersionId,
                     default, null, [], null, false, null, "registration_order_not_found"));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, launchHandler);
+        });
         using HttpClient client = factory.CreateClient();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -147,12 +154,15 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task ValidationProblemContainsOnlyIssueCodesAndFieldKeys()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        var submitHandler = Substitute.For<ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>();
+        submitHandler.ExecuteAsync(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(new NativeRegistrationSubmissionResult(
                 false, Guid.CreateVersion7(), [new("INVALID_TEXT", "profile.display_name")],
                 "registration_submission_invalid"));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, submitHandler);
+        });
         using HttpClient client = factory.CreateClient();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -193,13 +203,14 @@ public sealed class NativeRegistrationSubmissionHttpTests
     {
         const string orderCapability = "valid-order-capability";
         const string attemptCapability = "valid-attempt-capability";
-        var mediator = Substitute.For<IMediator>();
+        var authenticatedSubmitHandler = Substitute.For<ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>();
+        var guestSubmitHandler = Substitute.For<ICommandHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>();
         Guid submissionId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        authenticatedSubmitHandler.ExecuteAsync(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<SubmitAuthenticatedNativeRegistrationAttemptCommand>().AttemptCapabilityToken == attemptCapability
                 ? new NativeRegistrationSubmissionResult(true, submissionId, [])
                 : new NativeRegistrationSubmissionResult(false, Guid.Empty, [], "registration_attempt_not_found"));
-        mediator.Send(Arg.Any<SubmitGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        guestSubmitHandler.ExecuteAsync(Arg.Any<SubmitGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 SubmitGuestNativeRegistrationAttemptCommand command = call.Arg<SubmitGuestNativeRegistrationAttemptCommand>();
@@ -207,7 +218,11 @@ public sealed class NativeRegistrationSubmissionHttpTests
                     ? new NativeRegistrationSubmissionResult(true, submissionId, [])
                     : new NativeRegistrationSubmissionResult(false, Guid.Empty, [], "registration_attempt_not_found");
             });
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, authenticatedSubmitHandler);
+            SubstituteNativeHandler(services, guestSubmitHandler);
+        });
         using HttpClient client = factory.CreateClient();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -674,13 +689,34 @@ public sealed class NativeRegistrationSubmissionHttpTests
         await Assert.That(payload).DoesNotContain(PlatformDefaults.DefaultTenantId.ToString("D"));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(IMediator mediator) =>
+    private static WebApplicationFactory<Program> CreateFactory(Action<IServiceCollection>? configureServices = null) =>
         new AuthenticatedWebApplicationFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
+                configureServices?.Invoke(services);
             }));
+
+    /// <summary>
+    /// Replaces a native operation handler with an NSubstitute test double while keeping the
+    /// <see cref="NativeOperationCatalog"/> consistent so composition validation passes.
+    /// </summary>
+    private static void SubstituteNativeHandler<TContract>(IServiceCollection services, TContract substitute) where TContract : class
+    {
+        var contractType = typeof(TContract);
+        var catalog = (NativeOperationCatalog)services.Single(d => d.ServiceType == typeof(NativeOperationCatalog)).ImplementationInstance!;
+        var entry = catalog.Registrations.Single(r => r.Contract == contractType);
+        catalog.Registrations.Remove(entry);
+        services.Remove(entry.PublicDescriptor);
+        services.Remove(entry.ConcreteDescriptor);
+
+        var substituteType = substitute.GetType();
+        var concreteDescriptor = ServiceDescriptor.Scoped(substituteType, _ => substitute);
+        var publicDescriptor = ServiceDescriptor.Scoped(contractType, _ => substitute);
+        services.Add(concreteDescriptor);
+        services.Add(publicDescriptor);
+        catalog.Registrations.Add(new NativeOperationRegistration(
+            contractType, substituteType, publicDescriptor, concreteDescriptor, [[]]));
+    }
 
     private static WebApplicationFactory<Program> CreateCallbackFactory() =>
         CreateCallbackFactory<FakeRegistrationProviderCallbackVerifier>();

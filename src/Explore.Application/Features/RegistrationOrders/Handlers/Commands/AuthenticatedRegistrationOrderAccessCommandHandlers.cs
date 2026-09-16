@@ -9,16 +9,15 @@ using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Application.Contracts.Operations;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
 public sealed class StartAuthenticatedRegistrationOrderCommandHandler(
     IRegistrationOrderStarter starter,
     ICurrentUserService currentUser)
-    : IRequestHandler<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>
 {
-    public Task<BaseCommandResponse<Guid>> Handle(
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
         StartAuthenticatedRegistrationOrderCommand request,
         CancellationToken cancellationToken)
     {
@@ -51,9 +50,9 @@ public sealed class ClaimGuestRegistrationOrderCommandHandler(
     IUserRepository users,
     TimeProvider timeProvider,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<ClaimGuestRegistrationOrderCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ClaimGuestRegistrationOrderCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ClaimGuestRegistrationOrderCommand request,
         CancellationToken cancellationToken)
     {
@@ -126,9 +125,9 @@ public sealed class ContinueAuthenticatedRegistrationOrderCommandHandler(
     IRegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant,
     ICurrentUserService currentUser)
-    : IRequestHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public Task<RegistrationOrderLifecycleResponseDto> Handle(
+    public Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(
         ContinueAuthenticatedRegistrationOrderCommand request,
         CancellationToken cancellationToken) => RegistrationOrderAccessGuard.ExecuteCurrentAccountAsync(
         request,
@@ -148,9 +147,9 @@ public sealed class FinalizeAuthenticatedRegistrationOrderCommandHandler(
     IRegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant,
     ICurrentUserService currentUser)
-    : IRequestHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(
         FinalizeAuthenticatedRegistrationOrderCommand request,
         CancellationToken cancellationToken) => await RegistrationOrderAccessGuard.ExecuteCurrentAccountAsync(
         request, inventory, tenant, currentUser, lifecycle.FinalizeFreeAsync, cancellationToken);
@@ -161,9 +160,9 @@ public sealed class CancelAuthenticatedRegistrationOrderCommandHandler(
     IRegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant,
     ICurrentUserService currentUser)
-    : IRequestHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(
         CancelAuthenticatedRegistrationOrderCommand request,
         CancellationToken cancellationToken) => await RegistrationOrderAccessGuard.ExecuteCurrentAccountAsync(
         request, inventory, tenant, currentUser, lifecycle.CancelAsync, cancellationToken);
@@ -174,9 +173,9 @@ public sealed class LaunchAuthenticatedNativeRegistrationAttemptCommandHandler(
     ITenantContext tenant,
     ICurrentUserService currentUser,
     ICommandHandler<LaunchNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult> launchHandler)
-    : IRequestHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
+    : ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
 {
-    public async Task<NativeRegistrationAttemptResult> Handle(
+    public async Task<NativeRegistrationAttemptResult> ExecuteAsync(
         LaunchAuthenticatedNativeRegistrationAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -203,9 +202,9 @@ public sealed class SubmitAuthenticatedNativeRegistrationAttemptCommandHandler(
     ITenantContext tenant,
     ICurrentUserService currentUser,
     ICommandHandler<SubmitNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult> submitHandler)
-    : IRequestHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
+    : ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
 {
-    public async Task<NativeRegistrationSubmissionResult> Handle(
+    public async Task<NativeRegistrationSubmissionResult> ExecuteAsync(
         SubmitAuthenticatedNativeRegistrationAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -226,9 +225,9 @@ public sealed class LaunchAuthenticatedRegistrationProviderAttemptCommandHandler
     ITenantContext tenant,
     ICurrentUserService currentUser,
     ICommandHandler<LaunchRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult> launchProviderHandler)
-    : IRequestHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
+    : ICommandHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
 {
-    public async Task<RegistrationProviderAttemptResult> Handle(
+    public async Task<RegistrationProviderAttemptResult> ExecuteAsync(
         LaunchAuthenticatedRegistrationProviderAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -250,9 +249,9 @@ public sealed class SkipAuthenticatedNativeRegistrationRequirementCommandHandler
     ITenantContext tenant,
     ICurrentUserService currentUser,
     ICommandHandler<SkipNativeRegistrationRequirementCommand, NativeRegistrationSkipResult> skipHandler)
-    : IRequestHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
+    : ICommandHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
 {
-    public async Task<NativeRegistrationSkipResult> Handle(
+    public async Task<NativeRegistrationSkipResult> ExecuteAsync(
         SkipAuthenticatedNativeRegistrationRequirementCommand request,
         CancellationToken cancellationToken)
     {

@@ -138,7 +138,7 @@ public sealed class EventVisitorCapabilityGateTests
         var ticket = await fixture.SeedTicketAsync(entity.Id);
         async Task<BaseCommandResponse<Guid>> StartAsync() => surface switch
         {
-            "authenticated" => await fixture.ExecuteAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
+            "authenticated" => await fixture.ExecuteCommandAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
                 new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)])),
             "guest" => await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
                 (await fixture.IssueGuestProofAsync(new(entity.Id, ticket.CatalogId,
@@ -172,7 +172,7 @@ public sealed class EventVisitorCapabilityGateTests
         BaseCommandResponse<Guid> cancelled = existing is GuestRegistrationOrderStartDto guest
             ? await fixture.ExecuteCommandAsync<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
                 new(entity.Id, existing.Id, guest.GuestCapabilityToken))
-            : await fixture.ExecuteAsync<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>(
+            : await fixture.ExecuteCommandAsync<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>(
                 new(entity.Id, existing.Id));
         await Assert.That(cancelled.IsSuccess).IsTrue();
         fixture.Context.ChangeTracker.Clear();

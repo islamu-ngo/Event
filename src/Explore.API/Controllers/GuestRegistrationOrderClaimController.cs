@@ -3,9 +3,9 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +18,7 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Tags("GuestRegistrationOrder")]
 public sealed class GuestRegistrationOrderClaimController(
-    IMediator mediator) : RegistrationOrderControllerBase
+    ICommandHandler<ClaimGuestRegistrationOrderCommand, BaseCommandResponse<Guid>> claimHandler) : RegistrationOrderControllerBase
 {
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -39,7 +39,7 @@ public sealed class GuestRegistrationOrderClaimController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await claimHandler.ExecuteAsync(
             new ClaimGuestRegistrationOrderCommand(eventId, orderId, capability), cancellationToken);
         return response.IsSuccess
             ? Ok(response)

@@ -6,8 +6,6 @@ using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
-
 using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
@@ -17,9 +15,9 @@ public sealed class GetCurrentRegistrationOrderQueryHandler(
     IRegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant,
     ICurrentUserService currentUser)
-    : IRequestHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>
+    : IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>
 {
-    public async Task<RegistrationOrderDto?> Handle(GetCurrentRegistrationOrderQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderDto?> QueryAsync(GetCurrentRegistrationOrderQuery request, CancellationToken cancellationToken)
     {
         return await RegistrationOrderAccessGuard.GetCurrentAccountOrderAsync(
             inventory,
@@ -37,9 +35,9 @@ public sealed class GetAuthenticatedNativeRegistrationRequirementProgressQueryHa
     ITenantContext tenant,
     ICurrentUserService currentUser,
     IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler)
-    : IRequestHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
+    : IQueryHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
-    public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
+    public async Task<NativeRegistrationRequirementProgressCollectionDto?> QueryAsync(
         GetAuthenticatedNativeRegistrationRequirementProgressQuery request,
         CancellationToken cancellationToken)
     {

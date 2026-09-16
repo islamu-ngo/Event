@@ -6,7 +6,6 @@ using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Commands;
 
@@ -41,7 +40,7 @@ public sealed record StartAuthenticatedRegistrationOrderCommand(
     BookingPartyTypeEnum BookingPartyType,
     IReadOnlyList<RegistrationOrderLineSelection> Lines,
     int? PlatformContributionBasisPoints = null)
-    : IRequest<BaseCommandResponse<Guid>>;
+    : ICommand<BaseCommandResponse<Guid>>;
 
 public sealed record ReserveAuthenticatedTicketPurchaseCommand(
     Guid EventId,
@@ -74,19 +73,19 @@ public sealed record CancelGuestRegistrationOrderCommand(Guid EventId, Guid Orde
     : ICommand<GuestRegistrationOrderLifecycleResponseDto>, IGuestRegistrationOrderAccessCommand;
 
 public sealed record ClaimGuestRegistrationOrderCommand(Guid EventId, Guid OrderId, string? CapabilityToken)
-    : IRequest<BaseCommandResponse<Guid>>, IGuestRegistrationOrderAccessCommand;
+    : ICommand<BaseCommandResponse<Guid>>, IGuestRegistrationOrderAccessCommand;
 
 public sealed record ContinueAuthenticatedRegistrationOrderCommand(
     Guid EventId,
     Guid OrderId,
     int? PlatformContributionBasisPoints = null)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record FinalizeAuthenticatedRegistrationOrderCommand(Guid EventId, Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record CancelAuthenticatedRegistrationOrderCommand(Guid EventId, Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record MutateGuestRegistrationParticipantsCommand(
     Guid EventId,
@@ -122,7 +121,7 @@ public sealed record LaunchAuthenticatedNativeRegistrationAttemptCommand(
     Guid FormVersionId,
     Guid? BindingId = null,
     Guid? SupersededAttemptId = null)
-    : IRequest<NativeRegistrationAttemptResult>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<NativeRegistrationAttemptResult>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record LaunchGuestRegistrationProviderAttemptCommand(
     Guid EventId,
@@ -145,7 +144,7 @@ public sealed record LaunchAuthenticatedRegistrationProviderAttemptCommand(
     Guid FormId,
     Guid FormVersionId,
     Guid? SupersededAttemptId = null)
-    : IRequest<RegistrationProviderAttemptResult>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<RegistrationProviderAttemptResult>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record SubmitGuestNativeRegistrationAttemptCommand(
     Guid EventId,
@@ -166,7 +165,7 @@ public sealed record SubmitAuthenticatedNativeRegistrationAttemptCommand(
     string? AttemptCapabilityToken,
     string? IdempotencyKey,
     IReadOnlyList<RegistrationSubmissionAnswerInput> Answers)
-    : IRequest<NativeRegistrationSubmissionResult>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<NativeRegistrationSubmissionResult>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record SkipGuestNativeRegistrationRequirementCommand(
     Guid EventId,
@@ -183,4 +182,4 @@ public sealed record SkipAuthenticatedNativeRegistrationRequirementCommand(
     Guid RequirementId,
     Guid AttemptId,
     string? AttemptCapabilityToken)
-    : IRequest<NativeRegistrationSkipResult>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<NativeRegistrationSkipResult>, IAuthenticatedRegistrationOrderAccessCommand;

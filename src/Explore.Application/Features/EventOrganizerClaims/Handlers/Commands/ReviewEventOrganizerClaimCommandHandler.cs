@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.DTOs.EventOrganizerClaim.Validators;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Handlers.Commands;
 
@@ -19,9 +19,9 @@ public sealed class ReviewEventOrganizerClaimCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<ReviewEventOrganizerClaimCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReviewEventOrganizerClaimCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ReviewEventOrganizerClaimCommand request,
         CancellationToken cancellationToken)
     {

@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EventOrganizerClaim, AuthorizationActions.Events.ReviewOrganizerClaim)]
-public sealed record ReviewEventOrganizerClaimCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ReviewEventOrganizerClaimCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid ClaimId { get; init; }

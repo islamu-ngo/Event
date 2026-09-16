@@ -1,16 +1,16 @@
 using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Handlers.Queries;
 
 public sealed class GetEventOrganizerClaimRequestHandler(
     IEventOrganizerClaimRepository claimRepository)
-    : IRequestHandler<GetEventOrganizerClaimRequest, EventOrganizerClaimDto?>
+    : IQueryHandler<GetEventOrganizerClaimRequest, EventOrganizerClaimDto?>
 {
-    public async Task<EventOrganizerClaimDto?> Handle(
+    public async Task<EventOrganizerClaimDto?> QueryAsync(
         GetEventOrganizerClaimRequest request,
         CancellationToken cancellationToken)
     {

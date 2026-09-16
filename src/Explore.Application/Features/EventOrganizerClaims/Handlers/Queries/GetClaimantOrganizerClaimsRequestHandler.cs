@@ -1,10 +1,10 @@
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Handlers.Queries;
 
@@ -18,9 +18,9 @@ public sealed class GetClaimantOrganizerClaimsRequestHandler(
     IGroupMemberRepository groupMemberRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetClaimantOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>>
+    : IQueryHandler<GetClaimantOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>>
 {
-    public async Task<IReadOnlyList<EventOrganizerClaimDto>> Handle(
+    public async Task<IReadOnlyList<EventOrganizerClaimDto>> QueryAsync(
         GetClaimantOrganizerClaimsRequest request,
         CancellationToken cancellationToken)
     {

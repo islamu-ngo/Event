@@ -35,8 +35,8 @@ public sealed class EventClaimMapperTests
         var repository = Substitute.For<IEventOrganizerClaimRepository>();
         repository.GetDetailsAsync(claim.Id, false, Arg.Any<CancellationToken>()).Returns(claim);
         var handler = new GetEventOrganizerClaimRequestHandler(repository);
-        var dto = await handler.Handle(new GetEventOrganizerClaimRequest(eventId, claim.Id), CancellationToken.None);
-        var wrongParent = await handler.Handle(new GetEventOrganizerClaimRequest(groupId, claim.Id), CancellationToken.None);
+        var dto = await handler.QueryAsync(new GetEventOrganizerClaimRequest(eventId, claim.Id), CancellationToken.None);
+        var wrongParent = await handler.QueryAsync(new GetEventOrganizerClaimRequest(groupId, claim.Id), CancellationToken.None);
         await Assert.That(wrongParent).IsNull();
         await Assert.That(dto).IsNotNull();
         await Assert.That(dto!.ClaimantActorGroupId).IsEqualTo(groupId);

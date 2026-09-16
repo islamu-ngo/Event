@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim.Validators;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Handlers.Commands;
 
@@ -20,9 +20,9 @@ public sealed class SubmitEventOrganizerClaimCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<SubmitEventOrganizerClaimCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SubmitEventOrganizerClaimCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SubmitEventOrganizerClaimCommand request,
         CancellationToken cancellationToken)
     {

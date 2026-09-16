@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventTicketing.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageTickets)]
-public sealed record DeleteEventTicketTypeCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record DeleteEventTicketTypeCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid TicketTypeId { get; init; }

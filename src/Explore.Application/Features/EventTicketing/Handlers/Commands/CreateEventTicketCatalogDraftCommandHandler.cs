@@ -1,47 +1,47 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
 
 public sealed class CreateEventTicketCatalogDraftCommandHandler(
     IEventRepository events,
     IEventTicketCatalogRepository catalogs,
-    ITenantContext tenant) : IRequestHandler<CreateEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>
+    ITenantContext tenant) : ICommandHandler<CreateEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        CreateEventTicketCatalogDraftCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        CreateEventTicketCatalogDraftCommand command,
         CancellationToken cancellationToken)
     {
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId)
-            || await catalogs.GetManagementCatalogAsync(request.EventId, tenant.TenantId, cancellationToken) is not null)
+            || await catalogs.GetManagementCatalogAsync(command.EventId, tenant.TenantId, cancellationToken) is not null)
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
         try
         {
             EventTicketCatalogVersion catalog = EventTicketCatalogVersion.Create(
                 tenant.TenantId,
-                request.EventId,
-                request.CurrencyCode,
+                command.EventId,
+                command.CurrencyCode,
                 1);
             await catalogs.AddAsync(catalog, cancellationToken);
             return Ok(catalog.Id, "Ticket catalog draft created.");
         }
         catch (ArgumentException exception)
         {
-            return Bad(request.EventId, exception.Message);
+            return Bad(command.EventId, exception.Message);
         }
         catch (ConcurrencyConflictException exception)
         {
-            return Conflict(request.EventId, exception.Message);
+            return Conflict(command.EventId, exception.Message);
         }
     }
 

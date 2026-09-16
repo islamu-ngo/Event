@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing.Validators;
 using Explore.Application.Exceptions;
@@ -6,7 +7,6 @@ using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
@@ -15,47 +15,47 @@ public sealed class CreateEventCapacityPoolCommandHandler(
     IEventRepository events,
     IEventTicketCatalogRepository catalogs,
     ITenantContext tenant,
-    HybridCache cache) : IRequestHandler<CreateEventCapacityPoolCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<CreateEventCapacityPoolCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        CreateEventCapacityPoolCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        CreateEventCapacityPoolCommand command,
         CancellationToken cancellationToken)
     {
         var validation = await new ManageEventCapacityPoolDtoValidator()
-            .ValidateAsync(request.CapacityPool, cancellationToken);
+            .ValidateAsync(command.CapacityPool, cancellationToken);
         if (!validation.IsValid)
         {
-            return Bad(request.EventId, validation.Errors.Select(error => error.ErrorMessage));
+            return Bad(command.EventId, validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
         try
         {
             EventCapacityPool pool = EventCapacityPool.Create(
                 tenant.TenantId,
-                request.EventId,
-                request.CapacityPool.Name,
-                request.CapacityPool.MaximumQuantity,
-                request.CapacityPool.HoldDurationSeconds,
-                (CapacityHoldPolicyEnum)request.CapacityPool.CapacityHoldPolicyId,
-                (CapacityOversellPolicyEnum)request.CapacityPool.CapacityOversellPolicyId,
-                request.CapacityPool.IsActive);
+                command.EventId,
+                command.CapacityPool.Name,
+                command.CapacityPool.MaximumQuantity,
+                command.CapacityPool.HoldDurationSeconds,
+                (CapacityHoldPolicyEnum)command.CapacityPool.CapacityHoldPolicyId,
+                (CapacityOversellPolicyEnum)command.CapacityPool.CapacityOversellPolicyId,
+                command.CapacityPool.IsActive);
             await catalogs.AddCapacityPoolAsync(pool, cancellationToken);
-            await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
             return Ok(pool.Id, "Capacity pool created.");
         }
         catch (ConcurrencyConflictException exception)
         {
-            return Conflict(request.EventId, exception.Message);
+            return Conflict(command.EventId, exception.Message);
         }
         catch (ArgumentException exception)
         {
-            return Bad(request.EventId, exception.Message);
+            return Bad(command.EventId, exception.Message);
         }
     }
 

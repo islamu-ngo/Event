@@ -5,6 +5,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.DTOs.OrganizerPaymentConnections;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
@@ -29,7 +30,19 @@ public sealed class EventTicketingController(
     IMediator mediator,
     IResourceAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementDto> assembler,
     IResourceAssembler<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightDto> preflightAssembler,
-    IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto> paymentConnectionAssembler) : ControllerBase
+    IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto> paymentConnectionAssembler,
+    IQueryHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?> getCatalogQueryHandler,
+    ICommandHandler<CreateEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>> createDraftCommandHandler,
+    ICommandHandler<CloneEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>> cloneDraftCommandHandler,
+    ICommandHandler<CreateEventTicketTypeCommand, BaseCommandResponse<Guid>> createTypeCommandHandler,
+    ICommandHandler<UpdateEventTicketTypeCommand, BaseCommandResponse<Guid>> updateTypeCommandHandler,
+    ICommandHandler<DeleteEventTicketTypeCommand, BaseCommandResponse<Guid>> deleteTypeCommandHandler,
+    ICommandHandler<CreateEventCapacityPoolCommand, BaseCommandResponse<Guid>> createPoolCommandHandler,
+    ICommandHandler<UpdateEventCapacityPoolCommand, BaseCommandResponse<Guid>> updatePoolCommandHandler,
+    ICommandHandler<DeleteEventCapacityPoolCommand, BaseCommandResponse<Guid>> deletePoolCommandHandler,
+    IQueryHandler<GetPaidEventPublicationPreflightQuery, PaidEventPublicationPreflightDto> preflightQueryHandler,
+    ICommandHandler<UpdateEventTicketCatalogCommercialDisclosuresCommand, BaseCommandResponse<Guid>> disclosuresCommandHandler,
+    ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>> publishCommandHandler) : ControllerBase
 {
     private static readonly ApiValidationProblemDescriptor TicketingValidationProblem = new(
         "eventTicketing",
@@ -61,7 +74,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<EventTicketCatalogManagementDto>>> Get(Guid eventId, CancellationToken cancellationToken)
     {
-        var dto = await mediator.Send(new GetEventTicketCatalogManagementQuery(eventId), cancellationToken);
+        var dto = await getCatalogQueryHandler.QueryAsync(new GetEventTicketCatalogManagementQuery(eventId), cancellationToken);
         if (dto is null)
         {
             return this.ToNotFoundProblem(NotFoundProblem);
@@ -83,7 +96,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> CreateDraft(Guid eventId, [FromBody] CreateEventTicketCatalogDraftCommand command, CancellationToken ct) => SendCreated(new CreateEventTicketCatalogDraftCommand { EventId = eventId, CurrencyCode = command.CurrencyCode }, RouteNames.GetEventTicketCatalogManagement, new { eventId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> CreateDraft(Guid eventId, [FromBody] CreateEventTicketCatalogDraftCommand command, CancellationToken ct) => ExecuteCreated(createDraftCommandHandler.ExecuteAsync(new CreateEventTicketCatalogDraftCommand { EventId = eventId, CurrencyCode = command.CurrencyCode }, ct), RouteNames.GetEventTicketCatalogManagement, new { eventId });
 
     [HttpPost("draft:clone", Name = RouteNames.CloneEventTicketCatalogDraft)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -93,7 +106,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> CloneDraft(Guid eventId, CancellationToken ct) => SendCreated(new CloneEventTicketCatalogDraftCommand { EventId = eventId }, RouteNames.GetEventTicketCatalogManagement, new { eventId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> CloneDraft(Guid eventId, CancellationToken ct) => ExecuteCreated(cloneDraftCommandHandler.ExecuteAsync(new CloneEventTicketCatalogDraftCommand { EventId = eventId }, ct), RouteNames.GetEventTicketCatalogManagement, new { eventId });
 
     [HttpPost("ticket-types", Name = RouteNames.CreateEventTicketType)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -102,7 +115,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> CreateType(Guid eventId, [FromBody] ManageEventTicketTypeDto ticketType, CancellationToken ct) => SendCreated(new CreateEventTicketTypeCommand { EventId = eventId, TicketType = ticketType }, RouteNames.GetEventTicketCatalogManagement, new { eventId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> CreateType(Guid eventId, [FromBody] ManageEventTicketTypeDto ticketType, CancellationToken ct) => ExecuteCreated(createTypeCommandHandler.ExecuteAsync(new CreateEventTicketTypeCommand { EventId = eventId, TicketType = ticketType }, ct), RouteNames.GetEventTicketCatalogManagement, new { eventId });
 
     [HttpPut("ticket-types/{ticketTypeId:guid}", Name = RouteNames.UpdateEventTicketType)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -112,7 +125,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> UpdateType(Guid eventId, Guid ticketTypeId, [FromBody] ManageEventTicketTypeDto ticketType, CancellationToken ct) => SendOk(new UpdateEventTicketTypeCommand { EventId = eventId, TicketTypeId = ticketTypeId, TicketType = ticketType }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> UpdateType(Guid eventId, Guid ticketTypeId, [FromBody] ManageEventTicketTypeDto ticketType, CancellationToken ct) => ExecuteOk(updateTypeCommandHandler.ExecuteAsync(new UpdateEventTicketTypeCommand { EventId = eventId, TicketTypeId = ticketTypeId, TicketType = ticketType }, ct));
 
     [HttpDelete("ticket-types/{ticketTypeId:guid}", Name = RouteNames.DeleteEventTicketType)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -121,7 +134,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> DeleteType(Guid eventId, Guid ticketTypeId, CancellationToken ct) => SendOk(new DeleteEventTicketTypeCommand { EventId = eventId, TicketTypeId = ticketTypeId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> DeleteType(Guid eventId, Guid ticketTypeId, CancellationToken ct) => ExecuteOk(deleteTypeCommandHandler.ExecuteAsync(new DeleteEventTicketTypeCommand { EventId = eventId, TicketTypeId = ticketTypeId }, ct));
 
     [HttpPost("capacity-pools", Name = RouteNames.CreateEventCapacityPool)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -131,7 +144,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> CreatePool(Guid eventId, [FromBody] ManageEventCapacityPoolDto capacityPool, CancellationToken ct) => SendCreated(new CreateEventCapacityPoolCommand { EventId = eventId, CapacityPool = capacityPool }, RouteNames.GetEventTicketCatalogManagement, new { eventId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> CreatePool(Guid eventId, [FromBody] ManageEventCapacityPoolDto capacityPool, CancellationToken ct) => ExecuteCreated(createPoolCommandHandler.ExecuteAsync(new CreateEventCapacityPoolCommand { EventId = eventId, CapacityPool = capacityPool }, ct), RouteNames.GetEventTicketCatalogManagement, new { eventId });
 
     [HttpPut("capacity-pools/{capacityPoolId:guid}", Name = RouteNames.UpdateEventCapacityPool)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -141,7 +154,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> UpdatePool(Guid eventId, Guid capacityPoolId, [FromBody] ManageEventCapacityPoolDto capacityPool, CancellationToken ct) => SendOk(new UpdateEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = capacityPoolId, CapacityPool = capacityPool }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> UpdatePool(Guid eventId, Guid capacityPoolId, [FromBody] ManageEventCapacityPoolDto capacityPool, CancellationToken ct) => ExecuteOk(updatePoolCommandHandler.ExecuteAsync(new UpdateEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = capacityPoolId, CapacityPool = capacityPool }, ct));
 
     [HttpDelete("capacity-pools/{capacityPoolId:guid}", Name = RouteNames.DeleteEventCapacityPool)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -150,7 +163,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> DeletePool(Guid eventId, Guid capacityPoolId, CancellationToken ct) => SendOk(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = capacityPoolId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> DeletePool(Guid eventId, Guid capacityPoolId, CancellationToken ct) => ExecuteOk(deletePoolCommandHandler.ExecuteAsync(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = capacityPoolId }, ct));
 
     [HttpGet("publication-preflight", Name = RouteNames.GetPaidEventPublicationPreflight)]
     [PrivateNoStore]
@@ -161,7 +174,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<PaidEventPublicationPreflightDto>>> Preflight(Guid eventId, CancellationToken ct)
     {
-        PaidEventPublicationPreflightDto dto = await mediator.Send(new GetPaidEventPublicationPreflightQuery(eventId), ct);
+        PaidEventPublicationPreflightDto dto = await preflightQueryHandler.QueryAsync(new GetPaidEventPublicationPreflightQuery(eventId), ct);
         var result = new ObjectResult(await preflightAssembler.ToResource(dto, HttpContext)) { StatusCode = StatusCodes.Status200OK };
         result.ContentTypes.Add(HateoasConstants.HalJsonMediaType);
         return result;
@@ -174,13 +187,13 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> UpdateCommercialDisclosures(Guid eventId, [FromBody] UpdateEventTicketCatalogCommercialDisclosuresCommand command, CancellationToken ct) => SendOk(new UpdateEventTicketCatalogCommercialDisclosuresCommand
+    public Task<ActionResult<BaseCommandResponse<Guid>>> UpdateCommercialDisclosures(Guid eventId, [FromBody] UpdateEventTicketCatalogCommercialDisclosuresCommand command, CancellationToken ct) => ExecuteOk(disclosuresCommandHandler.ExecuteAsync(new UpdateEventTicketCatalogCommercialDisclosuresCommand
     {
         EventId = eventId,
         MerchantDisclosureText = command.MerchantDisclosureText,
         RefundPolicyDisclosureText = command.RefundPolicyDisclosureText,
         SupportContactDisclosureText = command.SupportContactDisclosureText
-    }, ct);
+    }, ct));
 
     [HttpGet("payment-connection", Name = RouteNames.GetEventOrganizerPaymentConnection)]
     [PrivateNoStore]
@@ -253,23 +266,21 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<ActionResult<BaseCommandResponse<Guid>>> Publish(Guid eventId, CancellationToken ct) => SendOk(new PublishEventTicketCatalogCommand { EventId = eventId }, ct);
+    public Task<ActionResult<BaseCommandResponse<Guid>>> Publish(Guid eventId, CancellationToken ct) =>
+        ExecuteOk(publishCommandHandler.ExecuteAsync(new PublishEventTicketCatalogCommand { EventId = eventId }, ct));
 
-    private async Task<ActionResult<BaseCommandResponse<Guid>>> SendOk<T>(T command, CancellationToken ct)
-        where T : IRequest<BaseCommandResponse<Guid>>
+    private async Task<ActionResult<BaseCommandResponse<Guid>>> ExecuteOk(Task<BaseCommandResponse<Guid>> execution)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(command, ct);
+        BaseCommandResponse<Guid> response = await execution;
         return response.IsSuccess ? Ok(response) : TicketingFailures.Map(this, response);
     }
 
-    private async Task<ActionResult<BaseCommandResponse<Guid>>> SendCreated<T>(
-        T command,
+    private async Task<ActionResult<BaseCommandResponse<Guid>>> ExecuteCreated(
+        Task<BaseCommandResponse<Guid>> execution,
         string route,
-        object values,
-        CancellationToken ct)
-        where T : IRequest<BaseCommandResponse<Guid>>
+        object values)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(command, ct);
+        BaseCommandResponse<Guid> response = await execution;
         return response.IsSuccess ? CreatedAtRoute(route, values, response) : TicketingFailures.Map(this, response);
     }
 

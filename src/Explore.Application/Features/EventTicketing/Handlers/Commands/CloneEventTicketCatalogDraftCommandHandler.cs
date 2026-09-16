@@ -1,45 +1,45 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
 
 public sealed class CloneEventTicketCatalogDraftCommandHandler(
     IEventRepository events,
     IEventTicketCatalogRepository catalogs,
-    ITenantContext tenant) : IRequestHandler<CloneEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>
+    ITenantContext tenant) : ICommandHandler<CloneEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        CloneEventTicketCatalogDraftCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        CloneEventTicketCatalogDraftCommand command,
         CancellationToken cancellationToken)
     {
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
         EventTicketCatalogVersion? publishedCatalog = await catalogs.GetPublishedCatalogAsync(
-            request.EventId,
+            command.EventId,
             tenant.TenantId,
             cancellationToken);
         if (publishedCatalog is null)
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
         EventTicketCatalogVersion? managementCatalog = await catalogs.GetManagementCatalogAsync(
-            request.EventId,
+            command.EventId,
             tenant.TenantId,
             cancellationToken);
         if (managementCatalog?.TicketCatalogStatusId == (int)TicketCatalogStatusEnum.Draft)
         {
-            return Bad(request.EventId, "A ticket catalog draft already exists.");
+            return Bad(command.EventId, "A ticket catalog draft already exists.");
         }
 
         EventTicketCatalogVersion draft;
@@ -49,7 +49,7 @@ public sealed class CloneEventTicketCatalogDraftCommandHandler(
         }
         catch (InvalidOperationException exception)
         {
-            return Bad(request.EventId, exception.Message);
+            return Bad(command.EventId, exception.Message);
         }
 
         try
@@ -59,7 +59,7 @@ public sealed class CloneEventTicketCatalogDraftCommandHandler(
         }
         catch (ConcurrencyConflictException exception)
         {
-            return Conflict(request.EventId, exception.Message);
+            return Conflict(command.EventId, exception.Message);
         }
     }
 

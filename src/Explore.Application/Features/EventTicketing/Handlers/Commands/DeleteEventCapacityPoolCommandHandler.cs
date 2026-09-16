@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
@@ -16,21 +16,21 @@ public sealed class DeleteEventCapacityPoolCommandHandler(
     ICurrentUserService currentUser,
     TimeProvider timeProvider,
     IUnitOfWork unitOfWork,
-    HybridCache cache) : IRequestHandler<DeleteEventCapacityPoolCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<DeleteEventCapacityPoolCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        DeleteEventCapacityPoolCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        DeleteEventCapacityPoolCommand command,
         CancellationToken cancellationToken)
     {
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.CapacityPoolId);
+            return Missing(command.CapacityPoolId);
         }
 
         if (currentUser.UserId is not Guid userId)
         {
-            return Bad(request.CapacityPoolId, "An authenticated user is required.");
+            return Bad(command.CapacityPoolId, "An authenticated user is required.");
         }
 
         try
@@ -38,18 +38,18 @@ public sealed class DeleteEventCapacityPoolCommandHandler(
             BaseCommandResponse<Guid> response = await unitOfWork.ExecuteInTransactionAsync(async token =>
             {
                 EventCapacityPool? pool = await catalogs.GetActiveCapacityPoolForUpdateAsync(
-                    request.CapacityPoolId,
-                    request.EventId,
+                    command.CapacityPoolId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
                 if (pool is null)
                 {
-                    return Missing(request.CapacityPoolId);
+                    return Missing(command.CapacityPoolId);
                 }
 
                 bool hasLiveReferences = await catalogs.HasLiveTicketTypeReferencesAsync(
                     pool.Id,
-                    request.EventId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
                 if (hasLiveReferences)
@@ -67,12 +67,12 @@ public sealed class DeleteEventCapacityPoolCommandHandler(
                 return response;
             }
 
-            await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
             return response;
         }
         catch (ArgumentException exception)
         {
-            return Bad(request.CapacityPoolId, exception.Message);
+            return Bad(command.CapacityPoolId, exception.Message);
         }
     }
 

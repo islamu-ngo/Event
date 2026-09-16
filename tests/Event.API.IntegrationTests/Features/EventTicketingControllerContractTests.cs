@@ -3,8 +3,11 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.DTOs.OrganizerPaymentConnections;
+using Explore.Application.Features.EventTicketing.Requests.Commands;
+using Explore.Application.Features.EventTicketing.Requests.Queries;
 using Explore.Application.Features.OrganizerPaymentConnections.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
@@ -176,7 +179,19 @@ public sealed class EventTicketingControllerContractTests
             mediator,
             Substitute.For<IResourceAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementDto>>(),
             Substitute.For<IResourceAssembler<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightDto>>(),
-            Substitute.For<IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto>>());
+            Substitute.For<IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto>>(),
+            Substitute.For<IQueryHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>>(),
+            Substitute.For<ICommandHandler<CreateEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CloneEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateEventTicketTypeCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateEventTicketTypeCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteEventTicketTypeCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateEventCapacityPoolCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateEventCapacityPoolCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteEventCapacityPoolCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<IQueryHandler<GetPaidEventPublicationPreflightQuery, PaidEventPublicationPreflightDto>>(),
+            Substitute.For<ICommandHandler<UpdateEventTicketCatalogCommercialDisclosuresCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         controller.ControllerContext.HttpContext.Request.Scheme = "https";
         controller.ControllerContext.HttpContext.Request.Host = new HostString("api.example");

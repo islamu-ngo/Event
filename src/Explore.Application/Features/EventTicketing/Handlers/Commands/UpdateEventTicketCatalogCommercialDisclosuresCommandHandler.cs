@@ -1,46 +1,46 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
 
 public sealed class UpdateEventTicketCatalogCommercialDisclosuresCommandHandler(
     IEventRepository events,
     IEventTicketCatalogRepository catalogs,
-    ITenantContext tenant) : IRequestHandler<UpdateEventTicketCatalogCommercialDisclosuresCommand, BaseCommandResponse<Guid>>
+    ITenantContext tenant) : ICommandHandler<UpdateEventTicketCatalogCommercialDisclosuresCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventTicketCatalogCommercialDisclosuresCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventTicketCatalogCommercialDisclosuresCommand command, CancellationToken cancellationToken)
     {
-        var validation = await new UpdateEventTicketCatalogCommercialDisclosuresCommandValidator().ValidateAsync(request, cancellationToken);
+        var validation = await new UpdateEventTicketCatalogCommercialDisclosuresCommandValidator().ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return Failure(request.EventId, "event_ticketing_validation_failed", validation.Errors[0].ErrorMessage);
+            return Failure(command.EventId, "event_ticketing_validation_failed", validation.Errors[0].ErrorMessage);
         }
 
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (eventTarget?.TenantId != tenant.TenantId
             || eventTarget.ParticipationConfiguration?.ParticipationHandlingModeId != (int)ParticipationHandlingModeEnum.PlatformManaged)
         {
-            return Failure(request.EventId, "event_ticketing_not_found", "Ticketing configuration was not found.");
+            return Failure(command.EventId, "event_ticketing_not_found", "Ticketing configuration was not found.");
         }
 
-        EventTicketCatalogVersion? draft = await catalogs.GetDraftCatalogForUpdateAsync(request.EventId, tenant.TenantId, cancellationToken);
+        EventTicketCatalogVersion? draft = await catalogs.GetDraftCatalogForUpdateAsync(command.EventId, tenant.TenantId, cancellationToken);
         if (draft is null)
         {
-            return Failure(request.EventId, "event_ticketing_not_found", "Ticketing configuration was not found.");
+            return Failure(command.EventId, "event_ticketing_not_found", "Ticketing configuration was not found.");
         }
 
         try
         {
             draft.UpdateCommercialDisclosures(
-                request.MerchantDisclosureText,
-                request.RefundPolicyDisclosureText,
-                request.SupportContactDisclosureText);
+                command.MerchantDisclosureText,
+                command.RefundPolicyDisclosureText,
+                command.SupportContactDisclosureText);
         }
         catch (ArgumentException exception)
         {

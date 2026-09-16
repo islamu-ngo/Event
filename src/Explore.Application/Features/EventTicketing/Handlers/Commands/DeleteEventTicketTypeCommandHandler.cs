@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
@@ -16,21 +16,21 @@ public sealed class DeleteEventTicketTypeCommandHandler(
     ICurrentUserService currentUser,
     TimeProvider timeProvider,
     IUnitOfWork unitOfWork,
-    HybridCache cache) : IRequestHandler<DeleteEventTicketTypeCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<DeleteEventTicketTypeCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        DeleteEventTicketTypeCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        DeleteEventTicketTypeCommand command,
         CancellationToken cancellationToken)
     {
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.TicketTypeId);
+            return Missing(command.TicketTypeId);
         }
 
         if (currentUser.UserId is not Guid userId)
         {
-            return Bad(request.TicketTypeId, "An authenticated user is required.");
+            return Bad(command.TicketTypeId, "An authenticated user is required.");
         }
 
         try
@@ -38,11 +38,11 @@ public sealed class DeleteEventTicketTypeCommandHandler(
             Guid? ticketTypeId = await unitOfWork.ExecuteInTransactionAsync<Guid?>(async token =>
             {
                 EventTicketCatalogVersion? catalog = await catalogs.GetDraftCatalogForUpdateAsync(
-                    request.EventId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
                 EventTicketType? ticketType = catalog?.TicketTypes.SingleOrDefault(
-                    candidate => candidate.Id == request.TicketTypeId && !candidate.IsDeleted);
+                    candidate => candidate.Id == command.TicketTypeId && !candidate.IsDeleted);
                 if (ticketType is null)
                 {
                     return null;
@@ -55,15 +55,15 @@ public sealed class DeleteEventTicketTypeCommandHandler(
 
             if (ticketTypeId is null)
             {
-                return Missing(request.TicketTypeId);
+                return Missing(command.TicketTypeId);
             }
 
-            await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
             return Ok(ticketTypeId.Value, "Ticket type deleted.");
         }
         catch (ArgumentException exception)
         {
-            return Bad(request.TicketTypeId, exception.Message);
+            return Bad(command.TicketTypeId, exception.Message);
         }
     }
 

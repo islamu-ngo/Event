@@ -246,8 +246,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     internal static async Task<StartGuestRegistrationOrderCommand> ValidateGuestProofAsync(
         IServiceProvider services, GuestAllocationProof proof)
     {
-        var authority = await services.GetRequiredService<IRequestHandler<ConsumeAnonymousRegistrationChallengeCommand,
-            AnonymousRegistrationChallengeAuthority?>>().Handle(new(proof.Request.EventId,
+        var authority = await services.GetRequiredService<ICommandHandler<ConsumeAnonymousRegistrationChallengeCommand,
+            AnonymousRegistrationChallengeAuthority?>>().ExecuteAsync(new(proof.Request.EventId,
                 proof.Binding.CanonicalRequestDigest, proof.Binding.IdempotencyKey,
                 proof.Challenge.ProtectedChallenge, proof.Nonce, proof.Request), CancellationToken.None);
         return proof.Request with

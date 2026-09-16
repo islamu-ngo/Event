@@ -68,7 +68,7 @@ public sealed class AnonymousRegistrationChallengeIssueTests
     public async Task MalformedTrustedBindingCannotIssueBearer()
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
-        var response = await fixture.ExecuteAsync<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>(
+        var response = await fixture.ExecuteCommandAsync<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>(
             new(Guid.CreateVersion7(), string.Empty, Guid.CreateVersion7().ToString("N")));
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.Challenge).IsNull();
@@ -140,6 +140,6 @@ public sealed class AnonymousRegistrationChallengeIssueTests
     }
 
     private static Task<AnonymousRegistrationChallengeIssueResult> IssueAsync(EventVisitorCapabilitySqliteFixture fixture, Guid eventId) =>
-        fixture.ExecuteAsync<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>(
+        fixture.ExecuteCommandAsync<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>(
             new(eventId, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), Guid.CreateVersion7().ToString("N")));
 }

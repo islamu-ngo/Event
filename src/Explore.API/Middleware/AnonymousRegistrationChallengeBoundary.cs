@@ -4,11 +4,11 @@ using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Commands;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -63,9 +63,11 @@ internal static class AnonymousRegistrationChallengeBoundary
             body.BookingPartyType, body.Lines, body.PlatformContributionBasisPoints);
         Guid tenantId = context.RequestServices.GetRequiredService<ITenantContext>().TenantId;
         string digest = IdempotencyRequestIdentityFactory.ComputeGuestStartDigest(identity, tenantId, eventId, key);
-        var authority = await context.RequestServices.GetRequiredService<IMediator>().Send(
-            new ConsumeAnonymousRegistrationChallengeCommand(eventId, digest, key, challenge, proof, intended),
-            context.RequestAborted);
+        var authority = await context.RequestServices
+            .GetRequiredService<ICommandHandler<ConsumeAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeAuthority?>>()
+            .ExecuteAsync(
+                new ConsumeAnonymousRegistrationChallengeCommand(eventId, digest, key, challenge, proof, intended),
+                context.RequestAborted);
         if (authority is null)
         {
             await RejectAsync(context);

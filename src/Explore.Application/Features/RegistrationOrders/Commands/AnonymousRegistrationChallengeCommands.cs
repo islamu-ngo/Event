@@ -12,17 +12,17 @@ using Explore.Application.Models;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Settings;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Commands;
 
 public sealed record IssueAnonymousRegistrationChallengeCommand(
     Guid EventId, string CanonicalRequestDigest, string IdempotencyKey)
-    : IRequest<AnonymousRegistrationChallengeIssueResult>
+    : ICommand<AnonymousRegistrationChallengeIssueResult>
 {
     public override string ToString() => "IssueAnonymousRegistrationChallengeCommand { Redacted = true }";
 }
@@ -30,7 +30,7 @@ public sealed record IssueAnonymousRegistrationChallengeCommand(
 public sealed record ConsumeAnonymousRegistrationChallengeCommand(
     Guid EventId, string CanonicalRequestDigest, string IdempotencyKey,
     string? ProtectedChallenge, string? Nonce, StartGuestRegistrationOrderCommand IntendedRequest)
-    : IRequest<AnonymousRegistrationChallengeAuthority?>
+    : ICommand<AnonymousRegistrationChallengeAuthority?>
 {
     public override string ToString() => "ConsumeAnonymousRegistrationChallengeCommand { Redacted = true }";
 }
@@ -62,43 +62,43 @@ public sealed class IssueAnonymousRegistrationChallengeCommandHandler(
     ISystemSettingRepository systemSettings,
     ITenantSettingRepository tenantSettings,
     TimeProvider timeProvider)
-    : IRequestHandler<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>
+    : ICommandHandler<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>
 {
-    public async Task<AnonymousRegistrationChallengeIssueResult> Handle(
-        IssueAnonymousRegistrationChallengeCommand request, CancellationToken cancellationToken)
+    public async Task<AnonymousRegistrationChallengeIssueResult> ExecuteAsync(
+        IssueAnonymousRegistrationChallengeCommand command, CancellationToken cancellationToken = default)
     {
         AnonymousRegistrationChallengeBinding binding;
         try
         {
-            binding = new(tenant.TenantId, request.EventId, request.CanonicalRequestDigest, request.IdempotencyKey);
+            binding = new(tenant.TenantId, command.EventId, command.CanonicalRequestDigest, command.IdempotencyKey);
         }
         catch (ArgumentException)
         {
-            return AnonymousRegistrationChallengeIssueResult.Denied(request.EventId, "anonymous_registration_challenge_invalid");
+            return AnonymousRegistrationChallengeIssueResult.Denied(command.EventId, "anonymous_registration_challenge_invalid");
         }
 
         return await mutationLock.ExecuteOrderedGroupsAsync(
             [AnonymousRegistrationChallengeIssuePolicy.AuthoritySettingKeys],
             outerToken => unitOfWork.ExecuteBootstrapConvergenceAsync(async token =>
             {
-                var eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+                var eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
                 var capability = await visitorCapabilities.ResolveAsync(tenant.TenantId, token);
                 if (!AnonymousRegistrationChallengeIssuePolicy.CanIssue(eventTarget, tenant.TenantId, capability)
-                    || !await events.IsPubliclyEligibleAsync(tenant.TenantId, request.EventId, token)
+                    || !await events.IsPubliclyEligibleAsync(tenant.TenantId, command.EventId, token)
                     || Explore.Domain.RegistrationOrder.GetGuestStatusDeadline(eventTarget?.LastSessionEndUtc) is not { } deadline
                     || deadline <= timeProvider.GetUtcNow().UtcDateTime)
-                    return AnonymousRegistrationChallengeIssueResult.Denied(request.EventId, "anonymous_registration_challenge_unavailable");
+                    return AnonymousRegistrationChallengeIssueResult.Denied(command.EventId, "anonymous_registration_challenge_unavailable");
 
                 int? difficulty = await ReadDifficultyAsync(token);
                 if (difficulty is null)
-                    return AnonymousRegistrationChallengeIssueResult.Denied(request.EventId, "anonymous_registration_challenge_configuration_invalid");
+                    return AnonymousRegistrationChallengeIssueResult.Denied(command.EventId, "anonymous_registration_challenge_configuration_invalid");
 
                 // The quota adapter requires this ambient transaction and atomically charges both scopes.
                 // Native protection failure rolls back its debit; no inventory or plaintext intent is stored.
-                if (!await quota.TryAcquireAsync(tenant.TenantId, request.EventId, token))
-                    return AnonymousRegistrationChallengeIssueResult.Denied(request.EventId, "anonymous_registration_challenge_quota_exceeded");
+                if (!await quota.TryAcquireAsync(tenant.TenantId, command.EventId, token))
+                    return AnonymousRegistrationChallengeIssueResult.Denied(command.EventId, "anonymous_registration_challenge_quota_exceeded");
 
-                return AnonymousRegistrationChallengeIssueResult.Issued(request.EventId, challenges.Issue(binding, difficulty.Value));
+                return AnonymousRegistrationChallengeIssueResult.Issued(command.EventId, challenges.Issue(binding, difficulty.Value));
             }, outerToken), cancellationToken);
     }
 
@@ -156,29 +156,29 @@ public static class AnonymousRegistrationChallengeIssuePolicy
 
 public sealed class ConsumeAnonymousRegistrationChallengeCommandHandler(
     ITenantContext tenant, IAnonymousRegistrationChallengeService challenges)
-    : IRequestHandler<ConsumeAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeAuthority?>
+    : ICommandHandler<ConsumeAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeAuthority?>
 {
-    public Task<AnonymousRegistrationChallengeAuthority?> Handle(
-        ConsumeAnonymousRegistrationChallengeCommand request, CancellationToken cancellationToken)
+    public Task<AnonymousRegistrationChallengeAuthority?> ExecuteAsync(
+        ConsumeAnonymousRegistrationChallengeCommand command, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         AnonymousRegistrationChallengeBinding binding;
         try
         {
-            binding = new(tenant.TenantId, request.EventId, request.CanonicalRequestDigest, request.IdempotencyKey);
+            binding = new(tenant.TenantId, command.EventId, command.CanonicalRequestDigest, command.IdempotencyKey);
         }
         catch (ArgumentException)
         {
             return Task.FromResult<AnonymousRegistrationChallengeAuthority?>(null);
         }
 
-        if (request.IntendedRequest is null || request.IntendedRequest.EventId != request.EventId
-            || request.IntendedRequest.Lines is null)
+        if (command.IntendedRequest is null || command.IntendedRequest.EventId != command.EventId
+            || command.IntendedRequest.Lines is null)
             return Task.FromResult<AnonymousRegistrationChallengeAuthority?>(null);
 
-        var validated = challenges.Validate(binding, request.ProtectedChallenge, request.Nonce);
+        var validated = challenges.Validate(binding, command.ProtectedChallenge, command.Nonce);
         return Task.FromResult<AnonymousRegistrationChallengeAuthority?>(validated is null
-            ? null : new BoundAuthority(validated, request.IntendedRequest));
+            ? null : new BoundAuthority(validated, command.IntendedRequest));
     }
 
     private sealed class BoundAuthority : AnonymousRegistrationChallengeAuthority

@@ -1,46 +1,46 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Queries;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.PaidEventPolicies.Handlers.Queries;
 
 public sealed class GetInstancePaidEventPolicyQueryHandler(IPaidEventPolicyRepository policies)
-    : IRequestHandler<GetInstancePaidEventPolicyQuery, PaidEventPolicyDto?>
+    : IQueryHandler<GetInstancePaidEventPolicyQuery, PaidEventPolicyDto?>
 {
-    public async Task<PaidEventPolicyDto?> Handle(GetInstancePaidEventPolicyQuery request, CancellationToken cancellationToken) =>
+    public async Task<PaidEventPolicyDto?> QueryAsync(GetInstancePaidEventPolicyQuery query, CancellationToken cancellationToken = default) =>
         (await policies.GetActiveInstanceAsync(cancellationToken)) is { } policy ? PaidEventPolicyMapper.ToDto(policy) : null;
 }
 
 public sealed class GetTenantPaidEventPolicyQueryHandler(IPaidEventPolicyRepository policies)
-    : IRequestHandler<GetTenantPaidEventPolicyQuery, PaidEventPolicyDto?>
+    : IQueryHandler<GetTenantPaidEventPolicyQuery, PaidEventPolicyDto?>
 {
-    public async Task<PaidEventPolicyDto?> Handle(
-        GetTenantPaidEventPolicyQuery request,
-        CancellationToken cancellationToken)
+    public async Task<PaidEventPolicyDto?> QueryAsync(
+        GetTenantPaidEventPolicyQuery query,
+        CancellationToken cancellationToken = default)
     {
-        if (request.TenantId == Guid.Empty)
+        if (query.TenantId == Guid.Empty)
         {
             return null;
         }
 
         PaidEventPolicyVersion? policy =
             await policies.GetActiveTenantAsync(
-                request.TenantId,
+                query.TenantId,
                 cancellationToken);
-        return policy?.TenantId == request.TenantId
+        return policy?.TenantId == query.TenantId
             ? PaidEventPolicyMapper.ToDto(policy)
             : null;
     }
 }
 
 public sealed class GetTenantPaidEventPolicyConfigurationQueryHandler(IPaidEventPolicyRepository policies)
-    : IRequestHandler<GetTenantPaidEventPolicyConfigurationQuery, TenantPaidEventPolicyConfigurationDto?>
+    : IQueryHandler<GetTenantPaidEventPolicyConfigurationQuery, TenantPaidEventPolicyConfigurationDto?>
 {
-    public async Task<TenantPaidEventPolicyConfigurationDto?> Handle(GetTenantPaidEventPolicyConfigurationQuery request, CancellationToken cancellationToken)
+    public async Task<TenantPaidEventPolicyConfigurationDto?> QueryAsync(GetTenantPaidEventPolicyConfigurationQuery query, CancellationToken cancellationToken = default)
     {
-        if (request.TenantId == Guid.Empty)
+        if (query.TenantId == Guid.Empty)
         {
             return null;
         }
@@ -53,8 +53,8 @@ public sealed class GetTenantPaidEventPolicyConfigurationQueryHandler(IPaidEvent
             return null;
         }
 
-        var tenantPolicy = await policies.GetActiveTenantAsync(request.TenantId, cancellationToken);
-        if (tenantPolicy is not null && tenantPolicy.TenantId != request.TenantId)
+        var tenantPolicy = await policies.GetActiveTenantAsync(query.TenantId, cancellationToken);
+        if (tenantPolicy is not null && tenantPolicy.TenantId != query.TenantId)
         {
             return null;
         }
@@ -63,7 +63,7 @@ public sealed class GetTenantPaidEventPolicyConfigurationQueryHandler(IPaidEvent
 
         return new TenantPaidEventPolicyConfigurationDto
         {
-            TenantId = request.TenantId,
+            TenantId = query.TenantId,
             ActiveInstanceCeiling = instanceDto,
             ActiveTenantOverride = tenantDto,
             EffectivePolicy = tenantDto ?? instanceDto,

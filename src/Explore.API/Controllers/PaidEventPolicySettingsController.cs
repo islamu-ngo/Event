@@ -5,12 +5,12 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Commands;
 using Explore.Application.Features.PaidEventPolicies.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -24,7 +24,8 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Admin)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class InstancePaidEventPolicySettingsController(
-    IMediator mediator,
+    IQueryHandler<GetInstancePaidEventPolicyQuery, PaidEventPolicyDto?> getQueryHandler,
+    ICommandHandler<ReviseInstancePaidEventPolicyCommand, BaseCommandResponse<Guid>> reviseCommandHandler,
     IResourceAssembler<PaidEventPolicyDto, PaidEventPolicyDto> assembler) : EventControllerBase
 {
     private static readonly ApiNotFoundProblemDescriptor NotFoundProblem = new(
@@ -45,7 +46,7 @@ public sealed class InstancePaidEventPolicySettingsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<PaidEventPolicyDto>>> Get(CancellationToken cancellationToken)
     {
-        PaidEventPolicyDto? policy = await mediator.Send(new GetInstancePaidEventPolicyQuery(), cancellationToken);
+        PaidEventPolicyDto? policy = await getQueryHandler.QueryAsync(new GetInstancePaidEventPolicyQuery(), cancellationToken);
         if (policy is null)
         {
             return this.ToNotFoundProblem(NotFoundProblem);
@@ -73,7 +74,7 @@ public sealed class InstancePaidEventPolicySettingsController(
         [FromBody] RevisePaidEventPolicyDto policy,
         CancellationToken cancellationToken)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(new ReviseInstancePaidEventPolicyCommand(policy), cancellationToken);
+        BaseCommandResponse<Guid> response = await reviseCommandHandler.ExecuteAsync(new ReviseInstancePaidEventPolicyCommand(policy), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, PolicyValidationProblem);
     }
 }
@@ -85,7 +86,8 @@ public sealed class InstancePaidEventPolicySettingsController(
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class TenantPaidEventPolicySettingsController(
-    IMediator mediator,
+    IQueryHandler<GetTenantPaidEventPolicyConfigurationQuery, TenantPaidEventPolicyConfigurationDto?> getConfigurationQueryHandler,
+    ICommandHandler<ReviseTenantPaidEventPolicyCommand, BaseCommandResponse<Guid>> reviseCommandHandler,
     IResourceAssembler<TenantPaidEventPolicyConfigurationDto, TenantPaidEventPolicyConfigurationDto> assembler) : EventControllerBase
 {
     private static readonly ApiNotFoundProblemDescriptor NotFoundProblem = new(
@@ -108,7 +110,7 @@ public sealed class TenantPaidEventPolicySettingsController(
         [FromRoute] Guid tenantId,
         CancellationToken cancellationToken)
     {
-        TenantPaidEventPolicyConfigurationDto? configuration = await mediator.Send(
+        TenantPaidEventPolicyConfigurationDto? configuration = await getConfigurationQueryHandler.QueryAsync(
             new GetTenantPaidEventPolicyConfigurationQuery(tenantId),
             cancellationToken);
         if (configuration is null)
@@ -139,7 +141,7 @@ public sealed class TenantPaidEventPolicySettingsController(
         [FromBody] RevisePaidEventPolicyDto policy,
         CancellationToken cancellationToken)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await reviseCommandHandler.ExecuteAsync(
             new ReviseTenantPaidEventPolicyCommand(tenantId, policy),
             cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, TenantPolicyValidationProblem);

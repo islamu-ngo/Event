@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
@@ -13,14 +13,14 @@ public sealed class ReserveAuthenticatedTicketPurchaseCommandHandler(
     ITicketPurchaseGovernanceRepository governance,
     ICurrentUserService currentUser,
     ITenantContext tenant,
-    IMediator mediator) :
-    IRequestHandler<
+    ICommandHandler<ReserveTicketPurchaseCommand, BaseCommandResponse<Guid>> reserveHandler) :
+    ICommandHandler<
         ReserveAuthenticatedTicketPurchaseCommand,
         BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        ReserveAuthenticatedTicketPurchaseCommand request,
-        CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ReserveAuthenticatedTicketPurchaseCommand command,
+        CancellationToken cancellationToken = default)
     {
         RegistrationOrder? order =
             await RegistrationOrderAccessGuard
@@ -28,32 +28,32 @@ public sealed class ReserveAuthenticatedTicketPurchaseCommandHandler(
                     inventory,
                     currentUser,
                     tenant.TenantId,
-                    request.EventId,
-                    request.OrderId,
+                    command.EventId,
+                    command.OrderId,
                     cancellationToken);
         if (order is null)
         {
-            return NotFound(request.OrderId);
+            return NotFound(command.OrderId);
         }
 
         TicketPurchasePolicyVersion? policy =
             await governance.GetCurrentPolicyVersionAsync(
                 tenant.TenantId,
-                request.EventId,
+                command.EventId,
                 cancellationToken);
         if (policy is null)
         {
-            return PolicyUnavailable(request.OrderId);
+            return PolicyUnavailable(command.OrderId);
         }
 
-        return await mediator.Send(
+        return await reserveHandler.ExecuteAsync(
             new ReserveTicketPurchaseCommand(
-                request.EventId,
-                request.OrderId,
+                command.EventId,
+                command.OrderId,
                 policy.Id,
                 TicketPurchaseAccessMode.AuthenticatedAccount,
-                request.RequestedPurchaserActorId,
-                request.OperationKey),
+                command.RequestedPurchaserActorId,
+                command.OperationKey),
             cancellationToken);
     }
 
@@ -77,22 +77,22 @@ public sealed class ReserveGuestTicketPurchaseCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IMediator mediator) :
-    IRequestHandler<
+    ICommandHandler<ReserveTicketPurchaseCommand, BaseCommandResponse<Guid>> reserveHandler) :
+    ICommandHandler<
         ReserveGuestTicketPurchaseCommand,
         BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        ReserveGuestTicketPurchaseCommand request,
-        CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ReserveGuestTicketPurchaseCommand command,
+        CancellationToken cancellationToken = default)
     {
-        if (request.AccessMode is not (
+        if (command.AccessMode is not (
             TicketPurchaseAccessMode.VerifiedContact
             or TicketPurchaseAccessMode.NameOnly))
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Guest purchase access mode is invalid."],
-                id: request.OrderId);
+                id: command.OrderId);
         }
 
         RegistrationOrder? order =
@@ -100,34 +100,34 @@ public sealed class ReserveGuestTicketPurchaseCommandHandler(
                 inventory,
                 capabilities,
                 tenant.TenantId,
-                request.EventId,
-                request.OrderId,
-                request.CapabilityToken,
+                command.EventId,
+                command.OrderId,
+                command.CapabilityToken,
                 timeProvider,
                 cancellationToken);
         if (order is null)
         {
-            return NotFound(request.OrderId);
+            return NotFound(command.OrderId);
         }
 
         TicketPurchasePolicyVersion? policy =
             await governance.GetCurrentPolicyVersionAsync(
                 tenant.TenantId,
-                request.EventId,
+                command.EventId,
                 cancellationToken);
         if (policy is null)
         {
-            return PolicyUnavailable(request.OrderId);
+            return PolicyUnavailable(command.OrderId);
         }
 
-        return await mediator.Send(
+        return await reserveHandler.ExecuteAsync(
             new ReserveTicketPurchaseCommand(
-                request.EventId,
-                request.OrderId,
+                command.EventId,
+                command.OrderId,
                 policy.Id,
-                request.AccessMode,
+                command.AccessMode,
                 RequestedPurchaserActorId: null,
-                request.OperationKey),
+                command.OperationKey),
             cancellationToken);
     }
 

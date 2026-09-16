@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
@@ -47,7 +48,7 @@ public sealed record ReserveAuthenticatedTicketPurchaseCommand(
     Guid OrderId,
     Guid? RequestedPurchaserActorId,
     string OperationKey)
-    : IRequest<BaseCommandResponse<Guid>>,
+    : ICommand<BaseCommandResponse<Guid>>,
       IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record ReserveGuestTicketPurchaseCommand(
@@ -56,7 +57,7 @@ public sealed record ReserveGuestTicketPurchaseCommand(
     TicketPurchaseAccessMode AccessMode,
     string? CapabilityToken,
     string OperationKey)
-    : IRequest<BaseCommandResponse<Guid>>,
+    : ICommand<BaseCommandResponse<Guid>>,
       IGuestRegistrationOrderAccessCommand;
 
 public sealed record ContinueGuestRegistrationOrderCommand(

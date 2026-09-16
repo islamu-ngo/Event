@@ -5,11 +5,11 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -19,7 +19,9 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/events/{eventId:guid}/registration-orders")]
 [ApiController]
-public sealed class TicketPurchaseController(IMediator mediator) : ControllerBase
+public sealed class TicketPurchaseController(
+    ICommandHandler<ReserveAuthenticatedTicketPurchaseCommand, BaseCommandResponse<Guid>> authenticatedCommandHandler,
+    ICommandHandler<ReserveGuestTicketPurchaseCommand, BaseCommandResponse<Guid>> guestCommandHandler) : ControllerBase
 {
     private const string CapabilityHeader = "X-Registration-Order-Capability";
     private const string IdempotencyKeyHeader = "Idempotency-Key";
@@ -91,7 +93,7 @@ public sealed class TicketPurchaseController(IMediator mediator) : ControllerBas
                 "A ticket-purchase payload is required.");
         }
 
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await authenticatedCommandHandler.ExecuteAsync(
             new ReserveAuthenticatedTicketPurchaseCommand(
                 eventId,
                 orderId,
@@ -141,7 +143,7 @@ public sealed class TicketPurchaseController(IMediator mediator) : ControllerBas
                 "A ticket-purchase payload is required.");
         }
 
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await guestCommandHandler.ExecuteAsync(
             new ReserveGuestTicketPurchaseCommand(
                 eventId,
                 orderId,

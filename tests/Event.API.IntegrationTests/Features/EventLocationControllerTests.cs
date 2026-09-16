@@ -11,6 +11,7 @@ using Explore.API.Filters;
 using Explore.API.Models;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventLocations.Requests.Commands;
 using Explore.Application.Models.Common;
@@ -80,8 +81,16 @@ public sealed class EventLocationControllerTests
             FullDetailsAudienceId = (int)LocationDisclosureAudienceEnum.ConfirmedParticipant,
             RevealFullDetailsFromUtc = OptionalUpdate<DateTime?>.Set(DateTime.UtcNow)
         };
-        var mediator = new EventLocationMediatorStub();
-        var controller = new EventLocationController(mediator, null!);
+        var updatePolicyHandler = new UpdateEventLocationPolicyCommandHandlerStub();
+        var controller = new EventLocationController(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            updatePolicyHandler,
+            null!,
+            null!);
 
         await controller.UpdateDisclosure(eventId, eventLocationId, new UpdateEventLocationDisclosureDto
         {
@@ -96,7 +105,7 @@ public sealed class EventLocationControllerTests
             Audience = audience
         });
 
-        UpdateEventLocationPolicyCommand fieldsCommand = mediator.Requests[0];
+        UpdateEventLocationPolicyCommand fieldsCommand = updatePolicyHandler.Requests[0];
         await Assert.That(fieldsCommand.EventId).IsEqualTo(eventId);
         await Assert.That(fieldsCommand.EventLocationId).IsEqualTo(eventLocationId);
         await Assert.That(fieldsCommand.ExpectedPolicyVersion).IsEqualTo(4);
@@ -104,7 +113,7 @@ public sealed class EventLocationControllerTests
         await Assert.That(fieldsCommand.Fields).IsSameReferenceAs(fields);
         await Assert.That(fieldsCommand.Audience).IsNull();
 
-        UpdateEventLocationPolicyCommand audienceCommand = mediator.Requests[1];
+        UpdateEventLocationPolicyCommand audienceCommand = updatePolicyHandler.Requests[1];
         await Assert.That(audienceCommand.EventId).IsEqualTo(eventId);
         await Assert.That(audienceCommand.EventLocationId).IsEqualTo(eventLocationId);
         await Assert.That(audienceCommand.ExpectedPolicyVersion).IsEqualTo(5);
@@ -173,42 +182,20 @@ public sealed class EventLocationControllerTests
         action.GetCustomAttribute<TAttribute>(inherit: true)
         ?? action.DeclaringType?.GetCustomAttribute<TAttribute>(inherit: true);
 
-    private sealed class EventLocationMediatorStub : IMediator
+    private sealed class UpdateEventLocationPolicyCommandHandlerStub
+        : ICommandHandler<UpdateEventLocationPolicyCommand, BaseCommandResponse<Guid>>
     {
         public List<UpdateEventLocationPolicyCommand> Requests { get; } = [];
 
-        public Task<TResponse> Send<TResponse>(
-            IRequest<TResponse> request,
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            UpdateEventLocationPolicyCommand command,
             CancellationToken cancellationToken = default)
         {
-            Requests.Add((UpdateEventLocationPolicyCommand)(object)request);
-            object response = BaseCommandResponse.Success(
+            Requests.Add(command);
+            return Task.FromResult(BaseCommandResponse.Success(
                 Guid.CreateVersion7(),
-                "Disclosure updated.");
-            return Task.FromResult((TResponse)response);
+                "Disclosure updated."));
         }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest => Task.CompletedTask;
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-
-        public Task Publish<TNotification>(
-            TNotification notification,
-            CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(
-            IStreamRequest<TResponse> request,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(
-            object request,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }
 

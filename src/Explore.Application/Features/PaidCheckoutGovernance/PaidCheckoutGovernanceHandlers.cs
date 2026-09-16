@@ -1,20 +1,20 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Payments;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.PaidCheckoutGovernance.Commands;
 
 public sealed class GetPaidCheckoutSaleControlQueryHandler(IPaidCheckoutActivationRepository repository)
-    : IRequestHandler<GetPaidCheckoutSaleControlQuery, PaidCheckoutSaleControlDto?>
+    : IQueryHandler<GetPaidCheckoutSaleControlQuery, PaidCheckoutSaleControlDto?>
 {
-    public async Task<PaidCheckoutSaleControlDto?> Handle(GetPaidCheckoutSaleControlQuery request, CancellationToken cancellationToken)
+    public async Task<PaidCheckoutSaleControlDto?> QueryAsync(GetPaidCheckoutSaleControlQuery query, CancellationToken cancellationToken = default)
     {
         PaidCheckoutSaleControl? control = await repository.GetSaleControlAsync(
-            request.TenantId, request.EventId, false, cancellationToken);
+            query.TenantId, query.EventId, false, cancellationToken);
         return control is null ? null : Map(control);
     }
 
@@ -40,10 +40,10 @@ public sealed class StopPaidCheckoutSalesCommandHandler(
     IEventRepository events,
     ICurrentUserService currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IRequestHandler<StopPaidCheckoutSalesCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<StopPaidCheckoutSalesCommand, BaseCommandResponse<Guid>>
 {
-    public Task<BaseCommandResponse<Guid>> Handle(StopPaidCheckoutSalesCommand request, CancellationToken cancellationToken) =>
-        PaidCheckoutSaleControlMutation.StopAsync(request.TenantId, request.EventId, request.ReasonCode,
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(StopPaidCheckoutSalesCommand command, CancellationToken cancellationToken = default) =>
+        PaidCheckoutSaleControlMutation.StopAsync(command.TenantId, command.EventId, command.ReasonCode,
             repository, events, currentUser, unitOfWork, timeProvider, cancellationToken);
 }
 
@@ -52,10 +52,10 @@ public sealed class RequestPaidCheckoutResumeCommandHandler(
     IEventRepository events,
     ICurrentUserService currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IRequestHandler<RequestPaidCheckoutResumeCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<RequestPaidCheckoutResumeCommand, BaseCommandResponse<Guid>>
 {
-    public Task<BaseCommandResponse<Guid>> Handle(RequestPaidCheckoutResumeCommand request, CancellationToken cancellationToken) =>
-        PaidCheckoutSaleControlMutation.RequestResumeAsync(request.TenantId, request.EventId, request.ReasonCode,
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(RequestPaidCheckoutResumeCommand command, CancellationToken cancellationToken = default) =>
+        PaidCheckoutSaleControlMutation.RequestResumeAsync(command.TenantId, command.EventId, command.ReasonCode,
             repository, events, currentUser, unitOfWork, timeProvider, cancellationToken);
 }
 
@@ -64,12 +64,12 @@ public sealed class ReviewPaidCheckoutResumeCommandHandler(
     IEventRepository events,
     ICurrentUserService currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IRequestHandler<ReviewPaidCheckoutResumeCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<ReviewPaidCheckoutResumeCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ReviewPaidCheckoutResumeCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReviewPaidCheckoutResumeCommand command, CancellationToken cancellationToken = default)
     {
         if (currentUser.UserId is not Guid reviewer || !await PaidCheckoutSaleControlMutation.ValidScopeAsync(
-                request.TenantId, request.EventId, events, cancellationToken))
+                command.TenantId, command.EventId, events, cancellationToken))
         {
             return PaidCheckoutSaleControlMutation.Failure("paid_checkout_governance_invalid");
         }
@@ -78,13 +78,13 @@ public sealed class ReviewPaidCheckoutResumeCommandHandler(
             Guid id = await unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 PaidCheckoutSaleControl control = await repository.GetSaleControlAsync(
-                    request.TenantId, request.EventId, true, token)
+                    command.TenantId, command.EventId, true, token)
                     ?? throw new InvalidOperationException("Sale control was not found.");
-                control.ReviewResume(reviewer, request.Approved, request.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
+                control.ReviewResume(reviewer, command.Approved, command.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
                 await repository.SaveChangesAsync(token);
                 return control.Id;
             }, cancellationToken);
-            return PaidCheckoutSaleControlMutation.Success(id, request.Approved ? "Paid sales resumed." : "Paid-sales resume rejected.");
+            return PaidCheckoutSaleControlMutation.Success(id, command.Approved ? "Paid sales resumed." : "Paid-sales resume rejected.");
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {
@@ -99,11 +99,11 @@ public sealed class RequestPaidCheckoutReviewCommandHandler(
     IEventRepository events,
     ICurrentUserService currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IRequestHandler<RequestPaidCheckoutReviewCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<RequestPaidCheckoutReviewCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(RequestPaidCheckoutReviewCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RequestPaidCheckoutReviewCommand command, CancellationToken cancellationToken = default)
     {
-        if (currentUser.UserId is not Guid requester || !Enum.IsDefined(typeof(PaidCheckoutReviewTrigger), request.TriggerId))
+        if (currentUser.UserId is not Guid requester || !Enum.IsDefined(typeof(PaidCheckoutReviewTrigger), command.TriggerId))
         {
             return PaidCheckoutSaleControlMutation.Failure("paid_checkout_review_invalid");
         }
@@ -111,31 +111,31 @@ public sealed class RequestPaidCheckoutReviewCommandHandler(
         {
             Guid id = await unitOfWork.ExecuteSerializableAsync(async token =>
             {
-                Event? eventTarget = await events.GetEventWithDetails(request.EventId);
-                if (eventTarget?.TenantId != request.TenantId || eventTarget.OrganizerActorId is not Guid organizerActorId)
+                Event? eventTarget = await events.GetEventWithDetails(command.EventId);
+                if (eventTarget?.TenantId != command.TenantId || eventTarget.OrganizerActorId is not Guid organizerActorId)
                 {
                     throw new InvalidOperationException("Event organizer was not found.");
                 }
                 PaidEventPolicyVersion instance = await policies.GetActiveInstanceAsync(token)
                     ?? throw new InvalidOperationException("Active paid-event policy was not found.");
-                PaidEventPolicyVersion? tenant = await policies.GetActiveTenantAsync(request.TenantId, token);
+                PaidEventPolicyVersion? tenant = await policies.GetActiveTenantAsync(command.TenantId, token);
                 if (tenant is not null)
                 {
                     PaidEventPolicyRules.ValidateTenantPolicy(instance, tenant);
                 }
                 PaidEventPolicyVersion effective = tenant ?? instance;
-                var trigger = (PaidCheckoutReviewTrigger)request.TriggerId;
+                var trigger = (PaidCheckoutReviewTrigger)command.TriggerId;
                 PaidEventPolicyCurrencyRiskLimit? limit = effective.CurrencyRiskLimits.SingleOrDefault(value =>
-                    value.CurrencyCode == request.CurrencyCode);
+                    value.CurrencyCode == command.CurrencyCode);
                 if (trigger == PaidCheckoutReviewTrigger.FirstPaidEvent && !effective.RequiresFirstPaidEventReview ||
                     trigger == PaidCheckoutReviewTrigger.HighValue &&
-                    (limit?.HighValueReviewThresholdMinor is not { } threshold || request.MaximumOrderAmountMinor < threshold))
+                    (limit?.HighValueReviewThresholdMinor is not { } threshold || command.MaximumOrderAmountMinor < threshold))
                 {
                     throw new InvalidOperationException("The requested review is not required by the effective policy.");
                 }
                 PaidCheckoutReviewApproval review = PaidCheckoutReviewApproval.Request(
-                    request.TenantId, request.EventId, organizerActorId, effective.Id, request.CurrencyCode,
-                    trigger, request.MaximumOrderAmountMinor, requester, request.ReasonCode,
+                    command.TenantId, command.EventId, organizerActorId, effective.Id, command.CurrencyCode,
+                    trigger, command.MaximumOrderAmountMinor, requester, command.ReasonCode,
                     timeProvider.GetUtcNow().UtcDateTime);
                 await repository.AddReviewAsync(review, token);
                 await repository.SaveChangesAsync(token);
@@ -154,9 +154,9 @@ public sealed class DecidePaidCheckoutReviewCommandHandler(
     IPaidCheckoutActivationRepository repository,
     ICurrentUserService currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider) : IRequestHandler<DecidePaidCheckoutReviewCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<DecidePaidCheckoutReviewCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DecidePaidCheckoutReviewCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DecidePaidCheckoutReviewCommand command, CancellationToken cancellationToken = default)
     {
         if (currentUser.UserId is not Guid reviewer)
         {
@@ -166,14 +166,14 @@ public sealed class DecidePaidCheckoutReviewCommandHandler(
         {
             Guid id = await unitOfWork.ExecuteSerializableAsync(async token =>
             {
-                PaidCheckoutReviewApproval review = await repository.GetReviewAsync(request.TenantId, request.ReviewId, true, token)
+                PaidCheckoutReviewApproval review = await repository.GetReviewAsync(command.TenantId, command.ReviewId, true, token)
                     ?? throw new InvalidOperationException("Review was not found.");
-                if (request.Approved) review.Approve(reviewer, request.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
-                else review.Reject(reviewer, request.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
+                if (command.Approved) review.Approve(reviewer, command.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
+                else review.Reject(reviewer, command.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
                 await repository.SaveChangesAsync(token);
                 return review.Id;
             }, cancellationToken);
-            return PaidCheckoutSaleControlMutation.Success(id, request.Approved ? "Paid Checkout review approved." : "Paid Checkout review rejected.");
+            return PaidCheckoutSaleControlMutation.Success(id, command.Approved ? "Paid Checkout review approved." : "Paid Checkout review rejected.");
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventAddOns;
@@ -8,7 +9,6 @@ using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using DomainEvent = Explore.Domain.Event;
 
 namespace Explore.Application.Features.EventAddOns.Handlers.Commands;
@@ -18,9 +18,9 @@ public sealed class CreateEventAddOnCatalogDraftCommandHandler(
     IEventAddOnRepository addOns,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<CreateEventAddOnCatalogDraftCommand, EventAddOnCatalogDto?>
+    ICommandHandler<CreateEventAddOnCatalogDraftCommand, EventAddOnCatalogDto?>
 {
-    public async Task<EventAddOnCatalogDto?> Handle(
+    public async Task<EventAddOnCatalogDto?> ExecuteAsync(
         CreateEventAddOnCatalogDraftCommand request,
         CancellationToken cancellationToken)
     {
@@ -67,9 +67,9 @@ public sealed class AddEventAddOnCatalogItemCommandHandler(
     IEventAddOnRepository addOns,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<AddEventAddOnCatalogItemCommand, EventAddOnCatalogDto?>
+    ICommandHandler<AddEventAddOnCatalogItemCommand, EventAddOnCatalogDto?>
 {
-    public async Task<EventAddOnCatalogDto?> Handle(
+    public async Task<EventAddOnCatalogDto?> ExecuteAsync(
         AddEventAddOnCatalogItemCommand request,
         CancellationToken cancellationToken)
     {
@@ -113,9 +113,9 @@ public sealed class PublishEventAddOnCatalogCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<PublishEventAddOnCatalogCommand, EventAddOnCatalogDto?>
+    ICommandHandler<PublishEventAddOnCatalogCommand, EventAddOnCatalogDto?>
 {
-    public async Task<EventAddOnCatalogDto?> Handle(
+    public async Task<EventAddOnCatalogDto?> ExecuteAsync(
         PublishEventAddOnCatalogCommand request,
         CancellationToken cancellationToken)
     {
@@ -166,9 +166,9 @@ public sealed class RetireEventAddOnCatalogCommandHandler(
     IEventAddOnRepository addOns,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<RetireEventAddOnCatalogCommand, EventAddOnCatalogDto?>
+    ICommandHandler<RetireEventAddOnCatalogCommand, EventAddOnCatalogDto?>
 {
-    public async Task<EventAddOnCatalogDto?> Handle(
+    public async Task<EventAddOnCatalogDto?> ExecuteAsync(
         RetireEventAddOnCatalogCommand request,
         CancellationToken cancellationToken)
     {
@@ -199,9 +199,9 @@ public sealed class ReserveRegistrationOrderAddOnsCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<ReserveRegistrationOrderAddOnsCommand, RegistrationOrderAddOnSummaryDto?>
+    ICommandHandler<ReserveRegistrationOrderAddOnsCommand, RegistrationOrderAddOnSummaryDto?>
 {
-    public async Task<RegistrationOrderAddOnSummaryDto?> Handle(
+    public async Task<RegistrationOrderAddOnSummaryDto?> ExecuteAsync(
         ReserveRegistrationOrderAddOnsCommand request,
         CancellationToken cancellationToken)
     {
@@ -326,9 +326,9 @@ public sealed class FulfillRegistrationOrderAddOnCommandHandler(
     IEventAddOnRepository addOns,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<FulfillRegistrationOrderAddOnCommand, RegistrationOrderAddOnSummaryDto?>
+    ICommandHandler<FulfillRegistrationOrderAddOnCommand, RegistrationOrderAddOnSummaryDto?>
 {
-    public async Task<RegistrationOrderAddOnSummaryDto?> Handle(
+    public async Task<RegistrationOrderAddOnSummaryDto?> ExecuteAsync(
         FulfillRegistrationOrderAddOnCommand request,
         CancellationToken cancellationToken)
     {
@@ -392,9 +392,9 @@ public sealed class RefundRegistrationOrderAddOnCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<RefundRegistrationOrderAddOnCommand, RegistrationOrderAddOnSummaryDto?>
+    ICommandHandler<RefundRegistrationOrderAddOnCommand, RegistrationOrderAddOnSummaryDto?>
 {
-    public async Task<RegistrationOrderAddOnSummaryDto?> Handle(
+    public async Task<RegistrationOrderAddOnSummaryDto?> ExecuteAsync(
         RefundRegistrationOrderAddOnCommand request,
         CancellationToken cancellationToken)
     {

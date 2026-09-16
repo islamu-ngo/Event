@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.Features.EventAddOns.Requests.Commands;
 using Explore.Application.Features.EventAddOns.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,7 +23,10 @@ namespace Explore.API.Controllers;
     "api/events/{eventId:guid}/registration-orders/" +
     "{registrationOrderId:guid}/add-ons")]
 public sealed class RegistrationOrderAddOnController(
-    IMediator mediator,
+    IQueryHandler<GetRegistrationOrderAddOnsQuery, RegistrationOrderAddOnSummaryDto?> getOrderAddOnsHandler,
+    ICommandHandler<ReserveRegistrationOrderAddOnsCommand, RegistrationOrderAddOnSummaryDto?> reserveHandler,
+    ICommandHandler<FulfillRegistrationOrderAddOnCommand, RegistrationOrderAddOnSummaryDto?> fulfillHandler,
+    ICommandHandler<RefundRegistrationOrderAddOnCommand, RegistrationOrderAddOnSummaryDto?> refundHandler,
     IResourceAssembler<
         RegistrationOrderAddOnSummaryDto,
         RegistrationOrderAddOnSummaryDto> assembler,
@@ -49,7 +52,7 @@ public sealed class RegistrationOrderAddOnController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            getOrderAddOnsHandler.QueryAsync(
                 new GetRegistrationOrderAddOnsQuery(
                     eventId,
                     registrationOrderId,
@@ -70,7 +73,7 @@ public sealed class RegistrationOrderAddOnController(
         [FromBody] ReserveEventAddOnsRequest request,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            reserveHandler.ExecuteAsync(
                 new ReserveRegistrationOrderAddOnsCommand(
                     eventId,
                     registrationOrderId,
@@ -99,7 +102,7 @@ public sealed class RegistrationOrderAddOnController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            fulfillHandler.ExecuteAsync(
                 new FulfillRegistrationOrderAddOnCommand(
                     eventId,
                     registrationOrderId,
@@ -125,7 +128,7 @@ public sealed class RegistrationOrderAddOnController(
         [FromBody] RefundEventAddOnRequest request,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            refundHandler.ExecuteAsync(
                 new RefundRegistrationOrderAddOnCommand(
                     eventId,
                     registrationOrderId,

@@ -5,10 +5,10 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.Features.EventAddOns.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,7 +18,7 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Route("api/events/{eventId:guid}/add-ons")]
 public sealed class EventAddOnCatalogController(
-    IMediator mediator,
+    IQueryHandler<GetEventAddOnCatalogQuery, EventAddOnCatalogDto?> getCatalogHandler,
     IResourceAssembler<EventAddOnCatalogDto, EventAddOnCatalogDto> assembler) :
     ControllerBase
 {
@@ -37,7 +37,7 @@ public sealed class EventAddOnCatalogController(
         Guid eventId,
         CancellationToken cancellationToken)
     {
-        EventAddOnCatalogDto? dto = await mediator.Send(
+        EventAddOnCatalogDto? dto = await getCatalogHandler.QueryAsync(
             new GetEventAddOnCatalogQuery(eventId, ManagementView: false),
             cancellationToken);
         return dto is null

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventAddOns;
@@ -8,7 +9,6 @@ using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using DomainEvent = Explore.Domain.Event;
 
 namespace Explore.Application.Features.EventAddOns.Handlers.Queries;
@@ -18,9 +18,9 @@ public sealed class GetEventAddOnCatalogQueryHandler(
     IEventAddOnRepository addOns,
     ITenantContext tenant,
     ICurrentUserService currentUser) :
-    IRequestHandler<GetEventAddOnCatalogQuery, EventAddOnCatalogDto?>
+    IQueryHandler<GetEventAddOnCatalogQuery, EventAddOnCatalogDto?>
 {
-    public async Task<EventAddOnCatalogDto?> Handle(
+    public async Task<EventAddOnCatalogDto?> QueryAsync(
         GetEventAddOnCatalogQuery request,
         CancellationToken cancellationToken)
     {
@@ -81,9 +81,9 @@ public sealed class GetRegistrationOrderAddOnsQueryHandler(
     ICurrentUserService currentUser,
     IGuestCapabilityTokenService guestTokens,
     TimeProvider timeProvider) :
-    IRequestHandler<GetRegistrationOrderAddOnsQuery, RegistrationOrderAddOnSummaryDto?>
+    IQueryHandler<GetRegistrationOrderAddOnsQuery, RegistrationOrderAddOnSummaryDto?>
 {
-    public async Task<RegistrationOrderAddOnSummaryDto?> Handle(
+    public async Task<RegistrationOrderAddOnSummaryDto?> QueryAsync(
         GetRegistrationOrderAddOnsQuery request,
         CancellationToken cancellationToken)
     {

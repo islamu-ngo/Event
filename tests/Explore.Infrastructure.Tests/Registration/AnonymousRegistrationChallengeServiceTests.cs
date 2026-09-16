@@ -208,7 +208,7 @@ public sealed class AnonymousRegistrationChallengeServiceTests
         var handler = new ConsumeAnonymousRegistrationChallengeCommandHandler(new TenantScope(binding.TenantId), service);
         var command = new ConsumeAnonymousRegistrationChallengeCommand(binding.EventId, binding.CanonicalRequestDigest,
             binding.IdempotencyKey, challenge.ProtectedChallenge, nonce, intended);
-        var authority = await handler.Handle(command, CancellationToken.None);
+        var authority = await handler.ExecuteAsync(command, CancellationToken.None);
         await Assert.That(authority).IsNotNull();
         await Assert.That(authority!.Matches(intended)).IsTrue();
         await Assert.That(authority.Matches(intended with { EventId = Guid.CreateVersion7() })).IsFalse();
@@ -236,8 +236,8 @@ public sealed class AnonymousRegistrationChallengeServiceTests
         await Assert.That(JsonSerializer.Serialize(authority)).IsEqualTo("{}");
         await Assert.That(() => JsonSerializer.Deserialize<AnonymousRegistrationChallengeAuthority>("{}")).Throws<NotSupportedException>();
         await Assert.That(typeof(AnonymousRegistrationChallengeAuthority).GetConstructors()).IsEmpty();
-        await Assert.That(await handler.Handle(command with { EventId = Guid.CreateVersion7() }, CancellationToken.None)).IsNull();
-        await Assert.That(await handler.Handle(command with { CanonicalRequestDigest = string.Empty }, CancellationToken.None)).IsNull();
+        await Assert.That(await handler.ExecuteAsync(command with { EventId = Guid.CreateVersion7() }, CancellationToken.None)).IsNull();
+        await Assert.That(await handler.ExecuteAsync(command with { CanonicalRequestDigest = string.Empty }, CancellationToken.None)).IsNull();
     }
 
     [Test]

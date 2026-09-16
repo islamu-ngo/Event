@@ -199,7 +199,7 @@ public sealed class EventSessionMappingHandlerTests
         });
         var handler = new CreateEventSessionGroupCommandHandler(repository, events,
             Substitute.For<ILocationRepository>(), Substitute.For<ILocationRoomRepository>(), new InlineUnitOfWork(), Attachment());
-        var result = await handler.Handle(new CreateEventSessionGroupCommand
+        var result = await handler.ExecuteAsync(new CreateEventSessionGroupCommand
         {
             EventSessionGroup = new CreateEventSessionGroupRequestDto
             {

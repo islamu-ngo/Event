@@ -22,7 +22,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
             repository,
             Substitute.For<IEventLocationDisclosureService>());
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetEventSessionGroupsByEventRequest { EventId = eventId },
             CancellationToken.None);
 
@@ -43,7 +43,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
             repository,
             Substitute.For<IEventLocationDisclosureService>());
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetEventSessionGroupDetailRequest { Id = entity.Id },
             CancellationToken.None);
 
@@ -62,7 +62,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
         repository.GetActiveByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([entity]);
         var handler = new GetManagedEventSessionGroupsByEventRequestHandler(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventId },
             CancellationToken.None);
 
@@ -81,7 +81,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
         repository.GetWithDetailsAsync(entity.Id, Arg.Any<CancellationToken>()).Returns(entity);
         var handler = new GetManagedEventSessionGroupDetailRequestHandler(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetManagedEventSessionGroupDetailRequest { EventId = eventId, Id = entity.Id },
             CancellationToken.None);
 

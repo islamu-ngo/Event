@@ -95,9 +95,9 @@ public sealed class PublicEventLocationProjectionTests
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([group]);
 
         EventSessionGroupDto? detail = await new GetEventSessionGroupDetailRequestHandler(repository, disclosureService)
-            .Handle(new GetEventSessionGroupDetailRequest { Id = group.Id }, CancellationToken.None);
+            .QueryAsync(new GetEventSessionGroupDetailRequest { Id = group.Id }, CancellationToken.None);
         EventSessionGroupListDto byEvent = (await new GetEventSessionGroupsByEventRequestHandler(repository, disclosureService)
-            .Handle(new GetEventSessionGroupsByEventRequest { EventId = eventId }, CancellationToken.None)).Single();
+            .QueryAsync(new GetEventSessionGroupsByEventRequest { EventId = eventId }, CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: true);
         await AssertPublicLocationAsync(byEvent.EventLocation, eventLocationId, expectRoom: true);

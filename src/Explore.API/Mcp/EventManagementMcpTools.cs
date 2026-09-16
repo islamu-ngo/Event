@@ -63,6 +63,7 @@ public sealed class EventManagementMcpTools(
     IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays,
     IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
     IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
+    IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> managedEventSessionGroups,
     IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> customPropertyDefinitions,
     IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues,
     IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler,
@@ -897,7 +898,7 @@ public sealed class EventManagementMcpTools(
 
         var eventDto = gate.Event!;
         var sessions = await mediator.Send(new GetManagedSessionsByEventRequest { EventId = eventDto.Id }, cancellationToken);
-        var sessionGroups = await mediator.Send(
+        var sessionGroups = await managedEventSessionGroups.QueryAsync(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventDto.Id },
             cancellationToken);
         var days = await managedEventDays.QueryAsync(

@@ -1,13 +1,13 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Commands;
 
-public class AssignSessionToGroupCommandHandler : IRequestHandler<AssignSessionToGroupCommand, BaseCommandResponse<Guid>>
+public class AssignSessionToGroupCommandHandler : ICommandHandler<AssignSessionToGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
     private readonly IEventSessionGroupSessionRepository _eventSessionGroupSessionRepository;
@@ -26,13 +26,13 @@ public class AssignSessionToGroupCommandHandler : IRequestHandler<AssignSessionT
         _eventSessionRepository = eventSessionRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(AssignSessionToGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AssignSessionToGroupCommand command, CancellationToken cancellationToken = default)
     {
         var validator = new AssignSessionToGroupRequestDtoValidator(
             _eventRepository,
             _eventSessionGroupRepository,
             _eventSessionRepository);
-        var validationResult = await validator.ValidateAsync(request.Assignment, cancellationToken);
+        var validationResult = await validator.ValidateAsync(command.Assignment, cancellationToken);
 
         if (!validationResult.IsValid)
         {
@@ -42,10 +42,10 @@ public class AssignSessionToGroupCommandHandler : IRequestHandler<AssignSessionT
         }
 
         var group = await _eventSessionGroupRepository.GetForUpdateAsync(
-            request.Assignment.EventSessionGroupId,
+            command.Assignment.EventSessionGroupId,
             cancellationToken);
-        var session = await _eventSessionRepository.GetById(request.Assignment.EventSessionId);
-        var parentEvent = await _eventRepository.GetById(request.Assignment.EventId);
+        var session = await _eventSessionRepository.GetById(command.Assignment.EventSessionId);
+        var parentEvent = await _eventRepository.GetById(command.Assignment.EventId);
 
         if (group is null || session is null || parentEvent is null)
         {
@@ -53,7 +53,7 @@ public class AssignSessionToGroupCommandHandler : IRequestHandler<AssignSessionT
                 "Event, session group, or event session was not found in the current tenant.");
         }
 
-        if (group.EventId != request.Assignment.EventId || session.EventId != request.Assignment.EventId)
+        if (group.EventId != command.Assignment.EventId || session.EventId != command.Assignment.EventId)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Session group and event session must belong to the requested event."],
@@ -61,20 +61,20 @@ public class AssignSessionToGroupCommandHandler : IRequestHandler<AssignSessionT
         }
 
         var existingAssignment = await _eventSessionGroupSessionRepository.GetExistingAssignmentAsync(
-            request.Assignment.EventSessionGroupId,
-            request.Assignment.EventSessionId,
+            command.Assignment.EventSessionGroupId,
+            command.Assignment.EventSessionId,
             cancellationToken);
 
-        if (request.Assignment.IsPrimary)
+        if (command.Assignment.IsPrimary)
         {
             await DemoteOtherPrimaryAssignmentsAsync(session.Id, existingAssignment?.Id, cancellationToken);
         }
 
         if (existingAssignment is not null)
         {
-            existingAssignment.EventId = request.Assignment.EventId;
-            existingAssignment.IsPrimary = request.Assignment.IsPrimary;
-            existingAssignment.SortOrder = request.Assignment.SortOrder;
+            existingAssignment.EventId = command.Assignment.EventId;
+            existingAssignment.IsPrimary = command.Assignment.IsPrimary;
+            existingAssignment.SortOrder = command.Assignment.SortOrder;
             await _eventSessionGroupSessionRepository.Update(existingAssignment);
 
             return BaseCommandResponse.Success(
@@ -92,8 +92,8 @@ public class AssignSessionToGroupCommandHandler : IRequestHandler<AssignSessionT
             Event = null!,
             TenantId = parentEvent.TenantId,
             Tenant = null!,
-            IsPrimary = request.Assignment.IsPrimary,
-            SortOrder = request.Assignment.SortOrder
+            IsPrimary = command.Assignment.IsPrimary,
+            SortOrder = command.Assignment.SortOrder
         };
 
         assignment = await _eventSessionGroupSessionRepository.Create(assignment);

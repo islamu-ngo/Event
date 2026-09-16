@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -6,11 +7,10 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Queries;
 
-public class GetEventSessionGroupDetailRequestHandler : IRequestHandler<GetEventSessionGroupDetailRequest, EventSessionGroupDto?>
+public class GetEventSessionGroupDetailRequestHandler : IQueryHandler<GetEventSessionGroupDetailRequest, EventSessionGroupDto?>
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
     private readonly IEventLocationDisclosureService _disclosureService;
@@ -23,9 +23,9 @@ public class GetEventSessionGroupDetailRequestHandler : IRequestHandler<GetEvent
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventSessionGroupDto?> Handle(GetEventSessionGroupDetailRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionGroupDto?> QueryAsync(GetEventSessionGroupDetailRequest query, CancellationToken cancellationToken = default)
     {
-        var group = await _eventSessionGroupRepository.GetPublicWithDetailsAsync(request.Id, cancellationToken);
+        var group = await _eventSessionGroupRepository.GetPublicWithDetailsAsync(query.Id, cancellationToken);
         return await PublicEventSessionGroupLocationProjector.ProjectAsync(
             group,
             _disclosureService,

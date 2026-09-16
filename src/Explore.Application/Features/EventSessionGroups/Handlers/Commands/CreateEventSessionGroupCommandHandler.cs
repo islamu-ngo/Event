@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Commands;
 
-public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEventSessionGroupCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionGroupCommandHandler : ICommandHandler<CreateEventSessionGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
     private readonly IEventRepository _eventRepository;
@@ -33,13 +33,13 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionGroupCommand command, CancellationToken cancellationToken = default)
     {
         var validator = new CreateEventSessionGroupRequestDtoValidator(
             _eventRepository,
             _locationRepository,
             _locationRoomRepository);
-        var validationResult = await validator.ValidateAsync(request.EventSessionGroup, cancellationToken);
+        var validationResult = await validator.ValidateAsync(command.EventSessionGroup, cancellationToken);
 
         if (!validationResult.IsValid)
         {
@@ -48,15 +48,15 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
                 "Event session group creation failed.");
         }
 
-        var parentEvent = await _eventRepository.GetById(request.EventSessionGroup.EventId);
+        var parentEvent = await _eventRepository.GetById(command.EventSessionGroup.EventId);
         if (parentEvent is null)
         {
             return BaseCommandResponse.NotFound<Guid>("Event not found in the current tenant.");
         }
 
         if (await SlugExistsForEventAsync(
-                request.EventSessionGroup.EventId,
-                request.EventSessionGroup.Slug,
+                command.EventSessionGroup.EventId,
+                command.EventSessionGroup.Slug,
                 cancellationToken))
         {
             return BaseCommandResponse.Validation<Guid>(
@@ -65,7 +65,7 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
         }
 
         // Identity, tenant, audit and relationship state are not client-mapped.
-        var input = request.EventSessionGroup;
+        var input = command.EventSessionGroup;
         var group = new EventSessionGroup
         {
             EventId = input.EventId,

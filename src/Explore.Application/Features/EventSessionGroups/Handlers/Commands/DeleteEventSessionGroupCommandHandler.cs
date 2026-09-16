@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Commands;
 
-public class DeleteEventSessionGroupCommandHandler : IRequestHandler<DeleteEventSessionGroupCommand, BaseCommandResponse<Guid>>
+public class DeleteEventSessionGroupCommandHandler : ICommandHandler<DeleteEventSessionGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
     private readonly IEventSessionGroupSessionRepository _eventSessionGroupSessionRepository;
@@ -25,15 +25,15 @@ public class DeleteEventSessionGroupCommandHandler : IRequestHandler<DeleteEvent
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteEventSessionGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteEventSessionGroupCommand command, CancellationToken cancellationToken = default)
     {
-        var group = await _eventSessionGroupRepository.GetForUpdateAsync(request.Id, cancellationToken);
+        var group = await _eventSessionGroupRepository.GetForUpdateAsync(command.Id, cancellationToken);
         if (group is null)
         {
             return BaseCommandResponse.NotFound<Guid>("Event session group not found.");
         }
 
-        if (group.EventId != request.EventId)
+        if (group.EventId != command.EventId)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Event session group must belong to the requested event."],

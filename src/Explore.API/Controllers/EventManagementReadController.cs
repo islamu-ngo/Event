@@ -51,17 +51,20 @@ public class EventManagementReadController : EventControllerBase
     private readonly IResourceAssembler<EventDto, EventListDto> _resourceAssembler;
     private readonly IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> _publicProgramSummary;
     private readonly IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> _managedProgramSummary;
+    private readonly IQueryHandler<GetEventSessionCreateContextRequest, EventSessionCreateContextDto?> _sessionCreateContext;
 
     public EventManagementReadController(
         IMediator mediator,
         IResourceAssembler<EventDto, EventListDto> resourceAssembler,
         IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
-        IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> managedProgramSummary)
+        IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> managedProgramSummary,
+        IQueryHandler<GetEventSessionCreateContextRequest, EventSessionCreateContextDto?> sessionCreateContext)
     {
         _mediator = mediator;
         _resourceAssembler = resourceAssembler;
         _publicProgramSummary = publicProgramSummary;
         _managedProgramSummary = managedProgramSummary;
+        _sessionCreateContext = sessionCreateContext;
     }
 
     /// <summary>
@@ -125,7 +128,7 @@ public class EventManagementReadController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EventSessionCreateContextDto>> GetSessionCreateContext(Guid id, CancellationToken cancellationToken = default)
     {
-        var context = await _mediator.Send(new GetEventSessionCreateContextRequest { EventId = id }, cancellationToken);
+        var context = await _sessionCreateContext.QueryAsync(new GetEventSessionCreateContextRequest { EventId = id }, cancellationToken);
         if (context is null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 

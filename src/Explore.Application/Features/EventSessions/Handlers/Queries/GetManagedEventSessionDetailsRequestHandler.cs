@@ -1,16 +1,16 @@
 using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 
 public sealed class GetManagedEventSessionDetailsRequestHandler(
     IEventSessionRepository eventSessionRepository)
-    : IRequestHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?>
+    : IQueryHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?>
 {
-    public async Task<EventSessionDto?> Handle(
+    public async Task<EventSessionDto?> QueryAsync(
         GetManagedEventSessionDetailsRequest request,
         CancellationToken cancellationToken)
     {

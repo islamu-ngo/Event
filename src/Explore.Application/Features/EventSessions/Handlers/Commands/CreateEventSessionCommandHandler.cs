@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -13,13 +9,12 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Domain.ValueObjects;
 using Explore.Domain.Services.Scheduling;
-using MediatR;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
 
-public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly IEventRepository _eventRepository;
@@ -71,7 +66,7 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventSessionDtoValidator(
             _eventRepository,

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
@@ -6,11 +7,10 @@ using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.EventSessions;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 
-public class GetEventSessionListRequestHandler : IRequestHandler<GetEventSessionListRequest, PaginatedResult<EventSessionListDto>>
+public class GetEventSessionListRequestHandler : IQueryHandler<GetEventSessionListRequest, PaginatedResult<EventSessionListDto>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
@@ -29,7 +29,7 @@ public class GetEventSessionListRequestHandler : IRequestHandler<GetEventSession
         _disclosureService = disclosureService;
     }
 
-    public async Task<PaginatedResult<EventSessionListDto>> Handle(GetEventSessionListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventSessionListDto>> QueryAsync(GetEventSessionListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<EventSessionListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
 

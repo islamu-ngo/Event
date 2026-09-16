@@ -6,6 +6,7 @@ using Explore.API.Attributes;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Features.EventSessions.Requests.Queries;
@@ -321,14 +322,27 @@ public class EventSessionControllerTests
     public async Task Delete_WhenPublishedTicketReferencesSession_ReturnsConflict()
     {
         Guid id = Guid.CreateVersion7();
-        IMediator mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<DeleteEventSessionCommand>(), Arg.Any<CancellationToken>()).Returns(
+        var deleteHandler = Substitute.For<ICommandHandler<DeleteEventSessionCommand, BaseCommandResponse<Guid>>>();
+        deleteHandler.ExecuteAsync(Arg.Any<DeleteEventSessionCommand>(), Arg.Any<CancellationToken>()).Returns(
             BaseCommandResponse.Failure<Guid>(
                 "event_session_ticket_entitlement_conflict",
                 "Event session is referenced by a published ticket catalog.",
                 id: id));
         var controller = new EventSessionController(
-            mediator,
+            Substitute.For<IQueryHandler<GetEventSessionListRequest, PaginatedResult<EventSessionListDto>>>(),
+            Substitute.For<IQueryHandler<GetEventSessionDetailsRequest, EventSessionDto?>>(),
+            Substitute.For<IQueryHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?>>(),
+            Substitute.For<IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>>(),
+            Substitute.For<IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>>>(),
+            Substitute.For<ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateDraftEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<ArchiveEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CancelEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CompleteEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateEventSessionCommand, BaseCommandResponse<Guid>>>(),
+            deleteHandler,
             Substitute.For<ILogger<EventSessionController>>(),
             Substitute.For<Explore.Application.Contracts.Infrastructure.ITenantContext>(),
             Substitute.For<IResourceAssembler<EventSessionDto, EventSessionListDto>>())

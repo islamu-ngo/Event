@@ -153,7 +153,7 @@ public sealed class EventSessionMappingHandlerTests
             Substitute.For<IEventSessionCustomPropertyProjectionUpdater>(), Substitute.For<IEventSessionTemplateInstantiationService>(),
             new EventScheduleProjectionCalculator(), Substitute.For<IEventDayRepository>(), Substitute.For<IStorageObjectRepository>(),
             new InlineUnitOfWork(), Attachment());
-        var result = await handler.Handle(new CreateEventSessionCommand
+        var result = await handler.ExecuteAsync(new CreateEventSessionCommand
         {
             EventSessionDto = new CreateEventSessionDto
             {

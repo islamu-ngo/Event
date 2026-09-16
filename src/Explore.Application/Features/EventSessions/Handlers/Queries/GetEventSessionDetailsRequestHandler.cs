@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -8,11 +9,10 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 
-public class GetEventSessionDetailsRequestHandler : IRequestHandler<GetEventSessionDetailsRequest, EventSessionDto?>
+public class GetEventSessionDetailsRequestHandler : IQueryHandler<GetEventSessionDetailsRequest, EventSessionDto?>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly IEventLocationDisclosureService _disclosureService;
@@ -25,7 +25,7 @@ public class GetEventSessionDetailsRequestHandler : IRequestHandler<GetEventSess
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventSessionDto?> Handle(GetEventSessionDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionDto?> QueryAsync(GetEventSessionDetailsRequest request, CancellationToken cancellationToken)
     {
         var eventSession = await _eventSessionRepository.GetPublicSessionWithDetailsAsync(
             request.Id,

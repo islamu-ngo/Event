@@ -1,11 +1,13 @@
 using Explore.Application.Authorization;
-using Explore.Application.Behaviors;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessions.Requests.Commands;
+using Explore.Application.Operations.Decorators;
 using Explore.Application.Responses;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace Event.Application.UnitTests.Features.EventSessions.Commands;
 
@@ -36,18 +38,18 @@ public class CreateEventSessionCommandSecurityTests
         var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000101");
         var eventId = Guid.Parse("00000000-0000-0000-0000-000000000102");
         var command = CreateCommand(tenantId, eventId);
-        var behavior = new AuthorizationBehavior<CreateEventSessionCommand, BaseCommandResponse<Guid>>(
-            new ExactPreCreateAuthorizationProvider(tenantId, eventId),
-            NullLogger<AuthorizationBehavior<CreateEventSessionCommand, BaseCommandResponse<Guid>>>.Instance);
-        var handlerRunCount = 0;
+        var innerHandler = Substitute.For<ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>>();
+        innerHandler.ExecuteAsync(Arg.Any<CreateEventSessionCommand>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult(BaseCommandResponse.Success(call.Arg<CreateEventSessionCommand>().EventSessionDto.EventId)));
+        var authorization = new RequestAuthorization<CreateEventSessionCommand>(
+            new ExactPreCreateAuthorizationProvider(tenantId, eventId));
+        var decorator = new AuthorizationCommandHandlerDecorator<CreateEventSessionCommand, BaseCommandResponse<Guid>>(
+            innerHandler,
+            authorization,
+            NullLogger<RequestAuthorization<CreateEventSessionCommand>>.Instance);
 
-        BaseCommandResponse<Guid> allowed = await behavior.Handle(
+        BaseCommandResponse<Guid> allowed = await decorator.ExecuteAsync(
             command,
-            _ =>
-            {
-                handlerRunCount++;
-                return Task.FromResult(BaseCommandResponse.Success(eventId));
-            },
             CancellationToken.None);
 
         await Assert.That(allowed.IsSuccess).IsTrue();
@@ -71,17 +73,12 @@ public class CreateEventSessionCommandSecurityTests
 
         foreach (CreateEventSessionCommand forged in forgedVariants)
         {
-            await Assert.ThrowsAsync<AuthorizationException>(() => behavior.Handle(
+            await Assert.ThrowsAsync<AuthorizationException>(() => decorator.ExecuteAsync(
                 forged,
-                _ =>
-                {
-                    handlerRunCount++;
-                    return Task.FromResult(BaseCommandResponse.Success(Guid.Empty));
-                },
                 CancellationToken.None));
         }
 
-        await Assert.That(handlerRunCount).IsEqualTo(1);
+        await innerHandler.Received(1).ExecuteAsync(Arg.Any<CreateEventSessionCommand>(), Arg.Any<CancellationToken>());
     }
 
     private static CreateEventSessionCommand CreateCommand(Guid tenantId, Guid eventId) => new()

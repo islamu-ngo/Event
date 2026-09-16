@@ -1,4 +1,5 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;
 using Explore.Application.Features.EventSessions.Requests.Commands;
@@ -7,7 +8,6 @@ using Explore.Application.Services;
 using Explore.Application.Services.Lifecycle;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
@@ -19,11 +19,11 @@ public sealed class CreateDraftEventSessionCommandHandler(
     IEventLifecycleReadinessEvaluator readinessEvaluator,
     IUnitOfWork unitOfWork,
     EventLocationAttachmentService eventLocationAttachmentService,
-    HybridCache cache) : IRequestHandler<CreateDraftEventSessionCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<CreateDraftEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private const string ReadinessFailedCode = "event_session_draft_readiness_failed";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateDraftEventSessionCommand command, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateDraftEventSessionCommand command, CancellationToken cancellationToken)
     {
         var validator = new CreateDraftEventSessionRequestDtoValidator();
         var validationResult = await validator.ValidateAsync(command.Request, cancellationToken);

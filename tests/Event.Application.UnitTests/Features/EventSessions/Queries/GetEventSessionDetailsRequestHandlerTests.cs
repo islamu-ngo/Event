@@ -22,7 +22,7 @@ public class GetEventSessionDetailsRequestHandlerTests
         var session = CreateSession();
         _repository.GetPublicSessionWithDetailsAsync(session.Id, Arg.Any<CancellationToken>()).Returns(session);
         var result = await new GetEventSessionDetailsRequestHandler(_repository, _disclosureService)
-            .Handle(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
+            .QueryAsync(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
         await Assert.That(result).IsNotNull();
         await Assert.That(result!.Id).IsEqualTo(session.Id);
         await Assert.That(result.Title).IsEqualTo("Test Session");
@@ -34,7 +34,7 @@ public class GetEventSessionDetailsRequestHandlerTests
         var id = Guid.Parse("01900000-0000-7000-8000-000000000001");
         _repository.GetPublicSessionWithDetailsAsync(id, Arg.Any<CancellationToken>()).Returns((EventSession?)null);
         var result = await new GetEventSessionDetailsRequestHandler(_repository, _disclosureService)
-            .Handle(new GetEventSessionDetailsRequest { Id = id }, CancellationToken.None);
+            .QueryAsync(new GetEventSessionDetailsRequest { Id = id }, CancellationToken.None);
         await Assert.That(result).IsNull();
     }
 
@@ -44,7 +44,7 @@ public class GetEventSessionDetailsRequestHandlerTests
         var session = CreateSession();
         _repository.GetPublicSessionWithDetailsAsync(session.Id, Arg.Any<CancellationToken>()).Returns(session);
         var result = await new GetEventSessionDetailsRequestHandler(_repository, _disclosureService)
-            .Handle(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
+            .QueryAsync(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
         await Assert.That(result!.LocationId).IsNull();
         await Assert.That(result.LocationFullName).IsNull();
         await Assert.That(result.LocationAddress).IsNull();
@@ -83,7 +83,7 @@ public sealed class PublicEventSessionListLocationPrivacyTests
         var session = GetEventSessionDetailsRequestHandlerTests.CreateSession();
         _repository.GetPublicSessionsByEventAsync(session.EventId, Arg.Any<CancellationToken>()).Returns([session]);
         var result = await new GetSessionsByEventRequestHandler(_repository, _disclosureService)
-            .Handle(new GetSessionsByEventRequest { EventId = session.EventId }, CancellationToken.None);
+            .QueryAsync(new GetSessionsByEventRequest { EventId = session.EventId }, CancellationToken.None);
         await AssertPhysicalLocationIsRedactedAsync(result.Single());
     }
 
@@ -94,7 +94,7 @@ public sealed class PublicEventSessionListLocationPrivacyTests
         _repository.GetPublicSessionsWithDetailsPagedAsync(1, 20, Arg.Any<CancellationToken>()).Returns(([session], 1));
         var handler = new GetEventSessionListRequestHandler(
             _repository, Substitute.For<ICustomPropertyQuotaResolver>(), Substitute.For<ITenantContext>(), _disclosureService);
-        var result = await handler.Handle(new GetEventSessionListRequest(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetEventSessionListRequest(), CancellationToken.None);
         await AssertPhysicalLocationIsRedactedAsync(result.Items.Single());
         await Assert.That(result.TotalCount).IsEqualTo(1);
     }

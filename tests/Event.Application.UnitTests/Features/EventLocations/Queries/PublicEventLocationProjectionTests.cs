@@ -49,15 +49,15 @@ public sealed class PublicEventLocationProjectionTests
         repository.GetPublicSessionsByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([session]);
 
         EventSessionDto? detail = await new GetEventSessionDetailsRequestHandler(repository, disclosureService)
-            .Handle(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
+            .QueryAsync(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
         EventSessionListDto paged = (await new GetEventSessionListRequestHandler(
                 repository,
                 Substitute.For<ICustomPropertyQuotaResolver>(),
                 Substitute.For<ITenantContext>(),
                 disclosureService)
-            .Handle(new GetEventSessionListRequest(), CancellationToken.None)).Items.Single();
+            .QueryAsync(new GetEventSessionListRequest(), CancellationToken.None)).Items.Single();
         EventSessionListDto byEvent = (await new GetSessionsByEventRequestHandler(repository, disclosureService)
-            .Handle(new GetSessionsByEventRequest { EventId = eventId }, CancellationToken.None)).Single();
+            .QueryAsync(new GetSessionsByEventRequest { EventId = eventId }, CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: true);
         await AssertPublicLocationAsync(paged.EventLocation, eventLocationId, expectRoom: true);
@@ -274,7 +274,7 @@ public sealed class PublicEventLocationProjectionTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Assert.That(async () => await handler.Handle(
+        await Assert.That(async () => await handler.QueryAsync(
                 new GetEventSessionDetailsRequest { Id = session.Id },
                 cancellation.Token))
             .Throws<OperationCanceledException>();

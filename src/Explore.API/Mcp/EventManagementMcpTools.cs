@@ -69,7 +69,9 @@ public sealed class EventManagementMcpTools(
     IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler,
     IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>> eventTeamListHandler,
     IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> currentUserEventPermissionsHandler,
-    IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> assignableEventRolePresetsHandler)
+    IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> assignableEventRolePresetsHandler,
+    IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>> publicSessionsByEvent,
+    IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> managedSessionsByEvent)
 {
 
     [McpServerTool(
@@ -321,7 +323,7 @@ public sealed class EventManagementMcpTools(
             var publicEvent = await GetPublicEventOrNullAsync(eventId, cancellationToken);
             var sessions = publicEvent is null
                 ? null
-                : await mediator.Send(new GetSessionsByEventRequest { EventId = eventId }, cancellationToken);
+                : await publicSessionsByEvent.QueryAsync(new GetSessionsByEventRequest { EventId = eventId }, cancellationToken);
             EventMcpSessionListResultDescriptor descriptor;
             if (sessions is null)
             {
@@ -897,7 +899,7 @@ public sealed class EventManagementMcpTools(
         }
 
         var eventDto = gate.Event!;
-        var sessions = await mediator.Send(new GetManagedSessionsByEventRequest { EventId = eventDto.Id }, cancellationToken);
+        var sessions = await managedSessionsByEvent.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventDto.Id }, cancellationToken);
         var sessionGroups = await managedEventSessionGroups.QueryAsync(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventDto.Id },
             cancellationToken);
@@ -1272,7 +1274,7 @@ public sealed class EventManagementMcpTools(
             return EventMcpSessionTemplateSyncContextResultDescriptor.Unavailable(eventId, sessionId);
         }
 
-        var sessions = await mediator.Send(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
+        var sessions = await managedSessionsByEvent.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
         if (sessions.All(session => session.Id != sessionId))
         {
             return EventMcpSessionTemplateSyncContextResultDescriptor.NotFound(eventId, sessionId);

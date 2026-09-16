@@ -14,7 +14,6 @@ using Explore.Application.Features.OrganizerPaymentConnections;
 using Explore.Application.Features.OrganizerPaymentConnections.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -27,7 +26,6 @@ namespace Explore.API.Controllers;
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class EventTicketingController(
-    IMediator mediator,
     IResourceAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementDto> assembler,
     IResourceAssembler<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightDto> preflightAssembler,
     IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto> paymentConnectionAssembler,
@@ -42,7 +40,9 @@ public sealed class EventTicketingController(
     ICommandHandler<DeleteEventCapacityPoolCommand, BaseCommandResponse<Guid>> deletePoolCommandHandler,
     IQueryHandler<GetPaidEventPublicationPreflightQuery, PaidEventPublicationPreflightDto> preflightQueryHandler,
     ICommandHandler<UpdateEventTicketCatalogCommercialDisclosuresCommand, BaseCommandResponse<Guid>> disclosuresCommandHandler,
-    ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>> publishCommandHandler) : ControllerBase
+    ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>> publishCommandHandler,
+    IQueryHandler<GetEventOrganizerPaymentConnectionQuery, EventOrganizerPaymentConnectionManagementDto?> paymentConnectionQueryHandler,
+    ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>> paymentOnboardingCommandHandler) : ControllerBase
 {
     private static readonly ApiValidationProblemDescriptor TicketingValidationProblem = new(
         "eventTicketing",
@@ -204,7 +204,7 @@ public sealed class EventTicketingController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<EventOrganizerPaymentConnectionManagementDto>>> GetPaymentConnection(Guid eventId, CancellationToken ct)
     {
-        EventOrganizerPaymentConnectionManagementDto? dto = await mediator.Send(new GetEventOrganizerPaymentConnectionQuery(eventId), ct);
+        EventOrganizerPaymentConnectionManagementDto? dto = await paymentConnectionQueryHandler.QueryAsync(new GetEventOrganizerPaymentConnectionQuery(eventId), ct);
         if (dto is null)
         {
             return this.ToNotFoundProblem(NotFoundProblem);
@@ -236,7 +236,7 @@ public sealed class EventTicketingController(
                 TicketingValidationProblem);
         }
 
-        BaseCommandResponse<OrganizerPaymentOnboardingLinkResult> response = await mediator.Send(new CreateOrganizerPaymentOnboardingLinkCommand(eventId, returnUrl, refreshUrl), ct);
+        BaseCommandResponse<OrganizerPaymentOnboardingLinkResult> response = await paymentOnboardingCommandHandler.ExecuteAsync(new CreateOrganizerPaymentOnboardingLinkCommand(eventId, returnUrl, refreshUrl), ct);
         return response.IsSuccess ? Ok(response) : OrganizerPaymentFailures.Map(this, response);
     }
 

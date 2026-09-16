@@ -86,7 +86,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
             directoryReadiness,
             new OrganizerEarningsCalculator());
 
-        var result = await handler.Handle(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
         var options = result!.TicketTypes.Single().SlidingScaleOptions;
 
         await Assert.That(options.Count).IsEqualTo(5);

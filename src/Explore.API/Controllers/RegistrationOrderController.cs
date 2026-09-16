@@ -1,21 +1,14 @@
 using Asp.Versioning;
-using System.Text.Json;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
-using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
-using Explore.Application.DTOs.RegistrationSubmissions;
-using Explore.Application.Features.Promotions.Requests.Commands;
-using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
-using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Hateoas;
-using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -26,11 +19,11 @@ namespace Explore.API.Controllers;
 [Route("api/events/{eventId:guid}/registration-orders")]
 [ApiController]
 public sealed class RegistrationOrderController(
-    IMediator mediator,
+    IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?> checkoutHandler,
+    IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventOrdersHandler,
     IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> assembler)
     : RegistrationOrderControllerBase
 {
-
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [PrivateNoStore]
@@ -43,7 +36,7 @@ public sealed class RegistrationOrderController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new GetRegistrationCheckoutCompositionQuery(eventId), cancellationToken);
+        var response = await checkoutHandler.QueryAsync(new GetRegistrationCheckoutCompositionQuery(eventId), cancellationToken);
         return response is null ? this.ToNotFoundProblem(RegistrationOrderNotFoundProblem) : Ok(response);
     }
 
@@ -61,7 +54,7 @@ public sealed class RegistrationOrderController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<RegistrationOrderDto> orders = await mediator.Send(
+        IReadOnlyList<RegistrationOrderDto> orders = await eventOrdersHandler.QueryAsync(
             new GetEventRegistrationOrdersQuery(eventId),
             cancellationToken);
         HalCollectionResource<RegistrationOrderDto> resource = await assembler.ToCollectionResource(
@@ -71,5 +64,4 @@ public sealed class RegistrationOrderController(
             HttpContext);
         return Ok(resource);
     }
-
 }

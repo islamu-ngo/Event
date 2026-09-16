@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -6,7 +7,6 @@ using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
 
@@ -16,9 +16,9 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandler(
     IPlatformFeePolicyRepository feePolicies,
     ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
     IOrganizerEarningsCalculator earningsCalculator)
-    : IRequestHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>
+    : IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>
 {
-    public async Task<RegistrationCheckoutCompositionDto?> Handle(
+    public async Task<RegistrationCheckoutCompositionDto?> QueryAsync(
         GetRegistrationCheckoutCompositionQuery request,
         CancellationToken cancellationToken)
     {

@@ -1,27 +1,27 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Commands;
 
-public interface IRegistrationOrderLifecycleCommand
+public interface IRegistrationOrderLifecycleCommand : ICommand<RegistrationOrderLifecycleResponseDto>
 {
     Guid OrderId { get; }
 }
 
 public sealed record SubmitRegistrationOrderCommand(Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
 
 public sealed record ReadyRegistrationOrderForCheckoutCommand(Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
 
 public sealed record FinalizeFreeRegistrationOrderCommand(Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
 
 public sealed record CancelRegistrationOrderCommand(Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
 
 public sealed record ApproveRegistrationOrderCommand(Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
 
 public sealed record RejectRegistrationOrderCommand(Guid OrderId)
-    : IRequest<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;
+    : ICommand<RegistrationOrderLifecycleResponseDto>, IRegistrationOrderLifecycleCommand;

@@ -64,7 +64,8 @@ public sealed class EventManagementMcpTools(
     IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
     IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
     IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> customPropertyDefinitions,
-    IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues)
+    IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues,
+    IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler)
 {
 
     [McpServerTool(
@@ -1086,7 +1087,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxManagedRegistrations);
-        IReadOnlyList<RegistrationOrderDto> orders = await mediator.Send(
+        IReadOnlyList<RegistrationOrderDto> orders = await eventRegistrationOrdersHandler.QueryAsync(
             new GetEventRegistrationOrdersQuery(eventDto.Id),
             cancellationToken);
         int totalOrderCount = orders.Count;

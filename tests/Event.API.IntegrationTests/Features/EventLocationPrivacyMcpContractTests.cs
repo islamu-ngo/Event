@@ -11,14 +11,19 @@ using Explore.Application.DTOs.EventProgram;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.DTOs.Location;
+using Explore.Application.DTOs.EventCustomProperty;
+using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.EventAgendaItems.Requests.Queries;
+using Explore.Application.Features.EventCustomProperties.Requests.Queries;
 using Explore.Application.Features.EventDays.Requests.Queries;
 using Explore.Application.Features.EventPrograms.Requests.Queries;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Application.Features.EventSessions.Requests.Queries;
+using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -322,7 +327,13 @@ public sealed class EventLocationPrivacyMcpContractTests
             [typeof(IResourceAssembler<EventDto, EventListDto>)] = eventResourceAssembler
                 ?? Substitute.For<IResourceAssembler<EventDto, EventListDto>>(),
             [typeof(IHttpContextAccessor)] = httpContextAccessor ?? Substitute.For<IHttpContextAccessor>(),
-            [typeof(EventMcpLocationDisclosureGuard)] = new EventMcpLocationDisclosureGuard(gateway)
+            [typeof(EventMcpLocationDisclosureGuard)] = new EventMcpLocationDisclosureGuard(gateway),
+            [typeof(IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>>(),
+            [typeof(IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>>)] =
+                Substitute.For<IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>>>(),
+            [typeof(IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>)] =
+                Substitute.For<IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>>()
         };
         var constructor = typeof(EventManagementMcpTools).GetConstructors().Single();
         var parameters = constructor.GetParameters();

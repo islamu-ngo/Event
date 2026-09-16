@@ -187,24 +187,26 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task GetEventOrders_DispatchesEventScopedQueryAndAssemblesHalCollection()
     {
-        var mediator = Substitute.For<IMediator>();
+        var checkoutHandler = Substitute.For<IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>>();
+        var eventOrdersHandler = Substitute.For<IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>>();
         var assembler = Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         var eventId = Guid.CreateVersion7();
         IReadOnlyList<RegistrationOrderDto> orders = [new RegistrationOrderDto { Id = Guid.CreateVersion7(), EventId = eventId }];
         var collection = new HalCollectionResource<RegistrationOrderDto>();
-        mediator.Send(Arg.Any<GetEventRegistrationOrdersQuery>(), Arg.Any<CancellationToken>()).Returns(orders);
+        eventOrdersHandler.QueryAsync(Arg.Any<GetEventRegistrationOrdersQuery>(), Arg.Any<CancellationToken>()).Returns(orders);
         assembler.ToCollectionResource(
                 Arg.Any<IEnumerable<RegistrationOrderDto>>(),
                 RouteNames.GetEventRegistrationOrders,
                 Arg.Any<object?>(),
                 Arg.Any<HttpContext>())
             .Returns(collection);
-        var controller = CreateController<RegistrationOrderController>(mediator, assembler);
+        var controller = new RegistrationOrderController(checkoutHandler, eventOrdersHandler, assembler);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         ActionResult<HalCollectionResource<RegistrationOrderDto>> result = await controller.GetEventOrders(eventId);
 
         await Assert.That((result.Result as OkObjectResult)?.Value).IsEqualTo(collection);
-        _ = mediator.Received(1).Send(
+        _ = eventOrdersHandler.Received(1).QueryAsync(
             Arg.Is<GetEventRegistrationOrdersQuery>(query => query.EventId == eventId),
             Arg.Any<CancellationToken>());
     }
@@ -557,6 +559,10 @@ public sealed class RegistrationOrderControllerTests
                    Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>(),
                    Substitute.For<ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>>(),
                    Substitute.For<ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>>()]
+            : typeof(TController) == typeof(RegistrationOrderController)
+                ? [Substitute.For<IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>>(),
+                   Substitute.For<IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>>(),
+                   effectiveAssembler]
             : typeof(TController).GetConstructors().Single().GetParameters().Length == 1
                 ? [mediator]
                 : [mediator, effectiveAssembler];

@@ -14,8 +14,8 @@ using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Services;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
@@ -37,10 +37,10 @@ public sealed class CreateOrderWithHoldCommandHandler(
     IVisitorAccessCapabilityResolver visitorCapabilities,
     ISystemSettingRepository systemSettings,
     ITenantSettingRepository tenantSettings) :
-    IRequestHandler<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>,
+    ICommandHandler<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>,
     IRegistrationOrderStarter
 {
-    public Task<BaseCommandResponse<Guid>> Handle(
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateRegistrationOrderWithHoldCommand request,
         CancellationToken cancellationToken) => StartAsync(request, cancellationToken);
 

@@ -1,13 +1,13 @@
 using System.Text.Json.Serialization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Commands;
 
-public sealed record CreateRegistrationOrderWithHoldCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record CreateRegistrationOrderWithHoldCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public Guid EventId { get; init; }
 

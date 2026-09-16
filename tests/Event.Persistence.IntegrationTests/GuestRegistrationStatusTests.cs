@@ -37,14 +37,14 @@ public sealed class GuestRegistrationStatusTests
         await Assert.That(status).IsNotNull();
         await Assert.That(status!.StatusAccessUntil).IsEqualTo(Deadline);
         await Assert.That(status.RegistrationOrderStatusId).IsEqualTo((int)RegistrationOrderStatusEnum.Confirmed);
-        await Assert.That(await fixture.ExecuteAsync<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>(
+        await Assert.That(await fixture.ExecuteQueryAsync<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>(
             new(query.EventId, query.OrderId, query.CapabilityToken))).IsNull();
-        var continueResult = await fixture.ExecuteAsync<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
+        var continueResult = await fixture.ExecuteCommandAsync<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
             new(query.EventId, query.OrderId, query.CapabilityToken));
         await Assert.That(continueResult.IsSuccess).IsFalse();
         await Assert.That(continueResult.FailureCode).IsEqualTo("registration_order_not_found");
         await Assert.That(await fixture.Context.RegistrationOrderPii.CountAsync()).IsEqualTo(0);
-        await Assert.That(await fixture.ExecuteAsync<GetGuestRegistrationPaymentQuery, RegistrationPaymentDto?>(
+        await Assert.That(await fixture.ExecuteQueryAsync<GetGuestRegistrationPaymentQuery, RegistrationPaymentDto?>(
             new(query.EventId, query.OrderId, query.CapabilityToken))).IsNull();
         var orderWithPii = await fixture.Context.RegistrationOrders.SingleAsync(order => order.Id == query.OrderId);
         string retainedName = Guid.CreateVersion7().ToString("N");
@@ -252,7 +252,7 @@ public sealed class GuestRegistrationStatusTests
         var ticket = paid ? await SeedPaidTicketAsync(fixture, target.Id) : await fixture.SeedTicketAsync(target.Id);
         var proof = await fixture.IssueGuestProofAsync(new(target.Id, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]));
-        return await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+        return await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
     }
 
     private static async Task AssertNoAllocationAsync(EventVisitorCapabilitySqliteFixture fixture,
@@ -365,7 +365,7 @@ public sealed class GuestRegistrationStatusTests
         var ticket = await fixture.SeedTicketAsync(target.Id);
         var proof = await fixture.IssueGuestProofAsync(new(target.Id, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]));
-        var created = await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+        var created = await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(created.IsSuccess).IsTrue();
         if (confirm)
         {

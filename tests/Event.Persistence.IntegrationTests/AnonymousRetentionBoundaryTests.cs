@@ -141,14 +141,14 @@ public sealed class AnonymousRetentionBoundaryTests
         var ticket = await fixture.Inner.SeedTicketAsync(target.Id);
         var proof = await fixture.Inner.IssueGuestProofAsync(new StartGuestRegistrationOrderCommand(target.Id, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]));
-        var response = await fixture.Inner.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+        var response = await fixture.Inner.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(response.IsSuccess).IsTrue();
         var inventory = fixture.Services.GetRequiredService<IRegistrationInventoryRepository>();
         var order = (await inventory.GetOrderWithLinesAsync(response.Id, fixture.TenantId, CancellationToken.None))!;
         await Assert.That(order.AnonymousPiiRetentionUntilUtc).IsEqualTo(new DateTime(2027, 1, expectedDay, 14, 0, 0, DateTimeKind.Utc));
         await fixture.Context.Events.Where(value => value.Id == target.Id).ExecuteUpdateAsync(setters =>
             setters.SetProperty(value => value.LastSessionEndUtc, new DateTimeOffset(2027, 4, 1, 14, 0, 0, TimeSpan.Zero)));
-        var replay = await fixture.Inner.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+        var replay = await fixture.Inner.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(replay.Id).IsEqualTo(response.Id);
         await Assert.That((await inventory.GetOrderWithLinesAsync(response.Id, fixture.TenantId, CancellationToken.None))!.AnonymousPiiRetentionUntilUtc)
             .IsEqualTo(order.AnonymousPiiRetentionUntilUtc);

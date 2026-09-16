@@ -140,10 +140,10 @@ public sealed class EventVisitorCapabilityGateTests
         {
             "authenticated" => await fixture.ExecuteAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
                 new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)])),
-            "guest" => await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
+            "guest" => await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
                 (await fixture.IssueGuestProofAsync(new(entity.Id, ticket.CatalogId,
                     BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]))).Request),
-            _ => await fixture.ExecuteAsync<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>(new()
+            _ => await fixture.ExecuteCommandAsync<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>(new()
             {
                 EventId = entity.Id,
                 TicketCatalogVersionId = ticket.CatalogId,
@@ -170,7 +170,7 @@ public sealed class EventVisitorCapabilityGateTests
         await Assert.That(hold.RegistrationInventoryHoldStatusId).IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Active);
 
         BaseCommandResponse<Guid> cancelled = existing is GuestRegistrationOrderStartDto guest
-            ? await fixture.ExecuteAsync<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
+            ? await fixture.ExecuteCommandAsync<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
                 new(entity.Id, existing.Id, guest.GuestCapabilityToken))
             : await fixture.ExecuteAsync<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>(
                 new(entity.Id, existing.Id));

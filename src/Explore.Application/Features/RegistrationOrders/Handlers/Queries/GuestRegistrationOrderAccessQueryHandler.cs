@@ -9,7 +9,6 @@ using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
 
@@ -19,9 +18,9 @@ public sealed class GetGuestRegistrationOrderQueryHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider)
-    : IRequestHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>
+    : IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>
 {
-    public async Task<GuestRegistrationOrderDto?> Handle(GetGuestRegistrationOrderQuery request, CancellationToken cancellationToken)
+    public async Task<GuestRegistrationOrderDto?> QueryAsync(GetGuestRegistrationOrderQuery request, CancellationToken cancellationToken)
     {
         var command = new ContinueGuestRegistrationOrderCommand(request.EventId, request.OrderId, request.CapabilityToken);
         if (!(await new GuestRegistrationOrderAccessCommandValidator<ContinueGuestRegistrationOrderCommand>()
@@ -50,9 +49,9 @@ public sealed class GetGuestNativeRegistrationRequirementProgressQueryHandler(
     ITenantContext tenant,
     TimeProvider timeProvider,
     IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler)
-    : IRequestHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
+    : IQueryHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
-    public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
+    public async Task<NativeRegistrationRequirementProgressCollectionDto?> QueryAsync(
         GetGuestNativeRegistrationRequirementProgressQuery request,
         CancellationToken cancellationToken)
     {

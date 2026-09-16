@@ -4,11 +4,12 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
+using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +22,11 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Tags("GuestRegistrationOrder")]
 public sealed class GuestRegistrationOrderRequirementsController(
-    IMediator mediator) : RegistrationOrderControllerBase
+    ICommandHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult> launchAttemptHandler,
+    IQueryHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler,
+    ICommandHandler<LaunchGuestRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult> launchProviderHandler,
+    ICommandHandler<SkipGuestNativeRegistrationRequirementCommand, NativeRegistrationSkipResult> skipHandler,
+    ICommandHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult> submitHandler) : RegistrationOrderControllerBase
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
@@ -40,7 +45,7 @@ public sealed class GuestRegistrationOrderRequirementsController(
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         [FromBody] LaunchNativeRegistrationAttemptRequest request,
         CancellationToken cancellationToken = default) => await LaunchNativeAttempt(
-        await mediator.Send(new LaunchGuestNativeRegistrationAttemptCommand(
+        await launchAttemptHandler.ExecuteAsync(new LaunchGuestNativeRegistrationAttemptCommand(
             eventId, orderId, capability, request.RequirementId, request.ChannelId,
             request.FormId, request.FormVersionId, request.BindingId, request.SupersededAttemptId), cancellationToken),
         eventId,
@@ -59,7 +64,7 @@ public sealed class GuestRegistrationOrderRequirementsController(
         Guid orderId,
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default) => ToNativeProgressResource(
-        await mediator.Send(new GetGuestNativeRegistrationRequirementProgressQuery(
+        await progressHandler.QueryAsync(new GetGuestNativeRegistrationRequirementProgressQuery(
             eventId, orderId, capability), cancellationToken), eventId, orderId, guest: true);
 
     [AllowAnonymous]
@@ -77,7 +82,7 @@ public sealed class GuestRegistrationOrderRequirementsController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         [FromBody] LaunchRegistrationProviderAttemptRequest request,
         CancellationToken cancellationToken = default) => LaunchProviderAttempt(
-        await mediator.Send(new LaunchGuestRegistrationProviderAttemptCommand(
+        await launchProviderHandler.ExecuteAsync(new LaunchGuestRegistrationProviderAttemptCommand(
             eventId, orderId, capability, request.RequirementId, request.ChannelId,
             request.BindingId, request.FormId, request.FormVersionId, request.SupersededAttemptId), cancellationToken),
         eventId,
@@ -100,7 +105,7 @@ public sealed class GuestRegistrationOrderRequirementsController(
         [FromHeader(Name = AttemptCapabilityHeader)] string? attemptCapability,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         [FromBody] SkipNativeRegistrationRequirementRequest request,
-        CancellationToken cancellationToken = default) => MapNativeSkip(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapNativeSkip(await skipHandler.ExecuteAsync(
         new SkipGuestNativeRegistrationRequirementCommand(
             eventId, orderId, capability, request.RequirementId, attemptId, attemptCapability), cancellationToken));
 
@@ -121,7 +126,7 @@ public sealed class GuestRegistrationOrderRequirementsController(
         [FromHeader(Name = AttemptCapabilityHeader)] string? attemptCapability,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         [FromBody] SubmitNativeRegistrationAttemptRequest request,
-        CancellationToken cancellationToken = default) => MapNativeSubmission(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapNativeSubmission(await submitHandler.ExecuteAsync(
         new SubmitGuestNativeRegistrationAttemptCommand(
             eventId, orderId, capability, request.RequirementId, attemptId, attemptCapability,
             idempotencyKey, MapNativeAnswers(request.Answers)), cancellationToken));

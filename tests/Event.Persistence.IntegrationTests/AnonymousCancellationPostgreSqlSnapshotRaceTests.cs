@@ -115,7 +115,7 @@ public sealed class AnonymousCancellationPostgreSqlSnapshotRaceTests(PostgreSqlC
         EventVisitorCapabilitySqliteFixture.GuestAllocationProof proof = await fixture.IssueGuestProofAsync(
             new(target.Id, catalog.Id, BookingPartyTypeEnum.Individual, [new(ticket.Id, 1, null)]));
         GuestRegistrationOrderStartDto created = await fixture
-            .ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+            .ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(created.IsSuccess).IsTrue();
         RegistrationOrder order = await fixture.Context.RegistrationOrders.Include(value => value.Lines)
             .SingleAsync(value => value.Id == created.Id);

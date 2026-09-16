@@ -7,15 +7,14 @@ using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Contracts.Operations;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
 public sealed class StartGuestRegistrationOrderCommandHandler(
     IRegistrationOrderStarter starter)
-    : IRequestHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>
+    : ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>
 {
-    public async Task<GuestRegistrationOrderStartDto> Handle(
+    public async Task<GuestRegistrationOrderStartDto> ExecuteAsync(
         StartGuestRegistrationOrderCommand request,
         CancellationToken cancellationToken)
     {
@@ -48,9 +47,9 @@ public sealed class ContinueGuestRegistrationOrderCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider)
-    : IRequestHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>
 {
-    public async Task<GuestRegistrationOrderLifecycleResponseDto> Handle(
+    public async Task<GuestRegistrationOrderLifecycleResponseDto> ExecuteAsync(
         ContinueGuestRegistrationOrderCommand request,
         CancellationToken cancellationToken) => GuestRegistrationOrderLifecycleResponseDto.From(
         await RegistrationOrderAccessGuard.ExecuteGuestAsync(
@@ -73,9 +72,9 @@ public sealed class FinalizeGuestRegistrationOrderCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider)
-    : IRequestHandler<FinalizeGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<FinalizeGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>
 {
-    public async Task<GuestRegistrationOrderLifecycleResponseDto> Handle(
+    public async Task<GuestRegistrationOrderLifecycleResponseDto> ExecuteAsync(
         FinalizeGuestRegistrationOrderCommand request,
         CancellationToken cancellationToken) => GuestRegistrationOrderLifecycleResponseDto.From(
         await RegistrationOrderAccessGuard.ExecuteGuestAsync(
@@ -88,9 +87,9 @@ public sealed class CancelGuestRegistrationOrderCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider)
-    : IRequestHandler<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>
 {
-    public async Task<GuestRegistrationOrderLifecycleResponseDto> Handle(
+    public async Task<GuestRegistrationOrderLifecycleResponseDto> ExecuteAsync(
         CancelGuestRegistrationOrderCommand request,
         CancellationToken cancellationToken) => GuestRegistrationOrderLifecycleResponseDto.From(
         await RegistrationOrderAccessGuard.ExecuteGuestAsync(
@@ -103,9 +102,9 @@ public sealed class LaunchGuestNativeRegistrationAttemptCommandHandler(
     ITenantContext tenant,
     TimeProvider timeProvider,
     ICommandHandler<LaunchNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult> launchHandler)
-    : IRequestHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
+    : ICommandHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
 {
-    public async Task<NativeRegistrationAttemptResult> Handle(
+    public async Task<NativeRegistrationAttemptResult> ExecuteAsync(
         LaunchGuestNativeRegistrationAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -130,9 +129,9 @@ public sealed class SubmitGuestNativeRegistrationAttemptCommandHandler(
     ITenantContext tenant,
     TimeProvider timeProvider,
     ICommandHandler<SubmitNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult> submitHandler)
-    : IRequestHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
+    : ICommandHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
 {
-    public async Task<NativeRegistrationSubmissionResult> Handle(
+    public async Task<NativeRegistrationSubmissionResult> ExecuteAsync(
         SubmitGuestNativeRegistrationAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -155,9 +154,9 @@ public sealed class LaunchGuestRegistrationProviderAttemptCommandHandler(
     ITenantContext tenant,
     TimeProvider timeProvider,
     ICommandHandler<LaunchRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult> launchProviderHandler)
-    : IRequestHandler<LaunchGuestRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
+    : ICommandHandler<LaunchGuestRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
 {
-    public async Task<RegistrationProviderAttemptResult> Handle(
+    public async Task<RegistrationProviderAttemptResult> ExecuteAsync(
         LaunchGuestRegistrationProviderAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -181,9 +180,9 @@ public sealed class SkipGuestNativeRegistrationRequirementCommandHandler(
     ITenantContext tenant,
     TimeProvider timeProvider,
     ICommandHandler<SkipNativeRegistrationRequirementCommand, NativeRegistrationSkipResult> skipHandler)
-    : IRequestHandler<SkipGuestNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
+    : ICommandHandler<SkipGuestNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
 {
-    public async Task<NativeRegistrationSkipResult> Handle(
+    public async Task<NativeRegistrationSkipResult> ExecuteAsync(
         SkipGuestNativeRegistrationRequirementCommand request,
         CancellationToken cancellationToken)
     {

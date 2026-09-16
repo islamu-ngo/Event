@@ -6,7 +6,7 @@ using MediatR;
 namespace Explore.Application.Features.RegistrationOrders.Requests.Queries;
 
 public sealed record GetGuestRegistrationOrderQuery(Guid EventId, Guid OrderId, string? CapabilityToken)
-    : IRequest<GuestRegistrationOrderDto?>;
+    : IQuery<GuestRegistrationOrderDto?>;
 
 public sealed record GetCurrentRegistrationOrderQuery(Guid OrderId)
     : IRequest<RegistrationOrderDto?>;
@@ -22,7 +22,7 @@ public sealed record GetAuthenticatedRegistrationOrderParticipantsQuery(Guid Eve
 public sealed record GetGuestNativeRegistrationRequirementProgressQuery(
     Guid EventId,
     Guid OrderId,
-    string? CapabilityToken) : IRequest<NativeRegistrationRequirementProgressCollectionDto?>;
+    string? CapabilityToken) : IQuery<NativeRegistrationRequirementProgressCollectionDto?>;
 
 public sealed record GetAuthenticatedNativeRegistrationRequirementProgressQuery(Guid EventId, Guid OrderId)
     : IRequest<NativeRegistrationRequirementProgressCollectionDto?>;

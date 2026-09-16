@@ -12,7 +12,6 @@ using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -25,7 +24,11 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Tags("GuestRegistrationOrder")]
 public sealed class GuestRegistrationOrderController(
-    IMediator mediator,
+    ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto> startGuestHandler,
+    IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?> getGuestHandler,
+    ICommandHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto> continueGuestHandler,
+    ICommandHandler<FinalizeGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto> finalizeGuestHandler,
+    ICommandHandler<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto> cancelGuestHandler,
     TimeProvider timeProvider,
     IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?> getStatusQueryHandler) : RegistrationOrderControllerBase
 {
@@ -59,7 +62,7 @@ public sealed class GuestRegistrationOrderController(
             return this.ToValidationProblem(RegistrationOrderValidationProblem, "A registration-order payload is required.");
         }
 
-        GuestRegistrationOrderStartDto response = await mediator.Send(
+        GuestRegistrationOrderStartDto response = await startGuestHandler.ExecuteAsync(
             new StartGuestRegistrationOrderCommand(
                 eventId,
                 request.TicketCatalogVersionId,
@@ -99,7 +102,7 @@ public sealed class GuestRegistrationOrderController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default)
     {
-        GuestRegistrationOrderDto? response = await mediator.Send(
+        GuestRegistrationOrderDto? response = await getGuestHandler.QueryAsync(
             new GetGuestRegistrationOrderQuery(eventId, orderId, capability),
             cancellationToken);
         return response is null
@@ -128,7 +131,7 @@ public sealed class GuestRegistrationOrderController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         [FromBody] ContinueRegistrationOrderRequest? request = null,
         CancellationToken cancellationToken = default) =>
-        await MapGuestStatusLifecycle(await mediator.Send(
+        await MapGuestStatusLifecycle(await continueGuestHandler.ExecuteAsync(
             new ContinueGuestRegistrationOrderCommand(
                 eventId,
                 orderId,
@@ -155,7 +158,7 @@ public sealed class GuestRegistrationOrderController(
         Guid orderId,
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default) =>
-        await MapGuestStatusLifecycle(await mediator.Send(
+        await MapGuestStatusLifecycle(await finalizeGuestHandler.ExecuteAsync(
             new FinalizeGuestRegistrationOrderCommand(eventId, orderId, capability),
             cancellationToken), eventId, orderId, capability, cancellationToken);
 
@@ -176,7 +179,7 @@ public sealed class GuestRegistrationOrderController(
         Guid orderId,
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default) =>
-        MapGuestLifecycle(await mediator.Send(
+        MapGuestLifecycle(await cancelGuestHandler.ExecuteAsync(
             new CancelGuestRegistrationOrderCommand(eventId, orderId, capability),
             cancellationToken));
 

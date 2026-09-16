@@ -63,7 +63,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();
 
-        var result = await fixture.ExecuteAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(order.Id));
+        var result = await fixture.ExecuteQueryAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(order.Id));
 
         await Assert.That(result).IsNotNull();
         var disclosed = result!.Participants.Single();
@@ -134,7 +134,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
         try
         {
             clock.Now = new DateTimeOffset(scope.Deadline.AddTicks(ticks));
-            var participants = await fixture.ExecuteAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(scope.OrderId));
+            var participants = await fixture.ExecuteQueryAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(scope.OrderId));
             await Assert.That(participants!.Participants.Single().DisplayName).IsEqualTo(allowed ? "Held attendee" : null);
             var presentations = await fixture.Services.GetRequiredService<IAdmissionTicketPresentationResolver>()
                 .ResolveAsync(fixture.TenantId, [scope.TicketId], CancellationToken.None);
@@ -549,7 +549,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
             boundary.ExpireAt = new DateTimeOffset(scope.Deadline);
             if (surface == "participant")
             {
-                var result = await fixture.ExecuteAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(scope.OrderId));
+                var result = await fixture.ExecuteQueryAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(scope.OrderId));
                 await Assert.That(result!.Participants.Single().DisplayName).IsNull();
             }
             else if (surface == "ticket")
@@ -615,7 +615,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
                 .ExecuteUpdateAsync(setters => setters.SetProperty(storage => storage.RegistrationContentRetentionUntilUtc, rowDeadline));
             fixture.Context.ChangeTracker.Clear();
             clock.Now = new DateTimeOffset(rowDeadline.AddTicks(ticks));
-            var participants = await fixture.ExecuteAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(scope.OrderId));
+            var participants = await fixture.ExecuteQueryAsync<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>(new(scope.OrderId));
             await Assert.That(participants!.Participants.Single().DisplayName).IsEqualTo(allowed ? "Held attendee" : null);
             var tickets = await fixture.Services.GetRequiredService<IAdmissionTicketPresentationResolver>()
                 .ResolveAsync(fixture.TenantId, [scope.TicketId], CancellationToken.None);

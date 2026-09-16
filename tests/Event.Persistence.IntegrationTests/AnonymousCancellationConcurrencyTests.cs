@@ -65,7 +65,7 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         var ticket = await fixture.Context.EventTicketTypes.AsNoTracking().SingleAsync();
         var proof = await fixture.IssueGuestProofAsync(new(command.EventId, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.Id, 10, null)]));
-        await Assert.That((await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request)).IsSuccess).IsTrue();
+        await Assert.That((await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request)).IsSuccess).IsTrue();
         await Assert.That(await fixture.Services.GetRequiredService<IRegistrationInventoryRepository>()
             .GetAllocatedQuantityAsync(before.CapacityPoolId, fixture.TenantId, CancellationToken.None)).IsEqualTo(10);
         await Assert.That((await CancelAsync(fixture, command)).IsSuccess).IsTrue();
@@ -364,7 +364,7 @@ public sealed partial class AnonymousCancellationConcurrencyTests
             fixture.Context.ChangeTracker.Clear();
         }
         var proof = await fixture.IssueGuestProofAsync(new(target.Id, catalog.Id, BookingPartyTypeEnum.Individual, [new(ticket.Id, 1, null)]));
-        var created = await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+        var created = await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(created.IsSuccess).IsTrue();
         var order = await fixture.Context.RegistrationOrders.Include(value => value.Lines).SingleAsync(value => value.Id == created.Id);
         // Native issuance currently requires a delivery address. Its presence is not anonymous authority.

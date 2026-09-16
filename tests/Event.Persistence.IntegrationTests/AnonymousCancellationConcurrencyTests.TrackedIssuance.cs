@@ -63,7 +63,7 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         var ticket = await fixture.Context.EventTicketTypes.AsNoTracking().SingleAsync();
         var proof = await fixture.IssueGuestProofAsync(new(command.EventId, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.Id, 10, null)]));
-        await Assert.That((await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request)).IsSuccess)
+        await Assert.That((await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request)).IsSuccess)
             .IsTrue();
 
         // Reusing the released pool must remain safe against another delayed producer in scope A.

@@ -1,6 +1,7 @@
 using Explore.Application.Authorization;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Events.Moderation;
@@ -14,7 +15,6 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
@@ -34,13 +34,14 @@ public sealed class HeavyRedactEventCommandHandler(
     ILogger<HeavyRedactEventCommandHandler> logger,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
     TimeProvider timeProvider,
-    ISettingMutationLock mutationLock) : IRequestHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
+    ISettingMutationLock mutationLock)
+    : ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
 {
     private const int ImmediateDeletionBatchSize = 100;
     private const string ActionKind = "heavy_redacted";
     private const string FanoutSourceType = "event_moderation_record";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(HeavyRedactEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(HeavyRedactEventCommand request, CancellationToken cancellationToken)
     {
         // Reason metadata is normalized here rather than at the transport boundary so every caller of this
         // command — HTTP, MCP, or an internal moderation flow — is held to the same audit-code shape.

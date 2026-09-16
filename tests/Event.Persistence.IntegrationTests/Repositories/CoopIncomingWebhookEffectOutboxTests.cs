@@ -12,8 +12,8 @@ using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
+using Explore.Application.Contracts.Operations;
 using Explore.Secrets.Database;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -395,7 +395,7 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
                 new IncomingWebhookMessageRepository(processingContext),
                 new IncomingWebhookEffectReceiptRepository(processingContext),
                 new EfCoreUnitOfWork(processingContext),
-                new SuccessfulCoopDecisionMediator(),
+                new SuccessfulCoopDecisionHandler(),
                 Options.Create(new IncomingWebhookProcessingSettings()),
                 new FixedTimeProvider(claimedAt.AddSeconds(1)));
 
@@ -712,39 +712,12 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
         public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);
     }
 
-    private sealed class SuccessfulCoopDecisionMediator : IMediator
+    private sealed class SuccessfulCoopDecisionHandler : ICommandHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>>
     {
-        public Task<TResponse> Send<TResponse>(
-            IRequest<TResponse> request,
-            CancellationToken cancellationToken = default)
-        {
-            object response = request is ProcessCoopDecisionCallbackCommand
-                ? BaseCommandResponse.Success(Guid.CreateVersion7())
-                : throw new NotSupportedException();
-            return Task.FromResult((TResponse)response);
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest => throw new NotSupportedException();
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-
-        public Task Publish<TNotification>(
-            TNotification notification,
-            CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(
-            IStreamRequest<TResponse> request,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(
-            object request,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            ProcessCoopDecisionCallbackCommand command,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(BaseCommandResponse.Success(Guid.CreateVersion7()));
     }
 
     private sealed class InjectedPointerFailureException : Exception;

@@ -10,13 +10,13 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -88,21 +88,22 @@ public sealed class ReportingIntakeSettingsApiTests
     [Test]
     public async Task Get_DerivesTenantFromAmbientContextAndAssemblesHal()
     {
-        var mediator = Substitute.For<IMediator>();
+        var getPolicyHandler = Substitute.For<IQueryHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto>>();
+        var updatePolicyHandler = Substitute.For<ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>>();
         var assembler = Substitute.For<IResourceAssembler<TenantReportingIntakePolicyDto, TenantReportingIntakePolicyDto>>();
         TenantReportingIntakePolicyDto policy = Policy();
         HalResource<TenantReportingIntakePolicyDto> resource = new(policy);
-        mediator.Send(Arg.Any<GetTenantReportingIntakePolicyQuery>(), Arg.Any<CancellationToken>())
+        getPolicyHandler.QueryAsync(Arg.Any<GetTenantReportingIntakePolicyQuery>(), Arg.Any<CancellationToken>())
             .Returns(policy);
         assembler.ToResource(policy, Arg.Any<HttpContext>()).Returns(resource);
-        TenantReportingIntakeSettingsController controller = CreateController(mediator, assembler);
+        TenantReportingIntakeSettingsController controller = CreateController(getPolicyHandler, updatePolicyHandler, assembler);
 
         var result = await controller.Get(CancellationToken.None);
 
         ObjectResult response = (ObjectResult)result.Result!;
         await Assert.That(response.StatusCode).IsEqualTo(StatusCodes.Status200OK);
         await Assert.That(response.Value).IsSameReferenceAs(resource);
-        await mediator.Received(1).Send(
+        await getPolicyHandler.Received(1).QueryAsync(
             Arg.Is<GetTenantReportingIntakePolicyQuery>(query => query.TenantId == _tenantId),
             CancellationToken.None);
         await assembler.Received(1).ToResource(policy, controller.HttpContext);
@@ -111,18 +112,20 @@ public sealed class ReportingIntakeSettingsApiTests
     [Test]
     public async Task Update_DerivesTenantAndActorOnServerAndDispatchesOnlyEnabledState()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateTenantReportingIntakePolicyCommand>(), Arg.Any<CancellationToken>())
+        var getPolicyHandler = Substitute.For<IQueryHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto>>();
+        var updatePolicyHandler = Substitute.For<ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>>();
+        updatePolicyHandler.ExecuteAsync(Arg.Any<UpdateTenantReportingIntakePolicyCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(_tenantId));
         TenantReportingIntakeSettingsController controller = CreateController(
-            mediator,
+            getPolicyHandler,
+            updatePolicyHandler,
             Substitute.For<IResourceAssembler<TenantReportingIntakePolicyDto, TenantReportingIntakePolicyDto>>());
         var body = new UpdateTenantReportingIntakePolicyDto { Enabled = false };
 
         var result = await controller.Update(body, CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await updatePolicyHandler.Received(1).ExecuteAsync(
             Arg.Is<UpdateTenantReportingIntakePolicyCommand>(command =>
                 command.TenantId == _tenantId
                 && command.ActorUserId == _actorUserId
@@ -138,14 +141,16 @@ public sealed class ReportingIntakeSettingsApiTests
     [Arguments("event_reporting_intake_unsafe_publication_policy", StatusCodes.Status409Conflict)]
     public async Task Update_UsesImmutableRfc7807FailurePolicy(string failureCode, int expectedStatus)
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateTenantReportingIntakePolicyCommand>(), Arg.Any<CancellationToken>())
+        var getPolicyHandler = Substitute.For<IQueryHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto>>();
+        var updatePolicyHandler = Substitute.For<ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>>();
+        updatePolicyHandler.ExecuteAsync(Arg.Any<UpdateTenantReportingIntakePolicyCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 failureCode,
                 "Reporting intake policy was not changed.",
                 [failureCode]));
         TenantReportingIntakeSettingsController controller = CreateController(
-            mediator,
+            getPolicyHandler,
+            updatePolicyHandler,
             Substitute.For<IResourceAssembler<TenantReportingIntakePolicyDto, TenantReportingIntakePolicyDto>>());
 
         var result = await controller.Update(
@@ -223,7 +228,8 @@ public sealed class ReportingIntakeSettingsApiTests
     }
 
     private TenantReportingIntakeSettingsController CreateController(
-        IMediator mediator,
+        IQueryHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto> getPolicyHandler,
+        ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>> updatePolicyHandler,
         IResourceAssembler<TenantReportingIntakePolicyDto, TenantReportingIntakePolicyDto> assembler)
     {
         var tenant = Substitute.For<ITenantContext>();
@@ -237,7 +243,7 @@ public sealed class ReportingIntakeSettingsApiTests
             [new Claim("internal_user_id", _actorUserId.ToString("D"))],
             authenticationType: "Test"));
 
-        return new TenantReportingIntakeSettingsController(mediator, tenant, assembler)
+        return new TenantReportingIntakeSettingsController(getPolicyHandler, updatePolicyHandler, tenant, assembler)
         {
             ControllerContext = new ControllerContext
             {

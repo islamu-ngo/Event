@@ -1,5 +1,6 @@
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Policies;
@@ -8,16 +9,15 @@ using Explore.Application.Responses;
 using Explore.Application.Specifications.EventReports;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
 
 public sealed class GetModerationReportQueueRequestHandler(
     IEventReportRepository eventReportRepository,
     ITenantContext tenantContext)
-    : IRequestHandler<GetModerationReportQueueRequest, PaginatedResult<ModerationReportQueueItemDto>>
+    : IQueryHandler<GetModerationReportQueueRequest, PaginatedResult<ModerationReportQueueItemDto>>
 {
-    public async Task<PaginatedResult<ModerationReportQueueItemDto>> Handle(
+    public async Task<PaginatedResult<ModerationReportQueueItemDto>> QueryAsync(
         GetModerationReportQueueRequest request,
         CancellationToken cancellationToken)
     {

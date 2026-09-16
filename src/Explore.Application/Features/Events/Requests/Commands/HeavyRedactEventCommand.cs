@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ModerateHeavy)]
-public sealed record HeavyRedactEventCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record HeavyRedactEventCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public const string DefaultReasonCode = "heavy_redaction";
     public const string StorageDeletionPendingFailureCode = "event_heavy_redaction_storage_deletion_pending";

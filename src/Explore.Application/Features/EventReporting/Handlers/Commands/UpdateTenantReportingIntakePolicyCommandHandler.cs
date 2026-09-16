@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
@@ -8,7 +9,6 @@ using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -18,11 +18,11 @@ public sealed class UpdateTenantReportingIntakePolicyCommandHandler(
     IUnitOfWork unitOfWork,
     IHierarchicalSettingsResolver settingsResolver,
     IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
-    : IRequestHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>
 {
     private const string TenantContextMismatchCode = "tenant_context_mismatch";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateTenantReportingIntakePolicyCommand request,
         CancellationToken cancellationToken)
     {

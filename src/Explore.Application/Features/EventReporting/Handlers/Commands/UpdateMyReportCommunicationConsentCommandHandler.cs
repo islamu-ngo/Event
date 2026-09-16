@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
@@ -19,11 +19,11 @@ public sealed class UpdateMyReportCommunicationConsentCommandHandler(
     IAuthorizationProvider authorizationProvider,
     HybridCache cache,
     TimeProvider timeProvider)
-    : IRequestHandler<UpdateMyReportCommunicationConsentCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateMyReportCommunicationConsentCommand, BaseCommandResponse<Guid>>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateMyReportCommunicationConsentCommand request,
         CancellationToken cancellationToken)
     {

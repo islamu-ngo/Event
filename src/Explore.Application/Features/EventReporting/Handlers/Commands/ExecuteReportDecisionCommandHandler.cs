@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventReporting.Requests.Commands;
@@ -10,7 +11,6 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -29,12 +29,13 @@ public sealed class ExecuteReportDecisionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IMediator mediator,
-    ISettingMutationLock mutationLock) : IRequestHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<ModerateEventCommand, BaseCommandResponse<Guid>> moderateCommandHandler,
+    ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>> heavyRedactCommandHandler,
+    ISettingMutationLock mutationLock) : ICommandHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>>
 {
     private static readonly TimeSpan ProcessingLeaseDuration = TimeSpan.FromMinutes(10);
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ExecuteReportDecisionCommand request,
         CancellationToken cancellationToken)
     {
@@ -385,7 +386,7 @@ public sealed class ExecuteReportDecisionCommandHandler(
         string correlationId = NormalizeCorrelationId(request);
         return decision.DecisionKind switch
         {
-            EventReportDecisionKind.LightModerate => mediator.Send(new ModerateEventCommand
+            EventReportDecisionKind.LightModerate => moderateCommandHandler.ExecuteAsync(new ModerateEventCommand
             {
                 Id = request.EventId,
                 ReasonCode = decision.ReasonCode,
@@ -393,7 +394,7 @@ public sealed class ExecuteReportDecisionCommandHandler(
                 SourceReportId = request.ReportId,
                 SourceReportDecisionId = request.DecisionId
             }, cancellationToken),
-            EventReportDecisionKind.HeavyRedact => mediator.Send(new HeavyRedactEventCommand
+            EventReportDecisionKind.HeavyRedact => heavyRedactCommandHandler.ExecuteAsync(new HeavyRedactEventCommand
             {
                 Id = request.EventId,
                 ReasonCode = decision.ReasonCode,

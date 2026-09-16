@@ -1,15 +1,15 @@
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
-using MediatR;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.Update)]
 public sealed record UpdateReportingProviderLocksCommand(
     Guid UserId,
     UpdateReportingProviderLocksDto Locks)
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     private const string SettingKey = "moderation-reporting-locks";
 

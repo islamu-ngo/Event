@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -14,9 +14,9 @@ public sealed class DecideEventReportCommandHandler(
     ITenantUserRepository tenantUserRepository,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
-    ICurrentUserService currentUserService) : IRequestHandler<DecideEventReportCommand, BaseCommandResponse<Guid>>
+    ICurrentUserService currentUserService) : ICommandHandler<DecideEventReportCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DecideEventReportCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DecideEventReportCommand request, CancellationToken cancellationToken)
     {
         var validationResult = await new DecideEventReportCommandValidator().ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)

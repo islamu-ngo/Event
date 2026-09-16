@@ -5,7 +5,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
-using Explore.API.Services.Calendar;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventProgram;
 using Explore.Application.DTOs.EventSession;
@@ -52,12 +52,17 @@ public class EventModerationController : EventControllerBase
         "Event not found.");
 
     private readonly IMediator _mediator;
-
+    private readonly ICommandHandler<ModerateEventCommand, BaseCommandResponse<Guid>> _moderateCommandHandler;
+    private readonly ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>> _heavyRedactCommandHandler;
 
     public EventModerationController(
-        IMediator mediator)
+        IMediator mediator,
+        ICommandHandler<ModerateEventCommand, BaseCommandResponse<Guid>> moderateCommandHandler,
+        ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>> heavyRedactCommandHandler)
     {
         _mediator = mediator;
+        _moderateCommandHandler = moderateCommandHandler;
+        _heavyRedactCommandHandler = heavyRedactCommandHandler;
     }
 
     /// <summary>
@@ -98,7 +103,7 @@ public class EventModerationController : EventControllerBase
         [FromBody] EventModerationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ModerateEventCommand
+        var response = await _moderateCommandHandler.ExecuteAsync(new ModerateEventCommand
         {
             Id = id,
             ReasonCode = request.ReasonCode ?? string.Empty,
@@ -134,7 +139,7 @@ public class EventModerationController : EventControllerBase
         [FromBody] EventModerationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new HeavyRedactEventCommand
+        var response = await _heavyRedactCommandHandler.ExecuteAsync(new HeavyRedactEventCommand
         {
             Id = id,
             ReasonCode = request.ReasonCode ?? string.Empty,

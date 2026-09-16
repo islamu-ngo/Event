@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.EventReporting;
@@ -8,10 +10,10 @@ using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
+using Explore.Application.Responses;
 using Explore.Application.Serialization;
-using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
+using Explore.Domain.Enums;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Services.Webhooks;
@@ -22,7 +24,7 @@ public sealed class IncomingWebhookEffectProcessingService(
     IIncomingWebhookEffectReceiptRepository receiptRepository,
     IRegistrationProviderSubscriptionStateRepository subscriptionStateRepository,
     IUnitOfWork unitOfWork,
-    IMediator mediator,
+    ICommandHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>> processCoopDecisionHandler,
     ICommandHandler<ProcessProviderSubmissionEffectCommand, ProviderSubmissionEffectResult> providerSubmissionEffectHandler,
     IOptions<IncomingWebhookProcessingSettings> settings,
     TimeProvider timeProvider) : IIncomingWebhookEffectProcessingService
@@ -32,7 +34,7 @@ public sealed class IncomingWebhookEffectProcessingService(
         IIncomingWebhookMessageRepository messageRepository,
         IIncomingWebhookEffectReceiptRepository receiptRepository,
         IUnitOfWork unitOfWork,
-        IMediator mediator,
+        ICommandHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>> processCoopDecisionHandler,
         IOptions<IncomingWebhookProcessingSettings> settings,
         TimeProvider timeProvider) : this(
         pointerRepository,
@@ -40,7 +42,7 @@ public sealed class IncomingWebhookEffectProcessingService(
         receiptRepository,
         new MissingRegistrationProviderSubscriptionStateRepository(),
         unitOfWork,
-        mediator,
+        processCoopDecisionHandler,
         providerSubmissionEffectHandler: null!,
         settings,
         timeProvider)
@@ -174,7 +176,7 @@ public sealed class IncomingWebhookEffectProcessingService(
 
         try
         {
-            var response = await mediator.Send(
+            var response = await processCoopDecisionHandler.ExecuteAsync(
                 new ProcessCoopDecisionCallbackCommand { Request = request },
                 cancellationToken);
             if (response.IsSuccess)

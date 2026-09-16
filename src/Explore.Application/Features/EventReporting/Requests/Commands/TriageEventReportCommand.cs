@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ModerateLight)]
-public sealed record TriageEventReportCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record TriageEventReportCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid ReportId { get; init; }

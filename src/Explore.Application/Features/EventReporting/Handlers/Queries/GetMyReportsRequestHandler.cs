@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Mappers;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
 
@@ -12,9 +12,9 @@ public sealed class GetMyReportsRequestHandler(
     IEventReportRepository eventReportRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetMyReportsRequest, PaginatedResult<MyEventReportDto>>
+    : IQueryHandler<GetMyReportsRequest, PaginatedResult<MyEventReportDto>>
 {
-    public async Task<PaginatedResult<MyEventReportDto>> Handle(
+    public async Task<PaginatedResult<MyEventReportDto>> QueryAsync(
         GetMyReportsRequest request,
         CancellationToken cancellationToken)
     {

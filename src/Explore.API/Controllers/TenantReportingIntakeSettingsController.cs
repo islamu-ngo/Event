@@ -6,13 +6,13 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +27,8 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class TenantReportingIntakeSettingsController(
-    IMediator mediator,
+    IQueryHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto> getPolicyHandler,
+    ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>> updatePolicyHandler,
     ITenantContext tenantContext,
     IResourceAssembler<TenantReportingIntakePolicyDto, TenantReportingIntakePolicyDto> assembler)
     : EventControllerBase
@@ -60,7 +61,7 @@ public sealed class TenantReportingIntakeSettingsController(
     public async Task<ActionResult<HalResource<TenantReportingIntakePolicyDto>>> Get(
         CancellationToken cancellationToken)
     {
-        TenantReportingIntakePolicyDto policy = await mediator.Send(
+        TenantReportingIntakePolicyDto policy = await getPolicyHandler.QueryAsync(
             new GetTenantReportingIntakePolicyQuery(tenantContext.TenantId),
             cancellationToken);
         var response = new ObjectResult(await assembler.ToResource(policy, HttpContext))
@@ -88,7 +89,7 @@ public sealed class TenantReportingIntakeSettingsController(
         [FromBody] UpdateTenantReportingIntakePolicyDto policy,
         CancellationToken cancellationToken)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await updatePolicyHandler.ExecuteAsync(
             new UpdateTenantReportingIntakePolicyCommand(
                 tenantContext.TenantId,
                 RequiredUserId,

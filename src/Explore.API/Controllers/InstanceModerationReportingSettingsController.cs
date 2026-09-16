@@ -10,7 +10,6 @@ using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,7 +20,7 @@ using Microsoft.AspNetCore.Mvc;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class InstanceModerationReportingSettingsController(
-    IMediator mediator,
+    ICommandHandler<UpdateReportingProviderLocksCommand, BaseCommandResponse<Guid>> updateLocksHandler,
     IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery) : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor UpdateLocksValidationProblem = new(
@@ -48,7 +47,7 @@ public sealed class InstanceModerationReportingSettingsController(
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await mediator.Send(
+        var response = await updateLocksHandler.ExecuteAsync(
             new UpdateReportingProviderLocksCommand(userId.Value, locks),
             cancellationToken);
 

@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Mappers;
 using Explore.Application.Features.EventReporting.Requests.Queries;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
@@ -13,9 +13,9 @@ public sealed class GetMyReportRequestHandler(
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
     HybridCache cache)
-    : IRequestHandler<GetMyReportRequest, MyEventReportDto?>
+    : IQueryHandler<GetMyReportRequest, MyEventReportDto?>
 {
-    public async Task<MyEventReportDto?> Handle(
+    public async Task<MyEventReportDto?> QueryAsync(
         GetMyReportRequest request,
         CancellationToken cancellationToken)
     {

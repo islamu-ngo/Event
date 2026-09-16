@@ -1,5 +1,6 @@
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Federation.Atproto.Services;
@@ -9,7 +10,6 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Explore.Application.Features.Events.Moderation;
@@ -27,13 +27,14 @@ public sealed class ModerateEventCommandHandler(
     BusinessMetrics metrics,
     ILogger<ModerateEventCommandHandler> logger,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
-    TimeProvider timeProvider) : IRequestHandler<ModerateEventCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider)
+    : ICommandHandler<ModerateEventCommand, BaseCommandResponse<Guid>>
 {
     private const string InvalidStatusFailureCode = "event_light_moderation_invalid_status";
     private const string UserResolutionFailureCode = "event_light_moderation_user_unresolved";
     private const string ActionKind = "light_moderated";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(ModerateEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ModerateEventCommand request, CancellationToken cancellationToken)
     {
         // Reason metadata is normalized here rather than at the transport boundary so every caller of this
         // command — HTTP, MCP, or an internal moderation flow — is held to the same audit-code shape.

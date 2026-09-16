@@ -2,19 +2,26 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.API.Controllers;
+using Explore.API.Hateoas;
+using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NSubstitute;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -109,11 +116,9 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
     [Test]
     public async Task UpdateRoutingState_WithAuth_ShouldSendCommandWithoutEchoingSecrets()
     {
-        var mediator = new UpdateRoutingMediator();
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(HttpMethod.Patch);
-        request.Content = JsonContent.Create(new UpdateReportingRoutingSettingsDto
+        var handler = new UpdateRoutingStubHandler();
+        var controller = CreateController(handler);
+        var dto = new UpdateReportingRoutingSettingsDto
         {
             Policy = new ReportingRoutingPolicyUpdateDto { ExternalSyncEnabled = true },
             Osprey = new ReportingProviderRoutingUpdateDto
@@ -127,14 +132,16 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
                 Enabled = true,
                 RoutingMode = "tenant"
             }
-        });
+        };
 
-        var response = await client.SendAsync(request);
+        var actionResult = await controller.UpdateRoutingSettings(dto, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(mediator.LastCommand).IsNotNull();
-        await Assert.That(mediator.LastCommand!.Settings.Osprey!.Credentials!.ApiKey).IsEqualTo(SecretApiKey);
-        var json = await response.Content.ReadAsStringAsync();
+        var okResult = actionResult.Result as OkObjectResult;
+        await Assert.That(okResult).IsNotNull();
+        await Assert.That(okResult!.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+        await Assert.That(handler.LastCommand).IsNotNull();
+        await Assert.That(handler.LastCommand!.Settings.Osprey!.Credentials!.ApiKey).IsEqualTo(SecretApiKey);
+        var json = JsonSerializer.Serialize(okResult.Value);
         await Assert.That(json).DoesNotContain(SecretApiKey);
         await Assert.That(json).DoesNotContain(SecretEndpoint);
     }
@@ -142,17 +149,17 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
     [Test]
     public async Task TestProvider_WithAuth_ShouldSendCommandWithoutEchoingSecrets()
     {
-        var mediator = new UpdateRoutingMediator();
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(HttpMethod.Post, OspreyTestPath);
+        var handler = new UpdateRoutingStubHandler();
+        var controller = CreateController(handler);
 
-        var response = await client.SendAsync(request);
+        var actionResult = await controller.TestProvider(EventReportExternalProvider.Osprey, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(mediator.LastTestCommand).IsNotNull();
-        await Assert.That(mediator.LastTestCommand!.Provider).IsEqualTo(EventReportExternalProvider.Osprey);
-        var json = await response.Content.ReadAsStringAsync();
+        var okResult = actionResult.Result as OkObjectResult;
+        await Assert.That(okResult).IsNotNull();
+        await Assert.That(okResult!.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+        await Assert.That(handler.LastTestCommand).IsNotNull();
+        await Assert.That(handler.LastTestCommand!.Provider).IsEqualTo(EventReportExternalProvider.Osprey);
+        var json = JsonSerializer.Serialize(okResult.Value);
         await Assert.That(json).DoesNotContain(SecretApiKey);
         await Assert.That(json).DoesNotContain(SecretEndpoint);
     }
@@ -160,14 +167,41 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
     [Test]
     public async Task TestProvider_WhenLocked_ShouldReturnForbidden()
     {
-        var mediator = new UpdateRoutingMediator(providerTestLocked: true);
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(HttpMethod.Post, OspreyTestPath);
+        var handler = new UpdateRoutingStubHandler(providerTestLocked: true);
+        var controller = CreateController(handler);
 
-        var response = await client.SendAsync(request);
+        var actionResult = await controller.TestProvider(EventReportExternalProvider.Osprey, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        var problem = actionResult.Result as ObjectResult;
+        await Assert.That(problem).IsNotNull();
+        await Assert.That(problem!.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
+    }
+
+    private static ModerationReportingRoutingController CreateController(UpdateRoutingStubHandler stubHandler)
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var tenantContext = Substitute.For<ITenantContext>();
+        tenantContext.TenantId.Returns(tenantId);
+        var identityQuery = Substitute.For<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>();
+        identityQuery.QueryAsync(Arg.Any<ResolveCurrentUserIdByIdentityRequest>(), Arg.Any<CancellationToken>())
+            .Returns(userId);
+        var routingStateAssembler = Substitute.For<IResourceAssembler<ReportingRoutingStateDto, ReportingRoutingStateDto>>();
+        var getRoutingStateHandler = Substitute.For<IQueryHandler<GetReportingRoutingStateRequest, ReportingRoutingStateDto>>();
+
+        var controller = new ModerationReportingRoutingController(
+            getRoutingStateHandler,
+            stubHandler,
+            stubHandler,
+            identityQuery,
+            tenantContext,
+            routingStateAssembler);
+
+        var httpContext = new DefaultHttpContext();
+        var claims = new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId.ToString()) };
+        httpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth"));
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        return controller;
     }
 
     private static WebApplicationFactory<Program> CreateFactory(bool allowAuthorization)
@@ -183,23 +217,6 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
             {
                 services.RemoveAll<IReportingRoutingPolicyResolver>();
                 services.AddSingleton<IReportingRoutingPolicyResolver>(new StubRoutingPolicyResolver());
-            });
-        });
-    }
-
-    private static WebApplicationFactory<Program> CreateFactoryWithMediator(IMediator mediator)
-    {
-        var factory = new AuthenticatedWebApplicationFactory
-        {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
-        };
-
-        return factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
             });
         });
     }
@@ -249,64 +266,35 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
         }
     }
 
-    private sealed class UpdateRoutingMediator(bool providerTestLocked = false) : IMediator
+    private sealed class UpdateRoutingStubHandler(bool providerTestLocked = false)
+        : ICommandHandler<UpdateReportingRoutingSettingsCommand, BaseCommandResponse<Guid>>,
+          ICommandHandler<TestReportingProviderTargetCommand, BaseCommandResponse<Guid>>
     {
         public UpdateReportingRoutingSettingsCommand? LastCommand { get; private set; }
         public TestReportingProviderTargetCommand? LastTestCommand { get; private set; }
 
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            object response = request switch
-            {
-                UpdateReportingRoutingSettingsCommand command => Update(command),
-                TestReportingProviderTargetCommand command => Test(command),
-                GetReportingRoutingStateRequest => throw new InvalidOperationException("Routing-state query is not expected in the update test."),
-                _ => throw new InvalidOperationException($"Unexpected request type {request.GetType().Name}.")
-            };
-
-            return Task.FromResult((TResponse)response);
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-            => Task.CompletedTask;
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-            => request switch
-            {
-                UpdateReportingRoutingSettingsCommand command => Task.FromResult<object?>(Update(command)),
-                TestReportingProviderTargetCommand command => Task.FromResult<object?>(Test(command)),
-                _ => throw new InvalidOperationException($"Unexpected request type {request.GetType().Name}.")
-            };
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        private BaseCommandResponse<Guid> Update(UpdateReportingRoutingSettingsCommand command)
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            UpdateReportingRoutingSettingsCommand command,
+            CancellationToken cancellationToken = default)
         {
             LastCommand = command;
 
-            return BaseCommandResponse.Success(command.TenantId, "Updated");
+            return Task.FromResult(BaseCommandResponse.Success(command.TenantId, "Updated"));
         }
 
-        private BaseCommandResponse<Guid> Test(TestReportingProviderTargetCommand command)
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            TestReportingProviderTargetCommand command,
+            CancellationToken cancellationToken = default)
         {
             LastTestCommand = command;
 
-            return providerTestLocked
+            var response = providerTestLocked
                 ? BaseCommandResponse.Failure<Guid>(
                     "ReportingTenantOverridesLocked",
                     "Tenant Osprey reporting provider tests are locked by instance policy.")
                 : BaseCommandResponse.Success(command.TenantId, "Ready");
+
+            return Task.FromResult(response);
         }
     }
 }

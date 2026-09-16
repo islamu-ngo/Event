@@ -19,7 +19,9 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Operations;
+using Explore.Application.Responses;
 using Explore.Application.Services.Webhooks;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
@@ -453,7 +455,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
                     sp.GetRequiredService<IIncomingWebhookEffectReceiptRepository>(),
                     sp.GetRequiredService<IRegistrationProviderSubscriptionStateRepository>(),
                     sp.GetRequiredService<IUnitOfWork>(),
-                    sp.GetRequiredService<IMediator>(),
+                    sp.GetRequiredService<ICommandHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>>>(),
                     capturingHandler,
                     sp.GetRequiredService<IOptions<IncomingWebhookProcessingSettings>>(),
                     sp.GetRequiredService<TimeProvider>()));

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventReporting;
@@ -8,7 +9,6 @@ using Explore.Application.Features.EventReporting.Policies;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
 
@@ -16,9 +16,9 @@ public sealed class GetModerationReportDetailRequestHandler(
     IEventReportRepository eventReportRepository,
     ITenantContext tenantContext,
     IEventReportEvidenceProtector evidenceProtector)
-    : IRequestHandler<GetModerationReportDetailRequest, ModerationReportDetailDto?>
+    : IQueryHandler<GetModerationReportDetailRequest, ModerationReportDetailDto?>
 {
-    public async Task<ModerationReportDetailDto?> Handle(
+    public async Task<ModerationReportDetailDto?> QueryAsync(
         GetModerationReportDetailRequest request,
         CancellationToken cancellationToken)
     {

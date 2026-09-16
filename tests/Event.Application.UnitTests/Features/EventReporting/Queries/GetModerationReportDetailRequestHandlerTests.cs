@@ -18,7 +18,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
     private readonly IEventReportEvidenceProtector _evidenceProtector = Substitute.For<IEventReportEvidenceProtector>();
 
     [Test]
-    public async Task Handle_WhenReportMatchesEvent_ReturnsDetailWithDecryptedEvidenceAndLogs()
+    public async Task QueryAsync_WhenReportMatchesEvent_ReturnsDetailWithDecryptedEvidenceAndLogs()
     {
         var tenantId = Guid.CreateVersion7();
         var eventId = Guid.CreateVersion7();
@@ -29,7 +29,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
             .Returns(report);
         _evidenceProtector.Unprotect("protected-text").Returns("plain reporter evidence");
 
-        var result = await CreateHandler().Handle(new GetModerationReportDetailRequest
+        var result = await CreateHandler().QueryAsync(new GetModerationReportDetailRequest
         {
             EventId = eventId,
             ReportId = report.Id
@@ -80,7 +80,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenReportBelongsToDifferentEvent_ReturnsNull()
+    public async Task QueryAsync_WhenReportBelongsToDifferentEvent_ReturnsNull()
     {
         var tenantId = Guid.CreateVersion7();
         var report = CreateDetailedReport(tenantId, Guid.CreateVersion7(), Guid.CreateVersion7());
@@ -88,7 +88,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
         _eventReportRepository.GetByIdWithEvidenceAsync(tenantId, report.Id, Arg.Any<CancellationToken>())
             .Returns(report);
 
-        var result = await CreateHandler().Handle(new GetModerationReportDetailRequest
+        var result = await CreateHandler().QueryAsync(new GetModerationReportDetailRequest
         {
             EventId = Guid.CreateVersion7(),
             ReportId = report.Id
@@ -98,7 +98,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenEvidenceCannotBeUnprotected_MarksTextUnavailable()
+    public async Task QueryAsync_WhenEvidenceCannotBeUnprotected_MarksTextUnavailable()
     {
         var tenantId = Guid.CreateVersion7();
         var eventId = Guid.CreateVersion7();
@@ -109,7 +109,7 @@ public sealed class GetModerationReportDetailRequestHandlerTests
         _evidenceProtector.Unprotect("protected-text")
             .Returns(_ => throw new CryptographicException("invalid payload"));
 
-        var result = await CreateHandler().Handle(new GetModerationReportDetailRequest
+        var result = await CreateHandler().QueryAsync(new GetModerationReportDetailRequest
         {
             EventId = eventId,
             ReportId = report.Id

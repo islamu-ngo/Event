@@ -7,6 +7,7 @@ using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
@@ -14,7 +15,6 @@ using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +27,18 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class ModerationReportControllerTests
 {
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetModerationReportQueueRequest, PaginatedResult<ModerationReportQueueItemDto>> _getQueueHandler =
+        Substitute.For<IQueryHandler<GetModerationReportQueueRequest, PaginatedResult<ModerationReportQueueItemDto>>>();
+    private readonly IQueryHandler<GetModerationReportDetailRequest, ModerationReportDetailDto?> _getDetailHandler =
+        Substitute.For<IQueryHandler<GetModerationReportDetailRequest, ModerationReportDetailDto?>>();
+    private readonly ICommandHandler<TriageEventReportCommand, BaseCommandResponse<Guid>> _triageHandler =
+        Substitute.For<ICommandHandler<TriageEventReportCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<AssignEventReportCommand, BaseCommandResponse<Guid>> _assignHandler =
+        Substitute.For<ICommandHandler<AssignEventReportCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<DecideEventReportCommand, BaseCommandResponse<Guid>> _decideHandler =
+        Substitute.For<ICommandHandler<DecideEventReportCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>> _executeDecisionHandler =
+        Substitute.For<ICommandHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>>>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly IResourceAssembler<ModerationReportDetailDto, ModerationReportQueueItemDto> _resourceAssembler =
         Substitute.For<IResourceAssembler<ModerationReportDetailDto, ModerationReportQueueItemDto>>();
@@ -77,7 +88,7 @@ public sealed class ModerationReportControllerTests
         var eventId = Guid.CreateVersion7();
         var result = PaginatedResult<ModerationReportQueueItemDto>.Create([], 0, 2, 10);
         var halCollection = new HalCollectionResource<ModerationReportQueueItemDto>();
-        _mediator.Send(Arg.Any<GetModerationReportQueueRequest>(), Arg.Any<CancellationToken>())
+        _getQueueHandler.QueryAsync(Arg.Any<GetModerationReportQueueRequest>(), Arg.Any<CancellationToken>())
             .Returns(result);
         _resourceAssembler.ToCollectionResource(
                 result,
@@ -105,7 +116,7 @@ public sealed class ModerationReportControllerTests
         var ok = response.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsSameReferenceAs(halCollection);
-        await _mediator.Received(1).Send(
+        await _getQueueHandler.Received(1).QueryAsync(
             Arg.Is<GetModerationReportQueueRequest>(request =>
                 request.EventId == eventId &&
                 request.PageNumber == 2 &&
@@ -130,10 +141,10 @@ public sealed class ModerationReportControllerTests
         var assigneeId = Guid.CreateVersion7();
         var decisionId = Guid.CreateVersion7();
         var duplicateGroupId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<TriageEventReportCommand>(), Arg.Any<CancellationToken>()).Returns(Success(reportId));
-        _mediator.Send(Arg.Any<AssignEventReportCommand>(), Arg.Any<CancellationToken>()).Returns(Success(reportId));
-        _mediator.Send(Arg.Any<DecideEventReportCommand>(), Arg.Any<CancellationToken>()).Returns(Success(decisionId));
-        _mediator.Send(Arg.Any<ExecuteReportDecisionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(decisionId));
+        _triageHandler.ExecuteAsync(Arg.Any<TriageEventReportCommand>(), Arg.Any<CancellationToken>()).Returns(Success(reportId));
+        _assignHandler.ExecuteAsync(Arg.Any<AssignEventReportCommand>(), Arg.Any<CancellationToken>()).Returns(Success(reportId));
+        _decideHandler.ExecuteAsync(Arg.Any<DecideEventReportCommand>(), Arg.Any<CancellationToken>()).Returns(Success(decisionId));
+        _executeDecisionHandler.ExecuteAsync(Arg.Any<ExecuteReportDecisionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(decisionId));
         var controller = CreateController();
 
         await controller.Triage(eventId, reportId, new TriageModerationReportRequestDto
@@ -166,7 +177,7 @@ public sealed class ModerationReportControllerTests
             CorrelationId = "corr-report-decision"
         }, CancellationToken.None);
 
-        await _mediator.Received(1).Send(
+        await _triageHandler.Received(1).ExecuteAsync(
             Arg.Is<TriageEventReportCommand>(command =>
                 command.EventId == eventId &&
                 command.ReportId == reportId &&
@@ -175,7 +186,7 @@ public sealed class ModerationReportControllerTests
                 command.QueueCode == "policy" &&
                 command.Priority == EventReportPriority.High),
             Arg.Any<CancellationToken>());
-        await _mediator.Received(1).Send(
+        await _assignHandler.Received(1).ExecuteAsync(
             Arg.Is<AssignEventReportCommand>(command =>
                 command.EventId == eventId &&
                 command.ReportId == reportId &&
@@ -183,7 +194,7 @@ public sealed class ModerationReportControllerTests
                 command.ExpectedCaseConcurrencyStamp == stamp &&
                 command.AssigneeUserId == assigneeId),
             Arg.Any<CancellationToken>());
-        await _mediator.Received(1).Send(
+        await _decideHandler.Received(1).ExecuteAsync(
             Arg.Is<DecideEventReportCommand>(command =>
                 command.EventId == eventId &&
                 command.ReportId == reportId &&
@@ -194,7 +205,7 @@ public sealed class ModerationReportControllerTests
                 command.SafeNote == "Duplicate report." &&
                 command.DuplicateGroupId == duplicateGroupId),
             Arg.Any<CancellationToken>());
-        await _mediator.Received(1).Send(
+        await _executeDecisionHandler.Received(1).ExecuteAsync(
             Arg.Is<ExecuteReportDecisionCommand>(command =>
                 command.EventId == eventId &&
                 command.ReportId == reportId &&
@@ -207,7 +218,12 @@ public sealed class ModerationReportControllerTests
 
     private ModerationReportController CreateController()
         => new(
-            _mediator,
+            _getQueueHandler,
+            _getDetailHandler,
+            _triageHandler,
+            _assignHandler,
+            _decideHandler,
+            _executeDecisionHandler,
             _resourceAssembler,
             _tenantContext,
             CreateMetrics(),

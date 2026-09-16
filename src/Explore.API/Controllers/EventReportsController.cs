@@ -6,13 +6,13 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -35,7 +35,11 @@ public sealed class EventReportsController : EventControllerBase
         "Event report not found",
         "Event report was not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventReportOptionsRequest, EventReportOptionsDto?> _getOptionsHandler;
+    private readonly ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>> _submitReportHandler;
+    private readonly IQueryHandler<GetMyReportsRequest, PaginatedResult<MyEventReportDto>> _getMyReportsHandler;
+    private readonly IQueryHandler<GetMyReportRequest, MyEventReportDto?> _getMyReportHandler;
+    private readonly ICommandHandler<UpdateMyReportCommunicationConsentCommand, BaseCommandResponse<Guid>> _updateConsentHandler;
     private readonly IResourceAssembler<EventReportOptionsDto, EventReportOptionsDto> _optionsResourceAssembler;
     private readonly IResourceAssembler<MyEventReportDto, MyEventReportDto> _myReportResourceAssembler;
     private readonly ITenantContext _tenantContext;
@@ -43,14 +47,22 @@ public sealed class EventReportsController : EventControllerBase
     private readonly ILogger<EventReportsController> _logger;
 
     public EventReportsController(
-        IMediator mediator,
+        IQueryHandler<GetEventReportOptionsRequest, EventReportOptionsDto?> getOptionsHandler,
+        ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>> submitReportHandler,
+        IQueryHandler<GetMyReportsRequest, PaginatedResult<MyEventReportDto>> getMyReportsHandler,
+        IQueryHandler<GetMyReportRequest, MyEventReportDto?> getMyReportHandler,
+        ICommandHandler<UpdateMyReportCommunicationConsentCommand, BaseCommandResponse<Guid>> updateConsentHandler,
         IResourceAssembler<EventReportOptionsDto, EventReportOptionsDto> optionsResourceAssembler,
         IResourceAssembler<MyEventReportDto, MyEventReportDto> myReportResourceAssembler,
         ITenantContext tenantContext,
         IOptions<EventReportSubmissionOptions> submissionOptions,
         ILogger<EventReportsController> logger)
     {
-        _mediator = mediator;
+        _getOptionsHandler = getOptionsHandler;
+        _submitReportHandler = submitReportHandler;
+        _getMyReportsHandler = getMyReportsHandler;
+        _getMyReportHandler = getMyReportHandler;
+        _updateConsentHandler = updateConsentHandler;
         _optionsResourceAssembler = optionsResourceAssembler;
         _myReportResourceAssembler = myReportResourceAssembler;
         _tenantContext = tenantContext;
@@ -70,7 +82,7 @@ public sealed class EventReportsController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var options = await _mediator.Send(new GetEventReportOptionsRequest { EventId = eventId }, cancellationToken);
+        var options = await _getOptionsHandler.QueryAsync(new GetEventReportOptionsRequest { EventId = eventId }, cancellationToken);
         if (options is null)
         {
             return this.ToNotFoundProblem(EventReportOptionsNotFoundProblem);
@@ -190,7 +202,7 @@ public sealed class EventReportsController : EventControllerBase
             CorrelationId = HttpContext.Items["CorrelationId"] as string ?? HttpContext.TraceIdentifier
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _submitReportHandler.ExecuteAsync(command, cancellationToken);
         _logger.LogInformation(
             "Event report submission completed for event {EventId} report {ReportId} channel {SubmissionChannel} outcome {Outcome} failure {FailureCategory}",
             request.EventId,
@@ -223,7 +235,7 @@ public sealed class EventReportsController : EventControllerBase
         [FromQuery] int pageSize = PaginatedResult<MyEventReportDto>.DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetMyReportsRequest
+        var result = await _getMyReportsHandler.QueryAsync(new GetMyReportsRequest
         {
             PageNumber = pageNumber,
             PageSize = pageSize
@@ -251,7 +263,7 @@ public sealed class EventReportsController : EventControllerBase
         Guid reportId,
         CancellationToken cancellationToken = default)
     {
-        var report = await _mediator.Send(new GetMyReportRequest { ReportId = reportId }, cancellationToken);
+        var report = await _getMyReportHandler.QueryAsync(new GetMyReportRequest { ReportId = reportId }, cancellationToken);
         if (report is null)
         {
             return this.ToNotFoundProblem(MyEventReportNotFoundProblem);
@@ -281,7 +293,7 @@ public sealed class EventReportsController : EventControllerBase
         [FromBody] UpdateMyReportCommunicationConsentDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _updateConsentHandler.ExecuteAsync(
             new UpdateMyReportCommunicationConsentCommand
             {
                 ReportId = reportId,
@@ -294,7 +306,7 @@ public sealed class EventReportsController : EventControllerBase
             return this.ToEventReportProblem(response);
         }
 
-        var report = await _mediator.Send(
+        var report = await _getMyReportHandler.QueryAsync(
             new GetMyReportRequest { ReportId = reportId },
             cancellationToken);
         if (report is null)

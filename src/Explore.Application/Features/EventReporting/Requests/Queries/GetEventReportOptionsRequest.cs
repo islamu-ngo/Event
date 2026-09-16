@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Queries;
 
-public sealed record GetEventReportOptionsRequest : IRequest<EventReportOptionsDto?>
+public sealed record GetEventReportOptionsRequest : IQuery<EventReportOptionsDto?>
 {
     public Guid EventId { get; init; }
 }

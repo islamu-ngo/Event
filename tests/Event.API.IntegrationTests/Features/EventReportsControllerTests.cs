@@ -10,6 +10,7 @@ using Explore.API.Hateoas;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventReporting;
@@ -17,7 +18,6 @@ using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -35,7 +35,16 @@ public sealed class EventReportsControllerTests
     private const string ReporterFingerprintPepper = "reporting-pepper";
 
     private readonly Guid _tenantId = Guid.CreateVersion7();
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetEventReportOptionsRequest, EventReportOptionsDto?> _getOptionsHandler =
+        Substitute.For<IQueryHandler<GetEventReportOptionsRequest, EventReportOptionsDto?>>();
+    private readonly ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>> _submitReportHandler =
+        Substitute.For<ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>>();
+    private readonly IQueryHandler<GetMyReportsRequest, PaginatedResult<MyEventReportDto>> _getMyReportsHandler =
+        Substitute.For<IQueryHandler<GetMyReportsRequest, PaginatedResult<MyEventReportDto>>>();
+    private readonly IQueryHandler<GetMyReportRequest, MyEventReportDto?> _getMyReportHandler =
+        Substitute.For<IQueryHandler<GetMyReportRequest, MyEventReportDto?>>();
+    private readonly ICommandHandler<UpdateMyReportCommunicationConsentCommand, BaseCommandResponse<Guid>> _updateConsentHandler =
+        Substitute.For<ICommandHandler<UpdateMyReportCommunicationConsentCommand, BaseCommandResponse<Guid>>>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly IResourceAssembler<EventReportOptionsDto, EventReportOptionsDto> _optionsAssembler =
         Substitute.For<IResourceAssembler<EventReportOptionsDto, EventReportOptionsDto>>();
@@ -152,7 +161,7 @@ public sealed class EventReportsControllerTests
             result.PageSize,
             result.TotalCount,
             []);
-        _mediator.Send(Arg.Any<GetMyReportsRequest>(), Arg.Any<CancellationToken>())
+        _getMyReportsHandler.QueryAsync(Arg.Any<GetMyReportsRequest>(), Arg.Any<CancellationToken>())
             .Returns(result);
         _myReportAssembler.ToCollectionResource(
                 Arg.Is<PaginatedResult<MyEventReportDto>>(value => ReferenceEquals(value, result)),
@@ -167,7 +176,7 @@ public sealed class EventReportsControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halCollection);
-        await _mediator.Received(1).Send(
+        await _getMyReportsHandler.Received(1).QueryAsync(
             Arg.Is<GetMyReportsRequest>(query => query.PageNumber == 2 && query.PageSize == 10),
             Arg.Any<CancellationToken>());
     }
@@ -177,7 +186,7 @@ public sealed class EventReportsControllerTests
     {
         var reportId = Guid.CreateVersion7();
         var dto = CreateSubmitDto();
-        _mediator.Send(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
+        _submitReportHandler.ExecuteAsync(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 reportId,
                 "Event report submitted successfully."));
@@ -192,7 +201,7 @@ public sealed class EventReportsControllerTests
 
         var expectedIpHash = ComputeExpectedFingerprint("ip", "203.0.113.5");
         var expectedUserAgentHash = ComputeExpectedFingerprint("user-agent", "EventReportingTests/1.0");
-        await _mediator.Received(1).Send(
+        await _submitReportHandler.Received(1).ExecuteAsync(
             Arg.Is<SubmitEventReportCommand>(command =>
                 ReferenceEquals(command.Request, dto) &&
                 command.Request.ReportCaseUpdatesConsent &&
@@ -215,7 +224,7 @@ public sealed class EventReportsControllerTests
     {
         EventReportSubmissionChannel expectedChannel =
             Enum.Parse<EventReportSubmissionChannel>(channelName);
-        _mediator.Send(
+        _submitReportHandler.ExecuteAsync(
                 Arg.Any<SubmitEventReportCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
@@ -245,7 +254,7 @@ public sealed class EventReportsControllerTests
                 "Only remedy channels are valid for this test.")
         };
 
-        await _mediator.Received(1).Send(
+        await _submitReportHandler.Received(1).ExecuteAsync(
             Arg.Is<SubmitEventReportCommand>(command =>
                 ReferenceEquals(command.Request, request)
                 && command.SubmissionChannel == expectedChannel),
@@ -255,7 +264,7 @@ public sealed class EventReportsControllerTests
     [Test]
     public async Task Submit_WhenDuplicate_ReturnsConflictProblemDetails()
     {
-        _mediator.Send(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
+        _submitReportHandler.ExecuteAsync(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 EventReportFailureCodes.Duplicate,
                 "A matching event report was already submitted recently.",
@@ -276,7 +285,7 @@ public sealed class EventReportsControllerTests
     [Test]
     public async Task Submit_WhenIntakeIsDisabled_DelegatesCanonicalConflictMapping()
     {
-        _mediator.Send(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
+        _submitReportHandler.ExecuteAsync(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "event_reporting_intake_disabled",
                 "Event report intake is disabled for this tenant."));
@@ -293,7 +302,7 @@ public sealed class EventReportsControllerTests
         await Assert.That(problemDetails.Title).IsEqualTo("Event report conflict");
         await Assert.That(problemDetails.Detail).IsEqualTo("Event report intake is disabled for this tenant.");
         await Assert.That(problemDetails.Extensions["code"]).IsEqualTo("event_reporting_intake_disabled");
-        await _mediator.Received(1).Send(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>());
+        await _submitReportHandler.Received(1).ExecuteAsync(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -309,13 +318,13 @@ public sealed class EventReportsControllerTests
             }
         };
         var halResource = new HalResource<MyEventReportDto>(report);
-        _mediator.Send(
+        _updateConsentHandler.ExecuteAsync(
                 Arg.Any<UpdateMyReportCommunicationConsentCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 report.Id,
                 "Event report communication consent updated successfully."));
-        _mediator.Send(Arg.Any<GetMyReportRequest>(), Arg.Any<CancellationToken>())
+        _getMyReportHandler.QueryAsync(Arg.Any<GetMyReportRequest>(), Arg.Any<CancellationToken>())
             .Returns(report);
         _myReportAssembler.ToResource(report, Arg.Any<HttpContext>()).Returns(halResource);
         var controller = CreateController(null, null, "corr-report-consent");
@@ -328,14 +337,14 @@ public sealed class EventReportsControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halResource);
-        await _mediator.Received(1).Send(
+        await _updateConsentHandler.Received(1).ExecuteAsync(
             Arg.Is<UpdateMyReportCommunicationConsentCommand>(command =>
                 command.ReportId == report.Id
                 && ReferenceEquals(command.Request, request)
                 && !command.Request.Consent!.ReportCaseUpdatesConsent
                 && command.Request.Consent.ReportFollowUpContactConsent),
             Arg.Any<CancellationToken>());
-        await _mediator.Received(1).Send(
+        await _getMyReportHandler.Received(1).QueryAsync(
             Arg.Is<GetMyReportRequest>(query => query.ReportId == report.Id),
             Arg.Any<CancellationToken>());
     }
@@ -344,7 +353,7 @@ public sealed class EventReportsControllerTests
     public async Task UpdateCommunicationConsent_WhenOwnershipFails_ReturnsGenericNotFoundWithoutRefresh()
     {
         var reportId = Guid.CreateVersion7();
-        _mediator.Send(
+        _updateConsentHandler.ExecuteAsync(
                 Arg.Any<UpdateMyReportCommunicationConsentCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
@@ -365,7 +374,7 @@ public sealed class EventReportsControllerTests
         var objectResult = actionResult.Result as ObjectResult;
         await Assert.That(objectResult).IsNotNull();
         await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-        await _mediator.DidNotReceive().Send(
+        await _getMyReportHandler.DidNotReceive().QueryAsync(
             Arg.Any<GetMyReportRequest>(),
             Arg.Any<CancellationToken>());
         await _myReportAssembler.DidNotReceive().ToResource(
@@ -377,7 +386,7 @@ public sealed class EventReportsControllerTests
     public async Task UpdateCommunicationConsent_WhenProviderDenies_PropagatesAuthorizationFailureWithoutRefresh()
     {
         var reportId = Guid.CreateVersion7();
-        _mediator.Send(
+        _updateConsentHandler.ExecuteAsync(
                 Arg.Any<UpdateMyReportCommunicationConsentCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BaseCommandResponse<Guid>>(new AuthorizationException(
@@ -393,7 +402,7 @@ public sealed class EventReportsControllerTests
             },
             CancellationToken.None));
 
-        await _mediator.DidNotReceive().Send(
+        await _getMyReportHandler.DidNotReceive().QueryAsync(
             Arg.Any<GetMyReportRequest>(),
             Arg.Any<CancellationToken>());
         await _myReportAssembler.DidNotReceive().ToResource(
@@ -419,7 +428,11 @@ public sealed class EventReportsControllerTests
         }
 
         return new EventReportsController(
-            _mediator,
+            _getOptionsHandler,
+            _submitReportHandler,
+            _getMyReportsHandler,
+            _getMyReportHandler,
+            _updateConsentHandler,
             _optionsAssembler,
             _myReportAssembler,
             _tenantContext,

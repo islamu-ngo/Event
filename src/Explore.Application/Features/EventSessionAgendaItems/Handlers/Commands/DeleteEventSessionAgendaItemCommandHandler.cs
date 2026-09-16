@@ -1,13 +1,13 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Commands;
 using Explore.Application.Services;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Commands;
 
-public class DeleteEventSessionAgendaItemCommandHandler : IRequestHandler<DeleteEventSessionAgendaItemCommand, bool>
+public class DeleteEventSessionAgendaItemCommandHandler : ICommandHandler<DeleteEventSessionAgendaItemCommand, bool>
 {
     private readonly IEventSessionAgendaItemRepository _agendaItemRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -23,9 +23,9 @@ public class DeleteEventSessionAgendaItemCommandHandler : IRequestHandler<Delete
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<bool> Handle(DeleteEventSessionAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventSessionAgendaItemCommand command, CancellationToken cancellationToken = default)
     {
-        var agendaItem = await _agendaItemRepository.GetById(request.Id);
+        var agendaItem = await _agendaItemRepository.GetById(command.Id);
 
         if (agendaItem == null)
         {

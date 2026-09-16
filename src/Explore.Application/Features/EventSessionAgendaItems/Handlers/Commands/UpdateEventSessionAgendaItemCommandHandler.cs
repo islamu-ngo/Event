@@ -1,16 +1,16 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionAgendaItem.Validators;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Commands;
 
-public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<UpdateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionAgendaItemCommandHandler : ICommandHandler<UpdateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionAgendaItemRepository _agendaItemRepository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -35,10 +35,10 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionAgendaItemCommand command, CancellationToken cancellationToken = default)
     {
         var validator = new UpdateEventSessionAgendaItemDtoValidator();
-        var validationResult = await validator.ValidateAsync(request.AgendaItemDto, cancellationToken);
+        var validationResult = await validator.ValidateAsync(command.AgendaItemDto, cancellationToken);
 
         if (!validationResult.IsValid)
         {
@@ -47,7 +47,7 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
                 "Agenda item update failed.");
         }
 
-        var agendaItem = await _agendaItemRepository.GetById(request.EventSessionAgendaItemId);
+        var agendaItem = await _agendaItemRepository.GetById(command.EventSessionAgendaItemId);
 
         if (agendaItem == null)
         {
@@ -55,7 +55,7 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
         }
 
         EventSession? currentSession = await _eventSessionRepository.GetById(agendaItem.EventSessionId);
-        Guid destinationSessionId = request.AgendaItemDto.Relationship?.EventSessionId ?? agendaItem.EventSessionId;
+        Guid destinationSessionId = command.AgendaItemDto.Relationship?.EventSessionId ?? agendaItem.EventSessionId;
         EventSession? parentSession = destinationSessionId == currentSession?.Id
             ? currentSession
             : await _eventSessionRepository.GetById(destinationSessionId);
@@ -64,7 +64,7 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
             return BaseCommandResponse.NotFound<Guid>("Event session not found in the current tenant.");
         }
 
-        request = request with
+        command = command with
         {
             EventSessionId = agendaItem.EventSessionId,
             EventId = currentSession.EventId,
@@ -78,9 +78,9 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
                 "Agenda items cannot move to a session from another event.");
         }
 
-        string title = request.AgendaItemDto.Content?.Title ?? agendaItem.Title;
-        DateTimeOffset startTime = request.AgendaItemDto.Schedule?.StartTime ?? agendaItem.StartTime;
-        DateTimeOffset endTime = request.AgendaItemDto.Schedule?.EndTime ?? agendaItem.EndTime;
+        string title = command.AgendaItemDto.Content?.Title ?? agendaItem.Title;
+        DateTimeOffset startTime = command.AgendaItemDto.Schedule?.StartTime ?? agendaItem.StartTime;
+        DateTimeOffset endTime = command.AgendaItemDto.Schedule?.EndTime ?? agendaItem.EndTime;
         if (string.IsNullOrWhiteSpace(title) || endTime <= startTime)
         {
             return BaseCommandResponse.Validation<Guid>(
@@ -90,8 +90,8 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
                 "Agenda item update failed.");
         }
 
-        Guid? locationId = request.AgendaItemDto.Location?.Value.HasValue == true
-            ? request.AgendaItemDto.Location.Value.Value
+        Guid? locationId = command.AgendaItemDto.Location?.Value.HasValue == true
+            ? command.AgendaItemDto.Location.Value.Value
             : agendaItem.LocationId;
         if (locationId.HasValue)
         {
@@ -107,8 +107,8 @@ public class UpdateEventSessionAgendaItemCommandHandler : IRequestHandler<Update
         agendaItem.Title = title;
         agendaItem.StartTime = startTime;
         agendaItem.EndTime = endTime;
-        if (request.AgendaItemDto.Content?.Description.HasValue == true)
-            agendaItem.Description = request.AgendaItemDto.Content.Description.Value;
+        if (command.AgendaItemDto.Content?.Description.HasValue == true)
+            agendaItem.Description = command.AgendaItemDto.Content.Description.Value;
         agendaItem.TenantId = parentSession.TenantId;
         agendaItem.EventSession = parentSession;
 

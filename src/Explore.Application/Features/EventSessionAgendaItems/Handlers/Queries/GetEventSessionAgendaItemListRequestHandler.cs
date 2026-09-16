@@ -1,16 +1,16 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Queries;
 
-public class GetEventSessionAgendaItemListRequestHandler : IRequestHandler<GetEventSessionAgendaItemListRequest, PaginatedResult<EventSessionAgendaItemListDto>>
+public class GetEventSessionAgendaItemListRequestHandler : IQueryHandler<GetEventSessionAgendaItemListRequest, PaginatedResult<EventSessionAgendaItemListDto>>
 {
     private readonly IEventSessionAgendaItemRepository _agendaItemRepository;
     private readonly IEventLocationDisclosureService _disclosureService;
@@ -23,9 +23,9 @@ public class GetEventSessionAgendaItemListRequestHandler : IRequestHandler<GetEv
         _disclosureService = disclosureService;
     }
 
-    public async Task<PaginatedResult<EventSessionAgendaItemListDto>> Handle(GetEventSessionAgendaItemListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventSessionAgendaItemListDto>> QueryAsync(GetEventSessionAgendaItemListRequest query, CancellationToken cancellationToken = default)
     {
-        var (pageNumber, pageSize) = PaginatedResult<EventSessionAgendaItemListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
+        var (pageNumber, pageSize) = PaginatedResult<EventSessionAgendaItemListDto>.NormalizeParameters(query.PageNumber, query.PageSize);
         var (agendaItems, totalCount) = await _agendaItemRepository.GetPublicAgendaItemsWithDetailsPagedAsync(
             pageNumber,
             pageSize,

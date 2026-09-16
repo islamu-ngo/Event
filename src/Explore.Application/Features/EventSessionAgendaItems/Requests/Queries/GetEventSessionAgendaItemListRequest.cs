@@ -1,11 +1,11 @@
 using System.Collections.Generic;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
 
-public sealed record GetEventSessionAgendaItemListRequest : IRequest<PaginatedResult<EventSessionAgendaItemListDto>>
+public sealed record GetEventSessionAgendaItemListRequest : IQuery<PaginatedResult<EventSessionAgendaItemListDto>>
 {
     /// <summary>
     /// Gets or sets the page number (1-based). Defaults to 1.

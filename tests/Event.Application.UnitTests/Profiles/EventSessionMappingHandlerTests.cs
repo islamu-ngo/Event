@@ -242,7 +242,7 @@ public sealed class EventSessionMappingHandlerTests
         });
         var handler = new CreateEventSessionAgendaItemCommandHandler(repository, sessions,
             Substitute.For<ILocationRepository>(), Tenant(), new InlineUnitOfWork(), Attachment());
-        var result = await handler.Handle(new CreateEventSessionAgendaItemCommand
+        var result = await handler.ExecuteAsync(new CreateEventSessionAgendaItemCommand
         {
             AgendaItemDto = new CreateEventSessionAgendaItemDto
             {

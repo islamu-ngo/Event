@@ -149,11 +149,11 @@ public sealed class PublicEventLocationProjectionTests
         repository.GetPublicBySessionAsync(item.EventSessionId, Arg.Any<CancellationToken>()).Returns([item]);
 
         EventSessionAgendaItemDto? detail = await new GetEventSessionAgendaItemDetailsRequestHandler(repository, disclosureService)
-            .Handle(new GetEventSessionAgendaItemDetailsRequest { Id = item.Id }, CancellationToken.None);
+            .QueryAsync(new GetEventSessionAgendaItemDetailsRequest { Id = item.Id }, CancellationToken.None);
         EventSessionAgendaItemListDto paged = (await new GetEventSessionAgendaItemListRequestHandler(repository, disclosureService)
-            .Handle(new GetEventSessionAgendaItemListRequest(), CancellationToken.None)).Items.Single();
+            .QueryAsync(new GetEventSessionAgendaItemListRequest(), CancellationToken.None)).Items.Single();
         EventSessionAgendaItemListDto bySession = (await new GetAgendaItemsBySessionRequestHandler(repository, disclosureService)
-            .Handle(new GetAgendaItemsBySessionRequest { EventSessionId = item.EventSessionId }, CancellationToken.None)).Single();
+            .QueryAsync(new GetAgendaItemsBySessionRequest { EventSessionId = item.EventSessionId }, CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: false);
         await AssertPublicLocationAsync(paged.EventLocation, eventLocationId, expectRoom: false);

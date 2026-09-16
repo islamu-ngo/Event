@@ -7,13 +7,13 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionAgendaItem.Validators;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Commands;
 
-public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<CreateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionAgendaItemCommandHandler : ICommandHandler<CreateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionAgendaItemRepository _agendaItemRepository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -38,10 +38,10 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionAgendaItemCommand command, CancellationToken cancellationToken = default)
     {
         var validator = new CreateEventSessionAgendaItemDtoValidator(_eventSessionRepository, _locationRepository);
-        var validationResult = await validator.ValidateAsync(request.AgendaItemDto, cancellationToken);
+        var validationResult = await validator.ValidateAsync(command.AgendaItemDto, cancellationToken);
 
         if (!validationResult.IsValid)
         {
@@ -51,7 +51,7 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
         }
 
         // Only business fields are copied; the checked parent and location attachment are resolved below.
-        var input = request.AgendaItemDto;
+        var input = command.AgendaItemDto;
         var agendaItem = new EventSessionAgendaItem
         {
             EventSessionId = input.EventSessionId,
@@ -67,7 +67,7 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
         // Set TenantId from the request context
         agendaItem.TenantId = _tenantContext.TenantId;
 
-        EventSession? parentSession = await _eventSessionRepository.GetById(request.AgendaItemDto.EventSessionId);
+        EventSession? parentSession = await _eventSessionRepository.GetById(command.AgendaItemDto.EventSessionId);
         if (parentSession is null || parentSession.TenantId != agendaItem.TenantId)
         {
             return BaseCommandResponse.NotFound<Guid>("Event session not found in the current tenant.");

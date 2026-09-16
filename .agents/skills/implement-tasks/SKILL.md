@@ -54,6 +54,7 @@ priority: high
    - **Holistic Orientation (Read Once per Session)**: On session start or cold resume, read `*-context.md` (`## Quick Resume`, current milestone, blockers), `*-tasks.md` (identify active phase and unchecked `[ ]` tasks), and read `*-plan.md` to establish the holistic mental model (system architecture, cross-cutting invariants, and downstream phase contracts). Never implement blind to future phase dependencies.
    - **Execution Economy (Inner Loop Zooming)**: Once oriented within the session, do NOT re-read the entire plan on every task turn. Zoom into the active phase heading in `*-plan.md` and manage granular state via `*-tasks.md`.
    - **Re-Orientation Triggers**: Re-read the full plan (or downstream phases) immediately if an unexpected blocker arises, domain model friction occurs, cross-phase contracts conflict, or the user redirects requirements.
+   - **Git History Grounding (Commit Convention Anchoring)**: On cold resume, run `git log -n 5 --oneline` in the execution context to see the branch's established commit pattern. This anchors the resuming agent to the branch's Conventional Commit style (type, scope, trailer discipline) before writing any new code or commits. Locate the active phase's `#### Planned Commit Contract` in `*-tasks.md` and hold it as the template for the next phase-close commit.
    - **Inner Loop Baseline Sanity**: Run a fast Ring 1 sliced test (`--treenode-filter`) in the target execution context (`Cwd`) to verify the previous session's green baseline before modifying code.
    - **Quarantine Rot & Differential Baseline Attribution**: If an unexpected failure occurs outside touched paths (e.g. in Persistence or Architecture tests), do NOT debug or absorb it into this task. Run a differential baseline check against clean `origin/develop` (`git -C <repo-root> test --project <project> --filter "<FailingTest>"`). If it reproduces on `develop`, it is Class C baseline rot: log the failure signature under `## Quarantined Baseline Failures` in `*-context.md` and quarantine it immediately. Never derail the task to fix pre-existing baseline rot.
    - **Continue the Phased Loop**: Pick up execution directly at the first unchecked task `[ ]` in the active phase.
@@ -155,7 +156,7 @@ priority: high
    - Read <PlanPath>/<task>-context.md (Quick Resume, blockers, baseline).
    - Read <PlanPath>/<task>-tasks.md (find first unchecked [ ] task and active Phase).
    - Read <PlanPath>/<task>-plan.md once per session to establish holistic context (architecture, cross-phase contracts); zoom into the active phase heading for execution.
-   - (If Resuming): Run quick Ring 1 test in Cwd to verify baseline health before editing.
+   - (If Resuming): Run `git log -n 5 --oneline` to ground in the branch's commit convention, then run quick Ring 1 test in Cwd to verify baseline health before editing.
 
 3. Loop through Remaining Phases (in resolved Cwd):
    a. Red: compilable stubs + failing invariant test (in-memory domain first)
@@ -163,7 +164,7 @@ priority: high
    c. Verify: Ring 1 sliced test (< 2s) -> Ring 2 phase build & single-provider test (< 15s)
       - Apply Three-Tier Failure Triage (Class A: fix, Class B: align or brief, Class C: quarantine)
       - Differential Baseline Check: verify unexpected failures against clean origin/develop
-   d. Commit: git add -A && git commit using semantic phase contract from tasks.md
+   d. Commit: Stage only phase-relevant files (`git add <paths>`; never blind `git add -A` on mixed trees — Rule 8 from conventional-commit/SKILL.md). Commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. The `.githooks/commit-msg` hook will reject non-conforming commits; if rejected, fix the message format and re-commit.
    e. Update: batch checkbox updates in tasks.md (obey anti-sprawl ledger cap; never add dynamic finding tasks); apply Rolling Context Compaction to context.md (keep < 200–300 lines; summarize completed cohorts to 1-line checkpoints)
    f. (If Hub-and-Spoke): author spoke in .worktrees/<task>--<cohort> on feat/<task>--<cohort>. Once spoke cohort commits integrate into hub branch, immediately prune spoke worktree: git worktree remove .worktrees/<task>--<cohort> && git branch -d feat/<task>--<cohort> (bound active worktrees <= 3–5)
    g. Pause / Slice: If phase boundary requires user decision or blast radius expands, output Decision Brief (propose Mid-Flight PR Slice if scope ballooned).
@@ -179,6 +180,7 @@ priority: high
       - Mass-Failure Circuit Breaker: if > 10 failures, cluster root causes; do NOT add 10+ tasks to tasks.md
    b. git fetch origin develop && git rebase origin/develop (in Cwd)
    c. dotnet test (verify regression-free rebase)
+   d. Commit Audit: run `git log --format='%s' "$(git merge-base HEAD origin/develop)"..HEAD` and verify every subject line is a valid Conventional Commit. If any malformed commits exist (from earlier sessions before the hook was installed), interactive-rebase to fix them before pushing.
 
 6. PR Creation & Handoff:
    a. git push -u origin <branch> --force-with-lease

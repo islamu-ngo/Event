@@ -296,7 +296,10 @@ public sealed class RegistrationOrderControllerTests
             Substitute.For<IMediator>(),
             Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>(),
             applyAuthHandler,
-            removeAuthHandler);
+            removeAuthHandler,
+            Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>(),
+            Substitute.For<ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>>());
         authenticatedController.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var guestApply = await guestController.ApplyGuestPromotion(eventId, orderId, "guest-capability", new PromotionCodeRequest("SAVE10"), Guid.CreateVersion7().ToString("N"));
@@ -317,14 +320,25 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task ParticipantHalMutationRelationsFollowServerManageDecision()
     {
-        var mediator = Substitute.For<IMediator>();
+        var participantsHandler = Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>();
         var eventId = Guid.CreateVersion7();
         var orderId = Guid.CreateVersion7();
         var viewOnly = new RegistrationOrderParticipantsDto(orderId, [], []);
         var manageable = viewOnly with { CanManage = true };
-        mediator.Send(Arg.Any<GetAuthenticatedRegistrationOrderParticipantsQuery>(), Arg.Any<CancellationToken>())
+        participantsHandler.QueryAsync(Arg.Any<GetAuthenticatedRegistrationOrderParticipantsQuery>(), Arg.Any<CancellationToken>())
             .Returns(viewOnly, manageable);
-        var controller = CreateController<AuthenticatedRegistrationOrderController>(mediator);
+        var controller = new AuthenticatedRegistrationOrderController(
+            Substitute.For<IMediator>(),
+            Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>(),
+            Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
+            Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
+            participantsHandler,
+            Substitute.For<ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>>());
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        var url = Substitute.For<IUrlHelper>();
+        url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");
+        controller.Url = url;
 
         var organizerResult = await controller.GetAuthenticatedParticipants(eventId, orderId);
         var ownerResult = await controller.GetAuthenticatedParticipants(eventId, orderId);
@@ -539,7 +553,10 @@ public sealed class RegistrationOrderControllerTests
             : typeof(TController) == typeof(AuthenticatedRegistrationOrderController)
                 ? [mediator, effectiveAssembler,
                    Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
-                   Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>()]
+                   Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
+                   Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>(),
+                   Substitute.For<ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>>(),
+                   Substitute.For<ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>>()]
             : typeof(TController).GetConstructors().Single().GetParameters().Length == 1
                 ? [mediator]
                 : [mediator, effectiveAssembler];

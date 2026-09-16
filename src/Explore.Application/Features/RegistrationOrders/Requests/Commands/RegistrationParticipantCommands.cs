@@ -1,11 +1,11 @@
-using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Commands;
 
-public interface IRegistrationParticipantMutation : IRequest<BaseCommandResponse<Guid>>
+public interface IRegistrationParticipantMutation : ICommand<BaseCommandResponse<Guid>>
 {
     Guid RegistrationOrderId { get; }
 }
@@ -49,7 +49,7 @@ public sealed record ImportCompanyRegistrationAssignmentsCsvCommand(
     Guid EventId,
     Guid RegistrationOrderId,
     string CsvUtf8,
-    string LineageKey) : IRequest<BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>, ISecureRequest
+    string LineageKey) : ICommand<BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString("D");
 

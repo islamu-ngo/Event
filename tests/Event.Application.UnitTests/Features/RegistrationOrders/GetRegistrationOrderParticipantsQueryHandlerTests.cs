@@ -46,7 +46,7 @@ public sealed class GetRegistrationOrderParticipantsQueryHandlerTests
         participants.GetAssignmentsWithParticipantsByOrderAsync(order.Id, tenantId, Arg.Any<CancellationToken>()).Returns([]);
         var handler = new GetRegistrationOrderParticipantsQueryHandler(inventory, catalogs, participants, tenant);
 
-        var result = await handler.Handle(new GetRegistrationOrderParticipantsQuery(order.Id), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationOrderParticipantsQuery(order.Id), CancellationToken.None);
 
         var projected = result!.Lines.Single();
         await Assert.That(projected.Id).IsEqualTo(line.Id);

@@ -93,13 +93,13 @@ public sealed record MutateGuestRegistrationParticipantsCommand(
     Guid OrderId,
     string? CapabilityToken,
     IRegistrationParticipantMutation Mutation)
-    : IRequest<BaseCommandResponse<Guid>>, IGuestRegistrationOrderAccessCommand;
+    : ICommand<BaseCommandResponse<Guid>>, IGuestRegistrationOrderAccessCommand;
 
 public sealed record MutateAuthenticatedRegistrationParticipantsCommand(
     Guid EventId,
     Guid OrderId,
     IRegistrationParticipantMutation Mutation)
-    : IRequest<BaseCommandResponse<Guid>>, IAuthenticatedRegistrationOrderAccessCommand;
+    : ICommand<BaseCommandResponse<Guid>>, IAuthenticatedRegistrationOrderAccessCommand;
 
 public sealed record LaunchGuestNativeRegistrationAttemptCommand(
     Guid EventId,

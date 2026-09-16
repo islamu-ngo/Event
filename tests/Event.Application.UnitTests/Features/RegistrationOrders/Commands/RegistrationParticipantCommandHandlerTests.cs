@@ -24,15 +24,15 @@ public sealed class RegistrationParticipantCommandHandlerTests
         Guid firstChild = await fixture.AddParticipantAsync(ParticipantTypeEnum.Child, firstAdult, new ParticipantDetailsDto("Child A", null, null));
         Guid secondChild = await fixture.AddParticipantAsync(ParticipantTypeEnum.Child, firstAdult, new ParticipantDetailsDto("Child B", null, null));
         Guid thirdChild = await fixture.AddParticipantAsync(ParticipantTypeEnum.Child, secondAdult, new ParticipantDetailsDto("Child C", null, null));
-        BaseCommandResponse<Guid> updated = await fixture.Update.Handle(
+        BaseCommandResponse<Guid> updated = await fixture.Update.ExecuteAsync(
             new UpdateRegistrationParticipantCommand(
                 fixture.Order.Id, secondAdult, (int)ParticipantTypeEnum.Adult, null, new ParticipantDetailsDto(null, null, null)),
             CancellationToken.None);
-        BaseCommandResponse<Guid> singlyAssigned = await fixture.Assign.Handle(
+        BaseCommandResponse<Guid> singlyAssigned = await fixture.Assign.ExecuteAsync(
             new AssignRegistrationTicketCommand(fixture.Order.Id, fixture.FirstLine.Id, 1, firstAdult),
             CancellationToken.None);
 
-        BaseCommandResponse<Guid> assigned = await fixture.BulkAssign.Handle(
+        BaseCommandResponse<Guid> assigned = await fixture.BulkAssign.ExecuteAsync(
             new BulkAssignRegistrationTicketsCommand(fixture.Order.Id,
             [
                 new(fixture.FirstLine.Id, 2, secondAdult),
@@ -64,7 +64,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             1,
             ParticipantDataCollectionModeEnum.DeferredAssignment,
             bookingPartyType: BookingPartyTypeEnum.Company);
-        BaseCommandResponse<Guid> deferred = await fixture.BulkDefer.Handle(
+        BaseCommandResponse<Guid> deferred = await fixture.BulkDefer.ExecuteAsync(
             new BulkDeferRegistrationTicketsCommand(
                 fixture.Order.Id,
                 [new(fixture.SecondLine.Id, 1)],
@@ -75,9 +75,9 @@ public sealed class RegistrationParticipantCommandHandlerTests
         string csv = $"registrationOrderLineId,ordinal,participantTypeId,displayName,email,phone\n{fixture.FirstLine.Id},1,{(int)ParticipantTypeEnum.Adult},Optional Person,optional@example.test,\n{fixture.SecondLine.Id},1,{(int)ParticipantTypeEnum.Employee},Employee,employee@example.test,";
         var amendment = new ImportCompanyRegistrationAssignmentsCsvCommand(fixture.EventId, fixture.Order.Id, csv, "company-roster-1");
 
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> first = await fixture.ImportCompanyCsv.Handle(amendment, CancellationToken.None);
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> first = await fixture.ImportCompanyCsv.ExecuteAsync(amendment, CancellationToken.None);
         Guid replayStamp = fixture.Order.ConcurrencyStamp;
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> replay = await fixture.ImportCompanyCsv.Handle(amendment, CancellationToken.None);
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> replay = await fixture.ImportCompanyCsv.ExecuteAsync(amendment, CancellationToken.None);
 
         await Assert.That(deferred.IsSuccess && finalized.IsSuccess && first.IsSuccess && replay.IsSuccess).IsTrue();
         await Assert.That(fixture.Admissions).Count().IsEqualTo(2);
@@ -94,13 +94,13 @@ public sealed class RegistrationParticipantCommandHandlerTests
     public async Task CompanyCsv_RejectsFormulaAndMalformedRowsWithoutWrites()
     {
         var fixture = new HandlerFixture(1, ParticipantDataCollectionModeEnum.PerTicketOptional, 1, ParticipantDataCollectionModeEnum.PerTicketOptional);
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> formula = await fixture.ImportCompanyCsv.Handle(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> formula = await fixture.ImportCompanyCsv.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(
                 fixture.EventId,
                 fixture.Order.Id,
                 $"registrationOrderLineId,ordinal,participantTypeId,displayName,email,phone\n={fixture.FirstLine.Id},1,{(int)ParticipantTypeEnum.Adult},Name,,",
                 "import-1"), CancellationToken.None);
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> malformed = await fixture.ImportCompanyCsv.Handle(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> malformed = await fixture.ImportCompanyCsv.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(
                 fixture.EventId,
                 fixture.Order.Id,
@@ -122,11 +122,11 @@ public sealed class RegistrationParticipantCommandHandlerTests
         fixture.ParticipantRows.Add(otherOrderParticipant);
         int originalAssignments = fixture.AssignmentRows.Count;
 
-        BaseCommandResponse<Guid> duplicate = await fixture.BulkAssign.Handle(new BulkAssignRegistrationTicketsCommand(
+        BaseCommandResponse<Guid> duplicate = await fixture.BulkAssign.ExecuteAsync(new BulkAssignRegistrationTicketsCommand(
             fixture.Order.Id, [new(fixture.FirstLine.Id, 1, participant), new(fixture.FirstLine.Id, 1, participant)]), CancellationToken.None);
-        BaseCommandResponse<Guid> crossOrder = await fixture.Assign.Handle(new AssignRegistrationTicketCommand(
+        BaseCommandResponse<Guid> crossOrder = await fixture.Assign.ExecuteAsync(new AssignRegistrationTicketCommand(
             fixture.Order.Id, fixture.FirstLine.Id, 1, otherOrderParticipant.Id), CancellationToken.None);
-        BaseCommandResponse<Guid> expired = await fixture.Defer.Handle(new DeferRegistrationTicketCommand(
+        BaseCommandResponse<Guid> expired = await fixture.Defer.ExecuteAsync(new DeferRegistrationTicketCommand(
             fixture.Order.Id, fixture.SecondLine.Id, 1, fixture.UtcNow), CancellationToken.None);
 
         await Assert.That(duplicate.IsSuccess || crossOrder.IsSuccess || expired.IsSuccess).IsFalse();
@@ -147,7 +147,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             null,
             new ParticipantDetailsDto(null, null, null));
 
-        BaseCommandResponse<Guid> response = await fixture.Assign.Handle(
+        BaseCommandResponse<Guid> response = await fixture.Assign.ExecuteAsync(
             new AssignRegistrationTicketCommand(fixture.Order.Id, fixture.FirstLine.Id, 2, participant),
             CancellationToken.None);
 
@@ -165,7 +165,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             1,
             ParticipantDataCollectionModeEnum.PerTicketOptional,
             bookingPartyType: BookingPartyTypeEnum.Company);
-        await fixture.BulkDefer.Handle(new BulkDeferRegistrationTicketsCommand(
+        await fixture.BulkDefer.ExecuteAsync(new BulkDeferRegistrationTicketsCommand(
             fixture.Order.Id,
             [new(fixture.FirstLine.Id, 1), new(fixture.FirstLine.Id, 2)],
             fixture.UtcNow.AddDays(7)), CancellationToken.None);
@@ -176,9 +176,9 @@ public sealed class RegistrationParticipantCommandHandlerTests
             $"{fixture.FirstLine.Id},1,{(int)ParticipantTypeEnum.Employee},Employee One,one@example.test,",
             $"{fixture.FirstLine.Id},2,{(int)ParticipantTypeEnum.Employee},Employee Two,two@example.test,");
 
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> imported = await fixture.ImportCompanyCsv.Handle(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> imported = await fixture.ImportCompanyCsv.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(fixture.EventId, fixture.Order.Id, csv, "import-001"), CancellationToken.None);
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> replayed = await fixture.ImportCompanyCsv.Handle(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> replayed = await fixture.ImportCompanyCsv.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(fixture.EventId, fixture.Order.Id, csv, "import-001"), CancellationToken.None);
 
         await Assert.That(finalized.IsSuccess && imported.IsSuccess && replayed.IsSuccess).IsTrue();
@@ -199,7 +199,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             1,
             ParticipantDataCollectionModeEnum.PerTicketOptional,
             bookingPartyType: BookingPartyTypeEnum.Company);
-        await fixture.BulkDefer.Handle(new BulkDeferRegistrationTicketsCommand(
+        await fixture.BulkDefer.ExecuteAsync(new BulkDeferRegistrationTicketsCommand(
             fixture.Order.Id,
             [new(fixture.FirstLine.Id, 1)],
             fixture.UtcNow.AddDays(7)), CancellationToken.None);
@@ -210,7 +210,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             $"{fixture.FirstLine.Id},1,{(int)ParticipantTypeEnum.Employee},Employee One,one@example.test,",
             $"{fixture.SecondLine.Id},2,{(int)ParticipantTypeEnum.Employee},Employee Two,two@example.test,");
 
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> imported = await fixture.ImportCompanyCsv.Handle(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> imported = await fixture.ImportCompanyCsv.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(fixture.EventId, fixture.Order.Id, csv, "import-002"), CancellationToken.None);
 
         await Assert.That(imported.IsSuccess).IsFalse();
@@ -228,7 +228,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             1,
             ParticipantDataCollectionModeEnum.PerTicketOptional,
             bookingPartyType: BookingPartyTypeEnum.Company);
-        await fixture.BulkDefer.Handle(new BulkDeferRegistrationTicketsCommand(
+        await fixture.BulkDefer.ExecuteAsync(new BulkDeferRegistrationTicketsCommand(
             fixture.Order.Id,
             [new(fixture.FirstLine.Id, 1)],
             fixture.UtcNow.AddDays(7)), CancellationToken.None);
@@ -239,7 +239,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
             $"{fixture.FirstLine.Id},1,{(int)ParticipantTypeEnum.Employee},Employee One,one@example.test,",
             $"{fixture.FirstLine.Id},1,{(int)ParticipantTypeEnum.Employee},Employee Two,two@example.test,");
 
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> imported = await fixture.ImportCompanyCsv.Handle(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> imported = await fixture.ImportCompanyCsv.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(fixture.EventId, fixture.Order.Id, csv, "import-duplicate"), CancellationToken.None);
 
         await Assert.That(imported.IsSuccess).IsFalse();
@@ -355,7 +355,7 @@ public sealed class RegistrationParticipantCommandHandlerTests
 
         public async Task<Guid> AddParticipantAsync(ParticipantTypeEnum type, Guid? guardianId, ParticipantDetailsDto details)
         {
-            BaseCommandResponse<Guid> response = await Add.Handle(
+            BaseCommandResponse<Guid> response = await Add.ExecuteAsync(
                 new AddRegistrationParticipantCommand(Order.Id, (int)type, guardianId, details), CancellationToken.None);
             await Assert.That(response.IsSuccess).IsTrue();
             return response.Id;

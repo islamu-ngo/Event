@@ -5,12 +5,12 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +23,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Tags("GuestRegistrationOrder")]
 public sealed class GuestRegistrationOrderParticipantsController(
-    IMediator mediator) : RegistrationOrderControllerBase
+    IQueryHandler<GetGuestRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?> participantsQueryHandler,
+    ICommandHandler<MutateGuestRegistrationParticipantsCommand, BaseCommandResponse<Guid>> mutateCommandHandler) : RegistrationOrderControllerBase
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
@@ -38,7 +39,7 @@ public sealed class GuestRegistrationOrderParticipantsController(
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default)
     {
-        RegistrationOrderParticipantsDto? response = await mediator.Send(
+        RegistrationOrderParticipantsDto? response = await participantsQueryHandler.QueryAsync(
             new GetGuestRegistrationOrderParticipantsQuery(eventId, orderId, capability), cancellationToken);
         return response is null
             ? this.ToNotFoundProblem(RegistrationOrderNotFoundProblem)
@@ -109,6 +110,6 @@ public sealed class GuestRegistrationOrderParticipantsController(
 
     private async Task<ActionResult<BaseCommandResponse<Guid>>> MutateGuest(
         Guid eventId, Guid orderId, string? capability, IRegistrationParticipantMutation mutation,
-        CancellationToken cancellationToken) => MapParticipantMutation(await mediator.Send(
+        CancellationToken cancellationToken) => MapParticipantMutation(await mutateCommandHandler.ExecuteAsync(
             new MutateGuestRegistrationParticipantsCommand(eventId, orderId, capability, mutation), cancellationToken));
 }

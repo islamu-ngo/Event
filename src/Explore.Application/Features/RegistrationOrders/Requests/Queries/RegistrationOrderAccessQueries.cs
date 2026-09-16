@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using MediatR;
@@ -13,10 +14,10 @@ public sealed record GetCurrentRegistrationOrderQuery(Guid OrderId)
 public sealed record GetGuestRegistrationOrderParticipantsQuery(
     Guid EventId,
     Guid OrderId,
-    string? CapabilityToken) : IRequest<RegistrationOrderParticipantsDto?>;
+    string? CapabilityToken) : IQuery<RegistrationOrderParticipantsDto?>;
 
 public sealed record GetAuthenticatedRegistrationOrderParticipantsQuery(Guid EventId, Guid OrderId)
-    : IRequest<RegistrationOrderParticipantsDto?>;
+    : IQuery<RegistrationOrderParticipantsDto?>;
 
 public sealed record GetGuestNativeRegistrationRequirementProgressQuery(
     Guid EventId,

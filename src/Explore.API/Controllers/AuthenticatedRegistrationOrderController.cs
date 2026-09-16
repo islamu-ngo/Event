@@ -39,7 +39,10 @@ public sealed class AuthenticatedRegistrationOrderController(
     IMediator mediator,
     IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> assembler,
     ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto> applyPromotionHandler,
-    ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removePromotionHandler) : RegistrationOrderControllerBase
+    ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removePromotionHandler,
+    IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?> participantsQueryHandler,
+    ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>> mutateParticipantsCommandHandler,
+    ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>> csvHandler) : RegistrationOrderControllerBase
 {
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -215,7 +218,7 @@ public sealed class AuthenticatedRegistrationOrderController(
     public async Task<ActionResult<HalResource<RegistrationOrderParticipantsDto>>> GetAuthenticatedParticipants(
         Guid eventId, Guid orderId, CancellationToken cancellationToken = default)
     {
-        RegistrationOrderParticipantsDto? response = await mediator.Send(
+        RegistrationOrderParticipantsDto? response = await participantsQueryHandler.QueryAsync(
             new GetAuthenticatedRegistrationOrderParticipantsQuery(eventId, orderId), cancellationToken);
         return response is null
             ? this.ToNotFoundProblem(RegistrationOrderNotFoundProblem)
@@ -286,7 +289,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid eventId, Guid orderId, [FromBody] RegistrationCompanyAssignmentCsvRequest request,
         CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> response = await mediator.Send(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> response = await csvHandler.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(eventId, orderId, request.CsvUtf8, request.LineageKey), cancellationToken);
         return response.IsSuccess
             ? Ok(response)
@@ -418,7 +421,7 @@ public sealed class AuthenticatedRegistrationOrderController(
 
     private async Task<ActionResult<BaseCommandResponse<Guid>>> MutateAuthenticated(
         Guid eventId, Guid orderId, IRegistrationParticipantMutation mutation,
-        CancellationToken cancellationToken) => MapParticipantMutation(await mediator.Send(
+        CancellationToken cancellationToken) => MapParticipantMutation(await mutateParticipantsCommandHandler.ExecuteAsync(
             new MutateAuthenticatedRegistrationParticipantsCommand(eventId, orderId, mutation), cancellationToken));
 
     private async Task<ActionResult<HalResource<RegistrationOrderDto>>> MapAuthenticatedLifecycle(

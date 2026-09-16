@@ -3,11 +3,11 @@ using Explore.API.Attributes;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,7 +17,15 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/events/{eventId:guid}/registration-orders")]
 [ApiController]
-public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator mediator) : RegistrationOrderPaymentControllerBase(mediator)
+public sealed class AuthenticatedRegistrationOrderPaymentController(
+    ICommandHandler<StartAuthenticatedRegistrationPaymentCommand, RegistrationPaymentCommandResultDto> startCommandHandler,
+    IQueryHandler<GetAuthenticatedPaidOrderAcceptanceQuery, PaidOrderAcceptanceDisclosureDto?> acceptanceQueryHandler,
+    IQueryHandler<GetAuthenticatedRegistrationPaymentQuery, RegistrationPaymentDto?> statusQueryHandler,
+    ICommandHandler<RetryAuthenticatedRegistrationPaymentCommand, RegistrationPaymentCommandResultDto> retryCommandHandler,
+    IQueryHandler<GetAuthenticatedRegistrationPaymentCheckoutTargetQuery, RegistrationPaymentCheckoutTargetDto?> checkoutTargetQueryHandler,
+    ICommandHandler<RequestAuthenticatedRegistrationRefundCommand, RegistrationRefundCommandResultDto> refundCommandHandler,
+    ICommandHandler<RespondAuthenticatedRegistrationMaterialChangeCommand, RegistrationMaterialChangeChoiceCommandResultDto> materialChangeCommandHandler)
+    : RegistrationOrderPaymentControllerBase
 {
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -39,7 +47,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
         CancellationToken cancellationToken = default)
     {
         _ = idempotencyKey;
-        return MapResult(await Mediator.Send(new StartAuthenticatedRegistrationPaymentCommand(eventId, orderId, acceptance), cancellationToken), eventId, orderId, false);
+        return MapResult(await startCommandHandler.ExecuteAsync(new StartAuthenticatedRegistrationPaymentCommand(eventId, orderId, acceptance), cancellationToken), eventId, orderId, false);
     }
 
     [Authorize]
@@ -50,7 +58,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaidOrderAcceptanceDisclosureDto>> GetAcceptance(Guid eventId, Guid orderId, CancellationToken cancellationToken = default)
     {
-        PaidOrderAcceptanceDisclosureDto? disclosure = await Mediator.Send(new GetAuthenticatedPaidOrderAcceptanceQuery(eventId, orderId), cancellationToken);
+        PaidOrderAcceptanceDisclosureDto? disclosure = await acceptanceQueryHandler.QueryAsync(new GetAuthenticatedPaidOrderAcceptanceQuery(eventId, orderId), cancellationToken);
         return disclosure is null ? PaymentNotFoundResult() : Ok(disclosure);
     }
 
@@ -63,7 +71,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<RegistrationPaymentDto>>> GetStatus(Guid eventId, Guid orderId, CancellationToken cancellationToken = default)
     {
-        RegistrationPaymentDto? payment = await Mediator.Send(new GetAuthenticatedRegistrationPaymentQuery(eventId, orderId), cancellationToken);
+        RegistrationPaymentDto? payment = await statusQueryHandler.QueryAsync(new GetAuthenticatedRegistrationPaymentQuery(eventId, orderId), cancellationToken);
         return payment is null ? PaymentNotFoundResult() : Ok(ToResource(payment, eventId, orderId, false));
     }
 
@@ -86,7 +94,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
         CancellationToken cancellationToken = default)
     {
         _ = idempotencyKey;
-        return MapResult(await Mediator.Send(new RetryAuthenticatedRegistrationPaymentCommand(eventId, orderId), cancellationToken), eventId, orderId, false);
+        return MapResult(await retryCommandHandler.ExecuteAsync(new RetryAuthenticatedRegistrationPaymentCommand(eventId, orderId), cancellationToken), eventId, orderId, false);
     }
 
     [Authorize]
@@ -97,7 +105,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RegistrationPaymentCheckoutTargetDto>> GetCheckoutTarget(Guid eventId, Guid orderId, CancellationToken cancellationToken = default) =>
-        TargetOrNotFound(await Mediator.Send(new GetAuthenticatedRegistrationPaymentCheckoutTargetQuery(eventId, orderId), cancellationToken));
+        TargetOrNotFound(await checkoutTargetQueryHandler.QueryAsync(new GetAuthenticatedRegistrationPaymentCheckoutTargetQuery(eventId, orderId), cancellationToken));
 
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -118,7 +126,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
         [FromBody] RegistrationRefundRequestDto request,
         CancellationToken cancellationToken = default) =>
         MapRefundResult(
-            await Mediator.Send(new RequestAuthenticatedRegistrationRefundCommand(
+            await refundCommandHandler.ExecuteAsync(new RequestAuthenticatedRegistrationRefundCommand(
                 eventId, orderId, request, idempotencyKey), cancellationToken),
             eventId,
             orderId,
@@ -145,7 +153,7 @@ public sealed class AuthenticatedRegistrationOrderPaymentController(IMediator me
     {
         _ = idempotencyKey;
         return MapMaterialChangeResult(
-            await Mediator.Send(new RespondAuthenticatedRegistrationMaterialChangeCommand(
+            await materialChangeCommandHandler.ExecuteAsync(new RespondAuthenticatedRegistrationMaterialChangeCommand(
                 eventId, orderId, request), cancellationToken),
             eventId,
             orderId);

@@ -1,4 +1,5 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
+ARG TARGETARCH
 WORKDIR /src
 
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
@@ -24,18 +25,18 @@ COPY ["src/Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite/Explore
 COPY ["src/Explore.Secrets/Explore.Secrets.csproj", "src/Explore.Secrets/packages.lock.json", "src/Explore.Secrets/"]
 COPY ["src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj", "src/Explore.ServiceDefaults/packages.lock.json", "src/Explore.ServiceDefaults/"]
 COPY ["src/Event.Web.BffHosting/Event.Web.BffHosting.csproj", "src/Event.Web.BffHosting/packages.lock.json", "src/Event.Web.BffHosting/"]
-RUN dotnet restore "src/Event.MigrationService/Event.MigrationService.csproj" --locked-mode --force-evaluate \
-    && dotnet restore "src/Event.Standalone/Event.Standalone.csproj" --locked-mode --force-evaluate /p:StandaloneContainerPublish=true \
+RUN dotnet restore "src/Event.MigrationService/Event.MigrationService.csproj" -a $TARGETARCH --locked-mode --force-evaluate \
+    && dotnet restore "src/Event.Standalone/Event.Standalone.csproj" -a $TARGETARCH --locked-mode --force-evaluate /p:StandaloneContainerPublish=true \
     && dotnet tool restore
 
 COPY . .
-RUN dotnet build "src/Event.MigrationService/Event.MigrationService.csproj" -c Release --no-restore -maxcpucount:1 \
-    && dotnet publish "src/Event.Standalone/Event.Standalone.csproj" -c Release -o /app/publish /p:StandaloneContainerPublish=true /p:DebugType=none /p:ErrorOnDuplicatePublishOutputFiles=false --no-restore -maxcpucount:1 \
+RUN dotnet build "src/Event.MigrationService/Event.MigrationService.csproj" -c Release -a $TARGETARCH --no-restore -maxcpucount:1 \
+    && dotnet publish "src/Event.Standalone/Event.Standalone.csproj" -c Release -o /app/publish -a $TARGETARCH /p:StandaloneContainerPublish=true /p:DebugType=none /p:ErrorOnDuplicatePublishOutputFiles=false --no-restore -maxcpucount:1 \
     && find /app/publish/wwwroot -type f -name '*.gz' -delete \
     && cp src/Event.Standalone/appsettings.json /app/publish/appsettings.json \
     && mkdir /app/data
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:a0428e029a1026daa75e68d00ee464c78d8979fb10f289257b143e3ea997196b AS final
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra@sha256:9a3e4e315a3eae3be20b73739ae84fa7e4ffb2a47a234f3bef30825f0543fe1b AS final
 WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV HttpsRedirection__Enabled=false

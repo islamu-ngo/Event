@@ -38,7 +38,7 @@ return 0;
 static IEnumerable<string> ValidateDockerfile(string path)
 {
     var failures = new List<string>();
-    var fromPattern = new Regex(@"^\s*FROM\s+(?<source>\S+)(?:\s+AS\s+(?<alias>\S+))?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    var fromPattern = new Regex(@"^\s*FROM\s+(?:--platform=\S+\s+)?(?<source>\S+)(?:\s+AS\s+(?<alias>\S+))?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     var digestPattern = new Regex(@"@sha256:[0-9a-fA-F]{64}$", RegexOptions.Compiled);
     var knownStages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

@@ -405,7 +405,7 @@ public sealed class AnonymousRetentionProviderDrainTests
             var handler = new DrainRegistrationProviderSubmissionWriteEffectsCommandHandler(
                 new RegistrationProviderSubmissionWriteEffectRepository(Context), new RegistrationProviderRegistry([sink]),
                 fixture.Services.GetRequiredService<ITenantContextAccessor>(), Protector, clock);
-            return await handler.Handle(new("retention-provider", 10), CancellationToken.None);
+            return await handler.ExecuteAsync(new("retention-provider", 10), CancellationToken.None);
         }
 
         public ValueTask DisposeAsync() => fixture.DisposeAsync();

@@ -1,19 +1,19 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services.Registration.Commands;
-using MediatR;
 using Quartz;
 
 namespace Explore.API.Scheduling;
 
 [DisallowConcurrentExecution]
 public sealed class RegistrationProviderSubmissionWriteDrainJob(
-    ISender sender,
+    ICommandHandler<DrainRegistrationProviderSubmissionWriteEffectsCommand, int> handler,
     ILogger<RegistrationProviderSubmissionWriteDrainJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        int processed = await sender.Send(
+        int processed = await handler.ExecuteAsync(
             new DrainRegistrationProviderSubmissionWriteEffectsCommand(
                 ScheduledJobNames.RegistrationProviderSubmissionWriteDrain),
             context.CancellationToken);

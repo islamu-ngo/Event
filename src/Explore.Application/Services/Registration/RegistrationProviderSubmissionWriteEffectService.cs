@@ -5,15 +5,15 @@ using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
+using Explore.Application.Contracts.Operations;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Services.Registration.Commands;
 
 public sealed record DrainRegistrationProviderSubmissionWriteEffectsCommand(
     string LeaseOwner,
     int BatchSize = 100,
-    int LeaseSeconds = 60) : IRequest<int>;
+    int LeaseSeconds = 60) : ICommand<int>;
 
 public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandValidator
     : AbstractValidator<DrainRegistrationProviderSubmissionWriteEffectsCommand>
@@ -32,18 +32,18 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
     ITenantContextAccessor tenantContextAccessor,
     IRegistrationSensitiveValueProtector sensitiveValueProtector,
     TimeProvider timeProvider)
-    : IRequestHandler<DrainRegistrationProviderSubmissionWriteEffectsCommand, int>
+    : ICommandHandler<DrainRegistrationProviderSubmissionWriteEffectsCommand, int>
 {
     private const int MaxAttempts = 5;
 
-    public async Task<int> Handle(
-        DrainRegistrationProviderSubmissionWriteEffectsCommand request,
+    public async Task<int> ExecuteAsync(
+        DrainRegistrationProviderSubmissionWriteEffectsCommand command,
         CancellationToken cancellationToken)
     {
-        await new DrainRegistrationProviderSubmissionWriteEffectsCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new DrainRegistrationProviderSubmissionWriteEffectsCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         IReadOnlyList<RegistrationProviderSubmissionWriteClaim> claims = await effects.ClaimDueAsync(
-            request.LeaseOwner, request.BatchSize, now, TimeSpan.FromSeconds(request.LeaseSeconds), cancellationToken);
+            command.LeaseOwner, command.BatchSize, now, TimeSpan.FromSeconds(command.LeaseSeconds), cancellationToken);
         int completed = 0;
         foreach (RegistrationProviderSubmissionWriteClaim claim in claims)
         {

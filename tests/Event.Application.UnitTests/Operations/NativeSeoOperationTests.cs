@@ -22,6 +22,6 @@ public sealed class NativeSeoOperationTests
         await Assert.That(ports[0].Lifetime).IsEqualTo(ServiceLifetime.Scoped);
         await Assert.That(ports[0].ServiceType.GetGenericArguments()[0]).IsEqualTo(typeof(GetSitemapEventsQuery));
         await Assert.That(ports[0].ServiceType.GetGenericArguments()[1]).IsEqualTo(typeof(IReadOnlyList<SitemapEventEntryDto>));
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(typeof(GetSitemapEventsQuery))).IsFalse();
+        await Assert.That(typeof(GetSitemapEventsQuery).GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
     }
 }

@@ -18,8 +18,7 @@ public class CqrsPatternTests
         var failures = types
             .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false })
             .Where(OperationContractDiscovery.IsNativeRequest)
-            .Where(request => typeof(MediatR.IBaseRequest).IsAssignableFrom(request)
-                || request.GetInterfaces().Count(contract =>
+            .Where(request => request.GetInterfaces().Count(contract =>
                     contract == typeof(Explore.Application.Contracts.Operations.ICommand)
                     || OperationContractDiscovery.IsResultContract(contract)) != 1
                 || types.Count(handler => handler is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }

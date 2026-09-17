@@ -72,5 +72,5 @@ public sealed class UpdateEventHandler(IEventRepository repository)
 
 ## Related Skills
 - [../clean-architecture-rules/SKILL.md](../clean-architecture-rules/SKILL.md)
-- [../cqrs-mediatr-guidelines/SKILL.md](../cqrs-mediatr-guidelines/SKILL.md)
+- [../cqrs-guidelines/SKILL.md](../cqrs-guidelines/SKILL.md)
 - [../blazor-bff-patterns/SKILL.md](../blazor-bff-patterns/SKILL.md)

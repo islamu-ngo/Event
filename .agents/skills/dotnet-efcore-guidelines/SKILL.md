@@ -40,5 +40,5 @@ priority: high
 
 ## Related
 - [../clean-architecture-rules/SKILL.md](../clean-architecture-rules/SKILL.md)
-- [../cqrs-mediatr-guidelines/SKILL.md](../cqrs-mediatr-guidelines/SKILL.md)
+- [../cqrs-guidelines/SKILL.md](../cqrs-guidelines/SKILL.md)
 - [../criticality-guardrail/SKILL.md](../criticality-guardrail/SKILL.md)

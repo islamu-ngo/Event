@@ -41,7 +41,7 @@ Deliver observable presentation behavior from HTTP contract through HAL affordan
 
 ## Skill Routing
 
-- Controller or HAL contract: [cqrs-mediatr-guidelines](../skills/cqrs-mediatr-guidelines/SKILL.md) plus [auth-patterns](../skills/auth-patterns/SKILL.md).
+- Controller or HAL contract: [cqrs-guidelines](../skills/cqrs-guidelines/SKILL.md) plus [auth-patterns](../skills/auth-patterns/SKILL.md).
 - BFF, YARP, cookies, token forwarding, antiforgery: [blazor-bff-patterns](../skills/blazor-bff-patterns/SKILL.md).
 - Razor, MudBlazor, render modes, dialogs, state: [blazor-ui-conventions](../skills/blazor-ui-conventions/SKILL.md).
 - Component styling: [blazor-css-isolation](../skills/blazor-css-isolation/SKILL.md) and [design-system](../skills/design-system/SKILL.md).

@@ -29,7 +29,7 @@ public sealed class NativeEventLocationOperationTests
             : typeof(ICommand<>).MakeGenericType(result);
 
         await Assert.That(expectedContractType.IsAssignableFrom(request)).IsTrue();
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+        await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
 
         Type expectedPortType = query
             ? typeof(IQueryHandler<,>).MakeGenericType(request, result)

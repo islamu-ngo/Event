@@ -13,7 +13,6 @@ using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Models.Common;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

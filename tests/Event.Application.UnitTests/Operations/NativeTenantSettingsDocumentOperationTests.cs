@@ -30,7 +30,7 @@ public sealed class NativeTenantSettingsDocumentOperationTests
         await Assert.That(ports.Count(port => port.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))).IsEqualTo(1);
         foreach (Type port in ports)
         {
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(port.GetGenericArguments()[0])).IsFalse();
+            await Assert.That(port.GetGenericArguments()[0].GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
             await Assert.That(services.Single(descriptor => descriptor.ServiceType == port).Lifetime)
                 .IsEqualTo(ServiceLifetime.Scoped);
         }

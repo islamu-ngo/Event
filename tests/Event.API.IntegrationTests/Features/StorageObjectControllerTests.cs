@@ -11,7 +11,6 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -447,14 +446,11 @@ public class StorageObjectControllerTests
     [Test]
     public async Task LegacyStorageWriteRoutes_AreNotCallable()
     {
-        var mediator = Substitute.For<IMediator>();
         var storageService = Substitute.For<IObjectStorageService>();
         var repository = Substitute.For<IStorageObjectRepository>();
         await using var factory = _fixture.Factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
                 services.RemoveAll<IObjectStorageService>();
                 services.AddSingleton(storageService);
                 services.RemoveAll<IStorageObjectRepository>();
@@ -471,7 +467,6 @@ public class StorageObjectControllerTests
 
         await Assert.That(directUpload.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed).IsTrue();
         await Assert.That(callerMetadata.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed).IsTrue();
-        await Assert.That(mediator.ReceivedCalls()).IsEmpty();
         await Assert.That(storageService.ReceivedCalls()).IsEmpty();
         await Assert.That(repository.ReceivedCalls()).IsEmpty();
     }

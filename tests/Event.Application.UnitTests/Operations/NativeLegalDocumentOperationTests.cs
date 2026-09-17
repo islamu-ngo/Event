@@ -13,8 +13,8 @@ public sealed class NativeLegalDocumentOperationTests
     {
         await Assert.That(typeof(IQuery<PublicLegalDocumentQueryResult>)
             .IsAssignableFrom(typeof(GetPublicLegalDocumentQuery))).IsTrue();
-        await Assert.That(typeof(MediatR.IBaseRequest)
-            .IsAssignableFrom(typeof(GetPublicLegalDocumentQuery))).IsFalse();
+        await Assert.That(typeof(GetPublicLegalDocumentQuery).GetInterfaces()
+            .Any(type => type.Namespace == "MediatR")).IsFalse();
         var contracts = typeof(GetPublicLegalDocumentQueryHandler).GetInterfaces();
         await Assert.That(contracts.Length).IsEqualTo(1);
         await Assert.That(contracts[0].GetGenericTypeDefinition()).IsEqualTo(typeof(IQueryHandler<,>));

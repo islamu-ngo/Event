@@ -18,7 +18,6 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Secrets.Extensions;
-using MediatR;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;

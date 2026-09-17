@@ -5,7 +5,6 @@ using Explore.Application.Features.EventCustomPropertyProjections.Requests.Queri
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Commands;
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Event.Application.UnitTests.Features.EventCustomPropertyProjections;
 
@@ -22,9 +21,8 @@ public sealed class NativeProjectionContractTests
     [Arguments(typeof(RebuildEventCustomPropertyProjectionCommand), typeof(ICommand<BaseCommandResponse<RebuildProjectionResponseDto>>))]
     [Arguments(typeof(RebuildSingleEventCustomPropertyProjectionCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(DrainCustomPropertyProjectionDirtyScopesCommand), typeof(ICommand<BaseCommandResponse<DrainDirtyScopesResponseDto>>))]
-    public async Task OperationsHaveOneNativeShapeAndNoMediatorContract(Type request, Type shape)
+    public async Task OperationsHaveOneNativeShape(Type request, Type shape)
     {
         await Assert.That(shape.IsAssignableFrom(request)).IsTrue();
-        await Assert.That(typeof(IBaseRequest).IsAssignableFrom(request)).IsFalse();
     }
 }

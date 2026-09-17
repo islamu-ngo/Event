@@ -13,7 +13,6 @@ namespace Event.Architecture.Tests
     using Explore.Application.DTOs.RegistrationSubmissions;
     using Explore.Application.Responses;
     using Explore.Domain.Interfaces;
-    using MediatR;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.AspNetCore.Mvc.ModelBinding;
     using Microsoft.AspNetCore.Mvc.Routing;
@@ -93,13 +92,13 @@ namespace Event.Architecture.Tests
             await Assert.That(compiledRequests.Contains(abstractRecordRequest)).IsFalse();
             await Assert.That(IsApplicationContractOwned(generated)).IsTrue();
             await Assert.That(Classify(generated)).IsEqualTo(ContractClassification.Generated);
-            await Assert.That(typeof(IBaseRequest).IsAssignableFrom(generatedRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(generatedRequest)).IsTrue();
             await Assert.That(IsGenerated(generatedRequest)).IsTrue();
             await Assert.That(IsCompiledApplicationRequest(generatedRequest)).IsFalse();
-            await Assert.That(typeof(IBaseRequest).IsAssignableFrom(compilerGeneratedRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(compilerGeneratedRequest)).IsTrue();
             await Assert.That(IsGenerated(compilerGeneratedRequest)).IsTrue();
             await Assert.That(IsCompiledApplicationRequest(compilerGeneratedRequest)).IsFalse();
-            await Assert.That(typeof(IBaseRequest).IsAssignableFrom(fixtureRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(fixtureRequest)).IsTrue();
             await Assert.That(IsTestFixture(fixtureRequest)).IsTrue();
             await Assert.That(IsCompiledApplicationRequest(fixtureRequest)).IsFalse();
             await Assert.That(IsApplicationContractOwned(typeof(RebuildProjectionRequestDtoValidator))).IsTrue();
@@ -765,7 +764,7 @@ namespace Event.Architecture.Tests
 
         private sealed class SyntheticBindingContract;
 
-        private sealed class SyntheticTestFixtureRequest : IRequest;
+        private sealed class SyntheticTestFixtureRequest : Explore.Application.Contracts.Operations.ICommand;
     }
 }
 
@@ -775,10 +774,10 @@ namespace Explore.Application.DTOs.RecordContractCharacterization
     internal sealed class GeneratedContract;
 
     [System.CodeDom.Compiler.GeneratedCode("RecordContractArchitectureTests", "1.0")]
-    internal sealed class GeneratedRequest : MediatR.IRequest;
+    internal sealed class GeneratedRequest : Explore.Application.Contracts.Operations.ICommand;
 
     [System.Runtime.CompilerServices.CompilerGenerated]
-    internal sealed class CompilerGeneratedRequest : MediatR.IRequest;
+    internal sealed class CompilerGeneratedRequest : Explore.Application.Contracts.Operations.ICommand;
 
     internal sealed class MutableContractEditState;
 

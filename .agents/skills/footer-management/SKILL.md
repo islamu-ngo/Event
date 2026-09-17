@@ -31,4 +31,4 @@ ABOUTME: Enforces governance locking, template selection, and footer data model 
 
 - `docs/internal/FOOTER_MANAGEMENT.md`
 - `.agents/skills/blazor-ui-conventions/SKILL.md`
-- `.agents/skills/cqrs-mediatr-guidelines/SKILL.md`
+- `.agents/skills/cqrs-guidelines/SKILL.md`

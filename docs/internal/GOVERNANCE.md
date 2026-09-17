@@ -541,7 +541,7 @@ For detailed code patterns and examples, see:
 | Skill | Content |
 |-------|---------|
 | `clean-architecture-rules` | Layer boundaries, dependency rules |
-| `cqrs-mediatr-guidelines` | Commands, queries, handlers |
+| `cqrs-guidelines` | Commands, queries, handlers |
 | `dotnet-efcore-guidelines` | DbContext, repositories, queries |
 | `blazor-ui-conventions` | Component patterns, state management |
 | `auth-patterns` | User ID extraction, authorization |
@@ -559,7 +559,7 @@ Every change — human or agent — routes through the Contribution Contract bef
 | Adding read endpoint | `add-get-endpoint` | `docs/API.md`, `.agents/rules/api-controllers.md` |
 | Adding/modifying mutation endpoint | `add-write-endpoint` | `docs/API.md`, `.agents/rules/api-controllers.md`, `auth-patterns` |
 | Adding HAL affordance / link-based button | `add-hal-link` | `.agents/rules/api-hateoas.md`, `auth-patterns` |
-| New MediatR command/query | `add-cqrs-handler` | `cqrs-mediatr-guidelines`, `.agents/rules/application-layer.md` |
+| New MediatR command/query | `add-cqrs-handler` | `cqrs-guidelines`, `.agents/rules/application-layer.md` |
 | New EF Core migration | `add-ef-migration` | `dotnet-efcore-guidelines`, `.agents/rules/efcore-migrations.md` |
 | Repository query change | `update-repository-query` | `dotnet-efcore-guidelines`, `.agents/rules/efcore-persistence.md` |
 | Repository-wide test architecture refactor | `test-suite-rationalization` | `docs/TESTING.md`, `.agents/rules/tests.md`, `refactor-safely` |

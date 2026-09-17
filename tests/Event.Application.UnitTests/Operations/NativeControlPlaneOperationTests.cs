@@ -32,7 +32,7 @@ public sealed class NativeControlPlaneOperationTests
         foreach (Type port in ports)
         {
             Type request = port.GetGenericArguments()[0];
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
             await Assert.That(services.Single(descriptor => descriptor.ServiceType == port).Lifetime)
                 .IsEqualTo(ServiceLifetime.Scoped);
         }

@@ -7,7 +7,6 @@ using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Federation.Atproto.Models;
-using MediatR;
 
 namespace Event.Architecture.Tests;
 
@@ -707,13 +706,13 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
     }
 
     [GeneratedCode("CoordinateWriteAuthorityArchitectureTests", "1.0")]
-    private sealed class GeneratedCodeCoordinateContractFixture : IRequest
+    private sealed class GeneratedCodeCoordinateContractFixture : Explore.Application.Contracts.Operations.ICommand
     {
         public double? Latitude { get; init; }
     }
 
     [CompilerGenerated]
-    private sealed class CompilerGeneratedCoordinateContractFixture : IRequest
+    private sealed class CompilerGeneratedCoordinateContractFixture : Explore.Application.Contracts.Operations.ICommand
     {
         public double? Longitude { get; init; }
     }

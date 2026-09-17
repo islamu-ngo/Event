@@ -48,9 +48,9 @@ public sealed class NativeControlPlaneHttpTests
             .ToArray();
         await Assert.That(requests.Length).IsEqualTo(26);
         await Assert.That(requests.Distinct().Count()).IsEqualTo(26);
-        await Assert.That(parameters.Count(type => type == typeof(MediatR.IMediator))).IsEqualTo(1);
+        await Assert.That(parameters.Any(type => type.Namespace == "MediatR")).IsFalse();
         foreach (Type request in requests)
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(c => c.Namespace == "MediatR")).IsFalse();
     }
 
     [Test]

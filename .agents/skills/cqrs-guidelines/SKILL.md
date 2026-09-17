@@ -1,22 +1,22 @@
 ---
-name: cqrs-mediatr-guidelines
-description: "Load for MediatR/CQRS commands, queries, immutable request/result contracts, handlers, validators, pipeline behaviors, cache invalidation, idempotency, or specification-driven reads in `Explore.Application`; not for controller-only or repository-only edits."
+name: cqrs-guidelines
+description: "Load for native CQS commands, queries, immutable request/result contracts, handlers (ICommandHandler, IQueryHandler), validators, cache invalidation, idempotency, or specification-driven reads in Explore.Application; not for controller-only or repository-only edits."
 type: pattern
 enforcement: suggest
 priority: high
 ---
-<!-- ABOUTME: CQRS and MediatR guidance for commands, queries, handlers, validators, caching, and specification usage. -->
+<!-- ABOUTME: CQS guidance for commands, queries, handlers, validators, caching, and specification usage. -->
 <!-- ABOUTME: Keeps Explore.Application handlers thin, entity-first, cancellation-aware, and aligned with repository and response contracts. -->
 
 ## Resources
 - [Record contracts](../../../docs/internal/RECORD_CONTRACTS.md) — load for request/result record selection, factories, collection ownership, and trusted authority.
-- [Architecture](../../../docs/internal/ARCHITECTURE.md) — load for Application boundaries and CQRS flow.
+- [Architecture](../../../docs/internal/ARCHITECTURE.md) — load for Application boundaries and CQS flow.
 - [API](../../../docs/internal/API.md) — load when result mapping or the public HTTP contract changes.
-- [Quick reference](../../../docs/internal/QUICK_REFERENCE.md) — load for repository-wide CQRS invariants.
+- [Quick reference](../../../docs/internal/QUICK_REFERENCE.md) — load for repository-wide CQS invariants.
 
 ## Rules
 
-- Concrete MediatR requests default to sealed records. Prefer positional records only for short stable contracts; use nominal `init`/`required` members for long, optional, attributed, or presence-sensitive contracts.
+- Concrete CQS requests default to sealed records. Prefer positional records only for short stable contracts; use nominal `init`/`required` members for long, optional, attributed, or presence-sensitive contracts.
 - A request carries client intent, not current authority. HTTP or trusted adapters supply current tenant/user facts from principal, route, or tenant context; body identifiers name only independently authorized targets.
 - `BaseCommandResponse<TKey>` and concrete payload results are immutable valid-state records. Use named success/failure factories and the shared RFC 7807 mapper; never restore public setters or contradictory constructor states.
 - Repositories return entities. Handlers perform DTO mapping and never consume `ExploreDbContext` or a repository-returned `IQueryable`.
@@ -24,10 +24,10 @@ priority: high
 - Queries may use HybridCache read-through; commands invalidate affected keys after the owning write succeeds.
 - `IQuerySpecification<T>` composition remains immutable and Application-owned; Persistence applies it to EF queries.
 - **Pre-Agreed Seam Discipline**:
-  - Application Seam: MediatR Request `IRequest<TResult>` $\rightarrow$ Immutable Result / `BaseCommandResponse<TKey>`.
+  - Application Seam: Command/Query Request `ICommand<TResult>` / `IQuery<TResult>` $\rightarrow$ Immutable Result / `BaseCommandResponse<TKey>`.
   - API Seam: HTTP Route $\rightarrow$ RFC 7807 ProblemDetails / HAL `_links` / Status code.
   - Persistence Seam: `IQuerySpecification<T>` $\rightarrow$ Domain Aggregate Entity.
-- **Zero-Internal-Mocking Invariant**: Mock *only* external boundaries you do not control (payment gateways, external email dispatchers, clock/randomness). **Never mock internal domain entities, aggregates, or MediatR handlers.** Use real domain entities and in-memory/test-container database fixtures.
+- **Zero-Internal-Mocking Invariant**: Mock *only* external boundaries you do not control (payment gateways, external email dispatchers, clock/randomness). **Never mock internal domain entities, aggregates, or CQS handlers.** Use real domain entities and in-memory/test-container database fixtures.
 - **SDK-Style Interfaces for External Services**: External integrations must expose strongly-typed operation methods (`IStripeGateway.ChargeAsync(...)`) rather than generic dispatchers (`IFetcher.SendAsync(...)`), ensuring mocks remain simple, type-safe, and free of internal conditional branching.
 
 ## Workflow

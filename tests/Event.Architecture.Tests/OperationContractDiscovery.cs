@@ -1,12 +1,10 @@
 using Explore.Application.Contracts.Operations;
-using MediatR;
 
 namespace Event.Architecture.Tests;
 
 internal static class OperationContractDiscovery
 {
-    internal static bool IsRequest(Type type) => typeof(IBaseRequest).IsAssignableFrom(type)
-        || IsNativeRequest(type);
+    internal static bool IsRequest(Type type) => IsNativeRequest(type);
 
     internal static bool IsNativeRequest(Type type) => typeof(ICommand).IsAssignableFrom(type)
         || type.GetInterfaces().Any(IsResultContract);
@@ -19,10 +17,7 @@ internal static class OperationContractDiscovery
         && (type.GetGenericTypeDefinition() == typeof(ICommand<>)
             || type.GetGenericTypeDefinition() == typeof(IQuery<>));
 
-    internal static bool IsHandler(Type type) => type.IsGenericType
-        && (type.GetGenericTypeDefinition() == typeof(IRequestHandler<,>)
-            || type.GetGenericTypeDefinition() == typeof(IRequestHandler<>)
-            || IsNativeHandler(type));
+    internal static bool IsHandler(Type type) => IsNativeHandler(type);
 
     internal static bool IsNativeHandler(Type type) => type.IsGenericType
         && (type.GetGenericTypeDefinition() == typeof(ICommandHandler<>)

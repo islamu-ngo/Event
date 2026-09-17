@@ -18,7 +18,6 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Constants;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

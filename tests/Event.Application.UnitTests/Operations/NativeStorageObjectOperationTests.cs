@@ -33,7 +33,7 @@ public sealed class NativeStorageObjectOperationTests
             await Assert.That(port.GetGenericTypeDefinition()).IsEqualTo(
                 request.Name.EndsWith("Command", StringComparison.Ordinal)
                     ? typeof(ICommandHandler<,>) : typeof(IQueryHandler<,>));
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
             await Assert.That(services.Single(descriptor => descriptor.ServiceType == port).Lifetime)
                 .IsEqualTo(ServiceLifetime.Scoped);
         }

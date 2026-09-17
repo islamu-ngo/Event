@@ -39,7 +39,7 @@ public sealed class NativeListmonkOperationTests
             await Assert.That(port.GetGenericArguments()[1]).IsEqualTo(
                 request == typeof(GetListmonkIntegrationSettingsQuery)
                     ? typeof(ListmonkIntegrationSettingsDto) : typeof(BaseCommandResponse<Guid>));
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
             await Assert.That(services.Single(descriptor => descriptor.ServiceType == port).Lifetime)
                 .IsEqualTo(ServiceLifetime.Scoped);
         }

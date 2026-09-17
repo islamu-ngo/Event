@@ -5,10 +5,11 @@ using Explore.API.Controllers;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationProviders;
+using Explore.Application.Features.RegistrationProviders.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -27,29 +28,48 @@ public sealed class RegistrationProviderCapabilityContractTests
     private const string RoutePrefix = "api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers";
 
     [Test]
-    public async Task Capabilities_DeclareOnlyTheirMediatorAndHalDependenciesAndPreserveClassMetadata()
+    public async Task Capabilities_DeclareOnlyTheirCqsAndHalDependenciesAndPreserveClassMetadata()
     {
         Dictionary<Type, Type[]> expected = new()
         {
             [typeof(RegistrationProviderConnectionsController)] =
             [
-                typeof(IMediator),
+                typeof(IQueryHandler<GetRegistrationProviderConnectionsQuery, IReadOnlyList<RegistrationProviderConnectionDto>>),
+                typeof(IQueryHandler<GetRegistrationProviderConnectionQuery, RegistrationProviderConnectionDto?>),
+                typeof(ICommandHandler<UpsertRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<DeleteRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<ReplaceRegistrationProviderApprovedOriginsCommand, BaseCommandResponse<Guid>>),
                 typeof(IResourceAssembler<RegistrationProviderConnectionDto, RegistrationProviderConnectionDto>)
             ],
             [typeof(RegistrationProviderBindingsController)] =
             [
-                typeof(IMediator),
+                typeof(ICommandHandler<ImportExternalRegistrationProviderFormVersionCommand, BaseCommandResponse<Guid>>),
+                typeof(IQueryHandler<GetRegistrationProviderBindingsQuery, IReadOnlyList<RegistrationProviderBindingDto>>),
+                typeof(IQueryHandler<GetRegistrationProviderBindingQuery, RegistrationProviderBindingDto?>),
+                typeof(ICommandHandler<CreateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<UpdateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<DeleteRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<ReplaceEventDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>),
                 typeof(IResourceAssembler<RegistrationProviderBindingDto, RegistrationProviderBindingDto>)
             ],
             [typeof(RegistrationProviderChannelsController)] =
             [
-                typeof(IMediator),
+                typeof(IQueryHandler<GetRegistrationProviderLaunchDescriptorQuery, RegistrationProviderLaunchDescriptorDto>),
+                typeof(IQueryHandler<GetRegistrationChannelsQuery, IReadOnlyList<RegistrationChannelDto>>),
+                typeof(ICommandHandler<UpsertRegistrationChannelCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<DeleteRegistrationChannelCommand, BaseCommandResponse<Guid>>),
                 typeof(IResourceAssembler<RegistrationChannelDto, RegistrationChannelDto>),
                 typeof(IResourceAssembler<RegistrationProviderLaunchDescriptorDto, RegistrationProviderLaunchDescriptorDto>)
             ],
             [typeof(RegistrationProviderOperationsController)] =
             [
-                typeof(IMediator),
+                typeof(IQueryHandler<GetRegistrationProviderHealthQuery, IReadOnlyList<RegistrationProviderBindingHealthDto>>),
+                typeof(IQueryHandler<GetRegistrationProviderQueueQuery, IReadOnlyList<RegistrationProviderParkedQueueItemDto>>),
+                typeof(ICommandHandler<PollRegistrationProviderReconciliationCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<QueueManualRegistrationProviderImportCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<RetryRegistrationProviderParkedItemCommand, BaseCommandResponse<Guid>>),
+                typeof(ICommandHandler<ResolveRegistrationProviderQueueItemCommand, BaseCommandResponse<Guid>>),
                 typeof(IResourceAssembler<RegistrationProviderBindingHealthDto, RegistrationProviderBindingHealthDto>),
                 typeof(IResourceAssembler<RegistrationProviderParkedQueueItemDto, RegistrationProviderParkedQueueItemDto>)
             ]

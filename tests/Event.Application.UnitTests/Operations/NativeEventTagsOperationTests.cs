@@ -24,7 +24,7 @@ public sealed class NativeEventTagsOperationTests
                 (type.GetGenericTypeDefinition() == typeof(ICommand<>) ||
                  type.GetGenericTypeDefinition() == typeof(IQuery<>))).ToArray();
             await Assert.That(shapes.Length).IsEqualTo(1).Because(request.Name);
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
         }
     }
 

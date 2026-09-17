@@ -35,7 +35,7 @@ public sealed class NativeEmailDispatchOperationTests
         await Assert.That(requests).IsNotEmpty();
         foreach (var request in requests)
         {
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
             await Assert.That(request.GetInterfaces().Count(contract => contract.IsGenericType
                 && (contract.GetGenericTypeDefinition() == typeof(ICommand<>)
                     || contract.GetGenericTypeDefinition() == typeof(IQuery<>)))).IsEqualTo(1);
@@ -57,8 +57,7 @@ public sealed class NativeEmailDispatchOperationTests
         await Assert.That(ports[0].ServiceType.GenericTypeArguments[0]).IsEqualTo(operation.Request);
         await Assert.That(operation.Request.GetInterfaces().Count(contract => contract.IsGenericType
             && contract.GetGenericTypeDefinition() == operation.Shape)).IsEqualTo(1);
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(operation.Request)).IsFalse();
-        await Assert.That(operation.Handler.GetInterfaces().Any(contract => contract.IsGenericType
-            && contract.GetGenericTypeDefinition() == typeof(MediatR.IRequestHandler<,>))).IsFalse();
+        await Assert.That(operation.Request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
+        await Assert.That(operation.Handler.GetInterfaces().Any(contract => contract.Namespace == "MediatR")).IsFalse();
     }
 }

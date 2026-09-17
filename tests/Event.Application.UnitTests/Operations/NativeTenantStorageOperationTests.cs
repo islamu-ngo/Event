@@ -27,7 +27,7 @@ public sealed class NativeTenantStorageOperationTests
         await Assert.That(ports.Count(type => type.GetGenericTypeDefinition() == typeof(ICommandHandler<,>))).IsEqualTo(2);
         await Assert.That(ports.Single(type => type.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))
             .GetGenericArguments()[0]).IsEqualTo(typeof(GetTenantStorageSettingsQuery));
-        await Assert.That(cohort.Any(type => typeof(MediatR.IBaseRequest).IsAssignableFrom(type))).IsFalse();
+        await Assert.That(cohort.Any(type => type.GetInterfaces().Any(i => i.Namespace == "MediatR"))).IsFalse();
         await Assert.That(assembly.GetType("Explore.Application.Features.TenantStorageSettings.Requests.Queries.TestTenantStorageProviderQuery"))
             .IsNull();
     }

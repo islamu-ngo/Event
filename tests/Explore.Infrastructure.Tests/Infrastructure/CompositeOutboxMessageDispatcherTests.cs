@@ -25,7 +25,6 @@ using Explore.Infrastructure.Services.Moderation;
 using Explore.Persistence;
 using Explore.Persistence.Services;
 using Explore.Tests.Shared.Telemetry;
-using MediatR;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;

@@ -1,8 +1,8 @@
 namespace Explore.Application.Authorization;
 
 /// <summary>
-/// Marks a MediatR command with authorization requirements.
-/// The AuthorizationBehavior pipeline behavior reads this attribute to determine
+/// Marks an operation with authorization requirements.
+/// The native authorization decorator reads this attribute to determine
 /// the resource kind and action for the authorization check.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]

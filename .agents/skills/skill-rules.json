@@ -49,29 +49,27 @@
         "fileMarkers": ["@skip-architecture-check"]
       }
     },
-    "cqrs-mediatr-guidelines": {
+    "cqrs-guidelines": {
       "type": "pattern",
       "enforcement": "suggest",
       "priority": "high",
-      "description": "CQRS (Command Query Responsibility Segregation) patterns with MediatR. Covers commands, queries, handlers, validation, and pipeline behaviors.",
+      "description": "CQRS (Command Query Responsibility Segregation) patterns with native CQS handlers. Covers commands, queries, handlers, and validation.",
       "promptTriggers": {
         "keywords": [
           "command",
           "query",
           "handler",
-          "mediatr",
+          "cqs",
           "cqrs",
           "validation",
           "validator",
-          "pipeline",
-          "behavior",
           "feature",
           "use case"
         ],
         "intentPatterns": [
           "(create|add|implement).*?(feature|endpoint|use case)",
           "(handle|validate).*?(request|command|query)",
-          "(how to).*?(mediatr|cqrs)"
+          "(how to).*?(cqs|cqrs)"
         ]
       },
       "fileTriggers": {
@@ -82,17 +80,17 @@
           "**/*Application/**/*Validator.cs",
           "**/*Application/**/*Request.cs",
           "**/*Application/**/*Specification.cs",
-          "**/*Application/**/*Filter.cs",
-          "**/*Application/**/*Behavior.cs"
+          "**/*Application/**/*Filter.cs"
         ],
         "contentPatterns": [
-          "IRequest",
-          "IRequestHandler",
+          "ICommand",
+          "IQuery",
+          "ICommandHandler",
+          "IQueryHandler",
           "AbstractValidator",
           "FluentValidation",
           "BaseCommandResponse",
           "IQuerySpecification",
-          "IPipelineBehavior",
           "PaginatedResult",
           "HybridCache"
         ]

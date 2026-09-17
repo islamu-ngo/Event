@@ -41,5 +41,5 @@ priority: critical
 - `dotnet build --configuration Release --verbosity quiet`
 
 ## Related
-- [../cqrs-mediatr-guidelines/SKILL.md](../cqrs-mediatr-guidelines/SKILL.md)
+- [../cqrs-guidelines/SKILL.md](../cqrs-guidelines/SKILL.md)
 - [../dotnet-efcore-guidelines/SKILL.md](../dotnet-efcore-guidelines/SKILL.md)

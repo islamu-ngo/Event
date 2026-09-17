@@ -9,22 +9,7 @@
          Earlier versions remain Apache-2.0.
          See docs/internal/DUAL_VERSIONING.md for full details. -->
     <UseCommercialLuckyPennyLibraries Condition="'$(UseCommercialLuckyPennyLibraries)' == ''">false</UseCommercialLuckyPennyLibraries>
-
-    <!-- Remaining commercial mediator version pin. -->
-    <MediatRCommercialVersion Condition="'$(MediatRCommercialVersion)' == ''">14.1.0</MediatRCommercialVersion>
   </PropertyGroup>
-
-  <!-- FOSS version (default for self-hosters).
-       MediatR 12.5.0 = last Apache-2.0-licensed version. -->
-  <ItemGroup Condition="'$(UseCommercialLuckyPennyLibraries)' != 'true'">
-    <PackageVersion Include="MediatR" Version="12.5.0" />
-  </ItemGroup>
-
-  <!-- Commercial Lucky Penny versions (ISLAMU production builds).
-       Uses the selected secret authority for Licensing:LuckyPenny:LicenseKey. -->
-  <ItemGroup Condition="'$(UseCommercialLuckyPennyLibraries)' == 'true'">
-    <PackageVersion Include="MediatR" Version="$(MediatRCommercialVersion)" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageVersion Include="Asp.Versioning.Mvc" Version="10.0.1" />

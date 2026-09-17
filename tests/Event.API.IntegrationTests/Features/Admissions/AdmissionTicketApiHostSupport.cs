@@ -9,7 +9,6 @@ using Explore.Application.Features.AdmissionTickets.Handlers.Commands;
 using Explore.Application.Features.AdmissionTickets.Requests.Commands;
 using Explore.Application.Features.AdmissionTickets.Requests.Queries;
 using Explore.Application.Operations;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -47,16 +46,11 @@ internal sealed class AdmissionApiFactory : AuthenticatedWebApplicationFactory
             builder.ConfigureLogging(logging => logging.AddProvider(logs));
         builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<IMediator>();
-            services.RemoveAll<ISender>();
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(scenario.Clock);
             services.AddSingleton(scenario);
             services.AddSingleton(AdmissionApiRequestContracts.Resolve());
             services.AddSingleton<AdmissionScenarioDispatcher>();
-            services.AddSingleton<IMediator>(provider => new AdmissionScenarioMediator(
-                provider.GetRequiredService<AdmissionScenarioDispatcher>()));
-            services.AddSingleton<ISender>(provider => provider.GetRequiredService<IMediator>());
 
             var catalog = services.SingleOrDefault(d => d.ServiceType == typeof(NativeOperationCatalog))?.ImplementationInstance as NativeOperationCatalog;
             Type[] prodHandlers =
@@ -116,39 +110,6 @@ internal sealed class AdmissionApiFactory : AuthenticatedWebApplicationFactory
             }
         });
     }
-}
-
-internal sealed class AdmissionScenarioMediator(AdmissionScenarioDispatcher dispatcher) : IMediator
-{
-    public Task<TResponse> Send<TResponse>(
-        IRequest<TResponse> request,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult((TResponse)dispatcher.Dispatch(request, typeof(TResponse))!);
-
-    public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-        where TRequest : IRequest => throw Unsupported(request!.GetType().AssemblyQualifiedName);
-
-    public Task<object?> Send(object request, CancellationToken cancellationToken = default) =>
-        throw Unsupported(request.GetType().AssemblyQualifiedName);
-
-    public IAsyncEnumerable<TResponse> CreateStream<TResponse>(
-        IStreamRequest<TResponse> request,
-        CancellationToken cancellationToken = default) => throw Unsupported(request.GetType().AssemblyQualifiedName);
-
-    public IAsyncEnumerable<object?> CreateStream(
-        object request,
-        CancellationToken cancellationToken = default) => throw Unsupported(request.GetType().AssemblyQualifiedName);
-
-    public Task Publish(object notification, CancellationToken cancellationToken = default) =>
-        throw Unsupported(notification.GetType().AssemblyQualifiedName);
-
-    public Task Publish<TNotification>(
-        TNotification notification,
-        CancellationToken cancellationToken = default)
-        where TNotification : MediatR.INotification => throw Unsupported(notification.GetType().AssemblyQualifiedName);
-
-    private static InvalidOperationException Unsupported(string? identity) =>
-        new($"Admission API test mediator received unsupported exact type '{identity ?? "<unknown>"}'.");
 }
 
 internal sealed class AdmissionScenarioGetTicketsHandler(AdmissionScenarioDispatcher dispatcher)

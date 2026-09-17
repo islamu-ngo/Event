@@ -59,7 +59,7 @@ public sealed class NativeEventSessionSpeakerOperationTests
                     (definition == typeof(ICommand<>) || definition == typeof(IQuery<>))).ToArray();
 
             await Assert.That(nativeShapes.Length).IsEqualTo(1).Because(operation.Request.Name);
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(operation.Request)).IsFalse()
+            await Assert.That(operation.Request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse()
                 .Because(operation.Request.Name);
             await Assert.That(operation.Handler.GetInterfaces()).Contains(operation.Port).Because(operation.Handler.Name);
         }

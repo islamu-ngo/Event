@@ -5,10 +5,10 @@ using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -36,14 +36,14 @@ public sealed class EventReportRemedyHttpContractTests
         string expectedPath,
         EventReportSubmissionChannel expectedChannel)
     {
-        IMediator mediator = Substitute.For<IMediator>();
-        mediator.Send(
+        var submitReportHandler = Substitute.For<ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>>();
+        submitReportHandler.ExecuteAsync(
                 Arg.Any<SubmitEventReportCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 Guid.CreateVersion7(),
                 "Submitted."));
-        using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        using WebApplicationFactory<Program> factory = CreateFactory(submitReportHandler);
         using HttpClient client = factory.CreateClient();
         IHateoasLinkGenerator linkGenerator = factory.Services
             .GetRequiredService<IHateoasLinkGenerator>();
@@ -78,7 +78,7 @@ public sealed class EventReportRemedyHttpContractTests
         using HttpResponseMessage response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created);
-        await mediator.Received(1).Send(
+        await submitReportHandler.Received(1).ExecuteAsync(
             Arg.Is<SubmitEventReportCommand>(command =>
                 command.SubmissionChannel == expectedChannel),
             Arg.Any<CancellationToken>());
@@ -91,8 +91,8 @@ public sealed class EventReportRemedyHttpContractTests
     public async Task UnauthenticatedRoute_ReturnsUnauthorizedWithoutDispatch(
         string route)
     {
-        IMediator mediator = Substitute.For<IMediator>();
-        using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        var submitReportHandler = Substitute.For<ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>>();
+        using WebApplicationFactory<Program> factory = CreateFactory(submitReportHandler);
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
@@ -112,13 +112,13 @@ public sealed class EventReportRemedyHttpContractTests
 
         await Assert.That(response.StatusCode)
             .IsEqualTo(HttpStatusCode.Unauthorized);
-        await mediator.DidNotReceive().Send(
+        await submitReportHandler.DidNotReceive().ExecuteAsync(
             Arg.Any<SubmitEventReportCommand>(),
             Arg.Any<CancellationToken>());
     }
 
     private static WebApplicationFactory<Program> CreateFactory(
-        IMediator mediator)
+        ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>> submitReportHandler)
     {
         var factory = new AuthenticatedWebApplicationFactory
         {
@@ -131,8 +131,8 @@ public sealed class EventReportRemedyHttpContractTests
         {
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
+                services.RemoveAll<ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>>();
+                services.AddSingleton(submitReportHandler);
             });
         });
     }

@@ -45,7 +45,7 @@ public sealed class NativeFooterOperationTests
             var descriptor = ports.Single(port => port.ServiceType.GetGenericArguments()[0] == operation.Request);
             await Assert.That(descriptor.ServiceType).IsEqualTo(operation.Port.MakeGenericType(operation.Request, operation.Result));
             await Assert.That(descriptor.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(operation.Request)).IsFalse();
+            await Assert.That(operation.Request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
             var method = operation.Handler.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 .Single(method => method.ReturnType == typeof(Task<>).MakeGenericType(operation.Result));
             var result = new NullabilityInfoContext().Create(method.ReturnParameter).GenericTypeArguments.Single();

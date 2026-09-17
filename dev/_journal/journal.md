@@ -768,7 +768,7 @@ When startup is blocked by data that violates an earlier migration, do not try t
 **Promotion Consideration**:
 - [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
 - [ ] Candidate for new `.claude/rules/*.md` entry
-- [ ] Candidate for skill update: `cqrs-mediatr-guidelines`
+- [ ] Candidate for skill update: `cqrs-guidelines`
 - [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
 - [x] Stays in journal only (one-off debugging lesson)
 
@@ -1511,7 +1511,7 @@ closed phase manifests manufactures evidence that pass never produced.
 **Promotion Consideration**:
 - [x] Candidate for `docs/QUICK_REFERENCE.md` (promoted)
 - [x] Candidate for new `.agents/rules/*.md` entry (promoted)
-- [ ] Candidate for skill update: `cqrs-mediatr-guidelines`
+- [ ] Candidate for skill update: `cqrs-guidelines`
 - [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
 - [ ] Stays in journal only (one-off debugging lesson)
 

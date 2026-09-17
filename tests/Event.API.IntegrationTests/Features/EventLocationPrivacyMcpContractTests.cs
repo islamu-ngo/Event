@@ -35,7 +35,6 @@ using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
 using TUnit.Core;
@@ -104,7 +103,6 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task ListPublicEventSessions_InvokesAiContextGatewayOnRealAdapterPath()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var gateway = CreateZeroDisclosureGateway();
         var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
         eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
@@ -126,7 +124,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 }
             });
 
-        var tools = await CreateTools(mediator, gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails);
+        var tools = await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails);
 
         await tools.ListPublicEventSessionsAsync(eventId);
 
@@ -140,7 +138,6 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task GetPublicEventProgramSummary_InvokesGatewayAndOmitsPhysicalValues()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var gateway = CreateZeroDisclosureGateway();
         var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
         eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
@@ -170,7 +167,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 ]
             });
 
-        var result = await (await CreateTools(mediator, gateway, summaryQuery: summaryQuery, eventDetailsQuery: eventDetails))
+        var result = await (await CreateTools(gateway, summaryQuery: summaryQuery, eventDetailsQuery: eventDetails))
             .GetPublicEventProgramSummaryAsync(eventId);
 
         await Assert.That(gateway.ReceivedCalls()).Contains(call =>
@@ -183,7 +180,6 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task PublicSessionAdapter_FailsClosedWhenGatewayDisclosesPhysicalValue()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
         eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
@@ -205,7 +201,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 .Select(DisclosePrivateVenue)
                 .ToArray());
 
-        var act = async () => await (await CreateTools(mediator, gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
+        var act = async () => await (await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(act);
     }
@@ -219,7 +215,6 @@ public sealed class EventLocationPrivacyMcpContractTests
         int resultCount)
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
         eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
@@ -240,7 +235,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 .Select(_ => PassThroughLocationEnvelope())
                 .ToArray());
 
-        var act = async () => await (await CreateTools(mediator, gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
+        var act = async () => await (await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(act);
     }
@@ -249,7 +244,6 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task PublicSessionAdapter_FailsClosedWhenGatewayResultEntityDoesNotMatchRequest()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
         eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
@@ -268,7 +262,7 @@ public sealed class EventLocationPrivacyMcpContractTests
         gateway.SanitizeMany(Arg.Any<IReadOnlyList<AiContextSanitizationInput>>())
             .Returns([AiContextSanitizedEnvelope.Success("EventPii", [], [], [])]);
 
-        var act = async () => await (await CreateTools(mediator, gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
+        var act = async () => await (await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(act);
     }
@@ -278,7 +272,6 @@ public sealed class EventLocationPrivacyMcpContractTests
     {
         var eventId = Guid.NewGuid();
         var eventDto = CreatePublishedEvent(eventId);
-        var mediator = Substitute.For<IMediator>();
         var eventManagementDetails = Substitute.For<IQueryHandler<GetEventManagementDetailsRequest, EventDto?>>();
         eventManagementDetails.QueryAsync(Arg.Any<GetEventManagementDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(eventDto);
@@ -309,7 +302,7 @@ public sealed class EventLocationPrivacyMcpContractTests
         httpContextAccessor.HttpContext.Returns(new DefaultHttpContext());
         var gateway = CreateZeroDisclosureGateway();
 
-        var result = await (await CreateTools(mediator, gateway, assembler, httpContextAccessor, managedSessionGroupsQuery: sessionGroupsHandler, eventManagementDetailsQuery: eventManagementDetails))
+        var result = await (await CreateTools(gateway, assembler, httpContextAccessor, managedSessionGroupsQuery: sessionGroupsHandler, eventManagementDetailsQuery: eventManagementDetails))
             .GetEventProgramManagementContextAsync(eventId);
 
         await Assert.That(gateway.ReceivedCalls()).Contains(call =>
@@ -325,7 +318,6 @@ public sealed class EventLocationPrivacyMcpContractTests
     }
 
     private static async Task<EventManagementMcpTools> CreateTools(
-        IMediator? mediator,
         IAiContextGateway gateway,
         IResourceAssembler<EventDto, EventListDto>? eventResourceAssembler = null,
         IHttpContextAccessor? httpContextAccessor = null,

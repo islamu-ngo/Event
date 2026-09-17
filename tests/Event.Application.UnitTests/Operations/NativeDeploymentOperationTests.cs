@@ -106,7 +106,8 @@ public sealed class NativeDeploymentOperationTests
         {
             typeof(GetTicketingDeploymentCapabilitiesQuery), typeof(TicketingDeploymentCapabilityMatrixDto)
         });
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(typeof(GetTicketingDeploymentCapabilitiesQuery))).IsFalse();
+        await Assert.That(typeof(GetTicketingDeploymentCapabilitiesQuery).GetInterfaces()
+            .Any(contract => contract.Namespace == "MediatR")).IsFalse();
         await Assert.That(typeof(GetTicketingDeploymentCapabilitiesQueryHandler).GetInterfaces()
             .Any(contract => contract.Namespace == "MediatR")).IsFalse();
     }

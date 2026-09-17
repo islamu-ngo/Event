@@ -21,7 +21,6 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

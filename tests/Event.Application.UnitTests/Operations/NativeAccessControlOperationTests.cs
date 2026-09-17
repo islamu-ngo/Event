@@ -74,7 +74,7 @@ public sealed class NativeAccessControlOperationTests
                 (type.GetGenericTypeDefinition() == typeof(ICommand<>) ||
                  type.GetGenericTypeDefinition() == typeof(IQuery<>))).ToArray();
             await Assert.That(shapes.Length).IsEqualTo(1);
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
         }
     }
 

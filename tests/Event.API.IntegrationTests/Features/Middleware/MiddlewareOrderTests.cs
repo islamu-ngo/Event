@@ -9,11 +9,14 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.Actor;
+using Explore.Application.Features.Actors.Requests.Queries;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features.Middleware;
 
@@ -187,41 +190,20 @@ public class MiddlewareOrderTests
 
     private HttpClient CreateClientThatThrows(Exception exception)
     {
+        var throwingHandler = Substitute.For<IQueryHandler<GetActorDetailsRequest, ActorDto?>>();
+        throwingHandler.QueryAsync(Arg.Any<GetActorDetailsRequest>(), Arg.Any<CancellationToken>())
+            .Returns<ActorDto?>(_ => throw exception);
+
         var app = _fixture.Factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton<IMediator>(new ThrowingMediator(exception));
+                services.RemoveAll<IQueryHandler<GetActorDetailsRequest, ActorDto?>>();
+                services.AddSingleton(throwingHandler);
             });
         });
 
         return app.CreateClient();
-    }
-
-    private sealed class ThrowingMediator(Exception exception) : IMediator
-    {
-        public Task Publish(object notification, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw exception;
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default) where TRequest : IRequest
-            => throw exception;
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-            => throw exception;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw exception;
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw exception;
     }
 
     private sealed class TestTenantSlugCache(Guid tenantId) : ITenantSlugCache

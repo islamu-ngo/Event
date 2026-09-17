@@ -1,7 +1,6 @@
 using System.Reflection;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
-using MediatR;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -79,8 +78,7 @@ internal sealed class AdmissionApiRequestContracts
     {
         Type declaredResponse = requestType.GetInterfaces()
             .Single(contract => contract.IsGenericType
-                                && (contract.GetGenericTypeDefinition() == typeof(IRequest<>)
-                                    || contract.GetGenericTypeDefinition() == typeof(ICommand<>)
+                                && (contract.GetGenericTypeDefinition() == typeof(ICommand<>)
                                     || contract.GetGenericTypeDefinition() == typeof(IQuery<>)))
             .GetGenericArguments()[0];
         if (declaredResponse != responseType)

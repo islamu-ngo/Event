@@ -3,7 +3,7 @@ name: application-layer
 description: Apply when editing Explore.Application CQRS handlers, requests, DTOs, and validators.
 paths:
   - "src/Explore.Application/**/*.cs"
-related_skills: [cqrs-mediatr-guidelines, clean-architecture-rules]
+related_skills: [cqrs-guidelines, clean-architecture-rules]
 related_docs: [docs/internal/ARCHITECTURE.md, docs/internal/GOVERNANCE.md, docs/internal/QUICK_REFERENCE.md]
 minimum_tests: [Event.Application.UnitTests, Event.Architecture.Tests]
 related_intents: [add-cqrs-handler, add-get-endpoint, add-write-endpoint, update-repository-query]

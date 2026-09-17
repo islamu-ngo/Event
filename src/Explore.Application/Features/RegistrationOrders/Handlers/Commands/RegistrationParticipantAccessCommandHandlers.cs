@@ -8,16 +8,46 @@ using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
+
+public interface IRegistrationParticipantMutationDispatcher
+{
+    Task<BaseCommandResponse<Guid>> DispatchMutationAsync(
+        IRegistrationParticipantMutation mutation,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class RegistrationParticipantMutationDispatcher(
+    ICommandHandler<AddRegistrationParticipantCommand, BaseCommandResponse<Guid>> addHandler,
+    ICommandHandler<UpdateRegistrationParticipantCommand, BaseCommandResponse<Guid>> updateHandler,
+    ICommandHandler<AssignRegistrationTicketCommand, BaseCommandResponse<Guid>> assignHandler,
+    ICommandHandler<BulkAssignRegistrationTicketsCommand, BaseCommandResponse<Guid>> bulkAssignHandler,
+    ICommandHandler<DeferRegistrationTicketCommand, BaseCommandResponse<Guid>> deferHandler,
+    ICommandHandler<BulkDeferRegistrationTicketsCommand, BaseCommandResponse<Guid>> bulkDeferHandler)
+    : IRegistrationParticipantMutationDispatcher
+{
+    public Task<BaseCommandResponse<Guid>> DispatchMutationAsync(
+        IRegistrationParticipantMutation mutation,
+        CancellationToken cancellationToken = default) =>
+        mutation switch
+        {
+            AddRegistrationParticipantCommand add => addHandler.ExecuteAsync(add, cancellationToken),
+            UpdateRegistrationParticipantCommand update => updateHandler.ExecuteAsync(update, cancellationToken),
+            AssignRegistrationTicketCommand assign => assignHandler.ExecuteAsync(assign, cancellationToken),
+            BulkAssignRegistrationTicketsCommand bulkAssign => bulkAssignHandler.ExecuteAsync(bulkAssign, cancellationToken),
+            DeferRegistrationTicketCommand defer => deferHandler.ExecuteAsync(defer, cancellationToken),
+            BulkDeferRegistrationTicketsCommand bulkDefer => bulkDeferHandler.ExecuteAsync(bulkDefer, cancellationToken),
+            _ => throw new NotSupportedException($"Unknown registration participant mutation type '{mutation.GetType().FullName}'.")
+        };
+}
 
 public sealed class MutateGuestRegistrationParticipantsCommandHandler(
     IRegistrationInventoryRepository inventory,
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IServiceProvider serviceProvider)
+    IRegistrationParticipantMutationDispatcher dispatcher)
     : ICommandHandler<MutateGuestRegistrationParticipantsCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -28,22 +58,7 @@ public sealed class MutateGuestRegistrationParticipantsCommandHandler(
             inventory, capabilities, tenant.TenantId, command.EventId, command.OrderId,
             command.CapabilityToken, timeProvider, cancellationToken) is null
             ? RegistrationOrderAccessGuard.ParticipantNotFound(command.OrderId)
-            : await DispatchMutationAsync(command.Mutation, serviceProvider, cancellationToken);
-
-    internal static Task<BaseCommandResponse<Guid>> DispatchMutationAsync(
-        IRegistrationParticipantMutation mutation,
-        IServiceProvider serviceProvider,
-        CancellationToken cancellationToken) =>
-        mutation switch
-        {
-            AddRegistrationParticipantCommand add => serviceProvider.GetRequiredService<ICommandHandler<AddRegistrationParticipantCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(add, cancellationToken),
-            UpdateRegistrationParticipantCommand update => serviceProvider.GetRequiredService<ICommandHandler<UpdateRegistrationParticipantCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(update, cancellationToken),
-            AssignRegistrationTicketCommand assign => serviceProvider.GetRequiredService<ICommandHandler<AssignRegistrationTicketCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(assign, cancellationToken),
-            BulkAssignRegistrationTicketsCommand bulkAssign => serviceProvider.GetRequiredService<ICommandHandler<BulkAssignRegistrationTicketsCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(bulkAssign, cancellationToken),
-            DeferRegistrationTicketCommand defer => serviceProvider.GetRequiredService<ICommandHandler<DeferRegistrationTicketCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(defer, cancellationToken),
-            BulkDeferRegistrationTicketsCommand bulkDefer => serviceProvider.GetRequiredService<ICommandHandler<BulkDeferRegistrationTicketsCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(bulkDefer, cancellationToken),
-            _ => throw new NotSupportedException($"Unknown registration participant mutation type '{mutation.GetType().FullName}'.")
-        };
+            : await dispatcher.DispatchMutationAsync(command.Mutation, cancellationToken);
 }
 
 public sealed class MutateAuthenticatedRegistrationParticipantsCommandHandler(
@@ -52,7 +67,7 @@ public sealed class MutateAuthenticatedRegistrationParticipantsCommandHandler(
     ITenantContext tenant,
     ICurrentUserService currentUser,
     IAuthorizationProvider authorization,
-    IServiceProvider serviceProvider)
+    IRegistrationParticipantMutationDispatcher dispatcher)
     : ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -72,7 +87,7 @@ public sealed class MutateAuthenticatedRegistrationParticipantsCommandHandler(
 
         bool ownsOrder = currentUser.IsAuthenticated && currentUser.UserId == order.AccountUserId;
         return ownsOrder
-            ? await MutateGuestRegistrationParticipantsCommandHandler.DispatchMutationAsync(command.Mutation, serviceProvider, cancellationToken)
+            ? await dispatcher.DispatchMutationAsync(command.Mutation, cancellationToken)
             : RegistrationOrderAccessGuard.ParticipantNotFound(command.OrderId);
     }
 

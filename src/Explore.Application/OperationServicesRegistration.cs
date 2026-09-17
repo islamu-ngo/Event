@@ -35,7 +35,7 @@ public static class OperationServicesRegistration
         foreach (var request in requests)
         {
             var markers = request.Value.Where(IsRequestContract).ToArray();
-            if (markers.Length != 1 || typeof(MediatR.IBaseRequest).IsAssignableFrom(request.Key))
+            if (markers.Length != 1)
                 throw OperationCompositionValidation.Error("mixed request shapes", request.Key);
             var marker = markers[0];
             var expected = marker == typeof(ICommand)

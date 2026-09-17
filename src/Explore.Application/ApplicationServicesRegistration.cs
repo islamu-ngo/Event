@@ -1,7 +1,6 @@
 using System.Reflection;
 using Explore.Application.Analytics;
 using Explore.Application.Authorization;
-using Explore.Application.Behaviors;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Identity;
@@ -74,7 +73,6 @@ using Explore.Application.Settings;
 using Explore.Application.Telemetry;
 using Explore.Application.Webhooks;
 using Explore.Domain.Services.Scheduling;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -111,26 +109,11 @@ public static class ApplicationServicesRegistration
             }, "Privacy-erasure lifecycle settings are invalid.")
             .ValidateOnStart();
 
-        services.AddMediatR(cfg =>
-        {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-            // MediatR 13+ requires a Lucky Penny commercial license key at runtime.
-            // LUCKYPENNY_LICENSE_KEY is injected from the selected secret authority.
-            var licenseKey = configuration["Licensing:LuckyPenny:LicenseKey"];
-            if (!string.IsNullOrEmpty(licenseKey))
-            {
-                cfg.LicenseKey = licenseKey;
-            }
-#endif
-            cfg.RegisterServicesFromAssembly(typeof(ApplicationServicesRegistration).Assembly);
-        });
-
         services.AddScoped<Contracts.Operations.INotificationHandler<SettingChangedNotification>, SettingCacheInvalidationHandler>();
         services.AddScoped<Contracts.Operations.INotificationHandler<SettingChangedNotification>, SettingAuditLogHandler>();
         services.AddScoped<Contracts.Operations.INotificationHandler<PolicyChangedNotification>, PolicyChangedCacheInvalidationHandler>();
+        services.AddScoped<Features.RegistrationOrders.Handlers.Commands.IRegistrationParticipantMutationDispatcher, Features.RegistrationOrders.Handlers.Commands.RegistrationParticipantMutationDispatcher>();
 
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
         services.AddTransient<AuthorizationResourceContextResolver>();
         services.AddTransient<IAuthorizationContextEnricher<Features.EventSeries.Requests.Commands.UpdateEventSeriesCommand>, Features.EventSeries.Authorization.UpdateEventSeriesAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<CreateEventDayCommand>, EventDayAuthorizationContextEnricher>();

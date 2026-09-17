@@ -59,7 +59,7 @@ public sealed partial class EventSeriesDisclosureHttpTests
         await Assert.That(typeof(EventSeriesController).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType))
             .IsEquivalentTo(expected);
         foreach (var request in expected.Take(6).Select(port => port.GetGenericArguments()[0]))
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Any(c => c.Namespace == "MediatR")).IsFalse();
     }
 
     [Test]

@@ -28,7 +28,7 @@ public sealed class NativeSessionCustomPropertyOperationTests
     public async Task Operation_HasOneNativeContractAndPreservesProtection(Type request, Type handler, Type result, bool query)
     {
         await Assert.That((query ? typeof(IQuery<>) : typeof(ICommand<>)).MakeGenericType(result).IsAssignableFrom(request)).IsTrue();
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+        await Assert.That(request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
         var port = (query ? typeof(IQueryHandler<,>) : typeof(ICommandHandler<,>)).MakeGenericType(request, result);
         await Assert.That(handler.GetInterfaces()).IsEquivalentTo(new[] { port });
         await Assert.That(handler.GetMethod("Handle")).IsNull();

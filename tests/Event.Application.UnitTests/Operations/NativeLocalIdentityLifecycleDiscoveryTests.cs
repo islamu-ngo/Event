@@ -20,6 +20,6 @@ public sealed class NativeLocalIdentityLifecycleDiscoveryTests
         await Assert.That(ports.Length).IsEqualTo(1);
         await Assert.That(ports[0].Lifetime).IsEqualTo(ServiceLifetime.Scoped);
         await Assert.That(ports[0].ServiceType.GenericTypeArguments[1]).IsEqualTo(typeof(LocalIdentityLifecycleCapabilities));
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(typeof(GetLocalIdentityLifecycleCapabilitiesQuery))).IsFalse();
+        await Assert.That(typeof(GetLocalIdentityLifecycleCapabilitiesQuery).GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
     }
 }

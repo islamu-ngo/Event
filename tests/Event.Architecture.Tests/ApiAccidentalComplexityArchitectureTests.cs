@@ -1,5 +1,6 @@
 using System.Reflection;
-using Explore.Application.Behaviors;
+using Explore.Application;
+using Explore.Application.Operations.Decorators;
 using NetArchTest.Rules;
 
 namespace Event.Architecture.Tests;
@@ -7,15 +8,17 @@ namespace Event.Architecture.Tests;
 public sealed class ApiAccidentalComplexityArchitectureTests
 {
     private static readonly Assembly ApplicationAssembly =
-        typeof(AuthorizationBehavior<,>).Assembly;
+        typeof(ApplicationServicesRegistration).Assembly;
 
     [Test]
-    [DisplayName("AuthorizationBehavior must not depend on feature namespaces")]
-    public async Task AuthorizationBehaviorMustNotDependOnFeatureNamespaces()
+    [DisplayName("Authorization decorators must not depend on feature namespaces")]
+    public async Task AuthorizationDecoratorsMustNotDependOnFeatureNamespaces()
     {
         var result = Types.InAssembly(ApplicationAssembly)
             .That()
-            .HaveName("AuthorizationBehavior`2")
+            .ResideInNamespace("Explore.Application.Operations.Decorators")
+            .And()
+            .HaveNameStartingWith("Authorization")
             .ShouldNot()
             .HaveDependencyOn("Explore.Application.Features")
             .GetResult();

@@ -3,7 +3,6 @@ namespace Event.Architecture.Tests;
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
 
 /// <summary>
 /// An inventory that is only a document goes stale the first time somebody adds a query. These tests
@@ -40,8 +39,7 @@ public sealed class SensitiveCollectionInventoryTests
         requestType
             .GetInterfaces()
             .Where(contract => contract.IsGenericType
-                && (contract.GetGenericTypeDefinition() == typeof(IRequest<>)
-                    || OperationContractDiscovery.IsResultContract(contract)))
+                && OperationContractDiscovery.IsResultContract(contract))
             .Select(contract => contract.GetGenericArguments()[0])
             .Any(ContainsPaginatedResult);
 

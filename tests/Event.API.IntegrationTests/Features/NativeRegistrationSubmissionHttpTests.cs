@@ -23,7 +23,6 @@ using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Operations;
 using Explore.Application.Responses;
 using Explore.Application.Services.Webhooks;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Mvc.Testing;

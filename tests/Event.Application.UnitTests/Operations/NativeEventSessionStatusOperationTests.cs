@@ -46,7 +46,7 @@ public sealed class NativeEventSessionStatusOperationTests
             .Contains(typeof(IQuery<EventSessionStatusDto>));
         await Assert.That(typeof(GetEventSessionStatusListQuery).GetInterfaces())
             .Contains(typeof(IQuery<List<EventSessionStatusListDto>>));
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(typeof(GetEventSessionStatusDetailsQuery))).IsFalse();
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(typeof(GetEventSessionStatusListQuery))).IsFalse();
+        await Assert.That(typeof(GetEventSessionStatusDetailsQuery).GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
+        await Assert.That(typeof(GetEventSessionStatusListQuery).GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
     }
 }

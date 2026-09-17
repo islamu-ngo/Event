@@ -49,7 +49,7 @@ public sealed class NativeLocalizationOperationTests
                 descriptor.ServiceType.GetGenericArguments()[0] == operation.Request).ServiceType;
             await Assert.That(port.GetGenericTypeDefinition()).IsEqualTo(operation.Port);
             await Assert.That(port.GetGenericArguments()[1]).IsEqualTo(operation.Result);
-            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(operation.Request)).IsFalse();
+            await Assert.That(operation.Request.GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
         }
     }
 }

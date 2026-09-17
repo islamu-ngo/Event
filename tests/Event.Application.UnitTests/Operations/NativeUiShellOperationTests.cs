@@ -13,7 +13,7 @@ public sealed class NativeUiShellOperationTests
     public async Task RequestAndHandler_ExposeOnlyTheNativeQueryContract()
     {
         await Assert.That(typeof(IQuery<UiShellContextDto>).IsAssignableFrom(typeof(GetUiShellContextRequest))).IsTrue();
-        await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(typeof(GetUiShellContextRequest))).IsFalse();
+        await Assert.That(typeof(GetUiShellContextRequest).GetInterfaces().Any(type => type.Namespace == "MediatR")).IsFalse();
         var contracts = typeof(GetUiShellContextRequestHandler).GetInterfaces();
         await Assert.That(contracts.Length).IsEqualTo(1);
         await Assert.That(contracts[0].GetGenericTypeDefinition()).IsEqualTo(typeof(IQueryHandler<,>));

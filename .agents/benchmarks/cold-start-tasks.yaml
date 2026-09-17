@@ -30,7 +30,7 @@ scenarios:
       - "docs/API.md"
       - ".agents/rules/api-controllers.md"
       - ".agents/rules/api-hateoas.md"
-      - ".agents/skills/cqrs-mediatr-guidelines/SKILL.md"
+      - ".agents/skills/cqrs-guidelines/SKILL.md"
     expected_paths_in_scope:
       - "Explore.API/Controllers/**/*.cs"
       - "Explore.API/Hateoas/**/*.cs"
@@ -100,7 +100,7 @@ scenarios:
       - "docs/QUICK_REFERENCE.md"
       - "docs/ARCHITECTURE.md"
       - ".agents/rules/application-layer.md"
-      - ".agents/skills/cqrs-mediatr-guidelines/SKILL.md"
+      - ".agents/skills/cqrs-guidelines/SKILL.md"
       - ".agents/skills/clean-architecture-rules/SKILL.md"
     expected_paths_in_scope:
       - "Explore.Application/Features/**/Commands/**/*.cs"
@@ -167,7 +167,7 @@ scenarios:
       - "docs/QUICK_REFERENCE.md"
       - "docs/ARCHITECTURE.md"
       - ".agents/rules/efcore-persistence.md"
-      - ".agents/skills/cqrs-mediatr-guidelines/SKILL.md"
+      - ".agents/skills/cqrs-guidelines/SKILL.md"
       - ".agents/skills/dotnet-efcore-guidelines/SKILL.md"
     expected_paths_in_scope:
       - "Explore.Application/Features/**/*.cs"
@@ -431,7 +431,7 @@ scenarios:
       - ".agents/rules/api-hateoas.md"
       - ".agents/rules/blazor-client.md"
       - ".agents/skills/clean-architecture-rules/SKILL.md"
-      - ".agents/skills/cqrs-mediatr-guidelines/SKILL.md"
+      - ".agents/skills/cqrs-guidelines/SKILL.md"
       - ".agents/skills/dotnet-efcore-guidelines/SKILL.md"
       - ".agents/skills/outbox-pattern/SKILL.md"
       - ".agents/skills/auth-patterns/SKILL.md"

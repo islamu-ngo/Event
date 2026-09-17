@@ -20,7 +20,6 @@ using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -117,7 +116,6 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task AttemptLaunchRequests_ForwardOptionalSupersededAttemptForExplicitRestart()
     {
-        var mediator = Substitute.For<IMediator>();
         Guid oldAttemptId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -541,62 +539,6 @@ public sealed class RegistrationOrderControllerTests
             Arg.Is<ClaimGuestRegistrationOrderCommand>(command =>
                 command.EventId == eventId && command.OrderId == orderId && command.CapabilityToken == "guest-token"),
             Arg.Any<CancellationToken>());
-    }
-
-    private static TController CreateController<TController>(
-        IMediator mediator,
-        IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>? assembler = null)
-        where TController : ControllerBase
-    {
-        IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> effectiveAssembler =
-            assembler ?? Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
-        object[] arguments = typeof(TController) == typeof(GuestRegistrationOrderController)
-            ? [Substitute.For<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>(),
-               Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>(),
-               Substitute.For<ICommandHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>(),
-               Substitute.For<ICommandHandler<FinalizeGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>(),
-               Substitute.For<ICommandHandler<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>(),
-               TimeProvider.System,
-               Substitute.For<IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>>()]
-            : typeof(TController) == typeof(GuestRegistrationOrderRequirementsController)
-                ? [Substitute.For<ICommandHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>(),
-                   Substitute.For<IQueryHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>>(),
-                   Substitute.For<ICommandHandler<LaunchGuestRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>>(),
-                   Substitute.For<ICommandHandler<SkipGuestNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>>(),
-                   Substitute.For<ICommandHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>()]
-            : typeof(TController) == typeof(GuestRegistrationOrderClaimController)
-                ? [Substitute.For<ICommandHandler<ClaimGuestRegistrationOrderCommand, BaseCommandResponse<Guid>>>()]
-            : typeof(TController) == typeof(AuthenticatedRegistrationOrderController)
-                ? [Substitute.For<ICommandHandler<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>>(),
-                   Substitute.For<ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>(),
-                   Substitute.For<IQueryHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>>(),
-                   Substitute.For<ICommandHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>>(),
-                   Substitute.For<ICommandHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>>(),
-                   Substitute.For<ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>(),
-                   Substitute.For<IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>>(),
-                   Substitute.For<ICommandHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>(),
-                   Substitute.For<ICommandHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>(),
-                   Substitute.For<ICommandHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>(),
-                   effectiveAssembler,
-                   Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
-                   Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
-                   Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>(),
-                   Substitute.For<ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>>(),
-                   Substitute.For<ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>>()]
-            : typeof(TController) == typeof(RegistrationOrderController)
-                ? [Substitute.For<IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>>(),
-                   Substitute.For<IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>>(),
-                   effectiveAssembler]
-            : typeof(TController).GetConstructors().Single().GetParameters().Length == 1
-                ? [mediator]
-                : [mediator, effectiveAssembler];
-        var controller = (TController)Activator.CreateInstance(typeof(TController), arguments)!;
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-        var url = Substitute.For<IUrlHelper>();
-        url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");
-        controller.Url = url;
-
-        return controller;
     }
 
     private static GuestRegistrationOrderController CreateGuestController(

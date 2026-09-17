@@ -8,7 +8,6 @@ using Explore.API.Filters;
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -113,6 +112,14 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "Explore.Application.Features.RegistrationOrders.Commands.IssueAnonymousRegistrationChallengeCommand",
             "handler-bounded-public-proof-issuance",
             "Current tenant, publicly eligible published event, guest visitor/participation mode, finite live end promise, bounded difficulty and transactional tenant/event quotas gate issuance under the settings lease without allocation. Evidence: AnonymousRegistrationChallengeIssueTests; AnonymousRegistrationChallengeQuotaTests; AnonymousRegistrationChallengeHttpTests.EffectiveIpBudgetCoversIssuanceAndStartWithoutLoopbackBypass."),
+        new(
+            "Explore.Application.Features.AiAssistant.Requests.Commands.ProcessAiRunCommand",
+            "host-local-worker",
+            "Executed only by the background AiAssistantRunWorker within the hosting process boundary; no HTTP route or user principal dispatches it directly."),
+        new(
+            "Explore.Application.Features.UserAuthenticationTokens.Requests.Commands.DeleteUserAuthenticationTokenCommand",
+            "handler-contained-user-token-authority",
+            "The handler directly resolves the authenticated current user identity via ICurrentUserService and verifies ownership against persisted user authentication tokens before deleting."),
     ];
     private static readonly string[] NamedMediatRViolations =
     [
@@ -483,9 +490,9 @@ public sealed class AuthorizationSurfaceGuardrailTests
         await Assert.That(anonymousMutations.Any(item => item.IsReviewedLocalLifecycle)).IsFalse();
     }
 
-    private sealed record SyntheticUnclassifiedCommand : IRequest<BaseCommandResponse<Guid>>;
-    private sealed record SyntheticLocalLifecycleCommand : IRequest<BaseCommandResponse<Guid>>;
-    private sealed record SyntheticProofPreviewQuery : IRequest<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticUnclassifiedCommand : Explore.Application.Contracts.Operations.ICommand<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticLocalLifecycleCommand : Explore.Application.Contracts.Operations.ICommand<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticProofPreviewQuery : Explore.Application.Contracts.Operations.ICommand<BaseCommandResponse<Guid>>;
 
     private sealed class SyntheticAnonymousMutationController : ControllerBase
     {
@@ -604,8 +611,7 @@ internal static class AuthorizationSurfaceInventory
     private static Type? GetResponseType(Type type) =>
         type.GetInterfaces()
             .Where(interfaceType => interfaceType.IsGenericType
-                && (interfaceType.GetGenericTypeDefinition() == typeof(IRequest<>)
-                    || OperationContractDiscovery.IsResultContract(interfaceType)))
+                && OperationContractDiscovery.IsResultContract(interfaceType))
             .Select(interfaceType => interfaceType.GetGenericArguments()[0])
             .FirstOrDefault();
 

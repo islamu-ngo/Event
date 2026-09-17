@@ -4,13 +4,13 @@ using System.Reflection;
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
+using Explore.Application.Contracts.Operations;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.DTOs.Registration;
 using Explore.Application.Features.RegistrationAnswerFiles.Queries;
 using Explore.Application.Hateoas;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -238,8 +238,8 @@ public sealed class AdminRoleEndpointParityTests
 
     private static WebApplicationFactory<Program> CreateFactory()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetRegistrationAnswerFileQuery>(), Arg.Any<CancellationToken>()).Returns(new RegistrationAnswerFileDto(
+        var fileHandler = Substitute.For<IQueryHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>>();
+        fileHandler.QueryAsync(Arg.Any<GetRegistrationAnswerFileQuery>(), Arg.Any<CancellationToken>()).Returns(new RegistrationAnswerFileDto(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
             "answer.pdf", "application/pdf", ".pdf", 128, "quarantined", "clean",
             DateTime.UnixEpoch, null, null, null));
@@ -249,8 +249,8 @@ public sealed class AdminRoleEndpointParityTests
             AuthorizationProviderOverride = new StubAuthorizationProvider()
         }.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<IMediator>();
-            services.AddSingleton(mediator);
+            services.RemoveAll<IQueryHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>>();
+            services.AddSingleton(fileHandler);
         }));
     }
 }

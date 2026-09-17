@@ -3,7 +3,7 @@ name: api-controllers
 description: Apply when editing Explore.API controller actions and route contracts.
 paths:
   - "src/Explore.API/Controllers/**/*.cs"
-related_skills: [cqrs-mediatr-guidelines, auth-patterns]
+related_skills: [cqrs-guidelines, auth-patterns]
 related_docs: [docs/internal/API.md, docs/internal/GOVERNANCE.md, docs/internal/AUTHORIZATION.md, docs/internal/QUICK_REFERENCE.md]
 minimum_tests: [Event.API.IntegrationTests, Event.Architecture.Tests]
 related_intents: [add-get-endpoint, add-write-endpoint, openapi-contract-change, add-hal-link]

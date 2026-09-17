@@ -58,11 +58,15 @@ listed in the Compose file and the environment reference.
 ## 2. Prerequisites & Preparation
 
 1. **Host Requirements**:
-   - OS: Linux (Ubuntu 22.04+ / Debian 12 recommended)
+   - OS: Linux (Ubuntu 22.04+ / Debian 12 recommended), macOS (Apple Silicon or Intel via Docker Desktop/OrbStack/Colima), or Windows (via WSL2)
+   - Architecture: `linux/amd64` (x86_64) or `linux/arm64` (ARM64 / aarch64, e.g., AWS Graviton, Hetzner CAX series, Ampere Altra)
    - CPU: 2+ vCPUs
    - RAM: 4 GB minimum (8 GB recommended for full stack with Keycloak and Cerbos)
    - Disk: 20 GB SSD storage
    - Software: Docker Engine 24+ and Docker Compose v2.20+
+
+> [!TIP]
+> **Multi-Platform Image Support:** All container images (`islamu-event-api`, `islamu-event-ui`, `event-migrationservice`) and auxiliary infrastructure (PostgreSQL, Redis, Keycloak, Cerbos) ship with multi-architecture OCI manifests (`linux/amd64` and `linux/arm64`). Docker automatically pulls and executes the native CPU architecture variant from single image tags without per-platform tag suffixes.
 
 2. **Clone and Prepare Environment**:
 

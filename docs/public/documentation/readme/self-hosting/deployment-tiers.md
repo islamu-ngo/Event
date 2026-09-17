@@ -18,10 +18,11 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 | **Authorization** | Local database-backed RBAC | External Cerbos PDP (Fail-closed) | High-Availability Cerbos Cluster |
 | **Storage** | Local volume mount | S3-Compatible (MinIO / R2 / S3) | Distributed S3 with Multi-Region CDN |
 | **Minimum Hardware** | 1 vCPU, 2 GB RAM | 4 vCPUs, 8 GB RAM | 8+ vCPUs, 16+ GB RAM (per node) |
+| **Supported Architectures** | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64` |
 
 > [!TIP]
 > **⚙️ Reference Architecture Blueprint (Target Topology):**
-> Our recommended multi-service split deployment blueprint is designed for a **Hetzner CPX32** cloud server managed via **Coolify** (see our [Coolify Deployment Guide](coolify-cerbos-traefik.md)):
+> Our recommended multi-service split deployment blueprint is designed for a **Hetzner CPX32** (x86_64) or **CAX31/CAX41** (ARM64 Ampere Altra) cloud server managed via **Coolify** (see our [Coolify Deployment Guide](coolify-cerbos-traefik.md)). Because all ISLAMU Event images ship with native multi-architecture support, operators can choose ARM64 cloud instances (e.g., Hetzner CAX, AWS Graviton) for improved price-to-performance without emulation overhead:
 > - **Server Hardware & Compute (Reference Blueprint):**
 >   - **CPU:** 4 vCPUs
 >   - **RAM:** 8 GB

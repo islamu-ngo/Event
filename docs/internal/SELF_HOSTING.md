@@ -223,6 +223,15 @@ successful restore, and retaining Data Protection keys alone does not guarantee
 that every session survives. Follow [BACKUP_RESTORE_UPGRADE.md](BACKUP_RESTORE_UPGRADE.md)
 and verify recovery in an isolated environment.
 
+### Multi-Platform Container Runtime Invariants
+
+1. **OCI Manifest List Single-Tag Contract**: All deployable application containers (`Explore.API`, `Explore.Blazor`, `Event.MigrationService`, `Event.Standalone`) are distributed as multi-platform OCI image indexes (`linux/amd64` and `linux/arm64`). Operators pull a single image tag (e.g. `ghcr.io/islamu-ngo/event-standalone:latest`); the local container engine transparently resolves the matching native architecture layer.
+2. **Execution Environment Parity**:
+   * **Linux Bare-Metal/Cloud**: Native execution on 64-bit x86 and ARM64 instances (AWS Graviton, Hetzner CAX/ARM, Ampere Altra, Raspberry Pi 4/5).
+   * **macOS**: Native execution inside container virtualization (Docker Desktop, OrbStack, Colima). Apple Silicon M-series nodes execute `linux/arm64` natively without Rosetta 2 emulation penalty.
+   * **Windows**: Supported via Docker Desktop (WSL2 Linux VM backend). Native Windows Server container mode (`Windows Server Core` / `NanoServer`) is deliberately unsupported; bare Windows Server deployments must run via system services or IIS.
+3. **Pure IL & Dynamic PGO Invariant**: Images distribute platform-agnostic Intermediate Language (IL) assemblies rather than Ahead-of-Time (AOT) or ReadyToRun (R2R) pre-compiled binaries. This retains full Tiered Compilation Dynamic Profile-Guided Optimization (Dynamic PGO) at runtime, allowing the JIT compiler to devirtualize and inline CQS command/query handler decorator chains according to host-specific traffic patterns.
+
 ---
 
 ## Related Specifications & Architecture Docs

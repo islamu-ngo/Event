@@ -13,7 +13,7 @@ Select a topology by operational needs, then follow its dedicated runbook. The p
 | Path                                                       | Best fit                                                | Primary constraint                                                     |
 | ---------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
 | [Deployment Tiers & Sizing](deployment-tiers.md)           | Hardware capacity and infrastructure sizing             | Choose based on monthly attendee volume                                |
-| [Docker Standalone](docker-standalone.md)                  | Smallest deployment and lowest operating load           | One replica, durable SQLite/local volume, initial `linux/amd64` target |
+| [Docker Standalone](docker-standalone.md)                  | Smallest deployment and lowest operating load           | One replica, durable SQLite/local volume, multi-platform (`linux/amd64`, `linux/arm64`) |
 | [Docker Compose](docker-compose.md)                        | Split services and a server database                    | One-shot migration service must complete before API/UI                 |
 | [Coolify with Cerbos & Traefik](coolify-cerbos-traefik.md) | Existing Coolify/Traefik operators using Cerbos         | Cerbos runbook only, not a whole-platform one-click template           |
 | [.NET Aspire & Cloud](dotnet-aspire-and-cloud.md)          | Development orchestration or adopter-owned cloud design | No turnkey Azure/AWS template or universal responsibility model        |

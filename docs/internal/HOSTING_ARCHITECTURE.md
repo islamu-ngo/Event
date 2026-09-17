@@ -123,7 +123,43 @@ Contract details live in [PAYMENTS.md](PAYMENTS.md).
 
 ---
 
-## 4. Operational Deployment Runbooks (Public Source of Truth)
+## 4. Multi-Platform Container Packaging & Runtime Model
+
+All ISLAMU Event container images (`Explore.API`, `Explore.Blazor`, `Event.MigrationService`, and `Event.Standalone`) are packaged as **multi-architecture OCI manifest lists (Image Indexes)** targeting `linux/amd64` and `linux/arm64`:
+
+```text
+                  ghcr.io/islamu-ngo/islamu-event-api:latest
+                                      │
+                  ┌───────────────────┴───────────────────┐
+                  ▼                                       ▼
+          [linux/amd64 Layer]                     [linux/arm64 Layer]
+         (Intel / AMD x86_64)                    (ARM64 / aarch64)
+```
+
+### 1. Single-Tag Registry Distribution
+Adopters reference a single, canonical image tag (e.g. `:latest`, `:develop`, or semantic release tags). The Docker daemon / container runtime inspects the host CPU architecture and transparently pulls only the matching architecture slice without operator intervention or architecture-specific tag suffixes.
+
+### 2. Native Cross-Compilation Build Pipeline
+To avoid the significant 5×–10× performance penalties of running the full .NET SDK under QEMU emulation on x64 CI runners, the build stage uses native cross-compilation:
+* **Host SDK Stage**: `FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0@sha256:...` executes Roslyn, MSBuild, and CLI tools natively on the runner's architecture.
+* **Target Architecture Argument**: Buildx injects `ARG TARGETARCH` (`amd64` or `arm64`).
+* **DotNet Cross-Publish**: `-a $TARGETARCH` instructs the native .NET SDK to restore and publish IL assemblies targeting the target runtime.
+* **Runtime Layer**: The final stage binds the native target architecture runtime (`aspnet:10.0` or `runtime-deps:10.0-noble-chiseled-extra` chiseled Ubuntu).
+
+### 3. JIT Dynamic PGO Preserved (No ReadyToRun Overhead)
+Images distribute pure Intermediate Language (IL) assemblies rather than Ahead-Of-Time (AOT) or ReadyToRun (R2R) pre-compiled binaries. This preserves:
+* Unrestricted reflection compatibility with EF Core query generation, Blazor WebAssembly component parameters, and dynamic FluentValidation rules.
+* Modern .NET 10 Tiered Compilation and **Dynamic PGO (Profile-Guided Optimization)**, enabling the JIT compiler to devirtualize and inline frequently called CQS command/query handlers and authorization decorators based on actual production traffic patterns.
+
+### 4. Host OS Compatibility Matrix
+* **Linux (AMD64 & ARM64)**: Native bare-metal / VPS container execution (standard cloud nodes, Hetzner CAX/CPX, AWS Graviton).
+* **macOS (Apple Silicon & Intel)**: Native container execution inside the macOS lightweight Linux hypervisor (Docker Desktop, OrbStack, Colima). Apple Silicon Macs execute the `linux/arm64` slice natively on M-series cores with zero Rosetta translation overhead.
+* **Windows (WSL2 / Hyper-V)**: Fully supported through the WSL2 Linux kernel backend.
+* **Windows Server (Native Windows Containers)**: Deliberately unsupported. The application uses Linux base images (`aspnet:10.0`, `runtime-deps`). Native Windows Server container mode (`Windows Server Core` / `NanoServer`) is not utilized, following cloud-native industry standards. Operators running on bare Windows Server should deploy as a Windows Service or via IIS.
+
+---
+
+## 5. Operational Deployment Runbooks (Public Source of Truth)
 
 For step-by-step container configuration, Docker Compose YAML manifests, environment variables, reverse proxies, and backup/restore procedures, **refer exclusively to the canonical public documentation**:
 

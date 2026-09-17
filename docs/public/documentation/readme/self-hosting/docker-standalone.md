@@ -19,7 +19,7 @@ administrator-controlled capability.
 |---|---|
 | **Zero External Infrastructure**: Runs on built-in SQLite persistence; no PostgreSQL server or Redis required. | **Single Replica**: SQLite requires exactly one running container instance (no horizontal multi-container scaling). |
 | **Single-Process Footprint**: Runs API, BFF/UI, and SQLite in one container without auxiliary database servers. | **Local-First Storage**: Media and database files live in a mounted Docker volume. |
-| **Instant Onboarding**: In-process migrations apply automatically before the HTTP port opens. | **Initial Platform Target**: Built for `linux/amd64`. |
+| **Instant Onboarding**: In-process migrations apply automatically before the HTTP port opens. | **Multi-Platform Support**: Official multi-arch images built for `linux/amd64` and `linux/arm64`. |
 
 SQLite coordinates transaction-owned work inside the application process.
 Failed operations release that coordination when their transaction and connection
@@ -143,6 +143,24 @@ docker run -d \
 ```
 
 *(Alternatively, build from source: `docker build -t islamu/event-standalone -f src/Event.Standalone/Dockerfile .`)*
+
+### Multi-Platform & Host OS Compatibility
+
+ISLAMU Event standalone images are published as **multi-architecture OCI manifest lists (Image Indexes)**. You pull a single image tag and your Docker daemon automatically selects and runs the matching native binary slice:
+
+```bash
+docker pull ghcr.io/islamu-ngo/event-standalone:latest
+```
+
+| Host Environment | Supported Architectures | Execution Model & Operational Notes |
+|---|---|---|
+| **Linux Servers & VPS** | `linux/amd64`, `linux/arm64` | **Native execution.** Supports standard x86_64 Intel/AMD servers and 64-bit ARM cloud instances (e.g., AWS Graviton, Hetzner CAX series, Ampere Altra, Raspberry Pi 4/5) with zero CPU emulation overhead. |
+| **macOS (Apple Silicon & Intel)** | `linux/arm64` (M1–M4), `linux/amd64` (Intel) | **Native container performance.** Runs inside the standard macOS Linux virtualization layer (Docker Desktop, OrbStack, Colima). Apple Silicon Macs automatically pull and execute `linux/arm64` directly on the M-series CPU without Rosetta 2 translation penalties. |
+| **Windows (WSL2 / Docker Desktop)** | `linux/amd64` | **Native Linux VM execution.** Fully supported via Docker Desktop with the WSL2 backend or a Hyper-V Linux VM. Docker automatically pulls the `linux/amd64` variant and runs it within the lightweight Linux utility VM. |
+| **Windows Server (Native Windows Containers)** | *Not Supported* | The container packaging uses Linux base images (`mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra`). Native Windows container mode (`Windows Server Core` / `NanoServer`) is not used. For native Windows Server environments without Linux containers, host the application directly as a system service or behind IIS. |
+
+> [!TIP]
+> **Single Tag Convenience:** You do not need to manage or specify architecture tags (such as `:latest-arm64` or `:latest-amd64`). The container registry resolves the target CPU transparently on `docker pull` or `docker run`.
 
 ---
 

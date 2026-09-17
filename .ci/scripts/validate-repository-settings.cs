@@ -51,8 +51,6 @@ var evidence = new JsonObject
 var checks = evidence["checks"]!.AsObject();
 
 await CheckRepositorySecurityAsync(repository, checks, findings);
-await CheckBranchProtectionAsync(repository, "main", checks, findings);
-await CheckBranchProtectionAsync(repository, "develop", checks, findings);
 await CheckRulesetsAsync(repository, checks, findings);
 await CheckEnvironmentsAsync(repository, checks, findings);
 await CheckActionsPolicyAsync(repository, checks, findings);
@@ -132,50 +130,6 @@ async Task CheckRepositorySecurityAsync(string repo, JsonObject checksObject, Li
     checksObject["repositorySecurity"] = check;
 }
 
-async Task CheckBranchProtectionAsync(string repo, string branch, JsonObject checksObject, List<Finding> output)
-{
-    var response = await GetJsonAsync($"repos/{repo}/branches/{branch}/protection");
-    var check = new JsonObject
-    {
-        ["status"] = StatusText(response.StatusCode)
-    };
-
-    if (response.StatusCode == HttpStatusCode.NotFound)
-    {
-        output.Add(new Finding($"{branch} branch protection", "error", "Branch protection endpoint returned 404."));
-        checksObject[$"branchProtection:{branch}"] = check;
-        return;
-    }
-
-    if (response.StatusCode != HttpStatusCode.OK || response.Json is null)
-    {
-        output.Add(new Finding($"{branch} branch protection", "error", $"Branch protection API returned {(int)response.StatusCode} {response.StatusCode}."));
-        checksObject[$"branchProtection:{branch}"] = check;
-        return;
-    }
-
-    var requiredChecks = response.Json["required_status_checks"];
-    var contexts = requiredChecks?["contexts"] as JsonArray;
-    var checks = requiredChecks?["checks"] as JsonArray;
-    var requiredCheckCount = (contexts?.Count ?? 0) + (checks?.Count ?? 0);
-    check["requiredStatusCheckCount"] = requiredCheckCount;
-    check["hasPullRequestReviews"] = response.Json["required_pull_request_reviews"] is not null;
-    check["requiredLinearHistory"] = response.Json["required_linear_history"]?["enabled"]?.GetValue<bool>() ?? false;
-    check["requiredConversationResolution"] = response.Json["required_conversation_resolution"]?["enabled"]?.GetValue<bool>() ?? false;
-
-    if (requiredCheckCount == 0)
-    {
-        output.Add(new Finding($"{branch} required status checks", "error", "No required status checks are configured."));
-    }
-
-    if (response.Json["required_pull_request_reviews"] is null)
-    {
-        output.Add(new Finding($"{branch} pull request review policy", "error", "Required pull request reviews are not configured."));
-    }
-
-    checksObject[$"branchProtection:{branch}"] = check;
-}
-
 async Task CheckRulesetsAsync(string repo, JsonObject checksObject, List<Finding> output)
 {
     var list = await GetJsonAsync($"repos/{repo}/rulesets");
@@ -184,6 +138,10 @@ async Task CheckRulesetsAsync(string repo, JsonObject checksObject, List<Finding
     var hasDevelop = false;
     var hasMergeQueue = false;
     var hasReservedVersionTagGlob = false;
+    var coveredBranches = new HashSet<string>(StringComparer.Ordinal);
+    var pullRequestReviews = new HashSet<string>(StringComparer.Ordinal);
+    var requiredStatusChecks = new HashSet<string>(StringComparer.Ordinal);
+    var requiredCheckContexts = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
     if (list.Json is JsonArray array)
     {
@@ -206,19 +164,80 @@ async Task CheckRulesetsAsync(string repo, JsonObject checksObject, List<Finding
 
             if (detailObject?["rules"] is JsonArray ruleArray)
             {
-                hasMergeQueue |= ruleArray.OfType<JsonObject>().Any(rule => string.Equals(rule["type"]?.GetValue<string>(), "merge_queue", StringComparison.Ordinal));
+                var ruleTypes = ruleArray.OfType<JsonObject>()
+                    .Select(rule => rule["type"]?.GetValue<string>() ?? string.Empty)
+                    .ToHashSet(StringComparer.Ordinal);
+                hasMergeQueue |= ruleTypes.Contains("merge_queue");
 
                 // Version tags own the v* glob outright. A branch named v0.1 beside tag v0.1.0
                 // would make a bare name resolvable to either object, so branch creation in that
                 // namespace must be refused by the provider, not disambiguated afterwards.
                 hasReservedVersionTagGlob |= includeRefs.Contains("refs/heads/v*", StringComparer.Ordinal) &&
-                    ruleArray.OfType<JsonObject>().Any(rule => string.Equals(rule["type"]?.GetValue<string>(), "creation", StringComparison.Ordinal));
+                    ruleTypes.Contains("creation");
+
+                var enforced = string.Equals(detailObject?["enforcement"]?.GetValue<string>(), "active", StringComparison.Ordinal);
+                foreach (var branch in new[] { "main", "develop" })
+                {
+                    if (!includeRefs.Contains($"refs/heads/{branch}", StringComparer.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    coveredBranches.Add(branch);
+                    if (!enforced)
+                    {
+                        continue;
+                    }
+
+                    if (ruleTypes.Contains("pull_request"))
+                    {
+                        pullRequestReviews.Add(branch);
+                    }
+
+                    var contexts = CollectRequiredCheckContexts(ruleArray);
+                    if (contexts.Count > 0)
+                    {
+                        requiredStatusChecks.Add(branch);
+                        requiredCheckContexts[branch] = contexts;
+                    }
+                }
             }
         }
     }
     else
     {
         output.Add(new Finding("Repository rulesets", "error", $"Rulesets API returned {(int)list.StatusCode} {list.StatusCode}."));
+    }
+
+    var branchPolicy = new JsonObject();
+    foreach (var branch in new[] { "main", "develop" })
+    {
+        branchPolicy[branch] = new JsonObject
+        {
+            ["coveredByRuleset"] = coveredBranches.Contains(branch),
+            ["hasPullRequestReviews"] = pullRequestReviews.Contains(branch),
+            ["hasRequiredStatusChecks"] = requiredStatusChecks.Contains(branch),
+            ["requiredStatusCheckContexts"] = new JsonArray(
+                requiredCheckContexts.GetValueOrDefault(branch, [])
+                    .Order(StringComparer.Ordinal)
+                    .Select(context => (JsonNode?)JsonValue.Create(context))
+                    .ToArray())
+        };
+
+        if (!coveredBranches.Contains(branch))
+        {
+            continue;
+        }
+
+        if (!pullRequestReviews.Contains(branch))
+        {
+            output.Add(new Finding($"{branch} pull request review policy", "error", $"No active branch ruleset enforces the pull_request rule for refs/heads/{branch}."));
+        }
+
+        if (!requiredStatusChecks.Contains(branch))
+        {
+            output.Add(new Finding($"{branch} required status checks", "error", $"No active branch ruleset configures required status checks for refs/heads/{branch}."));
+        }
     }
 
     checksObject["rulesets"] = new JsonObject
@@ -228,6 +247,7 @@ async Task CheckRulesetsAsync(string repo, JsonObject checksObject, List<Finding
         ["hasDevelopRuleset"] = hasDevelop,
         ["hasMergeQueueRule"] = hasMergeQueue,
         ["hasReservedVersionTagGlobRule"] = hasReservedVersionTagGlob,
+        ["branchPolicy"] = branchPolicy,
         ["rulesets"] = rulesets
     };
 
@@ -245,6 +265,34 @@ async Task CheckRulesetsAsync(string repo, JsonObject checksObject, List<Finding
     {
         output.Add(new Finding("reserved version-tag glob", "error", "No branch ruleset blocks creation under refs/heads/v*; version tags must own that glob."));
     }
+}
+
+static List<string> CollectRequiredCheckContexts(JsonArray ruleArray)
+{
+    var contexts = new List<string>();
+    foreach (var rule in ruleArray.OfType<JsonObject>())
+    {
+        if (!string.Equals(rule["type"]?.GetValue<string>(), "required_status_checks", StringComparison.Ordinal))
+        {
+            continue;
+        }
+
+        if (rule["parameters"]?["required_status_checks"] is not JsonArray entries)
+        {
+            continue;
+        }
+
+        foreach (var entry in entries.OfType<JsonObject>())
+        {
+            var context = entry["context"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(context))
+            {
+                contexts.Add(context);
+            }
+        }
+    }
+
+    return contexts;
 }
 
 async Task CheckEnvironmentsAsync(string repo, JsonObject checksObject, List<Finding> output)

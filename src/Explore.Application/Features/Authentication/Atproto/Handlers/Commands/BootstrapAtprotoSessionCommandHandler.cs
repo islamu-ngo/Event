@@ -12,7 +12,8 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Responses;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
@@ -20,7 +21,7 @@ namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 public sealed class BootstrapAtprotoSessionCommandHandler(
     IAtprotoOAuthSecurityGateway securityGateway,
     IAtprotoSessionTokenIssuer tokenIssuer,
-    ISender sender,
+    ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>> claimAdministratorHandler,
     IUserExternalLoginRepository externalLoginRepository,
     IInstanceBootstrapStateRepository bootstrapRepository,
     IAuthenticationProviderDispatcher authenticationProviderDispatcher,
@@ -33,11 +34,11 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     ITenantContext tenantContext,
     IConfiguration configuration,
     TimeProvider timeProvider)
-    : IRequestHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>
+    : ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>
 {
-    public async Task<AtprotoSessionBootstrapResult> Handle(
+    public async Task<AtprotoSessionBootstrapResult> ExecuteAsync(
         BootstrapAtprotoSessionCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validation = await new BootstrapAtprotoSessionCommandValidator()
             .ValidateAsync(request, cancellationToken).ConfigureAwait(false);
@@ -94,7 +95,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                     && bootstrap.CompletedByUserId == login!.UserId);
         if (configuredAccount)
         {
-            var claim = await sender.Send(
+            var claim = await claimAdministratorHandler.ExecuteAsync(
                 new ClaimConfiguredInstanceAdministratorCommand
                 {
                     AuthenticatedAccount = accountKey,

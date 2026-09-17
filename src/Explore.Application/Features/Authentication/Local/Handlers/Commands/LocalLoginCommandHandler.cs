@@ -9,7 +9,6 @@ using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
@@ -17,11 +16,11 @@ public sealed class LocalLoginCommandHandler(
     ILocalIdentityAuthService authService,
     IAuthenticationProviderDispatcher providerDispatcher,
     ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler)
-    : IRequestHandler<LocalLoginCommand, LocalAuthResponseDto>
+    : ICommandHandler<LocalLoginCommand, LocalAuthResponseDto>
 {
-    public async Task<LocalAuthResponseDto> Handle(
+    public async Task<LocalAuthResponseDto> ExecuteAsync(
         LocalLoginCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validation = await new LocalAuthRequestDtoValidator()
             .ValidateAsync(request.Request, cancellationToken)

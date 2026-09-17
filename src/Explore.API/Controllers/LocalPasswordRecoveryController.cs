@@ -5,9 +5,10 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Models;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,7 +18,9 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/auth/local/password-recoveries")]
 [ApiController]
-public sealed class LocalPasswordRecoveryController(ISender sender) : ControllerBase
+public sealed class LocalPasswordRecoveryController(
+    ICommandHandler<RequestLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>> requestHandler,
+    ICommandHandler<CompleteLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>> completeHandler) : ControllerBase
 {
     [HttpPost(Name = RouteNames.RequestLocalPasswordRecovery)]
     [AllowAnonymous]
@@ -36,7 +39,7 @@ public sealed class LocalPasswordRecoveryController(ISender sender) : Controller
     public async Task<ActionResult> RequestRecovery(
         [FromBody] LocalPasswordRecoveryRequestDto body, CancellationToken cancellationToken = default) =>
         LocalIdentityLifecycleFailurePolicy.Instance.Map(this,
-            await sender.Send(new RequestLocalPasswordRecoveryCommand(body), cancellationToken), onSuccess: Accepted);
+            await requestHandler.ExecuteAsync(new RequestLocalPasswordRecoveryCommand(body), cancellationToken), onSuccess: Accepted);
 
     [HttpPost("consume", Name = RouteNames.CompleteLocalPasswordRecovery)]
     [AllowAnonymous]
@@ -55,5 +58,5 @@ public sealed class LocalPasswordRecoveryController(ISender sender) : Controller
     public async Task<ActionResult> Consume(
         [FromBody] LocalPasswordRecoveryCompletionRequestDto body, CancellationToken cancellationToken = default) =>
         LocalIdentityLifecycleFailurePolicy.Instance.Map(this,
-            await sender.Send(new CompleteLocalPasswordRecoveryCommand(body), cancellationToken), onSuccess: NoContent);
+            await completeHandler.ExecuteAsync(new CompleteLocalPasswordRecoveryCommand(body), cancellationToken), onSuccess: NoContent);
 }

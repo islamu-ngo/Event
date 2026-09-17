@@ -8,10 +8,10 @@ using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,7 +23,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [EndpointClassification(EndpointClass.Authenticated)]
 [Authorize(AuthenticationSchemes = ApiAuthenticationSchemeNames.LocalCredentialReplacement)]
-public sealed class LocalCredentialReplacementController(ISender sender) : ControllerBase
+public sealed class LocalCredentialReplacementController(
+    ICommandHandler<CompleteLocalCredentialReplacementCommand, BaseCommandResponse<Guid>> completeHandler) : ControllerBase
 {
     private static readonly CommandFailurePolicy Failures = CommandFailurePolicy
         .ValidatedBy(new ApiValidationProblemDescriptor(
@@ -54,7 +55,7 @@ public sealed class LocalCredentialReplacementController(ISender sender) : Contr
         {
             return Failures.Map(this, BaseCommandResponse.Authentication<Guid>());
         }
-        BaseCommandResponse<Guid> response = await sender.Send(
+        BaseCommandResponse<Guid> response = await completeHandler.ExecuteAsync(
             new CompleteLocalCredentialReplacementCommand(request: new LocalCredentialReplacementRequest(
                 authority: authority, newPassword: body.NewPassword)), cancellationToken);
         return Failures.Map(this, response, onSuccess: NoContent);

@@ -4,9 +4,9 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +18,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [AllowAnonymous]
 [EndpointClassification(EndpointClass.Public)]
-public sealed class LocalAuthController(ISender sender) : ControllerBase
+public sealed class LocalAuthController(
+    ICommandHandler<LocalLoginCommand, LocalAuthResponseDto> loginHandler) : ControllerBase
 {
     [HttpPost("login", Name = RouteNames.LoginLocalIdentity)]
     [SuppressIdempotencyResponseStorage]
@@ -37,7 +38,7 @@ public sealed class LocalAuthController(ISender sender) : ControllerBase
         [FromBody] LocalAuthRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        LocalAuthResponseDto response = await sender.Send(
+        LocalAuthResponseDto response = await loginHandler.ExecuteAsync(
             new LocalLoginCommand(request),
             cancellationToken);
         return LocalAuthenticationResultMapper.Map(this, response);

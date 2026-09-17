@@ -164,7 +164,7 @@ public sealed class LocalCredentialBindingTests
             await Assert.That(await admin.IsInstanceAdminAsync(fixture.CancellationToken)).IsFalse();
         }
 
-        BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).Handle(
+        BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).ExecuteAsync(
             new ReconcileLocalCredentialOperationCommand(operationId: fixture.Receipt.OperationId), fixture.CancellationToken);
 
         await Assert.That(result.IsSuccess).IsFalse();
@@ -211,7 +211,7 @@ public sealed class LocalCredentialBindingTests
         }
 
         Guid? resolved = await admin.ResolveUserIdAsync(fixture.CancellationToken);
-        BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).Handle(
+        BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).ExecuteAsync(
             new ReconcileLocalCredentialOperationCommand(operationId: fixture.Receipt.OperationId), fixture.CancellationToken);
 
         await Assert.That(resolved).IsNull();
@@ -524,7 +524,7 @@ public sealed class LocalCredentialBindingTests
         internal async Task<BaseCommandResponse<Guid>> ReconcileAsync()
         {
             await using AsyncServiceScope scope = Provider.CreateAsyncScope();
-            return await Handler(scope).Handle(new ReconcileLocalCredentialOperationCommand(operationId: Receipt.OperationId), CancellationToken);
+            return await Handler(scope).ExecuteAsync(new ReconcileLocalCredentialOperationCommand(operationId: Receipt.OperationId), CancellationToken);
         }
 
         internal async Task<LocalIdentityUser> ReadIdentityUserAsync()

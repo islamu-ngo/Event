@@ -5,7 +5,6 @@ using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
@@ -14,9 +13,9 @@ public sealed class ConfirmLocalEmailCommandHandler(
     ILocalIdentityLifecycleStore lifecycle,
     ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler,
     HybridCache cache)
-    : IRequestHandler<ConfirmLocalEmailCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ConfirmLocalEmailCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ConfirmLocalEmailCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ConfirmLocalEmailCommand request, CancellationToken cancellationToken = default)
     {
         var body = request.Request;
         var validation = await new LocalEmailConfirmationRequestDtoValidator().ValidateAsync(body, cancellationToken);

@@ -17,9 +17,9 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
+using Explore.Application.Contracts.Operations;
 using Explore.Persistence;
 using Explore.Persistence.Operations;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -37,11 +37,12 @@ public sealed class AtprotoSoleProviderInvariantTests(
         await fixture.ResetDatabaseAsync();
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        var bootstrapHandler = scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
         AtprotoDid did = AtprotoDid.Parse(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
 
-        AtprotoSessionBootstrapResult result = await sender.Send(
+        AtprotoSessionBootstrapResult result = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
@@ -106,16 +107,17 @@ public sealed class AtprotoSoleProviderInvariantTests(
         await fixture.ResetDatabaseAsync();
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        var bootstrapHandler = scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
         AtprotoDid firstDid = AtprotoDid.Parse(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
         AtprotoDid secondDid = AtprotoDid.Parse(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
 
-        AtprotoSessionBootstrapResult first = await sender.Send(
+        AtprotoSessionBootstrapResult first = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(firstDid),
             CancellationToken.None);
-        AtprotoSessionBootstrapResult second = await sender.Send(
+        AtprotoSessionBootstrapResult second = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(secondDid),
             CancellationToken.None);
 
@@ -147,16 +149,16 @@ public sealed class AtprotoSoleProviderInvariantTests(
             fixture.Factory.Services.CreateAsyncScope();
         await using AsyncServiceScope secondScope =
             fixture.Factory.Services.CreateAsyncScope();
-        ISender firstSender =
-            firstScope.ServiceProvider.GetRequiredService<ISender>();
-        ISender secondSender =
-            secondScope.ServiceProvider.GetRequiredService<ISender>();
+        var firstHandler =
+            firstScope.ServiceProvider.GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        var secondHandler =
+            secondScope.ServiceProvider.GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
 
         AtprotoSessionBootstrapResult[] results = await Task.WhenAll(
-            firstSender.Send(
+            firstHandler.ExecuteAsync(
                 CreateBootstrapCommand(did),
                 CancellationToken.None),
-            secondSender.Send(
+            secondHandler.ExecuteAsync(
                 CreateBootstrapCommand(did),
                 CancellationToken.None));
 
@@ -203,8 +205,9 @@ public sealed class AtprotoSoleProviderInvariantTests(
 
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
-        AtprotoSessionBootstrapResult result = await sender.Send(
+        var bootstrapHandler = scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        AtprotoSessionBootstrapResult result = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
@@ -262,8 +265,9 @@ public sealed class AtprotoSoleProviderInvariantTests(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
-        AtprotoSessionBootstrapResult bootstrap = await sender.Send(
+        var bootstrapHandler = scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        AtprotoSessionBootstrapResult bootstrap = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
         await Assert.That(bootstrap.Success).IsTrue();
@@ -292,8 +296,9 @@ public sealed class AtprotoSoleProviderInvariantTests(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
-        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
-        AtprotoSessionBootstrapResult bootstrap = await sender.Send(
+        var bootstrapHandler = scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        AtprotoSessionBootstrapResult bootstrap = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
         await Assert.That(bootstrap.Success).IsTrue();

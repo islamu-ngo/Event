@@ -7,7 +7,6 @@ using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using NSubstitute;
 using System.Security.Cryptography;
 
@@ -31,7 +30,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
         var handler = new LocalLoginCommandHandler(authService: service,
             providerDispatcher: CreateActiveDispatcher(), syncUserCommandHandler: syncUserCommandHandler);
 
-        LocalAuthResponseDto response = await handler.Handle(
+        LocalAuthResponseDto response = await handler.ExecuteAsync(
             new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
@@ -57,7 +56,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CreateActiveDispatcher(),
             syncUserCommandHandler);
 
-        LocalAuthResponseDto result = await handler.Handle(
+        LocalAuthResponseDto result = await handler.ExecuteAsync(
             new LocalLoginCommand(new LocalAuthRequestDto("invalid", string.Empty)),
             CancellationToken.None);
 
@@ -86,7 +85,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CreateActiveDispatcher(),
             syncUserCommandHandler);
 
-        LocalAuthResponseDto result = await handler.Handle(
+        LocalAuthResponseDto result = await handler.ExecuteAsync(
             new LocalLoginCommand(new LocalAuthRequestDto(
                 "admin@example.test",
                 CreateValidPassword())),
@@ -116,7 +115,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             dispatcher,
             Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>());
 
-        LocalAuthResponseDto result = await handler.Handle(
+        LocalAuthResponseDto result = await handler.ExecuteAsync(
             new LocalLoginCommand(new LocalAuthRequestDto(
                 "admin@example.test",
                 CreateValidPassword())),
@@ -147,7 +146,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CreateActiveDispatcher(),
             syncUserCommandHandler);
 
-        LocalAuthResponseDto result = await handler.Handle(
+        LocalAuthResponseDto result = await handler.ExecuteAsync(
             new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
@@ -176,7 +175,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CreateActiveDispatcher(),
             syncUserCommandHandler);
 
-        LocalAuthResponseDto result = await handler.Handle(
+        LocalAuthResponseDto result = await handler.ExecuteAsync(
             new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 

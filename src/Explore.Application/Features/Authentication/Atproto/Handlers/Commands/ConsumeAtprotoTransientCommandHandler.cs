@@ -1,16 +1,16 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 
 public sealed class ConsumeAtprotoTransientCommandHandler(IAtprotoTransientStoreRepository store,
-    ITenantRepository tenants) : IRequestHandler<ConsumeAtprotoTransientCommand, AtprotoTransientCommandResult>
+    ITenantRepository tenants) : ICommandHandler<ConsumeAtprotoTransientCommand, AtprotoTransientCommandResult>
 {
-    public async Task<AtprotoTransientCommandResult> Handle(ConsumeAtprotoTransientCommand request, CancellationToken cancellationToken)
+    public async Task<AtprotoTransientCommandResult> ExecuteAsync(ConsumeAtprotoTransientCommand request, CancellationToken cancellationToken = default)
     {
         if (!(await new ConsumeAtprotoTransientCommandValidator().ValidateAsync(request, cancellationToken)).IsValid
             || await tenants.GetByIdAsNoTrackingAsync(request.ExpectedTenantId, cancellationToken) is not { IsActive: true })

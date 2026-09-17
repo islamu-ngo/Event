@@ -6,9 +6,10 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Models;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +19,9 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/auth/local/email-verifications")]
 [ApiController]
-public sealed class LocalEmailVerificationController(ISender sender) : ControllerBase
+public sealed class LocalEmailVerificationController(
+    ICommandHandler<RequestLocalEmailVerificationCommand, BaseCommandResponse<Guid>> requestHandler,
+    ICommandHandler<ConfirmLocalEmailCommand, BaseCommandResponse<Guid>> confirmHandler) : ControllerBase
 {
     [HttpPost(Name = RouteNames.RequestLocalEmailVerification)]
     [AllowAnonymous]
@@ -38,7 +41,7 @@ public sealed class LocalEmailVerificationController(ISender sender) : Controlle
     public async Task<ActionResult> RequestVerification(
         [FromBody] LocalEmailVerificationRequestDto body, CancellationToken cancellationToken = default) =>
         LocalIdentityLifecycleFailurePolicy.Instance.Map(this,
-            await sender.Send(new RequestLocalEmailVerificationCommand(body, User.TryGetLocalSessionAuthority()), cancellationToken),
+            await requestHandler.ExecuteAsync(new RequestLocalEmailVerificationCommand(body, User.TryGetLocalSessionAuthority()), cancellationToken),
             onSuccess: Accepted);
 
     [HttpPost("consume", Name = RouteNames.ConfirmLocalEmail)]
@@ -58,5 +61,5 @@ public sealed class LocalEmailVerificationController(ISender sender) : Controlle
     public async Task<ActionResult> Consume(
         [FromBody] LocalEmailConfirmationRequestDto body, CancellationToken cancellationToken = default) =>
         LocalIdentityLifecycleFailurePolicy.Instance.Map(this,
-            await sender.Send(new ConfirmLocalEmailCommand(body), cancellationToken), onSuccess: NoContent);
+            await confirmHandler.ExecuteAsync(new ConfirmLocalEmailCommand(body), cancellationToken), onSuccess: NoContent);
 }

@@ -1,18 +1,18 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Validators;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 
 public sealed class RevokeAtprotoSessionCommandHandler(IAtprotoOAuthSecurityGateway securityGateway)
-    : IRequestHandler<RevokeAtprotoSessionCommand, AtprotoSessionRevocationResult>
+    : ICommandHandler<RevokeAtprotoSessionCommand, AtprotoSessionRevocationResult>
 {
-    public async Task<AtprotoSessionRevocationResult> Handle(
+    public async Task<AtprotoSessionRevocationResult> ExecuteAsync(
         RevokeAtprotoSessionCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         await new AtprotoCurrentSessionIdentityValidator()
             .ValidateAndThrowAsync(request.Identity, cancellationToken).ConfigureAwait(false);

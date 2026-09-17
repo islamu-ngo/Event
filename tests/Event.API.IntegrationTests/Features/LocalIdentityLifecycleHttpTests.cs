@@ -10,7 +10,7 @@ using Explore.Application.DTOs.User;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Users.Requests.Queries;
-using MediatR;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Authentication;
@@ -209,8 +209,9 @@ public sealed class LocalIdentityLifecycleHttpTests
             await AssertProblemAsync(expired, HttpStatusCode.BadRequest);
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
         {
-            var repaired = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
-                new ReconcileLocalIdentityLifecycleMirrorCommand(handoff.Operation), CancellationToken);
+            var repaired = await scope.ServiceProvider
+                .GetRequiredService<ICommandHandler<ReconcileLocalIdentityLifecycleMirrorCommand, BaseCommandResponse<Guid>>>()
+                .ExecuteAsync(new ReconcileLocalIdentityLifecycleMirrorCommand(handoff.Operation), CancellationToken);
             await Assert.That(repaired.IsSuccess).IsTrue();
             UserDto refreshed = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto>>().QueryAsync(
                 new GetUserRequest { UserId = fixture.Binding.LocalSubjectId }, CancellationToken);

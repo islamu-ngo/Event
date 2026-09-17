@@ -1,12 +1,12 @@
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 
 [AuthorizeConfiguredAdministratorClaim]
-public sealed record ClaimConfiguredInstanceAdministratorCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record ClaimConfiguredInstanceAdministratorCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public required ProviderAccountKey AuthenticatedAccount { get; init; }
     public Guid UserId { get; init; }

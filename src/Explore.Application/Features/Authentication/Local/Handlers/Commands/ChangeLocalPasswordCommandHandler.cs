@@ -1,10 +1,10 @@
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
@@ -12,9 +12,9 @@ public sealed class ChangeLocalPasswordCommandHandler(
     ILocalIdentityLifecycleStore lifecycle,
     ILocalCredentialAdministration credentials,
     ILocalIdentityAuthService authentication)
-    : IRequestHandler<ChangeLocalPasswordCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ChangeLocalPasswordCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ChangeLocalPasswordCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ChangeLocalPasswordCommand request, CancellationToken cancellationToken = default)
     {
         if (request.Authority is not { } authority)
             return BaseCommandResponse.Authentication<Guid>();

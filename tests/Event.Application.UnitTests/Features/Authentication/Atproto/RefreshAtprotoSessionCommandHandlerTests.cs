@@ -32,7 +32,7 @@ public sealed class RefreshAtprotoSessionCommandHandlerTests
             .Returns(new AtprotoIssuedSessionToken("replacement-jwt", DateTimeOffset.UtcNow.AddMinutes(15)));
 
         var result = await new RefreshAtprotoSessionCommandHandler(gateway, issuer)
-            .Handle(new RefreshAtprotoSessionCommand(Identity), CancellationToken.None);
+            .ExecuteAsync(new RefreshAtprotoSessionCommand(Identity), CancellationToken.None);
 
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.Token).IsEqualTo("replacement-jwt");
@@ -52,7 +52,7 @@ public sealed class RefreshAtprotoSessionCommandHandlerTests
             .Returns(AtprotoOAuthRefreshResult.ReauthenticationRequired());
 
         var result = await new RefreshAtprotoSessionCommandHandler(gateway, issuer)
-            .Handle(new RefreshAtprotoSessionCommand(Identity), CancellationToken.None);
+            .ExecuteAsync(new RefreshAtprotoSessionCommand(Identity), CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("reauthentication_required");
@@ -68,7 +68,7 @@ public sealed class RefreshAtprotoSessionCommandHandlerTests
 
         await Assert.ThrowsAsync<ValidationException>(() =>
             new RefreshAtprotoSessionCommandHandler(gateway, issuer)
-                .Handle(new RefreshAtprotoSessionCommand(invalid), CancellationToken.None));
+                .ExecuteAsync(new RefreshAtprotoSessionCommand(invalid), CancellationToken.None));
 
         await gateway.DidNotReceiveWithAnyArgs().RefreshAsync(default!, default);
         await issuer.DidNotReceiveWithAnyArgs().IssueAsync(default, default, default!, default);

@@ -23,7 +23,9 @@ using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Federation;
 using Explore.Persistence.Repositories;
 using Explore.Tests.Shared.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Responses;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -114,13 +116,13 @@ public sealed class AtprotoOAuthSecurityGatewayTests
         var atprotoIdentities = Substitute.For<IAtprotoIdentityRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
-        var sender = Substitute.For<ISender>();
+        var claimAdministratorHandler = Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>();
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(Guid.NewGuid());
         var handler = new BootstrapAtprotoSessionCommandHandler(
             fixture.Gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             externalLogins,
             Substitute.For<IInstanceBootstrapStateRepository>(),
             Substitute.For<IAuthenticationProviderDispatcher>(),
@@ -156,7 +158,7 @@ public sealed class AtprotoOAuthSecurityGatewayTests
             TimeProvider.System);
         var payload = JsonSerializer.SerializeToUtf8Bytes(CreateSession());
 
-        var result = await handler.Handle(new BootstrapAtprotoSessionCommand(
+        var result = await handler.ExecuteAsync(new BootstrapAtprotoSessionCommand(
             ParsedDid,
             Pds,
             OAuthKeyId,

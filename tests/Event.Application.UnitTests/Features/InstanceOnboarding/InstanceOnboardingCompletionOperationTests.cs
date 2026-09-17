@@ -111,7 +111,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
     {
         var configured = new OnboardingCompletionScenario();
         BaseCommandResponse<Guid> configuredResponse = await new ClaimConfiguredInstanceAdministratorCommandHandler(
-            configured.Operation).Handle(configured.Command(), CancellationToken.None);
+            configured.Operation).ExecuteAsync(configured.Command(), CancellationToken.None);
 
         var interactive = new OnboardingCompletionScenario(interactive: true);
         var handler = new CompleteInstanceOnboardingCommandHandler(
@@ -421,7 +421,7 @@ internal sealed class OnboardingCompletionScenario
         ProviderAccountKey? account = null,
         CancellationToken cancellationToken = default) =>
         new ClaimConfiguredInstanceAdministratorCommandHandler(Operation)
-            .Handle(Command(userId, account), cancellationToken);
+            .ExecuteAsync(Command(userId, account), cancellationToken);
 
     public Task<BaseCommandResponse<Guid>> CompleteProvisionedLocalAsync()
     {

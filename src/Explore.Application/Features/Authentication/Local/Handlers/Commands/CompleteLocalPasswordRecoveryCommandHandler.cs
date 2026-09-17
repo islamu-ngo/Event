@@ -5,7 +5,6 @@ using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
@@ -14,9 +13,9 @@ public sealed class CompleteLocalPasswordRecoveryCommandHandler(
     ILocalIdentityLifecycleStore lifecycle,
     ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler,
     HybridCache cache)
-    : IRequestHandler<CompleteLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CompleteLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CompleteLocalPasswordRecoveryCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CompleteLocalPasswordRecoveryCommand request, CancellationToken cancellationToken = default)
     {
         var body = request.Request;
         var validation = await new LocalPasswordRecoveryCompletionRequestDtoValidator().ValidateAsync(body, cancellationToken);

@@ -26,7 +26,7 @@ public sealed class RevokeAtprotoSessionCommandHandlerTests
             .Returns(new AtprotoSessionRevocationResult(outcome));
         var handler = new RevokeAtprotoSessionCommandHandler(gateway);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new RevokeAtprotoSessionCommand(Identity),
             CancellationToken.None);
 
@@ -41,7 +41,7 @@ public sealed class RevokeAtprotoSessionCommandHandlerTests
         var invalid = Identity with { UserId = Guid.Empty };
 
         await Assert.ThrowsAsync<ValidationException>(() =>
-            new RevokeAtprotoSessionCommandHandler(gateway).Handle(
+            new RevokeAtprotoSessionCommandHandler(gateway).ExecuteAsync(
                 new RevokeAtprotoSessionCommand(invalid),
                 CancellationToken.None));
 

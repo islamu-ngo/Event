@@ -1,20 +1,20 @@
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Analytics;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
 public sealed class GetAnalyticsGovernanceSettingsQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IAnalyticsRuntimeProfileResolver runtimeProfileResolver)
-    : IRequestHandler<GetAnalyticsGovernanceSettingsQuery, AnalyticsGovernanceSettingsDto>
+    : IQueryHandler<GetAnalyticsGovernanceSettingsQuery, AnalyticsGovernanceSettingsDto>
 {
-    public async Task<AnalyticsGovernanceSettingsDto> Handle(
+    public async Task<AnalyticsGovernanceSettingsDto> QueryAsync(
         GetAnalyticsGovernanceSettingsQuery request, CancellationToken cancellationToken)
     {
         var group = await settingsResolver.ResolveGroupAsync<AnalyticsSettingGroup>(

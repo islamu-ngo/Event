@@ -1,10 +1,10 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
@@ -13,9 +13,9 @@ public sealed class SyncAuthorizationPolicyPackageCommandHandler(
     IPolicyPackageService policyPackageService,
     IAuthorizationProviderConfigurationService configurationService,
     ILogger<SyncAuthorizationPolicyPackageCommandHandler> logger)
-    : IRequestHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SyncAuthorizationPolicyPackageCommand request,
         CancellationToken cancellationToken)
     {

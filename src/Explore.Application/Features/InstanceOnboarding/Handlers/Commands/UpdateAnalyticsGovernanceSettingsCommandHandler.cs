@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
@@ -9,16 +10,15 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Enums.Analytics;
 using Explore.Domain.Settings;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public sealed class UpdateAnalyticsGovernanceSettingsCommandHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IAdminContext adminContext)
-    : IRequestHandler<UpdateAnalyticsGovernanceSettingsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateAnalyticsGovernanceSettingsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateAnalyticsGovernanceSettingsCommand request, CancellationToken cancellationToken)
     {
         var userId = request.UserId;

@@ -37,7 +37,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
     {
         _adminContext.IsInstanceAdminAsync(TestUserId, Arg.Any<CancellationToken>()).Returns(false);
 
-        var result = await _handler.Handle(CreateCommand(new AuthorizationProviderConfigurationDto
+        var result = await _handler.ExecuteAsync(CreateCommand(new AuthorizationProviderConfigurationDto
         {
             Provider = "local"
         }), CancellationToken.None);
@@ -58,7 +58,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
             }).Patch
         };
 
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await _handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await _adminContext.DidNotReceive().IsInstanceAdminAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
@@ -78,7 +78,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
             }).Patch
         };
 
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await _handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Message).Contains("Setup mode is no longer active");
@@ -90,7 +90,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
     {
         _adminContext.IsInstanceAdminAsync(TestUserId, Arg.Any<CancellationToken>()).Returns(true);
 
-        var result = await _handler.Handle(CreateCommand(new AuthorizationProviderConfigurationDto
+        var result = await _handler.ExecuteAsync(CreateCommand(new AuthorizationProviderConfigurationDto
         {
             Provider = "cerbos",
             CerbosGrpcEndpoint = string.Empty
@@ -111,7 +111,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
             Provider = "local"
         };
 
-        var result = await _handler.Handle(CreateCommand(configuration), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(CreateCommand(configuration), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await _configurationService.DidNotReceive().VerifyCerbosEndpointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -129,7 +129,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
             AuthorizationProviderManagedByDeployment = true
         });
 
-        var result = await _handler.Handle(CreateCommand(new AuthorizationProviderConfigurationDto
+        var result = await _handler.ExecuteAsync(CreateCommand(new AuthorizationProviderConfigurationDto
         {
             Provider = "local"
         }), CancellationToken.None);
@@ -153,7 +153,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
         _configurationService.VerifyCerbosEndpointAsync("https://cerbosgrpc.example.com:443", Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var result = await _handler.Handle(CreateCommand(configuration), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(CreateCommand(configuration), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await _configurationService.Received(1)
@@ -182,7 +182,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
         _configurationService.VerifyCerbosAdminEndpointAsync(configuration.CerbosAdminEndpoint, Arg.Any<CancellationToken>())
             .Returns(false);
 
-        var result = await _handler.Handle(CreateCommand(configuration), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(CreateCommand(configuration), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Message).Contains("Admin API endpoint");
@@ -203,7 +203,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandlerTests
         _configurationService.VerifyCerbosEndpointAsync(configuration.CerbosGrpcEndpoint, Arg.Any<CancellationToken>())
             .Returns(false);
 
-        var result = await _handler.Handle(CreateCommand(configuration), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(CreateCommand(configuration), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Message).Contains("could not be verified");

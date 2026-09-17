@@ -22,7 +22,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -49,21 +48,33 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
         "instanceDeploymentMode",
         "Instance deployment mode validation failed",
         "Deployment mode update failed.");
-    private readonly IMediator _mediator;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IDeploymentModeProvider _deploymentModeProvider;
+    private readonly IQueryHandler<GetInstanceGovernanceSettingsQuery, InstanceGovernanceSettings> _instanceGovernanceQuery;
+    private readonly ICommandHandler<UpdateBrandingSettingsCommand, BaseCommandResponse<Guid>> _updateBrandingHandler;
+    private readonly ICommandHandler<UpdateDomainSettingsCommand, BaseCommandResponse<Guid>> _updateDomainHandler;
+    private readonly ICommandHandler<UpdateAdminPortalSettingsCommand, BaseCommandResponse<Guid>> _updateAdminPortalHandler;
+    private readonly ICommandHandler<UpdateRenderPolicySettingsCommand, BaseCommandResponse<Guid>> _updateRenderPolicyHandler;
 
     public InstancePresentationSettingsController(
-        IMediator mediator,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IDeploymentModeProvider deploymentModeProvider,
+        IQueryHandler<GetInstanceGovernanceSettingsQuery, InstanceGovernanceSettings> instanceGovernanceQuery,
+        ICommandHandler<UpdateBrandingSettingsCommand, BaseCommandResponse<Guid>> updateBrandingHandler,
+        ICommandHandler<UpdateDomainSettingsCommand, BaseCommandResponse<Guid>> updateDomainHandler,
+        ICommandHandler<UpdateAdminPortalSettingsCommand, BaseCommandResponse<Guid>> updateAdminPortalHandler,
+        ICommandHandler<UpdateRenderPolicySettingsCommand, BaseCommandResponse<Guid>> updateRenderPolicyHandler,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
-        _mediator = mediator;
         _identityQuery = identityQuery;
         _deploymentModeProvider = deploymentModeProvider;
+        _instanceGovernanceQuery = instanceGovernanceQuery;
+        _updateBrandingHandler = updateBrandingHandler;
+        _updateDomainHandler = updateDomainHandler;
+        _updateAdminPortalHandler = updateAdminPortalHandler;
+        _updateRenderPolicyHandler = updateRenderPolicyHandler;
     }
 
     [HttpGet("branding", Name = RouteNames.GetInstanceBrandingSettings)]
@@ -74,7 +85,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
     public async Task<ActionResult<BrandingSettingsDto>> GetBrandingSettings(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var settings = await _mediator.Send(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
+        var settings = await _instanceGovernanceQuery.QueryAsync(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
         return Ok(settings.Branding);
     }
 
@@ -92,7 +103,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
         var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateBrandingSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateBrandingHandler.ExecuteAsync(new UpdateBrandingSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
         if (response.IsSuccess)
         {
             await cacheStore.EvictByTagAsync("public-experience-shell", cancellationToken);
@@ -109,7 +120,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
     public async Task<ActionResult<DomainSettingsDto>> GetDomainSettings(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var settings = await _mediator.Send(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
+        var settings = await _instanceGovernanceQuery.QueryAsync(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
         return Ok(settings.Domains);
     }
 
@@ -125,7 +136,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
         var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateDomainSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateDomainHandler.ExecuteAsync(new UpdateDomainSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
         return HandleCommandResponse(response);
     }
 
@@ -137,7 +148,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
     public async Task<ActionResult<AdminPortalSettingsDto>> GetAdminPortalSettings(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var settings = await _mediator.Send(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
+        var settings = await _instanceGovernanceQuery.QueryAsync(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
         return Ok(settings.AdminPortal);
     }
 
@@ -153,7 +164,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
         var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateAdminPortalSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateAdminPortalHandler.ExecuteAsync(new UpdateAdminPortalSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
         return HandleCommandResponse(response);
     }
 
@@ -165,7 +176,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
     public async Task<ActionResult<RenderPolicySettingsDto>> GetRenderPolicySettings(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var settings = await _mediator.Send(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
+        var settings = await _instanceGovernanceQuery.QueryAsync(new GetInstanceGovernanceSettingsQuery(), cancellationToken);
         return Ok(settings.RenderPolicy);
     }
 
@@ -181,7 +192,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
         var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateRenderPolicySettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateRenderPolicyHandler.ExecuteAsync(new UpdateRenderPolicySettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
         return HandleCommandResponse(response);
     }
 

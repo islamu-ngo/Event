@@ -8,11 +8,11 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public class UpdateModuleSettingsCommandHandler : IRequestHandler<UpdateModuleSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateModuleSettingsCommandHandler : ICommandHandler<UpdateModuleSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -31,7 +31,7 @@ public class UpdateModuleSettingsCommandHandler : IRequestHandler<UpdateModuleSe
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateModuleSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateModuleSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -57,7 +57,7 @@ public class UpdateModuleSettingsCommandHandler : IRequestHandler<UpdateModuleSe
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateEventPolicyCommandHandler : IRequestHandler<UpdateEventPolicyCommand, BaseCommandResponse<Guid>>
+public class UpdateEventPolicyCommandHandler : ICommandHandler<UpdateEventPolicyCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -73,7 +73,7 @@ public class UpdateEventPolicyCommandHandler : IRequestHandler<UpdateEventPolicy
         _notificationHandlers = notificationHandlers;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventPolicyCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventPolicyCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -119,7 +119,7 @@ public class UpdateEventPolicyCommandHandler : IRequestHandler<UpdateEventPolicy
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateOrganizationPolicyCommandHandler : IRequestHandler<UpdateOrganizationPolicyCommand, BaseCommandResponse<Guid>>
+public class UpdateOrganizationPolicyCommandHandler : ICommandHandler<UpdateOrganizationPolicyCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -132,7 +132,7 @@ public class UpdateOrganizationPolicyCommandHandler : IRequestHandler<UpdateOrga
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateOrganizationPolicyCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateOrganizationPolicyCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -159,7 +159,7 @@ public class UpdateOrganizationPolicyCommandHandler : IRequestHandler<UpdateOrga
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateBrandingSettingsCommandHandler : IRequestHandler<UpdateBrandingSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateBrandingSettingsCommandHandler : ICommandHandler<UpdateBrandingSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -184,7 +184,7 @@ public class UpdateBrandingSettingsCommandHandler : IRequestHandler<UpdateBrandi
         _notificationHandlers = notificationHandlers;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateBrandingSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateBrandingSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -243,7 +243,7 @@ public class UpdateBrandingSettingsCommandHandler : IRequestHandler<UpdateBrandi
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateDomainSettingsCommandHandler : IRequestHandler<UpdateDomainSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateDomainSettingsCommandHandler : ICommandHandler<UpdateDomainSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -259,7 +259,7 @@ public class UpdateDomainSettingsCommandHandler : IRequestHandler<UpdateDomainSe
         _notificationHandlers = notificationHandlers;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateDomainSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateDomainSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -293,7 +293,7 @@ public class UpdateDomainSettingsCommandHandler : IRequestHandler<UpdateDomainSe
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateTenantDelegationSettingsCommandHandler : IRequestHandler<UpdateTenantDelegationSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateTenantDelegationSettingsCommandHandler : ICommandHandler<UpdateTenantDelegationSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -312,7 +312,7 @@ public class UpdateTenantDelegationSettingsCommandHandler : IRequestHandler<Upda
         _mutationLock = mutationLock;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateTenantDelegationSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateTenantDelegationSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -366,7 +366,7 @@ public class UpdateTenantDelegationSettingsCommandHandler : IRequestHandler<Upda
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateAdminPortalSettingsCommandHandler : IRequestHandler<UpdateAdminPortalSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateAdminPortalSettingsCommandHandler : ICommandHandler<UpdateAdminPortalSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -379,7 +379,7 @@ public class UpdateAdminPortalSettingsCommandHandler : IRequestHandler<UpdateAdm
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateAdminPortalSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateAdminPortalSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -404,7 +404,7 @@ public class UpdateAdminPortalSettingsCommandHandler : IRequestHandler<UpdateAdm
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateMcpGovernanceSettingsCommandHandler : IRequestHandler<UpdateMcpGovernanceSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateMcpGovernanceSettingsCommandHandler : ICommandHandler<UpdateMcpGovernanceSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -420,7 +420,7 @@ public class UpdateMcpGovernanceSettingsCommandHandler : IRequestHandler<UpdateM
         _notificationHandlers = notificationHandlers;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateMcpGovernanceSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateMcpGovernanceSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -452,7 +452,7 @@ public class UpdateMcpGovernanceSettingsCommandHandler : IRequestHandler<UpdateM
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateAiAssistantGovernanceSettingsCommandHandler : IRequestHandler<UpdateAiAssistantGovernanceSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateAiAssistantGovernanceSettingsCommandHandler : ICommandHandler<UpdateAiAssistantGovernanceSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -468,7 +468,7 @@ public class UpdateAiAssistantGovernanceSettingsCommandHandler : IRequestHandler
         _notificationHandlers = notificationHandlers;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateAiAssistantGovernanceSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateAiAssistantGovernanceSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(
@@ -512,7 +512,7 @@ public class UpdateAiAssistantGovernanceSettingsCommandHandler : IRequestHandler
         BaseCommandResponse.Validation<Guid>([message], message);
 }
 
-public class UpdateRenderPolicySettingsCommandHandler : IRequestHandler<UpdateRenderPolicySettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateRenderPolicySettingsCommandHandler : ICommandHandler<UpdateRenderPolicySettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceGovernanceSettingService _service;
@@ -525,7 +525,7 @@ public class UpdateRenderPolicySettingsCommandHandler : IRequestHandler<UpdateRe
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRenderPolicySettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRenderPolicySettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))
             return BaseCommandResponse.Authorization<Guid>(

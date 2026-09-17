@@ -1,8 +1,8 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 
-public sealed record GetAuthorizationProviderConfigurationQuery : IRequest<AuthorizationProviderConfigurationDto>
+public sealed record GetAuthorizationProviderConfigurationQuery : IQuery<AuthorizationProviderConfigurationDto>
 {
 }

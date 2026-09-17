@@ -19,7 +19,7 @@ public class VerifyCerbosEndpointCommandHandlerTests
     [Test]
     public async Task Handle_WhenEndpointIsInvalid_ReturnsFailureWithoutVerification()
     {
-        var result = await _handler.Handle(new VerifyCerbosEndpointCommand
+        var result = await _handler.ExecuteAsync(new VerifyCerbosEndpointCommand
         {
             GrpcEndpoint = "not a grpc endpoint"
         }, CancellationToken.None);
@@ -35,7 +35,7 @@ public class VerifyCerbosEndpointCommandHandlerTests
         _configurationService.VerifyCerbosEndpointAsync("https://cerbosgrpc.example.com:443", Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var result = await _handler.Handle(new VerifyCerbosEndpointCommand
+        var result = await _handler.ExecuteAsync(new VerifyCerbosEndpointCommand
         {
             GrpcEndpoint = "cerbosgrpc.example.com:443"
         }, CancellationToken.None);
@@ -52,7 +52,7 @@ public class VerifyCerbosEndpointCommandHandlerTests
     [Arguments("https://cerbosgrpc.example.com:443#fragment")]
     public async Task Handle_WhenEndpointContainsUnsafeUriComponents_ReturnsFailure(string endpoint)
     {
-        var result = await _handler.Handle(new VerifyCerbosEndpointCommand
+        var result = await _handler.ExecuteAsync(new VerifyCerbosEndpointCommand
         {
             GrpcEndpoint = endpoint
         }, CancellationToken.None);
@@ -68,7 +68,7 @@ public class VerifyCerbosEndpointCommandHandlerTests
         _configurationService.VerifyCerbosEndpointAsync("https://cerbosgrpc.example.com:443", Arg.Any<CancellationToken>())
             .Returns(false);
 
-        var result = await _handler.Handle(new VerifyCerbosEndpointCommand
+        var result = await _handler.ExecuteAsync(new VerifyCerbosEndpointCommand
         {
             GrpcEndpoint = "https://cerbosgrpc.example.com:443"
         }, CancellationToken.None);

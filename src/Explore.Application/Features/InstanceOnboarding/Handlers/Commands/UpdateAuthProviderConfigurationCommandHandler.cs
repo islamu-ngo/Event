@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
@@ -9,13 +10,12 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public class UpdateAuthProviderConfigurationCommandHandler :
-    IRequestHandler<UpdateAuthProviderConfigurationCommand, BaseCommandResponse<Guid>>,
-    IRequestHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<UpdateAuthProviderConfigurationCommand, BaseCommandResponse<Guid>>,
+    ICommandHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IUserRepository _userRepository;
@@ -46,7 +46,7 @@ public class UpdateAuthProviderConfigurationCommandHandler :
         _setupSecretProvider = setupSecretProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateAuthProviderConfigurationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateAuthProviderConfigurationCommand request, CancellationToken cancellationToken)
     {
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
         if (!isInstanceAdmin)
@@ -58,7 +58,7 @@ public class UpdateAuthProviderConfigurationCommandHandler :
         return await ApplyConfigurationAsync(request.Patch, request.UserId, cancellationToken);
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateAuthProviderConfigurationDuringSetupCommand request,
         CancellationToken cancellationToken)
     {

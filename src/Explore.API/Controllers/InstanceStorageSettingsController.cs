@@ -22,7 +22,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -45,21 +44,30 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class InstanceStorageSettingsController : InstanceSettingsControllerBase
 {
-    private readonly IMediator _mediator;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<InstanceStorageSettingsDto, InstanceStorageSettingsDto> _storageSettingsAssembler;
+    private readonly IQueryHandler<GetInstanceStorageSettingsQuery, InstanceStorageSettingsDto> _instanceStorageQuery;
+    private readonly ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>> _updateStorageHandler;
+    private readonly IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto> _testStorageHandler;
+    private readonly ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto> _recalculateStorageHandler;
 
     public InstanceStorageSettingsController(
-        IMediator mediator,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<InstanceStorageSettingsDto, InstanceStorageSettingsDto> storageSettingsAssembler,
+        IQueryHandler<GetInstanceStorageSettingsQuery, InstanceStorageSettingsDto> instanceStorageQuery,
+        ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>> updateStorageHandler,
+        IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto> testStorageHandler,
+        ICommandHandler<RecalculateInstanceStorageUsageCommand, InstanceStorageUsageDto> recalculateStorageHandler,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
-        _mediator = mediator;
         _identityQuery = identityQuery;
         _storageSettingsAssembler = storageSettingsAssembler;
+        _instanceStorageQuery = instanceStorageQuery;
+        _updateStorageHandler = updateStorageHandler;
+        _testStorageHandler = testStorageHandler;
+        _recalculateStorageHandler = recalculateStorageHandler;
     }
 
     [HttpGet("storage", Name = RouteNames.GetInstanceStorageSettings)]
@@ -71,7 +79,7 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
     public async Task<ActionResult<HalResource<InstanceStorageSettingsDto>>> GetStorageSettings(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var settings = await _mediator.Send(new GetInstanceStorageSettingsQuery(), cancellationToken);
+        var settings = await _instanceStorageQuery.QueryAsync(new GetInstanceStorageSettingsQuery(), cancellationToken);
         var halResource = await _storageSettingsAssembler.ToResource(settings, HttpContext);
         return Ok(halResource);
     }
@@ -89,7 +97,7 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
         var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateInstanceStorageSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateStorageHandler.ExecuteAsync(new UpdateInstanceStorageSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
         return HandleCommandResponse(response);
     }
 
@@ -102,7 +110,7 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var status = await _mediator.Send(new TestInstanceStorageProviderQuery(), cancellationToken);
+        var status = await _testStorageHandler.QueryAsync(new TestInstanceStorageProviderQuery(), cancellationToken);
         return Ok(status);
     }
 
@@ -115,7 +123,7 @@ public sealed class InstanceStorageSettingsController : InstanceSettingsControll
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var usage = await _mediator.Send(new RecalculateInstanceStorageUsageCommand(), cancellationToken);
+        var usage = await _recalculateStorageHandler.ExecuteAsync(new RecalculateInstanceStorageUsageCommand(), cancellationToken);
         return Ok(usage);
     }
 }

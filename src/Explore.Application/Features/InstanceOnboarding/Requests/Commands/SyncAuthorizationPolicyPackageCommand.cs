@@ -1,10 +1,10 @@
-using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
-using MediatR;
+using Explore.Application.Responses;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 
-public sealed record SyncAuthorizationPolicyPackageCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record SyncAuthorizationPolicyPackageCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public AuthorizationPolicyPackageSyncRequestDto Request { get; init; } = new();
 }

@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 
-public sealed record CompleteInstanceOnboardingCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record CompleteInstanceOnboardingCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public Guid UserId { get; init; }
     public required CompleteInstanceOnboardingRequest Settings { get; init; }

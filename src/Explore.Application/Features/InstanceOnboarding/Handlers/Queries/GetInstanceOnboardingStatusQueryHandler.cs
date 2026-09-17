@@ -1,16 +1,16 @@
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public class GetInstanceOnboardingStatusQueryHandler : IRequestHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto>
+public class GetInstanceOnboardingStatusQueryHandler : IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto>
 {
     private readonly IInstanceBootstrapStateRepository _instanceBootstrapStateRepository;
     private readonly IAdminContext _adminContext;
@@ -35,7 +35,7 @@ public class GetInstanceOnboardingStatusQueryHandler : IRequestHandler<GetInstan
         _providers = providers;
     }
 
-    public async Task<InstanceOnboardingStatusDto> Handle(GetInstanceOnboardingStatusQuery request, CancellationToken cancellationToken)
+    public async Task<InstanceOnboardingStatusDto> QueryAsync(GetInstanceOnboardingStatusQuery request, CancellationToken cancellationToken)
     {
         var bootstrap = await _instanceBootstrapStateRepository.GetCurrent(cancellationToken);
         string state = bootstrap switch

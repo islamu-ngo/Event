@@ -20,7 +20,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -55,7 +54,16 @@ public class InstanceOnboardingController : EventControllerBase
         "Instance authorization-provider verification failed",
         "Instance authorization-provider endpoint verification failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto> _onboardingStatusQuery;
+    private readonly IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto> _onboardingPreflightQuery;
+    private readonly IQueryHandler<GetAuthorizationProviderConfigurationQuery, AuthorizationProviderConfigurationDto> _authzProviderConfigQuery;
+    private readonly IQueryHandler<DownloadAuthorizationPolicyPackageQuery, PolicyPackageArchive> _downloadPolicyPackageQuery;
+    private readonly ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>> _saveProfileCommand;
+    private readonly ICommandHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>> _completeOnboardingCommand;
+    private readonly ICommandHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>> _completeLocalOnboardingCommand;
+    private readonly ICommandHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>> _bootstrapKeycloakRealmCommand;
+    private readonly ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>> _syncPolicyPackageCommand;
+    private readonly ICommandHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>> _verifyCerbosEndpointCommand;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities> _lifecycleCapabilities;
     private readonly ISetupSecretProvider _setupSecretProvider;
@@ -67,7 +75,16 @@ public class InstanceOnboardingController : EventControllerBase
     private readonly IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> _statusAssembler;
 
     public InstanceOnboardingController(
-        IMediator mediator,
+        IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto> onboardingStatusQuery,
+        IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto> onboardingPreflightQuery,
+        IQueryHandler<GetAuthorizationProviderConfigurationQuery, AuthorizationProviderConfigurationDto> authzProviderConfigQuery,
+        IQueryHandler<DownloadAuthorizationPolicyPackageQuery, PolicyPackageArchive> downloadPolicyPackageQuery,
+        ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>> saveProfileCommand,
+        ICommandHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>> completeOnboardingCommand,
+        ICommandHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>> completeLocalOnboardingCommand,
+        ICommandHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>> bootstrapKeycloakRealmCommand,
+        ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>> syncPolicyPackageCommand,
+        ICommandHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>> verifyCerbosEndpointCommand,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities> lifecycleCapabilities,
         ISetupSecretProvider setupSecretProvider,
@@ -78,7 +95,16 @@ public class InstanceOnboardingController : EventControllerBase
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _onboardingStatusQuery = onboardingStatusQuery;
+        _onboardingPreflightQuery = onboardingPreflightQuery;
+        _authzProviderConfigQuery = authzProviderConfigQuery;
+        _downloadPolicyPackageQuery = downloadPolicyPackageQuery;
+        _saveProfileCommand = saveProfileCommand;
+        _completeOnboardingCommand = completeOnboardingCommand;
+        _completeLocalOnboardingCommand = completeLocalOnboardingCommand;
+        _bootstrapKeycloakRealmCommand = bootstrapKeycloakRealmCommand;
+        _syncPolicyPackageCommand = syncPolicyPackageCommand;
+        _verifyCerbosEndpointCommand = verifyCerbosEndpointCommand;
         _identityQuery = identityQuery;
         _lifecycleCapabilities = lifecycleCapabilities;
         _setupSecretProvider = setupSecretProvider;
@@ -101,7 +127,7 @@ public class InstanceOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<HalResource<InstanceOnboardingStatusDto>>> GetStatus(CancellationToken cancellationToken = default)
     {
-        var status = await _mediator.Send(new GetInstanceOnboardingStatusQuery { SetupPrincipal = User }, cancellationToken);
+        var status = await _onboardingStatusQuery.QueryAsync(new GetInstanceOnboardingStatusQuery { SetupPrincipal = User }, cancellationToken);
         var resource = await _statusAssembler.ToResource(status, HttpContext);
         return Ok(resource);
     }
@@ -123,7 +149,7 @@ public class InstanceOnboardingController : EventControllerBase
         [FromBody] SelfHostOnboardingProfileDto profile,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SaveInstanceOnboardingProfileCommand
+        var response = await _saveProfileCommand.ExecuteAsync(new SaveInstanceOnboardingProfileCommand
         {
             Profile = profile
         }, cancellationToken);
@@ -167,7 +193,7 @@ public class InstanceOnboardingController : EventControllerBase
             return this.ToAuthenticationRequiredProblem(detail: "Session expired. Please sign in again.");
         }
 
-        var preflight = await _mediator.Send(new GetOnboardingPreflightQuery(), cancellationToken);
+        var preflight = await _onboardingPreflightQuery.QueryAsync(new GetOnboardingPreflightQuery(), cancellationToken);
         if (!preflight.IsReadyToLaunch)
         {
             return this.ToValidationProblem(CompleteValidationProblem, PreflightBlockedMessage);
@@ -189,7 +215,7 @@ public class InstanceOnboardingController : EventControllerBase
             EmailVerified = User.GetEmailVerified()
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _completeOnboardingCommand.ExecuteAsync(command, cancellationToken);
         if (!response.IsSuccess)
         {
             return this.ToCommandValidationProblem(response, CompleteValidationProblem);
@@ -221,7 +247,7 @@ public class InstanceOnboardingController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> CompleteLocal(
         [FromBody] CompleteLocalInstanceOnboardingRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CompleteLocalInstanceOnboardingCommand(request, User), cancellationToken);
+        var response = await _completeLocalOnboardingCommand.ExecuteAsync(new CompleteLocalInstanceOnboardingCommand(request, User), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, CompleteValidationProblem);
     }
 
@@ -336,7 +362,7 @@ public class InstanceOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> BootstrapKeycloakRealm([FromBody] KeycloakBootstrapRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _bootstrapKeycloakRealmCommand.ExecuteAsync(
             new BootstrapKeycloakRealmCommand { BootstrapRequest = request },
             cancellationToken);
 
@@ -361,7 +387,7 @@ public class InstanceOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<AuthorizationProviderConfigurationDto>> GetAuthorizationProviderConfigurationInternal(CancellationToken cancellationToken = default)
     {
-        var configuration = await _mediator.Send(new GetAuthorizationProviderConfigurationQuery(), cancellationToken);
+        var configuration = await _authzProviderConfigQuery.QueryAsync(new GetAuthorizationProviderConfigurationQuery(), cancellationToken);
         return Ok(configuration);
     }
 
@@ -381,7 +407,7 @@ public class InstanceOnboardingController : EventControllerBase
         [FromBody] AuthorizationPolicyPackageSyncRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _syncPolicyPackageCommand.ExecuteAsync(
             new SyncAuthorizationPolicyPackageCommand { Request = request },
             cancellationToken);
         if (!response.IsSuccess)
@@ -409,7 +435,7 @@ public class InstanceOnboardingController : EventControllerBase
     {
         try
         {
-            var archive = await _mediator.Send(new DownloadAuthorizationPolicyPackageQuery(), cancellationToken);
+            var archive = await _downloadPolicyPackageQuery.QueryAsync(new DownloadAuthorizationPolicyPackageQuery(), cancellationToken);
             return File(archive.Content.ToArray(), archive.ContentType, archive.FileName);
         }
         catch (PolicyPackageUnavailableException ex)
@@ -441,7 +467,7 @@ public class InstanceOnboardingController : EventControllerBase
             GrpcEndpoint = request?.GrpcEndpoint ?? string.Empty
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _verifyCerbosEndpointCommand.ExecuteAsync(command, cancellationToken);
         if (!response.IsSuccess)
         {
             return this.ToCommandValidationProblem(response, AuthorizationProviderVerifyValidationProblem);

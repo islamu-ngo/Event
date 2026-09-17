@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Analytics;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 
-public sealed record GetAnalyticsGovernanceSettingsQuery : IRequest<AnalyticsGovernanceSettingsDto>;
+public sealed record GetAnalyticsGovernanceSettingsQuery : IQuery<AnalyticsGovernanceSettingsDto>;

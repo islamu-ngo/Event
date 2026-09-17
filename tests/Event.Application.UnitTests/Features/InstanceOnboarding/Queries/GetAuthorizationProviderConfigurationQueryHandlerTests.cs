@@ -27,7 +27,7 @@ public class GetAuthorizationProviderConfigurationQueryHandlerTests
         };
 
         _configurationService.ReadConfigurationAsync().Returns(configuration);
-        var result = await _handler.Handle(new GetAuthorizationProviderConfigurationQuery(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetAuthorizationProviderConfigurationQuery(), CancellationToken.None);
 
         await Assert.That(result.Provider).IsEqualTo("local");
         await _configurationService.DidNotReceive().VerifyCerbosEndpointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -44,7 +44,7 @@ public class GetAuthorizationProviderConfigurationQueryHandlerTests
         };
 
         _configurationService.ReadConfigurationAsync().Returns(configuration);
-        var result = await _handler.Handle(new GetAuthorizationProviderConfigurationQuery(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetAuthorizationProviderConfigurationQuery(), CancellationToken.None);
 
         await Assert.That(result.Provider).IsEqualTo("local");
         await Assert.That(result.CerbosEndpointVerified).IsFalse();
@@ -66,7 +66,7 @@ public class GetAuthorizationProviderConfigurationQueryHandlerTests
 
         _configurationService.ReadConfigurationAsync().Returns(configuration);
 
-        var result = await _handler.Handle(new GetAuthorizationProviderConfigurationQuery(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetAuthorizationProviderConfigurationQuery(), CancellationToken.None);
 
         await Assert.That(result.Provider).IsEqualTo("cerbos");
         await _configurationService.DidNotReceive().VerifyCerbosEndpointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());

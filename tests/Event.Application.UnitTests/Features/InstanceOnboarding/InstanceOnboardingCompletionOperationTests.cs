@@ -119,7 +119,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
             interactive.UserRepository,
             interactive.DeploymentModeProvider,
             interactive.Operation);
-        BaseCommandResponse<Guid> interactiveResponse = await handler.Handle(
+        BaseCommandResponse<Guid> interactiveResponse = await handler.ExecuteAsync(
             interactive.InteractiveCommand(),
             CancellationToken.None);
 

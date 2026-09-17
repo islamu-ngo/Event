@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public class GetInstanceGovernanceSettingsQueryHandler : IRequestHandler<GetInstanceGovernanceSettingsQuery, InstanceGovernanceSettings>
+public class GetInstanceGovernanceSettingsQueryHandler : IQueryHandler<GetInstanceGovernanceSettingsQuery, InstanceGovernanceSettings>
 {
     private readonly IInstanceGovernanceSettingService _governanceSettingService;
 
@@ -14,7 +14,7 @@ public class GetInstanceGovernanceSettingsQueryHandler : IRequestHandler<GetInst
         _governanceSettingService = governanceSettingService;
     }
 
-    public async Task<InstanceGovernanceSettings> Handle(GetInstanceGovernanceSettingsQuery request, CancellationToken cancellationToken)
+    public async Task<InstanceGovernanceSettings> QueryAsync(GetInstanceGovernanceSettingsQuery request, CancellationToken cancellationToken)
     {
         return await _governanceSettingService.ReadSettingsAsync();
     }

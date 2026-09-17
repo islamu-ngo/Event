@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public class RunKeycloakRealmDoctorQueryHandler : IRequestHandler<RunKeycloakRealmDoctorQuery, KeycloakRealmDoctorResultDto>
+public class RunKeycloakRealmDoctorQueryHandler : IQueryHandler<RunKeycloakRealmDoctorQuery, KeycloakRealmDoctorResultDto>
 {
     private readonly IAuthProviderConfigurationService _configurationService;
     private readonly IKeycloakBootstrapService _keycloakBootstrapService;
@@ -18,7 +18,7 @@ public class RunKeycloakRealmDoctorQueryHandler : IRequestHandler<RunKeycloakRea
         _keycloakBootstrapService = keycloakBootstrapService;
     }
 
-    public async Task<KeycloakRealmDoctorResultDto> Handle(
+    public async Task<KeycloakRealmDoctorResultDto> QueryAsync(
         RunKeycloakRealmDoctorQuery request,
         CancellationToken cancellationToken)
     {

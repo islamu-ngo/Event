@@ -59,7 +59,7 @@ public sealed class InstanceSmtpSettingsMutationTests
             using var concurrent = new InstanceSettingsCommandFixture(concurrentContext, actor);
             var supplied = Configuration("supplied", 2525, "SslOnConnect", 41, true);
             var committed = Configuration("concurrent", 465, "None", 52, true);
-            Task<BaseCommandResponse<Guid>> pending = CreateHandler(waiting).Handle(new UpdateInstanceSmtpSettingsCommand
+            Task<BaseCommandResponse<Guid>> pending = CreateHandler(waiting).ExecuteAsync(new UpdateInstanceSmtpSettingsCommand
             {
                 UserId = actor,
                 Patch = new PatchInstanceSmtpSettingsDto
@@ -75,7 +75,7 @@ public sealed class InstanceSmtpSettingsMutationTests
                 Task observed = await Task.WhenAny(reachedFence.Task, pending).WaitAsync(TimeSpan.FromSeconds(15));
                 await Assert.That(observed).IsSameReferenceAs(reachedFence.Task);
                 await Assert.That(waitingContext.Database.CurrentTransaction).IsNull();
-                var saved = await CreateHandler(concurrent).Handle(new UpdateInstanceSmtpSettingsCommand
+                var saved = await CreateHandler(concurrent).ExecuteAsync(new UpdateInstanceSmtpSettingsCommand
                 {
                     UserId = actor,
                     Patch = new PatchInstanceSmtpSettingsDto

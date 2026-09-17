@@ -145,20 +145,20 @@ public sealed class InstanceOperatorIdentityAdminService(
 
     private static SaveInstanceOperatorIdentityRequestDto BuildRequest(
         InstanceOperatorIdentityAdminModel model) => new()
-    {
-        ExpectedRevision = model.Revision,
-        PublicName = Normalize(model.PublicName),
-        LegalName = Normalize(model.LegalName),
-        OperatorKindCode = Normalize(model.OperatorKindCode),
-        JurisdictionCountryCode = Normalize(model.JurisdictionCountryCode),
-        RegistrationIdentifier = Normalize(model.RegistrationIdentifier),
-        PublicContactEmail = Normalize(model.PublicContactEmail),
-        WebsiteUrl = Normalize(model.WebsiteUrl),
-        LegalNoticeUrl = Normalize(model.LegalNoticeUrl),
-        TermsUrl = Normalize(model.TermsUrl),
-        PrivacyUrl = Normalize(model.PrivacyUrl),
-        OfficialOrigin = Normalize(model.OfficialOrigin)
-    };
+        {
+            ExpectedRevision = model.Revision,
+            PublicName = Normalize(model.PublicName),
+            LegalName = Normalize(model.LegalName),
+            OperatorKindCode = Normalize(model.OperatorKindCode),
+            JurisdictionCountryCode = Normalize(model.JurisdictionCountryCode),
+            RegistrationIdentifier = Normalize(model.RegistrationIdentifier),
+            PublicContactEmail = Normalize(model.PublicContactEmail),
+            WebsiteUrl = Normalize(model.WebsiteUrl),
+            LegalNoticeUrl = Normalize(model.LegalNoticeUrl),
+            TermsUrl = Normalize(model.TermsUrl),
+            PrivacyUrl = Normalize(model.PrivacyUrl),
+            OfficialOrigin = Normalize(model.OfficialOrigin)
+        };
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -243,29 +243,29 @@ public sealed record InstanceOperatorIdentitySaveResult
 
     public static InstanceOperatorIdentitySaveResult Successful(
         InstanceOperatorIdentityAdminModel model) => new()
-    {
-        Success = true,
-        MessageCode = InstanceOperatorIdentityAdminMessageCode.Saved,
-        Model = model
-    };
+        {
+            Success = true,
+            MessageCode = InstanceOperatorIdentityAdminMessageCode.Saved,
+            Model = model
+        };
 
     public static InstanceOperatorIdentitySaveResult Failed(
         InstanceOperatorIdentityAdminMessageCode messageCode,
         string? errorMessage = null,
         IReadOnlyDictionary<string, string>? validationErrors = null) => new()
-    {
-        MessageCode = messageCode,
-        ErrorMessage = errorMessage,
-        ValidationErrors = validationErrors ?? new Dictionary<string, string>()
-    };
+        {
+            MessageCode = messageCode,
+            ErrorMessage = errorMessage,
+            ValidationErrors = validationErrors ?? new Dictionary<string, string>()
+        };
 
     public static InstanceOperatorIdentitySaveResult Conflict(
         InstanceOperatorIdentityAdminModel authoritative) => new()
-    {
-        IsConcurrencyConflict = true,
-        MessageCode = InstanceOperatorIdentityAdminMessageCode.Conflict,
-        Model = authoritative
-    };
+        {
+            IsConcurrencyConflict = true,
+            MessageCode = InstanceOperatorIdentityAdminMessageCode.Conflict,
+            Model = authoritative
+        };
 }
 
 public enum InstanceOperatorIdentityAdminMessageCode

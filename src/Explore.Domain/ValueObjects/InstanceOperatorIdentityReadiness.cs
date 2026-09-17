@@ -169,17 +169,17 @@ public sealed record InstanceOperatorIdentityReadiness(
 
     private static TenantDirectoryOperatorIdentitySettings ToLegalSettings(
         InstanceOperatorIdentitySettings settings) => new()
-    {
-        PublicName = settings.PublicName,
-        LegalName = settings.LegalName,
-        OperatorKindCode = settings.OperatorKindCode,
-        JurisdictionCountryCode = settings.JurisdictionCountryCode,
-        RegistrationIdentifier = settings.RegistrationIdentifier,
-        PublicContactEmail = settings.PublicContactEmail,
-        LegalNoticeUrl = settings.LegalNoticeUrl,
-        TermsUrl = settings.TermsUrl,
-        PrivacyUrl = settings.PrivacyUrl
-    };
+        {
+            PublicName = settings.PublicName,
+            LegalName = settings.LegalName,
+            OperatorKindCode = settings.OperatorKindCode,
+            JurisdictionCountryCode = settings.JurisdictionCountryCode,
+            RegistrationIdentifier = settings.RegistrationIdentifier,
+            PublicContactEmail = settings.PublicContactEmail,
+            LegalNoticeUrl = settings.LegalNoticeUrl,
+            TermsUrl = settings.TermsUrl,
+            PrivacyUrl = settings.PrivacyUrl
+        };
 
     private static string? NormalizeOfficialOrigin(string? value)
     {

@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Webhooks;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.ViewDelivery)]
 public sealed record GetWebhookMessageByIdQuery
-    : IRequest<WebhookMessageDto?>, ISecureRequest, IWebhookPersistedOwnerRequest
+    : IQuery<WebhookMessageDto?>, ISecureRequest, IWebhookPersistedOwnerRequest
 {
     public Guid MessageId { get; init; }
 

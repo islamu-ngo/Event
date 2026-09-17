@@ -103864,7 +103864,7 @@
           "WebhookEndpoints"
         ],
         "summary": "Get webhook endpoint",
-        "description": "Returns one owner-authorized outgoing webhook endpoint with subscription metadata.",
+        "description": "Returns an outgoing webhook endpoint by identifier with state-authorized actions.",
         "operationId": "GetWebhookEndpointById",
         "parameters": [
           {
@@ -103938,7 +103938,8 @@
           }
         },
         "x-endpoint-class": "Public",
-        "x-rate-limit-policy": "Authenticated"
+        "x-rate-limit-policy": "Authenticated",
+        "x-output-cache-policy": "LookupData"
       },
       "patch": {
         "tags": [

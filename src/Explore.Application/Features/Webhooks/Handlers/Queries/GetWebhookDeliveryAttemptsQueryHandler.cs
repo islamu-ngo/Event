@@ -1,20 +1,20 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetWebhookDeliveryAttemptsQueryHandler(
     IWebhookDeliveryAttemptRepository attemptRepository,
     IWebhookOwnershipScopeResolver ownershipScopeResolver)
-    : IRequestHandler<GetWebhookDeliveryAttemptsQuery, IReadOnlyList<WebhookDeliveryAttemptDto>>
+    : IQueryHandler<GetWebhookDeliveryAttemptsQuery, IReadOnlyList<WebhookDeliveryAttemptDto>>
 {
     private const int DefaultLimit = 100;
     private const int MaxLimit = 500;
 
-    public async Task<IReadOnlyList<WebhookDeliveryAttemptDto>> Handle(
+    public async Task<IReadOnlyList<WebhookDeliveryAttemptDto>> QueryAsync(
         GetWebhookDeliveryAttemptsQuery request,
         CancellationToken cancellationToken)
     {

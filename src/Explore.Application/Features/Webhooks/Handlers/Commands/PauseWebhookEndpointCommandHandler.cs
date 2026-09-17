@@ -6,8 +6,8 @@ using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Validators;
 using Explore.Application.Lookups;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -16,9 +16,9 @@ public sealed class PauseWebhookEndpointCommandHandler(
     IWebhookAuditEventWriter auditWriter,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
-    : IRequestHandler<PauseWebhookEndpointCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PauseWebhookEndpointCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         PauseWebhookEndpointCommand request,
         CancellationToken cancellationToken)
     {

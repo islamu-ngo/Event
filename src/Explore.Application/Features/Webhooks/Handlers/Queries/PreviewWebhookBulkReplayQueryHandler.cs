@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Features.Webhooks.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
@@ -12,9 +12,9 @@ public sealed class PreviewWebhookBulkReplayQueryHandler(
     IWebhookBulkReplayRepository repository,
     IWebhookBulkReplayPolicyResolver policyResolver,
     TimeProvider timeProvider)
-    : IRequestHandler<PreviewWebhookBulkReplayQuery, WebhookBulkReplayPreviewResult>
+    : IQueryHandler<PreviewWebhookBulkReplayQuery, WebhookBulkReplayPreviewResult>
 {
-    public async Task<WebhookBulkReplayPreviewResult> Handle(
+    public async Task<WebhookBulkReplayPreviewResult> QueryAsync(
         PreviewWebhookBulkReplayQuery request,
         CancellationToken cancellationToken)
     {

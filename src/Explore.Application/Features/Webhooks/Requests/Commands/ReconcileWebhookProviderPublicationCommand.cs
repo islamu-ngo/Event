@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.ReconcilePublication)]
-public sealed record ReconcileWebhookProviderPublicationCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ReconcileWebhookProviderPublicationCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid PublicationId { get; init; }

@@ -11,9 +11,9 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +26,16 @@ public sealed class WebhookBulkReplayOperationsTests
 {
     private readonly Guid _tenantId = Guid.CreateVersion7();
     private readonly Guid _actorUserId = Guid.CreateVersion7();
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<PreviewWebhookBulkReplayQuery, WebhookBulkReplayPreviewResult> _previewHandler =
+        Substitute.For<IQueryHandler<PreviewWebhookBulkReplayQuery, WebhookBulkReplayPreviewResult>>();
+    private readonly IQueryHandler<GetWebhookBulkReplayOperationsQuery, IReadOnlyList<WebhookBulkReplayOperationDto>> _getOperationsHandler =
+        Substitute.For<IQueryHandler<GetWebhookBulkReplayOperationsQuery, IReadOnlyList<WebhookBulkReplayOperationDto>>>();
+    private readonly IQueryHandler<GetWebhookBulkReplayOperationQuery, WebhookBulkReplayOperationDto?> _getOperationHandler =
+        Substitute.For<IQueryHandler<GetWebhookBulkReplayOperationQuery, WebhookBulkReplayOperationDto?>>();
+    private readonly ICommandHandler<ScheduleWebhookBulkReplayCommand, BaseCommandResponse<Guid>> _scheduleHandler =
+        Substitute.For<ICommandHandler<ScheduleWebhookBulkReplayCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<CancelWebhookBulkReplayCommand, BaseCommandResponse<Guid>> _cancelHandler =
+        Substitute.For<ICommandHandler<CancelWebhookBulkReplayCommand, BaseCommandResponse<Guid>>>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly IResourceAssembler<WebhookBulkReplayOperationDto, WebhookBulkReplayOperationDto> _assembler =
         Substitute.For<IResourceAssembler<WebhookBulkReplayOperationDto, WebhookBulkReplayOperationDto>>();
@@ -87,7 +96,7 @@ public sealed class WebhookBulkReplayOperationsTests
         var toBoundary = new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Unspecified);
         var expectedFromUtc = DateTime.SpecifyKind(fromBoundary, DateTimeKind.Utc);
         var expectedToUtc = DateTime.SpecifyKind(toBoundary, DateTimeKind.Utc);
-        _mediator.Send(Arg.Any<PreviewWebhookBulkReplayQuery>(), Arg.Any<CancellationToken>())
+        _previewHandler.QueryAsync(Arg.Any<PreviewWebhookBulkReplayQuery>(), Arg.Any<CancellationToken>())
             .Returns(WebhookBulkReplayPreviewResult.Succeeded(new WebhookBulkReplayPreviewDto
             {
                 Filter = new WebhookBulkReplayFilterDto
@@ -106,7 +115,7 @@ public sealed class WebhookBulkReplayOperationsTests
             cancellationToken: CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await _mediator.Received(1).Send(
+        await _previewHandler.Received(1).QueryAsync(
             Arg.Is<PreviewWebhookBulkReplayQuery>(query =>
                 query.FromUtc == expectedFromUtc &&
                 query.FromUtc.Kind == DateTimeKind.Utc &&
@@ -119,7 +128,7 @@ public sealed class WebhookBulkReplayOperationsTests
     public async Task Schedule_MapsServerOwnedScopeAndReturnsAcceptedOperationLocation()
     {
         var operationId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<ScheduleWebhookBulkReplayCommand>(), Arg.Any<CancellationToken>())
+        _scheduleHandler.ExecuteAsync(Arg.Any<ScheduleWebhookBulkReplayCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 operationId,
                 "Webhook bulk replay operation queued."));
@@ -145,7 +154,7 @@ public sealed class WebhookBulkReplayOperationsTests
         await Assert.That(accepted).IsNotNull();
         await Assert.That(accepted!.RouteName).IsEqualTo(RouteNames.GetWebhookBulkReplayById);
         await Assert.That(accepted.RouteValues!["operationId"]).IsEqualTo(operationId);
-        await _mediator.Received(1).Send(
+        await _scheduleHandler.Received(1).ExecuteAsync(
             Arg.Is<ScheduleWebhookBulkReplayCommand>(command =>
                 command.TenantId == _tenantId &&
                 command.ActorUserId == _actorUserId &&
@@ -161,7 +170,7 @@ public sealed class WebhookBulkReplayOperationsTests
     public async Task Schedule_NormalizesOffsetlessGeneratedClientDatesAsUtc()
     {
         var operationId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<ScheduleWebhookBulkReplayCommand>(), Arg.Any<CancellationToken>())
+        _scheduleHandler.ExecuteAsync(Arg.Any<ScheduleWebhookBulkReplayCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 operationId,
                 "Webhook bulk replay operation queued."));
@@ -183,7 +192,7 @@ public sealed class WebhookBulkReplayOperationsTests
             }
         }, CancellationToken.None);
 
-        await _mediator.Received(1).Send(
+        await _scheduleHandler.Received(1).ExecuteAsync(
             Arg.Is<ScheduleWebhookBulkReplayCommand>(command =>
                 command.FromUtc == expectedFromUtc &&
                 command.FromUtc.Kind == DateTimeKind.Utc &&
@@ -208,7 +217,7 @@ public sealed class WebhookBulkReplayOperationsTests
                 [new Claim("sub", _actorUserId.ToString("D"))],
                 authenticationType: "TestAuth"))
         };
-        return new WebhookBulkReplaysController(_mediator, _tenantContext, _assembler)
+        return new WebhookBulkReplaysController(_previewHandler, _getOperationsHandler, _getOperationHandler, _scheduleHandler, _cancelHandler, _tenantContext, _assembler)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

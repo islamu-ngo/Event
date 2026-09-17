@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Webhooks;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.BulkReplay)]
-public sealed record GetWebhookBulkReplayOperationQuery : IRequest<WebhookBulkReplayOperationDto?>, ISecureRequest
+public sealed record GetWebhookBulkReplayOperationQuery : IQuery<WebhookBulkReplayOperationDto?>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid OperationId { get; init; }

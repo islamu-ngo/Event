@@ -1,15 +1,15 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetWebhookEndpointByIdQueryHandler(
     IWebhookEndpointRepository endpointRepository)
-    : IRequestHandler<GetWebhookEndpointByIdQuery, WebhookEndpointDto?>
+    : IQueryHandler<GetWebhookEndpointByIdQuery, WebhookEndpointDto?>
 {
-    public async Task<WebhookEndpointDto?> Handle(
+    public async Task<WebhookEndpointDto?> QueryAsync(
         GetWebhookEndpointByIdQuery request,
         CancellationToken cancellationToken)
     {

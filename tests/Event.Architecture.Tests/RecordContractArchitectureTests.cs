@@ -82,7 +82,7 @@ namespace Event.Architecture.Tests
             await Assert.That(Classify(typeof(NativeRegistrationFormDefinitionDto))).IsEqualTo(ContractClassification.Record);
             await Assert.That(IsRecord(genericRecordRequest)).IsTrue();
             await Assert.That(genericRecordRequest.GetInterfaces().Any(contract =>
-                contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IRequest<>))).IsTrue();
+                contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IQuery<>))).IsTrue();
             await Assert.That(typeof(ICommand).IsAssignableFrom(nonGenericRecordRequest)).IsTrue();
             await Assert.That(IsRecord(abstractRecordRequest)).IsTrue();
             await Assert.That(IsRecord(inheritedRecordRequest)).IsTrue();

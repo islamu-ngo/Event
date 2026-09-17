@@ -2,10 +2,10 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +19,9 @@ namespace Explore.API.Controllers;
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
-public sealed class WebhookEndpointOperationsController(IMediator mediator) : EventControllerBase
+public sealed class WebhookEndpointOperationsController(
+    ICommandHandler<PauseWebhookEndpointCommand, BaseCommandResponse<Guid>> pauseHandler,
+    ICommandHandler<ResumeWebhookEndpointCommand, BaseCommandResponse<Guid>> resumeHandler) : EventControllerBase
 {
     [HttpPost("{endpointId:guid}/pause", Name = RouteNames.PauseWebhookEndpoint)]
     [EndpointSummary("Pause webhook endpoint")]
@@ -37,7 +39,7 @@ public sealed class WebhookEndpointOperationsController(IMediator mediator) : Ev
         [FromBody] PauseWebhookEndpointRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await pauseHandler.ExecuteAsync(
             new PauseWebhookEndpointCommand
             {
                 EndpointId = endpointId,
@@ -87,7 +89,7 @@ public sealed class WebhookEndpointOperationsController(IMediator mediator) : Ev
         [FromBody] ResumeWebhookEndpointRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await resumeHandler.ExecuteAsync(
             new ResumeWebhookEndpointCommand
             {
                 EndpointId = endpointId,

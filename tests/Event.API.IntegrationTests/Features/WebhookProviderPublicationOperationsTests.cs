@@ -12,9 +12,9 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +28,14 @@ public sealed class WebhookProviderPublicationOperationsTests
 {
     private readonly Guid _tenantId = Guid.CreateVersion7();
     private readonly Guid _actorUserId = Guid.CreateVersion7();
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetWebhookProviderPublicationsQuery, IReadOnlyList<WebhookProviderPublicationDto>> _getPublicationsHandler =
+        Substitute.For<IQueryHandler<GetWebhookProviderPublicationsQuery, IReadOnlyList<WebhookProviderPublicationDto>>>();
+    private readonly IQueryHandler<GetWebhookProviderPublicationByIdQuery, WebhookProviderPublicationDto?> _getPublicationHandler =
+        Substitute.For<IQueryHandler<GetWebhookProviderPublicationByIdQuery, WebhookProviderPublicationDto?>>();
+    private readonly ICommandHandler<ReconcileWebhookProviderPublicationCommand, BaseCommandResponse<Guid>> _reconcileHandler =
+        Substitute.For<ICommandHandler<ReconcileWebhookProviderPublicationCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<AbandonWebhookProviderPublicationCommand, BaseCommandResponse<Guid>> _abandonHandler =
+        Substitute.For<ICommandHandler<AbandonWebhookProviderPublicationCommand, BaseCommandResponse<Guid>>>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly IResourceAssembler<WebhookProviderPublicationDto, WebhookProviderPublicationDto> _assembler =
         Substitute.For<IResourceAssembler<WebhookProviderPublicationDto, WebhookProviderPublicationDto>>();
@@ -95,7 +102,7 @@ public sealed class WebhookProviderPublicationOperationsTests
     public async Task Reconcile_DispatchesServerOwnedTenantAndActorEvidence()
     {
         var publicationId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<ReconcileWebhookProviderPublicationCommand>(), Arg.Any<CancellationToken>())
+        _reconcileHandler.ExecuteAsync(Arg.Any<ReconcileWebhookProviderPublicationCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 publicationId,
                 "Provider publication reconciled."));
@@ -112,7 +119,7 @@ public sealed class WebhookProviderPublicationOperationsTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await _mediator.Received(1).Send(
+        await _reconcileHandler.Received(1).ExecuteAsync(
             Arg.Is<ReconcileWebhookProviderPublicationCommand>(command =>
                 command.TenantId == _tenantId &&
                 command.PublicationId == publicationId &&
@@ -126,7 +133,7 @@ public sealed class WebhookProviderPublicationOperationsTests
     [Test]
     public async Task Abandon_WhenStateConflicts_ReturnsConflict()
     {
-        _mediator.Send(Arg.Any<AbandonWebhookProviderPublicationCommand>(), Arg.Any<CancellationToken>())
+        _abandonHandler.ExecuteAsync(Arg.Any<AbandonWebhookProviderPublicationCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_provider_publication_not_abandonable",
                 "Provider publication cannot be abandoned.",
@@ -187,7 +194,13 @@ public sealed class WebhookProviderPublicationOperationsTests
                 authenticationType: "TestAuth"))
         };
 
-        return new WebhookProviderPublicationsController(_mediator, _tenantContext, _assembler)
+        return new WebhookProviderPublicationsController(
+            _getPublicationsHandler,
+            _getPublicationHandler,
+            _reconcileHandler,
+            _abandonHandler,
+            _tenantContext,
+            _assembler)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

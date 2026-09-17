@@ -4,8 +4,8 @@ using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -13,11 +13,11 @@ public sealed class OpenSvixAppPortalCommandHandler(
     IWebhookProviderPortalService portalService,
     IWebhookAuditEventWriter auditWriter,
     IWebhookConsumerRepository consumerRepository)
-    : IRequestHandler<OpenSvixAppPortalCommand, WebhookProviderPortalAccessCommandResponse>
+    : ICommandHandler<OpenSvixAppPortalCommand, WebhookProviderPortalAccessCommandResponse>
 {
     private const string ValidationFailure = "webhook_portal_validation_failed";
 
-    public async Task<WebhookProviderPortalAccessCommandResponse> Handle(
+    public async Task<WebhookProviderPortalAccessCommandResponse> ExecuteAsync(
         OpenSvixAppPortalCommand request,
         CancellationToken cancellationToken)
     {

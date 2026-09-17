@@ -6,8 +6,8 @@ using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Lookups;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -21,12 +21,12 @@ public sealed class RotateWebhookEndpointSecretCommandHandler(
     ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
     TimeProvider timeProvider)
-    : IRequestHandler<RotateWebhookEndpointSecretCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RotateWebhookEndpointSecretCommand, BaseCommandResponse<Guid>>
 {
     private const int DefaultPreviousSecretValidForSeconds = 86_400;
     private const int MaxPreviousSecretValidForSeconds = 2_592_000;
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         RotateWebhookEndpointSecretCommand request,
         CancellationToken cancellationToken)
     {

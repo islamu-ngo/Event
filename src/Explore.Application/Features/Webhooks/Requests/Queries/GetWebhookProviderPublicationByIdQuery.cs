@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Webhooks;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.ViewDelivery)]
-public sealed record GetWebhookProviderPublicationByIdQuery : IRequest<WebhookProviderPublicationDto?>, ISecureRequest
+public sealed record GetWebhookProviderPublicationByIdQuery : IQuery<WebhookProviderPublicationDto?>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid PublicationId { get; init; }

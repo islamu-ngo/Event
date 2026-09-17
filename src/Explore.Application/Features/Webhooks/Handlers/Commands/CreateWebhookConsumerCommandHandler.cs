@@ -3,8 +3,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -14,11 +14,11 @@ public sealed class CreateWebhookConsumerCommandHandler(
     IWebhookProviderCapabilityResolver capabilityResolver,
     IWebhookAuditEventWriter auditWriter,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateWebhookConsumerCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateWebhookConsumerCommand, BaseCommandResponse<Guid>>
 {
     private const int MaxNameLength = 200;
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateWebhookConsumerCommand request,
         CancellationToken cancellationToken)
     {

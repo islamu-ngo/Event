@@ -142854,7 +142854,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get webhook endpoint
         /// </summary>
         /// <remarks>
-        /// Returns one owner-authorized outgoing webhook endpoint with subscription metadata.
+        /// Returns an outgoing webhook endpoint by identifier with state-authorized actions.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -143208,7 +143208,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get webhook endpoint
         /// </summary>
         /// <remarks>
-        /// Returns one owner-authorized outgoing webhook endpoint with subscription metadata.
+        /// Returns an outgoing webhook endpoint by identifier with state-authorized actions.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>

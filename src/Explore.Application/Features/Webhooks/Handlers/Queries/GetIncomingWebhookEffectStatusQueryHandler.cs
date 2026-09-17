@@ -1,18 +1,18 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetIncomingWebhookEffectStatusQueryHandler(
     IIncomingWebhookEffectOutboxRepository repository)
-    : IRequestHandler<GetIncomingWebhookEffectStatusQuery, BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>>
+    : IQueryHandler<GetIncomingWebhookEffectStatusQuery, BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>>
 {
     private const int MaxLimit = 200;
 
-    public async Task<BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>> Handle(
+    public async Task<BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>> QueryAsync(
         GetIncomingWebhookEffectStatusQuery request,
         CancellationToken cancellationToken)
     {

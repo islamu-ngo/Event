@@ -6,8 +6,8 @@ using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Lookups;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -21,9 +21,9 @@ public sealed class UpdateWebhookConsumerProviderModeCommandHandler(
     ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
     TimeProvider timeProvider)
-    : IRequestHandler<UpdateWebhookConsumerProviderModeCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateWebhookConsumerProviderModeCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateWebhookConsumerProviderModeCommand request,
         CancellationToken cancellationToken)
     {

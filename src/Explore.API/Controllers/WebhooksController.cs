@@ -14,7 +14,7 @@ using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +30,13 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class WebhooksController(
-    IMediator mediator,
+    IQueryHandler<GetWebhookEventTypesQuery, IReadOnlyList<WebhookEventTypeDto>> getEventTypesHandler,
+    IQueryHandler<GetWebhookConsumersQuery, IReadOnlyList<WebhookConsumerDto>> getConsumersHandler,
+    IQueryHandler<GetWebhookConsumerByIdQuery, WebhookConsumerDto?> getConsumerHandler,
+    ICommandHandler<CreateWebhookConsumerCommand, BaseCommandResponse<Guid>> createConsumerHandler,
+    ICommandHandler<UpdateWebhookConsumerProviderModeCommand, BaseCommandResponse<Guid>> updateConsumerProviderModeHandler,
+    ICommandHandler<RepairWebhookProviderBindingCommand, BaseCommandResponse<Guid>> repairProviderBindingHandler,
+    ICommandHandler<OpenSvixAppPortalCommand, WebhookProviderPortalAccessCommandResponse> openSvixAppPortalHandler,
     IWebhookOwnershipScopeResolver webhookOwnershipScopeResolver,
     IResourceAssembler<WebhookConsumerDto, WebhookConsumerDto> webhookConsumerAssembler)
     : WebhooksControllerBase(webhookOwnershipScopeResolver)
@@ -102,7 +108,7 @@ public sealed class WebhooksController(
     public async Task<ActionResult<IReadOnlyList<WebhookEventTypeDto>>> GetEventTypes(
         CancellationToken cancellationToken = default)
     {
-        var eventTypes = await mediator.Send(new GetWebhookEventTypesQuery(), cancellationToken);
+        var eventTypes = await getEventTypesHandler.QueryAsync(new GetWebhookEventTypesQuery(), cancellationToken);
         return Ok(eventTypes);
     }
 
@@ -122,7 +128,7 @@ public sealed class WebhooksController(
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var consumers = await mediator.Send(
+        var consumers = await getConsumersHandler.QueryAsync(
             new GetWebhookConsumersQuery
             {
                 OwnerKindId = ownerKindId,
@@ -154,7 +160,7 @@ public sealed class WebhooksController(
         Guid consumerId,
         CancellationToken cancellationToken = default)
     {
-        var consumer = await mediator.Send(
+        var consumer = await getConsumerHandler.QueryAsync(
             new GetWebhookConsumerByIdQuery
             {
                 ConsumerId = consumerId
@@ -185,7 +191,7 @@ public sealed class WebhooksController(
         [FromBody] CreateWebhookConsumerRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await createConsumerHandler.ExecuteAsync(
             new CreateWebhookConsumerCommand
             {
                 OwnerId = request.OwnerId,
@@ -229,7 +235,7 @@ public sealed class WebhooksController(
         }
 
         var providerMode = request.ProviderMode;
-        var response = await mediator.Send(
+        var response = await updateConsumerProviderModeHandler.ExecuteAsync(
             new UpdateWebhookConsumerProviderModeCommand
             {
                 ConsumerId = consumerId,
@@ -262,7 +268,7 @@ public sealed class WebhooksController(
         [FromBody] RepairWebhookProviderBindingRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await repairProviderBindingHandler.ExecuteAsync(
             new RepairWebhookProviderBindingCommand
             {
                 ConsumerId = consumerId,
@@ -302,7 +308,7 @@ public sealed class WebhooksController(
         [FromBody] OpenSvixAppPortalRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await openSvixAppPortalHandler.ExecuteAsync(
             new OpenSvixAppPortalCommand
             {
                 ConsumerId = request.ConsumerId,

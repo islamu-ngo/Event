@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.ManageProvider)]
 public sealed record RepairWebhookProviderBindingCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest, IWebhookPersistedOwnerRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest, IWebhookPersistedOwnerRequest
 {
     public Guid ConsumerId { get; init; }
 

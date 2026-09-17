@@ -2,8 +2,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
@@ -11,9 +11,9 @@ public sealed class GetWebhookConsumerByIdQueryHandler(
     IWebhookConsumerRepository consumerRepository,
     IWebhookConsumerProviderBindingRepository bindingRepository,
     IWebhookProviderCapabilityResolver capabilityResolver)
-    : IRequestHandler<GetWebhookConsumerByIdQuery, WebhookConsumerDto?>
+    : IQueryHandler<GetWebhookConsumerByIdQuery, WebhookConsumerDto?>
 {
-    public async Task<WebhookConsumerDto?> Handle(
+    public async Task<WebhookConsumerDto?> QueryAsync(
         GetWebhookConsumerByIdQuery request,
         CancellationToken cancellationToken)
     {

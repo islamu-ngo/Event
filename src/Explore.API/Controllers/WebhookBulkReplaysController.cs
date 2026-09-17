@@ -8,7 +8,7 @@ using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +23,11 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class WebhookBulkReplaysController(
-    IMediator mediator,
+    IQueryHandler<PreviewWebhookBulkReplayQuery, WebhookBulkReplayPreviewResult> previewHandler,
+    IQueryHandler<GetWebhookBulkReplayOperationsQuery, IReadOnlyList<WebhookBulkReplayOperationDto>> getOperationsHandler,
+    IQueryHandler<GetWebhookBulkReplayOperationQuery, WebhookBulkReplayOperationDto?> getOperationHandler,
+    ICommandHandler<ScheduleWebhookBulkReplayCommand, BaseCommandResponse<Guid>> scheduleHandler,
+    ICommandHandler<CancelWebhookBulkReplayCommand, BaseCommandResponse<Guid>> cancelHandler,
     ITenantContext tenantContext,
     IResourceAssembler<WebhookBulkReplayOperationDto, WebhookBulkReplayOperationDto> assembler)
     : EventControllerBase
@@ -46,7 +50,7 @@ public sealed class WebhookBulkReplaysController(
         [FromQuery] int maxItems = 100,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await previewHandler.QueryAsync(
             new PreviewWebhookBulkReplayQuery
             {
                 TenantId = tenantContext.TenantId,
@@ -78,7 +82,7 @@ public sealed class WebhookBulkReplaysController(
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var operations = await mediator.Send(
+        var operations = await getOperationsHandler.QueryAsync(
             new GetWebhookBulkReplayOperationsQuery
             {
                 TenantId = tenantContext.TenantId,
@@ -105,7 +109,7 @@ public sealed class WebhookBulkReplaysController(
         Guid operationId,
         CancellationToken cancellationToken = default)
     {
-        var operation = await mediator.Send(
+        var operation = await getOperationHandler.QueryAsync(
             new GetWebhookBulkReplayOperationQuery
             {
                 TenantId = tenantContext.TenantId,
@@ -143,7 +147,7 @@ public sealed class WebhookBulkReplaysController(
             }));
         }
 
-        var response = await mediator.Send(
+        var response = await scheduleHandler.ExecuteAsync(
             new ScheduleWebhookBulkReplayCommand
             {
                 TenantId = tenantContext.TenantId,
@@ -194,7 +198,7 @@ public sealed class WebhookBulkReplaysController(
         [FromBody] CancelWebhookBulkReplayRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await cancelHandler.ExecuteAsync(
             new CancelWebhookBulkReplayCommand
             {
                 TenantId = tenantContext.TenantId,

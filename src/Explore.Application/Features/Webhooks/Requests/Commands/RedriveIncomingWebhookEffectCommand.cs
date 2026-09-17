@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.RedriveIncoming)]
-public sealed record RedriveIncomingWebhookEffectCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record RedriveIncomingWebhookEffectCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid EffectOutboxId { get; init; }

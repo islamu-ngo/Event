@@ -37,7 +37,7 @@ public sealed class GetWebhookEventTypesQueryHandlerTests
             new WebhookEventSchemaProvider(),
             eventTypeRepository);
 
-        var result = await handler.Handle(new GetWebhookEventTypesQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetWebhookEventTypesQuery(), CancellationToken.None);
 
         await Assert.That(result).Count().IsEqualTo(13);
         await Assert.That(result.Select(eventType => eventType.Name)).Contains(WebhookEventNames.EventPublished);

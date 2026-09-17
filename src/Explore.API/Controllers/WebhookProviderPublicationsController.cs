@@ -8,7 +8,7 @@ using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +23,10 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class WebhookProviderPublicationsController(
-    IMediator mediator,
+    IQueryHandler<GetWebhookProviderPublicationsQuery, IReadOnlyList<WebhookProviderPublicationDto>> getPublicationsHandler,
+    IQueryHandler<GetWebhookProviderPublicationByIdQuery, WebhookProviderPublicationDto?> getPublicationHandler,
+    ICommandHandler<ReconcileWebhookProviderPublicationCommand, BaseCommandResponse<Guid>> reconcileHandler,
+    ICommandHandler<AbandonWebhookProviderPublicationCommand, BaseCommandResponse<Guid>> abandonHandler,
     ITenantContext tenantContext,
     IResourceAssembler<WebhookProviderPublicationDto, WebhookProviderPublicationDto> assembler)
     : EventControllerBase
@@ -45,7 +48,7 @@ public sealed class WebhookProviderPublicationsController(
     {
         var normalizedMessageId = Normalize(messageId);
         var normalizedConsumerId = Normalize(consumerId);
-        var publications = await mediator.Send(
+        var publications = await getPublicationsHandler.QueryAsync(
             new GetWebhookProviderPublicationsQuery
             {
                 TenantId = tenantContext.TenantId,
@@ -77,7 +80,7 @@ public sealed class WebhookProviderPublicationsController(
         Guid publicationId,
         CancellationToken cancellationToken = default)
     {
-        var publication = await mediator.Send(
+        var publication = await getPublicationHandler.QueryAsync(
             new GetWebhookProviderPublicationByIdQuery
             {
                 TenantId = tenantContext.TenantId,
@@ -109,7 +112,7 @@ public sealed class WebhookProviderPublicationsController(
         [FromBody] ReconcileWebhookProviderPublicationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await reconcileHandler.ExecuteAsync(
             new ReconcileWebhookProviderPublicationCommand
             {
                 TenantId = tenantContext.TenantId,
@@ -137,7 +140,7 @@ public sealed class WebhookProviderPublicationsController(
         [FromBody] AbandonWebhookProviderPublicationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await abandonHandler.ExecuteAsync(
             new AbandonWebhookProviderPublicationCommand
             {
                 TenantId = tenantContext.TenantId,

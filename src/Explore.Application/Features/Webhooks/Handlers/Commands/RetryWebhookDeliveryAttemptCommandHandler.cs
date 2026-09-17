@@ -4,8 +4,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -14,9 +14,9 @@ public sealed class RetryWebhookDeliveryAttemptCommandHandler(
     IWebhookDeliveryAttemptRepository attemptRepository,
     ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor)
-    : IRequestHandler<RetryWebhookDeliveryAttemptCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RetryWebhookDeliveryAttemptCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         RetryWebhookDeliveryAttemptCommand request,
         CancellationToken cancellationToken)
     {

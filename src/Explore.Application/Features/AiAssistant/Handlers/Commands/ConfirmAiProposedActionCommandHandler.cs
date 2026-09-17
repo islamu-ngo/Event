@@ -13,7 +13,6 @@ using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
@@ -26,9 +25,9 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     ICurrentUserService currentUserService,
     ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createEventCommand,
     ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
-    ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload) : IRequestHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload) : ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ConfirmAiProposedActionCommand request,
         CancellationToken cancellationToken)
     {

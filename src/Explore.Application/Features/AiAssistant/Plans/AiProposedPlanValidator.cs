@@ -12,7 +12,7 @@ public sealed class AiProposedPlanValidator
     private const string RegeneratePlanStepNextAction = "Regenerate the plan step from current API/HAL context before confirmation.";
     private const string ReviewPlanNextAction = "Review the plan preview and required HAL affordances before creating proposed actions.";
     private const string PersistAndConfirmNextAction = "Persist each step as an AI proposed action, then confirm through the existing confirmation endpoint before any command executes.";
-    private const string ConfirmationWarning = "Human confirmation is required before this plan step can dispatch CQRS/MediatR commands.";
+    private const string ConfirmationWarning = "Human confirmation is required before this plan step can dispatch CQRS commands.";
 
     private readonly IAiToolContractRegistry _registry;
 

@@ -1,18 +1,18 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Ai;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
 public sealed class RejectAiProposedActionCommandHandler(
     IAiConversationRepository conversationRepository,
     ITenantContext tenantContext,
-    ICurrentUserService currentUserService) : IRequestHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>>
+    ICurrentUserService currentUserService) : ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         RejectAiProposedActionCommand request,
         CancellationToken cancellationToken)
     {

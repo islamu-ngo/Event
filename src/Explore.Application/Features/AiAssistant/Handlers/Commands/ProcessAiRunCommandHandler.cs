@@ -15,11 +15,10 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Ai;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
-public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCommand>
+public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCommand>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
     private const string PrivacyErasureFencedFailureMessage = "AI assistant processing is unavailable.";
@@ -55,7 +54,7 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
             new AiStructuredActionParser(toolRegistry));
     }
 
-    public async Task Handle(ProcessAiRunCommand request, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(ProcessAiRunCommand request, CancellationToken cancellationToken)
     {
         if (request.TenantId == Guid.Empty || request.ConversationId == Guid.Empty || request.RunId == Guid.Empty)
         {

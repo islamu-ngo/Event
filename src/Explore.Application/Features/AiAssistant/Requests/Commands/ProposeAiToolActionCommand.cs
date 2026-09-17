@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.AiConversation, AuthorizationActions.AiConversations.ProposeAction)]
-public sealed record ProposeAiToolActionCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ProposeAiToolActionCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid ConversationId { get; init; }
     public string ToolName { get; init; } = string.Empty;

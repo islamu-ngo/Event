@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai.Validators;
 using Explore.Application.Features.AiAssistant.Actors;
@@ -7,12 +8,11 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Ai;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
 public sealed class CreateAiConversationCommandHandler
-    : IRequestHandler<CreateAiConversationCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateAiConversationCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAiConversationRepository _conversationRepository;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
@@ -34,7 +34,7 @@ public sealed class CreateAiConversationCommandHandler
         _actorContextService = actorContextService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateAiConversationCommand request,
         CancellationToken cancellationToken)
     {

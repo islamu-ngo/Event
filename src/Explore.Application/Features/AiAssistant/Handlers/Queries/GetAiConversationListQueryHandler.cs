@@ -1,13 +1,13 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Queries;
 
 public sealed class GetAiConversationListQueryHandler
-    : IRequestHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>>
+    : IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>>
 {
     private readonly IAiConversationRepository _conversationRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -20,7 +20,7 @@ public sealed class GetAiConversationListQueryHandler
         _currentUserService = currentUserService;
     }
 
-    public async Task<IReadOnlyList<AiConversationSummaryDto>> Handle(
+    public async Task<IReadOnlyList<AiConversationSummaryDto>> QueryAsync(
         GetAiConversationListQuery request,
         CancellationToken cancellationToken)
     {

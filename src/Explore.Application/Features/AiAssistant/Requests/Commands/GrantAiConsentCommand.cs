@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Requests.Commands;
 
-public sealed record GrantAiConsentCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record GrantAiConsentCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public required Guid TenantId { get; init; }
     public required Guid SubjectUserId { get; init; }

@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Queries;
 
 public sealed class SearchAiReferencesQueryHandler(IEventRepository eventRepository, IActorRepository actorRepository)
-    : IRequestHandler<SearchAiReferencesQuery, IReadOnlyList<AiReferenceSearchResultDto>>
+    : IQueryHandler<SearchAiReferencesQuery, IReadOnlyList<AiReferenceSearchResultDto>>
 {
     public const int DefaultLimit = 10;
     public const int MaxLimit = 20;
@@ -18,7 +18,7 @@ public sealed class SearchAiReferencesQueryHandler(IEventRepository eventReposit
     private const string ActorReferenceKind = "Actor";
     private const string OrganizationReferenceKind = "Organization";
 
-    public async Task<IReadOnlyList<AiReferenceSearchResultDto>> Handle(
+    public async Task<IReadOnlyList<AiReferenceSearchResultDto>> QueryAsync(
         SearchAiReferencesQuery request,
         CancellationToken cancellationToken)
     {

@@ -3,9 +3,10 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Tools;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -176,8 +177,8 @@ public sealed class AiMcpProjectedProposalTool : McpServerTool
         {
             var services = request.Services
                 ?? throw new InvalidOperationException("MCP request services were unavailable.");
-            var mediator = services.GetRequiredService<IMediator>();
-            var response = await mediator.Send(command, cancellationToken);
+            var handler = services.GetRequiredService<ICommandHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>>>();
+            var response = await handler.ExecuteAsync(command, cancellationToken);
 
             if (response.IsSuccess)
             {

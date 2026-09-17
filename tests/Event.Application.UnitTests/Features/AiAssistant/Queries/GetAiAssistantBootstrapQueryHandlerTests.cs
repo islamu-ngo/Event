@@ -19,12 +19,12 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     private readonly IAiAssistantActorContextService _actorContextService = Substitute.For<IAiAssistantActorContextService>();
 
     [Test]
-    public async Task Handle_WhenDisabled_ReturnsDisabledBootstrapWithoutModels()
+    public async Task QueryAsync_WhenDisabled_ReturnsDisabledBootstrapWithoutModels()
     {
         var tenantId = Guid.NewGuid();
         var handler = CreateHandler(tenantId, CreateSettings());
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.TenantId).IsEqualTo(tenantId);
         await Assert.That(result.Enabled).IsFalse();
@@ -35,7 +35,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenFakeProviderEnabled_ReturnsDeterministicFakeModel()
+    public async Task QueryAsync_WhenFakeProviderEnabled_ReturnsDeterministicFakeModel()
     {
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
@@ -43,7 +43,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             toolProposalsEnabled: true,
             streamingEnabled: true));
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.Available).IsTrue();
         await Assert.That(result.DisabledReason).IsNull();
@@ -56,7 +56,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenOpenAiCompatibleMissingEndpoint_ReturnsEndpointDisabledReason()
+    public async Task QueryAsync_WhenOpenAiCompatibleMissingEndpoint_ReturnsEndpointDisabledReason()
     {
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
@@ -64,7 +64,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             apiKey: "secret",
             modelId: "gpt-test"));
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.Available).IsFalse();
         await Assert.That(result.DisabledReason).IsEqualTo("endpoint_not_configured");
@@ -72,7 +72,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenOpenAiCompatibleConfigured_ReturnsConfiguredModelAndLimits()
+    public async Task QueryAsync_WhenOpenAiCompatibleConfigured_ReturnsConfiguredModelAndLimits()
     {
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
@@ -88,7 +88,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             dailyMessageLimit: 25,
             toolProposalsEnabled: true));
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.Available).IsTrue();
         await Assert.That(result.Provider).IsEqualTo(AiProviderDefaults.ProviderOpenAiCompatible);
@@ -105,7 +105,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenAnthropicConfigured_ReturnsConfiguredModelWithoutEndpoint()
+    public async Task QueryAsync_WhenAnthropicConfigured_ReturnsConfiguredModelWithoutEndpoint()
     {
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
@@ -114,7 +114,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             modelId: "claude-test",
             toolProposalsEnabled: true));
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.Available).IsTrue();
         await Assert.That(result.Provider).IsEqualTo(AiProviderDefaults.ProviderAnthropic);
@@ -124,7 +124,7 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenOpenAiCompatibleUsesLocalEndpoint_ReturnsLocalTimeoutFloor()
+    public async Task QueryAsync_WhenOpenAiCompatibleUsesLocalEndpoint_ReturnsLocalTimeoutFloor()
     {
         var handler = CreateHandler(Guid.NewGuid(), CreateSettings(
             enabled: true,
@@ -133,14 +133,14 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
             modelId: "Gemma-4-E2B-Uncensored-HauhauCS-Aggressive-Q8_K_P",
             timeoutSeconds: 30));
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.Available).IsTrue();
         await Assert.That(result.Limits.TimeoutSeconds).IsEqualTo(AiProviderDefaults.LocalProviderTimeoutSeconds);
     }
 
     [Test]
-    public async Task Handle_WhenUserHasMembershipWithoutEventCreatePermission_ExcludesActorContext()
+    public async Task QueryAsync_WhenUserHasMembershipWithoutEventCreatePermission_ExcludesActorContext()
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -160,14 +160,15 @@ public sealed class GetAiAssistantBootstrapQueryHandlerTests
                 ActorContext(allowedOrganizationActorId, "Organization", "Allowed Org")
             ]);
 
-        var result = await handler.Handle(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetAiAssistantBootstrapQuery(), CancellationToken.None);
 
         await Assert.That(result.ActorContexts.Select(actor => actor.ActorId)).IsEquivalentTo(
-        [
-            userActorId,
-            allowedGroupActorId,
-            allowedOrganizationActorId
-        ]);
+            new[]
+            {
+                userActorId,
+                allowedGroupActorId,
+                allowedOrganizationActorId
+            });
         await Assert.That(result.ActorContexts.Select(actor => actor.ActorId)).DoesNotContain(blockedOrganizationActorId);
         await Assert.That(result.ActorContexts.Select(actor => actor.ActorId)).DoesNotContain(blockedGroupActorId);
     }

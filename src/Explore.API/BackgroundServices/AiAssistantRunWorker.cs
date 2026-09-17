@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
-using MediatR;
 
 namespace Explore.API.BackgroundServices;
 
@@ -25,8 +25,8 @@ public sealed class AiAssistantRunWorker(
 
         try
         {
-            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-            await mediator.Send(new ProcessAiRunCommand
+            var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<ProcessAiRunCommand>>();
+            await handler.ExecuteAsync(new ProcessAiRunCommand
             {
                 TenantId = item.TenantId,
                 ConversationId = item.ConversationId,

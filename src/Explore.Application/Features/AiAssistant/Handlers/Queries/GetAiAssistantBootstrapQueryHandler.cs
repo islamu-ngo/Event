@@ -1,16 +1,16 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Actors;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Queries;
 
-public sealed class GetAiAssistantBootstrapQueryHandler : IRequestHandler<GetAiAssistantBootstrapQuery, AiAssistantBootstrapDto>
+public sealed class GetAiAssistantBootstrapQueryHandler : IQueryHandler<GetAiAssistantBootstrapQuery, AiAssistantBootstrapDto>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
@@ -29,7 +29,7 @@ public sealed class GetAiAssistantBootstrapQueryHandler : IRequestHandler<GetAiA
         _actorContextService = actorContextService;
     }
 
-    public async Task<AiAssistantBootstrapDto> Handle(
+    public async Task<AiAssistantBootstrapDto> QueryAsync(
         GetAiAssistantBootstrapQuery request,
         CancellationToken cancellationToken)
     {

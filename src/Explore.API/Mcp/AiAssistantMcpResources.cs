@@ -1,16 +1,19 @@
 using System.ComponentModel;
 using System.Text.Json;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace Explore.API.Mcp;
 
 [McpServerResourceType]
-public sealed class AiAssistantMcpResources(IMediator mediator, IAiContextRedactor redactor)
+public sealed class AiAssistantMcpResources(
+    IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>> listHandler,
+    IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?> detailHandler,
+    IAiContextRedactor redactor)
 {
     [McpServerResource(
         Name = "ai_conversations",
@@ -21,7 +24,7 @@ public sealed class AiAssistantMcpResources(IMediator mediator, IAiContextRedact
     [Description("List recent authenticated AI assistant conversation summaries visible to the current principal.")]
     public async Task<string> ListConversationsAsync(CancellationToken cancellationToken = default)
     {
-        var conversations = await mediator.Send(new GetAiConversationListQuery { Limit = 10 }, cancellationToken);
+        var conversations = await listHandler.QueryAsync(new GetAiConversationListQuery { Limit = 10 }, cancellationToken);
         var descriptor = new AiMcpConversationListDescriptor(
             conversations.Select(MapSummary).ToArray());
 
@@ -42,7 +45,7 @@ public sealed class AiAssistantMcpResources(IMediator mediator, IAiContextRedact
         Guid conversationId,
         CancellationToken cancellationToken = default)
     {
-        var conversation = await mediator.Send(
+        var conversation = await detailHandler.QueryAsync(
             new GetAiConversationDetailQuery { ConversationId = conversationId },
             cancellationToken);
 

@@ -4,12 +4,12 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Features.EventTemplates.Requests.Commands;
 using Explore.Application.Features.EventTemplates.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -36,14 +36,26 @@ public class EventTemplateController : EventControllerBase
         "Event template not found",
         "Event template not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateEventTemplateCommand, BaseCommandResponse<Guid>> _createHandler;
+    private readonly ICommandHandler<UpdateEventTemplateCommand, BaseCommandResponse<Guid>> _updateHandler;
+    private readonly ICommandHandler<DeleteEventTemplateCommand, bool> _deleteHandler;
+    private readonly IQueryHandler<GetEventTemplateDetailsRequest, EventTemplateDto> _getDetailsHandler;
+    private readonly IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>> _getListHandler;
     private readonly IResourceAssembler<EventTemplateDto, EventTemplateListDto> _resourceAssembler;
 
     public EventTemplateController(
-        IMediator mediator,
+        ICommandHandler<CreateEventTemplateCommand, BaseCommandResponse<Guid>> createHandler,
+        ICommandHandler<UpdateEventTemplateCommand, BaseCommandResponse<Guid>> updateHandler,
+        ICommandHandler<DeleteEventTemplateCommand, bool> deleteHandler,
+        IQueryHandler<GetEventTemplateDetailsRequest, EventTemplateDto> getDetailsHandler,
+        IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>> getListHandler,
         IResourceAssembler<EventTemplateDto, EventTemplateListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _createHandler = createHandler;
+        _updateHandler = updateHandler;
+        _deleteHandler = deleteHandler;
+        _getDetailsHandler = getDetailsHandler;
+        _getListHandler = getListHandler;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -65,7 +77,7 @@ public class EventTemplateController : EventControllerBase
         [FromQuery] EventTemplateListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEventTemplateListRequest
+        var result = await _getListHandler.QueryAsync(new GetEventTemplateListRequest
         {
             EventTypeId = query.EventTypeId,
             PageNumber = query.PageNumber,
@@ -95,7 +107,7 @@ public class EventTemplateController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<EventTemplateDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var template = await _mediator.Send(new GetEventTemplateDetailsRequest { Id = id }, cancellationToken);
+        var template = await _getDetailsHandler.QueryAsync(new GetEventTemplateDetailsRequest { Id = id }, cancellationToken);
         if (template == null)
         {
             return this.ToNotFoundProblem(EventTemplateNotFoundProblem);
@@ -125,7 +137,7 @@ public class EventTemplateController : EventControllerBase
             TemplateDto = eventTemplate
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -172,7 +184,7 @@ public class EventTemplateController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp
         };
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _updateHandler.ExecuteAsync(command, cancellationToken);
 
         if (!result.IsSuccess)
         {
@@ -196,7 +208,7 @@ public class EventTemplateController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventTemplateCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteHandler.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

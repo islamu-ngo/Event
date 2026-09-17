@@ -23,6 +23,14 @@ using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Application.Features.EventSessions.Requests.Queries;
+using Explore.Application.Features.EventSessionTemplates.Requests.Queries;
+using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;
+using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateSyncHistory;
+using Explore.Application.Features.EventTemplates.Requests.Queries;
+using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDiff;
+using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
+using Explore.Application.DTOs.EventSessionTemplate;
+using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
@@ -31,6 +39,10 @@ using MediatR;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
 using TUnit.Core;
+using EventSessionTemplateDiffDto = Explore.Application.DTOs.EventSessionTemplateSync.TemplateDiffDto;
+using EventSessionTemplateSyncHistoryItemDto = Explore.Application.DTOs.EventSessionTemplateSync.EventSessionTemplateSyncHistoryItemDto;
+using EventTemplateDiffDto = Explore.Application.DTOs.EventTemplateSync.TemplateDiffDto;
+using EventTemplateSyncHistoryItemDto = Explore.Application.DTOs.EventTemplateSync.EventTemplateSyncHistoryItemDto;
 
 namespace ApiIntegrationTests.Features;
 
@@ -313,7 +325,7 @@ public sealed class EventLocationPrivacyMcpContractTests
     }
 
     private static async Task<EventManagementMcpTools> CreateTools(
-        IMediator mediator,
+        IMediator? mediator,
         IAiContextGateway gateway,
         IResourceAssembler<EventDto, EventListDto>? eventResourceAssembler = null,
         IHttpContextAccessor? httpContextAccessor = null,
@@ -355,13 +367,24 @@ public sealed class EventLocationPrivacyMcpContractTests
             [typeof(IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>)] = sessionGroups,
             [typeof(IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>)] = summaryQuery
                 ?? Substitute.For<IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>>(),
-            [typeof(IMediator)] = mediator,
             [typeof(IUserContext)] = Substitute.For<IUserContext>(),
             [typeof(ITenantContext)] = Substitute.For<ITenantContext>(),
             [typeof(IResourceAssembler<EventDto, EventListDto>)] = eventResourceAssembler
                 ?? Substitute.For<IResourceAssembler<EventDto, EventListDto>>(),
             [typeof(IHttpContextAccessor)] = httpContextAccessor ?? Substitute.For<IHttpContextAccessor>(),
             [typeof(EventMcpLocationDisclosureGuard)] = new EventMcpLocationDisclosureGuard(gateway),
+            [typeof(IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>>(),
+            [typeof(IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>>>(),
+            [typeof(IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>>(),
+            [typeof(IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>>)] =
+                Substitute.For<IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>>>(),
+            [typeof(IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>>>(),
+            [typeof(IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>>)] =
+                Substitute.For<IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>>>(),
             [typeof(IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>)] =
                 Substitute.For<IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>>(),
             [typeof(IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>>)] =

@@ -3,13 +3,13 @@ using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.DTOs.EventSessionTemplateSync.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionTemplateSync.Commands.ApplyEventSessionTemplateSync;
 
 public sealed class ApplyEventSessionTemplateSyncCommandHandler
-    : IRequestHandler<ApplyEventSessionTemplateSyncCommand, BaseCommandResponse<TemplateSyncOutcomeDto>>
+    : ICommandHandler<ApplyEventSessionTemplateSyncCommand, BaseCommandResponse<TemplateSyncOutcomeDto>>
 {
     private readonly IEventSessionTemplateSyncService _syncService;
 
@@ -18,7 +18,7 @@ public sealed class ApplyEventSessionTemplateSyncCommandHandler
         _syncService = syncService;
     }
 
-    public async Task<BaseCommandResponse<TemplateSyncOutcomeDto>> Handle(
+    public async Task<BaseCommandResponse<TemplateSyncOutcomeDto>> ExecuteAsync(
         ApplyEventSessionTemplateSyncCommand request,
         CancellationToken cancellationToken)
     {

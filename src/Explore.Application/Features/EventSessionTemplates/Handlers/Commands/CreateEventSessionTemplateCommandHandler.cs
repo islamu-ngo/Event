@@ -8,12 +8,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionTemplates.Handlers.Commands;
 
-public class CreateEventSessionTemplateCommandHandler : IRequestHandler<CreateEventSessionTemplateCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionTemplateCommandHandler : ICommandHandler<CreateEventSessionTemplateCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionTemplateRepository _sessionTemplateRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
@@ -41,7 +41,7 @@ public class CreateEventSessionTemplateCommandHandler : IRequestHandler<CreateEv
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionTemplateCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventSessionTemplateDtoValidator();
         var validationResult = await validator.ValidateAsync(request.SessionTemplateDto, cancellationToken);

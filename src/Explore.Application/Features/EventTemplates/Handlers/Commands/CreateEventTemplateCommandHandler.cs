@@ -8,12 +8,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Commands;
 
-public class CreateEventTemplateCommandHandler : IRequestHandler<CreateEventTemplateCommand, BaseCommandResponse<Guid>>
+public class CreateEventTemplateCommandHandler : ICommandHandler<CreateEventTemplateCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
@@ -41,7 +41,7 @@ public class CreateEventTemplateCommandHandler : IRequestHandler<CreateEventTemp
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventTemplateCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventTemplateDtoValidator();
         var validationResult = await validator.ValidateAsync(request.TemplateDto, cancellationToken);

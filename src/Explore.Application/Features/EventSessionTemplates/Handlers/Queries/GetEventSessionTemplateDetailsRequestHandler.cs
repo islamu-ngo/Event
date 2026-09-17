@@ -3,12 +3,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessionTemplates.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionTemplates.Handlers.Queries;
 
-public class GetEventSessionTemplateDetailsRequestHandler : IRequestHandler<GetEventSessionTemplateDetailsRequest, EventSessionTemplateDto>
+public class GetEventSessionTemplateDetailsRequestHandler : IQueryHandler<GetEventSessionTemplateDetailsRequest, EventSessionTemplateDto>
 {
     private readonly IEventSessionTemplateRepository _sessionTemplateRepository;
 
@@ -18,7 +18,7 @@ public class GetEventSessionTemplateDetailsRequestHandler : IRequestHandler<GetE
         _sessionTemplateRepository = sessionTemplateRepository;
     }
 
-    public async Task<EventSessionTemplateDto> Handle(GetEventSessionTemplateDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionTemplateDto> QueryAsync(GetEventSessionTemplateDetailsRequest request, CancellationToken cancellationToken)
     {
         var sessionTemplate = await _sessionTemplateRepository.GetSessionTemplateWithDetails(request.Id);
         if (sessionTemplate == null)

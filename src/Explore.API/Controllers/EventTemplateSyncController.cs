@@ -7,13 +7,13 @@ using Explore.API.Hateoas.Resources;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.Features.EventTemplateSync.Commands.ApplyEventTemplateSync;
 using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDiff;
 using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -33,20 +33,26 @@ public sealed class EventTemplateSyncController : EventControllerBase
         "Event template sync validation failed",
         "Event template diff computation failed.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<ApplyEventTemplateSyncCommand, BaseCommandResponse<TemplateSyncOutcomeDto>> _applyHandler;
+    private readonly IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<TemplateDiffDto>> _getDiffHandler;
+    private readonly IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>> _getHistoryHandler;
     private readonly IHateoasAuthorizationEvaluator _authorizationEvaluator;
     private readonly IHateoasLinkGenerator _linkGenerator;
     private readonly ILinkPolicy<EventTemplateSyncResource> _syncLinkPolicy;
     private readonly ITenantContext _tenantContext;
 
     public EventTemplateSyncController(
-        IMediator mediator,
+        ICommandHandler<ApplyEventTemplateSyncCommand, BaseCommandResponse<TemplateSyncOutcomeDto>> applyHandler,
+        IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<TemplateDiffDto>> getDiffHandler,
+        IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>> getHistoryHandler,
         IHateoasAuthorizationEvaluator authorizationEvaluator,
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<EventTemplateSyncResource> syncLinkPolicy,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _applyHandler = applyHandler;
+        _getDiffHandler = getDiffHandler;
+        _getHistoryHandler = getHistoryHandler;
         _authorizationEvaluator = authorizationEvaluator;
         _linkGenerator = linkGenerator;
         _syncLinkPolicy = syncLinkPolicy;
@@ -68,7 +74,7 @@ public sealed class EventTemplateSyncController : EventControllerBase
         [FromQuery(Name = "templateVersion")] int templateVersion,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _getDiffHandler.QueryAsync(
             new GetEventTemplateDiffQuery(eventId, templateVersion),
             cancellationToken);
 
@@ -130,7 +136,7 @@ public sealed class EventTemplateSyncController : EventControllerBase
         [FromBody] EventTemplateSyncApplyRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _applyHandler.ExecuteAsync(
             new ApplyEventTemplateSyncCommand(eventId, request.Plan, request.BaseProvenanceVersion),
             cancellationToken);
 
@@ -152,7 +158,7 @@ public sealed class EventTemplateSyncController : EventControllerBase
         [FromQuery] TemplateSyncHistoryQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _getHistoryHandler.QueryAsync(
             new GetEventTemplateSyncHistoryQuery(eventId, query.Page, query.PageSize),
             cancellationToken);
 

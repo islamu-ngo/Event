@@ -1,10 +1,10 @@
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventTemplates.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record DeleteEventTemplateCommand : IRequest<bool>, ISecureRequest
+public sealed record DeleteEventTemplateCommand : ICommand<bool>, ISecureRequest
 {
     public Guid Id { get; init; }
 

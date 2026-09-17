@@ -4,12 +4,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Features.EventTemplates.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Queries;
 
-public class GetEventTemplateListRequestHandler : IRequestHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>
+public class GetEventTemplateListRequestHandler : IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly ITenantContext _tenantContext;
@@ -25,7 +25,7 @@ public class GetEventTemplateListRequestHandler : IRequestHandler<GetEventTempla
         _cache = cache;
     }
 
-    public async Task<PaginatedResult<EventTemplateListDto>> Handle(GetEventTemplateListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventTemplateListDto>> QueryAsync(GetEventTemplateListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<EventTemplateListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var cacheKey = GetCacheKey(_tenantContext.TenantId, request.EventTypeId, pageNumber, pageSize);

@@ -9,12 +9,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Commands;
 
-public class UpdateEventTemplateCommandHandler : IRequestHandler<UpdateEventTemplateCommand, BaseCommandResponse<Guid>>
+public class UpdateEventTemplateCommandHandler : ICommandHandler<UpdateEventTemplateCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
@@ -39,7 +39,7 @@ public class UpdateEventTemplateCommandHandler : IRequestHandler<UpdateEventTemp
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventTemplateCommand request, CancellationToken cancellationToken)
     {
         if (request.TemplateId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {

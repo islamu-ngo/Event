@@ -3,12 +3,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTemplates.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Queries;
 
-public class GetEventTemplateDetailsRequestHandler : IRequestHandler<GetEventTemplateDetailsRequest, EventTemplateDto>
+public class GetEventTemplateDetailsRequestHandler : IQueryHandler<GetEventTemplateDetailsRequest, EventTemplateDto>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
 
@@ -18,7 +18,7 @@ public class GetEventTemplateDetailsRequestHandler : IRequestHandler<GetEventTem
         _eventTemplateRepository = eventTemplateRepository;
     }
 
-    public async Task<EventTemplateDto> Handle(GetEventTemplateDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventTemplateDto> QueryAsync(GetEventTemplateDetailsRequest request, CancellationToken cancellationToken)
     {
         var template = await _eventTemplateRepository.GetTemplateWithDetails(request.Id);
         if (template == null)

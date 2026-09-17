@@ -2,12 +2,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Features.EventSessionTemplates.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionTemplates.Handlers.Commands;
 
-public class DeleteEventSessionTemplateCommandHandler : IRequestHandler<DeleteEventSessionTemplateCommand, bool>
+public class DeleteEventSessionTemplateCommandHandler : ICommandHandler<DeleteEventSessionTemplateCommand, bool>
 {
     private readonly IEventSessionTemplateRepository _sessionTemplateRepository;
     private readonly HybridCache _cache;
@@ -20,7 +20,7 @@ public class DeleteEventSessionTemplateCommandHandler : IRequestHandler<DeleteEv
         _cache = cache;
     }
 
-    public async Task<bool> Handle(DeleteEventSessionTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventSessionTemplateCommand request, CancellationToken cancellationToken)
     {
         var sessionTemplate = await _sessionTemplateRepository.GetSessionTemplateWithDetails(request.Id);
         if (sessionTemplate == null)

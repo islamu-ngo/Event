@@ -39,7 +39,6 @@ using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
@@ -54,12 +53,17 @@ namespace Explore.API.Mcp;
 
 [McpServerToolType]
 public sealed class EventManagementMcpTools(
-    IMediator mediator,
     IUserContext userContext,
     ITenantContext tenantContext,
     IResourceAssembler<EventDto, EventListDto> eventResourceAssembler,
     IHttpContextAccessor httpContextAccessor,
     EventMcpLocationDisclosureGuard locationDisclosureGuard,
+    IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>> eventTemplateListHandler,
+    IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>> eventSessionTemplateListHandler,
+    IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>> eventTemplateSyncHistoryHandler,
+    IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> eventSessionTemplateSyncHistoryHandler,
+    IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>> eventTemplateDiffHandler,
+    IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>> eventSessionTemplateDiffHandler,
     IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays,
     IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
     IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
@@ -1157,7 +1161,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxTemplateCatalogItems);
-        var templates = await mediator.Send(
+        var templates = await eventTemplateListHandler.QueryAsync(
             new GetEventTemplateListRequest
             {
                 EventTypeId = eventTypeId ?? eventDto.EventTypeId,
@@ -1171,7 +1175,7 @@ public sealed class EventManagementMcpTools(
         {
             var (normalizedSessionPageNumber, normalizedSessionPageSize, sessionPageSizeWasClamped) =
                 NormalizeManagementPage(sessionTemplatePageNumber, sessionTemplatePageSize, MaxTemplateCatalogItems);
-            var sessionTemplatePage = await mediator.Send(
+            var sessionTemplatePage = await eventSessionTemplateListHandler.QueryAsync(
                 new GetEventSessionTemplateListRequest
                 {
                     EventTemplateId = eventTemplateId.Value,
@@ -1237,7 +1241,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedHistoryPageNumber, normalizedHistoryPageSize, historyPageSizeWasClamped) =
             NormalizeManagementPage(historyPageNumber, historyPageSize, MaxSyncHistoryItems);
-        var history = await mediator.Send(
+        var history = await eventTemplateSyncHistoryHandler.QueryAsync(
             new GetEventTemplateSyncHistoryQuery(eventDto.Id, normalizedHistoryPageNumber, normalizedHistoryPageSize),
             cancellationToken);
         var diffRead = await ReadEventTemplateDiffAsync(eventDto.Id, targetTemplateVersion, cancellationToken);
@@ -1289,7 +1293,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedHistoryPageNumber, normalizedHistoryPageSize, historyPageSizeWasClamped) =
             NormalizeManagementPage(historyPageNumber, historyPageSize, MaxSyncHistoryItems);
-        var history = await mediator.Send(
+        var history = await eventSessionTemplateSyncHistoryHandler.QueryAsync(
             new GetEventSessionTemplateSyncHistoryQuery(sessionId, normalizedHistoryPageNumber, normalizedHistoryPageSize),
             cancellationToken);
         var diffRead = await ReadEventSessionTemplateDiffAsync(sessionId, targetTemplateVersion, cancellationToken);
@@ -1349,7 +1353,7 @@ public sealed class EventManagementMcpTools(
 
         try
         {
-            var response = await mediator.Send(
+            var response = await eventTemplateDiffHandler.QueryAsync(
                 new GetEventTemplateDiffQuery(eventId, targetTemplateVersion.Value),
                 cancellationToken);
             return response.IsSuccess && response.Id is not null
@@ -1379,7 +1383,7 @@ public sealed class EventManagementMcpTools(
 
         try
         {
-            var response = await mediator.Send(
+            var response = await eventSessionTemplateDiffHandler.QueryAsync(
                 new GetEventSessionTemplateDiffQuery(sessionId, targetTemplateVersion.Value),
                 cancellationToken);
             return response.IsSuccess && response.Id is not null

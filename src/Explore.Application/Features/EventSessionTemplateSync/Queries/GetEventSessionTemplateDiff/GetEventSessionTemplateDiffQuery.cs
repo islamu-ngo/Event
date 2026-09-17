@@ -1,7 +1,7 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;
 
@@ -9,7 +9,7 @@ namespace Explore.Application.Features.EventSessionTemplateSync.Queries.GetEvent
 public sealed record GetEventSessionTemplateDiffQuery(
     Guid EventSessionId,
     int TargetTemplateVersion
-) : IRequest<BaseCommandResponse<TemplateDiffDto>>, ISecureRequest
+) : IQuery<BaseCommandResponse<TemplateDiffDto>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventSessionId.ToString();
 }

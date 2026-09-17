@@ -175,8 +175,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     }
 
     internal Task<TResponse> ExecuteAsync<TCommand, TResponse>(TCommand command)
-        where TCommand : IRequest<TResponse> =>
-        Services.GetRequiredService<IRequestHandler<TCommand, TResponse>>().Handle(command, CancellationToken.None);
+        where TCommand : ICommand<TResponse> =>
+        ExecuteCommandAsync<TCommand, TResponse>(command);
 
     internal Task<TResponse> ExecuteCommandAsync<TCommand, TResponse>(TCommand command)
         where TCommand : ICommand<TResponse> =>

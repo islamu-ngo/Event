@@ -9,6 +9,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
+using Explore.Application.Features.Events.OpenGraph;
+using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Notifications;
@@ -17,7 +19,6 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -273,7 +274,10 @@ public sealed class AtprotoEventDiscoveryApiTests
         IResourceAssembler<EventDiscoveryItemDto>? discoveryAssembler = null)
     {
         var controller = new EventController(
-            Substitute.For<IMediator>(),
+            Substitute.For<IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>>(),
+            Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>(),
+            Substitute.For<IQueryHandler<GetPublicEventDetailsRequest, EventDto?>>(),
+            Substitute.For<IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>>(),
             discoveryHandler ?? Substitute.For<IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>>(),
             sourceHandler ?? Substitute.For<IQueryHandler<GetAtprotoEventSourceQuery, string?>>(),
             Substitute.For<IResourceAssembler<EventDto, EventListDto>>(),

@@ -12,10 +12,10 @@ using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Federation;
 using Explore.Domain.Services.Lifecycle;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
@@ -31,13 +31,13 @@ public sealed class CancelEventCommandHandler(
     IRefundCampaignRepository refundCampaignRepository,
     IOutboxRepository outboxRepository,
     TimeProvider timeProvider,
-    ISettingMutationLock mutationLock) : IRequestHandler<CancelEventCommand, BaseCommandResponse<Guid>>
+    ISettingMutationLock mutationLock) : ICommandHandler<CancelEventCommand, BaseCommandResponse<Guid>>
 {
     private const string ConcurrencyConflictCode = "event_cancel_concurrency_conflict";
     private const string TransitionNotAllowedCode = "event_cancel_transition_not_allowed";
     private const string FanoutSourceType = "event_cancel_command";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CancelEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CancelEventCommand request, CancellationToken cancellationToken)
     {
         var validator = new CancelEventRequestDtoValidator();
         var validationResult = await validator.ValidateAsync(request.Request, cancellationToken);

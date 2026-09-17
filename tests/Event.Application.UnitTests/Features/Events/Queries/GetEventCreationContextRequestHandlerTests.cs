@@ -55,7 +55,7 @@ public class GetEventCreationContextRequestHandlerTests
         });
 
         // Act
-        var result = await _handler.Handle(new GetEventCreationContextRequest(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventCreationContextRequest(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.CanCreate).IsTrue();
@@ -67,7 +67,7 @@ public class GetEventCreationContextRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenOrganizationAndGroupPublishingAllowed_ReturnsPermissionBackedOptions()
+    public async Task QueryAsync_WhenOrganizationAndGroupPublishingAllowed_ReturnsPermissionBackedOptions()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -101,7 +101,7 @@ public class GetEventCreationContextRequestHandlerTests
             .Returns([allowedGroupId]);
 
         // Act
-        var result = await _handler.Handle(new GetEventCreationContextRequest(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventCreationContextRequest(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.CanCreate).IsTrue();
@@ -122,7 +122,7 @@ public class GetEventCreationContextRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenNoPublishersAllowed_ReturnsUnavailableReason()
+    public async Task QueryAsync_WhenNoPublishersAllowed_ReturnsUnavailableReason()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -137,7 +137,7 @@ public class GetEventCreationContextRequestHandlerTests
         });
 
         // Act
-        var result = await _handler.Handle(new GetEventCreationContextRequest(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventCreationContextRequest(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.CanCreate).IsFalse();

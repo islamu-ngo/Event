@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
-public sealed class GetEventManagementDetailsRequestHandler : IRequestHandler<GetEventManagementDetailsRequest, EventDto?>
+public sealed class GetEventManagementDetailsRequestHandler : IQueryHandler<GetEventManagementDetailsRequest, EventDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDetailsProjectionService _detailsProjectionService;
@@ -19,7 +19,7 @@ public sealed class GetEventManagementDetailsRequestHandler : IRequestHandler<Ge
         _detailsProjectionService = detailsProjectionService;
     }
 
-    public async Task<EventDto?> Handle(GetEventManagementDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventDto?> QueryAsync(GetEventManagementDetailsRequest request, CancellationToken cancellationToken)
     {
         var eventDto = await _detailsProjectionService.BuildAsync(request.Id, cancellationToken);
         if (eventDto is null)

@@ -37,12 +37,12 @@ public class GetEventPublishReadinessRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenEventIsReady_ReturnsReadyResult()
+    public async Task QueryAsync_WhenEventIsReady_ReturnsReadyResult()
     {
         var @event = CreateReadyEvent();
         _eventRepository.GetById(@event.Id).Returns(@event);
 
-        var result = await _handler.Handle(new GetEventPublishReadinessRequest { Id = @event.Id }, CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventPublishReadinessRequest { Id = @event.Id }, CancellationToken.None);
 
         await Assert.That(result).IsNotNull();
         await Assert.That(result!.EventId).IsEqualTo(@event.Id);
@@ -51,13 +51,13 @@ public class GetEventPublishReadinessRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenEventIsMissingSchedule_ReturnsMachineReadableError()
+    public async Task QueryAsync_WhenEventIsMissingSchedule_ReturnsMachineReadableError()
     {
         var @event = CreateReadyEvent();
         @event.FirstSessionStartUtc = null;
         _eventRepository.GetById(@event.Id).Returns(@event);
 
-        var result = await _handler.Handle(new GetEventPublishReadinessRequest { Id = @event.Id }, CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventPublishReadinessRequest { Id = @event.Id }, CancellationToken.None);
 
         await Assert.That(result).IsNotNull();
         await Assert.That(result!.IsReady).IsFalse();
@@ -68,7 +68,7 @@ public class GetEventPublishReadinessRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenCommunityProfileEventIsModerated_ReturnsHardInvariantError()
+    public async Task QueryAsync_WhenCommunityProfileEventIsModerated_ReturnsHardInvariantError()
     {
         var @event = CreateReadyEvent(EventStatusEnum.Moderated);
         _eventRepository.GetById(@event.Id).Returns(@event);
@@ -76,7 +76,7 @@ public class GetEventPublishReadinessRequestHandlerTests
             .GetEffectivePolicyAsync(@event.TenantId, ValidationProfile.EventPublish, Arg.Any<CancellationToken>())
             .Returns(CreateCommunityPublishPolicy());
 
-        var result = await _handler.Handle(
+        var result = await _handler.QueryAsync(
             new GetEventPublishReadinessRequest { Id = @event.Id },
             CancellationToken.None);
 
@@ -86,12 +86,12 @@ public class GetEventPublishReadinessRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WhenEventDoesNotExist_ReturnsNull()
+    public async Task QueryAsync_WhenEventDoesNotExist_ReturnsNull()
     {
         var eventId = Guid.NewGuid();
         _eventRepository.GetById(eventId).Returns((Explore.Domain.Event?)null);
 
-        var result = await _handler.Handle(new GetEventPublishReadinessRequest { Id = eventId }, CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventPublishReadinessRequest { Id = eventId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
     }

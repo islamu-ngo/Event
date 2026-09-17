@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Actions;
 
-public sealed class CreateEventDraftAiToolExecutor(IMediator mediator)
+public sealed class CreateEventDraftAiToolExecutor(ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createCommandHandler)
 {
     private readonly CreateEventDraftAiActionMapper _mapper = new();
 
@@ -42,7 +42,7 @@ public sealed class CreateEventDraftAiToolExecutor(IMediator mediator)
             draft.FeaturedImageId = featuredImageResult.FeaturedImageId;
         }
 
-        BaseCommandResponse<Guid> createResult = await mediator.Send(new CreateEventCommand
+        BaseCommandResponse<Guid> createResult = await createCommandHandler.ExecuteAsync(new CreateEventCommand
         {
             EventDto = draft.ToCreateEventDto()
         }, cancellationToken);

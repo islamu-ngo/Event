@@ -5,6 +5,7 @@ using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
+using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
@@ -23,7 +24,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     IActorRepository actorRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IMediator mediator,
+    ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createEventCommand,
     ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
     ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload) : IRequestHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
@@ -116,7 +117,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 mappingContext.FailureMessage ?? "AI proposed action actor context is invalid.");
         }
 
-        var executor = new CreateEventDraftAiToolExecutor(mediator);
+        var executor = new CreateEventDraftAiToolExecutor(createEventCommand);
         return await executor.ExecuteAsync(
             action.PayloadJson,
             mappingContext.Context,

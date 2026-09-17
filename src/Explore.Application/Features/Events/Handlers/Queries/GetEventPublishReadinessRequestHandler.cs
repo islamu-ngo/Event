@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Services.Lifecycle;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
@@ -12,9 +12,9 @@ public class GetEventPublishReadinessRequestHandler(
     IEventLocationRepository eventLocationRepository,
     IEventLifecyclePolicyProvider policyProvider,
     IEventLifecycleReadinessEvaluator readinessEvaluator)
-    : IRequestHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?>
+    : IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?>
 {
-    public async Task<EventPublishReadinessDto?> Handle(GetEventPublishReadinessRequest request, CancellationToken cancellationToken)
+    public async Task<EventPublishReadinessDto?> QueryAsync(GetEventPublishReadinessRequest request, CancellationToken cancellationToken)
     {
         var @event = await eventRepository.GetById(request.Id);
         if (@event is null)

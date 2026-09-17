@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Requests.Queries;
 
-public sealed record GetMyEventsRequest : IRequest<PaginatedResult<EventListDto>>
+public sealed record GetMyEventsRequest : IQuery<PaginatedResult<EventListDto>>
 {
     public required string UserId { get; init; }
 

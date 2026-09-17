@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Update)]
-public sealed record GetEventPublishReadinessRequest : IRequest<EventPublishReadinessDto?>, ISecureRequest
+public sealed record GetEventPublishReadinessRequest : IQuery<EventPublishReadinessDto?>, ISecureRequest
 {
     public Guid Id { get; init; }
 

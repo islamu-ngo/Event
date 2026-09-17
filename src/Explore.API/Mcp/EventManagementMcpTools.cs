@@ -71,7 +71,13 @@ public sealed class EventManagementMcpTools(
     IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> currentUserEventPermissionsHandler,
     IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> assignableEventRolePresetsHandler,
     IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>> publicSessionsByEvent,
-    IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> managedSessionsByEvent)
+    IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> managedSessionsByEvent,
+    IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>> eventListHandler,
+    IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>> myEventsHandler,
+    IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto> eventCreationContextHandler,
+    IQueryHandler<GetEventManagementDetailsRequest, EventDto?> eventManagementDetailsHandler,
+    IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?> eventPublishReadinessHandler,
+    IQueryHandler<GetEventDetailsRequest, EventDto?> eventDetailsHandler)
 {
 
     [McpServerTool(
@@ -107,7 +113,7 @@ public sealed class EventManagementMcpTools(
                 : Math.Clamp(pageSize, 1, MaxPublicEventPageSize);
             var pageSizeWasClamped = normalizedPageSize != pageSize;
 
-            var result = await mediator.Send(
+            var result = await eventListHandler.QueryAsync(
                 new GetEventListRequest
                 {
                     PageNumber = normalizedPageNumber,
@@ -399,7 +405,7 @@ public sealed class EventManagementMcpTools(
                 : Math.Clamp(pageSize, 1, MaxMyEventsPageSize);
             var pageSizeWasClamped = normalizedPageSize != pageSize;
 
-            var result = await mediator.Send(
+            var result = await myEventsHandler.QueryAsync(
                 new GetMyEventsRequest
                 {
                     UserId = userId.ToString(),
@@ -481,7 +487,7 @@ public sealed class EventManagementMcpTools(
 
         try
         {
-            var context = await mediator.Send(new GetEventCreationContextRequest(), cancellationToken);
+            var context = await eventCreationContextHandler.QueryAsync(new GetEventCreationContextRequest(), cancellationToken);
             var descriptor = MapCreationContext(context);
 
             McpAdapterTelemetry.MarkSuccess(activity);
@@ -790,7 +796,7 @@ public sealed class EventManagementMcpTools(
         Guid eventId,
         CancellationToken cancellationToken)
     {
-        var eventDto = await mediator.Send(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
+        var eventDto = await eventManagementDetailsHandler.QueryAsync(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
         if (eventDto is null)
         {
             return EventMcpPublishReadinessResultDescriptor.NotFound(eventId);
@@ -802,7 +808,7 @@ public sealed class EventManagementMcpTools(
             return EventMcpPublishReadinessResultDescriptor.Unavailable(eventDto.Id);
         }
 
-        var readiness = await mediator.Send(
+        var readiness = await eventPublishReadinessHandler.QueryAsync(
             new GetEventPublishReadinessRequest { Id = eventDto.Id },
             cancellationToken);
         if (readiness is null)
@@ -1314,7 +1320,7 @@ public sealed class EventManagementMcpTools(
         string requiredLinkRelation,
         CancellationToken cancellationToken)
     {
-        var eventDto = await mediator.Send(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
+        var eventDto = await eventManagementDetailsHandler.QueryAsync(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
         if (eventDto is null)
         {
             return EventMcpManagementReadGate.NotFound();
@@ -1396,7 +1402,7 @@ public sealed class EventManagementMcpTools(
 
     private async Task<EventDto?> GetPublicEventOrNullAsync(Guid eventId, CancellationToken cancellationToken)
     {
-        var eventDto = await mediator.Send(new GetEventDetailsRequest { Id = eventId }, cancellationToken);
+        var eventDto = await eventDetailsHandler.QueryAsync(new GetEventDetailsRequest { Id = eventId }, cancellationToken);
         return IsPublishedPublicEvent(eventDto) ? eventDto : null;
     }
 

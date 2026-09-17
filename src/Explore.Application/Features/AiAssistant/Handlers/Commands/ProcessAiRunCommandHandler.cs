@@ -1,6 +1,7 @@
 using System.Globalization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Event;
@@ -26,7 +27,7 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
     private readonly IAiConversationRepository _conversationRepository;
     private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventDetailsRequest, EventDto?> _eventDetailsHandler;
     private readonly AiPromptContextBuilder _promptContextBuilder;
     private readonly AiProviderResponseResolver _providerResponseResolver;
     private readonly IAiContextGateway _contextGateway;
@@ -37,14 +38,14 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
         IPrivacyErasureStateRepository privacyErasureStateRepository,
         IHierarchicalSettingsResolver settingsResolver,
         IAiChatProvider chatProvider,
-        IMediator mediator,
+        IQueryHandler<GetEventDetailsRequest, EventDto?> eventDetailsHandler,
         IAiContextGateway contextGateway,
         IAiProviderTrustResolver providerTrustResolver)
     {
         _conversationRepository = conversationRepository;
         _privacyErasureStateRepository = privacyErasureStateRepository;
         _settingsResolver = settingsResolver;
-        _mediator = mediator;
+        _eventDetailsHandler = eventDetailsHandler;
         _contextGateway = contextGateway;
         _providerTrustResolver = providerTrustResolver;
         var toolRegistry = AiToolContractRegistry.CreateDefault();
@@ -325,7 +326,7 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
         {
             if (IsEventReference(reference))
             {
-                var eventDetails = await _mediator.Send(
+                var eventDetails = await _eventDetailsHandler.QueryAsync(
                     new GetEventDetailsRequest { Id = reference.ReferenceId },
                     cancellationToken);
                 if (eventDetails is not null)

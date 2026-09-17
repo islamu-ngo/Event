@@ -17,13 +17,13 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Domain.Services.Scheduling;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
 
-public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, BaseCommandResponse<Guid>>
+public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -189,7 +189,7 @@ public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, Bas
         _visitorCapabilities = visitorCapabilities;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCommand request, CancellationToken cancellationToken)
     {
         var dto = request.EventDto;
 

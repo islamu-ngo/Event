@@ -11,12 +11,11 @@ using Explore.Application.Specifications.Events;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Federation.Atproto.Handlers.Queries;
 
 public sealed class GetPublicEventDiscoveryRequestHandler(
-    IRequestHandler<GetEventListRequest, PaginatedResult<EventListDto>> localHandler,
+    IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>> localHandler,
     IAtprotoEventProjectionRepository projectionRepository,
     AtprotoEventGovernanceResolver governanceResolver,
     Explore.Application.Contracts.Infrastructure.ITenantContext tenantContext,
@@ -39,7 +38,7 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
         GetEventListRequest criteria = request.Criteria;
         int requestedPage = criteria.PageNumber;
         int requestedPageSize = criteria.PageSize;
-        PaginatedResult<EventListDto> localPage = await localHandler.Handle(
+        PaginatedResult<EventListDto> localPage = await localHandler.QueryAsync(
             criteria.CopyWithPagination(1, window),
             cancellationToken);
 

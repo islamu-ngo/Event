@@ -12,14 +12,14 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
-public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, PaginatedResult<EventListDto>>
+public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IActorRepository _actorRepository;
@@ -50,7 +50,7 @@ public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, P
         _quotaResolver = quotaResolver;
     }
 
-    public async Task<PaginatedResult<EventListDto>> Handle(GetEventListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventListDto>> QueryAsync(GetEventListRequest request, CancellationToken cancellationToken)
     {
         var ownershipActorId = await ResolveOwnershipActorIdAsync(request);
         if (ownershipActorId == MissingOwnershipActorId)

@@ -20,7 +20,6 @@ using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -47,20 +46,29 @@ public class EventManagementReadController : EventControllerBase
         "Event not found",
         "Event not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetManagedEventsByActorRequest, PaginatedResult<EventListDto>> _managedEventsByActor;
+    private readonly IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto> _eventCreationContext;
+    private readonly IQueryHandler<GetEventManagementDetailsRequest, EventDto?> _eventManagementDetails;
+    private readonly IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?> _eventPublishReadiness;
     private readonly IResourceAssembler<EventDto, EventListDto> _resourceAssembler;
     private readonly IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> _publicProgramSummary;
     private readonly IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> _managedProgramSummary;
     private readonly IQueryHandler<GetEventSessionCreateContextRequest, EventSessionCreateContextDto?> _sessionCreateContext;
 
     public EventManagementReadController(
-        IMediator mediator,
+        IQueryHandler<GetManagedEventsByActorRequest, PaginatedResult<EventListDto>> managedEventsByActor,
+        IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto> eventCreationContext,
+        IQueryHandler<GetEventManagementDetailsRequest, EventDto?> eventManagementDetails,
+        IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?> eventPublishReadiness,
         IResourceAssembler<EventDto, EventListDto> resourceAssembler,
         IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
         IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> managedProgramSummary,
         IQueryHandler<GetEventSessionCreateContextRequest, EventSessionCreateContextDto?> sessionCreateContext)
     {
-        _mediator = mediator;
+        _managedEventsByActor = managedEventsByActor;
+        _eventCreationContext = eventCreationContext;
+        _eventManagementDetails = eventManagementDetails;
+        _eventPublishReadiness = eventPublishReadiness;
         _resourceAssembler = resourceAssembler;
         _publicProgramSummary = publicProgramSummary;
         _managedProgramSummary = managedProgramSummary;
@@ -82,7 +90,7 @@ public class EventManagementReadController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetManagedEventsByActorRequest
+        var result = await _managedEventsByActor.QueryAsync(new GetManagedEventsByActorRequest
         {
             ActorId = actorId,
             PageNumber = query.PageNumber,
@@ -110,7 +118,7 @@ public class EventManagementReadController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<EventCreationContextDto>> GetCreationContext(CancellationToken cancellationToken = default)
     {
-        var context = await _mediator.Send(new GetEventCreationContextRequest(), cancellationToken);
+        var context = await _eventCreationContext.QueryAsync(new GetEventCreationContextRequest(), cancellationToken);
         return Ok(context);
     }
 
@@ -189,7 +197,7 @@ public class EventManagementReadController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<EventDto>>> GetManagementDetails(Guid id, CancellationToken cancellationToken = default)
     {
-        var @event = await _mediator.Send(new GetEventManagementDetailsRequest { Id = id }, cancellationToken);
+        var @event = await _eventManagementDetails.QueryAsync(new GetEventManagementDetailsRequest { Id = id }, cancellationToken);
         if (@event == null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
@@ -211,7 +219,7 @@ public class EventManagementReadController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EventPublishReadinessDto>> GetPublishReadiness(Guid id, CancellationToken cancellationToken = default)
     {
-        var readiness = await _mediator.Send(new GetEventPublishReadinessRequest { Id = id }, cancellationToken);
+        var readiness = await _eventPublishReadiness.QueryAsync(new GetEventPublishReadinessRequest { Id = id }, cancellationToken);
         return readiness is null ? this.ToNotFoundProblem(EventNotFoundProblem) : Ok(readiness);
     }
 }

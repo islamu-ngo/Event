@@ -7,15 +7,15 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Federation;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
-public class GetMyEventsRequestHandler : IRequestHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>
+public class GetMyEventsRequestHandler : IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -37,7 +37,7 @@ public class GetMyEventsRequestHandler : IRequestHandler<GetMyEventsRequest, Pag
         _tenantContext = tenantContext;
     }
 
-    public async Task<PaginatedResult<EventListDto>> Handle(GetMyEventsRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventListDto>> QueryAsync(GetMyEventsRequest request, CancellationToken cancellationToken)
     {
         var (events, totalCount) = await _eventRepository.GetMyEventsWithDetailsPaged(request.UserId, request.PageNumber, request.PageSize);
         var eventDtos = events.Select(EventMapper.ToListItem).ToList();

@@ -17,6 +17,7 @@ using Explore.Application.Responses;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Hateoas;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -29,6 +30,7 @@ using Microsoft.AspNetCore.RateLimiting;
 [ApiVersion("0.1")]
 [Route("api/instance-operator-identity")]
 [ApiController]
+[Authorize]
 [EndpointClassification(EndpointClass.Admin)]
 public sealed class InstanceOperatorIdentityController : EventControllerBase
 {

@@ -19,12 +19,15 @@ public sealed class SetupSecretAuthenticationHandler(
 
     private const string AuthProviderPath = "/api/instance/settings/auth-provider";
     private const string AuthorizationProviderPath = "/api/instance/settings/authz-provider";
+    private const string OperatorIdentityPath = "/api/instance-operator-identity";
     private bool _setupModeInactive;
 
     internal static bool SupportsRequest(HttpRequest request)
         => (HttpMethods.IsGet(request.Method) || HttpMethods.IsPatch(request.Method))
            && (string.Equals(request.Path.Value, AuthProviderPath, StringComparison.OrdinalIgnoreCase)
                || string.Equals(request.Path.Value, AuthorizationProviderPath, StringComparison.OrdinalIgnoreCase))
+           || (HttpMethods.IsGet(request.Method) || HttpMethods.IsPut(request.Method))
+               && string.Equals(request.Path.Value, OperatorIdentityPath, StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsGet(request.Method)
                && string.Equals(request.Path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsPost(request.Method)

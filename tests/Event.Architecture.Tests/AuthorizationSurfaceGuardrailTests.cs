@@ -94,6 +94,10 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "handler-active-setup-secret-bootstrap",
             "Authenticated SetupSecret principal, durable active setup mode, active Local primary, server deployment mode, manual validation and preflight precede native bootstrap convergence. Evidence: LocalInstanceOnboardingHttpTests; LocalBootstrapConvergenceTests; LocalBootstrapSecretContractTests."),
         new(
+            "Explore.Application.Features.InstanceOnboarding.Commands.SaveInstanceOperatorIdentityCommand",
+            "controller-active-setup-secret-or-current-instance-administrator",
+            "The dedicated controller admits only an authenticated active SetupSecret principal or a freshly resolved platform administrator before dispatch. SetupSecretAuthenticationHandler restricts setup-secret authentication to the exact GET/PUT route and returns Gone after bootstrap completion. Evidence: InstanceOperatorIdentityControllerTests."),
+        new(
             "Explore.Application.Features.RegistrationOrders.Commands.CancelConfirmedGuestRegistrationCommand",
             "native-current-limited-guest-capability",
             "Exact tenant/event/order capability and live promise are freshly fenced before eligibility, aggregate transition, admission revocation and exact hold release in one Serializable transaction. Authorized duplicates revalidate capability/deadline without generic replay. Evidence: GuestRegistrationStatusHttpTests cancellation partials; AnonymousCancellationConcurrencyTests; AnonymousCancellationRulesTests."),

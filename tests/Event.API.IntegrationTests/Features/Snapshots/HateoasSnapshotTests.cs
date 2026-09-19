@@ -1,10 +1,9 @@
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
-using Explore.Application.Contracts.Operations;
-using Explore.Application.DTOs.Actor;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
-using Explore.Application.Features.Actors.Requests.Queries;
+using Explore.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
@@ -129,16 +128,16 @@ public class HateoasSnapshotTests(ContractApiFixture fixture)
 
     private HttpClient CreateClientThatThrows(Exception exception)
     {
-        var throwingHandler = Substitute.For<IQueryHandler<GetActorDetailsRequest, ActorDto?>>();
-        throwingHandler.QueryAsync(Arg.Any<GetActorDetailsRequest>(), Arg.Any<CancellationToken>())
-            .Returns<ActorDto?>(_ => throw exception);
+        var actorRepository = Substitute.For<IActorRepository>();
+        actorRepository.GetPublicActorProfileAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns<Actor?>(_ => throw exception);
 
         var app = _fixture.Factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IQueryHandler<GetActorDetailsRequest, ActorDto?>>();
-                services.AddSingleton(throwingHandler);
+                services.RemoveAll<IActorRepository>();
+                services.AddSingleton(actorRepository);
             });
         });
 

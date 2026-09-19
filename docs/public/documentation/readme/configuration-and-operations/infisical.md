@@ -27,7 +27,7 @@ ISLAMU Event authenticates with **Universal Auth** only.
 
 1. Create a Machine Identity in the organization.
 2. Attach a **Universal Auth** authentication method and generate a Client ID and Client Secret.
-3. Add the identity to the `ISLAMU Event` project with **read** access to every folder in the tree below. Write access is required only if you use the in-app Setup secret-write capability.
+3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity must be limited to `/keycloak`, `/blazor` and `/atproto` frontend values, not `/`, `/database` or `/api`. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
 4. Copy the project UUID from the project settings page.
 
 These four values plus the environment slug are *secret zero*: they live in the deployment environment, never inside Infisical itself.
@@ -53,6 +53,34 @@ When `SECRET_PROVIDER=Infisical`, only Infisical results are authoritative. The 
 > Self-hosted Infisical behind an AAAA record that is not routable will stall .NET connection attempts. The platform forces IPv4 for Infisical calls, but the host must still resolve and answer on IPv4.
 
 ---
+
+## Configuration boundary upgrade
+
+Before upgrading:
+
+1. Replace an obsolete `PrivacyErasure:Durability:Mode` selector (including its
+   double-underscore form) with an explicit supported `ERASURE_TOPOLOGY` or
+   `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY` value. Preserve the intended authority;
+   do not simply remove the old input and accept a default. Startup rejects the
+   obsolete input instead of silently choosing a replacement. Consult the
+   [privacy-erasure deployment guidance](../security-and-identity/privacy-erasure.md)
+   before intentionally changing topology or resetting existing state.
+2. Remove database credentials from BFF-readable folders. This includes
+   `KEYCLOAK_DB_PASSWORD`, even though its name begins with `KEYCLOAK`.
+   Supply such values through the provisioning/container environment only to the
+   backend service that owns them. BFF loading now rejects backend/root paths and
+   database configuration placed inside frontend folders.
+3. Retain the actual `secretPath` in recursive Infisical responses. Custom proxies
+   must not strip it: missing or out-of-scope provenance fails startup. Child
+   folders keep their own namespace and cannot overwrite parent database values.
+4. Keep the same five bootstrap inputs and explicit provider selection. Startup
+   and runtime provider binding now use the same validated authority and path set;
+   there is no implicit runtime root-folder read.
+
+This repair does not migrate data or switch authority automatically. Back up and
+follow the existing reset/restore procedure before any deliberate topology change.
+Keep API, BFF and database provisioning credentials separated; never broaden the
+BFF identity to work around an upgrade failure.
 
 ## 4. Folder Layout
 
@@ -140,7 +168,7 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_API_CLIENT_SECRET` | Optional; only for deployments that make the API resource-server client confidential. |
 | `KEYCLOAK_ADMIN_USERNAME` | Keycloak administrator username used by bootstrap sync. |
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak administrator password used by bootstrap sync. |
-| `KEYCLOAK_DB_PASSWORD` | Password for the Keycloak database container. |
+| `KEYCLOAK_DB_PASSWORD` | Backend provisioning input for the Keycloak database container; do not store in BFF-readable `/keycloak`. Inject only into its owning container/provisioning environment. |
 | `KEYCLOAK_SMTP_*` | Optional realm SMTP bootstrap for Keycloak's own verification mail. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak settings. |
 
 Keycloak's own account emails are configured here and are separate from ISLAMU Event's `/smtp` delivery.

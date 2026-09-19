@@ -136,12 +136,19 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 var secretValue = secret.SecretValue;
                 if (string.IsNullOrWhiteSpace(secretValue)) continue;
 
-                // Convert to .NET configuration key format
-                var configKey = ConvertToConfigurationKey(secret.SecretKey, path);
+                var secretPath = ValidateSecretPath(secret.SecretPath, path);
+                var configKey = ConvertToConfigurationKey(secret.SecretKey, secretPath);
                 newData[configKey] = secretValue;
 
-                // Also store with original key for direct access
-                newData[secret.SecretKey] = secretValue;
+                // Flat deployment aliases belong to the requested folder, not recursive children.
+                // Explicit identity/erasure reads must also never publish primary database aliases.
+                if (secretPath.Equals(path.TrimEnd('/'), StringComparison.Ordinal)
+                    && (!secretPath.StartsWith("/database/", StringComparison.Ordinal)
+                        || secretPath == "/database/identity" && secret.SecretKey.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
+                        || secretPath == "/database/erasure" && secret.SecretKey.StartsWith("ERASURE_DATABASE_", StringComparison.OrdinalIgnoreCase)))
+                {
+                    newData[secret.SecretKey] = secretValue;
+                }
 
                 if (configKey.Equals("Database:Name", StringComparison.OrdinalIgnoreCase))
                 {
@@ -174,6 +181,19 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             Console.Error.WriteLine(
                 "[Infisical] secret_authority_reload_failed; keeping the last-known-good configuration.");
         }
+    }
+
+    private static string ValidateSecretPath(string? secretPath, string requestedPath)
+    {
+        var path = secretPath?.TrimEnd('/');
+        var root = requestedPath.TrimEnd('/');
+        if (secretPath is null || !secretPath.StartsWith('/')
+            || secretPath.Split('/').Any(segment => segment is "." or "..")
+            || !(root.Length == 0 || path == root || path!.StartsWith(root + "/", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("secret_authority_invalid");
+        }
+        return path!;
     }
 
     private static InvalidOperationException ProviderFailure(HttpStatusCode statusCode) =>
@@ -236,7 +256,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
 
     private sealed record InfisicalRawSecret(
         [property: JsonPropertyName("secretKey")] string? SecretKey,
-        [property: JsonPropertyName("secretValue")] string? SecretValue);
+        [property: JsonPropertyName("secretValue")] string? SecretValue,
+        [property: JsonPropertyName("secretPath")] string? SecretPath);
 
     /// <summary>
     /// Converts an Infisical secret key to .NET configuration format.
@@ -248,9 +269,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
         // 1. Privacy Erasure Authority Database (/database/erasure) -> Database:Erasure:*
         if (normalizedPath.Equals("database/erasure", StringComparison.OrdinalIgnoreCase))
         {
-            // Keys carry the ERASURE_DATABASE_ prefix so they stay distinct from the primary
-            // /database keys. Folder reads are recursive, so an unprefixed DATABASE_HOST stored
-            // here would also be returned by the /database read and overwrite Database:Host.
+            // ERASURE_DATABASE_ is the external authority contract. Recursive reads use the
+            // returned folder provenance, so child fields cannot become primary database fields.
             return secretKey.ToUpperInvariant() switch
             {
                 "ERASURE_DATABASE_HOST" => "Database:Erasure:Host",

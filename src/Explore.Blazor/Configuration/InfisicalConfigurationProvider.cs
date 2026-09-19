@@ -9,6 +9,8 @@ using Microsoft.Extensions.Configuration;
 public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource source)
     : ConfigurationProvider
 {
+    private static readonly string[] FrontendRoots = ["/keycloak", "/blazor", "/atproto"];
+
     public override void Load()
     {
         try
@@ -76,6 +78,11 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
 
     private Dictionary<string, string?> LoadSecrets()
     {
+        if (source.Paths.Count == 0 || source.Paths.Any(path => !IsFrontendPath(path)))
+        {
+            throw new InvalidOperationException("bff_secret_scope_invalid");
+        }
+
         using var handler = CreateIpv4Handler();
         using var http = new HttpClient(handler)
         {
@@ -135,12 +142,52 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
                     continue;
                 }
 
-                data[ConvertToConfigurationKey(secret.SecretKey, path)] = secret.SecretValue ?? string.Empty;
-                data[secret.SecretKey] = secret.SecretValue ?? string.Empty;
+                var secretPath = ValidateSecretPath(secret.SecretPath, path);
+                if (ContainsDatabaseConfiguration(secret.SecretKey) || ContainsDatabaseConfiguration(secretPath))
+                {
+                    throw new InvalidOperationException("bff_database_configuration_forbidden");
+                }
+                data[ConvertToConfigurationKey(secret.SecretKey, secretPath)] = secret.SecretValue ?? string.Empty;
+                if (secretPath.Equals(path.TrimEnd('/'), StringComparison.Ordinal))
+                {
+                    data[secret.SecretKey] = secret.SecretValue ?? string.Empty;
+                }
             }
         }
 
         return data;
+    }
+
+    private static bool IsFrontendPath(string path)
+    {
+        var normalized = path.TrimEnd('/');
+        return !path.Split('/').Any(segment => segment is "." or "..")
+            && !ContainsDatabaseConfiguration(path)
+            && FrontendRoots.Any(root =>
+                normalized == root || normalized.StartsWith(root + "/", StringComparison.Ordinal));
+    }
+
+    private static bool ContainsDatabaseConfiguration(string key) =>
+        key.Split([':', '_', '/'], StringSplitOptions.RemoveEmptyEntries).Any(part =>
+            part.Equals("Database", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("Db", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("IdentityDatabase", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("DatabaseErasure", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("PrivacyErasureAuthorityDatabase", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("ConnectionStrings", StringComparison.OrdinalIgnoreCase)
+            || part.Equals("Postgresql", StringComparison.OrdinalIgnoreCase));
+
+    private static string ValidateSecretPath(string? secretPath, string requestedPath)
+    {
+        var path = secretPath?.TrimEnd('/');
+        var root = requestedPath.TrimEnd('/');
+        if (secretPath is null || !secretPath.StartsWith('/')
+            || secretPath.Split('/').Any(segment => segment is "." or "..")
+            || !(path == root || path!.StartsWith(root + "/", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("secret_authority_invalid");
+        }
+        return path!;
     }
 
     private static InvalidOperationException ProviderFailure(HttpStatusCode statusCode) =>
@@ -151,7 +198,9 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
     private static bool IsBoundedReasonCode(string message) => message is
         "secret_authority_unauthorized" or
         "secret_authority_unavailable" or
-        "secret_authority_invalid";
+        "secret_authority_invalid" or
+        "bff_secret_scope_invalid" or
+        "bff_database_configuration_forbidden";
 
     private static string ConvertToConfigurationKey(string secretKey, string path)
     {
@@ -160,11 +209,9 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
             return "AiProvider:ToolProposalsEnabled";
         }
 
-        var sectionName = path.Trim('/');
-        var section = string.IsNullOrEmpty(sectionName)
-            ? string.Empty
-            : ToPascalCase(sectionName) + ":";
-        var sectionPrefix = section.TrimEnd(':').ToUpperInvariant();
+        var pathSegments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var section = string.Join(":", pathSegments.Select(ToPascalCase)) + ":";
+        var sectionPrefix = section.TrimEnd(':').Replace(":", "_", StringComparison.Ordinal).ToUpperInvariant();
         var key = !string.IsNullOrEmpty(sectionPrefix)
             && secretKey.StartsWith(sectionPrefix + "_", StringComparison.OrdinalIgnoreCase)
                 ? secretKey[(sectionPrefix.Length + 1)..]
@@ -187,5 +234,6 @@ public sealed class InfisicalConfigurationProvider(InfisicalConfigurationSource 
 
     private sealed record InfisicalRawSecret(
         [property: JsonPropertyName("secretKey")] string? SecretKey,
-        [property: JsonPropertyName("secretValue")] string? SecretValue);
+        [property: JsonPropertyName("secretValue")] string? SecretValue,
+        [property: JsonPropertyName("secretPath")] string? SecretPath);
 }

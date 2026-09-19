@@ -53,7 +53,8 @@ public static class SecretAuthorityConfiguration
             source.Paths.AddRange(infisicalPaths);
             source.ThrowOnFirstLoadFailure = true;
         });
-        return PreserveProviderSelection(builder.Build(), provider);
+        var source = (InfisicalConfigurationSource)builder.Sources.Single();
+        return PreserveProviderSelection(builder.Build(), provider, source);
     }
 
     public static string GetEnvironmentName(IConfiguration configuration) =>
@@ -68,15 +69,31 @@ public static class SecretAuthorityConfiguration
 
     internal static IConfiguration PreserveProviderSelection(
         IConfiguration authority,
-        SecretProviderType provider) =>
-        new ConfigurationBuilder()
+        SecretProviderType provider,
+        InfisicalConfigurationSource? infisicalSource = null)
+    {
+        const string prefix = "SecretProvider:Infisical";
+        var runtime = authority.GetSection(prefix).AsEnumerable()
+            .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
+        runtime[$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString();
+        runtime["SECRET_PROVIDER"] = null;
+        if (infisicalSource is not null)
+        {
+            // Reuse the source that actually authenticated, never values returned by the vault
+            // or a second bootstrap read that could select a different runtime authority.
+            runtime[$"{prefix}:Url"] = infisicalSource.Url;
+            runtime[$"{prefix}:ProjectId"] = infisicalSource.ProjectId;
+            runtime[$"{prefix}:ClientId"] = infisicalSource.ClientId;
+            runtime[$"{prefix}:ClientSecret"] = infisicalSource.ClientSecret;
+            runtime[$"{prefix}:Environment"] = infisicalSource.Environment;
+            for (int index = 0; index < infisicalSource.Paths.Count; index++)
+                runtime[$"{prefix}:Paths:{index}"] = infisicalSource.Paths[index];
+        }
+        return new ConfigurationBuilder()
             .AddConfiguration(authority)
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString(),
-                ["SECRET_PROVIDER"] = null,
-            })
+            .AddInMemoryCollection(runtime)
             .Build();
+    }
 
     internal static void EnsureUserSecretsEnvironment(string environmentName)
     {

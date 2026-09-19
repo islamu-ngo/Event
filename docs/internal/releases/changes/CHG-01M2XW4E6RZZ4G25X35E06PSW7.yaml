@@ -1,0 +1,32 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2XW4E6RZZ4G25X35E06PSW7
+Title: "preserve secret authority and frontend credential boundaries"
+Type: fix
+Scope: self-hosting
+Summary: "Reject obsolete privacy-erasure selectors, preserve recursive secret namespaces, restrict frontend secret loading, and retain validated bootstrap settings for runtime secret providers."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: "Obsolete privacy-erasure durability selectors and backend secrets or paths in frontend Infisical loading now fail startup. Explicitly preserve the intended supported erasure topology, move database credentials to their backend consumers, and retain recursive secretPath provenance before upgrade."
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Recursive child values cannot replace parent database configuration. The BFF rejects backend roots and database configuration, including KEYCLOAK_DB_PASSWORD inside frontend folders; runtime secret providers retain the bootstrap authority that loaded startup secrets."
+  Migration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: "No data or schema migration is performed. Preserve the intended authority explicitly and follow the existing backup, reset and restore policy before deliberately changing erasure topology."
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: "Replace PrivacyErasure:Durability:Mode and its double-underscore form with an explicit supported topology. Keep the five bootstrap inputs; runtime provider options use the validated source and exact path set without an implicit root read."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: "Limit the BFF identity to frontend values under /keycloak, /blazor and /atproto. Supply database and container credentials only to their backend owners. Do not remove an obsolete selector or broaden access merely to bypass a startup error; verify the intended topology and namespace first."

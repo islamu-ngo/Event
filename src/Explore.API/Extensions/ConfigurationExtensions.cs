@@ -1,5 +1,6 @@
 namespace Explore.API.Extensions;
 
+using Explore.Application.Configuration;
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
 using Explore.Secrets.Configuration;
@@ -15,14 +16,24 @@ public static class ConfigurationExtensions
         string environmentName)
     {
         var bootstrapConfig = configBuilder.Build();
+        _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfig);
         IConfiguration authority = SecretAuthorityConfiguration.Build(
             bootstrapConfig,
             environmentName,
             "/keycloak", "/database", "/database/erasure", "/database/identity", "/api", "/blazor",
             "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/integrations/listmonk");
+        _ = PrivacyErasureDurabilityOptions.FromConfiguration(authority);
         var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
         PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
         ApplyMapping(configBuilder, isolatedAuthority.Build());
+
+        // Runtime provider binding must use the authority and bootstrap source that loaded
+        // startup secrets, not lower-priority settings or a vault-supplied provider selector.
+        var runtimeProvider = bootstrapConfig.GetSection("SecretProvider:Infisical").AsEnumerable()
+            .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in authority.GetSection(SecretProviderOptions.SectionName).AsEnumerable())
+            runtimeProvider[pair.Key] = pair.Value;
+        configBuilder.AddInMemoryCollection(runtimeProvider);
     }
 
     /// <summary>

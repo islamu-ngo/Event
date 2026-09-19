@@ -594,7 +594,7 @@ intents:
       - docs/internal/RELEASE_CHECKLIST.md
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/legal/IP_GOVERNANCE.md
-      - docs/internal/DUAL_VERSIONING.md
+      - docs/internal/legal/dependencies/mapperly.md
     load_skills:
       - ip-clean-room
     load_rules:
@@ -919,7 +919,7 @@ intents:
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/legal/IP_GOVERNANCE.md
       - docs/internal/legal/CONTRIBUTION_GOVERNANCE.md
-      - docs/internal/DUAL_VERSIONING.md
+      - docs/internal/legal/dependencies/mapperly.md
       - docs/internal/CI_CD_GOVERNANCE.md
       - .agents/skills/_SKILL_SCHEMA.md
     load_skills:

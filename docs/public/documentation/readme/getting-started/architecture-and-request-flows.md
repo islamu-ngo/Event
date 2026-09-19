@@ -1,5 +1,5 @@
 ---
-description: Understand the BFF, API, MediatR, authority, tenancy, and durable effect paths.
+description: Understand browser routing, application operations, authority, tenancy, and durable effects.
 ---
 
 # Architecture & Request Flows
@@ -13,7 +13,7 @@ ISLAMU Event follows [Clean Architecture](../contributing/clean-architecture.md)
 1. The browser connects over HTTPS to the Blazor BFF (`Explore.Blazor`).
 2. The BFF owns the encrypted session cookie and obtains or refreshes access tokens via [Keycloak Authentication](../security-and-identity/authentication.md).
 3. The BFF proxies requests to `Explore.API`, forwarding the bearer JWT and resolved [Multi-Tenant Context](../security-and-identity/multi-tenancy.md).
-4. `Explore.API` evaluates caller permissions, dispatches commands and queries through MediatR, and interacts with the database via entities.
+4. The API evaluates caller permissions and invokes the requested application operation before reading or changing stored data.
 5. The API response embeds dynamic [HAL Links](../security-and-identity/authorization.md#the-golden-rule-of-client-ui-affordances) indicating which follow-up actions the user is authorized to perform right now.
 
 > [!NOTE]
@@ -24,8 +24,8 @@ ISLAMU Event follows [Clean Architecture](../contributing/clean-architecture.md)
 ## 2. Write (Command) Flow
 
 1. **Endpoint Boundary**: Authentication and high-level route policies run first.
-2. **MediatR Resource Authorization**: Evaluates the caller, tenant boundary, and target entity state via [Authorization (Local RBAC or Cerbos)](../security-and-identity/authorization.md).
-3. **Domain Validation**: The MediatR command handler validates domain invariants.
+2. **Resource Authorization**: Evaluates the caller, tenant boundary, and target entity state via [Authorization (Local RBAC or Cerbos)](../security-and-identity/authorization.md).
+3. **Domain Validation**: The application operation validates the business rules.
 4. **Atomic Settlement**: A single serializable transaction commits state changes to PostgreSQL or SQLite.
 5. **Transactional Outbox**: Side effects (such as [Transactional Emails](../communications-and-notifications/email-smtp.md), [Outgoing Webhooks](../integrations-and-ai/webhooks.md), or [AT Protocol Federation](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md)) are written to outbox tables within the same database transaction.
 6. **HAL Affordance**: The response returns the updated resource with freshly computed `_links`.

@@ -65,7 +65,7 @@ dotnet test tests/Explore.Application.Tests/Explore.Application.Tests.csproj \
 
 Before authoring code, review our core architecture and clean-room policies:
 
-* **[Clean Architecture Conventions](clean-architecture.md)** — Inward dependency rules and MediatR slice patterns.
+* **[Clean Architecture Conventions](clean-architecture.md)** — Inward dependency rules and application operation boundaries.
 * **[TUnit Testing Conventions](tunit.md)** — Writing invariant-breaker tests instead of tautological mocks.
 * **[Clean-Room IP & Licensing](clean-room-ip-and-licensing.md)** — Independent design and outbound AGPLv3 protection.
 

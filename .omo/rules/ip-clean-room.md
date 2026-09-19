@@ -6,7 +6,7 @@ paths:
   - "docs/internal/**/*"
   - "dev/active/**/*"
 related_skills: [ip-clean-room, agentic-research]
-related_docs: [docs/internal/legal/IP_GOVERNANCE.md, docs/internal/QUICK_REFERENCE.md, docs/internal/DUAL_VERSIONING.md, legal/CLA.md]
+related_docs: [docs/internal/legal/IP_GOVERNANCE.md, docs/internal/QUICK_REFERENCE.md, docs/internal/legal/dependencies/mapperly.md, legal/CLA.md]
 minimum_tests: [Event.Architecture.Tests]
 related_intents: [add-get-endpoint, add-write-endpoint, add-hal-link, add-cqrs-handler, add-ef-migration, update-repository-query, blazor-component-affordance, bff-auth-bug, openapi-contract-change, ci-cd-change, external-infrastructure-bootstrap, ip-clean-room-governance, create-agent-context-skill, update-ai-context-disclosure, registration-data-collection, webhook-delivery-redesign, platform-privacy-erasure]
 ---
@@ -53,5 +53,5 @@ related_intents: [add-get-endpoint, add-write-endpoint, add-hal-link, add-cqrs-h
 ## Related
 
 - [CLA](../../legal/CLA.md)
-- [Dual-Versioning Strategy](../../docs/internal/DUAL_VERSIONING.md)
+- [Mapperly Dependency And Projection Contract](../../docs/internal/legal/dependencies/mapperly.md)
 - [CI/CD Governance](../../docs/internal/CI_CD_GOVERNANCE.md)

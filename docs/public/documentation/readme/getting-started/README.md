@@ -12,7 +12,7 @@ Use this section to decide whether ISLAMU Event fits your organization, run a lo
 
 * **[Why ISLAMU Event?](why-islamu-event.md)** — Explains product scope, adopter value, pre-1.0 maturity, and operator responsibility.
 * **[5-Minute Quickstart](5-minute-quickstart.md)** — Launch the complete platform locally in under 5 minutes using Docker.
-* **[Architecture & Request Flows](architecture-and-request-flows.md)** — Traces browser, write, callback, and operational paths through the BFF, API, MediatR, persistence, and provider boundaries.
+* **[Architecture & Request Flows](architecture-and-request-flows.md)** — Traces browser, write, callback, and operational paths through the BFF, API, application operations, persistence, and provider boundaries.
 
 ---
 

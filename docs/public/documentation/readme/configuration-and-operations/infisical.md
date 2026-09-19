@@ -111,11 +111,11 @@ Instance-level platform credentials read by `Explore.API`.
 | `VAPID_PUBLIC_KEY` | Web Push public key. Intentionally public; served to browsers. |
 | `VAPID_PRIVATE_KEY` | Web Push private key. Server-only; never leaves the API process. |
 | `WEB_PUSH_ENABLED` | `true` or `false`. Defaults to enabled when all three VAPID values are present. |
-| `USE_COMMERCIAL_LUCKYPENNY` | `true` or `false`; selects the commercial Lucky Penny licensing path. |
-| `LUCKYPENNY_LICENSE_KEY` | Lucky Penny commercial license key. |
 
-> [!WARNING]
-> `AUTOMAPPER_COMMERCIAL_VERSION` and `MEDIATR_COMMERCIAL_VERSION` are **build-time MSBuild properties**, not runtime configuration. Storing them in Infisical has no effect on a running instance; supply them to the build environment instead.
+The build no longer consumes Lucky Penny licensing or edition-selection secrets.
+Remove obsolete entries from the selected authority using the
+[removed-input checklist](environment-variables.md#removed-edition-inputs).
+Do not remove unrelated provider credentials or change the selected secret authority.
 
 ### `/blazor`
 

@@ -16,7 +16,7 @@ Every mutation and sensitive query passes through a multi-stage, fail-closed aut
 graph TD
     A[Incoming HTTP Request] --> B{Endpoint Policy Check}
     B -- Denied --> X[401 Unauthorized / 403 Forbidden]
-    B -- Allowed --> C[MediatR Request Pipeline]
+    B -- Allowed --> C[Application Operation Authorization]
     C --> D{Authorization Provider<br>Local RBAC vs. Cerbos}
     D -- Denied / Unreachable --> X
     D -- Allowed --> E[Handler Executes Domain Logic]
@@ -25,7 +25,7 @@ graph TD
 ```
 
 1. **Endpoint Boundary**: Broad policy checks verify caller identity and minimum claims.
-2. **MediatR Pipeline**: The request evaluates the caller, tenant context, resource state, and requested action against policy rules.
+2. **Operation Authorization**: The request evaluates the caller, tenant context, resource state, and requested action against policy rules.
 3. **Execution Gate**: Handlers only execute if authorization explicitly returns `Allow`.
 4. **HATEOAS Affordance Gating**: The response dynamically attaches allowed actions in HAL `_links` (e.g., `_links.edit`, `_links.refund`). The client renders UI buttons strictly based on the presence of these links.
 

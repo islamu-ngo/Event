@@ -1,0 +1,32 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2XRR8CVQEHFCZFFQ25V84TC
+Title: "build one edition without Lucky Penny dependencies"
+Type: build
+Scope: self-hosting
+Summary: "Remove obsolete Lucky Penny edition selectors and licensing configuration; builds now use generated mappings and native operation handlers."
+Supersedes: []
+Impacts:
+  Breaking:
+    Disposition: documented
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Detail: "Lucky Penny edition flags, commercial version overrides and license-key configuration are removed. Remove those inputs and use the single supported build."
+  Security:
+    Disposition: documented
+    Reference: docs/internal/legal/IP_GOVERNANCE.md
+    Detail: "Retire only the exhausted AutoMapper and MediatR exceptions; unrelated dependency controls remain required."
+  Migration:
+    Disposition: documented
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Detail: "Remove obsolete edition inputs from CI, Docker build arguments and the selected secret authority. No database migration is required."
+  Configuration:
+    Disposition: documented
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Detail: "Remove USE_COMMERCIAL_LUCKYPENNY, LUCKYPENNY_LICENSE_KEY, AUTOMAPPER_COMMERCIAL_VERSION, MEDIATR_COMMERCIAL_VERSION and old structured licensing keys; do not replace them with another edition selector."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Disposition: documented
+    Reference: docs/public/documentation/readme/self-hosting/docker-compose.md
+    Detail: "Rebuild using the single locked dependency graph without commercial MSBuild properties or USE_COMMERCIAL_LUCKYPENNY_LIBS. Other provider credentials and deployment topology remain unchanged."

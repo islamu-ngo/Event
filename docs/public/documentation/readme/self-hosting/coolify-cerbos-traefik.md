@@ -44,7 +44,7 @@ This runbook guides operators through deploying and operating an external **Cerb
                       PostgreSQL Policy Store
 ```
 
-- **Runtime Decisions**: ISLAMU Event connects to Cerbos over gRPC (`:3593`) to evaluate authorization policies for every MediatR request.
+- **Runtime Decisions**: When Cerbos is selected, ISLAMU Event connects over gRPC (`:3593`) for operations governed by resource authorization policies. Public, capability-token and worker operations retain their own explicit authority checks.
 - **Administration & Policies**: The Admin API (`:3592`) is used by `cerbosctl` or CI/CD to upload and validate policy bundles.
 - **Fail-Closed Security**: If Cerbos is unreachable or returns an error, ISLAMU Event **fails closed** (access denied). It does not silently fall back to local RBAC.
 
@@ -303,7 +303,7 @@ Verify that the `cerbos` health check reports `Healthy` (see [Health Check Endpo
 ## Related Guides & Next Steps
 
 * **[Deployment Tiers & Sizing](deployment-tiers.md)** — Review hardware requirements, sizing matrices, and ISLAMU's real-world reference setup.
-* **[Authorization Architecture & Policies](../security-and-identity/authorization.md)** — Understand how MediatR requests evaluate policies and generate HAL affordances.
+* **[Authorization Architecture & Policies](../security-and-identity/authorization.md)** — Understand how application operations evaluate policies and generate HAL affordances.
 * **[Docker Compose Runbook](docker-compose.md)** — Deploy the core application stack behind Traefik or Caddy.
 * **[Troubleshooting Recipe: Cerbos 403 Forbidden](../configuration-and-operations/troubleshooting-and-health.md#recipe-5-all-authenticated-actions-return-403-forbidden-cerbos-fail-closed)** — Diagnose missing policies or network timeouts.
 * **[Secrets Management](../configuration-and-operations/secrets.md)** — Securely store your `CERBOS_ADMIN_PASSWORD_HASH`.

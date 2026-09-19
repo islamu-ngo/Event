@@ -276,7 +276,7 @@ Optional or primary [AT Protocol Authentication](../federation-and-open-protocol
 
 ## Related Guides & Next Steps
 
-* **[Authorization & Access Control](authorization.md)** — Learn how MediatR handlers evaluate Local RBAC or Cerbos policies.
+* **[Authorization & Access Control](authorization.md)** — Learn how application operations evaluate Local RBAC or Cerbos policies.
 * **[Docker Standalone](../self-hosting/docker-standalone.md)** — Run Local Identity without a separate identity container.
 * **[Docker Compose Runbook](../self-hosting/docker-compose.md)** — Deploy Keycloak and configure the `event-blazor` client.
 * **[Troubleshooting Keycloak Errors](../configuration-and-operations/troubleshooting-and-health.md#recipe-1-keycloak-invalid-parameter-redirect_uri-or-infinite-login-loop)** — Resolve redirect URI mismatches and login loops.

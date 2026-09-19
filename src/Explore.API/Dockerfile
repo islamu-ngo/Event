@@ -9,7 +9,6 @@ EXPOSE 8081
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:ea8bde36c11b6e7eec2656d0e59101d4462f6bd630730f2c8201ed0572b295d5 AS build
 ARG BUILD_CONFIGURATION=Release
-ARG USE_COMMERCIAL_LUCKYPENNY_LIBS=false
 WORKDIR /src
 
 # Copy restore inputs and project graph first for deterministic locked restore caching
@@ -23,29 +22,19 @@ COPY ["src/Explore.Persistence/Explore.Persistence.csproj", "src/Explore.Persist
 COPY ["src/Explore.Secrets/Explore.Secrets.csproj", "src/Explore.Secrets/packages.lock.json", "src/Explore.Secrets/"]
 COPY ["src/Explore.ServiceDefaults/Explore.ServiceDefaults.csproj", "src/Explore.ServiceDefaults/packages.lock.json", "src/Explore.ServiceDefaults/"]
 
-# Restore: FOSS uses locked-mode for determinism; commercial re-resolves
-RUN if [ "$USE_COMMERCIAL_LUCKYPENNY_LIBS" = "true" ]; then \
-      dotnet restore "./src/Explore.API/Explore.API.csproj" \
-        -p:UseCommercialLuckyPennyLibraries=true; \
-    else \
-      dotnet restore "./src/Explore.API/Explore.API.csproj" \
-        --locked-mode \
-        -p:UseCommercialLuckyPennyLibraries=false; \
-    fi
+# Restore using locked-mode for determinism
+RUN dotnet restore "./src/Explore.API/Explore.API.csproj" --locked-mode
 
 COPY . .
 WORKDIR "/src/src/Explore.API"
 RUN dotnet build "./Explore.API.csproj" -c $BUILD_CONFIGURATION -o /app/build \
-      --no-restore \
-      -p:UseCommercialLuckyPennyLibraries=$USE_COMMERCIAL_LUCKYPENNY_LIBS
+      --no-restore
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-ARG USE_COMMERCIAL_LUCKYPENNY_LIBS=false
 RUN dotnet publish "./Explore.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish \
       /p:UseAppHost=false \
-      --no-restore \
-      -p:UseCommercialLuckyPennyLibraries=$USE_COMMERCIAL_LUCKYPENNY_LIBS
+      --no-restore
 
 FROM base AS final
 USER root
@@ -63,7 +52,6 @@ COPY --from=build /src/cerbos ./cerbos
 # Configure via environment variables:
 #   SecretProvider__Provider=Environment or Infisical (required; no fallback)
 #   SecretProvider__Infisical__ProjectId/ClientId/ClientSecret, etc.
-#   Licensing__AutoMapper__LicenseKey, Licensing__MediatR__LicenseKey (commercial builds only)
 # See docs/CONFIGURATION.md for full list of options
 
 USER $APP_UID

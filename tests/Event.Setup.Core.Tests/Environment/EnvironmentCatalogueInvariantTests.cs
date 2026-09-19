@@ -116,7 +116,7 @@ public sealed class EnvironmentCatalogueInvariantTests
         string[] valueBearingKeys =
         [
             "FORMBRICKS_ENCRYPTION_KEY",
-            "LUCKYPENNY_LICENSE_KEY",
+            "STRIPE_PLATFORM_SECRET_KEY",
             "VAPID_PRIVATE_KEY",
         ];
 

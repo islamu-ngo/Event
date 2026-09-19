@@ -41,21 +41,10 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
-  <!-- Commercial Lucky Penny build: define C# preprocessor symbol for #if guards -->
-  <PropertyGroup Condition="'$(UseCommercialLuckyPennyLibraries)' == 'true'">
-    <DefineConstants>$(DefineConstants);USE_COMMERCIAL_LUCKYPENNY_LIBS</DefineConstants>
-  </PropertyGroup>
-
-  <!-- CI: FOSS builds enforce locked restore (deterministic, lock files committed to repo) -->
-  <PropertyGroup Condition="('$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true') and '$(UseCommercialLuckyPennyLibraries)' != 'true'">
+  <!-- CI builds enforce locked restore (deterministic, lock files committed to repo) -->
+  <PropertyGroup Condition="'$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <RestoreLockedMode>true</RestoreLockedMode>
-  </PropertyGroup>
-
-  <!-- CI: Commercial builds re-resolve packages (lock files track FOSS versions) -->
-  <PropertyGroup Condition="('$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true') and '$(UseCommercialLuckyPennyLibraries)' == 'true'">
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <RestoreLockedMode>false</RestoreLockedMode>
   </PropertyGroup>
 
   <!-- Test Projects: standard BDD test method naming (Method_When_Should) and assertion ergonomics -->

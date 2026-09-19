@@ -14,7 +14,7 @@ priority: critical
 - [../../../docs/internal/legal/IP_GOVERNANCE.md](../../../docs/internal/legal/IP_GOVERNANCE.md)
 - [../../../legal/CLA.md](../../../legal/CLA.md)
 - [../../../docs/internal/legal/CONTRIBUTION_GOVERNANCE.md](../../../docs/internal/legal/CONTRIBUTION_GOVERNANCE.md)
-- [../../../docs/internal/DUAL_VERSIONING.md](../../../docs/internal/DUAL_VERSIONING.md)
+- [../../../docs/internal/legal/dependencies/mapperly.md](../../../docs/internal/legal/dependencies/mapperly.md)
 - [../../../docs/internal/CI_CD_GOVERNANCE.md](../../../docs/internal/CI_CD_GOVERNANCE.md)
 - [resources/index.md](resources/index.md)
 
@@ -44,8 +44,8 @@ Clean-room handoff:
 
 ```text
 Dependency decision:
-- Default build: compatible version, deterministic lock
-- Optional commercial build: explicit opt-in and separate rights
+- Single supported build: compatible versions, deterministic locks
+- Every distribution: retain each component's terms and required notices
 - Block: any terms prevent an intended ISLAMU outbound offering
 ```
 

@@ -36,6 +36,6 @@ The integrated MCP server implements the official Streamable HTTP standard:
 ## Related Guides & Next Steps
 
 * **[Direct API Authentication](../security-and-identity/authentication.md#direct-api-authentication)** — Provision and manage API keys for external integrations.
-* **[Authorization & Access Control](../security-and-identity/authorization.md)** — Understand how MediatR permissions guard data reads.
+* **[Authorization & Access Control](../security-and-identity/authorization.md)** — Understand how operation permissions guard data reads.
 * **[Multi-Tenancy Architecture](../security-and-identity/multi-tenancy.md)** — Verify tenant scoping on API and MCP requests.
 * **[Local Development Workflow](../contributing/local-development.md)** — Test MCP endpoints locally with .NET Aspire.

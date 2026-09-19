@@ -1,14 +1,6 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-
-    <!-- Remaining MediatR dual-versioning: FOSS by default, commercial via build flag.
-         Self-hosters: plain `dotnet build` resolves FOSS versions. No license needed.
-         ISLAMU production: `dotnet build -p:UseCommercialLuckyPennyLibraries=true`
-         Lucky Penny commercial licensing starts at MediatR 13.0.0+.
-         Earlier versions remain Apache-2.0.
-         See docs/internal/DUAL_VERSIONING.md for full details. -->
-    <UseCommercialLuckyPennyLibraries Condition="'$(UseCommercialLuckyPennyLibraries)' == ''">false</UseCommercialLuckyPennyLibraries>
   </PropertyGroup>
 
   <ItemGroup>

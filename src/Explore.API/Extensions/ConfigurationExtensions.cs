@@ -39,7 +39,6 @@ public static class ConfigurationExtensions
     ///   /storage:  STORAGE_S3_ENDPOINT, STORAGE_S3_BUCKET_NAME, STORAGE_S3_ACCESS_KEY_ID, etc.
     ///   /smtp:     MAIL_SMTP_HOST, MAIL_SMTP_PORT, MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD, etc.
     ///   /api:      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
-    ///   /api:      USE_COMMERCIAL_LUCKYPENNY, LUCKYPENNY_LICENSE_KEY (Lucky Penny dual-versioning)
     /// </remarks>
     private static void ApplyMapping(IConfigurationBuilder configBuilder, IConfiguration config)
     {
@@ -238,7 +237,6 @@ public static class ConfigurationExtensions
             ["WebPush:VapidPublicKey"] = null,
             ["WebPush:VapidPrivateKey"] = null,
             ["WebPush:VapidSubject"] = null,
-            ["Licensing:LuckyPenny:LicenseKey"] = null,
         };
 
         static void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
@@ -454,15 +452,6 @@ public static class ConfigurationExtensions
             TrySet(mappedConfig, config, "AiProvider:Enabled", "true");
             TrySet(mappedConfig, config, "AiProvider:Provider", aiProviderId ?? "3");
         }
-
-        // Lucky Penny dual-versioning (AutoMapper 15+ / MediatR 13+ commercial licensing).
-        // USE_COMMERCIAL_LUCKYPENNY and LUCKYPENNY_LICENSE_KEY come from Infisical /api folder.
-        // Version secrets (AUTOMAPPER_COMMERCIAL_VERSION, MEDIATR_COMMERCIAL_VERSION) are build-time
-        // MSBuild properties only — they are not mapped to runtime configuration.
-        TrySet(mappedConfig, config, "Licensing:LuckyPenny:Enabled",
-            NormalizeBoolean(ReadFirst(config, "USE_COMMERCIAL_LUCKYPENNY", "Licensing:LuckyPenny:Enabled")));
-        TrySet(mappedConfig, config, "Licensing:LuckyPenny:LicenseKey",
-            ReadFirst(config, "LUCKYPENNY_LICENSE_KEY", "Licensing:LuckyPenny:LicenseKey"));
 
         configBuilder.AddInMemoryCollection(mappedConfig);
     }

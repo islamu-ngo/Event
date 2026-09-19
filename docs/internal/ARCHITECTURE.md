@@ -14,7 +14,7 @@ ABOUTME: Captures key runtime patterns and boundaries that are not obvious from 
 | Metric / Dimension | Value as of 2026-09-03 | Architectural Context |
 |---|---|---|
 | **Runtime & SDK** | .NET 10 (`net10.0`) | Pinned preview SDK in `global.json`, C# 13 features |
-| **Architectural Style** | Clean Architecture + CQRS + BFF | Compile-enforced assembly boundaries + MediatR pipeline |
+| **Architectural Style** | Clean Architecture + CQRS + BFF | Compile-enforced assembly boundaries + protected native operations |
 | **Backend Production LOC** | **500,837 LOC** | API 73k, Application 224k, Domain 55k, Persistence 81k, Infrastructure 67k |
 | **Frontend / Client LOC** | **378,000 LOC** | `Explore.Blazor.Client` (incl. 182,524 LOC generated `EventApiClient.g.cs`) |
 | **Feature Slices** | **126 slices** | CQRS vertical slices under `Explore.Application/Features/` |
@@ -146,7 +146,7 @@ readiness limitations.
 The platform enforces Clean Architecture through **separate .NET project assemblies** with compile-time boundary enforcement, reinforced by 89 architecture test files (22,792 LOC):
 
 1. **`Explore.Domain` (55k LOC)**: Entities, enums, domain rules, state machines, and lifecycle specifications. References only `Event.Wire.Contracts`.
-2. **`Explore.Application` (224k LOC)**: CQRS requests/handlers (MediatR), DTOs, FluentValidation validators, application contracts. Depends only on `Explore.Domain`. Cannot reference Persistence, Infrastructure, or API.
+2. **`Explore.Application` (224k LOC)**: Native command/query requests and handlers, DTOs, FluentValidation validators, application contracts. Depends only on `Explore.Domain`. Cannot reference Persistence, Infrastructure, or API.
 3. **`Explore.Persistence` (81k LOC) + `Explore.Infrastructure` (67k LOC)**: EF Core DbContext, repositories, provider primitives, migrations, email, storage, Keycloak, webhooks. Depend on `Explore.Application`.
 4. **`Explore.API` (73k LOC)**: REST API host, composition root for all backend layers, HTTP middleware, controllers, Swagger/OpenAPI.
 5. **`Explore.Blazor` & `Explore.Blazor.Client` (378k LOC)**: Isolated BFF server and WebAssembly client. The client has **zero** source or project dependencies on Domain, Application, or Persistence; its backend boundary is strictly the generated `IEventApiClient` contract (182,524 LOC).
@@ -228,8 +228,8 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 
 ## Request Flow
 1. HTTP request enters the middleware pipeline (exception handling → security headers → correlation ID → logging → compression → HATEOAS → routing → timeouts → auth → rate limiting → authorization → output cache → ETag → idempotency).
-2. Controllers invoke their operation contract. During migration existing requests retain MediatR; native requests use explicitly injected closed command/query handler interfaces, never a generic sender.
-3. Native composition is authorization -> performance -> handler. The remaining MediatR cohort retains `PerformanceBehavior` -> `AuthorizationBehavior`. Both authorization integrations use `RequestAuthorization<TRequest>` and the existing `[AuthorizeResource]`/typed-facts contract.
+2. Controllers invoke explicitly injected closed command/query handler interfaces, never a generic sender.
+3. Native composition is authorization -> performance -> handler. Authorization uses `RequestAuthorization<TRequest>` and the existing `[AuthorizeResource]`/typed-facts contract.
 4. Handler orchestrates validation (manually instantiated validators), repository calls, mapping.
 5. Persistence layer returns entities; handlers map to DTO/response contracts.
 6. Controller delegates to an `IResourceAssembler<TDto, TListDto>` — by default the generic `HalResourceAssembler<TDto, TListDto>` over `ResourceAssemblerBase` — for HATEOAS HAL wrapping with authorization-aware link generation.
@@ -251,7 +251,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 
 ## Authorization Architecture
 1. Endpoint-level auth is handled via ASP.NET attributes/policies. `[AuthorizeResource]` attribute pairs a resource kind with a domain action constant from `AuthorizationActions`.
-2. `RequestAuthorization<TRequest>` owns resource-level evaluation for native authorization decorators and the remaining `AuthorizationBehavior` MediatR integration. Checks route to `IAuthorizationProvider`, which resolves to Cerbos PDP or local fallback.
+2. `RequestAuthorization<TRequest>` owns resource-level evaluation for native authorization decorators. Checks route to `IAuthorizationProvider`, which resolves to Cerbos PDP or local fallback.
 3. `AuthorizationActions` (string constants) and `ResourceKinds` (string constants) form the canonical action/resource catalogs shared by commands, link policies, and Cerbos policies.
 4. `IAuthorizableResourceDescriptor<T>` + `ResourceDescriptors` extract resource metadata (kind, id, attributes, scope) from DTOs — eliminating manual attribute dictionaries in HATEOAS link policies.
 5. HATEOAS capability planning uses a 4-phase pipeline: candidate links → normalized `AuthorizationCheck` with dedup key → batch evaluate unique checks → map decisions back to links. Fail-closed on batch failure.
@@ -271,7 +271,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 2. MCP hosting uses ASP.NET Core Streamable HTTP through the official C# MCP SDK, with stateless transport selected explicitly.
 3. The adapter is mapped by default through `Mcp:Enabled=true` at `/mcp`; self-hosted deployments can still unmap it with startup `Mcp:Enabled=false` or disable it at runtime with `mcp.enabled=false`.
 4. MCP tools, resources, and prompts must be registry-backed. Tool definitions and JSON schemas come from `IAiToolContractRegistry`; first-class projected MCP proposal tools add only the `conversationId`/`summary` envelope around registry payload fields, and mutating tools follow the existing proposal/confirmation path.
-5. MCP endpoint mapping is anonymous at the transport edge so official SDK authorization filters can expose only explicitly anonymous-safe registry discovery. Scoped tools, resources, prompts, proposals, and conversation data remain tenant-resolved and authenticated through `[Authorize]`, API-key/bearer principals, MediatR authorization, and HAL/API confirmation; no key or an invalid key can use only anonymous-safe capabilities.
+5. MCP endpoint mapping is anonymous at the transport edge so official SDK authorization filters can expose only explicitly anonymous-safe registry discovery. Scoped tools, resources, prompts, proposals, and conversation data remain tenant-resolved and authenticated through `[Authorize]`, API-key/bearer principals, native operation authorization, and HAL/API confirmation; no key or an invalid key can use only anonymous-safe capabilities.
 6. Stateful MCP sessions, runtime legacy SSE transport, sampling, elicitation, roots, completions, progress/list-changed notifications, resource subscriptions, and client-specific compatibility shims are ADR-gated protocol changes, not incidental adapter tweaks.
 7. MCP logs, health, metrics, and errors must not expose prompts, provider responses, tool payloads, tenant IDs, provider endpoint URLs, API keys, or raw provider exceptions.
 
@@ -305,14 +305,16 @@ No PostGIS extension, spatial entity/index, proximity endpoint, or readiness che
 
 ## Caching Architecture (3 Layers)
 1. **Output Cache** (HTTP response level): `LookupData` (1h), `ListData` (30s, varies by `Authorization` header), `DetailData` (60s, varies by `Authorization` header), `PublicData` (1h, no auth variance). Applied via `[OutputCache]` on endpoints.
-2. **HybridCache** (application level, L1 in-memory + L2 distributed): 30min default expiration, 5min local, 10MB max payload. Used in MediatR handlers with read-through and explicit invalidation patterns.
+2. **HybridCache** (application level, L1 in-memory + L2 distributed): 30min default expiration, 5min local, 10MB max payload. Used in native handlers with read-through and explicit invalidation patterns.
 3. **ETag Middleware** (conditional requests): RecyclableMemoryStream-based, SHA256 weak ETags on JSON/HAL responses, returns `304 Not Modified`. Skips bodies larger than 256KB.
 
-## MediatR Pipeline Behaviors
-The remaining MediatR cohort retains its performance-then-authorization registration order. `AuthorizationBehavior` delegates to the shared evaluator described below; there is no `IAuthorizedRequest` contract.
-
 ## Protected Native Operations
-`Explore.Application.Contracts.Operations` defines void commands (`Task ExecuteAsync`), result commands (`Task<TResult> ExecuteAsync`), queries (`Task<TResult> QueryAsync`), and typed notifications (`Task HandleAsync`). Requests implement exactly one operation shape. Provider identity resolution is the first product native query: `ResolveCurrentUserIdByIdentityRequest` returns `Guid?`, and its callers inject the exact closed query handler. Other commands and queries retain their existing contracts until their caller-closed migration. Setting notifications use native contracts independently of those remaining operations.
+
+[Mapping and operations](MAPPING_AND_OPERATIONS.md) owns the authoring boundaries;
+[ADR-030](adr/ADR-030-generated-mapping-and-native-operations.md) records the decision.
+AutoMapper and MediatR have no runtime registration or package dependency.
+
+`Explore.Application.Contracts.Operations` defines void commands (`Task ExecuteAsync`), result commands (`Task<TResult> ExecuteAsync`), queries (`Task<TResult> QueryAsync`), and typed notifications (`Task HandleAsync`). Requests implement exactly one operation shape. For example, provider identity resolution uses `ResolveCurrentUserIdByIdentityRequest`, returning `Guid?`, and its callers inject the exact closed query handler. Commands, queries and typed settings notifications use repository-owned contracts; there is no legacy dispatch fallback.
 
 Settings producers inject `IEnumerable<INotificationHandler<SettingChangedNotification>>` and await `NotificationHandlerExtensions.HandleAsync`. Application explicitly registers the setting-cache consumer before the audit consumer, and the separate policy-cache consumer for `PolicyChangedNotification`; there is no event bus or reflection dispatch. Cache-before-audit is an intentional ordering change from the former MediatR discovery order. Delivery is sequential in DI registration order and stops on the first consumer failure, preserving the exception and supplied token. Producer-owned tenant/user and specialized output-cache invalidation boundaries remain unchanged, including deliberate post-commit `CancellationToken.None` sites and sensitive-value redaction. A notification failure does not undo committed writes; investigate the failed cache/audit effect separately rather than report a rollback. The existing configuration-manifest durable outbox still owns aggregation across separate effects and its established replay policy; each individual notification remains fail-first.
 

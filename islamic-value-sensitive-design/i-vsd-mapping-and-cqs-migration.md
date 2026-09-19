@@ -1,6 +1,6 @@
-# I-VSD Planning Assessment: Generated Mapping And Native Operations
+# I-VSD Workstream Assessment: Generated Mapping And Native Operations
 
-Last Updated: 2026-09-11
+Last Updated: 2026-09-19
 
 ## Review Metadata
 
@@ -9,14 +9,14 @@ Last Updated: 2026-09-11
 - Workstream: mapping-and-cqs-migration
 - Report kind: workstream-planning-assessment
 - Report status: current
-- Disposition: plan-aligned
-- Evidence cutoff: 2026-09-11
-- Reviewed input: `mapping-and-cqs-migration / full-migration-r4` authority in the active grand ledger, plan and context (E11); completed subscription pilot `dee432983931a3b15b32d088461a427f72fa3b51` on develop baseline `97784ef6d22decab97a4da82c9e18f3ed8d7c2b1`, its dependency record and bounded recorded evidence (E12/E13).
+- Disposition: changes-required
+- Evidence cutoff: 2026-09-19
+- Reviewed input: `mapping-and-cqs-migration / full-migration-r4`, hub HEAD `5fa8a9df0ab62cf8cdc5fe58fb66956431398727` plus the uncommitted Phase 7 implementation and evidence identified in E15–E18. This is implementation revalidation of the same planning-workstream report, not a release or full-product certification.
 - Supersedes: none; applies the [Steward consultation](i-vsd-automapper-mapperly-and-mediatr-replacement-consultation.md) to a concrete implementation plan without replacing that decision record.
 
 ## Scope
 
-Evaluate whether the plan implements the provider responsibilities already accepted in the consultation: one supportable build, accurate dependency/configuration promises, safe DTO disclosure, explicit operation dependencies, reliable authorization and notification behavior, and maintainable native composition.
+Revalidate the accepted provider responsibilities against the current single-edition implementation: one supportable build, accurate dependency/configuration promises, safe DTO disclosure, explicit operation dependencies, reliable authorization and notification behavior, and maintainable native composition. The current assessment below supersedes historical pilot-only completion statements; retained September 11 evidence and lifecycle entries remain provenance, not current execution results.
 
 The user explicitly authorizes the entire grand migration: all eleven mapping families (subscription pilot complete; ten remaining), native CQS with authorization/timing decorators, all 124 capability cohorts and special consumers, full AutoMapper/MediatR/MediatR.Contracts removal, single-edition MSBuild/Docker/environment cleanup, documentation and integrated verification. The six delivery boundaries are active implementation ordering, not backlog approval gates. Literal caller-closed slice ownership remains required, not renewed scope approval.
 
@@ -24,11 +24,27 @@ The Steward has decided Mapperly and repository-native command/query handlers wi
 
 ## Claim Boundary
 
-This is provider-responsibility design reasoning and implementation traceability, with bounded recorded pilot test evidence. It is not a fatwa, legal opinion, security certification, full-migration test pass, stakeholder/operational validation, or a benchmark. **Disposition: aligned with the explicitly authorized full-migration-r4 plan; product assurances remain open.** All F001–F009 remain open; only the proven pilot portions of M001/M005 are complete. Apache-2.0 metadata and scanner success do not themselves settle every distribution or generated-output obligation.
+This is provider-responsibility design reasoning and implementation traceability (evidence levels 2/3), including actual Phase 7 build, Setup, restore, audit and policy results. It is not a fatwa, legal opinion, security certification, stakeholder/operational validation or benchmark. **Disposition: changes-required because the repository release-fragment acceptance gate failed; final Ring 3 assurance is also still open.** No failed gate is counted as a pass. All F001–F009 remain open at whole-workstream scope, while the completed Phase 7 portions are distinguished below. Apache-2.0 metadata and scanner success do not settle every distribution or generated-output obligation.
 
 ## Findings
 
-Finding IDs retain the consultation's meaning. New technical qualifications refine mitigations without renumbering the accepted concerns.
+Finding IDs retain the consultation's meaning. The following current revalidation governs over the historical planning details retained under each finding. Lifecycle remains open for every whole-workstream finding; the principle, stakeholder, provider decision and responsible owner below each ID remain applicable. No new religious-legal decision is introduced.
+
+### Current Implementation Revalidation — 2026-09-19
+
+| Finding / mitigation | Current implementation evidence and disposition | Next owner/gate |
+|---|---|---|
+| IVSD-F001 / IVSD-M001, IVSD-M002, IVSD-M004 | E15/E16: edition conditions, Docker forwarding, vendor configuration and catalogue inputs are removed; generator reports 373 definitions; Setup passes 101/101. Current operator instructions explain input removal. Implementation-traceability portion satisfied, not deployed validation. | Build/setup owner: final 7.R4 parity and governed release closure. |
+| IVSD-F002 / IVSD-M001 | E16/E17: zero removed-vendor entries in 59 reported package projects, 66 lockfiles and 31 Release dependency manifests; fresh vulnerability audit has zero findings. No universal recursion/privacy claim follows. | Dependency owner: final distributed-artifact review, 7.R4. |
+| IVSD-F003 / IVSD-M001, IVSD-M002 | E15: static projections and explicit inbound ownership are documented; strict diagnostics are not a PII allowlist. No new full-family serialization or forged-input tests were run in Phase 7. | Mapping owner: retained family evidence and 7.R1/7.R3. |
+| IVSD-F004 / IVSD-M003 | E15/E17: native closed command/query registration and zero vendor package graph support replacement traceability. This review does not rerun every caller or infer consumer closure from a package search. | Application/API owner: final compiled/runtime caller assurance, 7.R1. |
+| IVSD-F005 / IVSD-M005 | E15–E17: Apache-2.0 source register, notice duties and cautious generated-output disposition retained; license policy passes 472 package/version pairs with four unrelated exceptions. Checked-in SBOMs cover AI and Terminal.Gui only, not final product images. | Steward/dependency owner: actual distribution notices and SBOM, 7.R4. |
+| IVSD-F006 / IVSD-M003, IVSD-M006, IVSD-M007 | E15: composition source wraps all three native shapes authorization -> performance -> handler; descriptor validation and bounded runtime/deep-CI construction remain distinct. No final independent security review or host matrix was executed here. | Security/Application owner: 7.R1/7.R3; factual bypasses block release. |
+| IVSD-F007 / IVSD-M008 | E15: no validator-DI or validation-decorator policy change; manual ownership is retained. No new whole-handler convention pass is claimed. | Application owner: final compiled conventions, 7.R1. |
+| IVSD-F008 / IVSD-M009 | E15: transactions/outboxes stay capability-owned; explicit notification order and post-commit failure meaning are documented. Phase 7 does not prove real-provider concurrency, erasure or transaction behavior. | Application/Persistence owner: 7.R2/7.R3. |
+| IVSD-F009 / IVSD-M010 | E15: direct ports and capability boundaries are documented; current public guidance no longer describes mediator dispatch. Semantic OpenAPI/HAL parity is not established by prose or Setup tests. | API owner: 7.R4. |
+
+IVSD-M002/M004 are implemented for the reviewed Phase 7 inputs, but operator release acceptance remains blocked by E18. IVSD-M005 has current local dependency evidence, not a legal or final-artifact clearance. The retained historical task mapping below is not a request to repeat completed migration slices.
 
 ### IVSD-F001 — The edition promise must match the supported build
 
@@ -122,9 +138,9 @@ Finding IDs retain the consultation's meaning. New technical qualifications refi
 
 ## Recommendations
 
-Proceed with the entire authorized migration through bounded, independently reviewable mapper and operation slices, without stopping at the completed pilot or requiring backlog promotion. A request belongs to exactly one dispatch cohort while migrating; every converted callee's direct consumers move in the same slice. No old-to-new dispatcher adapter or compatibility API remains.
+Preserve the implemented single-edition contract and truthful partial assurance. Resolve the repository release-fragment gate under its existing owner before claiming policy acceptance; do not rewrite unrelated historical fragments or weaken the validator as part of Phase 7. Commit preparation does not replace the final touched-layer, provider, security/privacy and semantic-contract gates. The architecture remains approved; no speculative source-generation or performance backlog is justified by this evidence.
 
-All ownership below refers to [the active grand ledger](../dev/active/mapping-and-cqs-migration/mapping-and-cqs-migration-grand-tasks.md), revision `full-migration-r4`. Pilot completion does not close a whole-program finding. Per-slice security/architecture gates remain prerequisites for product cutover; the final integrated gate does not replace them.
+The historical mitigation mapping below retains the September 11 design obligations and stable IDs under the active grand ledger, revision `full-migration-r4`. Current completion/evidence state is the September 19 matrix above, not the pilot-only status text in this retained mapping. Per-slice assurance and final integrated gates remain distinct.
 
 | Mitigation | Concrete provider-responsibility requirement | Active ledger ownership and evidence state |
 |---|---|---|
@@ -154,7 +170,7 @@ Trust requires control over the authorization path and honest evidence of compos
 ## Common Overlooked Failures And Outcomes
 
 - A strict mapper can still map an automatically matching sensitive field; explicit disclosure and serialized-output tests remain necessary.
-- Void requests need their own protected handler shape. The current code has a non-generic IRequest in addition to two IRequest<Unit> types.
+- Void commands need their own protected handler shape. Native `ICommand` and `ICommandHandler<TCommand>` replace the historical non-generic and Unit-returning mediator shapes.
 - ValidateOnBuild excludes open generics and does not substitute for executing a factory's construction path. Native operation re-entry guards must release state after failures and remain scope-specific.
 - DI factory aliases already exist; preserve their shared-instance semantics. No general factory-dependency analyzer is assumed.
 - Annotation-free public/capability/worker handlers are not automatically unauthenticated operations. Preserve their actual authority and native discovery rather than adding broad bypass metadata.
@@ -163,13 +179,15 @@ Trust requires control over the authorization path and honest evidence of compos
 
 ## Validation Gaps
 
-This revalidation ran no dotnet command, host, test, restore or benchmark. It read the pilot commit footprint, dependency record, task-owned context and existing focused/Application/Architecture/license logs (E12/E13). Pilot evidence is reusable only for unchanged inputs; it does not establish native CQS, all mappings, real database visibility, final vendor removal or single-edition correctness.
+Current Phase 7 execution (E16–E18) includes Release build, Setup Core, restore, locked restore, dependency license policy, package graph, fresh vulnerability audit and the existing repository-fragment acceptance test. Build succeeded with 2,573 warnings and zero errors; warnings were not suppressed. Setup passed 101 tests with zero failures/skips. Five C# LSP requests timed out; compiler results, not an invented diagnostics pass, supply compilation evidence. No final Ring 3 suite, provider matrix, independent review, host exercise or benchmark was run. The release-fragment test failed on three existing inventory diagnostics; dirty-source preflight separately failed as designed.
+
+The following pilot evidence is historical and is not substituted for current final gates:
 
 The recorded pilot completed two one-way scalar projections, both consumers and exhausted-profile deletion. The read logs show 18/18 focused tests, 2,179/2,179 Application tests, 591 Architecture passes with one existing response-metadata skip, and dependency policy passing 475 package/version pairs with six visible exceptions and no Mapperly exception. Context/dependency record report the compiling detail/list Red cases and restored Green, whole-solution Release success, locked restore, clean C# diagnostics and independent privacy/provenance review. Those latter results are inherited execution records, not newly executed checks; the locked-restore log is empty and supplies no independent exit-status proof. Existing baseline warnings and the Architecture skip are not represented as clean universal assurance.
 
 The pilot contains no reverse/existing-target/nested-graph map and no nested mutable DTO collection. Its outer-list order/independence and handler-delegation evidence must not become a claim about PaginatedResult defensive copying or real persistence/discoverability enforcement. Remaining family privacy/serialization, forged-input and aggregate-encapsulation evidence stays open.
 
-The graph is stale/under-indexed and unavailable in current execution context. Slice-owned source inventories and compiled coverage remain required; recorded candidate/handler counts are not exhaustive runtime proof. Full native composition/authority, normal/Testing/standalone startup ordering, zero-payload telemetry, notification, worker-scope, transaction/outbox and five-provider evidence remain open. The architecture and full scope are already decided.
+At the historical pilot review the graph was stale/under-indexed and unavailable. Slice-owned source inventories and compiled coverage remain required; recorded candidate/handler counts are not exhaustive runtime proof. Full native composition/authority, normal/Testing/standalone startup ordering, zero-payload telemetry, notification, worker-scope, transaction/outbox and five-provider evidence remain open. The architecture and full scope are already decided.
 
 The source-free Mapperly admission and independent pilot review now exist. Package metadata supports the declared license, not a legal opinion. The record explicitly does not certify generated output as license-free; final artifact/notice obligations remain distribution-owned. No allocation, throughput, AOT, trimming or boot-latency improvement has been demonstrated, and no new benchmark deliverable is imposed.
 
@@ -196,13 +214,19 @@ E01–E10 retain the previous assessment's evidence identities; except the consu
 | E11 | [Grand ledger](../dev/active/mapping-and-cqs-migration/mapping-and-cqs-migration-grand-tasks.md) Execution Authority/Revised Delivery Boundaries/complete inventory; [plan](../dev/active/mapping-and-cqs-migration/mapping-and-cqs-migration-plan.md) Full Migration Authority/S1–S7/§5; [context](../dev/active/mapping-and-cqs-migration/mapping-and-cqs-migration-context.md) Full Migration Reactivation/Pilot Verification Evidence; full-migration-r4, 2026-09-11 | Explicit whole-program authorization supersedes historical split restrictions; all mapping families, 124 cohorts, special consumers, vendor/edition/docs closure and final assurance active. Design/task traceability, not completion. |
 | E12 | [Mapperly admission](../docs/internal/legal/dependencies/mapperly.md); `git show --stat --oneline dee432983` | Ten-path committed pilot footprint; recorded pinned package/lock hash, generator role, notice/output limitations, diagnostic warning-to-error policy, independent review and bounded pilot verification. No native or edition completion. |
 | E13 | Existing `/home/amir/.cache/agent-tmp/subscription-{final-focused,application-exit,architecture-exit,license-policy}.log`; context Pilot Verification Evidence; `subscription-locked-restore.log` (empty) | Read test/policy summaries substantiate the bounded counts above. Red/build/restore/diagnostic/review outcomes rely on task-owned records; commands were not rerun. No provider or live-host evidence inferred. |
-| E14 | `src/Explore.Application/ApplicationServicesRegistration.cs:143–144`, targeted source read | Existing PerformanceBehavior registration precedes AuthorizationBehavior; E11 deliberately reverses that nesting for native operations. No authorization implementation re-audit claimed. |
+| E14 | Historical `src/Explore.Application/ApplicationServicesRegistration.cs:143–144`, September 11 source read | Former performance-before-authorization registration; retained historical evidence, not the current source order. |
+| E15 | Current `OperationServicesRegistration.cs`, `Operations/OperationCompositionValidation.cs`, Application registration, Phase 7 runtime/build/configuration diffs; [mapping/operations](../docs/internal/MAPPING_AND_OPERATIONS.md), [ADR-030](../docs/internal/adr/ADR-030-generated-mapping-and-native-operations.md), [Mapperly record](../docs/internal/legal/dependencies/mapperly.md), current public operator guidance | Current source/design traceability and durable ownership. No broad handler or external-source re-audit. |
+| E16 | Task-local `dev/active/mapping-and-cqs-migration/phase7-evidence/{build,setup,restore,locked-restore,catalogue-write,license-policy}.log` and matching `.exit` files | Actual exits 0; Release 0 errors/2,573 warnings; Setup 101/101; generated catalogue 373 definitions; license policy 472 pairs and four retained exceptions. |
+| E17 | Same evidence directory: `package-graph.json`, `vulnerabilities.json`, `vulnerability-policy.log`, `artifact-absence.log` and exits | 59 package projects, zero fresh vulnerabilities; zero removed-vendor entries in 66 locks, 31 Release manifests and two limited checked-in SBOMs (8/20 components). Not a final image SBOM. |
+| E18 | Same evidence directory: `create-change.log`, `preflight-range.log`, `release-input-policy.log` and exits; generated fragment `CHG-01M2XRR8CVQEHFCZFFQ25V84TC` | Engine-generated identity, exit 0; preflight exit 2 `change_release_sources_not_committed`; repository fragment test 0 passed/1 failed, exit 2, reporting restricted-detail marker in `CHG-01M1SMGJ33KVXHCN9BHBTMM9ME` and incompatible groups `email-optional-self-hosting` / `database-backed-atproto-auth`. No fragment-policy pass claimed. |
 
 ## Missing Evidence
 
-Remaining execution obligations are the open rows in the active mitigation table: all remaining mapping privacy/collection/inbound/cyclic vectors; every native shape, caller and scoped authority; CI deep construction plus bounded boot/worker ordering; notification/transaction/outbox/erasure invariants; final restored and published zero-vendor graph; MSBuild/Docker/environment/generated-output and public/internal documentation parity; governed release evidence; touched-layer suites and PostgreSQL/SQLite/SQL Server/MariaDB/MySQL assurance. No such whole-program completion is established by the pilot. Stakeholder or deployed operational validation was not reviewed. Do not close findings from plan text or claim unmeasured benchmark/boot improvements.
+Whole-workstream closure still requires final touched-layer suites; real PostgreSQL/SQLite/SQL Server/MariaDB/MySQL transaction, concurrency and erasure evidence; independent security/privacy and architecture review; semantic OpenAPI/HAL and generated-artifact parity; actual distributed-image SBOM/notices; and passing governed release evidence. Source traceability and local dependency absence do not replace those obligations. Stakeholder/deployed operational validation and performance improvements are not established. The failed repository-fragment acceptance test is a concrete current gap, distinct from the expected pre-commit range-preflight boundary.
 
 ## Context Inventory
+
+September 19: read the report/integration/evidence contracts, this report, current Phase 7 diffs and durable documentation, native composition source, retained execution logs, package/audit/SBOM summaries and the existing release-fragment test. No restricted third-party expression was ingested, no scholarly conclusion issued and no Ring 3 execution performed. The following inventory records the earlier planning review only.
 
 Reused the shared evidence packet and re-read the consultation, complete active grand ledger/plan/context, current report, I-VSD skill and integration/report/scope/evidence/architecture resources. Bounded additional reads were the pilot admission, commit footprint, existing summary logs and old behavior registration order. No broad source scan, third-party implementation ingestion or external research was performed. The active grand ledger owns execution, plan owns architecture and context owns resume evidence; this report alone owns this revalidation's provider-responsibility traceability. The candidate inventory remains planning memory, not an assurance fixture.
 
@@ -218,12 +242,15 @@ Reused the shared evidence packet and re-read the consultation, complete active 
 | 2026-09-11 | current | stale | User corrected the backlog split and explicitly activated the entire grand migration; mitigation ownership and completed pilot evidence changed | E11–E13 |
 | 2026-09-11 | stale | current | Revalidated full-migration-r4: all F001–F009/M001–M010 retained and bound to active ledger rows; only proven pilot portions of M001/M005 complete; all findings remain open. Corrected diagnostic-default and unmeasured boot/performance claims; no design decision reopened | E11–E14 |
 
+| 2026-09-19 | current | stale | Implementation advanced from pilot evidence to vendor removal and uncommitted single-edition closure | E15–E18 |
+| 2026-09-19 | stale | current | Revalidated all stable findings/mitigations against current Phase 7 evidence; disposition changes-required for failed release inventory acceptance, with Ring 3 and final distribution evidence explicitly open | E15–E18 |
+
 ## Planning Handoff
 
 - Workstream: mapping-and-cqs-migration
-- Status: current / plan-aligned; explicitly aligned with the authorized full-migration-r4 design, not a full-product assurance pass.
-- Reviewed input: active grand ledger, plan and context full-migration-r4 overrides; committed pilot `dee432983931a3b15b32d088461a427f72fa3b51` and bounded E12/E13 evidence.
-- Findings and mitigations: all consultation IDs retained (F001–F009 -> M001–M010); every finding remains open. Recommendations binds each mitigation to S1–S7 and literal grand-ledger task IDs.
-- Required mappings: all eleven mapping families, native protected foundation, all 124 cohorts/special consumers, notifications, vendor removal and single-edition/docs cleanup are active. Only subscription projection/package-admission portions of M001/M005 are complete. Historical split ownership/promoted-packet language in the triad is superseded, not a new approval boundary.
+- Status: current / changes-required; architecture remains approved, but release-policy acceptance and whole-workstream assurance are not complete.
+- Reviewed input: hub HEAD `5fa8a9df0ab62cf8cdc5fe58fb66956431398727` plus uncommitted Phase 7 inputs, E15–E18.
+- Findings and mitigations: F001–F009 and M001–M010 retained; all whole-workstream findings remain open. Current matrix records the satisfied Phase 7 portions and their next owner/gate.
+- Required mappings: M002/M004/M005 -> 7.1–7.4/7.V and final 7.R4; M001/M003/M006/M007/M008/M009/M010 -> their retained capability assurance plus 7.R1–7.R4. No speculative performance or framework backlog is introduced.
 - Escalations before implementation/release: only an actual dependency/provenance rejection or newly discovered material authority/architecture conflict; no redundant approval of the selected architecture or full scope, and no invented legal certification gate.
 - Refresh triggers: material scope/authority or transaction/notification changes, new package/distribution evidence, unsafe mapping boundary, changed edition contract or material plan rewrite. Revalidate against final implementation evidence before whole-program closure; routine execution-slice ownership within approved scope requires no renewed scope approval.

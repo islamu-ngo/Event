@@ -2,8 +2,8 @@
 
 > **Audience:** Contributors | Maintainers | Distribution reviewers
 > **Owner:** Contributor Experience
-> **Reviewed:** 2026-09-11
-> **Scope:** Application DTO projections; native CQS and remaining MediatR edition policy are separately owned
+> **Reviewed:** 2026-09-19 (repository implementation); upstream admission sources retained from 2026-09-11
+> **Scope:** Application DTO projections, generator provenance and distribution obligations
 
 ## Runtime Mapping Retirement
 
@@ -16,9 +16,13 @@ registration guards replace the obsolete vendor depth-limit check.
 
 The exact AutoMapper license override and vulnerability exception are also
 removed. The vulnerability validator rejects the formerly suppressed advisory
-instead of relying on a runtime mapping-depth ceiling. MediatR remains separately
-tracked until its request and caller migration is complete. The pilot evidence
-below is historical admission evidence, not the current dependency inventory.
+instead of relying on a runtime mapping-depth ceiling. MediatR and
+MediatR.Contracts are also removed after native request/caller migration. The
+single supported build has no commercial edition selector, version override or
+vendor licensing configuration. See [mapping and operations](../../MAPPING_AND_OPERATIONS.md)
+and [ADR-030](../../adr/ADR-030-generated-mapping-and-native-operations.md).
+The pilot evidence below is historical admission evidence, not the current
+dependency inventory.
 
 ## Admission
 
@@ -126,6 +130,28 @@ Independent provenance and privacy reviews inspected the completed mapper,
 consumers, tests, generated output and package evidence and approved the pilot
 with no remaining findings. The separately captured list Red closes the initial
 detail-first assertion gap. This engineering admission is not legal certification.
+
+## Full-Migration Provenance Review
+
+The September 19 review used repository-native mapper inputs, operation
+registration/composition code, build/configuration diffs and the existing source
+register. No new external implementation source, snippets, tests or assets were
+used. The upstream access dates above are inherited admission evidence, not a
+claim of fresh web research or a new latest-version check.
+
+AFC/SSO disposition: entity/DTO identities and public interface spellings are
+constrained by repository contracts; the static mapper families, explicit inbound
+allowlists and closed operation ports follow the application's own capability
+boundaries. Microsoft DI and generic decorator mechanics are platform patterns,
+not a copied third-party mediator design. There is no vendor-source translation
+or runtime compatibility facade. This bounded review does not replace final
+privacy/serialization and real-provider assurance.
+
+The Apache-2.0 terms, pinned package identity, notice obligations and cautious
+generated-output disposition above still apply. Removal of the old vendor
+exceptions does not approve unrelated dependency exceptions or certify container
+redistribution. Retain restored graph, audit, license-policy and artifact/SBOM
+evidence for the exact final build; old pilot counts cannot close those gates.
 
 ## Historical Pilot Verification Evidence
 

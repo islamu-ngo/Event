@@ -1,13 +1,39 @@
-<!-- ABOUTME: Domain journal for Application layer, MediatR/CQRS, Outbox messaging, and settings cascade. -->
+<!-- ABOUTME: Domain journal for Application layer, native CQS, Outbox messaging, and settings cascade. -->
 <!-- ABOUTME: Captures durable findings on command handlers, event dispatching, and asynchronous workflows. -->
 
 # Application & Messaging Knowledge Ledger
 
-> **Scope**: `Explore.Application`, CQRS/MediatR pipeline, Transactional Outbox, RabbitMQ/MQContract, and EAV.
+> **Scope**: `Explore.Application`, protected native operations, Transactional Outbox, RabbitMQ/MQContract, and EAV.
 
 ---
 
 ## 1. Architectural Decisions
+
+### 2026-09-19: Explicit mapping and operation ownership
+
+The completed vendor-runtime migration uses named Application static projections
+and closed native command/query handler ports. Microsoft DI composes authorization
+outside timing outside the business handler; it is not a generic request bus.
+Manual validators, transactions and outbox writes remain capability-owned.
+
+Two boundaries are easy to lose during future cleanup: strict generated-mapping
+diagnostics do not prove PII disclosure safety, and successful descriptor checks
+do not prove opaque DI factories. Keep independent DTO behavior tests and actual
+scoped construction assurance. Never map trusted aggregate state from an input
+object or add container lookup to a controller to reduce constructor parameters.
+
+Settings notifications are ordered and fail-first. Their failure after commit
+must not be described as rollback. Singleton workers still need their established
+execution scopes. No benchmark, zero-allocation or universal startup-readiness
+claim follows from removing a library.
+
+One supported locked dependency graph replaces edition selectors and vendor
+license inputs. Dependency removal must include generated environment docs,
+operator migration instructions and exhausted audit exceptions together.
+Durable ownership: [mapping/operations](../../../docs/internal/MAPPING_AND_OPERATIONS.md),
+[ADR-030](../../../docs/internal/adr/ADR-030-generated-mapping-and-native-operations.md),
+and [Mapperly provenance](../../../docs/internal/legal/dependencies/mapperly.md).
+Final security/provider review remains a separate workstream exit gate.
 
 - **Transactional Outbox Mandate**: Any domain event, webhook, or external notification resulting from an aggregate state change must be written to the local outbox in the same database transaction.
 - **Provider Abstraction for Messaging**: `IMessagingProvider` defines the application contract, wrapped by `RuntimeMessagingProvider` (scoped with cache) and `RabbitMqMessagingProvider` (singleton with lazy init).

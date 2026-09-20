@@ -4,9 +4,9 @@ ABOUTME: Separates repository settings from workflow YAML so required gates stay
 # CI/CD Governance
 
 > **Audience:** Maintainers | Release operators | Contributors | AI agents
-> **Status:** Implemented + repository-settings required
+> **Status:** Implemented
 > **Owner:** Platform/Ops
-> **Last Verified:** 2026-05-07
+> **Last Verified:** 2026-09-20
 > **Source Anchors:** `.ci/`, `.github/workflows/`, `.github/dependabot.yml`, `docs/TESTING.md`, `docs/GOVERNANCE.md`, `docs/OPERATIONS.md`, `docs/RELEASE_CHECKLIST.md`
 
 This page is the source of truth for CI/CD governance. `.ci/` owns shared CI/CD implementation such as reusable scripts, policy validators, evidence writers, the OpenAPI Spectral ruleset, local composite actions, and mirror-provider CI/CD definitions. GitHub-native workflow discovery files stay in `.github/workflows/` because GitHub Actions requires that path.
@@ -203,21 +203,25 @@ Record evidence for these settings before treating the repository as enterprise-
 
 | Control | Expected setting | Evidence required | Current evidence |
 |---|---|---|---|
-| Default branch protection / ruleset | `main` requires pull requests, current required checks, linear history or reviewed merge policy, and stale review dismissal when available. | Ruleset export, branch protection API output, or maintainer screenshot. | 2026-06-01 API evidence: branch protection endpoint returns 404; active `main` branch ruleset only includes deletion, non-fast-forward, and Copilot code-review rules. Missing PR/review/required-check controls. |
-| Development branch protection / ruleset | `develop` requires pull requests and current required checks before merge. | Ruleset export, branch protection API output, or maintainer screenshot. | 2026-06-01 API evidence: branch protection endpoint returns 404 and no `develop` ruleset was returned. Missing expected controls. |
-| Required check names | Check names match the table above and are stable before branch protection is updated. | Branch protection required-check export. | 2026-06-01 API evidence: no branch-protection status-check configuration returned. Required checks are not configured yet. |
+| Default branch protection / ruleset | `main` requires pull requests, current required checks, linear history or reviewed merge policy, and stale review dismissal when available. | Ruleset export, branch protection API output, or maintainer screenshot. | 2026-09-20 API evidence: active `Gitflow - main` ruleset requires one approving review, linear history, and `run-tests / Build & Test`; stale-review dismissal remains disabled. |
+| Development branch protection / ruleset | `develop` requires pull requests and current required checks before merge. | Ruleset export, branch protection API output, or maintainer screenshot. | 2026-09-20 API evidence: active `Gitflow - Develop` ruleset requires one approving review, linear history, and `run-tests / Build & Test`. |
+| Required check names | Check names match the table above and are stable before branch protection is updated. | Branch protection required-check export. | 2026-09-20 API evidence: both Gitflow rulesets require `run-tests / Build & Test`; strict branch-update enforcement is disabled. |
 | Merge queue | Enabled only after all required workflows have `merge_group` or always-present wrappers. | Ruleset export showing queue status and required checks. | 2026-06-01 API evidence: repository ruleset export showed no merge-queue rule. |
-| Reserved version-tag glob | A branch ruleset includes `refs/heads/v*` with a `creation` rule so version tags keep sole ownership of the `v*` namespace. | Ruleset export showing the `refs/heads/v*` include and `creation` rule; `repository-settings-evidence` reports `hasReservedVersionTagGlobRule`. | Not yet configured. `.ci/scripts/validate-repository-settings.cs` now reports this control; the rule must be created in repository settings before the first governed release tag. |
+| Reserved version-tag glob | A branch ruleset includes `refs/heads/v*` with a `creation` rule so version tags keep sole ownership of the `v*` namespace. | Ruleset export showing the `refs/heads/v*` include and `creation` rule; `repository-settings-evidence` reports `hasReservedVersionTagGlobRule`. | 2026-09-19 remediation: active `Reserved version-tag namespace` branch ruleset reserves `refs/heads/v*` with a `creation` rule. |
 | Environments | `staging` and `production` exist with environment-scoped secrets. Production requires reviewers and branch/tag restrictions. | Environment settings screenshot/API output with secret names redacted. | 2026-06-01 remediation: `staging` and `production` environments created. `production` requires reviewer `@amirakrari`; custom deployment branch policies allow `main` and `v*`. `staging` custom deployment branch policy allows `develop`. Environment secrets still need maintainer verification with values redacted. |
-| Actions policy | Repository allows only GitHub-owned, verified, or SHA-pinned actions according to the organization policy. | Actions policy API output or maintainer screenshot. | 2026-06-01 API evidence: Actions are enabled and `allowed_actions` is `all`; policy is not restricted at the repository level. |
+| Actions policy | Repository allows only GitHub-owned, verified, or SHA-pinned actions according to the organization policy. | Actions policy API output or maintainer screenshot. | 2026-09-19 remediation: `allowed_actions` is `selected`; GitHub-owned and verified actions are allowed, and required SHA-pinned third-party actions are matched with explicit `owner/repository@*` patterns. |
 | Security features | Secret scanning, push protection, Dependabot security updates, dependency graph, and CodeQL alerts are enabled; CodeQL default setup is disabled while `CodeQL Advanced` owns uploads. | Security settings screenshot/API output. | 2026-06-07 API evidence: CodeQL default setup set to `not-configured` to unblock advanced workflow uploads. 2026-06-01 API evidence: secret scanning and push protection enabled; dependency graph/vulnerability alerts enabled; code-scanning API accessible with an open CodeQL alert; Dependabot security updates / automated security fixes enabled (`enabled: true`, `paused: false`). |
 | CODEOWNERS owner resolution | Every team/user referenced by `.github/CODEOWNERS` exists and has write access. | GitHub CODEOWNERS validation or maintainer confirmation. | 2026-06-01 API evidence: `@islamu-ngo/platform-ops` team lookup returned 404, so `.github/CODEOWNERS` now uses `@amirakrari`; collaborator permission API reports `admin`. Replace with an org team after it exists. |
 
-### Repository Settings Drift Check
+### Repository Settings Audit
 
-`.github/workflows/repository-settings.yml` runs scheduled/manual repository-settings drift checks through `.ci/scripts/validate-repository-settings.cs`. The workflow reads GitHub repository metadata, branch protection, rulesets, environments, Actions policy, security features, code scanning access, and CODEOWNERS owner resolution, then retains redacted JSON/Markdown evidence in `repository-settings-evidence`.
+Repository administration is a GitHub control-plane concern, so this repository does not place an elevated administration token inside its own Actions workflows. A maintainer audits settings on demand with their existing authenticated `gh` session:
 
-The lane is expected to fail until the release-blocking settings above are configured. Do not suppress it or remove findings without either fixing the GitHub setting or recording an owner, date, compensating control, and removal condition in the release evidence package.
+```bash
+GH_TOKEN="$(gh auth token)" dotnet run .ci/scripts/validate-repository-settings.cs -- islamu-ngo/Event artifacts/repository-settings
+```
+
+The validator reads repository metadata, rulesets, environments, Actions policy, security features, code scanning access, and CODEOWNERS owner resolution, then writes redacted JSON/Markdown evidence under `artifacts/repository-settings`. Run it when repository controls change and before a governed release. A finding must be fixed in GitHub settings or recorded with an owner, date, compensating control, and removal condition in the release evidence package; do not suppress findings in the validator.
 
 ### Deployment Environments
 
@@ -629,7 +633,6 @@ gate.
 | Workflow security evidence | `Workflow Security` | 30 days |
 | OpenSSF Scorecard SARIF | `OpenSSF Scorecard` | 30 days |
 | Secret-scanning SARIF/text evidence | `Secret Scanning` | 30 days |
-| Repository settings drift evidence | `Repository Settings Drift` | 30 days |
 | Security and Cerbos logs/TRX | `Security Integration Tests`, `Cerbos Policy Validation` | 30 days |
 | Coverage Cobertura/TRX/log evidence | `Coverage Evidence` | 30 days |
 | Performance smoke logs/results | `Performance Smoke` | 30 days |

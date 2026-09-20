@@ -3,6 +3,26 @@
 
 # Operations
 
+## Private Directory Preparation And Activation
+
+In SingleTenant mode, use the authenticated control-plane detail at
+`GET /api/admin/control-plane/tenants/{tenantId}` with the fixed default tenant ID.
+Fleet listing and other fleet operations remain MultiTenant-only. Identity and
+branding management use the existing tenant document routes and exact tenant
+permissions; public discovery is not a management entry point.
+
+Saving a complete identity leaves a Provisioning tenant private. Invoke the
+server-advertised `activate` relation explicitly. The existing transition handler
+rechecks identity and managed capacity under mutation locks, uses expected-old-status
+CAS, and writes lifecycle history atomically. Same-state retries add no history.
+Identity resolution now reads the current persisted document rather than a warmed
+node-local revision. A concurrent stale identity edit must reload its revision;
+do not retry it by overwriting current data.
+
+No schema migration, new configuration, dependency, or payment-history change is
+required. Setup completion and the browser getting-started journey are separate
+work; this change does not switch completion to Provisioning automatically.
+
 ## Anonymous Registration Retention
 
 Anonymous names and answers stop being operationally readable at their original

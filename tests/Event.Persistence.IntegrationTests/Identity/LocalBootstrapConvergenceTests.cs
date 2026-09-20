@@ -400,7 +400,7 @@ public sealed class LocalBootstrapConvergenceTests
             var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
             var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
             var systemSettings = new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork));
-            var identityEvaluator = new InstanceOperatorIdentityService(systemSettings, bootstrap, unitOfWork);
+            var identityEvaluator = new InstanceOperatorIdentityService(systemSettings, unitOfWork);
             var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles, tenantRoles,
                 new TenantUserRepository(application), new RoleRepository(application), new UserRepository(application),
                 new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents), documents,

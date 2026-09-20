@@ -107,14 +107,14 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         var unitOfWork = new EfCoreUnitOfWork(context);
         var service = new InstanceOperatorIdentityService(
             new SystemSettingRepository(context, new RelationalSettingMutationLock(context, unitOfWork)),
-            new InstanceBootstrapStateRepository(context),
             unitOfWork);
 
         BaseCommandResponse<InstanceOperatorIdentitySavedDocument> first =
             await service.SaveAsync(ValidCandidate(), expectedRevision: null);
 
         await Assert.That(first.IsSuccess).IsTrue();
-        await Assert.That(first.Id.Readiness.IsReady).IsTrue();
+        await Assert.That(first.Id.PublicDisclosure.IsReady).IsTrue();
+        await Assert.That(first.Id.PaidCommerce.IsReady).IsTrue();
         Guid firstRevision = first.Id.Revision;
 
         InstanceOperatorIdentityDocument document = await service.GetCurrentAsync();
@@ -122,9 +122,10 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         await Assert.That(document.Settings!.OperatorId!.Value.Version).IsEqualTo(7);
         await Assert.That(document.Settings.Revision).IsEqualTo(firstRevision);
         await Assert.That(document.Settings.PublicName).IsEqualTo("Independent Operator");
-        await Assert.That(document.Readiness.IsReady).IsTrue();
-        await Assert.That(document.Readiness.Identity).IsNotNull();
-        await Assert.That(document.Readiness.DocumentRevision).IsEqualTo(firstRevision);
+        await Assert.That(document.PublicDisclosure.IsReady).IsTrue();
+        await Assert.That(document.PaidCommerce.IsReady).IsTrue();
+        await Assert.That(document.PublicDisclosure.Identity).IsNotNull();
+        await Assert.That(document.PublicDisclosure.DocumentRevision).IsEqualTo(firstRevision);
 
         BaseCommandResponse<InstanceOperatorIdentitySavedDocument> second =
             await service.SaveAsync(ValidCandidate() with { PublicName = "Updated Operator" }, firstRevision);

@@ -21859,7 +21859,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get Control Plane Tenant
         /// </summary>
         /// <remarks>
-        /// Returns one multi-tenant control-plane tenant lifecycle detail resource for instance administrators.
+        /// Returns an exact tenant lifecycle detail for instance administrators; SingleTenant mode accepts only the fixed default tenant.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -21870,7 +21870,7 @@ namespace Explore.Blazor.Client.Clients
         /// Activate Control Plane Tenant
         /// </summary>
         /// <remarks>
-        /// Activates a provisioning tenant through the multi-tenant control plane.
+        /// Explicitly activates a tenant after current identity and capacity checks; SingleTenant mode accepts only the fixed default tenant.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -22082,7 +22082,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get Control Plane Tenant
         /// </summary>
         /// <remarks>
-        /// Returns one multi-tenant control-plane tenant lifecycle detail resource for instance administrators.
+        /// Returns an exact tenant lifecycle detail for instance administrators; SingleTenant mode accepts only the fixed default tenant.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -22202,7 +22202,7 @@ namespace Explore.Blazor.Client.Clients
         /// Activate Control Plane Tenant
         /// </summary>
         /// <remarks>
-        /// Activates a provisioning tenant through the multi-tenant control plane.
+        /// Explicitly activates a tenant after current identity and capacity checks; SingleTenant mode accepts only the fixed default tenant.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>

@@ -27,6 +27,27 @@ This guide walks administrators through the web consoles in the Blazor managemen
 In multi-tenant deployments, the **Instance Console** (`/admin/instance`) manages
 tenants and platform operations. Instance settings are available in both deployment modes.
 
+### Prepare A Private Default Directory
+
+A directory in **Provisioning** is private even when its operator identity is
+complete. The completed setup administrator can manage its branding and operator
+identity with the existing default-tenant permissions. Saving those documents
+never publishes the directory.
+
+In SingleTenant mode, authenticated instance administrators can read the default
+directory through the existing control-plane tenant-detail API and follow its
+`activate` link when offered. Only the fixed default directory is accepted; this
+does not enable the multi-tenant fleet console. Document editing still requires
+that directory's tenant-admin grant, not merely a platform role.
+
+Activation is explicit and rechecks current identity and configured capacity. If
+another administrator changes the identity first, activation uses that latest
+revision. Reload a conflicting edit instead of overwriting it. Repeating a
+successful activation does not create duplicate lifecycle history. Public pages
+remain unavailable until activation succeeds. No migration or new setting is
+needed; setup-completion and getting-started screens are unchanged by this API
+capability.
+
 ### Local Accounts
 
 Open `/settings/instance?section=local-accounts`. The Local accounts entry appears

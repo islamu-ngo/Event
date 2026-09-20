@@ -97,6 +97,12 @@ public sealed class TypedSettingsDocumentResolver : ITypedSettingsDocumentResolv
         IReadOnlyCollection<string> documentKeys,
         CancellationToken cancellationToken)
     {
+        // Identity participates in the activation lock/revision protocol. A node-local
+        // cached revision cannot authorize activation after another writer commits.
+        if (documentKeys.Contains(SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity))
+            return await _tenantSettingsDocumentRepository.GetManyForTenant(
+                tenantId, documentKeys, cancellationToken);
+
         var cacheKey = GetTenantDocumentsCacheKey(tenantId);
         var allTenantDocuments = await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {

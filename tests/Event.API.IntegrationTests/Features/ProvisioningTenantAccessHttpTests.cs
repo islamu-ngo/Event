@@ -8,6 +8,8 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Tenant;
+using Explore.Application.DTOs.TenantSettingsDocuments;
+using Explore.Application.Models.Common;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Features.Tenants.Requests.Queries;
 using Explore.Domain;
@@ -237,6 +239,171 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(expected);
         if (expected == HttpStatusCode.NotFound)
             await AssertLifecycleDenialAsync(response);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task InstanceAdministratorManagesPrivateDefaultAndExplicitlyActivates(bool multiTenant)
+    {
+        await using var factory = await CreateReadyAsync();
+        using var client = CreateClient(factory);
+        await SignInInstanceAdministratorAsync(factory, client);
+        if (multiTenant)
+        {
+            await using var modeDb = factory.CreateDatabase();
+            (await modeDb.InstanceBootstrapStates.SingleAsync(Token)).TransitionDeploymentMode(DeploymentMode.MultiTenant);
+            await modeDb.SaveChangesAsync(Token);
+            await using var scope = factory.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>().InvalidateCacheAsync();
+            client.DefaultRequestHeaders.Add("X-Tenant-Slug", "local-admission");
+        }
+        await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
+        string target = $"/api/admin/control-plane/tenants/{TenantId}";
+        using var detail = await client.GetAsync(target, Token);
+        await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var detailJson = JsonDocument.Parse(await detail.Content.ReadAsStringAsync(Token));
+        var links = detailJson.RootElement.GetProperty("_links");
+        await Assert.That(links.TryGetProperty("activate", out _)).IsTrue();
+        await Assert.That(links.TryGetProperty("collection", out _)).IsEqualTo(multiTenant);
+        await Assert.That(links.TryGetProperty("suspend", out _)).IsEqualTo(multiTenant);
+        foreach (string document in multiTenant ? Array.Empty<string>() : new[] { "branding", "directory-operator-identity" })
+        {
+            string path = "/api/tenant/settings/documents/" + document;
+            using var read = await client.GetAsync(path, Token);
+            await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            using var json = JsonDocument.Parse(await read.Content.ReadAsStringAsync(Token));
+            await Assert.That(json.RootElement.GetProperty("_links").TryGetProperty("edit", out _)).IsTrue().Because(json.RootElement.GetRawText());
+            Guid revision = json.RootElement.GetProperty("concurrencyStamp").GetGuid();
+            using var patch = document == "branding"
+                ? await client.PatchAsJsonAsync(path, new PatchTenantBrandingSettingsDocumentDto
+                {
+                    ExpectedConcurrencyStamp = revision,
+                    DisplayName = new PatchTenantBrandingDisplayNameDto { Value = OptionalUpdate<string?>.Set("Private directory") }
+                }, Token)
+                : await client.PatchAsJsonAsync(path, new PatchTenantDirectoryOperatorIdentityDocumentDto
+                {
+                    ExpectedConcurrencyStamp = revision,
+                    LegalEntity = new PatchTenantDirectoryOperatorLegalEntityDto { PublicName = OptionalUpdate<string?>.Set("Private operator") }
+                }, Token);
+            await Assert.That(patch.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await patch.Content.ReadAsStringAsync(Token));
+        }
+        await using (var db = factory.CreateDatabase())
+        {
+            await Assert.That((await db.Tenants.SingleAsync(t => t.Id == TenantId, Token)).TenantStatusId)
+                .IsEqualTo((int)TenantStatusEnum.Provisioning);
+            await Assert.That(await db.TenantLifecycleLogs.CountAsync(Token)).IsEqualTo(0);
+        }
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            using var activated = await client.PostAsJsonAsync(target + "/activate", new { }, Token);
+            await Assert.That(activated.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+        await using var verify = factory.CreateDatabase();
+        await Assert.That((await verify.Tenants.SingleAsync(t => t.Id == TenantId, Token)).TenantStatusId)
+            .IsEqualTo((int)TenantStatusEnum.Active);
+        await Assert.That(await verify.TenantLifecycleLogs.CountAsync(Token)).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task SingleTenantInstanceAdministratorCannotTargetAnotherPersistedDirectory()
+    {
+        await using var factory = await CreateReadyAsync();
+        using var client = CreateClient(factory);
+        await SignInInstanceAdministratorAsync(factory, client);
+        Guid otherId = Guid.CreateVersion7();
+        await using (var db = factory.CreateDatabase())
+        {
+            db.Tenants.Add(new Tenant { Id = otherId, FullName = "Other private directory", Slug = "other-private", TenantStatusId = (int)TenantStatusEnum.Provisioning, TenantStatus = null! });
+            await db.SaveChangesAsync(Token);
+        }
+        using var detail = await client.GetAsync($"/api/admin/control-plane/tenants/{otherId}", Token);
+        await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var activation = await client.PostAsJsonAsync($"/api/admin/control-plane/tenants/{otherId}/activate", new { }, Token);
+        await Assert.That(activation.IsSuccessStatusCode).IsFalse();
+        await using var verify = factory.CreateDatabase();
+        await Assert.That((await verify.Tenants.SingleAsync(t => t.Id == otherId, Token)).TenantStatusId).IsEqualTo((int)TenantStatusEnum.Provisioning);
+        await Assert.That(await verify.TenantLifecycleLogs.CountAsync(Token)).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PrivateControlPlaneDeniesMemberAndWrongTenantAdministrator(bool wrongTenantAdmin)
+    {
+        await using var factory = await CreateReadyAsync();
+        var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
+        if (wrongTenantAdmin)
+        {
+            await using var db = factory.CreateDatabase();
+            var user = await db.Users.SingleAsync(u => u.Pii!.Email == credentials.Identifier, Token);
+            var other = new Tenant { Id = Guid.CreateVersion7(), FullName = "Other", Slug = "wrong-admin", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
+            var member = new TenantUser { Id = Guid.CreateVersion7(), TenantId = other.Id, Tenant = other, UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active };
+            db.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant { Id = Guid.CreateVersion7(), TenantId = other.Id, Tenant = other, TenantUserId = member.Id, TenantUser = member, RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync(Token);
+        }
+        using var client = CreateClient(factory);
+        using var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token);
+        using var json = JsonDocument.Parse(await login.Content.ReadAsStringAsync(Token));
+        client.DefaultRequestHeaders.Authorization = new("Bearer", json.RootElement.GetProperty("token").GetString());
+        await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
+        using var read = await client.GetAsync($"/api/admin/control-plane/tenants/{TenantId}", Token);
+        using var write = await client.PostAsJsonAsync($"/api/admin/control-plane/tenants/{TenantId}/activate", new { }, Token);
+        await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(write.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task PrivateManagementDeniesInstanceOwnedMachineEvenWithAdministrativeScope()
+    {
+        await using var factory = await CreateReadyAsync();
+        string secret = Explore.Application.Services.ApiKeyHashing.CreateSecret();
+        string keyId = Guid.CreateVersion7().ToString("N");
+        await using (var db = factory.CreateDatabase())
+        {
+            db.ExternalApiKeys.Add(new ExternalApiKey
+            {
+                Id = Guid.CreateVersion7(), Name = "Private management machine", KeyId = keyId,
+                SecretHash = Explore.Application.Services.ApiKeyHashing.ComputeHash(secret), Scopes = "[\"admin:instance\"]",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = (await db.InstanceBootstrapStates.SingleAsync(Token)).CompletedByUserId!.Value,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = 1, ExternalApiKeyCreditPeriod = null!
+            });
+            await db.SaveChangesAsync(Token);
+        }
+        await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
+        using var client = CreateClient(factory);
+        client.DefaultRequestHeaders.Add("X-API-Key", Explore.Application.Services.ApiKeyHashing.FormatPersistedApiKey(keyId, secret));
+        foreach (string path in new[] { $"/api/admin/control-plane/tenants/{TenantId}", "/api/tenant/settings/documents/branding", "/api/tenant/settings/documents/directory-operator-identity" })
+        {
+            using var response = await client.GetAsync(path, Token);
+            await Assert.That(response.IsSuccessStatusCode).IsFalse();
+        }
+        using var activation = await client.PostAsJsonAsync($"/api/admin/control-plane/tenants/{TenantId}/activate", new { }, Token);
+        await Assert.That(activation.IsSuccessStatusCode).IsFalse();
+        await using var verify = factory.CreateDatabase();
+        await Assert.That(await verify.TenantLifecycleLogs.CountAsync(Token)).IsEqualTo(0);
+    }
+
+    private static async Task SignInInstanceAdministratorAsync(LocalAdmissionWebApplicationFactory factory, HttpClient client)
+    {
+        var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
+        await using (var db = factory.CreateDatabase())
+        {
+            var user = await db.Users.SingleAsync(u => u.Pii!.Email == credentials.Identifier, Token);
+            db.PlatformUserRoles.Add(new PlatformUserRole { Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = (int)RoleEnum.Admin, Role = null! });
+            var membership = new TenantUser { Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active };
+            db.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
+            {
+                Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, TenantUserId = membership.Id, TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync(Token);
+        }
+        using var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token);
+        await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await login.Content.ReadAsStringAsync(Token));
+        client.DefaultRequestHeaders.Authorization = new("Bearer", json.RootElement.GetProperty("token").GetString());
     }
 
     private static async Task<LocalAdmissionWebApplicationFactory> CreateReadyAsync()

@@ -17576,7 +17576,7 @@
           "ControlPlaneTenantLifecycle"
         ],
         "summary": "Get Control Plane Tenant",
-        "description": "Returns one multi-tenant control-plane tenant lifecycle detail resource for instance administrators.",
+        "description": "Returns an exact tenant lifecycle detail for instance administrators; SingleTenant mode accepts only the fixed default tenant.",
         "operationId": "GetControlPlaneTenantById",
         "parameters": [
           {
@@ -17674,8 +17674,7 @@
           }
         },
         "x-endpoint-class": "Admin",
-        "x-rate-limit-policy": "ControlPlane",
-        "x-tenant-mode": "multi-tenant-required"
+        "x-rate-limit-policy": "ControlPlane"
       }
     },
     "/api/admin/control-plane/tenants/{tenantId}/activate": {
@@ -17684,7 +17683,7 @@
           "ControlPlaneTenantLifecycle"
         ],
         "summary": "Activate Control Plane Tenant",
-        "description": "Activates a provisioning tenant through the multi-tenant control plane.",
+        "description": "Explicitly activates a tenant after current identity and capacity checks; SingleTenant mode accepts only the fixed default tenant.",
         "operationId": "ActivateControlPlaneTenant",
         "parameters": [
           {
@@ -17839,8 +17838,7 @@
           }
         },
         "x-endpoint-class": "Admin",
-        "x-rate-limit-policy": "ControlPlane",
-        "x-tenant-mode": "multi-tenant-required"
+        "x-rate-limit-policy": "ControlPlane"
       }
     },
     "/api/admin/control-plane/tenants/{tenantId}/suspend": {

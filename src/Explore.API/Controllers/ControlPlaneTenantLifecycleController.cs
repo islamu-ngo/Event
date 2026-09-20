@@ -6,6 +6,8 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Services;
+using Explore.Domain.Constants;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.ControlPlane.Plans;
@@ -43,25 +45,27 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
     private readonly IQueryHandler<GetControlPlaneTenantDetailsQuery, ControlPlaneTenantDetailDto?> _tenantQuery;
     private readonly ICommandHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> _transitionTenant;
     private readonly IResourceAssembler<ControlPlaneTenantDetailDto, ControlPlaneTenantListItemDto> _tenantAssembler;
+    private readonly IDeploymentModeProvider _deploymentMode;
 
     public ControlPlaneTenantLifecycleController(
         ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>> createTenant,
         IQueryHandler<GetControlPlaneTenantDetailsQuery, ControlPlaneTenantDetailDto?> tenantQuery,
         ICommandHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> transitionTenant,
-        IResourceAssembler<ControlPlaneTenantDetailDto, ControlPlaneTenantListItemDto> tenantAssembler)
+        IResourceAssembler<ControlPlaneTenantDetailDto, ControlPlaneTenantListItemDto> tenantAssembler,
+        IDeploymentModeProvider deploymentMode)
     {
         _createTenant = createTenant;
         _tenantQuery = tenantQuery;
         _transitionTenant = transitionTenant;
         _tenantAssembler = tenantAssembler;
+        _deploymentMode = deploymentMode;
     }
 
     [HttpGet("tenants/{tenantId:guid}", Name = RouteNames.GetControlPlaneTenantById)]
-    [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Get Control Plane Tenant")]
-    [EndpointDescription("Returns one multi-tenant control-plane tenant lifecycle detail resource for instance administrators.")]
+    [EndpointDescription("Returns an exact tenant lifecycle detail for instance administrators; SingleTenant mode accepts only the fixed default tenant.")]
     [ProducesResponseType(typeof(HalResource<ControlPlaneTenantDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -70,14 +74,23 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
+        DeploymentMode mode = await _deploymentMode.GetCurrentModeAsync(cancellationToken);
+        if (!AllowsExactTarget(mode, tenantId))
+            return NotFound();
+
         var tenant = await _tenantQuery.QueryAsync(new GetControlPlaneTenantDetailsQuery(tenantId), cancellationToken);
-        if (tenant is null)
+        if (tenant is null || !Enum.IsDefined((TenantStatusEnum)tenant.StatusId))
         {
             return NotFound();
         }
 
         var resource = await _tenantAssembler.ToResource(tenant, HttpContext);
-
+        if (mode == DeploymentMode.SingleTenant)
+        {
+            foreach (string relation in resource.Links.Keys.Where(relation => relation is not "self" and not "activate").ToArray())
+                resource.Links.Remove(relation);
+        }
+        Response.Headers.CacheControl = "no-store";
         return Ok(resource);
     }
 
@@ -105,11 +118,10 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
     }
 
     [HttpPost("tenants/{tenantId:guid}/activate", Name = RouteNames.ActivateControlPlaneTenant)]
-    [RequireMultiTenant]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
     [EndpointSummary("Activate Control Plane Tenant")]
-    [EndpointDescription("Activates a provisioning tenant through the multi-tenant control plane.")]
+    [EndpointDescription("Explicitly activates a tenant after current identity and capacity checks; SingleTenant mode accepts only the fixed default tenant.")]
     [ProducesResponseType(typeof(BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -189,12 +201,21 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
         CancellationToken cancellationToken = default) =>
         TransitionTenant(tenantId, TenantStatusEnum.Purged, dto, cancellationToken);
 
+    private static bool AllowsExactTarget(DeploymentMode mode, Guid tenantId) =>
+        tenantId != Guid.Empty && (mode == DeploymentMode.MultiTenant
+            || mode == DeploymentMode.SingleTenant && tenantId == PlatformDefaults.DefaultTenantId);
+
     private async Task<ActionResult<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>>> TransitionTenant(
         Guid tenantId,
         TenantStatusEnum status,
         ControlPlaneTenantLifecycleTransitionRequestDto? dto,
         CancellationToken cancellationToken)
     {
+        DeploymentMode mode = await _deploymentMode.GetCurrentModeAsync(cancellationToken);
+        if (!AllowsExactTarget(mode, tenantId)
+            || mode == DeploymentMode.SingleTenant && status != TenantStatusEnum.Active)
+            return NotFound();
+
         var response = await _transitionTenant.ExecuteAsync(
             new TransitionControlPlaneTenantLifecycleCommand(tenantId, status, dto?.Reason, dto?.ConfirmationText),
             cancellationToken);

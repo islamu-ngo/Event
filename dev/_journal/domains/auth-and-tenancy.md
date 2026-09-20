@@ -104,3 +104,15 @@
 - [x] Stays in journal as concurrency-regression evidence; readiness behavior belongs in the operator contract.
 
 ---
+
+[2026-09-20 Europe/Brussels] - Provider credential boundaries and honest partial mitigation
+
+- **Replay before MVC authorization:** Generic idempotency can return historical success before an MVC setup/admin check runs. On credential operations, suppression must precede replay identity/repository access; then every retry reaches current authority. Seed historical success and withdraw authority through the real HTTP pipeline to prove denial, rather than checking attributes alone. Existing private/no-store middleware must also protect early denials where a response exists.
+- **Admission before acquisition:** Both Infisical providers currently request recursive/reference-expanded values before mapping. Post-fetch rejection cannot prove that a wrong-consumer secret never entered the process. Exact root and expansion admission belongs before fetch, backed by identity permissions and acquisition-boundary tests, not just output filtering.
+- **Stored coordinates outlive defaults:** `SecretResolver` can select stored bindings ahead of registry defaults. Removing a definition or changing a default path is not data eradication. Enumerate exact prohibited keys/coordinates, preserve unrelated tenants/rows and drain stale caches/readers; cleanup must prove repeatability and no resurrection.
+- **BFF before cleanup:** `DynamicAuthSchemeManager` consumes the internal secret-bearing configuration and retains a Keycloak secret. Replace the selected-authority writer and BFF cold-start/refresh contract together before fencing old writers/readers and enabling transactional cleanup. Never delete still-live Cerbos bindings in the earlier authentication cutover.
+- **Honest partial mitigation:** Commit `1ea011a5353ec12a75340bec222c28526e9da9c8` ships HTTP no-store/replay exclusion only. It does not erase historical rows, sanitize all provider logs, clear browser state or remove standing custody. A current / plan-aligned I-VSD snapshot is design traceability, not evidence that open findings are resolved. Preserve explicit deferred owners and establish Cerbos publication readiness before removing runtime administration.
+
+**References:** [lifetime decision and revision mappings](../../../docs/internal/adr/ADR-031-provider-credential-lifetime-boundaries.md), [HTTP replay boundary](../../../src/Explore.API/Middleware/IdempotencyMiddleware.cs), [actual HTTP invariant specification](../../../tests/Event.API.IntegrationTests/Features/ProviderCredentialHttpBoundaryTests.cs), [runtime authority follow-up](../../backlog/provider-credential-runtime-authority.md), [deployment isolation follow-up](../../backlog/provider-credential-deployment-isolation.md), [Cerbos publication follow-up](../../backlog/provider-credential-cerbos-publication.md).
+
+These are reusable design/test lessons and source observations. Deferred custody behavior has not been implemented or runtime-verified by this documentation entry.

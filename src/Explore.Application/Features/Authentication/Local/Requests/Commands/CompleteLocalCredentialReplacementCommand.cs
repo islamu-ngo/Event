@@ -1,11 +1,11 @@
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Requests.Commands;
 
-public sealed record CompleteLocalCredentialReplacementCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record CompleteLocalCredentialReplacementCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public CompleteLocalCredentialReplacementCommand(LocalCredentialReplacementRequest request)
     {

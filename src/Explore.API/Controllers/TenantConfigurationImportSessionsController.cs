@@ -1,5 +1,6 @@
 namespace Explore.API.Controllers;
 
+using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;
@@ -13,7 +14,7 @@ using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,19 @@ using Microsoft.AspNetCore.RateLimiting;
 [Route("api/tenants/{tenantId:guid}/configuration-import/sessions")]
 [Tags("Tenant Configuration")]
 public sealed class TenantConfigurationImportSessionsController(
-    IMediator mediator,
+    ICommandHandler<CreateTenantConfigurationImportSessionCommand,
+        ConfigurationImportSessionCreatedResult> createSession,
+    ICommandHandler<PreviewTenantConfigurationImportSessionCommand,
+        ConfigurationImportPreviewResult> previewSession,
+    ICommandHandler<CancelTenantConfigurationImportSessionCommand> cancelSession,
+    ICommandHandler<ApplyTenantConfigurationImportCommand,
+        ConfigurationImportOperationResult> applyImport,
+    ICommandHandler<CreateTenantConfigurationRollbackSessionCommand,
+        ConfigurationImportRollbackSessionCreatedResult> createRollbackSession,
+    IQueryHandler<ListTenantConfigurationImportHistoryQuery,
+        ImmutableArray<ConfigurationImportOperationResult>> listHistory,
+    IQueryHandler<GetTenantConfigurationImportReceiptQuery,
+        ConfigurationImportOperationResult> getReceipt,
     IAuthorizationProvider authorization)
     : ConfigurationImportSessionsControllerBase
 {
@@ -58,7 +71,7 @@ public sealed class TenantConfigurationImportSessionsController(
             Request,
             cancellationToken);
         ConfigurationImportSessionCreatedResult created =
-            await mediator.Send(
+            await createSession.ExecuteAsync(
                 new CreateTenantConfigurationImportSessionCommand(
                     tenantId,
                     bytes),
@@ -157,7 +170,7 @@ public sealed class TenantConfigurationImportSessionsController(
         [FromBody] ConfigurationImportApplyRequest request,
         CancellationToken cancellationToken)
     {
-        ConfigurationImportOperationResult result = await mediator.Send(
+        ConfigurationImportOperationResult result = await applyImport.ExecuteAsync(
             new ApplyTenantConfigurationImportCommand(
                 tenantId,
                 sessionId,
@@ -184,7 +197,7 @@ public sealed class TenantConfigurationImportSessionsController(
         [FromQuery] int maximumCount = 50,
         CancellationToken cancellationToken = default)
     {
-        var operations = await mediator.Send(
+        var operations = await listHistory.QueryAsync(
             new ListTenantConfigurationImportHistoryQuery(
                 tenantId,
                 maximumCount),
@@ -209,7 +222,7 @@ public sealed class TenantConfigurationImportSessionsController(
         Guid operationId,
         CancellationToken cancellationToken)
     {
-        ConfigurationImportOperationResult result = await mediator.Send(
+        ConfigurationImportOperationResult result = await getReceipt.QueryAsync(
             new GetTenantConfigurationImportReceiptQuery(tenantId, operationId),
             cancellationToken);
         return Ok(WithOperationLinks(
@@ -241,7 +254,7 @@ public sealed class TenantConfigurationImportSessionsController(
         CancellationToken cancellationToken)
     {
         ConfigurationImportRollbackSessionCreatedResult result =
-            await mediator.Send(
+            await createRollbackSession.ExecuteAsync(
                 new CreateTenantConfigurationRollbackSessionCommand(
                     tenantId,
                     operationId),
@@ -273,7 +286,7 @@ public sealed class TenantConfigurationImportSessionsController(
         string accessToken,
         CancellationToken cancellationToken)
     {
-        await mediator.Send(
+        await cancelSession.ExecuteAsync(
             new CancelTenantConfigurationImportSessionCommand(
                 tenantId,
                 sessionId,
@@ -290,7 +303,7 @@ public sealed class TenantConfigurationImportSessionsController(
         ConfigurationImportPreviewRequest request,
         CancellationToken cancellationToken)
     {
-        ConfigurationImportPreviewResult preview = await mediator.Send(
+        ConfigurationImportPreviewResult preview = await previewSession.ExecuteAsync(
             new PreviewTenantConfigurationImportSessionCommand(
                 tenantId,
                 sessionId,

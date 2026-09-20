@@ -3,11 +3,11 @@ namespace Explore.Application.Features.TenantSettingsDocuments.Requests.Commands
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.TenantSettingsDocuments;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 [AuthorizeResource(ResourceKinds.TenantSetting, AuthorizationActions.Update)]
 public sealed record PatchTenantDirectoryOperatorIdentityDocumentCommand
-    : IRequest<BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>>, ISecureRequest
+    : ICommand<BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>>, ISecureRequest
 {
     public required Guid TenantId { get; init; }
     public required PatchTenantDirectoryOperatorIdentityDocumentDto Patch { get; init; }

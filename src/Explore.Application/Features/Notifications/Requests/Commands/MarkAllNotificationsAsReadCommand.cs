@@ -1,8 +1,8 @@
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Commands;
 
-public sealed record MarkAllNotificationsAsReadCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record MarkAllNotificationsAsReadCommand : ICommand<BaseCommandResponse<Guid>>
 {
 }

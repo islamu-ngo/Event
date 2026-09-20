@@ -3,161 +3,161 @@ using Explore.Application.Features.RegistrationForms.Validators;
 using Explore.Application.Responses;
 using Explore.Application.Services.Registration;
 using FluentValidation.Results;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationForms.Handlers.Commands;
 
 public sealed class CreateRegistrationWorkflowCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<CreateRegistrationWorkflowCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateRegistrationWorkflowCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateRegistrationWorkflowCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationWorkflowCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.CreateWorkflowAsync, cancellationToken);
 }
 
 public sealed class UpdateRegistrationWorkflowCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<UpdateRegistrationWorkflowCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationWorkflowCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationWorkflowCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationWorkflowCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.UpdateWorkflowAsync, cancellationToken);
 }
 
 public sealed class CreateRegistrationRequirementCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<CreateRegistrationRequirementCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateRegistrationRequirementCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateRegistrationRequirementCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationRequirementCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.CreateRequirementAsync, cancellationToken);
 }
 
 public sealed class UpdateRegistrationRequirementCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<UpdateRegistrationRequirementCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationRequirementCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationRequirementCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationRequirementCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.UpdateRequirementAsync, cancellationToken);
 }
 
 public sealed class DeleteRegistrationRequirementCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<DeleteRegistrationRequirementCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationRequirementCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationRequirementCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationRequirementCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.DeleteRequirementAsync, cancellationToken);
 }
 
 public sealed class CreateRegistrationFormCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<CreateRegistrationFormCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateRegistrationFormCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateRegistrationFormCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationFormCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.CreateFormAsync, cancellationToken);
 }
 
 public sealed class CreateRegistrationFormVersionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<CreateRegistrationFormVersionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateRegistrationFormVersionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateRegistrationFormVersionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationFormVersionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.CreateVersionAsync, cancellationToken);
 }
 
 public sealed class AddRegistrationFormSectionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<AddRegistrationFormSectionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<AddRegistrationFormSectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(AddRegistrationFormSectionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddRegistrationFormSectionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.AddSectionAsync, cancellationToken);
 }
 
 public sealed class UpdateRegistrationFormSectionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<UpdateRegistrationFormSectionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationFormSectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationFormSectionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationFormSectionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.UpdateSectionAsync, cancellationToken);
 }
 
 public sealed class ReorderRegistrationFormSectionsCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<ReorderRegistrationFormSectionsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReorderRegistrationFormSectionsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ReorderRegistrationFormSectionsCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReorderRegistrationFormSectionsCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.ReorderSectionsAsync, cancellationToken);
 }
 
 public sealed class DeleteRegistrationFormSectionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<DeleteRegistrationFormSectionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationFormSectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationFormSectionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationFormSectionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.DeleteSectionAsync, cancellationToken);
 }
 
 public sealed class AddRegistrationFormFieldCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<AddRegistrationFormFieldCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<AddRegistrationFormFieldCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(AddRegistrationFormFieldCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddRegistrationFormFieldCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.AddFieldAsync, cancellationToken);
 }
 
 public sealed class UpdateRegistrationFormFieldCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<UpdateRegistrationFormFieldCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationFormFieldCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationFormFieldCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationFormFieldCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.UpdateFieldAsync, cancellationToken);
 }
 
 public sealed class ReorderRegistrationFormFieldsCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<ReorderRegistrationFormFieldsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReorderRegistrationFormFieldsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ReorderRegistrationFormFieldsCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReorderRegistrationFormFieldsCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.ReorderFieldsAsync, cancellationToken);
 }
 
 public sealed class DeleteRegistrationFormFieldCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<DeleteRegistrationFormFieldCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationFormFieldCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationFormFieldCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationFormFieldCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.DeleteFieldAsync, cancellationToken);
 }
 
 public sealed class AddRegistrationFormFieldOptionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<AddRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<AddRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(AddRegistrationFormFieldOptionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddRegistrationFormFieldOptionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.AddOptionAsync, cancellationToken);
 }
 
 public sealed class UpdateRegistrationFormFieldOptionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<UpdateRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationFormFieldOptionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationFormFieldOptionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.UpdateOptionAsync, cancellationToken);
 }
 
 public sealed class RetireRegistrationFormFieldOptionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<RetireRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RetireRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(RetireRegistrationFormFieldOptionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RetireRegistrationFormFieldOptionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.RetireOptionAsync, cancellationToken);
 }
 
 public sealed class AddRegistrationFormRuleCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<AddRegistrationFormRuleCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<AddRegistrationFormRuleCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(AddRegistrationFormRuleCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddRegistrationFormRuleCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.AddRuleAsync, cancellationToken);
 }
 
 public sealed class UpdateRegistrationFormRuleCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<UpdateRegistrationFormRuleCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationFormRuleCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationFormRuleCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationFormRuleCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.UpdateRuleAsync, cancellationToken);
 }
 
 public sealed class DeleteRegistrationFormRuleCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<DeleteRegistrationFormRuleCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationFormRuleCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationFormRuleCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationFormRuleCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.DeleteRuleAsync, cancellationToken);
 }
 
 public sealed class PublishRegistrationFormVersionCommandHandler(RegistrationFormAuthoringCommandService service)
-    : IRequestHandler<PublishRegistrationFormVersionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PublishRegistrationFormVersionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(PublishRegistrationFormVersionCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishRegistrationFormVersionCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormCommandHandler.Run(request, service.PublishAsync, cancellationToken);
 }
 
@@ -166,7 +166,7 @@ internal static class RegistrationFormCommandHandler
     public static async Task<BaseCommandResponse<Guid>> Run<TCommand>(
         TCommand request,
         Func<TCommand, CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
         where TCommand : IRegistrationFormAuthoringCommand
     {
         ValidationResult validation = await new RegistrationFormAuthoringCommandValidator<TCommand>()

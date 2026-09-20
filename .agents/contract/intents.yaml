@@ -15,7 +15,7 @@ intents:
       - docs/internal/API.md
       - docs/internal/QUICK_REFERENCE.md
     load_skills:
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
     load_rules:
       - .agents/rules/api-controllers.md
     paths_in_scope:
@@ -65,7 +65,7 @@ intents:
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/SECURITY-MODEL.md
     load_skills:
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
       - auth-patterns
     load_rules:
       - .agents/rules/api-controllers.md
@@ -164,7 +164,7 @@ intents:
       - docs/internal/ARCHITECTURE.md
       - docs/internal/QUICK_REFERENCE.md
     load_skills:
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
     load_rules:
       - .agents/rules/application-layer.md
     paths_in_scope:
@@ -594,7 +594,7 @@ intents:
       - docs/internal/RELEASE_CHECKLIST.md
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/legal/IP_GOVERNANCE.md
-      - docs/internal/DUAL_VERSIONING.md
+      - docs/internal/legal/dependencies/mapperly.md
     load_skills:
       - ip-clean-room
     load_rules:
@@ -919,7 +919,7 @@ intents:
       - docs/internal/QUICK_REFERENCE.md
       - docs/internal/legal/IP_GOVERNANCE.md
       - docs/internal/legal/CONTRIBUTION_GOVERNANCE.md
-      - docs/internal/DUAL_VERSIONING.md
+      - docs/internal/legal/dependencies/mapperly.md
       - docs/internal/CI_CD_GOVERNANCE.md
       - .agents/skills/_SKILL_SCHEMA.md
     load_skills:
@@ -1169,7 +1169,7 @@ intents:
       - docs/internal/AUTHORIZATION.md
     load_skills:
       - clean-architecture-rules
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
       - auth-patterns
     load_rules:
       - .agents/rules/application-layer.md
@@ -1262,7 +1262,7 @@ intents:
       - docs/internal/adr/ADR-022-paid-event-commerce-and-stripe-connect.md
     load_skills:
       - clean-architecture-rules
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
       - dotnet-efcore-guidelines
       - auth-patterns
       - blazor-ui-conventions
@@ -1466,7 +1466,7 @@ intents:
       - islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md
     load_skills:
       - clean-architecture-rules
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
       - dotnet-efcore-guidelines
       - outbox-pattern
       - auth-patterns
@@ -1816,7 +1816,7 @@ intents:
       - islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md
     load_skills:
       - clean-architecture-rules
-      - cqrs-mediatr-guidelines
+      - cqrs-guidelines
       - dotnet-efcore-guidelines
       - outbox-pattern
       - auth-patterns

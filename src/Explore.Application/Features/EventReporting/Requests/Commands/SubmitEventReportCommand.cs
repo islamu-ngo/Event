@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
@@ -12,7 +12,7 @@ public enum EventReportSubmissionChannel
     LegalOrCopyright = 3
 }
 
-public sealed record SubmitEventReportCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record SubmitEventReportCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public required SubmitEventReportDto Request { get; init; }
     public EventReportSubmissionChannel SubmissionChannel { get; init; }

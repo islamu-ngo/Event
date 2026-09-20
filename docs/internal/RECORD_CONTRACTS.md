@@ -60,9 +60,13 @@ passing that tombstone through the live parser.
 
 ### Application Requests And Results
 
-Concrete MediatR requests default to sealed records. A request contains
-client-owned intent and trusted facts supplied by server adapters; body
-`TenantId` or `UserId` never becomes current authority.
+Concrete native and remaining MediatR requests default to sealed records. Native
+requests implement exactly one of `ICommand`, `ICommand<TResult>` or
+`IQuery<TResult>` from `Explore.Application.Contracts.Operations`; they never also
+implement a MediatR request contract. A request contains client-owned intent and
+trusted facts supplied by server adapters; body `TenantId` or `UserId` never
+becomes current authority. Existing immutable result factories and JSON shapes
+are unchanged by native `ExecuteAsync`/`QueryAsync` handlers.
 
 `BaseCommandResponse<TKey>` and its concrete descendants use immutable
 valid-state factories. Callers select success, validation, not-found,

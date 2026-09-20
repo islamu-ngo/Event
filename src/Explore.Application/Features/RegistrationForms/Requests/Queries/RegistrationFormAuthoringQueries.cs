@@ -1,10 +1,10 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationForms;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationForms.Requests.Queries;
 
-public interface IRegistrationFormAuthoringQuery<out TResponse> : IRequest<TResponse>, ISecureRequest
+public interface IRegistrationFormAuthoringQuery<TResponse> : IQuery<TResponse>, ISecureRequest
 {
     Guid EventId { get; }
 
@@ -16,14 +16,14 @@ public interface IRegistrationFormAuthoringQuery<out TResponse> : IRequest<TResp
         new EventScopedAuthorizationFacts(Guid.Empty, EventId);
 }
 
-public interface IRegistrationFormScopedQuery<out TResponse> : IRegistrationFormAuthoringQuery<TResponse>
+public interface IRegistrationFormScopedQuery<TResponse> : IRegistrationFormAuthoringQuery<TResponse>
 {
     Guid FormId { get; }
 
     string? ISecureRequest.ResourceId => FormId == Guid.Empty ? null : FormId.ToString();
 }
 
-public interface IRegistrationFormVersionScopedQuery<out TResponse> : IRegistrationFormScopedQuery<TResponse>
+public interface IRegistrationFormVersionScopedQuery<TResponse> : IRegistrationFormScopedQuery<TResponse>
 {
     Guid VersionId { get; }
 }

@@ -9,11 +9,11 @@ using Explore.Application.Features.GroupMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupMembers.Handlers.Commands;
 
-public class UpdateGroupMemberRoleCommandHandler : IRequestHandler<UpdateGroupMemberRoleCommand, BaseCommandResponse<Guid>>
+public class UpdateGroupMemberRoleCommandHandler : ICommandHandler<UpdateGroupMemberRoleCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IUserContext _userContext;
@@ -29,7 +29,7 @@ public class UpdateGroupMemberRoleCommandHandler : IRequestHandler<UpdateGroupMe
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateGroupMemberRoleCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateGroupMemberRoleCommand request, CancellationToken cancellationToken)
     {
         var dto = request.UpdateGroupMemberRoleDto;
 

@@ -26,6 +26,8 @@ public interface ICustomPropertyGovernanceRepository
         string? entityScopeFilter,
         int pageNumber,
         int pageSize,
+        PromotionRecommendation? recommendationFilter,
+        int totalEventCount,
         CancellationToken cancellationToken);
 
     Task<int> GetTotalEventCountForTenantAsync(

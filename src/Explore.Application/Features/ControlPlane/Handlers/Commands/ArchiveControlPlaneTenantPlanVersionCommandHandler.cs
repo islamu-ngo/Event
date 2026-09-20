@@ -3,14 +3,14 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
 public sealed class ArchiveControlPlaneTenantPlanVersionCommandHandler(ITenantPlanRepository tenantPlanRepository)
-    : IRequestHandler<ArchiveControlPlaneTenantPlanVersionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ArchiveControlPlaneTenantPlanVersionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ArchiveControlPlaneTenantPlanVersionCommand request,
         CancellationToken cancellationToken)
     {

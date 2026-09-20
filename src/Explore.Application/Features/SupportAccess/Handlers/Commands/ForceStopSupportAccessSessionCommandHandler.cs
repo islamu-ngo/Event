@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Commands;
@@ -7,7 +8,6 @@ using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.SupportAccess.Handlers.Commands;
@@ -19,9 +19,9 @@ public sealed class ForceStopSupportAccessSessionCommandHandler(
     IUnitOfWork unitOfWork,
     BusinessMetrics metrics,
     ILogger<ForceStopSupportAccessSessionCommandHandler> logger)
-    : IRequestHandler<ForceStopSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
+    : ICommandHandler<ForceStopSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
 {
-    public async Task<SupportAccessSessionCommandResponseDto> Handle(
+    public async Task<SupportAccessSessionCommandResponseDto> ExecuteAsync(
         ForceStopSupportAccessSessionCommand request,
         CancellationToken cancellationToken)
     {

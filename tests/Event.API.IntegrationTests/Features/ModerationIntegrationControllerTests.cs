@@ -10,13 +10,13 @@ using Explore.API.Controllers;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.API.Services;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Infrastructure.Configuration;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +30,8 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class ModerationIntegrationControllerTests
 {
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly ICommandHandler<RecordOspreySignalCallbackCommand, BaseCommandResponse<Guid>> _recordOspreyCallbackHandler =
+        Substitute.For<ICommandHandler<RecordOspreySignalCallbackCommand, BaseCommandResponse<Guid>>>();
     private readonly IIncomingWebhookIntakeService _incomingWebhookIntakeService = Substitute.For<IIncomingWebhookIntakeService>();
 
     [Test]
@@ -73,7 +74,7 @@ public sealed class ModerationIntegrationControllerTests
                 }
             ]
         };
-        _mediator.Send(Arg.Any<RecordOspreySignalCallbackCommand>(), Arg.Any<CancellationToken>())
+        _recordOspreyCallbackHandler.ExecuteAsync(Arg.Any<RecordOspreySignalCallbackCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 reportId,
                 "ok"));
@@ -83,14 +84,8 @@ public sealed class ModerationIntegrationControllerTests
 
         var ok = response.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
-        await _mediator.Received(1).Send(
+        await _recordOspreyCallbackHandler.Received(1).ExecuteAsync(
             Arg.Is<RecordOspreySignalCallbackCommand>(command => ReferenceEquals(command.Request, request)),
-            Arg.Any<CancellationToken>());
-        await _mediator.DidNotReceive().Send(
-            Arg.Any<ExecuteReportDecisionCommand>(),
-            Arg.Any<CancellationToken>());
-        await _mediator.DidNotReceive().Send(
-            Arg.Any<ProcessCoopDecisionCallbackCommand>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -139,9 +134,6 @@ public sealed class ModerationIntegrationControllerTests
         await _incomingWebhookIntakeService.Received(1).CaptureAsync(
             incoming,
             Arg.Any<CancellationToken>());
-        await _mediator.DidNotReceive().Send(
-            Arg.Any<ProcessCoopDecisionCallbackCommand>(),
-            Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -187,7 +179,6 @@ public sealed class ModerationIntegrationControllerTests
         var bodyResponse = ok!.Value as BaseCommandResponse<Guid>;
         await Assert.That(bodyResponse!.IsSuccess).IsTrue();
         await Assert.That(bodyResponse.Id).IsEqualTo(capturedMessageId);
-        await _mediator.DidNotReceive().Send(Arg.Any<ProcessCoopDecisionCallbackCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -224,7 +215,7 @@ public sealed class ModerationIntegrationControllerTests
 
     private ModerationIntegrationController CreateController()
         => new(
-            _mediator,
+            _recordOspreyCallbackHandler,
             _incomingWebhookIntakeService,
             new StaticOptionsMonitor<CoopProviderOptions>(new CoopProviderOptions
             {

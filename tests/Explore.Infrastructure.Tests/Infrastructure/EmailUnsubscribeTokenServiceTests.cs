@@ -49,7 +49,8 @@ public sealed class EmailUnsubscribeTokenServiceTests
                 DateTime.UtcNow);
 
             var token = service.GenerateToken(payload);
-            var tampered = token[..^1] + (token[^1] == 'a' ? 'b' : 'a');
+            var index = token.Length / 2;
+            var tampered = token[..index] + (token[index] == 'a' ? 'b' : 'a') + token[(index + 1)..];
 
             var result = service.ValidateToken(tampered);
 
@@ -75,8 +76,7 @@ public sealed class EmailUnsubscribeTokenServiceTests
                 NotificationPreferenceCategories.RegistrationConfirmations,
                 DateTime.UtcNow);
 
-            var token = service.GenerateToken(payload, TimeSpan.FromMilliseconds(1));
-            await Task.Delay(50);
+            var token = service.GenerateToken(payload, TimeSpan.FromDays(-1));
 
             var result = service.ValidateToken(token);
 

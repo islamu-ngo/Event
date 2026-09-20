@@ -1,8 +1,8 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
@@ -11,7 +11,7 @@ public sealed record UpdateTenantReportingIntakePolicyCommand(
     Guid TenantId,
     Guid ActorUserId,
     UpdateTenantReportingIntakePolicyDto Policy)
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => GovernanceSettingKeys.EventReporting.IntakeEnabled;
 

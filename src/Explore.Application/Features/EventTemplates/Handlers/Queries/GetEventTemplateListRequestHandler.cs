@@ -1,34 +1,31 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Features.EventTemplates.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Queries;
 
-public class GetEventTemplateListRequestHandler : IRequestHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>
+public class GetEventTemplateListRequestHandler : IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public GetEventTemplateListRequestHandler(
         IEventTemplateRepository eventTemplateRepository,
         ITenantContext tenantContext,
-        IMapper mapper,
         HybridCache cache)
     {
         _eventTemplateRepository = eventTemplateRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
         _cache = cache;
     }
 
-    public async Task<PaginatedResult<EventTemplateListDto>> Handle(GetEventTemplateListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventTemplateListDto>> QueryAsync(GetEventTemplateListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<EventTemplateListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var cacheKey = GetCacheKey(_tenantContext.TenantId, request.EventTypeId, pageNumber, pageSize);
@@ -42,7 +39,7 @@ public class GetEventTemplateListRequestHandler : IRequestHandler<GetEventTempla
                     request.EventTypeId,
                     pageNumber,
                     pageSize);
-                var dtos = _mapper.Map<List<EventTemplateListDto>>(templates);
+                var dtos = templates.Select(CustomPropertyMapper.ToListItem).ToList();
                 return PaginatedResult<EventTemplateListDto>.Create(dtos, totalCount, pageNumber, pageSize);
             },
             new HybridCacheEntryOptions

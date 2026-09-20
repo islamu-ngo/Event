@@ -2,13 +2,13 @@
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Admissions;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -188,8 +188,8 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         AdmissionTicketCredential? credential)
     {
         if (kind == "cancel")
-            return await services.GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-                .Handle(command, CancellationToken.None);
+            return await services.GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+                .ExecuteAsync(command, CancellationToken.None);
         if (kind == "issuance")
             return await services.GetRequiredService<IAdmissionIssuanceService>().IssueConfirmedAsync(
                 new(fixture.TenantId, command.OrderId, effectId, AdmissionIssuanceAuthority.ConfirmedFreeOrder), CancellationToken.None);

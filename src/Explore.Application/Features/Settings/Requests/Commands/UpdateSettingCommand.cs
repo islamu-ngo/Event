@@ -2,13 +2,13 @@ namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Updates a single setting key at the specified scope. The scope ID (tenant/user) is derived
 /// from the authenticated context — not supplied by the caller.
 /// </summary>
-public sealed record UpdateSettingCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record UpdateSettingCommand : ICommand<BaseCommandResponse<Guid>>
 {
     /// <summary>
     /// Fully qualified setting key (e.g., "event_list.page_size"). Must exist in SettingRegistry.

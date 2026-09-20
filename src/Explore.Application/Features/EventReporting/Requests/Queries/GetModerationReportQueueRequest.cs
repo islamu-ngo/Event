@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ViewManagement)]
-public sealed record GetModerationReportQueueRequest : IRequest<PaginatedResult<ModerationReportQueueItemDto>>, ISecureRequest
+public sealed record GetModerationReportQueueRequest : IQuery<PaginatedResult<ModerationReportQueueItemDto>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public int PageNumber { get; init; } = 1;

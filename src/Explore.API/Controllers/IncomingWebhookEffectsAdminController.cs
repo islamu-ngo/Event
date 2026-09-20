@@ -9,7 +9,7 @@ using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +24,8 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class IncomingWebhookEffectsAdminController(
-    IMediator mediator,
+    IQueryHandler<GetIncomingWebhookEffectStatusQuery, BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>> getStatusHandler,
+    ICommandHandler<RedriveIncomingWebhookEffectCommand, BaseCommandResponse<Guid>> redriveHandler,
     IResourceAssembler<IncomingWebhookEffectStatusDto, IncomingWebhookEffectStatusDto> statusAssembler)
     : EventControllerBase
 {
@@ -45,7 +46,7 @@ public sealed class IncomingWebhookEffectsAdminController(
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await getStatusHandler.QueryAsync(
             new GetIncomingWebhookEffectStatusQuery { TenantId = tenantId, Limit = limit },
             cancellationToken);
         if (!result.IsSuccess)
@@ -76,7 +77,7 @@ public sealed class IncomingWebhookEffectsAdminController(
         [FromBody] RedriveIncomingWebhookRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await redriveHandler.ExecuteAsync(
             new RedriveIncomingWebhookEffectCommand
             {
                 TenantId = tenantId,

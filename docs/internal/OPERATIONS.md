@@ -2785,6 +2785,19 @@ The governance report surfaces Layer 3 custom property definitions that may be c
 
 Review quarterly. Promotion is an operational decision, not an automated action.
 
+`CustomPropertyGovernanceController` injects the protected closed
+`IQueryHandler<GetCustomPropertyGovernanceReportQuery, PaginatedResult<CustomPropertyGovernanceRowDto>>`
+port. Authorization remains `custom_property_governance:view`; the target tenant
+must match `ITenantContext`. EF tenant and soft-delete filters remain active.
+The repository composes scalar event/session projections before constructing
+report rows, and applies scope and recommendation filters before count and paging.
+Ordering is scope, namespace, key, then definition ID for tied keys. The handler
+maps governance metadata and usage aggregates only, never answer values.
+Administrator authority uses the shared uncached database predicates. A new
+report request after role-grant revocation commits must be denied against the
+authoritative primary store; this does not revoke an already-created snapshot
+or cancel an in-flight authorized request.
+
 ## Configuration-manifest paid-policy operations
 
 Before deploying a manifest containing `instance.paid_event_policy` or

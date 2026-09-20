@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
-public sealed record GetControlPlaneOperationsQuery : IRequest<ControlPlaneOperationsDto>, ISecureRequest
+public sealed record GetControlPlaneOperationsQuery : IQuery<ControlPlaneOperationsDto>, ISecureRequest
 {
     public const string SettingKey = "control-plane.operations";
 

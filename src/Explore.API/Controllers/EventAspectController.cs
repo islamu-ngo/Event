@@ -7,7 +7,7 @@ using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.EventAspects.Requests.Commands;
 using Explore.Application.Features.EventAspects.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -19,7 +19,17 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 [Tags("Event")]
-public sealed class EventAspectController(IMediator mediator) : EventControllerBase
+public sealed class EventAspectController(
+    ICommandHandler<CreateEventIslamicAspectCommand, BaseCommandResponse<Guid>> createIslamic,
+    ICommandHandler<UpdateEventIslamicAspectCommand, BaseCommandResponse<Guid>> updateIslamic,
+    ICommandHandler<DeleteEventIslamicAspectCommand, bool> deleteIslamic,
+    ICommandHandler<CreateEventTechAspectCommand, BaseCommandResponse<Guid>> createTech,
+    ICommandHandler<UpdateEventTechAspectCommand, BaseCommandResponse<Guid>> updateTech,
+    ICommandHandler<DeleteEventTechAspectCommand, bool> deleteTech,
+    IQueryHandler<GetEventIslamicAspectRequest, EventIslamicAspectDto?> publicIslamic,
+    IQueryHandler<GetManagedEventIslamicAspectRequest, EventIslamicAspectDto?> managedIslamic,
+    IQueryHandler<GetEventTechAspectRequest, EventTechAspectDto?> publicTech,
+    IQueryHandler<GetManagedEventTechAspectRequest, EventTechAspectDto?> managedTech) : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor IslamicAspectValidationProblem = new(
         "eventIslamicAspect",
@@ -34,6 +44,13 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
     private static readonly ApiNotFoundProblemDescriptor EventNotFoundProblem = new(
         "Event not found",
         "Event not found.");
+
+    // JsonResult preserves the problem media type despite the controller's success-only Produces filter.
+    private JsonResult PublicAspectNotFound() => new(ApiProblemFactory.CreateNotFoundProblem(HttpContext, EventNotFoundProblem))
+    {
+        StatusCode = StatusCodes.Status404NotFound,
+        ContentType = "application/problem+json"
+    };
 
     /// <summary>
     /// Get the Islamic aspect for an event.
@@ -51,9 +68,9 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var aspect = await mediator.Send(new GetEventIslamicAspectRequest(id), cancellationToken);
+        var aspect = await publicIslamic.QueryAsync(new GetEventIslamicAspectRequest(id), cancellationToken);
 
-        return Ok(aspect);
+        return aspect is null ? PublicAspectNotFound() : Ok(aspect);
     }
 
     [Authorize]
@@ -68,7 +85,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var aspect = await mediator.Send(
+        var aspect = await managedIslamic.QueryAsync(
             new GetManagedEventIslamicAspectRequest { EventId = id },
             cancellationToken);
 
@@ -96,7 +113,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         [FromBody] CreateUpdateIslamicAspectDto aspectDto,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new CreateEventIslamicAspectCommand
+        var response = await createIslamic.ExecuteAsync(new CreateEventIslamicAspectCommand
         {
             EventId = id,
             AspectDto = aspectDto
@@ -135,7 +152,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         [FromBody] UpdateEventIslamicAspectDto aspectDto,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new UpdateEventIslamicAspectCommand
+        var response = await updateIslamic.ExecuteAsync(new UpdateEventIslamicAspectCommand
         {
             EventId = id,
             AspectDto = aspectDto
@@ -166,7 +183,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteIslamicAspect(Guid id, CancellationToken cancellationToken = default)
     {
-        await mediator.Send(new DeleteEventIslamicAspectCommand { EventId = id }, cancellationToken);
+        await deleteIslamic.ExecuteAsync(new DeleteEventIslamicAspectCommand { EventId = id }, cancellationToken);
 
         return NoContent();
     }
@@ -187,9 +204,9 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var aspect = await mediator.Send(new GetEventTechAspectRequest(id), cancellationToken);
+        var aspect = await publicTech.QueryAsync(new GetEventTechAspectRequest(id), cancellationToken);
 
-        return Ok(aspect);
+        return aspect is null ? PublicAspectNotFound() : Ok(aspect);
     }
 
     [Authorize]
@@ -204,7 +221,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var aspect = await mediator.Send(
+        var aspect = await managedTech.QueryAsync(
             new GetManagedEventTechAspectRequest { EventId = id },
             cancellationToken);
 
@@ -232,7 +249,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         [FromBody] CreateUpdateTechAspectDto aspectDto,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new CreateEventTechAspectCommand
+        var response = await createTech.ExecuteAsync(new CreateEventTechAspectCommand
         {
             EventId = id,
             AspectDto = aspectDto
@@ -271,7 +288,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
         [FromBody] UpdateEventTechAspectDto aspectDto,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new UpdateEventTechAspectCommand
+        var response = await updateTech.ExecuteAsync(new UpdateEventTechAspectCommand
         {
             EventId = id,
             AspectDto = aspectDto
@@ -302,7 +319,7 @@ public sealed class EventAspectController(IMediator mediator) : EventControllerB
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteTechAspect(Guid id, CancellationToken cancellationToken = default)
     {
-        await mediator.Send(new DeleteEventTechAspectCommand { EventId = id }, cancellationToken);
+        await deleteTech.ExecuteAsync(new DeleteEventTechAspectCommand { EventId = id }, cancellationToken);
 
         return NoContent();
     }

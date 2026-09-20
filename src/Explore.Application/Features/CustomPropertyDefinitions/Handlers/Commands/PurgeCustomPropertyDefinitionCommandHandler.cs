@@ -1,3 +1,4 @@
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;
@@ -5,12 +6,12 @@ using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public sealed class PurgeCustomPropertyDefinitionCommandHandler : IRequestHandler<PurgeCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
+public sealed class PurgeCustomPropertyDefinitionCommandHandler : ICommandHandler<PurgeCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
 {
     private readonly ICustomPropertyDefinitionRepository _repository;
     private readonly IAuditLogRepository _auditLogRepository;
@@ -35,7 +36,7 @@ public sealed class PurgeCustomPropertyDefinitionCommandHandler : IRequestHandle
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> Handle(PurgeCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> ExecuteAsync(PurgeCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var reason = request.Reason.Trim();
         if (string.IsNullOrWhiteSpace(reason))
@@ -97,7 +98,9 @@ public sealed class PurgeCustomPropertyDefinitionCommandHandler : IRequestHandle
 
         if (purged)
         {
-            await _cache.RemoveAsync($"custom-property-definitions:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(
+                CacheTags.CustomPropertyDefinitionListsByTenant(summary.TenantId),
+                CancellationToken.None);
             return BaseCommandResponse.Success(result, "Custom-property definition purged successfully.");
         }
 

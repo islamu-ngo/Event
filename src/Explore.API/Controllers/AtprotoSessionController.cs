@@ -12,8 +12,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -27,7 +27,10 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class AtprotoSessionController(
-    IMediator mediator,
+    ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult> bootstrapHandler,
+    IQueryHandler<GetCurrentAtprotoOAuthSessionQuery, AtprotoCurrentOAuthSession?> currentSessionHandler,
+    ICommandHandler<RefreshAtprotoSessionCommand, AtprotoSessionRefreshResult> refreshHandler,
+    ICommandHandler<RevokeAtprotoSessionCommand, AtprotoSessionRevocationResult> revokeHandler,
     ITenantContext tenantContext) : ControllerBase
 {
     [HttpPost("session", Name = RouteNames.BootstrapAtprotoSession)]
@@ -89,7 +92,7 @@ public sealed class AtprotoSessionController(
         }
 
         var sessionPayload = JsonSerializer.SerializeToUtf8Bytes(request.OAuthSession);
-        var result = await mediator.Send(new BootstrapAtprotoSessionCommand(
+        var result = await bootstrapHandler.ExecuteAsync(new BootstrapAtprotoSessionCommand(
             expectedDid,
             request.ExpectedPdsUri,
             request.OAuthClientKeyId,
@@ -149,7 +152,7 @@ public sealed class AtprotoSessionController(
             return ProblemResponse(StatusCodes.Status401Unauthorized, "ATProto session authentication failed");
         }
 
-        var session = await mediator.Send(
+        var session = await currentSessionHandler.QueryAsync(
             new GetCurrentAtprotoOAuthSessionQuery(identity),
             cancellationToken).ConfigureAwait(false);
         if (session is null)
@@ -181,7 +184,7 @@ public sealed class AtprotoSessionController(
             return ProblemResponse(StatusCodes.Status401Unauthorized, "ATProto session authentication failed");
         }
 
-        var result = await mediator.Send(
+        var result = await refreshHandler.ExecuteAsync(
             new RefreshAtprotoSessionCommand(identity),
             cancellationToken).ConfigureAwait(false);
         return result.Success && result.Token is { } token && result.ExpiresAt is { } expiresAt
@@ -204,7 +207,7 @@ public sealed class AtprotoSessionController(
             return ProblemResponse(StatusCodes.Status401Unauthorized, "ATProto session authentication failed");
         }
 
-        await mediator.Send(
+        await revokeHandler.ExecuteAsync(
             new RevokeAtprotoSessionCommand(identity),
             cancellationToken).ConfigureAwait(false);
         return NoContent();

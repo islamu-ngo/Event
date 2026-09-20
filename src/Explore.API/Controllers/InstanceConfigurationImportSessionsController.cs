@@ -1,5 +1,6 @@
 namespace Explore.API.Controllers;
 
+using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;
@@ -13,7 +14,7 @@ using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,19 @@ using Microsoft.AspNetCore.RateLimiting;
 [Route("api/control-plane/configuration-import/sessions")]
 [Tags("Control Plane Configuration")]
 public sealed class InstanceConfigurationImportSessionsController(
-    IMediator mediator,
+    ICommandHandler<CreateInstanceConfigurationImportSessionCommand,
+        ConfigurationImportSessionCreatedResult> createSession,
+    ICommandHandler<PreviewInstanceConfigurationImportSessionCommand,
+        ConfigurationImportPreviewResult> previewSession,
+    ICommandHandler<CancelInstanceConfigurationImportSessionCommand> cancelSession,
+    ICommandHandler<ApplyInstanceConfigurationImportCommand,
+        ConfigurationImportOperationResult> applyImport,
+    ICommandHandler<CreateInstanceConfigurationRollbackSessionCommand,
+        ConfigurationImportRollbackSessionCreatedResult> createRollbackSession,
+    IQueryHandler<ListInstanceConfigurationImportHistoryQuery,
+        ImmutableArray<ConfigurationImportOperationResult>> listHistory,
+    IQueryHandler<GetInstanceConfigurationImportReceiptQuery,
+        ConfigurationImportOperationResult> getReceipt,
     IAuthorizationProvider authorization)
     : ConfigurationImportSessionsControllerBase
 {
@@ -57,7 +70,7 @@ public sealed class InstanceConfigurationImportSessionsController(
             Request,
             cancellationToken);
         ConfigurationImportSessionCreatedResult created =
-            await mediator.Send(
+            await createSession.ExecuteAsync(
                 new CreateInstanceConfigurationImportSessionCommand(bytes),
                 cancellationToken);
         return StatusCode(
@@ -144,7 +157,7 @@ public sealed class InstanceConfigurationImportSessionsController(
         [FromBody] ConfigurationImportApplyRequest request,
         CancellationToken cancellationToken)
     {
-        ConfigurationImportOperationResult result = await mediator.Send(
+        ConfigurationImportOperationResult result = await applyImport.ExecuteAsync(
             new ApplyInstanceConfigurationImportCommand(
                 sessionId,
                 accessToken,
@@ -169,7 +182,7 @@ public sealed class InstanceConfigurationImportSessionsController(
         [FromQuery] int maximumCount = 50,
         CancellationToken cancellationToken = default)
     {
-        var operations = await mediator.Send(
+        var operations = await listHistory.QueryAsync(
             new ListInstanceConfigurationImportHistoryQuery(maximumCount),
             cancellationToken);
         return Ok(new HalResource<ConfigurationImportHistoryResult>(
@@ -191,7 +204,7 @@ public sealed class InstanceConfigurationImportSessionsController(
         Guid operationId,
         CancellationToken cancellationToken)
     {
-        ConfigurationImportOperationResult result = await mediator.Send(
+        ConfigurationImportOperationResult result = await getReceipt.QueryAsync(
             new GetInstanceConfigurationImportReceiptQuery(operationId),
             cancellationToken);
         return Ok(WithOperationLinks(
@@ -222,7 +235,7 @@ public sealed class InstanceConfigurationImportSessionsController(
         CancellationToken cancellationToken)
     {
         ConfigurationImportRollbackSessionCreatedResult result =
-            await mediator.Send(
+            await createRollbackSession.ExecuteAsync(
                 new CreateInstanceConfigurationRollbackSessionCommand(operationId),
                 cancellationToken);
         return StatusCode(
@@ -251,7 +264,7 @@ public sealed class InstanceConfigurationImportSessionsController(
         string accessToken,
         CancellationToken cancellationToken)
     {
-        await mediator.Send(
+        await cancelSession.ExecuteAsync(
             new CancelInstanceConfigurationImportSessionCommand(
                 sessionId,
                 accessToken),
@@ -266,7 +279,7 @@ public sealed class InstanceConfigurationImportSessionsController(
         ConfigurationImportPreviewRequest request,
         CancellationToken cancellationToken)
     {
-        ConfigurationImportPreviewResult preview = await mediator.Send(
+        ConfigurationImportPreviewResult preview = await previewSession.ExecuteAsync(
             new PreviewInstanceConfigurationImportSessionCommand(
                 sessionId,
                 accessToken,

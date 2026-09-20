@@ -1,3 +1,4 @@
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -242,6 +243,76 @@ public sealed class EventSessionRepositorySqliteTests
             .SingleAsync(item => item.Id == graph.AgendaItem.Id);
         await Assert.That(unchanged.EventId).IsNotEqualTo(graph.TargetEvent.Id);
         await Assert.That(unchanged.IsDeleted).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AgendaByEvent_OnSqlite_PreservesSortPriorityInstantChronologyAndVisibility(bool publicOnly)
+    {
+        await using var connection = await SqliteTestDatabaseFactory.CreateOpenIsolatedConnectionAsync();
+        Guid tenantId = Guid.CreateVersion7();
+        await using var context = CreateContext(connection, tenantId);
+        await context.Database.EnsureCreatedAsync();
+        await LookupTableSeeder.SeedAsync(context);
+        var parent = await SeedEventAsync(context, tenantId, EventStatusEnum.Published);
+        var hiddenDay = new EventDay
+        {
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = tenantId,
+            Tenant = null!,
+            LocalDate = new DateOnly(2026, 8, 15),
+            IsPublished = false
+        };
+        var later = AgendaItem(parent, "Later instant", 1, new DateTimeOffset(2026, 8, 15, 9, 0, 0, TimeSpan.Zero));
+        var earlier = AgendaItem(parent, "Earlier instant", 1, new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.FromHours(2)));
+        var priority = AgendaItem(parent, "Priority before chronology", 0, new DateTimeOffset(2026, 8, 15, 14, 0, 0, TimeSpan.Zero));
+        var unpublishedDayItem = AgendaItem(parent, "Unpublished day", 2, earlier.StartTime);
+        unpublishedDayItem.EventDayId = hiddenDay.Id;
+        unpublishedDayItem.EventDay = hiddenDay;
+        var deleted = AgendaItem(parent, "Deleted", -1, earlier.StartTime);
+        deleted.IsDeleted = true;
+        context.AddRange(hiddenDay, later, unpublishedDayItem, deleted, earlier, priority);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var repository = new EventAgendaItemRepository(context);
+        Func<Guid, CancellationToken, Task<List<EventAgendaItem>>> read = publicOnly
+            ? repository.GetPublicByEventAsync : repository.GetByEventAsync;
+        var items = await read(parent.Id, CancellationToken.None);
+        Guid[] expected = publicOnly
+            ? [priority.Id, earlier.Id, later.Id]
+            : [priority.Id, earlier.Id, later.Id, unpublishedDayItem.Id];
+        await Assert.That(items.Select(item => item.Id).SequenceEqual(expected)).IsTrue();
+        await Assert.That(context.ChangeTracker.Entries<EventAgendaItem>()).IsEmpty();
+        await Assert.That(await read(Guid.CreateVersion7(), CancellationToken.None)).IsEmpty();
+
+        await using var foreignContext = CreateContext(connection, Guid.CreateVersion7());
+        var foreignRepository = new EventAgendaItemRepository(foreignContext);
+        var foreignItems = publicOnly
+            ? await foreignRepository.GetPublicByEventAsync(parent.Id, CancellationToken.None)
+            : await foreignRepository.GetByEventAsync(parent.Id, CancellationToken.None);
+        await Assert.That(foreignItems).IsEmpty();
+    }
+
+    private static EventAgendaItem AgendaItem(DomainEvent parent, string title, int order, DateTimeOffset start)
+    {
+        var item = new EventAgendaItem
+        {
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            Title = title,
+            SortOrder = order,
+            StartTime = start,
+            EndTime = start.AddMinutes(30)
+        };
+        item.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
+        return item;
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid tenantId) =>

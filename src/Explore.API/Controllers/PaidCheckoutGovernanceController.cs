@@ -5,12 +5,12 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Extensions;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Payments;
 using Explore.Application.Features.PaidCheckoutGovernance.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -24,8 +24,13 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Admin)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class PaidCheckoutGovernanceController(
-    IMediator mediator,
-    IAuthorizationProvider authorization) : ControllerBase
+    IAuthorizationProvider authorization,
+    IQueryHandler<GetPaidCheckoutSaleControlQuery, PaidCheckoutSaleControlDto?> getSaleControlQueryHandler,
+    ICommandHandler<StopPaidCheckoutSalesCommand, BaseCommandResponse<Guid>> stopSalesCommandHandler,
+    ICommandHandler<RequestPaidCheckoutResumeCommand, BaseCommandResponse<Guid>> requestResumeCommandHandler,
+    ICommandHandler<ReviewPaidCheckoutResumeCommand, BaseCommandResponse<Guid>> reviewResumeCommandHandler,
+    ICommandHandler<RequestPaidCheckoutReviewCommand, BaseCommandResponse<Guid>> requestReviewCommandHandler,
+    ICommandHandler<DecidePaidCheckoutReviewCommand, BaseCommandResponse<Guid>> decideReviewCommandHandler) : ControllerBase
 {
     private static readonly ApiNotFoundProblemDescriptor SaleControlNotFoundProblem = new(
         "Paid-sale control not found",
@@ -59,7 +64,7 @@ public sealed class PaidCheckoutGovernanceController(
         [FromQuery] Guid? eventId,
         CancellationToken cancellationToken)
     {
-        PaidCheckoutSaleControlDto? control = await mediator.Send(
+        PaidCheckoutSaleControlDto? control = await getSaleControlQueryHandler.QueryAsync(
             new GetPaidCheckoutSaleControlQuery(tenantId, eventId), cancellationToken);
         if (control is null) return this.ToNotFoundProblem(SaleControlNotFoundProblem);
         var resource = new HalResource<PaidCheckoutSaleControlDto>(control)
@@ -99,7 +104,7 @@ public sealed class PaidCheckoutGovernanceController(
     public Task<ActionResult<BaseCommandResponse<Guid>>> Stop(
         Guid tenantId, [FromQuery] Guid? eventId, [FromBody] PaidCheckoutSaleControlMutationDto body,
         CancellationToken cancellationToken) => ExecuteAsync(
-            new StopPaidCheckoutSalesCommand(tenantId, eventId, body.ReasonCode), cancellationToken);
+            stopSalesCommandHandler.ExecuteAsync(new StopPaidCheckoutSalesCommand(tenantId, eventId, body.ReasonCode), cancellationToken));
 
     [HttpPost("sale-control/resume-requests", Name = RouteNames.RequestPaidCheckoutResume)]
     [PrivateNoStore]
@@ -114,7 +119,7 @@ public sealed class PaidCheckoutGovernanceController(
     public Task<ActionResult<BaseCommandResponse<Guid>>> RequestResume(
         Guid tenantId, [FromQuery] Guid? eventId, [FromBody] PaidCheckoutSaleControlMutationDto body,
         CancellationToken cancellationToken) => ExecuteAsync(
-            new RequestPaidCheckoutResumeCommand(tenantId, eventId, body.ReasonCode), cancellationToken);
+            requestResumeCommandHandler.ExecuteAsync(new RequestPaidCheckoutResumeCommand(tenantId, eventId, body.ReasonCode), cancellationToken));
 
     [HttpPost("sale-control/resume-reviews", Name = RouteNames.ReviewPaidCheckoutResume)]
     [PrivateNoStore]
@@ -129,7 +134,7 @@ public sealed class PaidCheckoutGovernanceController(
     public Task<ActionResult<BaseCommandResponse<Guid>>> ReviewResume(
         Guid tenantId, [FromQuery] Guid? eventId, [FromBody] PaidCheckoutResumeReviewDto body,
         CancellationToken cancellationToken) => ExecuteAsync(
-            new ReviewPaidCheckoutResumeCommand(tenantId, eventId, body.Approved, body.ReasonCode), cancellationToken);
+            reviewResumeCommandHandler.ExecuteAsync(new ReviewPaidCheckoutResumeCommand(tenantId, eventId, body.Approved, body.ReasonCode), cancellationToken));
 
     [HttpPost("events/{eventId:guid}/reviews", Name = RouteNames.RequestPaidCheckoutReview)]
     [PrivateNoStore]
@@ -144,8 +149,8 @@ public sealed class PaidCheckoutGovernanceController(
     public Task<ActionResult<BaseCommandResponse<Guid>>> RequestReview(
         Guid tenantId, Guid eventId, [FromBody] RequestPaidCheckoutReviewDto body,
         CancellationToken cancellationToken) => ExecuteAsync(
-            new RequestPaidCheckoutReviewCommand(tenantId, eventId, body.TriggerId, body.CurrencyCode,
-                body.MaximumOrderAmountMinor, body.ReasonCode), cancellationToken);
+            requestReviewCommandHandler.ExecuteAsync(new RequestPaidCheckoutReviewCommand(tenantId, eventId, body.TriggerId, body.CurrencyCode,
+                body.MaximumOrderAmountMinor, body.ReasonCode), cancellationToken));
 
     [HttpPost("reviews/{reviewId:guid}/decision", Name = RouteNames.DecidePaidCheckoutReview)]
     [PrivateNoStore]
@@ -160,13 +165,12 @@ public sealed class PaidCheckoutGovernanceController(
     public Task<ActionResult<BaseCommandResponse<Guid>>> DecideReview(
         Guid tenantId, Guid reviewId, [FromBody] DecidePaidCheckoutReviewDto body,
         CancellationToken cancellationToken) => ExecuteAsync(
-            new DecidePaidCheckoutReviewCommand(tenantId, reviewId, body.Approved, body.ReasonCode), cancellationToken);
+            decideReviewCommandHandler.ExecuteAsync(new DecidePaidCheckoutReviewCommand(tenantId, reviewId, body.Approved, body.ReasonCode), cancellationToken));
 
     private async Task<ActionResult<BaseCommandResponse<Guid>>> ExecuteAsync(
-        IRequest<BaseCommandResponse<Guid>> request,
-        CancellationToken cancellationToken)
+        Task<BaseCommandResponse<Guid>> execution)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(request, cancellationToken);
+        BaseCommandResponse<Guid> response = await execution;
         return response.IsSuccess ? Ok(response) : GovernanceFailures.Map(this, response);
     }
 

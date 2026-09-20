@@ -1,6 +1,7 @@
 using System.Globalization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Event;
@@ -14,11 +15,10 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Ai;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
-public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCommand>
+public sealed class ProcessAiRunCommandHandler : ICommandHandler<ProcessAiRunCommand>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
     private const string PrivacyErasureFencedFailureMessage = "AI assistant processing is unavailable.";
@@ -26,7 +26,7 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
     private readonly IAiConversationRepository _conversationRepository;
     private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventDetailsRequest, EventDto?> _eventDetailsHandler;
     private readonly AiPromptContextBuilder _promptContextBuilder;
     private readonly AiProviderResponseResolver _providerResponseResolver;
     private readonly IAiContextGateway _contextGateway;
@@ -37,14 +37,14 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
         IPrivacyErasureStateRepository privacyErasureStateRepository,
         IHierarchicalSettingsResolver settingsResolver,
         IAiChatProvider chatProvider,
-        IMediator mediator,
+        IQueryHandler<GetEventDetailsRequest, EventDto?> eventDetailsHandler,
         IAiContextGateway contextGateway,
         IAiProviderTrustResolver providerTrustResolver)
     {
         _conversationRepository = conversationRepository;
         _privacyErasureStateRepository = privacyErasureStateRepository;
         _settingsResolver = settingsResolver;
-        _mediator = mediator;
+        _eventDetailsHandler = eventDetailsHandler;
         _contextGateway = contextGateway;
         _providerTrustResolver = providerTrustResolver;
         var toolRegistry = AiToolContractRegistry.CreateDefault();
@@ -54,7 +54,7 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
             new AiStructuredActionParser(toolRegistry));
     }
 
-    public async Task Handle(ProcessAiRunCommand request, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(ProcessAiRunCommand request, CancellationToken cancellationToken)
     {
         if (request.TenantId == Guid.Empty || request.ConversationId == Guid.Empty || request.RunId == Guid.Empty)
         {
@@ -325,7 +325,7 @@ public sealed class ProcessAiRunCommandHandler : IRequestHandler<ProcessAiRunCom
         {
             if (IsEventReference(reference))
             {
-                var eventDetails = await _mediator.Send(
+                var eventDetails = await _eventDetailsHandler.QueryAsync(
                     new GetEventDetailsRequest { Id = reference.ReferenceId },
                     cancellationToken);
                 if (eventDetails is not null)

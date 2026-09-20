@@ -5,7 +5,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
-using Explore.API.Services.Calendar;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventProgram;
 using Explore.Application.DTOs.EventSession;
@@ -19,7 +19,6 @@ using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -51,13 +50,21 @@ public class EventModerationController : EventControllerBase
         "Event not found",
         "Event not found.");
 
-    private readonly IMediator _mediator;
-
+    private readonly ICommandHandler<ModerateEventCommand, BaseCommandResponse<Guid>> _moderateCommandHandler;
+    private readonly ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>> _heavyRedactCommandHandler;
+    private readonly ICommandHandler<UnmoderateEventCommand, BaseCommandResponse<Guid>> _unmoderateCommandHandler;
+    private readonly IQueryHandler<GetEventModerationHistoryRequest, IReadOnlyList<EventModerationHistoryDto>?> _getModerationHistory;
 
     public EventModerationController(
-        IMediator mediator)
+        ICommandHandler<ModerateEventCommand, BaseCommandResponse<Guid>> moderateCommandHandler,
+        ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>> heavyRedactCommandHandler,
+        ICommandHandler<UnmoderateEventCommand, BaseCommandResponse<Guid>> unmoderateCommandHandler,
+        IQueryHandler<GetEventModerationHistoryRequest, IReadOnlyList<EventModerationHistoryDto>?> getModerationHistory)
     {
-        _mediator = mediator;
+        _moderateCommandHandler = moderateCommandHandler;
+        _heavyRedactCommandHandler = heavyRedactCommandHandler;
+        _unmoderateCommandHandler = unmoderateCommandHandler;
+        _getModerationHistory = getModerationHistory;
     }
 
     /// <summary>
@@ -74,7 +81,7 @@ public class EventModerationController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<EventModerationHistoryDto>>> GetModerationHistory(Guid id, CancellationToken cancellationToken = default)
     {
-        var history = await _mediator.Send(new GetEventModerationHistoryRequest { Id = id }, cancellationToken);
+        var history = await _getModerationHistory.QueryAsync(new GetEventModerationHistoryRequest { Id = id }, cancellationToken);
         return history is null ? this.ToNotFoundProblem(EventNotFoundProblem) : Ok(history);
     }
 
@@ -98,7 +105,7 @@ public class EventModerationController : EventControllerBase
         [FromBody] EventModerationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ModerateEventCommand
+        var response = await _moderateCommandHandler.ExecuteAsync(new ModerateEventCommand
         {
             Id = id,
             ReasonCode = request.ReasonCode ?? string.Empty,
@@ -134,7 +141,7 @@ public class EventModerationController : EventControllerBase
         [FromBody] EventModerationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new HeavyRedactEventCommand
+        var response = await _heavyRedactCommandHandler.ExecuteAsync(new HeavyRedactEventCommand
         {
             Id = id,
             ReasonCode = request.ReasonCode ?? string.Empty,
@@ -174,7 +181,7 @@ public class EventModerationController : EventControllerBase
         [FromBody] EventModerationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UnmoderateEventCommand
+        var response = await _unmoderateCommandHandler.ExecuteAsync(new UnmoderateEventCommand
         {
             Id = id,
             ReasonCode = request.ReasonCode ?? string.Empty,

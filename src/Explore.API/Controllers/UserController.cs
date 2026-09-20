@@ -5,6 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.DTOs.User;
@@ -12,7 +13,6 @@ using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,7 +24,15 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 public class UserController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> _syncUserCommandHandler;
+    private readonly IQueryHandler<GetUserRequest, UserDto> _getUserRequestHandler;
+    private readonly IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto> _getAdminAuthorityRequestHandler;
+    private readonly IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto> _resolveTenantRedirectionRequestHandler;
+    private readonly ICommandHandler<UpdateUserLastActiveTenantCommand, bool> _updateLastActiveTenantCommandHandler;
+    private readonly IQueryHandler<GetUserOrganizationsRequest, List<OrganizationListDto>> _getUserOrganizationsRequestHandler;
+    private readonly ICommandHandler<UpdateUserCommand, BaseCommandResponse<Guid>> _updateUserCommandHandler;
+    private readonly ICommandHandler<DeleteUserCommand, PrivacyErasureStartDto> _deleteUserCommandHandler;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<UserDto, UserDto> _resourceAssembler;
 
     private static readonly ApiValidationProblemDescriptor SyncValidationProblem = new(
@@ -41,9 +49,27 @@ public class UserController : EventControllerBase
         "User not found",
         "The requested user could not be found.");
 
-    public UserController(IMediator mediator, IResourceAssembler<UserDto, UserDto> resourceAssembler)
+    public UserController(
+        ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler,
+        IQueryHandler<GetUserRequest, UserDto> getUserRequestHandler,
+        IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto> getAdminAuthorityRequestHandler,
+        IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto> resolveTenantRedirectionRequestHandler,
+        ICommandHandler<UpdateUserLastActiveTenantCommand, bool> updateLastActiveTenantCommandHandler,
+        IQueryHandler<GetUserOrganizationsRequest, List<OrganizationListDto>> getUserOrganizationsRequestHandler,
+        ICommandHandler<UpdateUserCommand, BaseCommandResponse<Guid>> updateUserCommandHandler,
+        ICommandHandler<DeleteUserCommand, PrivacyErasureStartDto> deleteUserCommandHandler,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
+        IResourceAssembler<UserDto, UserDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _syncUserCommandHandler = syncUserCommandHandler;
+        _getUserRequestHandler = getUserRequestHandler;
+        _getAdminAuthorityRequestHandler = getAdminAuthorityRequestHandler;
+        _resolveTenantRedirectionRequestHandler = resolveTenantRedirectionRequestHandler;
+        _updateLastActiveTenantCommandHandler = updateLastActiveTenantCommandHandler;
+        _getUserOrganizationsRequestHandler = getUserOrganizationsRequestHandler;
+        _updateUserCommandHandler = updateUserCommandHandler;
+        _deleteUserCommandHandler = deleteUserCommandHandler;
+        _identityQuery = identityQuery;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -88,7 +114,7 @@ public class UserController : EventControllerBase
             AccountKey = providerIdentity.AccountKey,
             UserDto = userDto
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _syncUserCommandHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -104,14 +130,14 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<UserDto>>> GetCurrentUser(CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
         }
 
         var query = new GetUserRequest { UserId = currentUserId.Value };
-        var user = await _mediator.Send(query, cancellationToken);
+        var user = await _getUserRequestHandler.QueryAsync(query, cancellationToken);
         if (user is null)
         {
             return this.ToNotFoundProblem(UserNotFoundProblem);
@@ -130,7 +156,7 @@ public class UserController : EventControllerBase
     [EndpointDescription("Returns instance, tenant, organization, and group admin status for the authenticated user. Consumed by BFF and route authorization.")]
     public async Task<ActionResult<AdminAuthorityDto>> GetAdminAuthority(CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
@@ -138,7 +164,7 @@ public class UserController : EventControllerBase
         }
 
         var query = new GetAdminAuthorityRequest { UserId = currentUserId.Value };
-        var authority = await _mediator.Send(query, cancellationToken);
+        var authority = await _getAdminAuthorityRequestHandler.QueryAsync(query, cancellationToken);
 
         return Ok(authority);
     }
@@ -153,14 +179,14 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(UserTenantRedirectionDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<UserTenantRedirectionDto>> ResolveTenantRedirection(CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
         }
 
         var query = new ResolveUserTenantRedirectionRequest { UserId = currentUserId.Value };
-        var redirection = await _mediator.Send(query, cancellationToken);
+        var redirection = await _resolveTenantRedirectionRequestHandler.QueryAsync(query, cancellationToken);
 
         return Ok(redirection);
     }
@@ -175,7 +201,7 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     public async Task<ActionResult<bool>> UpdateLastActiveTenant(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -186,7 +212,7 @@ public class UserController : EventControllerBase
             UserId = currentUserId.Value,
             TenantId = tenantId
         };
-        var success = await _mediator.Send(command, cancellationToken);
+        var success = await _updateLastActiveTenantCommandHandler.ExecuteAsync(command, cancellationToken);
 
         return Ok(success);
     }
@@ -204,14 +230,14 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<List<OrganizationListDto>>> GetUserOrganizations(Guid userId, CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
         }
 
         var query = new GetUserOrganizationsRequest { UserId = userId };
-        var organizations = await _mediator.Send(query, cancellationToken);
+        var organizations = await _getUserOrganizationsRequestHandler.QueryAsync(query, cancellationToken);
 
         return Ok(organizations);
     }
@@ -230,7 +256,7 @@ public class UserController : EventControllerBase
         [FromHeader(Name = "If-Match")] string? ifMatch,
         CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -254,7 +280,7 @@ public class UserController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             UpdateUserDto = userDto
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateUserCommandHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -275,7 +301,7 @@ public class UserController : EventControllerBase
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -290,7 +316,7 @@ public class UserController : EventControllerBase
         }
 
         var command = new DeleteUserCommand { UserId = currentUserId.Value, IntentId = intentId };
-        PrivacyErasureStartDto result = await _mediator.Send(command, cancellationToken);
+        PrivacyErasureStartDto result = await _deleteUserCommandHandler.ExecuteAsync(command, cancellationToken);
         Response.Headers.CacheControl = "private, no-store";
         Response.Headers.RetryAfter = "5";
         return AcceptedAtRoute(RouteNames.GetPrivacyErasureStatus, routeValues: null, value: result);

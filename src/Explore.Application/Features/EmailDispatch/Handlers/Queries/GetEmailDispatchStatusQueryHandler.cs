@@ -2,12 +2,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Queries;
 
 public sealed class GetEmailDispatchStatusQueryHandler
-    : IRequestHandler<GetEmailDispatchStatusQuery, BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>>
+    : IQueryHandler<GetEmailDispatchStatusQuery, BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>>
 {
     private const int MaxLimit = 200;
     private readonly IEmailDispatchOutboxRepository _repository;
@@ -17,7 +17,7 @@ public sealed class GetEmailDispatchStatusQueryHandler
         _repository = repository;
     }
 
-    public async Task<BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>> Handle(
+    public async Task<BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>> QueryAsync(
         GetEmailDispatchStatusQuery request,
         CancellationToken cancellationToken)
     {

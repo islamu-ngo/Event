@@ -5,12 +5,12 @@ using Explore.Application.Features.EventCustomPropertyProjections.Requests.Comma
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Handlers.Commands;
 
 public class RebuildEventCustomPropertyProjectionCommandHandler
-    : IRequestHandler<RebuildEventCustomPropertyProjectionCommand, BaseCommandResponse<RebuildProjectionResponseDto>>
+    : ICommandHandler<RebuildEventCustomPropertyProjectionCommand, BaseCommandResponse<RebuildProjectionResponseDto>>
 {
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
@@ -26,7 +26,7 @@ public class RebuildEventCustomPropertyProjectionCommandHandler
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<RebuildProjectionResponseDto>> Handle(
+    public async Task<BaseCommandResponse<RebuildProjectionResponseDto>> ExecuteAsync(
         RebuildEventCustomPropertyProjectionCommand request,
         CancellationToken cancellationToken)
     {

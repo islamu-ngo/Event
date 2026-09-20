@@ -167,7 +167,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var entity = await fixture.SeedEventAsync(accountRequired: true);
         if (surface == "batch")
         {
-            var result = await fixture.ExecuteAsync<UpdateSettingBatchCommand, BatchUpdateResponseDto>(new()
+            var result = await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>().ExecuteAsync(new()
             {
                 Category = SettingRegistry.Get(ModeKey)!.Category,
                 Scope = SettingScope.Instance,
@@ -177,7 +177,7 @@ public sealed class VisitorAccessSettingsWriterTests
                     [ModeKey] = "AnonymousOnly",
                     [GovernanceSettingKeys.PublicExperience.EventCatalogLabel] = "Uncommitted label"
                 }
-            });
+            }, CancellationToken.None);
             await Assert.That(result.Success).IsFalse();
             await Assert.That(result.Results.All(item => !item.Applied)).IsTrue();
             await Assert.That(await fixture.Services.GetRequiredService<ISystemSettingRepository>()
@@ -186,10 +186,10 @@ public sealed class VisitorAccessSettingsWriterTests
         else
         {
             BaseCommandResponse<Guid> result = surface == "scalar"
-                ? await fixture.ExecuteAsync<UpdateSettingCommand, BaseCommandResponse<Guid>>(new()
-                { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance })
-                : await fixture.ExecuteAsync<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>(
-                    new(fixture.TenantId, ModeKey, "AnonymousOnly"));
+                ? await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+                { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance }, CancellationToken.None)
+                : await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>>()
+                    .ExecuteAsync(new(fixture.TenantId, ModeKey, "AnonymousOnly"), CancellationToken.None);
             await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         }
         var stored = await fixture.Services.GetRequiredService<IEventParticipationConfigurationRepository>()
@@ -216,12 +216,12 @@ public sealed class VisitorAccessSettingsWriterTests
         await fixture.SeedEventAsync(accountRequired: true);
         BaseCommandResponse<Guid> result = operation switch
         {
-            "reset" => await fixture.ExecuteAsync<ResetSettingCommand, BaseCommandResponse<Guid>>(new()
-            { Key = ModeKey, Scope = SettingScope.Tenant }),
-            "lock" => await fixture.ExecuteAsync<LockSettingCommand, BaseCommandResponse<Guid>>(new()
-            { Key = ModeKey, Scope = SettingScope.Instance }),
-            _ => await fixture.ExecuteAsync<UnlockSettingCommand, BaseCommandResponse<Guid>>(new()
-            { Key = ModeKey, Scope = SettingScope.Instance })
+            "reset" => await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+            { Key = ModeKey, Scope = SettingScope.Tenant }, CancellationToken.None),
+            "lock" => await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+            { Key = ModeKey, Scope = SettingScope.Instance }, CancellationToken.None),
+            _ => await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+            { Key = ModeKey, Scope = SettingScope.Instance }, CancellationToken.None)
         };
         await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
@@ -239,8 +239,10 @@ public sealed class VisitorAccessSettingsWriterTests
             "\"FullRegistrationAndAuth\"", !locking)], fixture.UserId)).EnsureAccepted();
         await fixture.SeedEventAsync(accountRequired: true);
         var result = locking
-            ? await fixture.ExecuteAsync<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>(new(fixture.TenantId, ModeKey))
-            : await fixture.ExecuteAsync<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>(new(fixture.TenantId, ModeKey));
+            ? await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>>()
+                .ExecuteAsync(new(fixture.TenantId, ModeKey), CancellationToken.None)
+            : await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>>()
+                .ExecuteAsync(new(fixture.TenantId, ModeKey), CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue().Because(result.FailureCode ?? "tenant lock");
         var stored = await fixture.Services.GetRequiredService<ITenantSettingRepository>().GetByTenantAndKey(fixture.TenantId, ModeKey);
         await Assert.That(stored!.IsLocked).IsEqualTo(locking);
@@ -409,8 +411,8 @@ public sealed class VisitorAccessSettingsWriterTests
             AssignedAt = now,
             CreatedAt = now
         });
-        var result = await fixture.ExecuteAsync<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>(
-            new(fixture.TenantId, assignment.Id, fixture.UserId));
+        var result = await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(new(fixture.TenantId, assignment.Id, fixture.UserId), CancellationToken.None);
         await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         await Assert.That(await fixture.Services.GetRequiredService<ITenantSettingRepository>()
             .GetByTenantAndKey(fixture.TenantId, GovernanceSettingKeys.PublicExperience.EventCatalogLabel)).IsNull();
@@ -444,10 +446,10 @@ public sealed class VisitorAccessSettingsWriterTests
         await using var context = EmailDispatchSqliteFixture.CreateContext(fixture.DatabasePath, new RejectCatalogLabelSave());
         using var commands = new InstanceSettingsCommandFixture(context, fixture.UserId);
         var handler = new UpdateSettingBatchCommandHandler(commands.Settings, new UserPreferenceRepository(context), commands,
-            commands.CurrentUserService, commands.AdminContext, commands.Mediator, NullLogger<UpdateSettingBatchCommandHandler>.Instance,
+            commands.CurrentUserService, commands.AdminContext, commands.NotificationHandlers, NullLogger<UpdateSettingBatchCommandHandler>.Instance,
             commands.PublicationPolicyBoundary, commands.UnitOfWork, commands.MutationLock, commands.EmailDeliverySettingsWriter,
             commands.VisitorSettings);
-        await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.Handle(new()
+        await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.ExecuteAsync(new()
         {
             Category = SettingRegistry.Get(ModeKey)!.Category,
             Scope = SettingScope.Instance,
@@ -487,7 +489,8 @@ public sealed class VisitorAccessSettingsWriterTests
         var writer = new VisitorAccessSettingsWriter(fixture.Context, mutationLock, unitOfWork,
             new EventParticipationConfigurationRepository(fixture.Context), configuration);
         return new AuthProviderConfigurationService(new SystemSettingRepository(fixture.Context, mutationLock), configuration,
-            unitOfWork, mutationLock, writer, fixture.Services.GetRequiredService<MediatR.IMediator>());
+            unitOfWork, mutationLock, writer,
+            fixture.Services.GetServices<Explore.Application.Contracts.Operations.INotificationHandler<Explore.Application.Notifications.SettingChangedNotification>>());
     }
 
     private static IVisitorAccessSettingsWriter Writer(EventVisitorCapabilitySqliteFixture fixture) =>

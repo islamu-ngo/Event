@@ -3,7 +3,7 @@ using System.Security.Claims;
 using Explore.API.Controllers;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
-using MediatR;
+using Event.Api.IntegrationTests.Helpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,13 +13,15 @@ using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
-public sealed class AdminCacheDiagnosticsControllerTests
+public sealed class AdminCacheDiagnosticsControllerTests : IDisposable
 {
+    private readonly IdentityQueryTestScope _identity = new();
+    public void Dispose() => _identity.Dispose();
     [Test]
     public async Task SnapshotInDevelopmentUsesCanonicalResolutionAndOwnedDiagnosticClaimNames()
     {
-        Guid subject = Guid.CreateVersion7();
-        Guid internalUser = Guid.CreateVersion7();
+        Guid subject = Guid.Parse("018e4e5c-7f00-7000-8000-000000000081");
+        Guid internalUser = Guid.Parse("018e4e5c-7f00-7000-8000-000000000082");
         var controller = CreateController(new ClaimsPrincipal(new ClaimsIdentity([
             new Claim(JwtRegisteredClaimNames.Sub, subject.ToString("D")),
             new Claim(PlatformIdentityClaimTypes.InternalUserId, internalUser.ToString("D"))
@@ -27,7 +29,7 @@ public sealed class AdminCacheDiagnosticsControllerTests
 
         ActionResult<AdminCacheDiagnosticsController.AdminCacheCurrentUserDiagnostics> result =
             await controller.SnapshotCurrentUser(
-                Substitute.For<IMediator>(),
+                _identity.Query,
                 DevelopmentEnvironment(),
                 EnabledConfiguration(),
                 CancellationToken.None);
@@ -43,14 +45,14 @@ public sealed class AdminCacheDiagnosticsControllerTests
     [Test]
     public async Task SnapshotForPurposeBoundPrincipalDoesNotMasqueradeAsPlatformIdentity()
     {
-        Guid smuggledUser = Guid.CreateVersion7();
+        Guid smuggledUser = Guid.Parse("018e4e5c-7f00-7000-8000-000000000083");
         var controller = CreateController(new ClaimsPrincipal(new ClaimsIdentity([
             new Claim(JwtRegisteredClaimNames.Sub, smuggledUser.ToString("D"))
         ], ApiAuthenticationSchemeNames.ApiKey)));
 
         ActionResult<AdminCacheDiagnosticsController.AdminCacheCurrentUserDiagnostics> result =
             await controller.SnapshotCurrentUser(
-                Substitute.For<IMediator>(),
+                _identity.Query,
                 DevelopmentEnvironment(),
                 EnabledConfiguration(),
                 CancellationToken.None);
@@ -66,14 +68,14 @@ public sealed class AdminCacheDiagnosticsControllerTests
     public async Task SnapshotOutsideDevelopmentOrTestingStaysNotFound()
     {
         var controller = CreateController(new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(JwtRegisteredClaimNames.Sub, Guid.CreateVersion7().ToString("D"))],
+            [new Claim(JwtRegisteredClaimNames.Sub, "018e4e5c-7f00-7000-8000-000000000084")],
             "interactive")));
         var environment = Substitute.For<IHostEnvironment>();
         environment.EnvironmentName.Returns("Production");
 
         ActionResult<AdminCacheDiagnosticsController.AdminCacheCurrentUserDiagnostics> result =
             await controller.SnapshotCurrentUser(
-                Substitute.For<IMediator>(),
+                _identity.Query,
                 environment,
                 EnabledConfiguration(),
                 CancellationToken.None);

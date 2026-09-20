@@ -104,6 +104,19 @@ Tenant administrators manage their community experience via `/settings/admin`:
 - Define custom questions and fields for events and attendee registrations (see [Custom Properties Governance](../events-and-ticketing/custom-properties.md)).
 - Set exposure levels: `Public` (visible on listing), `Private` (visible to organizers only), or `System`.
 
+### Moving Rooms Between Locations
+
+A room can move to another location in the same tenant only when no session,
+session group, or agenda item still references it. This includes any retained
+reference on a deleted record: moving a room never rewrites historical schedule
+links. Non-location edits remain available for scheduled rooms. Create a replacement
+room at the destination if the original room must remain linked to a schedule.
+
+A successful move preserves the room ID and applies the final name and other
+submitted edits together. Room names must be unique within the destination
+location. If the room or its schedule references change concurrently, reload before
+retrying; a rejected move leaves the original placement intact.
+
 ---
 
 ## 4. Organization & Group Governance

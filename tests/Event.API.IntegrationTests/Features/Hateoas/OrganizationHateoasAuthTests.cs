@@ -2,7 +2,6 @@ using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
-using Explore.Application.Contracts.Identity;
 using Explore.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using TUnit.Assertions;
@@ -35,10 +34,6 @@ public class OrganizationHateoasAuthTests
         var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var seed = await TenantScenarioSeed.SeedActiveTenantWithOrganizationPublisherAsync(context);
 
-        // Evict from cache to make sure the fresh roles are loaded
-        var cache = scope.ServiceProvider.GetRequiredService<IAdminCacheInvalidator>();
-        cache.InvalidateUser(seed.UserId);
-
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Get, WithCacheBust(BaseUrl), seed.UserId);
         var response = await _fixture.Client.SendAsync(request);
 
@@ -68,10 +63,6 @@ public class OrganizationHateoasAuthTests
         await using var scope = _fixture.Factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var seed = await TenantScenarioSeed.SeedActiveTenantWithOrganizationPublisherAsync(context);
-
-        // Evict from cache to make sure the fresh roles are loaded
-        var cache = scope.ServiceProvider.GetRequiredService<IAdminCacheInvalidator>();
-        cache.InvalidateUser(seed.UserId);
 
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Get, WithCacheBust(BaseUrl), seed.UserId);
         var response = await _fixture.Client.SendAsync(request);

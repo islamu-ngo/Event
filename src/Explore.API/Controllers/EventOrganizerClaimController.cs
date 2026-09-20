@@ -3,12 +3,12 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -19,7 +19,15 @@ namespace Explore.API.Controllers;
 [Route("api/events/{eventId:guid}/organizer-claims")]
 [ApiController]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
-public sealed class EventOrganizerClaimController : EventControllerBase
+public sealed class EventOrganizerClaimController(
+    IQueryHandler<GetEventOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>> getEventOrganizerClaimsHandler,
+    IQueryHandler<GetEventOrganizerClaimRequest, EventOrganizerClaimDto?> getEventOrganizerClaimHandler,
+    IQueryHandler<GetClaimantOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>> getClaimantOrganizerClaimsHandler,
+    ICommandHandler<SubmitEventOrganizerClaimCommand, BaseCommandResponse<Guid>> submitHandler,
+    ICommandHandler<WithdrawEventOrganizerClaimCommand, BaseCommandResponse<Guid>> withdrawHandler,
+    ICommandHandler<ReviewEventOrganizerClaimCommand, BaseCommandResponse<Guid>> reviewHandler,
+    IResourceAssembler<EventOrganizerClaimDto, EventOrganizerClaimDto> resourceAssembler)
+    : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor SubmitValidationProblem = new(
         "eventOrganizerClaim",
@@ -40,17 +48,6 @@ public sealed class EventOrganizerClaimController : EventControllerBase
         "Event organizer claim not found",
         "The requested event organizer claim was not found.");
 
-    private readonly IMediator _mediator;
-    private readonly IResourceAssembler<EventOrganizerClaimDto, EventOrganizerClaimDto> _resourceAssembler;
-
-    public EventOrganizerClaimController(
-        IMediator mediator,
-        IResourceAssembler<EventOrganizerClaimDto, EventOrganizerClaimDto> resourceAssembler)
-    {
-        _mediator = mediator;
-        _resourceAssembler = resourceAssembler;
-    }
-
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
@@ -66,11 +63,11 @@ public sealed class EventOrganizerClaimController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var claims = await _mediator.Send(
+        var claims = await getEventOrganizerClaimsHandler.QueryAsync(
             new GetEventOrganizerClaimsRequest(eventId),
             cancellationToken);
 
-        var resource = await _resourceAssembler.ToCollectionResource(
+        var resource = await resourceAssembler.ToCollectionResource(
             claims,
             RouteNames.GetEventOrganizerClaims,
             new { eventId },
@@ -96,7 +93,7 @@ public sealed class EventOrganizerClaimController : EventControllerBase
         Guid claimId,
         CancellationToken cancellationToken = default)
     {
-        var claim = await _mediator.Send(
+        var claim = await getEventOrganizerClaimHandler.QueryAsync(
             new GetEventOrganizerClaimRequest(eventId, claimId),
             cancellationToken);
         if (claim is null)
@@ -104,7 +101,7 @@ public sealed class EventOrganizerClaimController : EventControllerBase
             return this.ToNotFoundProblem(OrganizerClaimNotFoundProblem);
         }
 
-        return Ok(await _resourceAssembler.ToResource(claim, HttpContext));
+        return Ok(await resourceAssembler.ToResource(claim, HttpContext));
     }
 
     [Authorize]
@@ -122,11 +119,11 @@ public sealed class EventOrganizerClaimController : EventControllerBase
         Guid claimantActorId,
         CancellationToken cancellationToken = default)
     {
-        var claims = await _mediator.Send(
+        var claims = await getClaimantOrganizerClaimsHandler.QueryAsync(
             new GetClaimantOrganizerClaimsRequest(claimantActorId),
             cancellationToken);
 
-        var resource = await _resourceAssembler.ToCollectionResource(
+        var resource = await resourceAssembler.ToCollectionResource(
             claims,
             RouteNames.GetClaimantOrganizerClaims,
             new { claimantActorId },
@@ -151,7 +148,7 @@ public sealed class EventOrganizerClaimController : EventControllerBase
         [FromBody] SubmitEventOrganizerClaimDto claim,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await submitHandler.ExecuteAsync(
             new SubmitEventOrganizerClaimCommand
             {
                 EventId = eventId,
@@ -193,7 +190,7 @@ public sealed class EventOrganizerClaimController : EventControllerBase
                 "If-Match header is required and must contain the current event organizer claim concurrency stamp.");
         }
 
-        var response = await _mediator.Send(
+        var response = await withdrawHandler.ExecuteAsync(
             new WithdrawEventOrganizerClaimCommand
             {
                 EventId = eventId,
@@ -227,7 +224,7 @@ public sealed class EventOrganizerClaimController : EventControllerBase
         [FromBody] ReviewEventOrganizerClaimDto review,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await reviewHandler.ExecuteAsync(
             new ReviewEventOrganizerClaimCommand
             {
                 EventId = eventId,

@@ -4,8 +4,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -17,9 +17,9 @@ public sealed class TestWebhookEndpointCommandHandler(
     IWebhookRetentionPolicyResolver retentionPolicyResolver,
     IWebhookAuditEventWriter auditWriter,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<TestWebhookEndpointCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<TestWebhookEndpointCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         TestWebhookEndpointCommand request,
         CancellationToken cancellationToken)
     {

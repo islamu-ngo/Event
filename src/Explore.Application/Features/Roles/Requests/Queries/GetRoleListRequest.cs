@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Role;
-using MediatR;
 
 namespace Explore.Application.Features.Roles.Requests.Queries;
 
-public sealed record GetRoleListRequest : IRequest<List<RoleListDto>>
+public sealed record GetRoleListRequest : IQuery<List<RoleListDto>>
 {
     /// <summary>
     /// Optional normalized role scope lookup ID filter. When null, returns all roles.

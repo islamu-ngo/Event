@@ -1,13 +1,13 @@
 using System;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Actors.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Actor, AuthorizationActions.Update)]
-public sealed record UpdateActorCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateActorCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid ActorId { get; init; }
 

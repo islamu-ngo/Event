@@ -1,15 +1,15 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantUserRoleGrant.Validators;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.TenantUserRoleGrants.Handlers.Commands;
 
-public class CreateTenantUserRoleGrantCommandHandler : IRequestHandler<CreateTenantUserRoleGrantCommand, BaseCommandResponse<Guid>>
+public class CreateTenantUserRoleGrantCommandHandler : ICommandHandler<CreateTenantUserRoleGrantCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITenantUserRoleGrantRepository _tenantUserRoleGrantRepository;
     private readonly ITenantUserRepository _tenantUserRepository;
@@ -31,7 +31,7 @@ public class CreateTenantUserRoleGrantCommandHandler : IRequestHandler<CreateTen
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
     {
         var dto = request.TenantUserRoleGrantDto;
 

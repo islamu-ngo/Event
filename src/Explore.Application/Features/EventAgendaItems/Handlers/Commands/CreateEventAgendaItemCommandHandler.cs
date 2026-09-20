@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem.Validators;
 using Explore.Application.Features.EventAgendaItems.Requests.Commands;
@@ -7,11 +6,11 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Handlers.Commands;
 
-public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>>
+public class CreateEventAgendaItemCommandHandler : ICommandHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
     private readonly IEventRepository _eventRepository;
@@ -19,7 +18,6 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
     private readonly IEventScheduleProjectionCalculator _scheduleProjectionCalculator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
-    private readonly IMapper _mapper;
 
     public CreateEventAgendaItemCommandHandler(
         IEventAgendaItemRepository eventAgendaItemRepository,
@@ -27,8 +25,7 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
         IEventDayRepository eventDayRepository,
         IEventScheduleProjectionCalculator scheduleProjectionCalculator,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService,
-        IMapper mapper)
+        EventLocationAttachmentService eventLocationAttachmentService)
     {
         _eventAgendaItemRepository = eventAgendaItemRepository;
         _eventRepository = eventRepository;
@@ -36,10 +33,9 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
         _scheduleProjectionCalculator = scheduleProjectionCalculator;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventAgendaItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventAgendaItemCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventAgendaItemDtoValidator(_eventRepository);
         var validationResult = await validator.ValidateAsync(request.EventAgendaItemDto, cancellationToken);
@@ -59,7 +55,18 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
                 "Event not found in the current tenant.");
         }
 
-        var agendaItem = _mapper.Map<EventAgendaItem>(request.EventAgendaItemDto);
+        var agendaItem = new EventAgendaItem
+        {
+            EventId = request.EventAgendaItemDto.EventId,
+            Title = request.EventAgendaItemDto.Title,
+            Description = request.EventAgendaItemDto.Description,
+            LocationId = request.EventAgendaItemDto.LocationId,
+            RoomId = request.EventAgendaItemDto.RoomId,
+            KindId = request.EventAgendaItemDto.KindId,
+            SortOrder = request.EventAgendaItemDto.SortOrder,
+            Event = null!,
+            Tenant = null!
+        };
         agendaItem.TenantId = parentEvent.TenantId;
 
         agendaItem.Reschedule(

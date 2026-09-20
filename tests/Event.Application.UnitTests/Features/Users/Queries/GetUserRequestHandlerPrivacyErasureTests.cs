@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User;
@@ -39,12 +38,11 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
         var handler = new GetUserRequestHandler(
             Substitute.For<IUserRepository>(),
             Substitute.For<IObjectStorageService>(),
-            Substitute.For<IMapper>(),
             Substitute.For<ILogger<GetUserRequestHandler>>(),
             cache,
             stateRepository);
 
-        UserDto result = await handler.Handle(new GetUserRequest { UserId = userId }, CancellationToken.None);
+        UserDto result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(cache.WasRead).IsFalse();
@@ -86,24 +84,15 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
                     LastName = "Profile"
                 }
             });
-        IMapper mapper = Substitute.For<IMapper>();
-        mapper.Map<UserDto>(Arg.Any<User>()).Returns(new UserDto
-        {
-            Id = userId,
-            Email = "stale@example.invalid",
-            FirstName = "Stale",
-            LastName = "Profile"
-        });
         var cache = new RecordingHybridCache();
         var handler = new GetUserRequestHandler(
             userRepository,
             Substitute.For<IObjectStorageService>(),
-            mapper,
             Substitute.For<ILogger<GetUserRequestHandler>>(),
             cache,
             stateRepository);
 
-        UserDto result = await handler.Handle(new GetUserRequest { UserId = userId }, CancellationToken.None);
+        UserDto result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(cache.RemovedKeys).Contains($"user:detail:{userId}");

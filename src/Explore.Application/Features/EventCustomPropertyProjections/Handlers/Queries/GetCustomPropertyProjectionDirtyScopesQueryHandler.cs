@@ -1,27 +1,24 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Handlers.Queries;
 
 public class GetCustomPropertyProjectionDirtyScopesQueryHandler
-    : IRequestHandler<GetCustomPropertyProjectionDirtyScopesQuery, PaginatedResult<ProjectionDirtyScopeDto>>
+    : IQueryHandler<GetCustomPropertyProjectionDirtyScopesQuery, PaginatedResult<ProjectionDirtyScopeDto>>
 {
     private readonly ICustomPropertyProjectionDirtyScopeRepository _dirtyScopeRepository;
-    private readonly IMapper _mapper;
 
     public GetCustomPropertyProjectionDirtyScopesQueryHandler(
-        ICustomPropertyProjectionDirtyScopeRepository dirtyScopeRepository,
-        IMapper mapper)
+        ICustomPropertyProjectionDirtyScopeRepository dirtyScopeRepository)
     {
         _dirtyScopeRepository = dirtyScopeRepository;
-        _mapper = mapper;
     }
 
-    public async Task<PaginatedResult<ProjectionDirtyScopeDto>> Handle(
+    public async Task<PaginatedResult<ProjectionDirtyScopeDto>> QueryAsync(
         GetCustomPropertyProjectionDirtyScopesQuery request,
         CancellationToken cancellationToken)
     {
@@ -39,9 +36,10 @@ public class GetCustomPropertyProjectionDirtyScopesQueryHandler
             1,
             request.TenantId,
             pageSize,
-            cancellationToken);
+            cancellationToken,
+            skip: (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue));
 
-        var dtos = _mapper.Map<List<ProjectionDirtyScopeDto>>(items);
+        var dtos = items.Select(CustomPropertyProjectionMapper.ToDirtyScope).ToList();
 
         return PaginatedResult<ProjectionDirtyScopeDto>.Create(dtos, pendingCount, pageNumber, pageSize);
     }

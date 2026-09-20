@@ -5,8 +5,8 @@ using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Features.Webhooks.Validators;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
@@ -14,9 +14,9 @@ public sealed class GetWebhookMessagePayloadQueryHandler(
     IWebhookMessageRepository messageRepository,
     IWebhookAuditEventWriter auditWriter,
     TimeProvider timeProvider)
-    : IRequestHandler<GetWebhookMessagePayloadQuery, WebhookMessagePayloadReadResult>
+    : IQueryHandler<GetWebhookMessagePayloadQuery, WebhookMessagePayloadReadResult>
 {
-    public async Task<WebhookMessagePayloadReadResult> Handle(
+    public async Task<WebhookMessagePayloadReadResult> QueryAsync(
         GetWebhookMessagePayloadQuery request,
         CancellationToken cancellationToken)
     {

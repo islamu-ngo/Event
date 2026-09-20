@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.BulkReplay)]
-public sealed record ScheduleWebhookBulkReplayCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ScheduleWebhookBulkReplayCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid ActorUserId { get; init; }

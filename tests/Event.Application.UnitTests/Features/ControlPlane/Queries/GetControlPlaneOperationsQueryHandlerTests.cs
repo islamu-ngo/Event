@@ -91,7 +91,7 @@ public sealed class GetControlPlaneOperationsQueryHandlerTests
             smtpService,
             configuration);
 
-        var result = await handler.Handle(new GetControlPlaneOperationsQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetControlPlaneOperationsQuery(), CancellationToken.None);
 
         await Assert.That(result.Statuses.Select(status => status.Key))
             .IsEquivalentTo(["general-outbox", "email-dispatch", "moderation-reporting", "storage"]);

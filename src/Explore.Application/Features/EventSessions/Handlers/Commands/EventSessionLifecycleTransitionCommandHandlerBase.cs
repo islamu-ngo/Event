@@ -1,4 +1,5 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;
 using Explore.Application.Exceptions;
@@ -6,7 +7,6 @@ using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
@@ -16,7 +16,7 @@ public abstract class EventSessionLifecycleTransitionCommandHandlerBase<TCommand
     IEventRepository eventRepository,
     IUnitOfWork unitOfWork,
     HybridCache cache,
-    TimeProvider timeProvider) : IRequestHandler<TCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<TCommand, BaseCommandResponse<Guid>>
     where TCommand : IEventSessionLifecycleTransitionCommand
 {
     protected abstract string ActionName { get; }
@@ -39,7 +39,7 @@ public abstract class EventSessionLifecycleTransitionCommandHandlerBase<TCommand
         TransitionAttempt attempt,
         CancellationToken cancellationToken) => Task.CompletedTask;
 
-    public async Task<BaseCommandResponse<Guid>> Handle(TCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(TCommand request, CancellationToken cancellationToken)
     {
         var validator = new EventSessionLifecycleRequestDtoValidator();
         var validationResult = await validator.ValidateAsync(request.Request, cancellationToken);

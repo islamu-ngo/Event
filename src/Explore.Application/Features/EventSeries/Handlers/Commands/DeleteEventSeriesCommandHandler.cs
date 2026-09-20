@@ -5,11 +5,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSeries.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSeries.Handlers.Commands;
 
-public class DeleteEventSeriesCommandHandler : IRequestHandler<DeleteEventSeriesCommand, BaseCommandResponse<bool>>
+public class DeleteEventSeriesCommandHandler : ICommandHandler<DeleteEventSeriesCommand, BaseCommandResponse<bool>>
 {
     private readonly IEventSeriesRepository _eventSeriesRepository;
     private readonly ITenantContext _tenantContext;
@@ -25,7 +25,7 @@ public class DeleteEventSeriesCommandHandler : IRequestHandler<DeleteEventSeries
         _adminContext = adminContext;
     }
 
-    public async Task<BaseCommandResponse<bool>> Handle(DeleteEventSeriesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<bool>> ExecuteAsync(DeleteEventSeriesCommand request, CancellationToken cancellationToken)
     {
         Guid tenantId = _tenantContext.TenantId;
         Guid? userId = await _adminContext.ResolveUserIdAsync(cancellationToken);
@@ -38,7 +38,7 @@ public class DeleteEventSeriesCommandHandler : IRequestHandler<DeleteEventSeries
             throw new AuthorizationException(ResourceKinds.Tenant, AuthorizationActions.Delete);
         }
 
-        var series = await _eventSeriesRepository.GetById(request.Id);
+        var series = await _eventSeriesRepository.GetForUpdateAsync(request.Id, tenantId, cancellationToken);
         if (series == null)
         {
             return BaseCommandResponse.Validation<bool>(

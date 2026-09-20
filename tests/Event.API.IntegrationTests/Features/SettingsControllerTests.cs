@@ -3,11 +3,11 @@ using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
-using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
+using Explore.Application.Features.Settings.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -256,14 +256,14 @@ public class SettingsControllerAuthenticatedTests
     }
 
     [Test]
-    public async Task UpdateTenantSetting_Success_EvictsShellAfterMediatorSuccess()
+    public async Task UpdateTenantSetting_Success_EvictsShellAfterCommandSuccess()
     {
         var calls = new List<string>();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
-                calls.Add("mediator");
+                calls.Add("command");
                 return BaseCommandResponse.Success(Guid.Empty);
             });
         var store = Substitute.For<IOutputCacheStore>();
@@ -273,7 +273,7 @@ public class SettingsControllerAuthenticatedTests
                 calls.Add("evict");
                 return default;
             });
-        var controller = CreateSettingsController(mediator);
+        var controller = CreateSettingsController(update: handler);
 
         await controller.UpdateTenantSetting(
             "event_list.page_size",
@@ -281,18 +281,18 @@ public class SettingsControllerAuthenticatedTests
             store,
             CancellationToken.None);
 
-        await Assert.That(calls.SequenceEqual(["mediator", "evict"])).IsTrue();
+        await Assert.That(calls.SequenceEqual(["command", "evict"])).IsTrue();
         await store.Received(1).EvictByTagAsync("public-experience-shell", Arg.Any<CancellationToken>());
     }
 
     [Test]
     public async Task UpdateTenantSetting_Failure_DoesNotEvictShell()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Validation<Guid>(["failed"], "failed"));
         var store = Substitute.For<IOutputCacheStore>();
-        var controller = CreateSettingsController(mediator);
+        var controller = CreateSettingsController(update: handler);
 
         await controller.UpdateTenantSetting(
             "event_list.page_size",
@@ -306,15 +306,15 @@ public class SettingsControllerAuthenticatedTests
     [Test]
     public async Task UpdateTenantSettingsBatch_AppliedResult_EvictsShell()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
             .Returns(new BatchUpdateResponseDto
             {
                 Success = true,
                 Results = [new SettingUpdateResultDto { Key = "event_list.page_size", Applied = true }]
             });
         var store = Substitute.For<IOutputCacheStore>();
-        var controller = CreateSettingsController(mediator);
+        var controller = CreateSettingsController(batch: handler);
 
         await controller.UpdateTenantSettingsBatch(
             "EventList",
@@ -328,8 +328,8 @@ public class SettingsControllerAuthenticatedTests
     [Test]
     public async Task UpdateTenantSettingsBatch_Failure_DoesNotEvictShell()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
             .Returns(new BatchUpdateResponseDto
             {
                 Success = false,
@@ -337,7 +337,7 @@ public class SettingsControllerAuthenticatedTests
                 Results = [new SettingUpdateResultDto { Key = "event_list.page_size", Applied = false }]
             });
         var store = Substitute.For<IOutputCacheStore>();
-        var controller = CreateSettingsController(mediator);
+        var controller = CreateSettingsController(batch: handler);
 
         await controller.UpdateTenantSettingsBatch(
             "EventList",
@@ -361,11 +361,11 @@ public class SettingsControllerAuthenticatedTests
             }
         })
         {
-            var mediator = Substitute.For<IMediator>();
-            mediator.Send(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
+            var handler = Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>();
+            handler.ExecuteAsync(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
                 .Returns(batchResponse);
             var store = Substitute.For<IOutputCacheStore>();
-            var controller = CreateSettingsController(mediator);
+            var controller = CreateSettingsController(batch: handler);
 
             await controller.UpdateTenantSettingsBatch(
                 "EventList",
@@ -378,13 +378,13 @@ public class SettingsControllerAuthenticatedTests
     }
 
     [Test]
-    public async Task UpdateTenantSetting_CancellationBeforeMediatorCompletion_DoesNotEvictShell()
+    public async Task UpdateTenantSetting_CancellationBeforeCommandCompletion_DoesNotEvictShell()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BaseCommandResponse<Guid>>(new OperationCanceledException()));
         var store = Substitute.For<IOutputCacheStore>();
-        var controller = CreateSettingsController(mediator);
+        var controller = CreateSettingsController(update: handler);
 
         var cancelled = false;
         try
@@ -405,13 +405,13 @@ public class SettingsControllerAuthenticatedTests
     }
 
     [Test]
-    public async Task UpdateTenantSettingsBatch_CancellationBeforeMediatorCompletion_DoesNotEvictShell()
+    public async Task UpdateTenantSettingsBatch_CancellationBeforeCommandCompletion_DoesNotEvictShell()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingBatchCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BatchUpdateResponseDto>(new OperationCanceledException()));
         var store = Substitute.For<IOutputCacheStore>();
-        var controller = CreateSettingsController(mediator);
+        var controller = CreateSettingsController(batch: handler);
 
         var cancelled = false;
         try
@@ -431,10 +431,16 @@ public class SettingsControllerAuthenticatedTests
         await store.DidNotReceiveWithAnyArgs().EvictByTagAsync(default!, default);
     }
 
-    private static SettingsController CreateSettingsController(IMediator mediator) =>
-        new SettingsController(
-            mediator,
-            Substitute.For<IAdminContext>(),
+    private static TenantSettingsController CreateSettingsController(
+        ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>? update = null,
+        ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>? batch = null) =>
+        new TenantSettingsController(
+            Substitute.For<IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>>(),
+            update ?? Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>(),
+            batch ?? Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>(),
+            Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>>())
         {
             ControllerContext = new ControllerContext

@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.Create)]
 public sealed record CreateWebhookConsumerCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest, IWebhookOwnerScopedRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest, IWebhookOwnerScopedRequest
 {
     public Guid? OwnerId { get; init; }
 

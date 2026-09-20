@@ -13,7 +13,6 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;

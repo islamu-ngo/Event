@@ -4,6 +4,8 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Groups.Requests.Commands;
@@ -12,7 +14,6 @@ using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -59,16 +60,46 @@ public class GroupController : EventControllerBase
         "Group not found",
         "Group not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetGroupNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> _notificationPreferences;
+    private readonly ICommandHandler<UpdateGroupNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> _updateNotificationPreferences;
+    private readonly ICommandHandler<SetGroupNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> _setNotificationMute;
+    private readonly ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>> _createGroup;
+    private readonly ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>> _updateGroup;
+    private readonly ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>> _deleteGroup;
+    private readonly ICommandHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>> _updateApproval;
+    private readonly IQueryHandler<GetGroupDetailsRequest, GroupDto?> _groupDetails;
+    private readonly IQueryHandler<GetGroupListRequest, PaginatedResult<GroupListDto>> _groupList;
+    private readonly IQueryHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>> _myGroups;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<GroupDto, GroupListDto> _resourceAssembler;
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
 
     public GroupController(
-        IMediator mediator,
+        IQueryHandler<GetGroupNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> notificationPreferences,
+        ICommandHandler<UpdateGroupNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> updateNotificationPreferences,
+        ICommandHandler<SetGroupNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> setNotificationMute,
+        ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>> createGroup,
+        ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>> updateGroup,
+        ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>> deleteGroup,
+        ICommandHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>> updateApproval,
+        IQueryHandler<GetGroupDetailsRequest, GroupDto?> groupDetails,
+        IQueryHandler<GetGroupListRequest, PaginatedResult<GroupListDto>> groupList,
+        IQueryHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>> myGroups,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<GroupDto, GroupListDto> resourceAssembler,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler)
     {
-        _mediator = mediator;
+        _notificationPreferences = notificationPreferences;
+        _updateNotificationPreferences = updateNotificationPreferences;
+        _setNotificationMute = setNotificationMute;
+        _createGroup = createGroup;
+        _updateGroup = updateGroup;
+        _deleteGroup = deleteGroup;
+        _updateApproval = updateApproval;
+        _groupDetails = groupDetails;
+        _groupList = groupList;
+        _myGroups = myGroups;
+        _identityQuery = identityQuery;
         _resourceAssembler = resourceAssembler;
         _preferenceAssembler = preferenceAssembler;
     }
@@ -85,7 +116,7 @@ public class GroupController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetGroupListRequest
+        var result = await _groupList.QueryAsync(new GetGroupListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -118,7 +149,7 @@ public class GroupController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var result = await _mediator.Send(new GetMyGroupsRequest
+        var result = await _myGroups.QueryAsync(new GetMyGroupsRequest
         {
             UserId = userId,
             PageNumber = query.PageNumber,
@@ -144,7 +175,7 @@ public class GroupController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<GroupDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var group = await _mediator.Send(new GetGroupDetailsRequest { Id = id }, cancellationToken);
+        var group = await _groupDetails.QueryAsync(new GetGroupDetailsRequest { Id = id }, cancellationToken);
 
         if (group == null)
         {
@@ -167,7 +198,7 @@ public class GroupController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var matrix = await _mediator.Send(new GetGroupNotificationPreferenceMatrixQuery
+        var matrix = await _notificationPreferences.QueryAsync(new GetGroupNotificationPreferenceMatrixQuery
         {
             GroupId = id
         }, cancellationToken);
@@ -191,7 +222,7 @@ public class GroupController : EventControllerBase
         [FromBody] UpdateNotificationPreferenceMatrixDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateGroupNotificationPreferenceMatrixCommand
+        var response = await _updateNotificationPreferences.ExecuteAsync(new UpdateGroupNotificationPreferenceMatrixCommand
         {
             GroupId = id,
             Cells = request.Cells
@@ -220,7 +251,7 @@ public class GroupController : EventControllerBase
         [FromBody] SetNotificationPreferenceMuteDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SetGroupNotificationPreferenceMuteCommand
+        var response = await _setNotificationMute.ExecuteAsync(new SetGroupNotificationPreferenceMuteCommand
         {
             GroupId = id,
             IsMuted = request.IsMuted
@@ -245,14 +276,14 @@ public class GroupController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateGroupDto group, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await _mediator.Send(new CreateGroupCommand
+        var response = await _createGroup.ExecuteAsync(new CreateGroupCommand
         {
             GroupDto = group,
             CreatorUserId = userId.Value
@@ -305,7 +336,7 @@ public class GroupController : EventControllerBase
             UpdateGroupDto = updateDto
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateGroup.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -333,7 +364,7 @@ public class GroupController : EventControllerBase
         [FromBody] UpdateGroupApprovalStatusDto approvalStatus,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateGroupApprovalStatusCommand
+        var response = await _updateApproval.ExecuteAsync(new UpdateGroupApprovalStatusCommand
         {
             Id = id,
             GroupApprovalStatusDto = approvalStatus
@@ -362,7 +393,7 @@ public class GroupController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var response = await _mediator.Send(new DeleteGroupCommand
+        var response = await _deleteGroup.ExecuteAsync(new DeleteGroupCommand
         {
             Id = id,
             UserId = userId

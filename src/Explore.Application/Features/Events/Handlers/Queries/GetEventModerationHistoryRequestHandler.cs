@@ -1,18 +1,18 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public sealed class GetEventModerationHistoryRequestHandler(
     IEventRepository eventRepository,
     IEventModerationRecordRepository moderationRecordRepository)
-    : IRequestHandler<GetEventModerationHistoryRequest, IReadOnlyList<EventModerationHistoryDto>?>
+    : IQueryHandler<GetEventModerationHistoryRequest, IReadOnlyList<EventModerationHistoryDto>?>
 {
-    public async Task<IReadOnlyList<EventModerationHistoryDto>?> Handle(
+    public async Task<IReadOnlyList<EventModerationHistoryDto>?> QueryAsync(
         GetEventModerationHistoryRequest request,
         CancellationToken cancellationToken)
     {

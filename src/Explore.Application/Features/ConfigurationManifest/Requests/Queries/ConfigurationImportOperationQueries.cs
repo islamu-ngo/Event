@@ -4,14 +4,14 @@ using System.Collections.Immutable;
 using Explore.Application.Authorization;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 [AuthorizeResource(
     ResourceKinds.InstanceSetting,
     AuthorizationActions.InstanceSettings.View)]
 public sealed record GetInstanceConfigurationImportReceiptQuery(
     Guid OperationId)
-    : IRequest<ConfigurationImportOperationResult>, ISecureRequest
+    : IQuery<ConfigurationImportOperationResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateInstanceConfigurationImportSessionCommand.ResourceKey;
@@ -25,7 +25,7 @@ public sealed record GetInstanceConfigurationImportReceiptQuery(
 public sealed record GetTenantConfigurationImportReceiptQuery(
     Guid TenantId,
     Guid OperationId)
-    : IRequest<ConfigurationImportOperationResult>, ISecureRequest
+    : IQuery<ConfigurationImportOperationResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateTenantConfigurationImportSessionCommand.ResourceKey;
@@ -40,7 +40,7 @@ public sealed record GetTenantConfigurationImportReceiptQuery(
     AuthorizationActions.InstanceSettings.View)]
 public sealed record ListInstanceConfigurationImportHistoryQuery(
     int MaximumCount = 50)
-    : IRequest<ImmutableArray<ConfigurationImportOperationResult>>, ISecureRequest
+    : IQuery<ImmutableArray<ConfigurationImportOperationResult>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateInstanceConfigurationImportSessionCommand.ResourceKey;
@@ -54,7 +54,7 @@ public sealed record ListInstanceConfigurationImportHistoryQuery(
 public sealed record ListTenantConfigurationImportHistoryQuery(
     Guid TenantId,
     int MaximumCount = 50)
-    : IRequest<ImmutableArray<ConfigurationImportOperationResult>>, ISecureRequest
+    : IQuery<ImmutableArray<ConfigurationImportOperationResult>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateTenantConfigurationImportSessionCommand.ResourceKey;

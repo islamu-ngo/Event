@@ -282,7 +282,9 @@ operation ledger.
 Its handler resolves the caller's current exact provider binding and checks the
 uncached database platform-admin role, repeating authorization inside the
 primary-store serializable transaction. `AdminContext.ResolveUserIdAsync` does
-not cache provider-to-user mappings; role-profile caches remain separate.
+not cache provider-to-user mappings, including missing bindings that onboarding
+may create later in the same scope. Administrator role results are also uncached;
+only an individual authorization batch may reuse its immutable authority profile.
 The handler creates or verifies the receipt's exact global User, personal Actor
 and Local login through entity repositories, without matching email addresses
 or granting tenant membership or administrator roles.

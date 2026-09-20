@@ -1,6 +1,6 @@
 using Explore.API.Scheduling;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -20,11 +20,11 @@ public sealed class RegistrationFinalizationDrainJobTests
     [Test]
     public async Task ExecuteSendsTheSharedFencedDrainCommandFromAScopedSender()
     {
-        var sender = Substitute.For<ISender>();
-        sender.Send(Arg.Any<DrainRegistrationFinalizationEffectsCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<DrainRegistrationFinalizationEffectsCommand, int>>();
+        handler.ExecuteAsync(Arg.Any<DrainRegistrationFinalizationEffectsCommand>(), Arg.Any<CancellationToken>())
             .Returns(2);
         var services = new ServiceCollection();
-        services.AddScoped(_ => sender);
+        services.AddScoped(_ => handler);
         await using ServiceProvider provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
             ValidateOnBuild = true,
@@ -36,7 +36,7 @@ public sealed class RegistrationFinalizationDrainJobTests
 
         await job.Execute(CreateContext());
 
-        await sender.Received(1).Send(
+        await handler.Received(1).ExecuteAsync(
             Arg.Is<DrainRegistrationFinalizationEffectsCommand>(command =>
                 command.LeaseOwner == "registration-finalization-drain-job" &&
                 command.BatchSize == 100 && command.LeaseSeconds == 60),

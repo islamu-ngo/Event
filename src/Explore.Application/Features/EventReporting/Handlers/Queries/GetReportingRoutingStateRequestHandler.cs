@@ -1,18 +1,18 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
 
 public sealed class GetReportingRoutingStateRequestHandler(
     IReportingRoutingPolicyResolver routingPolicyResolver,
     ITenantContext tenantContext)
-    : IRequestHandler<GetReportingRoutingStateRequest, ReportingRoutingStateDto>
+    : IQueryHandler<GetReportingRoutingStateRequest, ReportingRoutingStateDto>
 {
-    public async Task<ReportingRoutingStateDto> Handle(
+    public async Task<ReportingRoutingStateDto> QueryAsync(
         GetReportingRoutingStateRequest request,
         CancellationToken cancellationToken)
     {

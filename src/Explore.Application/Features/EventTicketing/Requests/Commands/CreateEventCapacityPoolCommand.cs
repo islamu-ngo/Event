@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventTicketing.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageTickets)]
-public sealed record CreateEventCapacityPoolCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record CreateEventCapacityPoolCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public required ManageEventCapacityPoolDto CapacityPool { get; init; }

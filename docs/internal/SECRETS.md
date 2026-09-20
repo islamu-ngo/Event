@@ -260,7 +260,7 @@ Blazor client.
 | `ERASURE_DATABASE_RUNTIME_USERNAME`, `ERASURE_DATABASE_RUNTIME_PASSWORD` (flat `.env` or Infisical `/database/erasure`) | `Database:Erasure:Runtime:Username`, `Database:Erasure:Runtime:Password` | API only, and only for `ExternalDatabase` |
 | `ERASURE_DATABASE_MIGRATOR_USERNAME`, `ERASURE_DATABASE_MIGRATOR_PASSWORD` (flat `.env` or Infisical `/database/erasure`) | `Database:Erasure:Migrator:Username`, `Database:Erasure:Migrator:Password` | `Event.MigrationService` only |
 
-For `ExternalDatabase`, endpoint metadata uses the same `ERASURE_DATABASE_*` names in both authorities: `ERASURE_DATABASE_HOST`, `PORT`, `NAME`, `TLS_MODE`, and `TRUST_SERVER_CERTIFICATE` (or structured `PrivacyErasureAuthorityDatabase:*`); the provider is fixed to PostgreSQL. The `ERASURE_DATABASE_` prefix is mandatory inside `/database/erasure` because the `/database` folder is read recursively; an unprefixed `DATABASE_HOST` stored there would also be returned by the primary read and overwrite `Database:Host`. Use separate
+For `ExternalDatabase`, endpoint metadata uses the same `ERASURE_DATABASE_*` names in both authorities: `ERASURE_DATABASE_HOST`, `PORT`, `NAME`, `TLS_MODE`, and `TRUST_SERVER_CERTIFICATE` (or structured `PrivacyErasureAuthorityDatabase:*`); the provider is fixed to PostgreSQL. The `ERASURE_DATABASE_` prefix remains the supported contract inside `/database/erasure`. Recursive startup reads use each response item's actual `secretPath`, not the requested parent path. Child values remain in their own section and cannot publish primary database flat aliases, including when `/database/identity` is also requested explicitly. Missing or out-of-scope response provenance fails closed. Use separate
 roles: runtime receives only authority append/read/state/evaluate function
 execution and still has zero table or sequence access, while the migrator owns
 schema, lifecycle functions, grants, and destructive compaction execution. The
@@ -279,6 +279,33 @@ file with filesystem permissions. Its nonsecret deployment fields are
 There is one Infisical bootstrap schema: `SecretProvider:Provider=Infisical`
 selects the authority and `SecretProvider:Infisical:*` (projected from the documented
 `INFISICAL_*` deployment inputs, or in Development/Testing loaded from User Secrets) supplies secret-zero Universal Auth credentials.
+API composition projects the validated provider selection and the actual authenticated
+source's URL, project, client, credential, environment and requested paths into
+runtime `SecretProviderOptions`. Runtime binding does not silently append a root
+path or select a provider supplied by vault contents. Bootstrap credentials still
+come from the process environment in Production, not arbitrary merged configuration.
+Development/Testing additionally supports bootstrap configuration and shared User Secrets.
+
+### Configuration boundary upgrade
+
+API composition validates obsolete `PrivacyErasure:Durability:Mode` inputs before
+projecting either bootstrap configuration or the selected Environment, Infisical
+or development User Secrets authority. Its double-underscore form is also rejected.
+Operators must explicitly retain the intended supported topology through
+`ERASURE_DATABASE_TOPOLOGY` or `PrivacyErasure:Authority:Topology`; deleting an obsolete selector without choosing
+the intended authority is not a migration. Follow the existing privacy-erasure
+backup/restore/reset policy before intentionally changing topology. This repair
+performs no automatic authority migration or database schema change.
+
+The isolated Blazor Infisical provider admits only `/keycloak`, `/blazor` and
+`/atproto` roots and their frontend subpaths. Backend/root paths and database
+configuration keys (including `KEYCLOAK_DB_PASSWORD`) fail closed, even when placed
+in a frontend folder. Restrict the BFF machine identity independently of the API
+and provisioning identities. Supply database/container credentials only to their
+backend consumers; do not expose them through a BFF-readable folder. Nested
+secrets use their actual folder namespace rather than a global flat alias.
+This is provider admission enforcement, not a claim that process environment
+variables or a standalone host's shared backend configuration are scrubbed.
 
 For full local runs, keep `SECRET_PROVIDER=Environment` and leave `INFISICAL_*` blank
 so local structured `DATABASE_*`, Keycloak, Cerbos, and storage values remain

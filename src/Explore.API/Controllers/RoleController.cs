@@ -1,9 +1,9 @@
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Role;
 using Explore.Application.Features.Roles.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +15,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class RoleController(IMediator mediator) : ControllerBase
+public class RoleController(
+    IQueryHandler<GetRoleListRequest, List<RoleListDto>> getRoleListHandler,
+    IQueryHandler<GetRoleDetailsRequest, RoleDto?> getRoleDetailsHandler) : ControllerBase
 {
 
     // GET: api/role?roleScopeId=2
@@ -29,7 +31,7 @@ public class RoleController(IMediator mediator) : ControllerBase
         [FromQuery] int? roleScopeId = null,
         CancellationToken cancellationToken = default)
     {
-        var roles = await mediator.Send(new GetRoleListRequest { RoleScopeId = roleScopeId }, cancellationToken);
+        var roles = await getRoleListHandler.QueryAsync(new GetRoleListRequest { RoleScopeId = roleScopeId }, cancellationToken);
         return Ok(roles);
     }
 
@@ -43,7 +45,7 @@ public class RoleController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<RoleDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var role = await mediator.Send(new GetRoleDetailsRequest { Id = id }, cancellationToken);
+        var role = await getRoleDetailsHandler.QueryAsync(new GetRoleDetailsRequest { Id = id }, cancellationToken);
 
         return Ok(role);
     }

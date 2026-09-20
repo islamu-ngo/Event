@@ -281,7 +281,7 @@ public sealed class SubmitEventOrganizerClaimCommandHandlerTests
             tenantContext,
             currentUser);
 
-        return await handler.Handle(new SubmitEventOrganizerClaimCommand
+        return await handler.ExecuteAsync(new SubmitEventOrganizerClaimCommand
         {
             EventId = eventId,
             Claim = new SubmitEventOrganizerClaimDto

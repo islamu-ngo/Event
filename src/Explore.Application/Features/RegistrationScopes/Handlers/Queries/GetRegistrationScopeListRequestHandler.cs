@@ -1,25 +1,23 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationScope;
 using Explore.Application.Features.RegistrationScopes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationScopes.Handlers.Queries;
 
-public class GetRegistrationScopeListRequestHandler : IRequestHandler<GetRegistrationScopeListRequest, List<RegistrationScopeListDto>>
+public class GetRegistrationScopeListRequestHandler : IQueryHandler<GetRegistrationScopeListRequest, List<RegistrationScopeListDto>>
 {
     private readonly IRegistrationScopeRepository _registrationScopeRepository;
-    private readonly IMapper _mapper;
 
-    public GetRegistrationScopeListRequestHandler(IRegistrationScopeRepository registrationScopeRepository, IMapper mapper)
+    public GetRegistrationScopeListRequestHandler(IRegistrationScopeRepository registrationScopeRepository)
     {
         _registrationScopeRepository = registrationScopeRepository;
-        _mapper = mapper;
     }
 
-    public async Task<List<RegistrationScopeListDto>> Handle(GetRegistrationScopeListRequest request, CancellationToken cancellationToken)
+    public async Task<List<RegistrationScopeListDto>> QueryAsync(GetRegistrationScopeListRequest request, CancellationToken cancellationToken)
     {
         var registrationScopes = await _registrationScopeRepository.GetAll();
-        return _mapper.Map<List<RegistrationScopeListDto>>(registrationScopes);
+        return registrationScopes.Select(RegistrationMapper.ToListItem).ToList();
     }
 }

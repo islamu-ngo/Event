@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.PaidEventPolicies;
-using MediatR;
 
 namespace Explore.Application.Features.PaidEventPolicies.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
-public sealed record GetInstancePaidEventPolicyQuery : IRequest<PaidEventPolicyDto?>, ISecureRequest
+public sealed record GetInstancePaidEventPolicyQuery : IQuery<PaidEventPolicyDto?>, ISecureRequest
 {
     public const string SettingKey = "paid-event-policy";
 

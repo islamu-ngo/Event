@@ -1,20 +1,20 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetWebhookEndpointsQueryHandler(
     IWebhookEndpointRepository endpointRepository,
     IWebhookOwnershipScopeResolver ownershipScopeResolver)
-    : IRequestHandler<GetWebhookEndpointsQuery, IReadOnlyList<WebhookEndpointDto>>
+    : IQueryHandler<GetWebhookEndpointsQuery, IReadOnlyList<WebhookEndpointDto>>
 {
     private const int DefaultLimit = 100;
     private const int MaxLimit = 500;
 
-    public async Task<IReadOnlyList<WebhookEndpointDto>> Handle(
+    public async Task<IReadOnlyList<WebhookEndpointDto>> QueryAsync(
         GetWebhookEndpointsQuery request,
         CancellationToken cancellationToken)
     {

@@ -2,12 +2,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Handlers.Commands;
 
 public class RebuildSingleEventCustomPropertyProjectionCommandHandler
-    : IRequestHandler<RebuildSingleEventCustomPropertyProjectionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RebuildSingleEventCustomPropertyProjectionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
     private readonly IUnitOfWork _unitOfWork;
@@ -20,7 +20,7 @@ public class RebuildSingleEventCustomPropertyProjectionCommandHandler
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         RebuildSingleEventCustomPropertyProjectionCommand request,
         CancellationToken cancellationToken)
     {

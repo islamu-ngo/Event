@@ -1,12 +1,12 @@
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
@@ -14,10 +14,11 @@ public sealed class CreateLocalIdentityCommandHandler(
     IAdminContext adminContext,
     IPlatformUserRoleRepository platformUserRoles,
     ILocalCredentialAdministration credentialAdministration,
-    ISender sender) : IRequestHandler<CreateLocalIdentityCommand, LocalCredentialIssueCommandResponse>
+    ICommandHandler<ReconcileLocalCredentialOperationCommand, BaseCommandResponse<Guid>> reconcileHandler)
+    : ICommandHandler<CreateLocalIdentityCommand, LocalCredentialIssueCommandResponse>
 {
-    public async Task<LocalCredentialIssueCommandResponse> Handle(
-        CreateLocalIdentityCommand request, CancellationToken cancellationToken)
+    public async Task<LocalCredentialIssueCommandResponse> ExecuteAsync(
+        CreateLocalIdentityCommand request, CancellationToken cancellationToken = default)
     {
         Guid? actor = await LocalCredentialAdministrator.ResolveAsync(
             adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)
@@ -64,7 +65,7 @@ public sealed class CreateLocalIdentityCommandHandler(
                 {
                     return LocalCredentialIssueCommandResponse.Failure(BaseCommandResponse.Authorization<Guid>());
                 }
-                BaseCommandResponse<Guid> reconciliation = await sender.Send(
+                BaseCommandResponse<Guid> reconciliation = await reconcileHandler.ExecuteAsync(
                     new ReconcileLocalCredentialOperationCommand(operationId: request.OperationId), cancellationToken)
                     .ConfigureAwait(false);
                 if (!reconciliation.IsSuccess)

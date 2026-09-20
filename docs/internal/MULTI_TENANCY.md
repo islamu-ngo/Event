@@ -245,6 +245,49 @@ Even in a tenant-centric platform, Instance Branding (`GovernanceSettingKeys.Bra
   * When provisioning additional tenancies (2nd, 3rd, etc.), the tenant creation flow initializes `BrandingSettings.DisplayName` from the provided tenant name (e.g., `"Dallas Muslim Center"`).
   * If white-labeling is permitted (`Tenants.WhiteLabelingEnabled = true`), tenant administrators can independently manage their display name, logo, favicon, and custom stylesheet.
 
+### Concurrent Initial Branding Provisioning
+
+The authenticated branding GET invokes `EnsureTenantBrandingSettingsDocumentCommand`.
+`TenantBrandingSettingsDocumentProvisioningService` retains its explicit-name
+update behavior when its initial read finds an existing document. If that read
+misses, `ITenantSettingsDocumentRepository.CreateIfMissingAsync` inserts the
+candidate or returns the exact tenant/document-key winner unchanged, including
+its revision. It never converts a raced insert into an update.
+
+Persistence recognizes only the model-derived unique `(TenantId, DocumentKey)`
+constraint through the existing relational conflict classifier. Without a
+caller transaction, EF owns the insert transaction. Inside a caller transaction,
+an explicit savepoint fences the attempt: recovery rolls back that savepoint,
+detaches only the candidate, and retains the owner's prior writes and other
+tracked changes. It neither commits nor rolls back the owner's transaction.
+A provider can nevertheless abort the entire transaction and remove its savepoints.
+If savepoint rollback fails, the candidate is still detached, winner recovery is
+forbidden, and the original failure escapes. A release failure cannot mask an
+active failure or make a recovered insert appear successful. Secondary cleanup
+exceptions are retained on that original exception in `Exception.Data` under
+`TenantSettingsDocument.SavepointRollbackFailure` and
+`TenantSettingsDocument.SavepointReleaseFailure`; callers can inspect both
+without losing the original exception type, inner provider code, stack, or
+cancellation token. A release failure after a successful insert remains an error
+in its own right. The owner's existing whole-transaction retry policy is unchanged;
+cleanup does not imply that a provider-aborted transaction is usable.
+
+Cancellation and unrelated failures escape after cleanup. A repeatable-read or
+serializable snapshot that cannot see the winning row must be rolled back and
+retried by its transaction owner; recovery never silently switches snapshots.
+
+The service invalidates the typed tenant-document cache after a successful
+insert or winner read; recovery publishes no candidate to the cache. Missing
+tenants still fail the foreign-key constraint. Tenant creation, onboarding,
+managed provisioning, and governance updates retain their existing transaction
+owners. Canonical SQLite HTTP tests cover two successful concurrent initial
+reads; PostgreSQL tests cover distinct proposed names, cache convergence,
+savepoint recovery, owner commit/rollback, snapshot retry, cancellation, and
+unrelated constraints. Deterministic SQLite transaction interceptors cover
+rollback/release failures, candidate detachment, blocked winner recovery, and
+preservation of retry-recognizable provider errors and cancellation. These
+injected boundary failures do not constitute a reproduced live MySQL deadlock.
+
 ### 3. Cosmetic Branding Fallback
 In multi-tenant mode, resolving `BrandDisplayName` may fall back to the instance
 name (and ultimately `"ISLAMU"`) if a tenant's cosmetic display name is

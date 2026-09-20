@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
@@ -6,34 +6,31 @@ using Explore.Application.Features.Groups.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Groups.Handlers.Queries;
 
-public class GetMyGroupsRequestHandler : IRequestHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>>
+public class GetMyGroupsRequestHandler : IQueryHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupMemberRepository _groupMemberRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetMyGroupsRequestHandler> _logger;
 
     public GetMyGroupsRequestHandler(
         IGroupRepository groupRepository,
         IGroupMemberRepository groupMemberRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetMyGroupsRequestHandler> logger)
     {
         _groupRepository = groupRepository;
         _groupMemberRepository = groupMemberRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<GroupListDto>> Handle(GetMyGroupsRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<GroupListDto>> QueryAsync(GetMyGroupsRequest request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(request.UserId, out Guid userGuid))
         {
@@ -48,7 +45,7 @@ public class GetMyGroupsRequestHandler : IRequestHandler<GetMyGroupsRequest, Pag
         var dtos = new List<GroupListDto>();
         foreach (var group in groups)
         {
-            var dto = _mapper.Map<GroupListDto>(group);
+            var dto = OrganizationMapper.ToGroupListItem(group);
             if (membershipDict.TryGetValue(group.Id, out var roleId))
             {
                 dto.CurrentUserRoleId = roleId;

@@ -2,10 +2,10 @@ using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
@@ -13,9 +13,9 @@ public sealed class GetAttendeeEventCalendarExportRequestHandler(
     IEventRepository eventRepository,
     IEventSessionRepository eventSessionRepository,
     IEventLocationDisclosureService eventLocationDisclosureService)
-    : IRequestHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?>
+    : IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?>
 {
-    public async Task<AttendeeEventCalendarExportDto?> Handle(
+    public async Task<AttendeeEventCalendarExportDto?> QueryAsync(
         GetAttendeeEventCalendarExportRequest request,
         CancellationToken cancellationToken)
     {

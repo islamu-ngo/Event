@@ -1,4 +1,5 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession.Validators;
@@ -14,7 +15,6 @@ using Explore.Domain.Enums;
 using Explore.Domain.Services.Lifecycle;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
@@ -31,13 +31,13 @@ public sealed class ScheduleEventSessionCommandHandler(
     NotificationFanoutOccurrenceCoordinator fanoutCoordinator,
     IEventLifecycleScheduler eventLifecycleScheduler,
     TimeProvider timeProvider,
-    ISettingMutationLock mutationLock) : IRequestHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>>
+    ISettingMutationLock mutationLock) : ICommandHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private const string ConcurrencyConflictCode = "event_session_schedule_concurrency_conflict";
     private const string ReadinessFailedCode = "event_session_schedule_readiness_failed";
     private const string InvalidStatusFailureCode = "event_session_schedule_invalid_status";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(ScheduleEventSessionCommand command, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ScheduleEventSessionCommand command, CancellationToken cancellationToken)
     {
         var validator = new ScheduleEventSessionRequestDtoValidator();
         var validationResult = await validator.ValidateAsync(command.Request, cancellationToken);

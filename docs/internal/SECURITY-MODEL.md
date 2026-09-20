@@ -364,6 +364,10 @@ Every accepted moderation request invalidates Event list, detail, and discovery 
 
 Legitimacy evidence belongs to `OrganizationTenant`, never the global Organization or Actor. An organization administrator can reserve and upload only an `application/pdf` private-owner Document through the organization-specific BFF session route. The server binds the upload session to the ambient tenant and exact pending participation; the browser supplies only the global Organization ID and file metadata, never a participation ID, storage owner ID, provider, object key, or destination.
 
+For OrganizationTenant-bound finalization, `AuthorizationResourceContextResolver` loads `StorageUploadFinalizationFacts` from the exact tenant-local persisted session, without tracking it or accepting caller-declared ownership or upload metadata. Non-OrganizationTenant reservations instead retain the existing collection-fact contract, using the stored tenant rather than a caller override: their image, document, attachment and system-asset finalization remains governed by the selected provider's existing create policy. This does not add generic local create/finalization authority. The local single and batch evaluators allow only the reservation's stored user, exact session ID, and private OrganizationTenant PDF Document metadata. Finalization is reservation-owner authority, not a new OrgAdmin grant check: losing that role after reservation does not by itself revoke the session. The handler still re-reads under its transaction and enforces user/tenant ownership, state, expiry, content, quota and privacy-erasure fences; finalized retries do not write bytes again. Provider object keys, display names and destinations are not included in these authorization facts. The selected provider remains authoritative: instance and BYO Cerbos explicitly deny unsupported typed OrganizationTenant reservation/finalization facts before gRPC. Runtime BYO transport and configuration-resolution failure paths exclude those unsupported checks from local safe-mode fallback, even for an instance-administrator owner. Unrelated safe-mode exceptions remain unchanged.
+
+Exact content downloads (`GetStorageObjectContentRequest`, including the manual registration-provider import consumer) resolve `PersistedStorageObjectAuthorizationFacts` through a cancellation-aware, explicitly tenant-bound, untracked authorization query. This snapshot does not populate EF's identity map: the byte reader performs its separate lookup after the awaited policy decision, so quarantine, deletion, visibility restriction or creator erasure committed while that decision is pending is observed before provider access. Request-authored collection, tenant, owner, visibility or resource overrides cannot replace that lookup. The selected provider still decides download policy, and `StorageObjectContentReader` retains its independent visibility, lifecycle, registration-retention and quarantine checks. PrivateOwner bytes require the persisted creator; losing OrgAdmin does not revoke that ownership, while a tenant-reviewer policy grant alone does not override it. Safe raster/public rules, attachment disposition and sanitized filenames remain unchanged across other storage purposes. BYO transport/configuration failure evaluates supported exact downloads using only their persisted tenant as the prior collection-fact contract did; newly resolved creator/visibility facts cannot grant outage-only access. Instance-admin ownership alone is not a tenant-administrator grant. Unrelated emergency exceptions and the prior tenant-authority check remain intact, while unsupported finalization facts continue to be denied outright.
+
 Submission accepts only a finalized active private Document with the exact tenant, participation owner kind, participation owner ID, purpose, file type, and content type. Evidence rows use composite tenant foreign keys and retain the document against storage update, deletion, and orphan reconciliation. Tenant administrators review evidence separately; an evidence approval never mutates or auto-approves the participation.
 
 Evidence API and HAL representations expose bounded document display metadata, review state, timestamps, and concurrency only. Protected document download and review actions exist only as authorized HAL links. Provider keys, object URIs, reviewer identity, tenant IDs, participation IDs, and document content are excluded from DTOs, logs, metrics, ProblemDetails, OpenAPI browser inputs, and generated clients.
@@ -685,18 +689,19 @@ Forwarded-host trust for direct API traffic:
 Server-side enforcement is layered:
 
 1. API endpoint-level attributes (`[AllowAnonymous]`, `[Authorize]`).
-2. Application MediatR pipeline `AuthorizationBehavior`:
-   - Checks `IAuthorizedRequest` interface — commands/queries declare required permissions.
-   - Checks `[AuthorizeResource]` attribute — declarative resource-level authorization.
-   - Optionally enhanced by `ISecureRequest` — provides dynamic resource context for fine-grained permission evaluation.
+2. Application `RequestAuthorization<TRequest>`, shared by native operation authorization decorators and the remaining MediatR `AuthorizationBehavior`:
+   - Checks `[AuthorizeResource]` for the fixed catalog resource/action; there is no `IAuthorizedRequest` contract.
+   - Resolves `ISecureRequest` typed facts, then optional typed enrichment, then authoritative persisted-resource overrides.
+   - Native void commands, result commands and queries all resolve behind authorization, outside performance timing. Existing exact public, capability and worker authorities remain owner-enforced.
 3. Runtime provider (`RuntimeAuthorizationProvider`) deciding Cerbos vs fallback.
 
 See [AUTHORIZATION.md](AUTHORIZATION.md) for the full provider model, request patterns, and role boundary details.
 
 Hard deny behavior:
 
-- `AuthorizationBehavior` throws `AuthorizationException` on deny.
-- API global exception handler returns HTTP `403 Forbidden` via RFC 7807 ProblemDetails.
+- The shared evaluator throws `AuthorizationException` on ordinary denial and `AuthorizationProviderUnavailableException` on provider unavailability; no protected business operation executes in either case.
+- API exception handling retains distinct forbidden and unavailable RFC 7807 responses.
+- Final native DI descriptors reject raw replacements. Scope-local construction guards reject native reentry through opaque aliases with bounded type-only errors and `finally` cleanup. Production preflight checks metadata without running operations; CI resolves complete native graphs in disposable scopes. See [native composition](ARCHITECTURE.md#protected-native-operations).
 
 Paid-event publication repeats its policy, organizer, connection, currency, disclosure, and commerce-authority checks in the server-side publish transaction; browser preflight is advisory UI state only. The organizer payment connection and policy reads are authenticated `private, no-store` resources. Browser policy responses omit policy and tenant identifiers. Browser-visible connection state is limited to status, merchant country, charge-capability state, requirements state, supported currencies, and readiness timestamp. It must not contain provider, platform, account, tenant, actor, connection, lineage, or evidence identifiers. Hosted onboarding exposes only an absolute HTTP(S) URL and whether an existing connection was reused; return and refresh redirects never assert readiness.
 
@@ -851,9 +856,10 @@ Notes:
 - `internal_user_id` is a BFF-enriched local-user claim added after external identity resolution. It is the
   **last** link in the chain, not a separate one: the provider claims come first because for platform-managed
   accounts the provider subject *is* the local user id, which keeps a single identifier authoritative.
-- When the subject is not a GUID at all (ATProto DIDs, Google subjects), the chain yields `null`. Resolve the
-  linked local account with `IMediator.ResolveCurrentUserIdAsync(principal, ct)` rather than reading a different
-  claim — a `null` result is an authentication outcome to map, not a reason to fall back elsewhere.
+- Resolve provider-linked accounts with `identityQuery.ResolveCurrentUserIdAsync(principal, ct)`, injecting
+  `IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>`. A reconstructed provider identity takes
+  precedence over GUID/internal-user claims. An unlinked account returns `null` without email fallback;
+  this remains identity resolution, not a new PDP capability.
 - Purpose-bound schemes (API key, setup secret, managed control plane, ATProto session, privacy-erasure receipt)
   validate their own claims at the authentication boundary and deliberately do **not** route through this chain.
 - A few BFF-only helpers stop at `sub` -> `ClaimTypes.NameIdentifier` where the server-authenticated session is

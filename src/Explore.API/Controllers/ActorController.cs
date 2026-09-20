@@ -11,7 +11,7 @@ using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -45,14 +45,29 @@ public class ActorController : ControllerBase
         "Global actor moderation validation failed",
         "Global actor moderation failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetActorListRequest, PaginatedResult<ActorListDto>> _getActorList;
+    private readonly IQueryHandler<GetActorDetailsRequest, ActorDto?> _getActorDetails;
+    private readonly IQueryHandler<GetActorByDidRequest, ActorDto?> _getActorByDid;
+    private readonly IQueryHandler<GetActorsByTenantRequest, List<ActorListDto>> _getActorsByTenant;
+    private readonly ICommandHandler<ModerateActorCommand, BaseCommandResponse<Guid>> _moderateActor;
+    private readonly ICommandHandler<ModerateAtprotoIdentityCommand, BaseCommandResponse<Guid>> _moderateAtprotoIdentity;
     private readonly IResourceAssembler<ActorDto, ActorListDto> _resourceAssembler;
 
     public ActorController(
-        IMediator mediator,
+        IQueryHandler<GetActorListRequest, PaginatedResult<ActorListDto>> getActorList,
+        IQueryHandler<GetActorDetailsRequest, ActorDto?> getActorDetails,
+        IQueryHandler<GetActorByDidRequest, ActorDto?> getActorByDid,
+        IQueryHandler<GetActorsByTenantRequest, List<ActorListDto>> getActorsByTenant,
+        ICommandHandler<ModerateActorCommand, BaseCommandResponse<Guid>> moderateActor,
+        ICommandHandler<ModerateAtprotoIdentityCommand, BaseCommandResponse<Guid>> moderateAtprotoIdentity,
         IResourceAssembler<ActorDto, ActorListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _getActorList = getActorList;
+        _getActorDetails = getActorDetails;
+        _getActorByDid = getActorByDid;
+        _getActorsByTenant = getActorsByTenant;
+        _moderateActor = moderateActor;
+        _moderateAtprotoIdentity = moderateAtprotoIdentity;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -73,7 +88,7 @@ public class ActorController : ControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetActorListRequest
+        var result = await _getActorList.QueryAsync(new GetActorListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -101,7 +116,7 @@ public class ActorController : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<ActorDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var actor = await _mediator.Send(new GetActorDetailsRequest { Id = id }, cancellationToken);
+        var actor = await _getActorDetails.QueryAsync(new GetActorDetailsRequest { Id = id }, cancellationToken);
         if (actor == null)
         {
             return this.ToNotFoundProblem(ActorNotFoundProblem);
@@ -129,7 +144,7 @@ public class ActorController : ControllerBase
         }
 
         // GetActorByDidRequest remains scalar until its Application-owned Task 5.5 boundary migration.
-        var actor = await _mediator.Send(new GetActorByDidRequest { Did = actorDid.Value }, cancellationToken);
+        var actor = await _getActorByDid.QueryAsync(new GetActorByDidRequest { Did = actorDid.Value }, cancellationToken);
         if (actor == null)
         {
             return this.ToNotFoundProblem(ActorNotFoundProblem);
@@ -154,7 +169,7 @@ public class ActorController : ControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var actors = await _mediator.Send(new GetActorsByTenantRequest
+        var actors = await _getActorsByTenant.QueryAsync(new GetActorsByTenantRequest
         {
             TenantId = tenantId,
             PageNumber = query.PageNumber,
@@ -181,7 +196,7 @@ public class ActorController : ControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var actor = await _mediator.Send(new GetActorDetailsRequest
+        var actor = await _getActorDetails.QueryAsync(new GetActorDetailsRequest
         {
             Id = id,
             TenantId = tenantId
@@ -292,7 +307,7 @@ public class ActorController : ControllerBase
         GlobalModerationRequestDto request,
         CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new ModerateActorCommand
+        var response = await _moderateActor.ExecuteAsync(new ModerateActorCommand
         {
             ActorId = actorId,
             Moderation = new GlobalModerationRequest
@@ -311,7 +326,7 @@ public class ActorController : ControllerBase
         GlobalModerationRequestDto request,
         CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(new ModerateAtprotoIdentityCommand
+        var response = await _moderateAtprotoIdentity.ExecuteAsync(new ModerateAtprotoIdentityCommand
         {
             AtprotoIdentityId = identityId,
             Moderation = new GlobalModerationRequest

@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.CustomPropertyProjection, AuthorizationActions.Update)]
-public sealed record RebuildEventSessionCustomPropertyProjectionCommand : IRequest<BaseCommandResponse<RebuildProjectionResponseDto>>, ISecureRequest
+public sealed record RebuildEventSessionCustomPropertyProjectionCommand : ICommand<BaseCommandResponse<RebuildProjectionResponseDto>>, ISecureRequest
 {
     public required RebuildProjectionRequestDto RequestDto { get; init; }
 

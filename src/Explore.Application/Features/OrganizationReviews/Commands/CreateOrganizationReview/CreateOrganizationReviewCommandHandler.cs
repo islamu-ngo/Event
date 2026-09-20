@@ -1,29 +1,36 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationReview;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationReviews.Commands.CreateOrganizationReview;
 
-public class CreateOrganizationReviewCommandHandler : IRequestHandler<CreateOrganizationReviewCommand, BaseCommandResponse<Guid>>
+public class CreateOrganizationReviewCommandHandler : ICommandHandler<CreateOrganizationReviewCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationReviewRepository _organizationReviewRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
-    public CreateOrganizationReviewCommandHandler(IOrganizationReviewRepository organizationReviewRepository, ITenantContext tenantContext, IMapper mapper)
+    public CreateOrganizationReviewCommandHandler(IOrganizationReviewRepository organizationReviewRepository, ITenantContext tenantContext)
     {
         _organizationReviewRepository = organizationReviewRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateOrganizationReviewCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateOrganizationReviewCommand request, CancellationToken cancellationToken)
     {
-        var organizationReview = _mapper.Map<OrganizationReview>(request.CreateOrganizationReviewDto);
+        var organizationReview = new OrganizationReview
+        {
+            OrganizationId = request.CreateOrganizationReviewDto.OrganizationId,
+            Organization = null!,
+            EventId = request.CreateOrganizationReviewDto.ProgramId,
+            Event = null!,
+            ReviewerName = request.CreateOrganizationReviewDto.ReviewerName,
+            Rating = request.CreateOrganizationReviewDto.Rating,
+            Comment = request.CreateOrganizationReviewDto.Comment,
+            Tenant = null!
+        };
 
         organizationReview.UserId = request.ReviewerUserId;
         organizationReview.CreatedAt = DateTime.UtcNow;

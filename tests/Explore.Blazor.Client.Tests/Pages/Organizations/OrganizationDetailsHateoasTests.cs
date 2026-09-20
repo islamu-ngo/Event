@@ -44,7 +44,6 @@ public class OrganizationDetailsHateoasTests : IDisposable
             .Returns(CreateOrganization(withEditLink: true));
 
         var cut = _ctx.RenderMudComponent<OrganizationDetails>();
-        cut.WaitForState(() => !cut.Markup.Contains("Loading", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         await Assert.That(cut.Markup).Contains("Create Event");
         await Assert.That(cut.Markup).Contains("Members");
@@ -58,7 +57,6 @@ public class OrganizationDetailsHateoasTests : IDisposable
             .Returns(CreateOrganization(withEditLink: false));
 
         var cut = _ctx.RenderMudComponent<OrganizationDetails>();
-        cut.WaitForState(() => !cut.Markup.Contains("Loading", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         await Assert.That(cut.Markup.Contains("Create Event", StringComparison.Ordinal)).IsFalse();
         await Assert.That(cut.Markup.Contains("Members", StringComparison.Ordinal)).IsFalse();
@@ -72,7 +70,6 @@ public class OrganizationDetailsHateoasTests : IDisposable
             .Returns(CreateOrganization(withEditLink: true));
 
         var cut = _ctx.RenderMudComponent<OrganizationDetails>();
-        cut.WaitForState(() => !cut.Markup.Contains("Loading", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         await _organizationMemberService.DidNotReceiveWithAnyArgs().GetMembersAsync(default);
     }
@@ -132,18 +129,39 @@ public class OrganizationDetailsHateoasTests : IDisposable
         await Assert.That(cut.Markup).DoesNotContain("<script>");
     }
 
-    private static OrganizationDto CreateOrganization(bool withEditLink)
+    [Test]
+    public async Task MissingProfile_RendersAndInitializesBlankEditFields()
+    {
+        _organizationService.GetOrganizationByIdAsync(Arg.Any<Guid>())
+            .Returns(CreateOrganization(withEditLink: true, missingProfile: true));
+
+        var cut = _ctx.RenderMudComponent<OrganizationDetails>();
+        var model = GetField(cut.Instance, "editModel");
+
+        await Assert.That(cut.FindComponent<MudAvatar>()).IsNotNull();
+        foreach (var field in new[] { "FullName", "Email", "Country", "City", "Address" })
+        {
+            await Assert.That(model.GetType().GetProperty(field)!.GetValue(model))
+                .IsEqualTo(string.Empty);
+        }
+        await Assert.That(cut.FindComponents<MudButton>().Any(button => button.Instance.StartIcon == Icons.Material.Filled.Edit)).IsTrue();
+        InvokePrivate(cut.Instance, "ToggleEditMode");
+        cut.Render();
+        await Assert.That(cut.Find("form")).IsNotNull();
+    }
+
+    private static OrganizationDto CreateOrganization(bool withEditLink, bool missingProfile = false)
     {
         var dto = new OrganizationDto
         {
             Id = Guid.NewGuid(),
-            FullName = "Test Organization",
-            Email = "test@example.com",
+            FullName = missingProfile ? null : "Test Organization",
+            Email = missingProfile ? null : "test@example.com",
             WebsiteUrl = "https://example.org",
-            Address = "1 Main Street",
+            Address = missingProfile ? null : "1 Main Street",
             Postcode = "12345",
-            City = "Brussels",
-            Country = "Belgium",
+            City = missingProfile ? null : "Brussels",
+            Country = missingProfile ? null : "Belgium",
             ApprovalStatusId = 2,
             ApprovalStatusFullName = "Approved",
             ConcurrencyStamp = Guid.NewGuid(),
@@ -166,7 +184,6 @@ public class OrganizationDetailsHateoasTests : IDisposable
             .Returns(CreateOrganization(withEditLink: true));
 
         var cut = _ctx.RenderMudComponent<OrganizationDetails>();
-        cut.WaitForState(() => !cut.Markup.Contains("Loading", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
         InvokePrivate(cut.Instance, "ToggleEditMode");
         cut.Render();
 

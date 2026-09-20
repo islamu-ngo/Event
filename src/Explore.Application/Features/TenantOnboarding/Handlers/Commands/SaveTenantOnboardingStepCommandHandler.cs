@@ -3,16 +3,16 @@ using System.Text.Json;
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.TenantOnboarding.Handlers.Commands;
 
-public class SaveTenantOnboardingStepCommandHandler : IRequestHandler<SaveTenantOnboardingStepCommand, BaseCommandResponse<Guid>>
+public class SaveTenantOnboardingStepCommandHandler : ICommandHandler<SaveTenantOnboardingStepCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly ITenantOnboardingStateRepository _tenantOnboardingStateRepository;
@@ -37,7 +37,7 @@ public class SaveTenantOnboardingStepCommandHandler : IRequestHandler<SaveTenant
         _adminContext = adminContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SaveTenantOnboardingStepCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SaveTenantOnboardingStepCommand request, CancellationToken cancellationToken = default)
     {
         var tenantId = _tenantContext.TenantId;
 

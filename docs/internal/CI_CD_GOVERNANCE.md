@@ -391,11 +391,13 @@ Fast CI runs `dotnet list Explore.sln package --vulnerable --include-transitive 
 
 The current policy is remediation-first. `MailKit` was upgraded from `4.15.1` to `4.16.0` to clear GitHub Advisory `GHSA-9j88-vvj5-vhgr` / `CVE-2026-41319` rather than making the audit advisory.
 
-The one approved advisory suppression is deliberately exact and remains visible in retained CI evidence:
+There are no approved advisory suppressions in the current validator. The former
+AutoMapper exception was retired with the package; recurrence of that advisory
+fails the audit rather than relying on a runtime mapping-depth mitigation.
 
-| Owner / review date | Package / relationship | Advisory / severity | Compensating control | Removal condition |
-|---|---|---|---|---|
-| ISLAMU maintainers / 2026-07-17 | `AutoMapper` `14.0.0`, direct and transitive | `GHSA-rvv3-g6hj-g44x` / High | `ApplicationServicesRegistration` applies `MaxDepth(64)` globally, bounding the advisory's uncontrolled-recursion path; production commercial builds use patched `16.1.1`. | Remove when AutoMapper is replaced, the default build moves to a patched version with approved licensing, or the advisory no longer applies. |
+All builds use one dependency graph. CI and both API/Blazor Docker build stages
+require locked restore; there is no commercial-edition restore bypass. See
+[IP Governance](legal/IP_GOVERNANCE.md#single-edition-dependency-policy).
 
 ### Dependency License Policy
 
@@ -440,8 +442,6 @@ Current visible exceptions are intentional debt, not blanket approvals:
 
 | Package | Risk | Removal condition |
 |---|---|---|
-| `AutoMapper` | Runtime dependency with RPL-1.5 metadata. | Replace, remove, or obtain legal approval before alternative-license distribution. |
-| `MediatR` | Runtime dependency with RPL-1.5 metadata. | Replace, remove, or obtain legal approval before alternative-license distribution. |
 | `SonarAnalyzer.CSharp` | Source-available analyzer license. | Keep analyzer/build-only or replace before treating as shipped runtime dependency. |
 | `Microsoft.VisualStudio.Azure.Containers.Tools.Targets` | Microsoft EULA build tooling. | Keep build-only or replace before treating as shipped runtime dependency. |
 | `NetArchTest.Rules` | Missing NuGet license metadata. | Replace or document package metadata before removing the exception. |

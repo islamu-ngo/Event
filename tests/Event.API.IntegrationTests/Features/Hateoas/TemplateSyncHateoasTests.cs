@@ -6,19 +6,28 @@ using Explore.API.Hateoas.Resources;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTemplate;
+using Explore.Application.Features.EventSessionTemplates.Requests.Queries;
+using Explore.Application.Features.EventSessionTemplateSync.Commands.ApplyEventSessionTemplateSync;
 using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;
+using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateSyncHistory;
+using Explore.Application.Features.EventTemplateSync.Commands.ApplyEventTemplateSync;
 using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDiff;
+using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
 using EventTemplateDiffDto = Explore.Application.DTOs.EventTemplateSync.TemplateDiffDto;
+using EventTemplateSyncOutcomeDto = Explore.Application.DTOs.EventTemplateSync.TemplateSyncOutcomeDto;
+using EventTemplateSyncHistoryItemDto = Explore.Application.DTOs.EventTemplateSync.EventTemplateSyncHistoryItemDto;
 using SessionTemplateDiffDto = Explore.Application.DTOs.EventSessionTemplateSync.TemplateDiffDto;
+using SessionTemplateSyncOutcomeDto = Explore.Application.DTOs.EventSessionTemplateSync.TemplateSyncOutcomeDto;
+using SessionTemplateSyncHistoryItemDto = Explore.Application.DTOs.EventSessionTemplateSync.EventSessionTemplateSyncHistoryItemDto;
 
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
@@ -150,19 +159,19 @@ public sealed class TemplateSyncHateoasTests
     public async Task EventTemplateSyncController_GetDiff_MaterializesOnlyAuthorizedLinks()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
+        var getDiffHandler = Substitute.For<IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>>>();
         var authorizationEvaluator = Substitute.For<IHateoasAuthorizationEvaluator>();
         var linkGenerator = Substitute.For<IHateoasLinkGenerator>();
         var linkPolicy = Substitute.For<ILinkPolicy<EventTemplateSyncResource>>();
         var definitions = CreateManualDefinitions();
-        mediator.Send(Arg.Is<GetEventTemplateDiffQuery>(query => query.EventId == eventId), Arg.Any<CancellationToken>())
+        getDiffHandler.QueryAsync(Arg.Is<GetEventTemplateDiffQuery>(query => query.EventId == eventId), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(BaseCommandResponse.Success(CreateEventTemplateDiff())));
         linkPolicy.GetLinks(Arg.Any<EventTemplateSyncResource>(), Arg.Any<ClaimsPrincipal?>()).Returns(definitions);
         authorizationEvaluator.AreLinksAllowedAsync(Arg.Is<IReadOnlyList<LinkDefinition>>(links => LinksMatchManualDefinitions(links)), Arg.Any<ClaimsPrincipal?>(), Arg.Any<HttpContext>())
             .Returns(Task.FromResult<IReadOnlyList<bool>>([true, false, true]));
         linkGenerator.GenerateLink(Arg.Any<LinkDefinition>(), Arg.Any<HttpContext>())
             .Returns(call => new HalLink { Href = $"/{call.Arg<LinkDefinition>().Rel}" });
-        var controller = CreateEventTemplateController(mediator, authorizationEvaluator, linkGenerator, linkPolicy);
+        var controller = CreateEventTemplateController(getDiffHandler, authorizationEvaluator, linkGenerator, linkPolicy);
 
         var result = await controller.GetDiff(eventId, 3, CancellationToken.None);
 
@@ -178,19 +187,19 @@ public sealed class TemplateSyncHateoasTests
     public async Task EventSessionTemplateSyncController_GetDiff_MaterializesOnlyAuthorizedLinks()
     {
         var sessionId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
+        var getDiffHandler = Substitute.For<IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<SessionTemplateDiffDto>>>();
         var authorizationEvaluator = Substitute.For<IHateoasAuthorizationEvaluator>();
         var linkGenerator = Substitute.For<IHateoasLinkGenerator>();
         var linkPolicy = Substitute.For<ILinkPolicy<EventSessionTemplateSyncResource>>();
         var definitions = CreateManualDefinitions();
-        mediator.Send(Arg.Is<GetEventSessionTemplateDiffQuery>(query => query.EventSessionId == sessionId), Arg.Any<CancellationToken>())
+        getDiffHandler.QueryAsync(Arg.Is<GetEventSessionTemplateDiffQuery>(query => query.EventSessionId == sessionId), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(BaseCommandResponse.Success(CreateSessionTemplateDiff())));
         linkPolicy.GetLinks(Arg.Any<EventSessionTemplateSyncResource>(), Arg.Any<ClaimsPrincipal?>()).Returns(definitions);
         authorizationEvaluator.AreLinksAllowedAsync(Arg.Is<IReadOnlyList<LinkDefinition>>(links => LinksMatchManualDefinitions(links)), Arg.Any<ClaimsPrincipal?>(), Arg.Any<HttpContext>())
             .Returns(Task.FromResult<IReadOnlyList<bool>>([true, false, true]));
         linkGenerator.GenerateLink(Arg.Any<LinkDefinition>(), Arg.Any<HttpContext>())
             .Returns(call => new HalLink { Href = $"/{call.Arg<LinkDefinition>().Rel}" });
-        var controller = CreateEventSessionTemplateController(mediator, authorizationEvaluator, linkGenerator, linkPolicy);
+        var controller = CreateEventSessionTemplateController(getDiffHandler, authorizationEvaluator, linkGenerator, linkPolicy);
 
         var result = await controller.GetDiff(sessionId, 3, CancellationToken.None);
 
@@ -216,13 +225,15 @@ public sealed class TemplateSyncHateoasTests
         links[2].Rel == "allowed-history";
 
     private static EventTemplateSyncController CreateEventTemplateController(
-        IMediator mediator,
+        IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>> getDiffHandler,
         IHateoasAuthorizationEvaluator authorizationEvaluator,
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<EventTemplateSyncResource> linkPolicy)
     {
         var controller = new EventTemplateSyncController(
-            mediator,
+            Substitute.For<ICommandHandler<ApplyEventTemplateSyncCommand, BaseCommandResponse<EventTemplateSyncOutcomeDto>>>(),
+            getDiffHandler,
+            Substitute.For<IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>>(),
             authorizationEvaluator,
             linkGenerator,
             linkPolicy,
@@ -232,13 +243,15 @@ public sealed class TemplateSyncHateoasTests
     }
 
     private static EventSessionTemplateSyncController CreateEventSessionTemplateController(
-        IMediator mediator,
+        IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<SessionTemplateDiffDto>> getDiffHandler,
         IHateoasAuthorizationEvaluator authorizationEvaluator,
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<EventSessionTemplateSyncResource> linkPolicy)
     {
         var controller = new EventSessionTemplateSyncController(
-            mediator,
+            Substitute.For<ICommandHandler<ApplyEventSessionTemplateSyncCommand, BaseCommandResponse<SessionTemplateSyncOutcomeDto>>>(),
+            getDiffHandler,
+            Substitute.For<IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<SessionTemplateSyncHistoryItemDto>>>(),
             authorizationEvaluator,
             linkGenerator,
             linkPolicy,

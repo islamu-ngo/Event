@@ -1,6 +1,7 @@
 using Explore.API.BackgroundServices;
 using Explore.API.Extensions;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Operations;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Security;
@@ -26,6 +27,11 @@ public static class ApiHostStartupExtensions
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(shutdownCts);
         ArgumentNullException.ThrowIfNull(markShuttingDown);
+
+        // Before shared API setup, hosted workers or traffic; standalone-owned bootstrap runs earlier.
+        // OpenAPI omits runtime dependencies; final descriptors were validated in the provider factory.
+        if (!state.IsOpenApiGeneration)
+            app.Services.ValidateNativeOperations();
 
         var appLifetime = app.Lifetime;
         var appLogger = app.Logger;

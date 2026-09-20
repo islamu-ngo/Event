@@ -2,13 +2,13 @@ using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationTenantEvidence.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Organizations.SubmitEvidence)]
 public sealed record CreateOrganizationTenantEvidenceUploadSessionCommand
-    : IRequest<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
+    : ICommand<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
 {
     public Guid OrganizationId { get; init; }
     public required CreateOrganizationTenantEvidenceUploadSessionDto Upload { get; init; }
@@ -19,7 +19,7 @@ public sealed record CreateOrganizationTenantEvidenceUploadSessionCommand
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Organizations.SubmitEvidence)]
 public sealed record SubmitOrganizationTenantEvidenceCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid OrganizationId { get; init; }
     public required SubmitOrganizationTenantEvidenceDto Evidence { get; init; }
@@ -30,7 +30,7 @@ public sealed record SubmitOrganizationTenantEvidenceCommand
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Organizations.ReviewEvidence)]
 public sealed record ReviewOrganizationTenantEvidenceCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid OrganizationId { get; init; }
     public Guid EvidenceId { get; init; }

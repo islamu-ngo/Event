@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Queries;
 
 public sealed class GetCurrentUserEventPermissionsRequestHandler
-    : IRequestHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto>
+    : IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto>
 {
     private readonly IEventAuthoritySnapshotService _eventAuthoritySnapshotService;
 
@@ -14,21 +14,21 @@ public sealed class GetCurrentUserEventPermissionsRequestHandler
         _eventAuthoritySnapshotService = eventAuthoritySnapshotService;
     }
 
-    public async Task<CurrentUserEventPermissionsDto> Handle(
-        GetCurrentUserEventPermissionsRequest request,
-        CancellationToken cancellationToken)
+    public async Task<CurrentUserEventPermissionsDto> QueryAsync(
+        GetCurrentUserEventPermissionsRequest query,
+        CancellationToken cancellationToken = default)
     {
         var snapshot = await _eventAuthoritySnapshotService.GetForUserAndEventsAsync(
-            request.TenantId,
-            request.UserId,
-            new[] { request.EventId },
+            query.TenantId,
+            query.UserId,
+            new[] { query.EventId },
             cancellationToken);
 
-        if (!snapshot.Events.TryGetValue(request.EventId, out var authority))
+        if (!snapshot.Events.TryGetValue(query.EventId, out var authority))
         {
             return new CurrentUserEventPermissionsDto
             {
-                EventId = request.EventId,
+                EventId = query.EventId,
                 HasAnyRole = false,
                 IsOwner = false,
                 IsManager = false,
@@ -39,7 +39,7 @@ public sealed class GetCurrentUserEventPermissionsRequestHandler
 
         return new CurrentUserEventPermissionsDto
         {
-            EventId = request.EventId,
+            EventId = query.EventId,
             HasAnyRole = authority.RoleCodes.Count > 0,
             IsOwner = authority.IsOwner,
             IsManager = authority.IsManager,

@@ -1,16 +1,16 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
 
-public class DeleteEventSessionCommandHandler : IRequestHandler<DeleteEventSessionCommand, BaseCommandResponse<Guid>>
+public class DeleteEventSessionCommandHandler : ICommandHandler<DeleteEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly IEventTicketCatalogRepository _catalogs;
@@ -29,7 +29,7 @@ public class DeleteEventSessionCommandHandler : IRequestHandler<DeleteEventSessi
         _eventLocationAttachmentService = eventLocationAttachmentService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteEventSessionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteEventSessionCommand request, CancellationToken cancellationToken)
     {
         var eventSession = await _eventSessionRepository.GetById(request.Id);
 

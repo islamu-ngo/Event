@@ -10,11 +10,11 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 public class UpdateSettingCommandHandler
-    : IRequestHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly IUserPreferenceRepository _userPreferenceRepository;
@@ -22,7 +22,7 @@ public class UpdateSettingCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly IAdminContext _adminContext;
     private readonly ICerbosConfigResolver? _cerbosConfigResolver;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly ILogger<UpdateSettingCommandHandler> _logger;
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
@@ -36,7 +36,7 @@ public class UpdateSettingCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAdminContext adminContext,
-        IMediator mediator,
+        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
         ILogger<UpdateSettingCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
@@ -51,7 +51,7 @@ public class UpdateSettingCommandHandler
         _currentUserService = currentUserService;
         _adminContext = adminContext;
         _cerbosConfigResolver = cerbosConfigResolver;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
         _logger = logger;
         _locationPrivacyMutations = locationPrivacyMutations;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
@@ -60,7 +60,7 @@ public class UpdateSettingCommandHandler
         _visitorSettings = visitorSettings;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateSettingCommand request, CancellationToken cancellationToken)
     {
         // Validate key exists
@@ -121,7 +121,7 @@ public class UpdateSettingCommandHandler
             var result = await _visitorSettings.ApplyAsync(
                 [new(tenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
                 resolvedUserId, cancellationToken);
-            return await result.CompleteAsync(_resolver, _mediator, request.Scope, tenantId ?? Guid.Empty);
+            return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, tenantId ?? Guid.Empty);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
@@ -133,7 +133,7 @@ public class UpdateSettingCommandHandler
                 actorUserId: resolvedUserId, cancellationToken: cancellationToken);
             if (result.IsAccepted())
                 foreach (var notification in result.ToNotifications(resolvedUserId))
-                    await _mediator.Publish(notification, CancellationToken.None);
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             return result.ToCommandResponse(targetTenantId ?? Guid.Empty, "SMTP setting updated.");
         }
 
@@ -203,7 +203,7 @@ public class UpdateSettingCommandHandler
                 _resolver.InvalidateCache(request.Scope, scopeId);
                 foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
                 {
-                    await _mediator.Publish(notification, CancellationToken.None);
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
                 }
             }
 
@@ -270,7 +270,7 @@ public class UpdateSettingCommandHandler
             "Setting updated: {SettingKey} at {Scope} scope. Actor: {ActorId}",
             request.Key, request.Scope, actorId);
 
-        await _mediator.Publish(new SettingChangedNotification(
+        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
             request.Key, oldValue, serializedValue,
             SettingCommandHelper.MapScopeToSource(request.Scope),
             _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);

@@ -7,6 +7,7 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.Promotions.Requests.Commands;
@@ -15,7 +16,6 @@ using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,10 +23,11 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Explore.API.Controllers;
 
 /// <summary>
-/// Authenticated checkout: account-scoped registration for the signed-in caller's current order.
+/// Authenticated checkout door of the registration flow.
 /// </summary>
 /// <remarks>
-/// Split out of RegistrationOrderController by route capability. The route template and every
+/// Partitions <c>RegistrationOrderController</c> to give the authenticated path its own explicit
+/// class-level authorization surface. Every action attribute, route template, and
 /// <c>Name = RouteNames.*</c> are carried over verbatim, so URLs, operationIds, and the generated
 /// client are unchanged by the split.
 /// </remarks>
@@ -34,8 +35,22 @@ namespace Explore.API.Controllers;
 [Route("api/events/{eventId:guid}/registration-orders")]
 [ApiController]
 public sealed class AuthenticatedRegistrationOrderController(
-    IMediator mediator,
-    IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> assembler) : RegistrationOrderControllerBase
+    ICommandHandler<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>> startHandler,
+    ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult> launchAttemptHandler,
+    IQueryHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler,
+    ICommandHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult> launchProviderHandler,
+    ICommandHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult> skipHandler,
+    ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult> submitHandler,
+    IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?> getHandler,
+    ICommandHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto> continueHandler,
+    ICommandHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto> finalizeHandler,
+    ICommandHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto> cancelHandler,
+    IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> assembler,
+    ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto> applyPromotionHandler,
+    ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removePromotionHandler,
+    IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?> participantsQueryHandler,
+    ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>> mutateParticipantsCommandHandler,
+    ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>> csvHandler) : RegistrationOrderControllerBase
 {
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -59,7 +74,7 @@ public sealed class AuthenticatedRegistrationOrderController(
             return this.ToValidationProblem(RegistrationOrderValidationProblem, "A registration-order payload is required.");
         }
 
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await startHandler.ExecuteAsync(
             new StartAuthenticatedRegistrationOrderCommand(
                 eventId,
                 request.TicketCatalogVersionId,
@@ -89,7 +104,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         [FromBody] LaunchNativeRegistrationAttemptRequest request,
         CancellationToken cancellationToken = default) => await LaunchNativeAttempt(
-        await mediator.Send(new LaunchAuthenticatedNativeRegistrationAttemptCommand(
+        await launchAttemptHandler.ExecuteAsync(new LaunchAuthenticatedNativeRegistrationAttemptCommand(
             eventId, orderId, request.RequirementId, request.ChannelId,
             request.FormId, request.FormVersionId, request.BindingId, request.SupersededAttemptId), cancellationToken),
         eventId,
@@ -108,7 +123,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid eventId,
         Guid orderId,
         CancellationToken cancellationToken = default) => ToNativeProgressResource(
-        await mediator.Send(new GetAuthenticatedNativeRegistrationRequirementProgressQuery(
+        await progressHandler.QueryAsync(new GetAuthenticatedNativeRegistrationRequirementProgressQuery(
             eventId, orderId), cancellationToken), eventId, orderId, guest: false);
 
     [Authorize]
@@ -126,7 +141,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid orderId,
         [FromBody] LaunchRegistrationProviderAttemptRequest request,
         CancellationToken cancellationToken = default) => LaunchProviderAttempt(
-        await mediator.Send(new LaunchAuthenticatedRegistrationProviderAttemptCommand(
+        await launchProviderHandler.ExecuteAsync(new LaunchAuthenticatedRegistrationProviderAttemptCommand(
             eventId, orderId, request.RequirementId, request.ChannelId,
             request.BindingId, request.FormId, request.FormVersionId, request.SupersededAttemptId), cancellationToken),
         eventId,
@@ -149,7 +164,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         [FromHeader(Name = AttemptCapabilityHeader)] string? attemptCapability,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         [FromBody] SkipNativeRegistrationRequirementRequest request,
-        CancellationToken cancellationToken = default) => MapNativeSkip(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapNativeSkip(await skipHandler.ExecuteAsync(
         new SkipAuthenticatedNativeRegistrationRequirementCommand(
             eventId, orderId, request.RequirementId, attemptId, attemptCapability), cancellationToken));
 
@@ -170,7 +185,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         [FromHeader(Name = AttemptCapabilityHeader)] string? attemptCapability,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         [FromBody] SubmitNativeRegistrationAttemptRequest request,
-        CancellationToken cancellationToken = default) => MapNativeSubmission(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapNativeSubmission(await submitHandler.ExecuteAsync(
         new SubmitAuthenticatedNativeRegistrationAttemptCommand(
             eventId, orderId, request.RequirementId, attemptId, attemptCapability,
             idempotencyKey, MapNativeAnswers(request.Answers)), cancellationToken));
@@ -190,7 +205,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        RegistrationOrderDto? response = await mediator.Send(new GetCurrentRegistrationOrderQuery(orderId), cancellationToken);
+        RegistrationOrderDto? response = await getHandler.QueryAsync(new GetCurrentRegistrationOrderQuery(orderId), cancellationToken);
         if (response is null || response.EventId != eventId)
         {
             return this.ToNotFoundProblem(RegistrationOrderNotFoundProblem);
@@ -211,7 +226,7 @@ public sealed class AuthenticatedRegistrationOrderController(
     public async Task<ActionResult<HalResource<RegistrationOrderParticipantsDto>>> GetAuthenticatedParticipants(
         Guid eventId, Guid orderId, CancellationToken cancellationToken = default)
     {
-        RegistrationOrderParticipantsDto? response = await mediator.Send(
+        RegistrationOrderParticipantsDto? response = await participantsQueryHandler.QueryAsync(
             new GetAuthenticatedRegistrationOrderParticipantsQuery(eventId, orderId), cancellationToken);
         return response is null
             ? this.ToNotFoundProblem(RegistrationOrderNotFoundProblem)
@@ -282,7 +297,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid eventId, Guid orderId, [FromBody] RegistrationCompanyAssignmentCsvRequest request,
         CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> response = await mediator.Send(
+        BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto> response = await csvHandler.ExecuteAsync(
             new ImportCompanyRegistrationAssignmentsCsvCommand(eventId, orderId, request.CsvUtf8, request.LineageKey), cancellationToken);
         return response.IsSuccess
             ? Ok(response)
@@ -322,7 +337,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid orderId,
         [FromBody] PromotionCodeRequest request,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapPromotionRedemption(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapPromotionRedemption(await applyPromotionHandler.ExecuteAsync(
         new ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand(eventId, orderId, request.Code), cancellationToken));
 
     [Authorize]
@@ -338,8 +353,9 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid eventId,
         Guid orderId,
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
-        CancellationToken cancellationToken = default) => MapPromotionRedemption(await mediator.Send(
+        CancellationToken cancellationToken = default) => MapPromotionRedemption(await removePromotionHandler.ExecuteAsync(
         new RemoveAuthenticatedPromotionFromRegistrationOrderCommand(eventId, orderId), cancellationToken));
+
 
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
@@ -358,7 +374,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         [FromBody] ContinueRegistrationOrderRequest? request = null,
         CancellationToken cancellationToken = default)
     {
-        RegistrationOrderLifecycleResponseDto response = await mediator.Send(
+        RegistrationOrderLifecycleResponseDto response = await continueHandler.ExecuteAsync(
             new ContinueAuthenticatedRegistrationOrderCommand(
                 eventId,
                 orderId,
@@ -383,7 +399,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        RegistrationOrderLifecycleResponseDto response = await mediator.Send(
+        RegistrationOrderLifecycleResponseDto response = await finalizeHandler.ExecuteAsync(
             new FinalizeAuthenticatedRegistrationOrderCommand(eventId, orderId),
             cancellationToken);
         return await MapAuthenticatedLifecycle(eventId, response);
@@ -405,7 +421,7 @@ public sealed class AuthenticatedRegistrationOrderController(
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        RegistrationOrderLifecycleResponseDto response = await mediator.Send(
+        RegistrationOrderLifecycleResponseDto response = await cancelHandler.ExecuteAsync(
             new CancelAuthenticatedRegistrationOrderCommand(eventId, orderId),
             cancellationToken);
         return await MapAuthenticatedLifecycle(eventId, response);
@@ -413,7 +429,7 @@ public sealed class AuthenticatedRegistrationOrderController(
 
     private async Task<ActionResult<BaseCommandResponse<Guid>>> MutateAuthenticated(
         Guid eventId, Guid orderId, IRegistrationParticipantMutation mutation,
-        CancellationToken cancellationToken) => MapParticipantMutation(await mediator.Send(
+        CancellationToken cancellationToken) => MapParticipantMutation(await mutateParticipantsCommandHandler.ExecuteAsync(
             new MutateAuthenticatedRegistrationParticipantsCommand(eventId, orderId, mutation), cancellationToken));
 
     private async Task<ActionResult<HalResource<RegistrationOrderDto>>> MapAuthenticatedLifecycle(

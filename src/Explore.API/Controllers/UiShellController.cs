@@ -2,9 +2,9 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.UiShell;
 using Explore.Application.Features.UiShell.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,8 @@ namespace Explore.API.Controllers;
 [Route("api/ui-shell")]
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
-public sealed class UiShellController(IMediator mediator) : ControllerBase
+public sealed class UiShellController(
+    IQueryHandler<GetUiShellContextRequest, UiShellContextDto> queryHandler) : ControllerBase
 {
     [PrivateNoStore]
     [HttpGet("context", Name = RouteNames.GetUiShellContext)]
@@ -25,7 +26,7 @@ public sealed class UiShellController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<UiShellContextDto>> GetContext(CancellationToken cancellationToken = default)
     {
-        UiShellContextDto context = await mediator.Send(new GetUiShellContextRequest(), cancellationToken);
+        UiShellContextDto context = await queryHandler.QueryAsync(new GetUiShellContextRequest(), cancellationToken);
         return Ok(context);
     }
 }

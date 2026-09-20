@@ -3,6 +3,8 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.EventReporting;
@@ -11,7 +13,6 @@ using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,7 +25,10 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ModerationReportingRoutingController(
-    IMediator mediator,
+    IQueryHandler<GetReportingRoutingStateRequest, ReportingRoutingStateDto> getRoutingStateHandler,
+    ICommandHandler<UpdateReportingRoutingSettingsCommand, BaseCommandResponse<Guid>> updateRoutingSettingsHandler,
+    ICommandHandler<TestReportingProviderTargetCommand, BaseCommandResponse<Guid>> testProviderHandler,
+    IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
     ITenantContext tenantContext,
     IResourceAssembler<ReportingRoutingStateDto, ReportingRoutingStateDto> routingStateAssembler)
     : EventControllerBase
@@ -48,7 +52,7 @@ public sealed class ModerationReportingRoutingController(
     public async Task<ActionResult<HalResource<ReportingRoutingStateDto>>> GetRoutingState(
         CancellationToken cancellationToken = default)
     {
-        var routingState = await mediator.Send(
+        var routingState = await getRoutingStateHandler.QueryAsync(
             new GetReportingRoutingStateRequest(tenantContext.TenantId),
             cancellationToken);
 
@@ -68,14 +72,14 @@ public sealed class ModerationReportingRoutingController(
         [FromBody] UpdateReportingRoutingSettingsDto settings,
         CancellationToken cancellationToken = default)
     {
-        var userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await mediator.Send(
+        var response = await updateRoutingSettingsHandler.ExecuteAsync(
             new UpdateReportingRoutingSettingsCommand(tenantContext.TenantId, userId.Value, settings),
             cancellationToken);
 
@@ -104,14 +108,14 @@ public sealed class ModerationReportingRoutingController(
         [FromRoute] EventReportExternalProvider provider,
         CancellationToken cancellationToken = default)
     {
-        var userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await mediator.Send(
+        var response = await testProviderHandler.ExecuteAsync(
             new TestReportingProviderTargetCommand(tenantContext.TenantId, userId.Value, provider),
             cancellationToken);
 

@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2966KXX903NK69492AHQCZD
+Title: "Compose protected operations through Microsoft DI"
+Type: refactor
+Scope: access
+Summary: "Protect native command and query handlers with shared authoritative authorization, scoped composition checks, and safe operation timing."
+Group: native-operation-composition
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: Existing product requests and transport contracts are unchanged; this change supplies the protected native foundation.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Native void commands, result commands and queries preserve authoritative persisted facts and distinct denied versus provider-unavailable outcomes. Final DI validation rejects raw replacements and guards native construction reentry.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No schema, persisted-data or product capability migration is included.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No operator variable, secret or edition selector is introduced or removed.
+  OpenAPI:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: Routes, request and response shapes, and generated clients are unchanged. Build-time OpenAPI composition uses descriptor-only validation.
+  Operator:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Native composition defects fail before traffic and workers. Runtime preflight does not construct the full handler graph; CI performs scoped deep resolution. Native timing excludes authorization and logs only slow successful operation type and elapsed time.

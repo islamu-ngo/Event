@@ -6,13 +6,13 @@ using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Localization.Handlers.Commands;
 
 public class UpdateLocalizationGovernanceCommandHandler
-    : IRequestHandler<UpdateLocalizationGovernanceCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateLocalizationGovernanceCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly SettingUpsertService _upsertService;
@@ -34,7 +34,7 @@ public class UpdateLocalizationGovernanceCommandHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateLocalizationGovernanceCommand request,
         CancellationToken cancellationToken)
     {

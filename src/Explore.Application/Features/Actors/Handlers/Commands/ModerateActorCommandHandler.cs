@@ -7,9 +7,9 @@ using Explore.Application.Features.Actors.Requests.Commands;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Actors.Handlers.Commands;
@@ -25,9 +25,9 @@ public sealed class ModerateActorCommandHandler(
     HybridCache cache,
     IEnumerable<IAtprotoDiscoveryCacheInvalidator> discoveryCacheInvalidators,
     TimeProvider timeProvider)
-    : IRequestHandler<ModerateActorCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ModerateActorCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ModerateActorCommand request,
         CancellationToken cancellationToken)
     {

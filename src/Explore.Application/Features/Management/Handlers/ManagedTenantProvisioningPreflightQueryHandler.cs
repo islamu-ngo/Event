@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;
@@ -7,7 +8,6 @@ using Explore.Application.Management;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Features.Management.Handlers.Queries;
@@ -18,12 +18,12 @@ public sealed class GetManagedTenantProvisioningPreflightQueryHandler(
     IManagedControlPlaneRegistrationRepository registrationRepository,
     TenantActivationCapacityPolicy capacityPolicy,
     ManagedTenantProvisioningPreflight preflight)
-    : IRequestHandler<GetManagedTenantProvisioningPreflightQuery,
+    : IQueryHandler<GetManagedTenantProvisioningPreflightQuery,
         ManagementTenantProvisioningPreflightDto>
 {
-    public async Task<ManagementTenantProvisioningPreflightDto> Handle(
+    public async Task<ManagementTenantProvisioningPreflightDto> QueryAsync(
         GetManagedTenantProvisioningPreflightQuery query,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validator = new ManagementTenantProvisioningRequestValidator();
         await validator.ValidateAndThrowAsync(query.Request, cancellationToken);

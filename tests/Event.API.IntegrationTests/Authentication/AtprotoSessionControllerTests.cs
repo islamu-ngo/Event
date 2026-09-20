@@ -5,8 +5,10 @@ using Explore.API.Controllers;
 using Explore.API.Models;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
-using MediatR;
+using Explore.Application.Features.Authentication.Atproto.Requests.Queries;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -18,11 +20,19 @@ public sealed class AtprotoSessionControllerTests
     [Test]
     public async Task BootstrapSessionRejectsCanonicalActorTargetBodyClaimParityMismatch()
     {
-        var mediator = Substitute.For<IMediator>();
+        var bootstrapHandler = Substitute.For<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        var currentSessionHandler = Substitute.For<IQueryHandler<GetCurrentAtprotoOAuthSessionQuery, AtprotoCurrentOAuthSession?>>();
+        var refreshHandler = Substitute.For<ICommandHandler<RefreshAtprotoSessionCommand, AtprotoSessionRefreshResult>>();
+        var revokeHandler = Substitute.For<ICommandHandler<RevokeAtprotoSessionCommand, AtprotoSessionRevocationResult>>();
         var tenantContext = Substitute.For<ITenantContext>();
         var canonicalActorId = Guid.NewGuid();
         var expectedConcurrencyStamp = Guid.NewGuid();
-        var controller = new AtprotoSessionController(mediator, tenantContext)
+        var controller = new AtprotoSessionController(
+            bootstrapHandler,
+            currentSessionHandler,
+            refreshHandler,
+            revokeHandler,
+            tenantContext)
         {
             ControllerContext = new ControllerContext
             {
@@ -42,7 +52,7 @@ public sealed class AtprotoSessionControllerTests
 
         await Assert.That(result.Result).IsTypeOf<ObjectResult>();
         await Assert.That(((ObjectResult)result.Result!).StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-        await mediator.DidNotReceive().Send(
+        await bootstrapHandler.DidNotReceive().ExecuteAsync(
             Arg.Any<BootstrapAtprotoSessionCommand>(),
             Arg.Any<CancellationToken>());
     }

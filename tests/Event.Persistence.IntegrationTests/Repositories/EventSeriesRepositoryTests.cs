@@ -24,6 +24,7 @@ public sealed class EventSeriesRepositoryTests
         {
             Id = Guid.CreateVersion7(),
             ActorTypeId = 1,
+            UserId = Guid.CreateVersion7(),
             ActorType = null!,
             Pii = new ActorPii { DisplayName = "Ticketed Actor" }
         };
@@ -133,12 +134,21 @@ public sealed class EventSeriesRepositoryTests
         EventTicketCatalogVersion draftCatalog = EventTicketCatalogVersion.Create(tenantId, eventId, "USD", 1);
         draftCatalog.CreatedAt = now;
 
-        context.EnableTenantFilterBypass("Seeds EventSeries pricing graph regression test rows.");
+        context.TenantContext = new TestTenantContext(tenantId);
+        context.TenantUsers.Add(new TenantUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            UserId = actor.UserId!.Value,
+            User = null!,
+            ActorId = actor.Id,
+            Actor = actor,
+            StatusId = (int)TenantUserStatusEnum.Active
+        });
         context.AddRange(actor, series, @event, participationConfiguration, publishedCatalog, draftCatalog);
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
-        context.TenantContext = new TestTenantContext(tenantId);
-        context.EnableTenantFilterBypass("Loads EventSeries pricing graph rows through explicit include filters.");
 
         var repository = new EventSeriesRepository(context);
         EventSeries loadedDetail = (await repository.GetEventSeriesWithEvents(seriesId))!;

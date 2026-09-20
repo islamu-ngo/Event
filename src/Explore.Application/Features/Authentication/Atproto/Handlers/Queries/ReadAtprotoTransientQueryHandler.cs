@@ -1,15 +1,15 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Queries;
 using Explore.Application.Features.Authentication.Atproto.Validators;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Queries;
 
 public sealed class ReadAtprotoTransientQueryHandler(IAtprotoTransientStoreRepository store,
-    ITenantRepository tenants) : IRequestHandler<ReadAtprotoTransientQuery, AtprotoTransientValue?>
+    ITenantRepository tenants) : IQueryHandler<ReadAtprotoTransientQuery, AtprotoTransientValue?>
 {
-    public async Task<AtprotoTransientValue?> Handle(ReadAtprotoTransientQuery request, CancellationToken cancellationToken)
+    public async Task<AtprotoTransientValue?> QueryAsync(ReadAtprotoTransientQuery request, CancellationToken cancellationToken = default)
     {
         if (!(await new ReadAtprotoTransientQueryValidator().ValidateAsync(request, cancellationToken)).IsValid)
             return null;

@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Admissions;
 using Explore.Application.Features.Admissions.Requests.Commands;
 using Explore.Application.Features.Admissions.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,7 +23,12 @@ namespace Explore.API.Controllers;
     "{admissionTicketId:guid}/transfers")]
 [ApiController]
 public sealed class TicketTransferController(
-    IMediator mediator,
+    IQueryHandler<GetTicketTransferQuery, TicketTransferDto?> getTransferQuery,
+    ICommandHandler<OfferTicketTransferCommand, TicketTransferOfferDto?> offerCommand,
+    ICommandHandler<AcceptTicketTransferCommand, TicketTransferAcceptanceDto?> acceptCommand,
+    ICommandHandler<CancelTicketTransferCommand, TicketTransferDto?> cancelCommand,
+    ICommandHandler<CorrectTicketTransferCommand, TicketTransferAcceptanceDto?> correctCommand,
+    ICommandHandler<ReissueTransferredTicketCommand, TicketTransferAcceptanceDto?> reissueCommand,
     IResourceAssembler<
         TicketTransferDto,
         TicketTransferDto> assembler) :
@@ -59,7 +64,7 @@ public sealed class TicketTransferController(
             CancellationToken cancellationToken)
     {
         TicketTransferDto? transfer =
-            await mediator.Send(
+            await getTransferQuery.QueryAsync(
                 new GetTicketTransferQuery(
                     eventId,
                     admissionTicketId,
@@ -96,7 +101,7 @@ public sealed class TicketTransferController(
             CancellationToken cancellationToken)
     {
         TicketTransferOfferDto? result =
-            await mediator.Send(
+            await offerCommand.ExecuteAsync(
                 new OfferTicketTransferCommand(
                     eventId,
                     admissionTicketId),
@@ -151,7 +156,7 @@ public sealed class TicketTransferController(
             CancellationToken cancellationToken)
     {
         TicketTransferAcceptanceDto? result =
-            await mediator.Send(
+            await acceptCommand.ExecuteAsync(
                 new AcceptTicketTransferCommand(
                     eventId,
                     admissionTicketId,
@@ -184,7 +189,7 @@ public sealed class TicketTransferController(
             CancellationToken cancellationToken)
     {
         TicketTransferDto? result =
-            await mediator.Send(
+            await cancelCommand.ExecuteAsync(
                 new CancelTicketTransferCommand(
                     eventId,
                     admissionTicketId,
@@ -222,7 +227,7 @@ public sealed class TicketTransferController(
             Guid transferId,
             CancellationToken cancellationToken) =>
         await CredentialResponseAsync(
-            await mediator.Send(
+            await correctCommand.ExecuteAsync(
                 new CorrectTicketTransferCommand(
                     eventId,
                     admissionTicketId,
@@ -250,7 +255,7 @@ public sealed class TicketTransferController(
             Guid transferId,
             CancellationToken cancellationToken) =>
         await CredentialResponseAsync(
-            await mediator.Send(
+            await reissueCommand.ExecuteAsync(
                 new ReissueTransferredTicketCommand(
                     eventId,
                     admissionTicketId,

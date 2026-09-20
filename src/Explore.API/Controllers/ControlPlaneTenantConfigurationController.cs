@@ -5,6 +5,8 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.DTOs.Tenant;
@@ -14,7 +16,6 @@ using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -38,14 +39,38 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ControlPlaneTenantConfigurationController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetControlPlaneTenantPlanAssignmentQuery, ControlPlaneTenantPlanAssignmentDto?> _assignmentQuery;
+    private readonly IQueryHandler<GetControlPlaneTenantEffectiveConfigurationQuery, ControlPlaneTenantEffectiveConfigurationDto> _configurationQuery;
+    private readonly ICommandHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>> _setSetting;
+    private readonly ICommandHandler<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>> _lockSetting;
+    private readonly ICommandHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>> _unlockSetting;
+    private readonly ICommandHandler<SwitchControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>> _switchAssignment;
+    private readonly ICommandHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>> _applyAssignment;
+    private readonly ICommandHandler<RollbackControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>> _rollbackAssignment;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationDto> _tenantEffectiveConfigurationAssembler;
 
     public ControlPlaneTenantConfigurationController(
-        IMediator mediator,
+        IQueryHandler<GetControlPlaneTenantPlanAssignmentQuery, ControlPlaneTenantPlanAssignmentDto?> assignmentQuery,
+        IQueryHandler<GetControlPlaneTenantEffectiveConfigurationQuery, ControlPlaneTenantEffectiveConfigurationDto> configurationQuery,
+        ICommandHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>> setSetting,
+        ICommandHandler<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>> lockSetting,
+        ICommandHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>> unlockSetting,
+        ICommandHandler<SwitchControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>> switchAssignment,
+        ICommandHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>> applyAssignment,
+        ICommandHandler<RollbackControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>> rollbackAssignment,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationDto> tenantEffectiveConfigurationAssembler)
     {
-        _mediator = mediator;
+        _assignmentQuery = assignmentQuery;
+        _configurationQuery = configurationQuery;
+        _setSetting = setSetting;
+        _lockSetting = lockSetting;
+        _unlockSetting = unlockSetting;
+        _switchAssignment = switchAssignment;
+        _applyAssignment = applyAssignment;
+        _rollbackAssignment = rollbackAssignment;
+        _identityQuery = identityQuery;
         _tenantEffectiveConfigurationAssembler = tenantEffectiveConfigurationAssembler;
     }
 
@@ -63,7 +88,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var assignment = await _mediator.Send(new GetControlPlaneTenantPlanAssignmentQuery(tenantId), cancellationToken);
+        var assignment = await _assignmentQuery.QueryAsync(new GetControlPlaneTenantPlanAssignmentQuery(tenantId), cancellationToken);
 
         return assignment is null ? NotFound() : Ok(assignment);
     }
@@ -81,7 +106,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var configuration = await _mediator.Send(
+        var configuration = await _configurationQuery.QueryAsync(
             new GetControlPlaneTenantEffectiveConfigurationQuery(tenantId),
             cancellationToken);
         var resource = await _tenantEffectiveConfigurationAssembler.ToResource(configuration, HttpContext);
@@ -107,7 +132,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         [FromBody] SetControlPlaneTenantSettingRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _setSetting.ExecuteAsync(
             new SetControlPlaneTenantSettingCommand(tenantId, key, request.Value),
             cancellationToken);
 
@@ -130,7 +155,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         string key,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _lockSetting.ExecuteAsync(
             new LockControlPlaneTenantSettingCommand(tenantId, key),
             cancellationToken);
 
@@ -153,7 +178,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         string key,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _unlockSetting.ExecuteAsync(
             new UnlockControlPlaneTenantSettingCommand(tenantId, key),
             cancellationToken);
 
@@ -175,13 +200,13 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         [FromBody] SwitchTenantPlanAssignmentRequest request,
         CancellationToken cancellationToken = default)
     {
-        var operatorId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var operatorId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!operatorId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _switchAssignment.ExecuteAsync(
             new SwitchControlPlaneTenantPlanAssignmentCommand(tenantId, request.TenantPlanVersionId, operatorId.Value),
             cancellationToken);
 
@@ -204,13 +229,13 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         Guid assignmentId,
         CancellationToken cancellationToken = default)
     {
-        var operatorId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var operatorId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!operatorId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _applyAssignment.ExecuteAsync(
             new ApplyControlPlaneTenantPlanAssignmentCommand(tenantId, assignmentId, operatorId.Value),
             cancellationToken);
 
@@ -232,13 +257,13 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         Guid assignmentId,
         CancellationToken cancellationToken = default)
     {
-        var operatorId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var operatorId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!operatorId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _rollbackAssignment.ExecuteAsync(
             new RollbackControlPlaneTenantPlanAssignmentCommand(tenantId, assignmentId, operatorId.Value),
             cancellationToken);
 

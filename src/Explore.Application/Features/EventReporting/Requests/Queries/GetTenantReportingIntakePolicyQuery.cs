@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.TenantSetting, AuthorizationActions.TenantSettings.View)]
 public sealed record GetTenantReportingIntakePolicyQuery(Guid TenantId)
-    : IRequest<TenantReportingIntakePolicyDto>, ISecureRequest
+    : IQuery<TenantReportingIntakePolicyDto>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => GovernanceSettingKeys.EventReporting.IntakeEnabled;
 

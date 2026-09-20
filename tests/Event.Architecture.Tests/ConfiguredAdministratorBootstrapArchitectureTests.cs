@@ -237,7 +237,7 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
     }
 
     [Test]
-    public async Task GeneratedClientOwnsBrowserStatusAndGenerationPipeline()
+    public async Task GeneratedClientOwnsBrowserStatus()
     {
         await Assert.That(typeof(GeneratedOnboardingStatus).Assembly)
             .IsEqualTo(typeof(IInstanceOnboardingClient).Assembly);
@@ -258,23 +258,6 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
         await Assert.That(requiredProperties)
             .All(required => generatedProperties.Contains(required, StringComparer.Ordinal));
 
-        XDocument project = XDocument.Load(ContextSystemHelpers.RepoPath(
-            "src", "Explore.Blazor.Client", "Explore.Blazor.Client.csproj"));
-        XElement generationTarget = ProjectTarget(project, "GenerateApiClient");
-        XElement generatedCompile = project.Descendants()
-            .Single(element => element.Name.LocalName == "Compile"
-                && string.Equals(
-                    element.Attribute("Update")?.Value,
-                    "Clients\\EventApiTagClients.g.cs",
-                    StringComparison.Ordinal));
-
-        await Assert.That(generationTarget.Attribute("BeforeTargets")?.Value)
-            .IsEqualTo("CoreCompile");
-        await Assert.That(generationTarget.Attribute("DependsOnTargets")?.Value)
-            .IsEqualTo("NormalizeGeneratedApiClient");
-        await Assert.That(generatedCompile.Elements()
-            .Single(element => element.Name.LocalName == "AutoGen").Value)
-            .IsEqualTo("true");
     }
 
     [Test]
@@ -572,11 +555,6 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
             }
         }
     }
-
-    private static XElement ProjectTarget(XDocument project, string name) =>
-        project.Descendants().Single(element =>
-            element.Name.LocalName == "Target"
-            && string.Equals(element.Attribute("Name")?.Value, name, StringComparison.Ordinal));
 
     private static MethodBase[] CallsFromTypeAndStateMachines(Type owner) =>
         owner.Assembly.GetTypes()

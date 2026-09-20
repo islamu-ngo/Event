@@ -1,0 +1,28 @@
+Change-Id: CHG-01M2E0AXF81AK292ATVJWFXZP4
+Title: "Restore authorized event day management"
+Type: fix
+Scope: events
+Summary: "Bind day writes to persisted parent authority, reject unsupported reparenting, and return conflict for competing updates."
+Group: event-day-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/architecture/native-event-days.md
+    Disposition: documented
+    Detail: Day writes require current-tenant persisted parent context; submitted destinations never replace source authority.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/features/event-day-management.md
+    Disposition: documented
+    Detail: Event owners can manage days; stale writes return409 and unsupported reparenting returns400 rather than server errors.

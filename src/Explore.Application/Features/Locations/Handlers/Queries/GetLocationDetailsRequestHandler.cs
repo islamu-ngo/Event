@@ -1,29 +1,26 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Locations.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Queries;
 
-public class GetLocationDetailsRequestHandler : IRequestHandler<GetLocationDetailsRequest, LocationDto>
+public class GetLocationDetailsRequestHandler : IQueryHandler<GetLocationDetailsRequest, LocationDto?>
 {
     private readonly ILocationRepository _locationRepository;
-    private readonly IMapper _mapper;
 
     public GetLocationDetailsRequestHandler(
-        ILocationRepository locationRepository,
-        IMapper mapper)
+        ILocationRepository locationRepository)
     {
         _locationRepository = locationRepository;
-        _mapper = mapper;
     }
 
-    public async Task<LocationDto> Handle(GetLocationDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<LocationDto?> QueryAsync(GetLocationDetailsRequest request, CancellationToken cancellationToken)
     {
         var location = await _locationRepository.GetById(request.Id);
-        return _mapper.Map<LocationDto>(location);
+        return LocationMapper.ToDetail(location);
     }
 }

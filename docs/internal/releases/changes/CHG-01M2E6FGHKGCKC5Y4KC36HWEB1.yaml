@@ -1,0 +1,36 @@
+Change-Id: CHG-01M2E6FGHKGCKC5Y4KC36HWEB1
+Title: "Enforce parent and destination authority for event tags"
+Type: fix
+Scope: events
+Summary: "Authorize tag-assignment deletion against its persisted parent event and require update permission on both events before relocation."
+Group: event-tags
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md#event-tag-assignment-authority
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Deletion evaluates the persisted parent event rather than treating an
+      assignment ID as an event. Relocation requires update authority on both
+      source and destination before changing any assignment fields. Missing or
+      tenant-invisible assignments fail closed; denial and outage remain distinct.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md#event-tag-assignment-permissions
+    Disposition: documented
+    Detail: >-
+      Upgrade the application normally. Event owners with update permission can
+      remove tag assignments; relocation requires destination update permission
+      too. No new policy grants, migration, configuration or endpoint are required.

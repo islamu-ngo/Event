@@ -23,7 +23,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             ]));
 
         var result = await CreateOverviewHandler(operations, readOnly: false)
-            .Handle(new GetSchedulerAdminOverviewQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminOverviewQuery(), CancellationToken.None);
 
         await Assert.That(result.State).IsEqualTo(SchedulerAdminStates.Running);
         await Assert.That(result.Available).IsTrue();
@@ -40,7 +40,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             .Returns(Snapshot(started: true, inStandby: true, jobs: []));
 
         var result = await CreateOverviewHandler(operations, readOnly: false)
-            .Handle(new GetSchedulerAdminOverviewQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminOverviewQuery(), CancellationToken.None);
 
         await Assert.That(result.State).IsEqualTo(SchedulerAdminStates.Standby);
     }
@@ -57,7 +57,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             .Returns(SchedulerRuntimeSnapshot.Unavailable);
 
         var result = await CreateOverviewHandler(operations, readOnly: true)
-            .Handle(new GetSchedulerAdminOverviewQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminOverviewQuery(), CancellationToken.None);
 
         await Assert.That(result.Available).IsFalse();
         await Assert.That(result.State).IsEqualTo(SchedulerAdminStates.Disabled);
@@ -85,7 +85,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             ]));
 
         var jobs = await new GetSchedulerAdminJobsQueryHandler(operations, EmptyRegistry())
-            .Handle(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
 
         var job = jobs.Single();
         await Assert.That(job.State).IsEqualTo(SchedulerAdminStates.Active);
@@ -106,7 +106,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             ]));
 
         var jobs = await new GetSchedulerAdminJobsQueryHandler(operations, EmptyRegistry())
-            .Handle(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
 
         await Assert.That(jobs.Single().State).IsEqualTo(SchedulerAdminStates.Paused);
     }
@@ -123,7 +123,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             .Returns(Snapshot(started: true, inStandby: false, jobs: [Job("event-reminder-dispatch")]));
 
         var jobs = await new GetSchedulerAdminJobsQueryHandler(operations, EmptyRegistry())
-            .Handle(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
 
         await Assert.That(jobs.Single().State).IsEqualTo(SchedulerAdminStates.OnDemand);
     }
@@ -141,7 +141,7 @@ public sealed class SchedulerAdminQueryHandlerTests
             ]));
 
         var jobs = await new GetSchedulerAdminJobsQueryHandler(operations, EmptyRegistry())
-            .Handle(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
+            .QueryAsync(new GetSchedulerAdminJobsQuery(), CancellationToken.None);
 
         await Assert.That(jobs.Single().State).IsEqualTo(SchedulerAdminStates.Error);
     }

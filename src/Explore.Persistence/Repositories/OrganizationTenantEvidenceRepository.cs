@@ -8,6 +8,14 @@ public sealed class OrganizationTenantEvidenceRepository(ExploreDbContext dbCont
     : GenericRepository<OrganizationTenantEvidence, Guid>(dbContext),
         IOrganizationTenantEvidenceRepository
 {
+    public override Task<OrganizationTenantEvidence> Create(OrganizationTenantEvidence entity)
+    {
+        // Only evidence is new; its document and participation graphs reference existing principals.
+        // Tracking the root first keeps the base insert from traversing those detached navigations.
+        dbContext.Entry(entity).State = EntityState.Added;
+        return base.Create(entity);
+    }
+
     public Task<OrganizationTenantEvidence?> GetDetailsAsync(
         Guid id,
         bool trackChanges,

@@ -1,8 +1,8 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.ExternalApiKey;
-using MediatR;
 
 namespace Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 
-public sealed record GetExternalApiKeyListRequest : IRequest<List<ExternalApiKeyListDto>>
+public sealed record GetExternalApiKeyListRequest : IQuery<List<ExternalApiKeyListDto>>
 {
 }

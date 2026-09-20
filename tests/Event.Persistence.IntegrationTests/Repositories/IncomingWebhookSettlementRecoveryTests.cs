@@ -318,7 +318,7 @@ public sealed class IncomingWebhookSettlementRecoveryTests(PostgreSqlContainerFi
                 currentUser,
                 machinePrincipal,
                 new FixedTimeProvider(redrivenAt));
-            var response = await handler.Handle(new RedriveIncomingWebhookCommand
+            var response = await handler.ExecuteAsync(new RedriveIncomingWebhookCommand
             {
                 TenantId = seeded.Claim.TenantId,
                 IncomingWebhookMessageId = seeded.Claim.IncomingWebhookMessageId,

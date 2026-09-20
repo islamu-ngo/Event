@@ -6,21 +6,20 @@ using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Extensions;
+using Explore.API.ExceptionHandling;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch;
-using Explore.Application.Features.EmailDispatch.Requests.Commands;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -33,8 +32,7 @@ public sealed class EmailDispatchAdminControllerTests
     [Test]
     public async Task ParkDispatch_WithoutAuthentication_ReturnsUnauthorized()
     {
-        using var mediator = new EmailDispatchMediatorStub(_ => Success(Guid.NewGuid()));
-        using var factory = CreateFactoryWithMediator(mediator);
+        await using var factory = new AuthenticatedWebApplicationFactory();
         using var client = factory.CreateClient();
 
         var response = await client.PutAsync(
@@ -128,8 +126,7 @@ public sealed class EmailDispatchAdminControllerTests
     [Test]
     public async Task GetStatus_WhenLimitIsOutOfRange_ReturnsValidationProblemBeforeDispatch()
     {
-        using var mediator = new EmailDispatchMediatorStub(_ => throw new InvalidOperationException("Mediator should not be called."));
-        using var factory = CreateFactoryWithMediator(mediator);
+        await using var factory = CreateIngressFactory();
         using var client = factory.CreateClient();
         using var request = CreateAuthenticatedRequest(
             HttpMethod.Get,
@@ -141,14 +138,12 @@ public sealed class EmailDispatchAdminControllerTests
             response,
             HttpStatusCode.BadRequest,
             "Validation failed");
-        await Assert.That(mediator.LastRequest).IsNull();
     }
 
     [Test]
     public async Task ParkDispatch_WhenReasonIsMissing_ReturnsValidationProblemBeforeDispatch()
     {
-        using var mediator = new EmailDispatchMediatorStub(_ => throw new InvalidOperationException("Mediator should not be called."));
-        using var factory = CreateFactoryWithMediator(mediator);
+        await using var factory = CreateIngressFactory();
         using var client = factory.CreateClient();
         using var request = CreateAuthenticatedRequest(
             HttpMethod.Put,
@@ -160,15 +155,13 @@ public sealed class EmailDispatchAdminControllerTests
             response,
             HttpStatusCode.BadRequest,
             "Validation failed");
-        await Assert.That(mediator.LastRequest).IsNull();
     }
 
     [Test]
     public async Task PauseTenant_WhenReasonIsTooLong_ReturnsValidationProblemBeforeDispatch()
     {
         var reason = new string('x', EmailDispatchPauseTenantQueryRequest.MaxReasonLength + 1);
-        using var mediator = new EmailDispatchMediatorStub(_ => throw new InvalidOperationException("Mediator should not be called."));
-        using var factory = CreateFactoryWithMediator(mediator);
+        await using var factory = CreateIngressFactory();
         using var client = factory.CreateClient();
         using var request = CreateAuthenticatedRequest(
             HttpMethod.Put,
@@ -180,47 +173,39 @@ public sealed class EmailDispatchAdminControllerTests
             response,
             HttpStatusCode.BadRequest,
             "Validation failed");
-        await Assert.That(mediator.LastRequest).IsNull();
     }
 
     [Test]
     public async Task ParkDispatch_WithAuthentication_DispatchesCommandAndReturnsSuccess()
     {
-        var tenantId = Guid.NewGuid();
-        var outboxId = Guid.NewGuid();
+        await using var factory = await NativeEmailDispatchWebApplicationFactory.CreateAsync();
+        var tenantId = PlatformDefaults.DefaultTenantId;
+        var outboxId = await factory.SeedDispatchAsync(EmailDispatchStatus.Pending);
         const string reason = "Provider payload needs manual review.";
-        using var mediator = new EmailDispatchMediatorStub(_ => Success(outboxId));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Put,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/park?reason={Uri.EscapeDataString(reason)}");
-
-        var response = await client.SendAsync(request);
+        using var client = factory.Client(factory.TenantAdminId);
+        var response = await client.PutAsync(
+            $"/api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/park?reason={Uri.EscapeDataString(reason)}", null);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var command = mediator.LastRequest as ParkEmailDispatchCommand;
-        await Assert.That(command).IsNotNull();
-        await Assert.That(command!.TenantId).IsEqualTo(tenantId);
-        await Assert.That(command.OutboxId).IsEqualTo(outboxId);
-        await Assert.That(command.Reason).IsEqualTo(reason);
+        using var scope = factory.Services.CreateScope();
+        var row = await scope.ServiceProvider.GetRequiredService<IEmailDispatchOutboxRepository>()
+            .GetByTenantAndId(tenantId, outboxId, default);
+        await Assert.That(row!.Status).IsEqualTo(EmailDispatchStatus.Parked);
+        await Assert.That(row.ParkReason).IsEqualTo(EmailDispatchParkReason.Operator);
+        await Assert.That(row.TenantId).IsEqualTo(tenantId);
+        await Assert.That(row.Id).IsEqualTo(outboxId);
+        await Assert.That(row.LastError).IsEqualTo(reason);
+        await Assert.That(row.UpdatedBy).IsEqualTo(factory.TenantAdminId);
     }
 
     [Test]
     public async Task ReplayDispatch_WhenInvalidTransition_ReturnsConflictProblemDetails()
     {
-        var tenantId = Guid.NewGuid();
-        var outboxId = Guid.NewGuid();
-        using var mediator = new EmailDispatchMediatorStub(_ => Failure(
-            "Sent email dispatch rows cannot be replayed.",
-            EmailDispatchFailureCodes.InvalidTransition));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Post,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/replay");
-
-        var response = await client.SendAsync(request);
+        await using var factory = await NativeEmailDispatchWebApplicationFactory.CreateAsync();
+        var outboxId = await factory.SeedDispatchAsync(EmailDispatchStatus.Sent);
+        using var client = factory.Client();
+        var response = await client.PostAsync(
+            $"/api/admin/email-dispatch/tenants/{PlatformDefaults.DefaultTenantId}/outbox/{outboxId}/replay", null);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
@@ -234,46 +219,33 @@ public sealed class EmailDispatchAdminControllerTests
     }
 
     [Test]
-    public async Task ReplayDispatch_WhenEmailDispatchMisconfigured_ReturnsServiceUnavailableProblemDetails()
+    public async Task EmailDispatchMisconfiguredMappingPreservesServiceUnavailableProblemDetails()
     {
-        var tenantId = Guid.NewGuid();
-        var outboxId = Guid.NewGuid();
-        using var mediator = new EmailDispatchMediatorStub(_ => Failure(
-            "Email dispatch RabbitMQ parking queue is not configured.",
-            EmailDispatchFailureCodes.Misconfigured));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Post,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/replay");
-
-        var response = await client.SendAsync(request);
-
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
-        await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = document.RootElement;
-        await Assert.That(root.GetProperty("status").GetInt32()).IsEqualTo((int)HttpStatusCode.ServiceUnavailable);
-        await Assert.That(root.GetProperty("title").GetString()).IsEqualTo("Email dispatch is misconfigured");
-        await Assert.That(root.GetProperty("code").GetString()).IsEqualTo(EmailDispatchFailureCodes.Misconfigured);
-        await Assert.That(root.TryGetProperty("traceId", out _)).IsTrue();
-        await Assert.That(root.TryGetProperty("timestamp", out _)).IsTrue();
+        // Replay only resets durable state; misconfiguration belongs to the shared failure mapper,
+        // not to a fabricated replay-handler response.
+        var controller = new ProblemController
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        var result = (ObjectResult)controller.ToEmailDispatchProblem(Failure(
+            "Email dispatch RabbitMQ parking queue is not configured.", EmailDispatchFailureCodes.Misconfigured));
+        var problem = (ProblemDetails)result.Value!;
+        await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status503ServiceUnavailable);
+        await Assert.That(result.ContentTypes).Contains("application/problem+json");
+        await Assert.That(problem.Status).IsEqualTo(StatusCodes.Status503ServiceUnavailable);
+        await Assert.That(problem.Title).IsEqualTo("Email dispatch is misconfigured");
+        await Assert.That(problem.Extensions["code"]).IsEqualTo(EmailDispatchFailureCodes.Misconfigured);
+        await Assert.That(problem.Extensions.ContainsKey("traceId")).IsTrue();
+        await Assert.That(problem.Extensions.ContainsKey("timestamp")).IsTrue();
     }
 
     [Test]
     public async Task PauseTenant_WhenValidationFails_ReturnsValidationProblemDetails()
     {
-        var tenantId = Guid.NewGuid();
-        using var mediator = new EmailDispatchMediatorStub(_ => Failure(
-            "Pause reason is required.",
-            EmailDispatchFailureCodes.ValidationFailed));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Put,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/pause");
-
-        var response = await client.SendAsync(request);
+        await using var factory = await NativeEmailDispatchWebApplicationFactory.CreateAsync();
+        using var client = factory.Client();
+        var response = await client.PutAsync(
+            $"/api/admin/email-dispatch/tenants/{Guid.Empty}/pause?reason=maintenance", null);
 
         using var document = await AssertEmailDispatchValidationProblemAsync(response);
         var root = document.RootElement;
@@ -283,17 +255,9 @@ public sealed class EmailDispatchAdminControllerTests
     [Test]
     public async Task ResumeTenant_WhenValidationFails_ReturnsValidationProblemDetails()
     {
-        var tenantId = Guid.NewGuid();
-        using var mediator = new EmailDispatchMediatorStub(_ => Failure(
-            "Tenant dispatch state cannot be changed.",
-            EmailDispatchFailureCodes.ValidationFailed));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Delete,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/pause");
-
-        var response = await client.SendAsync(request);
+        await using var factory = await NativeEmailDispatchWebApplicationFactory.CreateAsync();
+        using var client = factory.Client();
+        var response = await client.DeleteAsync($"/api/admin/email-dispatch/tenants/{Guid.Empty}/pause");
 
         using var document = await AssertEmailDispatchValidationProblemAsync(response);
         var root = document.RootElement;
@@ -358,19 +322,14 @@ public sealed class EmailDispatchAdminControllerTests
         await AssertProducesProblem(resume, StatusCodes.Status403Forbidden);
     }
 
-    private static WebApplicationFactory<Program> CreateFactoryWithMediator(IMediator mediator)
+    private static AuthenticatedWebApplicationFactory CreateIngressFactory() => new()
     {
-        var factory = new AuthenticatedWebApplicationFactory();
-
-        return factory.WithWebHostBuilder(builder =>
+        // Reaching protected native dispatch would produce a 500, not the expected ingress 400.
+        AuthorizationProviderOverride = new StubAuthorizationProvider
         {
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
-            });
-        });
-    }
+            CheckPredicate = _ => throw new InvalidOperationException("Invalid ingress reached operation authorization.")
+        }
+    };
 
     private static HttpRequestMessage CreateAuthenticatedRequest(HttpMethod method, string url)
     {
@@ -408,51 +367,9 @@ public sealed class EmailDispatchAdminControllerTests
         return await ProblemDetailsAssertions.ReadAsJsonAsync(response);
     }
 
-    private static BaseCommandResponse<Guid> Success(Guid id) =>
-        BaseCommandResponse.Success(id, "Email dispatch operation completed.");
-
     private static BaseCommandResponse<Guid> Failure(string message, string failureCode) =>
         BaseCommandResponse.Failure<Guid>(failureCode, message, [message]);
 
-    private sealed class EmailDispatchMediatorStub(Func<object, object> responseFactory) : IMediator, IDisposable
-    {
-        public object? LastRequest { get; private set; }
+    private sealed class ProblemController : ControllerBase;
 
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            object response = responseFactory(request);
-            return Task.FromResult((TResponse)response);
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-        {
-            LastRequest = request;
-            return Task.CompletedTask;
-        }
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            return Task.FromResult<object?>(responseFactory(request));
-        }
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public void Dispose()
-        {
-        }
-    }
 }

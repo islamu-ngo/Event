@@ -1,6 +1,6 @@
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
@@ -8,7 +8,6 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,8 +34,8 @@ public sealed class AnonymousRegistrationRecoveryDeadlineTests
             BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]));
         var authority = proof.Request.ChallengeAuthority!;
         var created = await fixture.Services
-            .GetRequiredService<IRequestHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>()
-            .Handle(proof.Request, CancellationToken.None);
+            .GetRequiredService<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>()
+            .ExecuteAsync(proof.Request, CancellationToken.None);
         await Assert.That(created.IsSuccess).IsTrue();
         RegistrationOrder original = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
         RegistrationInventoryHold hold = await fixture.Context.RegistrationInventoryHolds.AsNoTracking().SingleAsync();
@@ -47,8 +46,8 @@ public sealed class AnonymousRegistrationRecoveryDeadlineTests
         barrier.Arm();
         async Task<BaseCommandResponse<Guid>?> RecoverAsync() => throughStarter
             ? await scope.ServiceProvider
-                .GetRequiredService<IRequestHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>()
-                .Handle(proof.Request, CancellationToken.None)
+                .GetRequiredService<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>()
+                .ExecuteAsync(proof.Request, CancellationToken.None)
             : await starter.TryRecoverCommittedGuestAsync(proof.Request, CancellationToken.None);
         var pending = RecoverAsync();
         try

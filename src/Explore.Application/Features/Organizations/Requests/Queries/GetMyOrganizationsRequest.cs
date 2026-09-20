@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.Organization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Organizations.Requests.Queries;
 
-public sealed record GetMyOrganizationsRequest : IRequest<PaginatedResult<OrganizationListDto>>
+public sealed record GetMyOrganizationsRequest : IQuery<PaginatedResult<OrganizationListDto>>
 {
     public required string UserId { get; init; } = string.Empty;
 

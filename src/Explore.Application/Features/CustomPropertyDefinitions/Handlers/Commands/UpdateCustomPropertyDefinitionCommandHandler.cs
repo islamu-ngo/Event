@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -11,18 +11,17 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class UpdateCustomPropertyDefinitionCommandHandler : ICommandHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -31,7 +30,6 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
         ICustomPropertyGovernancePolicy customPropertyGovernancePolicy,
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
         IUnitOfWork unitOfWork)
     {
@@ -39,12 +37,11 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
@@ -168,7 +165,34 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
             }
         }
 
-        _mapper.Map(candidate, definition);
+        // Only validated business fields change; identity and option relationships remain owned here.
+        definition.EntityTypeName = candidate.EntityTypeName;
+        definition.DisplayName = candidate.DisplayName;
+        definition.Description = candidate.Description;
+        definition.PropertyType = candidate.PropertyType;
+        definition.IsRequired = candidate.IsRequired;
+        definition.IsMulti = candidate.IsMulti;
+        definition.IsActive = candidate.IsActive;
+        definition.SortOrder = candidate.SortOrder;
+        definition.ExposureLevel = candidate.ExposureLevel;
+        definition.IsSearchable = candidate.IsSearchable;
+        definition.IsFilterable = candidate.IsFilterable;
+        definition.IsExportable = candidate.IsExportable;
+        definition.IsModerationRelevant = candidate.IsModerationRelevant;
+        definition.IsAnalyticsRelevant = candidate.IsAnalyticsRelevant;
+        definition.IsSystemOwned = candidate.IsSystemOwned;
+        definition.DefaultTextValue = candidate.DefaultTextValue;
+        definition.DefaultNumberValue = candidate.DefaultNumberValue;
+        definition.DefaultBooleanValue = candidate.DefaultBooleanValue;
+        definition.DefaultDateTimeValue = candidate.DefaultDateTimeValue;
+        definition.MinLength = candidate.MinLength;
+        definition.MaxLength = candidate.MaxLength;
+        definition.RegexPattern = candidate.RegexPattern;
+        definition.MinNumber = candidate.MinNumber;
+        definition.MaxNumber = candidate.MaxNumber;
+        definition.MinDateTime = candidate.MinDateTime;
+        definition.MaxDateTime = candidate.MaxDateTime;
+        definition.AllowedUrlSchemes = candidate.AllowedUrlSchemes;
         definition.Namespace = governance.NormalizedNamespace;
         definition.Key = governance.NormalizedKey;
         definition.UpdatedBy = _currentUserService.UserId;
@@ -189,7 +213,7 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
                 cancellationToken);
         }
 
-        await InvalidateCaches(previousEntityTypeName, definition.EntityTypeName, definition.Id, cancellationToken);
+        await InvalidateCaches(definition.TenantId, previousEntityTypeName, definition.EntityTypeName);
 
         return BaseCommandResponse.Success(definition.Id, "Custom-property definition updated successfully.");
     }
@@ -247,17 +271,18 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
     }
 
     private async Task InvalidateCaches(
+        Guid tenantId,
         EntityTypeName previousEntityTypeName,
-        EntityTypeName currentEntityTypeName,
-        Guid definitionId,
-        CancellationToken cancellationToken)
+        EntityTypeName currentEntityTypeName)
     {
-        await _cache.RemoveAsync($"custom-property-definitions:list:{previousEntityTypeName}:1:{PaginatedResult<CustomPropertyDefinitionListDto>.DefaultPageSize}", cancellationToken);
+        await _cache.RemoveByTagAsync(
+            CacheTags.CustomPropertyDefinitionListsByScope(tenantId, previousEntityTypeName),
+            CancellationToken.None);
         if (currentEntityTypeName != previousEntityTypeName)
         {
-            await _cache.RemoveAsync($"custom-property-definitions:list:{currentEntityTypeName}:1:{PaginatedResult<CustomPropertyDefinitionListDto>.DefaultPageSize}", cancellationToken);
+            await _cache.RemoveByTagAsync(
+                CacheTags.CustomPropertyDefinitionListsByScope(tenantId, currentEntityTypeName),
+                CancellationToken.None);
         }
-
-        await _cache.RemoveAsync($"custom-property-definitions:detail:{definitionId}", cancellationToken);
     }
 }

@@ -81,6 +81,12 @@ dotnet_diagnostic.IDE0060.severity = suggestion
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.MUD0002.severity = suggestion
 
+# Generated projections must account for every source and target member.
+dotnet_diagnostic.RMG012.severity = error
+dotnet_diagnostic.RMG020.severity = error
+dotnet_diagnostic.RMG037.severity = error
+dotnet_diagnostic.RMG038.severity = error
+
 # Prefer explicitness where type is not obvious
 csharp_style_var_for_built_in_types = false:suggestion
 csharp_style_var_when_type_is_apparent = true:suggestion

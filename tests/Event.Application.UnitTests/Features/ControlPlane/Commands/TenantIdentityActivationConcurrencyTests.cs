@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ControlPlane;
@@ -79,7 +80,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
         var lifecycleLog = Substitute.For<ITenantLifecycleLogRepository>();
         lifecycleLog.CreateAsync(Arg.Any<TenantLifecycleLog>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(call.Arg<TenantLifecycleLog>()));
-        var activationHandler = new TransitionControlPlaneTenantLifecycleCommandHandler(
+        ICommandHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> activationHandler = new TransitionControlPlaneTenantLifecycleCommandHandler(
             tenantRepository,
             lifecycleLog,
             Substitute.For<IEmailDispatchOutboxRepository>(),
@@ -93,7 +94,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
             readiness);
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(tenantId);
-        var patchHandler = new PatchTenantDirectoryOperatorIdentityDocumentCommandHandler(
+        ICommandHandler<PatchTenantDirectoryOperatorIdentityDocumentCommand, BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>> patchHandler = new PatchTenantDirectoryOperatorIdentityDocumentCommandHandler(
             tenantContext,
             currentUser,
             identityRepository,
@@ -102,7 +103,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
             Substitute.For<ITypedSettingsDocumentResolver>());
 
         Task<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> activationTask =
-            activationHandler.Handle(
+            activationHandler.ExecuteAsync(
                 new TransitionControlPlaneTenantLifecycleCommand(
                     tenantId,
                     TenantStatusEnum.Active,
@@ -111,7 +112,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
         await activationAtCommit.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         Task<BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>> patchTask =
-            patchHandler.Handle(
+            patchHandler.ExecuteAsync(
                 new PatchTenantDirectoryOperatorIdentityDocumentCommand
                 {
                     TenantId = tenantId,

@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
 
@@ -15,13 +15,13 @@ public sealed class GetRegistrationOrderParticipantsQueryHandler(
     IRegistrationParticipantRepository participants,
     ITenantContext tenant,
     TimeProvider? timeProvider = null)
-    : IRequestHandler<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>
+    : IQueryHandler<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>
 {
-    public async Task<RegistrationOrderParticipantsDto?> Handle(
-        GetRegistrationOrderParticipantsQuery request,
-        CancellationToken cancellationToken)
+    public async Task<RegistrationOrderParticipantsDto?> QueryAsync(
+        GetRegistrationOrderParticipantsQuery query,
+        CancellationToken cancellationToken = default)
     {
-        RegistrationOrder? order = await inventory.GetOrderWithLinesAsync(request.RegistrationOrderId, tenant.TenantId, cancellationToken);
+        RegistrationOrder? order = await inventory.GetOrderWithLinesAsync(query.RegistrationOrderId, tenant.TenantId, cancellationToken);
         if (order is null)
         {
             return null;

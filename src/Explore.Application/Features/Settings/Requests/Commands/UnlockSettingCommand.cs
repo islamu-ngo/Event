@@ -2,14 +2,14 @@ namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Unlocks a setting key at the specified scope (Instance or Tenant only).
 /// Restores cascade resolution — previously suppressed lower-scope overrides become effective again.
 /// Requires administrator privileges for the target scope.
 /// </summary>
-public sealed record UnlockSettingCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record UnlockSettingCommand : ICommand<BaseCommandResponse<Guid>>
 {
     /// <summary>
     /// Fully qualified setting key to unlock. Must currently be locked at the specified scope.

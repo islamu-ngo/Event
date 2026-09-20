@@ -59,6 +59,6 @@ Quartz.NET is the single internal scheduler, including for Basic Dispatch Mode. 
 ## Related Skills
 - [../agentic-research/SKILL.md](../agentic-research/SKILL.md)
 - [../clean-architecture-rules/SKILL.md](../clean-architecture-rules/SKILL.md)
-- [../cqrs-mediatr-guidelines/SKILL.md](../cqrs-mediatr-guidelines/SKILL.md)
+- [../cqrs-guidelines/SKILL.md](../cqrs-guidelines/SKILL.md)
 - [../blazor-ui-conventions/SKILL.md](../blazor-ui-conventions/SKILL.md)
 - [../outbox-pattern/SKILL.md](../outbox-pattern/SKILL.md)

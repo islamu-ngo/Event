@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using Explore.API.Controllers;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
-using Explore.Application.Contracts.Infrastructure;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -15,11 +15,11 @@ public sealed class LocalAuthControllerTests
     [Test]
     public async Task ReplacementChallengeIsReturnedWithoutAnAuthenticatedSession()
     {
-        var sender = Substitute.For<ISender>();
+        var loginHandler = Substitute.For<ICommandHandler<LocalLoginCommand, LocalAuthResponseDto>>();
         var challenge = new LocalIssuedReplacementChallenge(token: CreateOpaqueValue(), expiresAt: DateTimeOffset.UtcNow.AddMinutes(5));
-        sender.Send(Arg.Any<LocalLoginCommand>(), Arg.Any<CancellationToken>())
+        loginHandler.ExecuteAsync(Arg.Any<LocalLoginCommand>(), Arg.Any<CancellationToken>())
             .Returns(LocalAuthResponseDto.ReplacementRequired(challenge: challenge));
-        LocalAuthController controller = CreateController(sender);
+        LocalAuthController controller = CreateController(loginHandler);
 
         ActionResult<LocalAuthResponseDto> result = await controller.Login(
             new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateOpaqueValue()), CancellationToken.None);
@@ -35,7 +35,7 @@ public sealed class LocalAuthControllerTests
     [Test]
     public async Task LoginReturnsAuthenticatedSession()
     {
-        var sender = Substitute.For<ISender>();
+        var loginHandler = Substitute.For<ICommandHandler<LocalLoginCommand, LocalAuthResponseDto>>();
         LocalAuthResponseDto response = LocalAuthResponseDto.Authenticated(
             userId: Guid.CreateVersion7(),
             email: "admin@example.test",
@@ -45,11 +45,11 @@ public sealed class LocalAuthControllerTests
             roles: [],
             token: CreateOpaqueValue(),
             expiresAt: DateTimeOffset.UtcNow.AddMinutes(30));
-        sender.Send(
+        loginHandler.ExecuteAsync(
                 Arg.Any<LocalLoginCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(response);
-        LocalAuthController controller = CreateController(sender);
+        LocalAuthController controller = CreateController(loginHandler);
 
         ActionResult<LocalAuthResponseDto> result = await controller.Login(
             new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateOpaqueValue()),
@@ -71,12 +71,12 @@ public sealed class LocalAuthControllerTests
     public async Task TypedFailureReturnsBoundedProblemWithoutEchoingCredentials(
         LocalAuthFailure failure, int expectedStatus, string expectedCode)
     {
-        var sender = Substitute.For<ISender>();
-        sender.Send(
+        var loginHandler = Substitute.For<ICommandHandler<LocalLoginCommand, LocalAuthResponseDto>>();
+        loginHandler.ExecuteAsync(
                 Arg.Any<LocalLoginCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(LocalAuthResponseDto.Failed(failure: failure));
-        LocalAuthController controller = CreateController(sender);
+        LocalAuthController controller = CreateController(loginHandler);
         string password = CreateOpaqueValue();
 
         ActionResult<LocalAuthResponseDto> result = await controller.Login(
@@ -92,8 +92,8 @@ public sealed class LocalAuthControllerTests
         await Assert.That(problem?.Detail).DoesNotContain(password);
     }
 
-    private static LocalAuthController CreateController(ISender sender) =>
-        new(sender)
+    private static LocalAuthController CreateController(ICommandHandler<LocalLoginCommand, LocalAuthResponseDto> loginHandler) =>
+        new(loginHandler)
         {
             ControllerContext = new ControllerContext
             {

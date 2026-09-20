@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
-public class MarkNotificationAsReadCommandHandler : IRequestHandler<MarkNotificationAsReadCommand, BaseCommandResponse<Guid>>
+public class MarkNotificationAsReadCommandHandler : ICommandHandler<MarkNotificationAsReadCommand, BaseCommandResponse<Guid>>
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -19,7 +19,7 @@ public class MarkNotificationAsReadCommandHandler : IRequestHandler<MarkNotifica
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(MarkNotificationAsReadCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(MarkNotificationAsReadCommand request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

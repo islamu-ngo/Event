@@ -42,7 +42,7 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             settingsResolver,
             s3ConfigResolver);
 
-        var result = await handler.Handle(CreateCommand(), CancellationToken.None);
+        var result = await handler.ExecuteAsync(CreateCommand(), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("StorageTenantOverridesLocked");
@@ -77,7 +77,7 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             settingsResolver,
             s3ConfigResolver);
 
-        var result = await handler.Handle(CreateCommand(maxUploadBytes: 101), CancellationToken.None);
+        var result = await handler.ExecuteAsync(CreateCommand(maxUploadBytes: 101), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Message).IsEqualTo("Tenant storage settings validation failed.");
@@ -114,7 +114,7 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             settingsResolver,
             s3ConfigResolver);
 
-        var result = await handler.Handle(CreateCommand(), CancellationToken.None);
+        var result = await handler.ExecuteAsync(CreateCommand(), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Message).Contains("Only tenant administrators");
@@ -150,7 +150,7 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             Settings = new PatchTenantStorageSettingsDto()
         };
 
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Errors!.Any(error => error.Contains("at least one", StringComparison.OrdinalIgnoreCase))).IsTrue();
@@ -200,7 +200,7 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             settingsResolver,
             s3ConfigResolver);
 
-        var result = await handler.Handle(CreateCommand(), CancellationToken.None);
+        var result = await handler.ExecuteAsync(CreateCommand(), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(unitOfWork.ExecutionCount).IsEqualTo(1);
@@ -240,7 +240,7 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             s3ConfigResolver);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.Handle(CreateCommand(), CancellationToken.None));
+            async () => await handler.ExecuteAsync(CreateCommand(), CancellationToken.None));
 
         await Assert.That(unitOfWork.ExecutionCount).IsEqualTo(1);
         settingsResolver.DidNotReceive().InvalidateCache(Arg.Any<SettingScope?>(), Arg.Any<Guid?>());

@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSession;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ViewManagement)]
-public sealed record GetEventSessionCreateContextRequest : IRequest<EventSessionCreateContextDto?>, ISecureRequest
+public sealed record GetEventSessionCreateContextRequest : IQuery<EventSessionCreateContextDto?>, ISecureRequest
 {
     public Guid EventId { get; init; }
 

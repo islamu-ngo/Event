@@ -10,8 +10,8 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -252,8 +252,8 @@ public sealed class AnonymousRegistrationReplayTests
 
     private static Task<GuestRegistrationOrderStartDto> StartAsync(IServiceProvider services,
         StartGuestRegistrationOrderCommand request, CancellationToken cancellationToken = default) =>
-        services.GetRequiredService<IRequestHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>()
-            .Handle(request, cancellationToken);
+        services.GetRequiredService<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>()
+            .ExecuteAsync(request, cancellationToken);
 
     private sealed class Clock : TimeProvider
     {

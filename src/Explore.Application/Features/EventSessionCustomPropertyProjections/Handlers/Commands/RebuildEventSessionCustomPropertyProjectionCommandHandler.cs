@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.CustomPropertyProjection.Validators;
@@ -5,12 +6,11 @@ using Explore.Application.Features.EventSessionCustomPropertyProjections.Request
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionCustomPropertyProjections.Handlers.Commands;
 
 public class RebuildEventSessionCustomPropertyProjectionCommandHandler
-    : IRequestHandler<RebuildEventSessionCustomPropertyProjectionCommand, BaseCommandResponse<RebuildProjectionResponseDto>>
+    : ICommandHandler<RebuildEventSessionCustomPropertyProjectionCommand, BaseCommandResponse<RebuildProjectionResponseDto>>
 {
     private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
@@ -26,7 +26,7 @@ public class RebuildEventSessionCustomPropertyProjectionCommandHandler
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<RebuildProjectionResponseDto>> Handle(
+    public async Task<BaseCommandResponse<RebuildProjectionResponseDto>> ExecuteAsync(
         RebuildEventSessionCustomPropertyProjectionCommand request,
         CancellationToken cancellationToken)
     {

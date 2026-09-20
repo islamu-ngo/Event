@@ -9,12 +9,12 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Categories.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Categories.Handlers.Commands;
 
-public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryCommand, BaseCommandResponse<Guid>>
+public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly HybridCache _cache;
@@ -27,7 +27,7 @@ public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryComman
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateCategoryCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateCategoryCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateCategoryDtoValidator(request.CategoryId, _categoryRepository);
         var validationResult = await validator.ValidateAsync(request.UpdateCategoryDto, cancellationToken);

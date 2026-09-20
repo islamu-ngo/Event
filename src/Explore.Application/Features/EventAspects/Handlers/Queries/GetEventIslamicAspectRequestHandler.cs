@@ -2,33 +2,30 @@ namespace Explore.Application.Features.EventAspects.Handlers.Queries;
 
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.EventAspects.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Handler for retrieving the Islamic aspect of an event.
 /// </summary>
 public class GetEventIslamicAspectRequestHandler :
-    IRequestHandler<GetEventIslamicAspectRequest, EventIslamicAspectDto?>
+    IQueryHandler<GetEventIslamicAspectRequest, EventIslamicAspectDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventIslamicAspectRepository _islamicAspectRepository;
-    private readonly IMapper _mapper;
 
     public GetEventIslamicAspectRequestHandler(
         IEventRepository eventRepository,
-        IEventIslamicAspectRepository islamicAspectRepository,
-        IMapper mapper)
+        IEventIslamicAspectRepository islamicAspectRepository)
     {
         _eventRepository = eventRepository;
         _islamicAspectRepository = islamicAspectRepository;
-        _mapper = mapper;
     }
 
-    public async Task<EventIslamicAspectDto?> Handle(GetEventIslamicAspectRequest request, CancellationToken cancellationToken)
+    public async Task<EventIslamicAspectDto?> QueryAsync(GetEventIslamicAspectRequest request, CancellationToken cancellationToken)
     {
         var parentEvent = await _eventRepository.GetById(request.EventId);
         if (parentEvent is null || !await _eventRepository.IsPubliclyEligibleAsync(
@@ -49,20 +46,19 @@ public class GetEventIslamicAspectRequestHandler :
             return null;
         }
 
-        return _mapper.Map<EventIslamicAspectDto>(aspect);
+        return EventMapper.ToDetail(aspect);
     }
 }
 
 public sealed class GetManagedEventIslamicAspectRequestHandler(
-    IEventIslamicAspectRepository islamicAspectRepository,
-    IMapper mapper)
-    : IRequestHandler<GetManagedEventIslamicAspectRequest, EventIslamicAspectDto?>
+    IEventIslamicAspectRepository islamicAspectRepository)
+    : IQueryHandler<GetManagedEventIslamicAspectRequest, EventIslamicAspectDto?>
 {
-    public async Task<EventIslamicAspectDto?> Handle(
+    public async Task<EventIslamicAspectDto?> QueryAsync(
         GetManagedEventIslamicAspectRequest request,
         CancellationToken cancellationToken)
     {
         var aspect = await islamicAspectRepository.GetByEventIdWithDetails(request.EventId);
-        return aspect is null ? null : mapper.Map<EventIslamicAspectDto>(aspect);
+        return EventMapper.ToDetail(aspect);
     }
 }

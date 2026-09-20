@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using Explore.Application.DTOs.ActorType;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorTypes.Requests.Queries;
 
-public sealed record GetActorTypeListRequest : IRequest<List<ActorTypeListDto>>
+public sealed record GetActorTypeListRequest : IQuery<List<ActorTypeListDto>>
 {
 }

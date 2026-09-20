@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Tenants.Requests.Commands.ReorderTenantNavLinks;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands.ReorderTenantNavLinks;
 
@@ -16,7 +16,7 @@ namespace Explore.Application.Features.Tenants.Handlers.Commands.ReorderTenantNa
 /// Updates the display order of multiple navigation links for the current tenant.
 /// Verifies all links belong to the tenant before updating.
 /// </summary>
-public class ReorderTenantNavLinksCommandHandler : IRequestHandler<ReorderTenantNavLinksCommand, BaseCommandResponse<bool>>
+public class ReorderTenantNavLinksCommandHandler : ICommandHandler<ReorderTenantNavLinksCommand, BaseCommandResponse<bool>>
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
@@ -29,7 +29,7 @@ public class ReorderTenantNavLinksCommandHandler : IRequestHandler<ReorderTenant
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<bool>> Handle(ReorderTenantNavLinksCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<bool>> ExecuteAsync(ReorderTenantNavLinksCommand request, CancellationToken cancellationToken = default)
     {
         if (request.NavigationLinkOrders?.Count == 0)
         {

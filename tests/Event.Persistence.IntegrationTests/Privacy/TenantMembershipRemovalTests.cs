@@ -35,10 +35,10 @@ public sealed class TenantMembershipRemovalTests(TenantMembershipRemovalPostgreS
         await using var context = fixture.CreateTenantContext(scenario.TenantAId, scenario.UserId);
         var handler = CreateHandler(context, scenario.TenantAId, scenario.UserId);
 
-        var first = await handler.Handle(
+        var first = await handler.ExecuteAsync(
             new RemoveTenantMembershipCommand(scenario.TenantAId, scenario.UserId),
             CancellationToken.None);
-        var replay = await handler.Handle(
+        var replay = await handler.ExecuteAsync(
             new RemoveTenantMembershipCommand(scenario.TenantAId, scenario.UserId),
             CancellationToken.None);
 
@@ -58,8 +58,8 @@ public sealed class TenantMembershipRemovalTests(TenantMembershipRemovalPostgreS
         var command = new RemoveTenantMembershipCommand(scenario.TenantAId, scenario.UserId);
 
         var results = await Task.WhenAll(
-            handlerA.Handle(command, CancellationToken.None),
-            handlerB.Handle(command, CancellationToken.None));
+            handlerA.ExecuteAsync(command, CancellationToken.None),
+            handlerB.ExecuteAsync(command, CancellationToken.None));
 
         await Assert.That(results.Count(result => result)).IsEqualTo(1);
         await Assert.That(results.Count(result => !result)).IsEqualTo(1);

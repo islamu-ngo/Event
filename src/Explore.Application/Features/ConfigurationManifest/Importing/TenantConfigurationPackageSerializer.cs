@@ -1,6 +1,7 @@
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Text.Json;
+using Explore.Application.DTOs.PaidEventPolicies;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 public static class TenantConfigurationPackageSerializer
@@ -34,7 +35,8 @@ public static class TenantConfigurationPackageSerializer
                     AuthorityScope = ConfigurationManifestExportMetadataValues
                         .TenantAuthorityScope,
                     SovereignValuesOmitted = true,
-                    SovereignLockedFields = []
+                    SovereignLockedFields =
+                        PaidEventPolicyAuthorityMetadata.SovereignLockedFields
                 }
             },
             Spec = new TenantConfigurationPackageSpecV1Alpha2

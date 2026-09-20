@@ -1,15 +1,16 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace Explore.API.Mcp;
 
 [McpServerToolType]
-public sealed class AiAssistantMcpTools(IMediator mediator)
+public sealed class AiAssistantMcpTools(ICommandHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>> proposeHandler)
 {
     [McpServerTool(
         Name = "propose_ai_tool_action",
@@ -36,7 +37,7 @@ public sealed class AiAssistantMcpTools(IMediator mediator)
 
         try
         {
-            var response = await mediator.Send(
+            var response = await proposeHandler.ExecuteAsync(
                 new ProposeAiToolActionCommand
                 {
                     ConversationId = conversationId,

@@ -1,0 +1,31 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DB44F9NASQ5YE9GM0JBBCM
+Title: "Isolate shared definition caches and refresh committed mutations"
+Type: fix
+Scope: privacy
+Summary: "Shared Organization and Group definition lists stay tenant-isolated and refresh every affected page after committed changes."
+Group: custom-property-cache-repair
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: mitigated
+    Public-Disclosure: documented
+    Detail: "Shared definition list caches use trusted tenant partitions; cached definition data cannot cross tenants."
+  Migration:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/custom-properties.md
+    Disposition: documented
+    Detail: "Replace all older API instances. New tenant-scoped keys do not reuse legacy cache entries; no migration or all-tenant flush is required. Reload before retrying a post-commit cache error."

@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Features.ContactShareConsents.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.ContactShareConsents.Handlers.Queries;
 
-public class GetOrganizationSharedContactsQueryHandler : IRequestHandler<GetOrganizationSharedContactsQuery, PaginatedResult<SharedContactDto>>
+public class GetOrganizationSharedContactsQueryHandler : IQueryHandler<GetOrganizationSharedContactsQuery, PaginatedResult<SharedContactDto>>
 {
     private readonly IEventContactShareConsentRepository _consentRepository;
     private readonly IActorRepository _actorRepository;
@@ -27,7 +27,7 @@ public class GetOrganizationSharedContactsQueryHandler : IRequestHandler<GetOrga
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<SharedContactDto>> Handle(GetOrganizationSharedContactsQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<SharedContactDto>> QueryAsync(GetOrganizationSharedContactsQuery request, CancellationToken cancellationToken = default)
     {
         // Validate actor is an approved organisation
         var actor = await _actorRepository.GetById(request.RecipientActorId);

@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EventSessionGroup, AuthorizationActions.Delete)]
-public sealed record DeleteEventSessionGroupCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record DeleteEventSessionGroupCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid Id { get; init; }
     public Guid EventId { get; init; }

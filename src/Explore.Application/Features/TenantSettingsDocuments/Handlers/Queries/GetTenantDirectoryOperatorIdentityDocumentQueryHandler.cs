@@ -6,16 +6,16 @@ using Explore.Application.Features.TenantSettingsDocuments.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public sealed class GetTenantDirectoryOperatorIdentityDocumentQueryHandler(
     ITenantContext tenantContext,
     ITypedSettingsDocumentResolver settingsDocumentResolver)
-    : IRequestHandler<
+    : IQueryHandler<
         GetTenantDirectoryOperatorIdentityDocumentQuery,
         TenantDirectoryOperatorIdentityDocumentDto?>
 {
-    public async Task<TenantDirectoryOperatorIdentityDocumentDto?> Handle(
+    public async Task<TenantDirectoryOperatorIdentityDocumentDto?> QueryAsync(
         GetTenantDirectoryOperatorIdentityDocumentQuery request,
         CancellationToken cancellationToken)
     {

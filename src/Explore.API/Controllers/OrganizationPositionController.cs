@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.OrganizationPosition;
 using Explore.Application.Features.OrganizationPositions.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class OrganizationPositionController(IMediator mediator) : ControllerBase
+public class OrganizationPositionController(
+    IQueryHandler<GetOrganizationPositionListRequest, List<OrganizationPositionListDto>> organizationPositionList,
+    IQueryHandler<GetOrganizationPositionDetailsRequest, OrganizationPositionDto?> organizationPositionDetails) : ControllerBase
 {
 
     // GET: api/organizationposition
@@ -29,7 +31,7 @@ public class OrganizationPositionController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<OrganizationPositionListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var organizationPositions = await mediator.Send(new GetOrganizationPositionListRequest(), cancellationToken);
+        var organizationPositions = await organizationPositionList.QueryAsync(new GetOrganizationPositionListRequest(), cancellationToken);
         return Ok(organizationPositions);
     }
 
@@ -43,7 +45,7 @@ public class OrganizationPositionController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<OrganizationPositionDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var organizationPosition = await mediator.Send(new GetOrganizationPositionDetailsRequest { Id = id }, cancellationToken);
+        var organizationPosition = await organizationPositionDetails.QueryAsync(new GetOrganizationPositionDetailsRequest { Id = id }, cancellationToken);
         return Ok(organizationPosition);
     }
 }

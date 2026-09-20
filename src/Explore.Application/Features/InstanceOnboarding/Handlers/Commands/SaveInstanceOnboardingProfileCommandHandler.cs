@@ -1,4 +1,5 @@
 using System.Linq;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding.Validators;
@@ -7,7 +8,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
@@ -17,9 +17,9 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger instanceBootstrapAuditLogger,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SaveInstanceOnboardingProfileCommand request,
         CancellationToken cancellationToken)
     {

@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
-public class DeleteNotificationCommandHandler : IRequestHandler<DeleteNotificationCommand, bool>
+public class DeleteNotificationCommandHandler : ICommandHandler<DeleteNotificationCommand, bool>
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -18,7 +18,7 @@ public class DeleteNotificationCommandHandler : IRequestHandler<DeleteNotificati
         _currentUserService = currentUserService;
     }
 
-    public async Task<bool> Handle(DeleteNotificationCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteNotificationCommand request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

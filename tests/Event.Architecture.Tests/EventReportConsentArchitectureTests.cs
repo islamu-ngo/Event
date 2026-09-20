@@ -18,7 +18,7 @@ public sealed class EventReportConsentArchitectureTests
         var actionEnd = controller.IndexOf("private string? ComputeReporterFingerprintHash", StringComparison.Ordinal);
         var action = controller[actionStart..actionEnd];
 
-        await Assert.That(action).Contains("_mediator.Send(");
+        await Assert.That(action).Contains("_updateConsentHandler.ExecuteAsync(");
         await Assert.That(action).Contains("_myReportResourceAssembler.ToResource(");
         await Assert.That(action).DoesNotContain("IEventReportRepository");
         await Assert.That(action).DoesNotContain("IUnitOfWork");

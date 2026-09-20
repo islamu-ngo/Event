@@ -7,7 +7,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Commands;
 
@@ -17,9 +17,9 @@ public sealed class CreateEventPublicActionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<CreateEventPublicActionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateEventPublicActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateEventPublicActionCommand request,
         CancellationToken cancellationToken)
     {

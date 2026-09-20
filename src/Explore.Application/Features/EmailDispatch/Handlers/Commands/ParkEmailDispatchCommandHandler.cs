@@ -3,11 +3,11 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
-public sealed class ParkEmailDispatchCommandHandler : IRequestHandler<ParkEmailDispatchCommand, BaseCommandResponse<Guid>>
+public sealed class ParkEmailDispatchCommandHandler : ICommandHandler<ParkEmailDispatchCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEmailDispatchOutboxRepository _repository;
 
@@ -16,7 +16,7 @@ public sealed class ParkEmailDispatchCommandHandler : IRequestHandler<ParkEmailD
         _repository = repository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ParkEmailDispatchCommand request,
         CancellationToken cancellationToken)
     {

@@ -4,9 +4,9 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.AdmissionTickets;
 using Explore.Application.Features.AdmissionTickets.Requests.Commands;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -16,7 +16,9 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [ApiController]
 [Route("api/tickets")]
-public sealed class AdmissionTicketRecoveryController(IMediator mediator) : ControllerBase
+public sealed class AdmissionTicketRecoveryController(
+    ICommandHandler<RequestAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryRequestResultDto> requestRecoveryHandler,
+    ICommandHandler<RedeemAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryConsumeResultDto> redeemRecoveryHandler) : ControllerBase
 {
     private const string RecoveryCapabilityHeader =
         "X-Admission-Ticket-Recovery-Capability";
@@ -37,7 +39,7 @@ public sealed class AdmissionTicketRecoveryController(IMediator mediator) : Cont
         [FromBody] RequestAdmissionTicketRecoveryCommand? request,
         CancellationToken cancellationToken)
     {
-        AdmissionTicketRecoveryRequestResultDto result = await mediator.Send(
+        AdmissionTicketRecoveryRequestResultDto result = await requestRecoveryHandler.ExecuteAsync(
             request ?? new RequestAdmissionTicketRecoveryCommand(string.Empty),
             cancellationToken);
         return Accepted(result);
@@ -56,7 +58,7 @@ public sealed class AdmissionTicketRecoveryController(IMediator mediator) : Cont
         [FromHeader(Name = RecoveryCapabilityHeader)] string? capability,
         CancellationToken cancellationToken)
     {
-        AdmissionTicketRecoveryConsumeResultDto? result = await mediator.Send(
+        AdmissionTicketRecoveryConsumeResultDto? result = await redeemRecoveryHandler.ExecuteAsync(
             new RedeemAdmissionTicketRecoveryCommand(capability ?? string.Empty),
             cancellationToken);
         return result is null

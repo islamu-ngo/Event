@@ -3,7 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.StatusType;
 using Explore.Application.Features.StatusTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -14,7 +14,8 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class ApprovalStatusController(IMediator mediator) : ControllerBase
+public class ApprovalStatusController(
+    IQueryHandler<GetStatusTypeListRequest, List<StatusTypeListDto>> approvalStatuses) : ControllerBase
 {
 
     [HttpGet(Name = RouteNames.GetApprovalStatusOptions)]
@@ -24,7 +25,7 @@ public class ApprovalStatusController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<StatusTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var statusTypes = await mediator.Send(new GetStatusTypeListRequest { FullName = string.Empty }, cancellationToken);
+        var statusTypes = await approvalStatuses.QueryAsync(new GetStatusTypeListRequest(), cancellationToken);
         return Ok(statusTypes);
     }
 }

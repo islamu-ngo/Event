@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Permission;
 using Explore.Application.Features.Permissions.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Permissions.Handlers.Queries;
 
-public class GetRolePermissionsRequestHandler : IRequestHandler<GetRolePermissionsRequest, List<RolePermissionDto>>
+public class GetRolePermissionsRequestHandler : IQueryHandler<GetRolePermissionsRequest, List<RolePermissionDto>>
 {
     private readonly IRoleRepository _roleRepository;
 
@@ -14,7 +14,7 @@ public class GetRolePermissionsRequestHandler : IRequestHandler<GetRolePermissio
         _roleRepository = roleRepository;
     }
 
-    public async Task<List<RolePermissionDto>> Handle(GetRolePermissionsRequest request, CancellationToken cancellationToken)
+    public async Task<List<RolePermissionDto>> QueryAsync(GetRolePermissionsRequest request, CancellationToken cancellationToken)
     {
         var role = await _roleRepository.GetByIdAsync(request.RoleId);
         if (role == null)

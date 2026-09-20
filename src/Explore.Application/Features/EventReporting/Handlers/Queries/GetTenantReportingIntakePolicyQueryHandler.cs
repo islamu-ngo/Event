@@ -1,5 +1,6 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventReporting.Requests.Queries;
@@ -7,16 +8,15 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
 
 public sealed class GetTenantReportingIntakePolicyQueryHandler(
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settingsResolver)
-    : IRequestHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto>
+    : IQueryHandler<GetTenantReportingIntakePolicyQuery, TenantReportingIntakePolicyDto>
 {
-    public async Task<TenantReportingIntakePolicyDto> Handle(
+    public async Task<TenantReportingIntakePolicyDto> QueryAsync(
         GetTenantReportingIntakePolicyQuery request,
         CancellationToken cancellationToken)
     {

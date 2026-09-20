@@ -8,17 +8,18 @@ using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.API.OpenApi;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.Promotions.Requests.Commands;
+using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -47,11 +48,11 @@ public sealed class RegistrationOrderControllerTests
         await AssertRoute<GuestRegistrationOrderController, HttpPostAttribute>(
             nameof(GuestRegistrationOrderController.ContinueGuest), "guest/{orderId:guid}/continue", RouteNames.ContinueGuestRegistrationOrder,
             EndpointClass.PublicTransactional, requiresIdempotency: true);
-        await AssertRoute<GuestRegistrationOrderController, HttpPostAttribute>(
-            nameof(GuestRegistrationOrderController.ApplyGuestPromotion), "guest/{orderId:guid}/promotion", RouteNames.ApplyGuestRegistrationOrderPromotion,
+        await AssertRoute<GuestRegistrationOrderPromotionsController, HttpPostAttribute>(
+            nameof(GuestRegistrationOrderPromotionsController.ApplyGuestPromotion), "guest/{orderId:guid}/promotion", RouteNames.ApplyGuestRegistrationOrderPromotion,
             EndpointClass.PublicTransactional, requiresIdempotency: true);
-        await AssertRoute<GuestRegistrationOrderController, HttpDeleteAttribute>(
-            nameof(GuestRegistrationOrderController.RemoveGuestPromotion), "guest/{orderId:guid}/promotion", RouteNames.RemoveGuestRegistrationOrderPromotion,
+        await AssertRoute<GuestRegistrationOrderPromotionsController, HttpDeleteAttribute>(
+            nameof(GuestRegistrationOrderPromotionsController.RemoveGuestPromotion), "guest/{orderId:guid}/promotion", RouteNames.RemoveGuestRegistrationOrderPromotion,
             EndpointClass.PublicTransactional, requiresIdempotency: true);
         await AssertRoute<GuestRegistrationOrderController, HttpPostAttribute>(
             nameof(GuestRegistrationOrderController.FinalizeGuest), "guest/{orderId:guid}/finalize", RouteNames.FinalizeGuestRegistrationOrder,
@@ -60,8 +61,8 @@ public sealed class RegistrationOrderControllerTests
             nameof(GuestRegistrationOrderController.CancelGuest), "guest/{orderId:guid}", RouteNames.CancelGuestRegistrationOrder,
             EndpointClass.PublicTransactional, requiresIdempotency: true);
 
-        await AssertRoute<GuestRegistrationOrderController, HttpPostAttribute>(
-            nameof(GuestRegistrationOrderController.ClaimGuest), "guest/{orderId:guid}/claim", RouteNames.ClaimGuestRegistrationOrder,
+        await AssertRoute<GuestRegistrationOrderClaimController, HttpPostAttribute>(
+            nameof(GuestRegistrationOrderClaimController.ClaimGuest), "guest/{orderId:guid}/claim", RouteNames.ClaimGuestRegistrationOrder,
             EndpointClass.Authenticated, requiresIdempotency: true);
 
         MethodInfo guestRead = controller.GetMethod(nameof(GuestRegistrationOrderController.GetGuest))!;
@@ -115,7 +116,6 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task AttemptLaunchRequests_ForwardOptionalSupersededAttemptForExplicitRestart()
     {
-        var mediator = Substitute.For<IMediator>();
         Guid oldAttemptId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -124,39 +124,43 @@ public sealed class RegistrationOrderControllerTests
         Guid formId = Guid.CreateVersion7();
         Guid versionId = Guid.CreateVersion7();
         Guid bindingId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<LaunchAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        var launchAttemptHandler = Substitute.For<ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>();
+        var launchProviderHandler = Substitute.For<ICommandHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>>();
+        launchAttemptHandler.ExecuteAsync(Arg.Any<LaunchAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(new NativeRegistrationAttemptResult(true, Guid.CreateVersion7(), requirementId, channelId, formId, versionId,
                 DateTime.UtcNow.AddMinutes(10), new NativeRegistrationFormDefinitionDto(versionId, 1, "en", null, [], []), [],
                 new NativeRegistrationRequirementProgressDto(0, 0, 0, 0, false), false, "raw-token"));
-        mediator.Send(Arg.Any<LaunchAuthenticatedRegistrationProviderAttemptCommand>(), Arg.Any<CancellationToken>())
+        launchProviderHandler.ExecuteAsync(Arg.Any<LaunchAuthenticatedRegistrationProviderAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(new RegistrationProviderAttemptResult(true, Guid.CreateVersion7(), new NativeRegistrationProviderLaunchDescriptorDto(
                 Guid.CreateVersion7(), requirementId, channelId, bindingId, formId, versionId, "redirect", true,
                 "https://forms.example.test/start", "Provider registration", true, "manual", "ok", [],
                 new NativeRegistrationRequirementProgressDto(0, 0, 0, 0, false))));
-        var controller = CreateController<AuthenticatedRegistrationOrderController>(mediator);
+        var controller = CreateAuthenticatedController(
+            launchAttemptHandler: launchAttemptHandler,
+            launchProviderHandler: launchProviderHandler);
 
         await controller.LaunchAuthenticatedNativeAttempt(eventId, orderId, "idem", new LaunchNativeRegistrationAttemptRequest(
             requirementId, channelId, formId, versionId, null, oldAttemptId));
         await controller.LaunchAuthenticatedProviderAttempt(eventId, orderId, new LaunchRegistrationProviderAttemptRequest(
             requirementId, channelId, bindingId, formId, versionId, oldAttemptId));
 
-        _ = mediator.Received(1).Send(Arg.Is<LaunchAuthenticatedNativeRegistrationAttemptCommand>(command =>
+        _ = launchAttemptHandler.Received(1).ExecuteAsync(Arg.Is<LaunchAuthenticatedNativeRegistrationAttemptCommand>(command =>
             command.SupersededAttemptId == oldAttemptId), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<LaunchAuthenticatedRegistrationProviderAttemptCommand>(command =>
+        _ = launchProviderHandler.Received(1).ExecuteAsync(Arg.Is<LaunchAuthenticatedRegistrationProviderAttemptCommand>(command =>
             command.SupersededAttemptId == oldAttemptId), Arg.Any<CancellationToken>());
     }
 
     [Test]
     public async Task GuestParticipantRoutes_KeepCapabilityInHeaderAndWritesTransactional()
     {
-        await AssertRoute<GuestRegistrationOrderController, HttpGetAttribute>(
-            nameof(GuestRegistrationOrderController.GetGuestParticipants), "guest/{orderId:guid}/participants", RouteNames.GetGuestRegistrationOrderParticipants,
+        await AssertRoute<GuestRegistrationOrderParticipantsController, HttpGetAttribute>(
+            nameof(GuestRegistrationOrderParticipantsController.GetGuestParticipants), "guest/{orderId:guid}/participants", RouteNames.GetGuestRegistrationOrderParticipants,
             EndpointClass.Public, requiresIdempotency: false);
-        await AssertRoute<GuestRegistrationOrderController, HttpPostAttribute>(
-            nameof(GuestRegistrationOrderController.AddGuestParticipant), "guest/{orderId:guid}/participants", RouteNames.AddGuestRegistrationOrderParticipant,
+        await AssertRoute<GuestRegistrationOrderParticipantsController, HttpPostAttribute>(
+            nameof(GuestRegistrationOrderParticipantsController.AddGuestParticipant), "guest/{orderId:guid}/participants", RouteNames.AddGuestRegistrationOrderParticipant,
             EndpointClass.PublicTransactional, requiresIdempotency: true);
 
-        MethodInfo read = typeof(GuestRegistrationOrderController).GetMethod(nameof(GuestRegistrationOrderController.GetGuestParticipants))!;
+        MethodInfo read = typeof(GuestRegistrationOrderParticipantsController).GetMethod(nameof(GuestRegistrationOrderParticipantsController.GetGuestParticipants))!;
         ParameterInfo capability = read.GetParameters()
             .Single(parameter => parameter.GetCustomAttribute<FromHeaderAttribute>()?.Name == CapabilityHeader);
         await Assert.That(capability.ParameterType).IsEqualTo(typeof(string));
@@ -185,24 +189,26 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task GetEventOrders_DispatchesEventScopedQueryAndAssemblesHalCollection()
     {
-        var mediator = Substitute.For<IMediator>();
+        var checkoutHandler = Substitute.For<IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>>();
+        var eventOrdersHandler = Substitute.For<IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>>();
         var assembler = Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         var eventId = Guid.CreateVersion7();
         IReadOnlyList<RegistrationOrderDto> orders = [new RegistrationOrderDto { Id = Guid.CreateVersion7(), EventId = eventId }];
         var collection = new HalCollectionResource<RegistrationOrderDto>();
-        mediator.Send(Arg.Any<GetEventRegistrationOrdersQuery>(), Arg.Any<CancellationToken>()).Returns(orders);
+        eventOrdersHandler.QueryAsync(Arg.Any<GetEventRegistrationOrdersQuery>(), Arg.Any<CancellationToken>()).Returns(orders);
         assembler.ToCollectionResource(
                 Arg.Any<IEnumerable<RegistrationOrderDto>>(),
                 RouteNames.GetEventRegistrationOrders,
                 Arg.Any<object?>(),
                 Arg.Any<HttpContext>())
             .Returns(collection);
-        var controller = CreateController<RegistrationOrderController>(mediator, assembler);
+        var controller = new RegistrationOrderController(checkoutHandler, eventOrdersHandler, assembler);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         ActionResult<HalCollectionResource<RegistrationOrderDto>> result = await controller.GetEventOrders(eventId);
 
         await Assert.That((result.Result as OkObjectResult)?.Value).IsEqualTo(collection);
-        _ = mediator.Received(1).Send(
+        _ = eventOrdersHandler.Received(1).QueryAsync(
             Arg.Is<GetEventRegistrationOrdersQuery>(query => query.EventId == eventId),
             Arg.Any<CancellationToken>());
     }
@@ -233,13 +239,13 @@ public sealed class RegistrationOrderControllerTests
     public async Task StartGuest_EmitsCapabilityOnlyInResponseHeader()
     {
         var token = "opaque-guest-capability";
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<StartGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
+        var startHandler = Substitute.For<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>();
+        startHandler.ExecuteAsync(Arg.Any<StartGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(GuestRegistrationOrderStartDto.Success(
                 Guid.CreateVersion7(),
                 message: null,
                 guestCapabilityToken: token)));
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var controller = CreateGuestController(startHandler: startHandler);
         var request = CreateStartRequest(platformContributionBasisPoints: 500);
         var eventId = Guid.CreateVersion7();
 
@@ -249,7 +255,7 @@ public sealed class RegistrationOrderControllerTests
         await Assert.That(created).IsNotNull();
         await Assert.That(controller.Response.Headers[CapabilityHeader].ToString()).IsEqualTo(token);
         await Assert.That(JsonSerializer.Serialize(created!.Value)).DoesNotContain(token);
-        _ = mediator.Received(1).Send(
+        _ = startHandler.Received(1).ExecuteAsync(
             Arg.Is<StartGuestRegistrationOrderCommand>(command => command.PlatformContributionBasisPoints == 500),
             Arg.Any<CancellationToken>());
     }
@@ -257,10 +263,10 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task GuestAccessFailures_ReturnGenericNotFoundWithoutCapabilityDisclosure()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>())
+        var getGuestHandler = Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>();
+        getGuestHandler.QueryAsync(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<GuestRegistrationOrderDto?>(null));
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var controller = CreateGuestController(getGuestHandler: getGuestHandler);
 
         ActionResult<HalResource<GuestRegistrationOrderDto>> result = await controller.GetGuest(
             Guid.CreateVersion7(), Guid.CreateVersion7(), "guessed-capability");
@@ -273,17 +279,26 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task PromotionRoutes_DispatchCapabilityAndCurrentAccountWrappersAndGenericFailures()
     {
-        var mediator = Substitute.For<IMediator>();
         var eventId = Guid.CreateVersion7();
         var orderId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<ApplyGuestPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
-        mediator.Send(Arg.Any<RemoveGuestPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
-        mediator.Send(Arg.Any<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
-        mediator.Send(Arg.Any<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
+        var applyGuestHandler = Substitute.For<ICommandHandler<ApplyGuestPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+        var removeGuestHandler = Substitute.For<ICommandHandler<RemoveGuestPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+        var applyAuthHandler = Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+        var removeAuthHandler = Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>();
+
+        applyGuestHandler.ExecuteAsync(Arg.Any<ApplyGuestPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
+        removeGuestHandler.ExecuteAsync(Arg.Any<RemoveGuestPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionFailure(orderId));
+        applyAuthHandler.ExecuteAsync(Arg.Any<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
+        removeAuthHandler.ExecuteAsync(Arg.Any<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(PromotionSuccess(orderId));
+
         // Guest and authenticated promotion now live on their own capability controllers; this test asserts
         // both doors behave identically, so it drives both.
-        var guestController = CreateController<GuestRegistrationOrderController>(mediator);
-        var authenticatedController = CreateController<AuthenticatedRegistrationOrderController>(mediator);
+        var guestController = new GuestRegistrationOrderPromotionsController(applyGuestHandler, removeGuestHandler);
+        guestController.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var authenticatedController = CreateAuthenticatedController(
+            applyPromotionHandler: applyAuthHandler,
+            removePromotionHandler: removeAuthHandler);
 
         var guestApply = await guestController.ApplyGuestPromotion(eventId, orderId, "guest-capability", new PromotionCodeRequest("SAVE10"), Guid.CreateVersion7().ToString("N"));
         var guestRemove = await guestController.RemoveGuestPromotion(eventId, orderId, "guest-capability", Guid.CreateVersion7().ToString("N"));
@@ -294,23 +309,27 @@ public sealed class RegistrationOrderControllerTests
         await Assert.That(JsonSerializer.Serialize((guestRemove.Result as ObjectResult)?.Value)).DoesNotContain("guest-capability");
         await Assert.That((authenticatedApply.Result as OkObjectResult)?.Value).IsTypeOf<PromotionRedemptionResponseDto>();
         await Assert.That((authenticatedRemove.Result as OkObjectResult)?.Value).IsTypeOf<PromotionRedemptionResponseDto>();
-        _ = mediator.Received(1).Send(Arg.Is<ApplyGuestPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.CapabilityToken == "guest-capability" && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<RemoveGuestPromotionFromRegistrationOrderCommand>(command => command.CapabilityToken == "guest-capability"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId), Arg.Any<CancellationToken>());
+        _ = applyGuestHandler.Received(1).ExecuteAsync(Arg.Is<ApplyGuestPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.CapabilityToken == "guest-capability" && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
+        _ = removeGuestHandler.Received(1).ExecuteAsync(Arg.Is<RemoveGuestPromotionFromRegistrationOrderCommand>(command => command.CapabilityToken == "guest-capability"), Arg.Any<CancellationToken>());
+        _ = applyAuthHandler.Received(1).ExecuteAsync(Arg.Is<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
+        _ = removeAuthHandler.Received(1).ExecuteAsync(Arg.Is<RemoveAuthenticatedPromotionFromRegistrationOrderCommand>(command => command.EventId == eventId && command.OrderId == orderId), Arg.Any<CancellationToken>());
     }
 
     [Test]
     public async Task ParticipantHalMutationRelationsFollowServerManageDecision()
     {
-        var mediator = Substitute.For<IMediator>();
+        var participantsHandler = Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>();
         var eventId = Guid.CreateVersion7();
         var orderId = Guid.CreateVersion7();
         var viewOnly = new RegistrationOrderParticipantsDto(orderId, [], []);
         var manageable = viewOnly with { CanManage = true };
-        mediator.Send(Arg.Any<GetAuthenticatedRegistrationOrderParticipantsQuery>(), Arg.Any<CancellationToken>())
+        participantsHandler.QueryAsync(Arg.Any<GetAuthenticatedRegistrationOrderParticipantsQuery>(), Arg.Any<CancellationToken>())
             .Returns(viewOnly, manageable);
-        var controller = CreateController<AuthenticatedRegistrationOrderController>(mediator);
+        var controller = CreateAuthenticatedController(
+            participantsQueryHandler: participantsHandler);
+        var url = Substitute.For<IUrlHelper>();
+        url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");
+        controller.Url = url;
 
         var organizerResult = await controller.GetAuthenticatedParticipants(eventId, orderId);
         var ownerResult = await controller.GetAuthenticatedParticipants(eventId, orderId);
@@ -327,13 +346,13 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task ContinueGuest_ForwardsContributionSelectionWithoutClientAmount()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<ContinueGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
+        var continueHandler = Substitute.For<ICommandHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>();
+        continueHandler.ExecuteAsync(Arg.Any<ContinueGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
             .Returns(GuestRegistrationOrderLifecycleResponseDto.Success(
                 Guid.CreateVersion7(),
                 message: null,
                 order: null));
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var controller = CreateGuestController(continueHandler: continueHandler);
 
         await controller.ContinueGuest(
             Guid.CreateVersion7(),
@@ -341,7 +360,7 @@ public sealed class RegistrationOrderControllerTests
             "guest-token",
             new ContinueRegistrationOrderRequest { PlatformContributionBasisPoints = 500 });
 
-        _ = mediator.Received(1).Send(
+        _ = continueHandler.Received(1).ExecuteAsync(
             Arg.Is<ContinueGuestRegistrationOrderCommand>(command => command.PlatformContributionBasisPoints == 500),
             Arg.Any<CancellationToken>());
     }
@@ -349,14 +368,14 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task AccountRequiredGuestStart_ReturnsAuthenticationRequiredWithoutCreatingAnAccount()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<StartGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
+        var startHandler = Substitute.For<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>();
+        startHandler.ExecuteAsync(Arg.Any<StartGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(GuestRegistrationOrderStartDto.Failure(
                 BaseCommandResponse.Failure<Guid>(
                     "registration_order_identity_required",
                     "Registration order requires an authenticated account.",
                     id: Guid.CreateVersion7()))));
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var controller = CreateGuestController(startHandler: startHandler);
 
         ActionResult<GuestRegistrationOrderStartDto> result = await controller.StartGuest(
             Guid.CreateVersion7(), CreateStartRequest());
@@ -369,19 +388,27 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task AuthenticatedReadAndLifecycle_AssembleHalResources()
     {
-        var mediator = Substitute.For<IMediator>();
+        var getHandler = Substitute.For<IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>>();
+        var continueHandler = Substitute.For<ICommandHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>();
+        var finalizeHandler = Substitute.For<ICommandHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>();
+        var cancelHandler = Substitute.For<ICommandHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>();
         var assembler = Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         var order = CreateOrder();
         var resource = new HalResource<RegistrationOrderDto>(order);
-        mediator.Send(Arg.Any<GetCurrentRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
-        mediator.Send(Arg.Any<ContinueAuthenticatedRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(
+        getHandler.QueryAsync(Arg.Any<GetCurrentRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
+        continueHandler.ExecuteAsync(Arg.Any<ContinueAuthenticatedRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(
             RegistrationOrderLifecycleResponseDto.Success(order.Id, message: null, order: order));
-        mediator.Send(Arg.Any<FinalizeAuthenticatedRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(
+        finalizeHandler.ExecuteAsync(Arg.Any<FinalizeAuthenticatedRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(
             RegistrationOrderLifecycleResponseDto.Success(order.Id, message: null, order: order));
-        mediator.Send(Arg.Any<CancelAuthenticatedRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(
+        cancelHandler.ExecuteAsync(Arg.Any<CancelAuthenticatedRegistrationOrderCommand>(), Arg.Any<CancellationToken>()).Returns(
             RegistrationOrderLifecycleResponseDto.Success(order.Id, message: null, order: order));
         assembler.ToResource(order, Arg.Any<HttpContext>()).Returns(resource);
-        var controller = CreateController<AuthenticatedRegistrationOrderController>(mediator, assembler);
+        var controller = CreateAuthenticatedController(
+            getHandler: getHandler,
+            continueHandler: continueHandler,
+            finalizeHandler: finalizeHandler,
+            cancelHandler: cancelHandler,
+            assembler: assembler);
 
         var current = await controller.GetCurrent(order.EventId, order.Id);
         var continued = await controller.ContinueAuthenticated(order.EventId, order.Id);
@@ -401,10 +428,10 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task GuestRead_ReturnsCapabilityScopedHalWithoutAuthenticatedAssembler()
     {
-        var mediator = Substitute.For<IMediator>();
         var guestOrder = new GuestRegistrationOrderDto { Id = Guid.CreateVersion7(), EventId = Guid.CreateVersion7() };
-        mediator.Send(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(guestOrder);
-        var controller = CreateGuestController(mediator, TimeProvider.System);
+        var getGuestHandler = Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>();
+        getGuestHandler.QueryAsync(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(guestOrder);
+        var controller = CreateGuestController(getGuestHandler: getGuestHandler, timeProvider: TimeProvider.System);
 
         ActionResult<HalResource<GuestRegistrationOrderDto>> result = await controller.GetGuest(
             guestOrder.EventId, guestOrder.Id, "opaque-capability");
@@ -421,7 +448,6 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task GuestReadyForCheckoutHal_WithoutPromotionExposesApplyOnlyWithoutCapabilityInUrls()
     {
-        var mediator = Substitute.For<IMediator>();
         var order = new GuestRegistrationOrderDto
         {
             Id = Guid.CreateVersion7(),
@@ -429,8 +455,9 @@ public sealed class RegistrationOrderControllerTests
             StatusId = (int)RegistrationOrderStatusEnum.ReadyForCheckout,
             StatusCode = "READY_FOR_CHECKOUT"
         };
-        mediator.Send(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var getGuestHandler = Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>();
+        getGuestHandler.QueryAsync(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
+        var controller = CreateGuestController(getGuestHandler: getGuestHandler);
 
         ActionResult<HalResource<GuestRegistrationOrderDto>> result = await controller.GetGuest(
             order.EventId, order.Id, "opaque-capability");
@@ -444,7 +471,6 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task GuestReadyForCheckoutHal_WithPromotionExposesRemoveOnlyWithoutCapabilityInUrls()
     {
-        var mediator = Substitute.For<IMediator>();
         var order = new GuestRegistrationOrderDto
         {
             Id = Guid.CreateVersion7(),
@@ -453,8 +479,9 @@ public sealed class RegistrationOrderControllerTests
             StatusCode = "READY_FOR_CHECKOUT",
             AppliedPromotionDisplayLabel = "Launch discount"
         };
-        mediator.Send(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var getGuestHandler = Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>();
+        getGuestHandler.QueryAsync(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
+        var controller = CreateGuestController(getGuestHandler: getGuestHandler);
 
         ActionResult<HalResource<GuestRegistrationOrderDto>> result = await controller.GetGuest(
             order.EventId, order.Id, "opaque-capability");
@@ -469,7 +496,6 @@ public sealed class RegistrationOrderControllerTests
     public async Task GuestAwaitingPaymentHal_WhenExpired_OmitsStartPayment()
     {
         DateTime utcNow = new(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
-        var mediator = Substitute.For<IMediator>();
         var order = new GuestRegistrationOrderDto
         {
             Id = Guid.CreateVersion7(),
@@ -479,8 +505,9 @@ public sealed class RegistrationOrderControllerTests
             TotalDueMinor = 1_000,
             ExpiresAt = utcNow.AddSeconds(-1)
         };
-        mediator.Send(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
-        var controller = CreateGuestController(mediator, new FixedTimeProvider(utcNow));
+        var getGuestHandler = Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>();
+        getGuestHandler.QueryAsync(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(order);
+        var controller = CreateGuestController(getGuestHandler: getGuestHandler, timeProvider: new FixedTimeProvider(utcNow));
 
         ActionResult<HalResource<GuestRegistrationOrderDto>> result = await controller.GetGuest(
             order.EventId, order.Id, "opaque-capability");
@@ -493,48 +520,86 @@ public sealed class RegistrationOrderControllerTests
     [Test]
     public async Task ClaimGuest_DispatchesCapabilityScopedCommandAndMapsConflict()
     {
-        var mediator = Substitute.For<IMediator>();
+        var claimHandler = Substitute.For<ICommandHandler<ClaimGuestRegistrationOrderCommand, BaseCommandResponse<Guid>>>();
         var orderId = Guid.CreateVersion7();
         var eventId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<ClaimGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
+        claimHandler.ExecuteAsync(Arg.Any<ClaimGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "registration_order_already_linked",
                 "Registration order is already linked to another account.",
                 id: orderId));
-        var controller = CreateController<GuestRegistrationOrderController>(mediator);
+        var controller = new GuestRegistrationOrderClaimController(claimHandler);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         ActionResult<BaseCommandResponse<Guid>> result = await controller.ClaimGuest(eventId, orderId, "guest-token");
 
         var conflict = result.Result as ConflictObjectResult;
         await Assert.That(conflict).IsNotNull();
-        _ = mediator.Received(1).Send(
+        _ = claimHandler.Received(1).ExecuteAsync(
             Arg.Is<ClaimGuestRegistrationOrderCommand>(command =>
                 command.EventId == eventId && command.OrderId == orderId && command.CapabilityToken == "guest-token"),
             Arg.Any<CancellationToken>());
     }
 
-    private static TController CreateController<TController>(
-        IMediator mediator,
-        IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>? assembler = null)
-        where TController : ControllerBase
+    private static GuestRegistrationOrderController CreateGuestController(
+        ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>? startHandler = null,
+        IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>? getGuestHandler = null,
+        ICommandHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>? continueHandler = null,
+        ICommandHandler<FinalizeGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>? finalizeHandler = null,
+        ICommandHandler<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>? cancelHandler = null,
+        TimeProvider? timeProvider = null,
+        IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>? statusHandler = null)
     {
-        IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> effectiveAssembler =
-            assembler ?? Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
-        object[] arguments = typeof(TController) == typeof(GuestRegistrationOrderController)
-            ? [mediator, TimeProvider.System]
-            : [mediator, effectiveAssembler];
-        var controller = (TController)Activator.CreateInstance(typeof(TController), arguments)!;
+        var controller = new GuestRegistrationOrderController(
+            startHandler ?? Substitute.For<ICommandHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>>(),
+            getGuestHandler ?? Substitute.For<IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>>(),
+            continueHandler ?? Substitute.For<ICommandHandler<ContinueGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>(),
+            finalizeHandler ?? Substitute.For<ICommandHandler<FinalizeGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>(),
+            cancelHandler ?? Substitute.For<ICommandHandler<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>>(),
+            timeProvider ?? TimeProvider.System,
+            statusHandler ?? Substitute.For<IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?>>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         var url = Substitute.For<IUrlHelper>();
         url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");
         controller.Url = url;
-
         return controller;
     }
 
-    private static GuestRegistrationOrderController CreateGuestController(IMediator mediator, TimeProvider timeProvider)
+    private static AuthenticatedRegistrationOrderController CreateAuthenticatedController(
+        ICommandHandler<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>? startHandler = null,
+        ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>? launchAttemptHandler = null,
+        IQueryHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>? progressHandler = null,
+        ICommandHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>? launchProviderHandler = null,
+        ICommandHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>? skipHandler = null,
+        ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>? submitHandler = null,
+        IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>? getHandler = null,
+        ICommandHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>? continueHandler = null,
+        ICommandHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>? finalizeHandler = null,
+        ICommandHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>? cancelHandler = null,
+        IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>? assembler = null,
+        ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>? applyPromotionHandler = null,
+        ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>? removePromotionHandler = null,
+        IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>? participantsQueryHandler = null,
+        ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>? mutateParticipantsCommandHandler = null,
+        ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>? csvHandler = null)
     {
-        var controller = new GuestRegistrationOrderController(mediator, timeProvider);
+        var controller = new AuthenticatedRegistrationOrderController(
+            startHandler ?? Substitute.For<ICommandHandler<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>>(),
+            launchAttemptHandler ?? Substitute.For<ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>(),
+            progressHandler ?? Substitute.For<IQueryHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>>(),
+            launchProviderHandler ?? Substitute.For<ICommandHandler<LaunchAuthenticatedRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>>(),
+            skipHandler ?? Substitute.For<ICommandHandler<SkipAuthenticatedNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>>(),
+            submitHandler ?? Substitute.For<ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>(),
+            getHandler ?? Substitute.For<IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>>(),
+            continueHandler ?? Substitute.For<ICommandHandler<ContinueAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>(),
+            finalizeHandler ?? Substitute.For<ICommandHandler<FinalizeAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>(),
+            cancelHandler ?? Substitute.For<ICommandHandler<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>>(),
+            assembler ?? Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>(),
+            applyPromotionHandler ?? Substitute.For<ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
+            removePromotionHandler ?? Substitute.For<ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>>(),
+            participantsQueryHandler ?? Substitute.For<IQueryHandler<GetAuthenticatedRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>>(),
+            mutateParticipantsCommandHandler ?? Substitute.For<ICommandHandler<MutateAuthenticatedRegistrationParticipantsCommand, BaseCommandResponse<Guid>>>(),
+            csvHandler ?? Substitute.For<ICommandHandler<ImportCompanyRegistrationAssignmentsCsvCommand, BaseCommandResponse<CompanyRegistrationAssignmentCsvResultDto>>>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         var url = Substitute.For<IUrlHelper>();
         url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");
@@ -639,6 +704,10 @@ public sealed class RegistrationOrderControllerTests
     {
         typeof(RegistrationOrderController),
         typeof(GuestRegistrationOrderController),
+        typeof(GuestRegistrationOrderRequirementsController),
+        typeof(GuestRegistrationOrderParticipantsController),
+        typeof(GuestRegistrationOrderPromotionsController),
+        typeof(GuestRegistrationOrderClaimController),
         typeof(AuthenticatedRegistrationOrderController),
     }.Select(type => type.GetMethod(actionName)).FirstOrDefault(method => method is not null);
 }

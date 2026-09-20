@@ -1,8 +1,8 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 
-public sealed record GetInstanceStorageSettingsQuery : IRequest<InstanceStorageSettingsDto>
+public sealed record GetInstanceStorageSettingsQuery : IQuery<InstanceStorageSettingsDto>
 {
 }

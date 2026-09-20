@@ -119,6 +119,7 @@ public sealed class PhotonProtectedSelectionWriteContractTests
             "Location PATCH must own protected selection validation");
         PhotonApplicationContractAssertions.RequireAsyncCallBefore(
             typeof(CreateLocationCommandHandler),
+            nameof(CreateLocationCommandHandler.ExecuteAsync),
             protector,
             "UnprotectAsync",
             typeof(ILocationRepository),
@@ -126,6 +127,7 @@ public sealed class PhotonProtectedSelectionWriteContractTests
             "token validation must complete before the create write");
         PhotonApplicationContractAssertions.RequireAsyncCallBefore(
             typeof(UpdateLocationCommandHandler),
+            nameof(UpdateLocationCommandHandler.ExecuteAsync),
             protector,
             "UnprotectAsync",
             typeof(ILocationRepository),

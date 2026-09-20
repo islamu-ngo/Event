@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.ViewDelivery)]
 public sealed record GetIncomingWebhookEffectStatusQuery
-    : IRequest<BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>>, ISecureRequest
+    : IQuery<BaseCommandResponse<IReadOnlyList<IncomingWebhookEffectStatusDto>>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public int Limit { get; init; } = 50;

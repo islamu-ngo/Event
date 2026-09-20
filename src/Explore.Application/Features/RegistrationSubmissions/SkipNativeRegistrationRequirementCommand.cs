@@ -4,7 +4,7 @@ using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
 
@@ -14,7 +14,7 @@ public sealed record SkipNativeRegistrationRequirementCommand(
     Guid OrderId,
     Guid RequirementId,
     Guid AttemptId,
-    string? AttemptCapabilityToken) : IRequest<NativeRegistrationSkipResult>;
+    string? AttemptCapabilityToken) : ICommand<NativeRegistrationSkipResult>;
 
 public sealed record NativeRegistrationSkipResult(
     bool Success,
@@ -42,9 +42,9 @@ public sealed class SkipNativeRegistrationRequirementCommandHandler(
     IRegistrationFinalizationRepository finalization,
     IGuestCapabilityTokenService capabilities,
     TimeProvider timeProvider)
-    : IRequestHandler<SkipNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
+    : ICommandHandler<SkipNativeRegistrationRequirementCommand, NativeRegistrationSkipResult>
 {
-    public async Task<NativeRegistrationSkipResult> Handle(
+    public async Task<NativeRegistrationSkipResult> ExecuteAsync(
         SkipNativeRegistrationRequirementCommand request,
         CancellationToken cancellationToken)
     {

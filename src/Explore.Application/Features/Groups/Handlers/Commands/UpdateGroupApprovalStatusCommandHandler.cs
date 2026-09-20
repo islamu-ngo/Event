@@ -5,7 +5,7 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Groups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Groups.Handlers.Commands;
@@ -16,9 +16,9 @@ public class UpdateGroupApprovalStatusCommandHandler(
     ICurrentUserService currentUserService,
     ITenantContext tenantContext,
     HybridCache cache)
-    : IRequestHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateGroupApprovalStatusCommand request,
         CancellationToken cancellationToken)
     {

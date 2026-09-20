@@ -2,14 +2,14 @@ namespace Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 
 using Explore.Application.Authorization;
 using Explore.Application.Features.ConfigurationManifest.Importing;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 [AuthorizeResource(
     ResourceKinds.InstanceSetting,
     AuthorizationActions.InstanceSettings.Update)]
 public sealed record CreateInstanceConfigurationImportSessionCommand(
     ReadOnlyMemory<byte> Artifact)
-    : IRequest<ConfigurationImportSessionCreatedResult>, ISecureRequest
+    : ICommand<ConfigurationImportSessionCreatedResult>, ISecureRequest
 {
     public const string ResourceKey = "instance.configuration-import";
     string? ISecureRequest.ResourceId => ResourceKey;
@@ -26,7 +26,7 @@ public sealed record CreateInstanceConfigurationImportSessionCommand(
 public sealed record CreateTenantConfigurationImportSessionCommand(
     Guid TenantId,
     ReadOnlyMemory<byte> Artifact)
-    : IRequest<ConfigurationImportSessionCreatedResult>, ISecureRequest
+    : ICommand<ConfigurationImportSessionCreatedResult>, ISecureRequest
 {
     public const string ResourceKey = "tenant.configuration-import";
     string? ISecureRequest.ResourceId => ResourceKey;
@@ -44,7 +44,7 @@ public sealed record PreviewInstanceConfigurationImportSessionCommand(
     Guid SessionId,
     string AccessToken,
     ConfigurationImportPreviewRequest Preview)
-    : IRequest<ConfigurationImportPreviewResult>, ISecureRequest
+    : ICommand<ConfigurationImportPreviewResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateInstanceConfigurationImportSessionCommand.ResourceKey;
@@ -63,7 +63,7 @@ public sealed record PreviewTenantConfigurationImportSessionCommand(
     Guid SessionId,
     string AccessToken,
     ConfigurationImportPreviewRequest Preview)
-    : IRequest<ConfigurationImportPreviewResult>, ISecureRequest
+    : ICommand<ConfigurationImportPreviewResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateTenantConfigurationImportSessionCommand.ResourceKey;
@@ -82,7 +82,7 @@ public sealed record PreviewTenantConfigurationImportSessionCommand(
 public sealed record CancelInstanceConfigurationImportSessionCommand(
     Guid SessionId,
     string AccessToken)
-    : IRequest, ISecureRequest
+    : ICommand, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateInstanceConfigurationImportSessionCommand.ResourceKey;
@@ -100,7 +100,7 @@ public sealed record CancelTenantConfigurationImportSessionCommand(
     Guid TenantId,
     Guid SessionId,
     string AccessToken)
-    : IRequest, ISecureRequest
+    : ICommand, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateTenantConfigurationImportSessionCommand.ResourceKey;
@@ -122,7 +122,7 @@ public sealed record ApplyInstanceConfigurationImportCommand(
     ConfigurationImportPreviewRequest Preview,
     Guid? RollbackOfOperationId = null,
     Guid? ManagedScheduleId = null)
-    : IRequest<ConfigurationImportOperationResult>, ISecureRequest
+    : ICommand<ConfigurationImportOperationResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateInstanceConfigurationImportSessionCommand.ResourceKey;
@@ -140,7 +140,7 @@ public sealed record ApplyTenantConfigurationImportCommand(
     ConfigurationImportPreviewRequest Preview,
     Guid? RollbackOfOperationId = null,
     Guid? ManagedScheduleId = null)
-    : IRequest<ConfigurationImportOperationResult>, ISecureRequest
+    : ICommand<ConfigurationImportOperationResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateTenantConfigurationImportSessionCommand.ResourceKey;
@@ -155,7 +155,7 @@ public sealed record ApplyTenantConfigurationImportCommand(
     AuthorizationActions.InstanceSettings.Update)]
 public sealed record CreateInstanceConfigurationRollbackSessionCommand(
     Guid OperationId)
-    : IRequest<ConfigurationImportRollbackSessionCreatedResult>, ISecureRequest
+    : ICommand<ConfigurationImportRollbackSessionCreatedResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateInstanceConfigurationImportSessionCommand.ResourceKey;
@@ -169,7 +169,7 @@ public sealed record CreateInstanceConfigurationRollbackSessionCommand(
 public sealed record CreateTenantConfigurationRollbackSessionCommand(
     Guid TenantId,
     Guid OperationId)
-    : IRequest<ConfigurationImportRollbackSessionCreatedResult>, ISecureRequest
+    : ICommand<ConfigurationImportRollbackSessionCreatedResult>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         CreateTenantConfigurationImportSessionCommand.ResourceKey;

@@ -13,13 +13,13 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Lifecycle;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Services.Scheduling;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
 
-public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEventDraftCommand, BaseCommandResponse<Guid>>
+public sealed class UpdateEventDraftCommandHandler : ICommandHandler<UpdateEventDraftCommand, BaseCommandResponse<Guid>>
 {
     public const string ConcurrencyConflictCode = "event_draft_concurrency_conflict";
     private const string DraftNotEditableCode = "event_draft_not_editable";
@@ -74,7 +74,7 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
         _visitorCapabilities = visitorCapabilities;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventDraftCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventDraftCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventDraftRequestDtoValidator(
             _audienceAgeRepository,

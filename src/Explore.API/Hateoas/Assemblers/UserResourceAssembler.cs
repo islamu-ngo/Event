@@ -1,16 +1,13 @@
-// ABOUTME: Assembles current-account HAL with existing profile links and native Local lifecycle discovery.
-// ABOUTME: Resolves password/email affordances from current persisted authority, never client claims or primary-provider guesses.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using System.Security.Claims;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Authentication.Local.Handlers.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 
 /// <summary>
 /// Resource assembler for User entities.
@@ -19,16 +16,16 @@ using MediatR;
 /// </summary>
 public sealed class UserResourceAssembler : ResourceAssemblerBase<UserDto, UserDto>
 {
-    private readonly ISender _sender;
+    private readonly IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities> _lifecycleCapabilities;
 
     public UserResourceAssembler(
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<UserDto> detailLinkPolicy,
         ICollectionLinkPolicy<UserDto> collectionLinkPolicy,
-        ISender sender)
+        IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities> lifecycleCapabilities)
         : base(linkGenerator, detailLinkPolicy, collectionLinkPolicy)
     {
-        _sender = sender;
+        _lifecycleCapabilities = lifecycleCapabilities;
     }
 
     protected override async Task<IReadOnlyList<LinkDefinition>> GetDetailLinkDefinitionsAsync(
@@ -37,7 +34,7 @@ public sealed class UserResourceAssembler : ResourceAssemblerBase<UserDto, UserD
         var existing = await base.GetDetailLinkDefinitionsAsync(dto, user, httpContext);
         var authority = user?.TryGetLocalSessionAuthority();
         if (authority?.LocalSubjectId != dto.Id) return existing;
-        var capabilities = await _sender.Send(new GetLocalIdentityLifecycleCapabilitiesQuery(authority), httpContext.RequestAborted);
+        var capabilities = await _lifecycleCapabilities.QueryAsync(new GetLocalIdentityLifecycleCapabilitiesQuery(authority), httpContext.RequestAborted);
         return [.. existing, .. LocalIdentityLifecycleLinkPolicy.GetLinks(capabilities)];
     }
 

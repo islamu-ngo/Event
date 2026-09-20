@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.RegistrationOrders.Handlers.Commands;
@@ -7,7 +8,6 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -39,8 +39,8 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
         Substitute.For<ITenantContext>();
     private readonly IGuestCapabilityTokenService _capabilities =
         Substitute.For<IGuestCapabilityTokenService>();
-    private readonly IMediator _mediator =
-        Substitute.For<IMediator>();
+    private readonly ICommandHandler<ReserveTicketPurchaseCommand, BaseCommandResponse<Guid>> _reserveHandler =
+        Substitute.For<ICommandHandler<ReserveTicketPurchaseCommand, BaseCommandResponse<Guid>>>();
 
     public TicketPurchaseAccessCommandHandlerTests()
     {
@@ -67,7 +67,7 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
                 _eventId,
                 Arg.Any<CancellationToken>())
             .Returns(currentPolicy);
-        _mediator.Send(
+        _reserveHandler.ExecuteAsync(
                 Arg.Any<ReserveTicketPurchaseCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(call =>
@@ -84,9 +84,9 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
                 _governance,
                 _currentUser,
                 _tenant,
-                _mediator);
+                _reserveHandler);
 
-        BaseCommandResponse<Guid> result = await handler.Handle(
+        BaseCommandResponse<Guid> result = await handler.ExecuteAsync(
             new ReserveAuthenticatedTicketPurchaseCommand(
                 _eventId,
                 _orderId,
@@ -120,9 +120,9 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
                 _governance,
                 _currentUser,
                 _tenant,
-                _mediator);
+                _reserveHandler);
 
-        BaseCommandResponse<Guid> result = await handler.Handle(
+        BaseCommandResponse<Guid> result = await handler.ExecuteAsync(
             new ReserveAuthenticatedTicketPurchaseCommand(
                 _eventId,
                 _orderId,
@@ -162,9 +162,9 @@ public sealed class TicketPurchaseAccessCommandHandlerTests
                 _capabilities,
                 _tenant,
                 new FixedTimeProvider(UtcNow),
-                _mediator);
+                _reserveHandler);
 
-        BaseCommandResponse<Guid> result = await handler.Handle(
+        BaseCommandResponse<Guid> result = await handler.ExecuteAsync(
             new ReserveGuestTicketPurchaseCommand(
                 _eventId,
                 _orderId,

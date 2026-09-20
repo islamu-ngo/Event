@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Models;
@@ -9,7 +10,6 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -18,9 +18,9 @@ public sealed class UpdateReportingRoutingSettingsCommandHandler(
     IAdminContext adminContext,
     IHierarchicalSettingsResolver settingsResolver,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdateReportingRoutingSettingsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateReportingRoutingSettingsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateReportingRoutingSettingsCommand request,
         CancellationToken cancellationToken)
     {

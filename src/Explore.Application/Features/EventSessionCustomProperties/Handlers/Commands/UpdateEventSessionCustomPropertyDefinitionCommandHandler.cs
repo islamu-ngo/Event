@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -10,19 +9,18 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequestHandler<UpdateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : ICommandHandler<UpdateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
     private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -32,7 +30,6 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         ICustomPropertyGovernancePolicy customPropertyGovernancePolicy,
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
         IUnitOfWork unitOfWork)
     {
@@ -41,12 +38,11 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
@@ -169,7 +165,33 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             }
         }
 
-        _mapper.Map(candidate, definition);
+        // Only validated business fields change; identity, provenance and option relationships remain owned here.
+        definition.DisplayName = candidate.DisplayName;
+        definition.Description = candidate.Description;
+        definition.PropertyType = candidate.PropertyType;
+        definition.IsRequired = candidate.IsRequired;
+        definition.IsMulti = candidate.IsMulti;
+        definition.IsActive = candidate.IsActive;
+        definition.SortOrder = candidate.SortOrder;
+        definition.ExposureLevel = candidate.ExposureLevel;
+        definition.IsSearchable = candidate.IsSearchable;
+        definition.IsFilterable = candidate.IsFilterable;
+        definition.IsExportable = candidate.IsExportable;
+        definition.IsModerationRelevant = candidate.IsModerationRelevant;
+        definition.IsAnalyticsRelevant = candidate.IsAnalyticsRelevant;
+        definition.IsSystemOwned = candidate.IsSystemOwned;
+        definition.DefaultTextValue = candidate.DefaultTextValue;
+        definition.DefaultNumberValue = candidate.DefaultNumberValue;
+        definition.DefaultBooleanValue = candidate.DefaultBooleanValue;
+        definition.DefaultDateTimeValue = candidate.DefaultDateTimeValue;
+        definition.MinLength = candidate.MinLength;
+        definition.MaxLength = candidate.MaxLength;
+        definition.RegexPattern = candidate.RegexPattern;
+        definition.MinNumber = candidate.MinNumber;
+        definition.MaxNumber = candidate.MaxNumber;
+        definition.MinDateTime = candidate.MinDateTime;
+        definition.MaxDateTime = candidate.MaxDateTime;
+        definition.AllowedUrlSchemes = candidate.AllowedUrlSchemes;
         definition.Namespace = governance.NormalizedNamespace;
         definition.Key = governance.NormalizedKey;
         definition.UpdatedBy = _currentUserService.UserId;
@@ -193,7 +215,9 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             },
             cancellationToken);
 
-        await InvalidateCaches(definition.EventSessionId, definition.Id, cancellationToken);
+        await _cache.RemoveByTagAsync(
+            SessionCustomPropertyCache.ListsBySession(definition.TenantId, definition.EventSessionId),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Event session custom property definition updated successfully.");
     }
@@ -280,11 +304,4 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             : candidate with { Options = patch.Options.Items! };
     }
 
-    private async Task InvalidateCaches(Guid eventSessionId, Guid definitionId, CancellationToken cancellationToken)
-    {
-        await _cache.RemoveAsync(
-            $"session-custom-properties:list:{eventSessionId}:1:{PaginatedResult<EventSessionCustomPropertyDefinitionListDto>.DefaultPageSize}",
-            cancellationToken);
-        await _cache.RemoveAsync($"session-custom-properties:detail:{definitionId}", cancellationToken);
-    }
 }

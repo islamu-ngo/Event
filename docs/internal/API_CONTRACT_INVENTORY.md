@@ -20,7 +20,7 @@
 - Classification breakdown: `Admin`=122, `Authenticated`=606, `Public`=168, `PublicTransactional`=20
 - Tenant-mode extension breakdown: `multi-tenant-required`=21
 - Rate-limit policy extension breakdown: `AddressSuggestions`=1, `AiAssistant`=5, `AnalyticsRelay`=1, `Authenticated`=57, `ConfigurationImportUpload`=2, `ControlPlane`=34, `EventOpenGraphImage`=1, `Global`=2, `PublicIngestion`=3, `SetupEnrollmentWrite`=3, `SetupSecret`=10, `SetupSecretBindingWrite`=1, `Write`=241, `admission_check_in`=6, `admission_scanner_capability`=2, `admission_scanner_check_in`=3, `admission_ticket_recovery`=1, `anonymous_registration`=2, `public_transactional`=22
-- Output-cache policy extension breakdown: `DetailData`=38, `EventDiscovery`=1, `ListData`=21, `LookupData`=26, `PublicHomeDiscovery`=1, `PublicLegalDocuments`=1, `SitemapData`=1, `SystemConfig`=1, `TenantNav`=1
+- Output-cache policy extension breakdown: `DetailData`=38, `EventDiscovery`=1, `ListData`=21, `LookupData`=27, `PublicHomeDiscovery`=1, `PublicLegalDocuments`=1, `SitemapData`=1, `SystemConfig`=1, `TenantNav`=1
 
 ## Operations
 
@@ -923,7 +923,7 @@
 | 895 | `/api/webhooks/delivery-attempts/{attemptId}/retry` | `POST` | `RetryWebhookDeliveryAttempt` | Retry webhook delivery attempt | WebhookMessages | `RetryWebhookDeliveryAttempt` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |
 | 896 | `/api/webhooks/endpoints` | `GET` | `GetWebhookEndpoints` | Get webhook endpoints | WebhookEndpoints | `GetWebhookEndpoints` | `Public` | no | _(none)_ | `Authenticated` | `ListData` |
 | 897 | `/api/webhooks/endpoints` | `POST` | `CreateWebhookEndpoint` | Create webhook endpoint | WebhookEndpoints | `CreateWebhookEndpoint` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |
-| 898 | `/api/webhooks/endpoints/{endpointId}` | `GET` | `GetWebhookEndpointById` | Get webhook endpoint | WebhookEndpoints | `GetWebhookEndpointById` | `Public` | no | _(none)_ | `Authenticated` | _(none)_ |
+| 898 | `/api/webhooks/endpoints/{endpointId}` | `GET` | `GetWebhookEndpointById` | Get webhook endpoint | WebhookEndpoints | `GetWebhookEndpointById` | `Public` | no | _(none)_ | `Authenticated` | `LookupData` |
 | 899 | `/api/webhooks/endpoints/{endpointId}` | `PATCH` | `UpdateWebhookEndpoint` | Update webhook endpoint | WebhookEndpoints | `UpdateWebhookEndpoint` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |
 | 900 | `/api/webhooks/endpoints/{endpointId}` | `DELETE` | `DeleteWebhookEndpoint` | Delete webhook endpoint | WebhookEndpoints | `DeleteWebhookEndpoint` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |
 | 901 | `/api/webhooks/endpoints/{endpointId}/pause` | `POST` | `PauseWebhookEndpoint` | Pause webhook endpoint | WebhookEndpointOperations | `PauseWebhookEndpoint` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |

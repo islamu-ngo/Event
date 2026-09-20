@@ -96,10 +96,10 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
 
         Task<BaseCommandResponse<Guid>> deletion = CreateDeletionHandler(
             deletionContext, deletionRepository, tenantId, services)
-            .Handle(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = poolId }, timeout.Token);
+            .ExecuteAsync(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = poolId }, timeout.Token);
         Task<BaseCommandResponse<Guid>> assignment = CreateAssignmentHandler(
             assignmentContext, assignmentRepository, tenantId, services)
-            .Handle(CreateAssignment(eventId, poolId), timeout.Token);
+            .ExecuteAsync(CreateAssignment(eventId, poolId), timeout.Token);
 
         await Task.WhenAll(deletionLoaded.Task, assignmentLoaded.Task).WaitAsync(timeout.Token);
         releaseDeletion.TrySetResult();
@@ -110,7 +110,7 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
         await using ExploreDbContext retryContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantId));
         BaseCommandResponse<Guid> retry = await CreateAssignmentHandler(
             retryContext, new EventTicketCatalogRepository(retryContext), tenantId, services)
-            .Handle(CreateAssignment(eventId, poolId), timeout.Token);
+            .ExecuteAsync(CreateAssignment(eventId, poolId), timeout.Token);
         await using ExploreDbContext verifyContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantId));
         var verifyRepository = new EventTicketCatalogRepository(verifyContext);
         bool poolDeleted = await verifyRepository.GetCapacityPoolByIdEventAndTenantAsync(
@@ -150,10 +150,10 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
 
         Task<BaseCommandResponse<Guid>> deletion = CreateDeletionHandler(
             deletionContext, deletionRepository, tenantId, services)
-            .Handle(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = poolId }, timeout.Token);
+            .ExecuteAsync(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = poolId }, timeout.Token);
         Task<BaseCommandResponse<Guid>> assignment = CreateAssignmentHandler(
             assignmentContext, assignmentRepository, tenantId, services)
-            .Handle(CreateAssignment(eventId, poolId), timeout.Token);
+            .ExecuteAsync(CreateAssignment(eventId, poolId), timeout.Token);
 
         await Task.WhenAll(deletionLoaded.Task, assignmentLoaded.Task).WaitAsync(timeout.Token);
         releaseAssignment.TrySetResult();
@@ -163,7 +163,7 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
         await using ExploreDbContext retryContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantId));
         BaseCommandResponse<Guid> retry = await CreateDeletionHandler(
             retryContext, new EventTicketCatalogRepository(retryContext), tenantId, services)
-            .Handle(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = poolId }, timeout.Token);
+            .ExecuteAsync(new DeleteEventCapacityPoolCommand { EventId = eventId, CapacityPoolId = poolId }, timeout.Token);
         await using ExploreDbContext verifyContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantId));
         var verifyRepository = new EventTicketCatalogRepository(verifyContext);
         EventTicketType? ticket = await verifyRepository.GetTicketTypeByIdEventAndTenantAsync(
@@ -230,12 +230,12 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
         await using ExploreDbContext wrongEventContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantId));
         BaseCommandResponse<Guid> wrongEvent = await CreateAssignmentHandler(
             wrongEventContext, new EventTicketCatalogRepository(wrongEventContext), tenantId, services)
-            .Handle(CreateAssignment(Guid.CreateVersion7(), poolId), cancellationToken);
+            .ExecuteAsync(CreateAssignment(Guid.CreateVersion7(), poolId), cancellationToken);
         Guid wrongTenantId = Guid.CreateVersion7();
         await using ExploreDbContext wrongTenantContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(wrongTenantId));
         BaseCommandResponse<Guid> wrongTenant = await CreateAssignmentHandler(
             wrongTenantContext, new EventTicketCatalogRepository(wrongTenantContext), wrongTenantId, services)
-            .Handle(CreateAssignment(eventId, poolId), cancellationToken);
+            .ExecuteAsync(CreateAssignment(eventId, poolId), cancellationToken);
         return wrongEvent.FailureCode == "event_ticketing_not_found"
             && wrongTenant.FailureCode == "event_ticketing_not_found";
     }

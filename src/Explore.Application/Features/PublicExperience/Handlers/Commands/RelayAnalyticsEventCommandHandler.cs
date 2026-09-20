@@ -4,11 +4,11 @@ using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.PublicExperience.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.PublicExperience.Handlers.Commands;
 
-public partial class RelayAnalyticsEventCommandHandler : IRequestHandler<RelayAnalyticsEventCommand, bool>
+public partial class RelayAnalyticsEventCommandHandler : ICommandHandler<RelayAnalyticsEventCommand, bool>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IAnalyticsProvider _analyticsProvider;
@@ -27,7 +27,7 @@ public partial class RelayAnalyticsEventCommandHandler : IRequestHandler<RelayAn
         _analyticsGovernanceService = analyticsGovernanceService;
     }
 
-    public async Task<bool> Handle(RelayAnalyticsEventCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(RelayAnalyticsEventCommand command, CancellationToken cancellationToken)
     {
         var configuration = await _analyticsConfigResolver.ResolveAsync(cancellationToken);
         if (!configuration.IsEnabled || configuration.Provider == Explore.Domain.Enums.AnalyticsProviderEnum.None)
@@ -35,8 +35,8 @@ public partial class RelayAnalyticsEventCommandHandler : IRequestHandler<RelayAn
             return true;
         }
 
-        var payload = request.Payload;
-        var distinctId = ResolveDistinctId(payload.DistinctId, request.AuthenticatedUserId);
+        var payload = command.Payload;
+        var distinctId = ResolveDistinctId(payload.DistinctId, command.AuthenticatedUserId);
         var properties = ConvertProperties(payload.Properties);
         properties[AnalyticsEvents.Properties.TenantId] = _tenantContext.TenantId;
 

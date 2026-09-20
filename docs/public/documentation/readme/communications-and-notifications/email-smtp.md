@@ -85,6 +85,21 @@ outcome is not proof that nothing was sent: use authorized reconciliation with
 provider evidence, not blind replay. Do not put addresses, message content,
 credentials or raw provider errors in support logs.
 
+### Inspecting tenant dispatch status
+
+Authorized operators can read
+`GET /api/admin/email-dispatch/status?tenantId=<tenant-id>&limit=50`.
+The limit defaults to 50 and must be between 1 and 200. The response is a HAL
+collection: follow the root `_links.self` and read status rows from
+`_embedded.items`. Each row includes only operational status fields; use its
+server-provided `_links` to discover permitted recovery actions. Access to
+another tenant still requires authority for that tenant.
+
+The endpoint now returns this declared HAL shape even when link authorization
+completes asynchronously. Custom clients that worked around the former malformed
+`result` wrapper must read the root collection instead. No compatibility wrapper
+is retained. Inspecting status does not send or replay email.
+
 Retention cleanup reports aggregate success/failure counts. A per-tenant cleanup
 warning includes the exception type, not recipient information or raw provider
 details. Investigate database availability and the cleanup configuration when

@@ -8,7 +8,7 @@ using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Integrations.Listmonk.Handlers.Queries;
 
@@ -18,9 +18,9 @@ public sealed class GetListmonkIntegrationSettingsQueryHandler(
     IAdminContext adminContext,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetListmonkIntegrationSettingsQuery, ListmonkIntegrationSettingsDto>
+    : IQueryHandler<GetListmonkIntegrationSettingsQuery, ListmonkIntegrationSettingsDto>
 {
-    public async Task<ListmonkIntegrationSettingsDto> Handle(
+    public async Task<ListmonkIntegrationSettingsDto> QueryAsync(
         GetListmonkIntegrationSettingsQuery request,
         CancellationToken cancellationToken)
     {

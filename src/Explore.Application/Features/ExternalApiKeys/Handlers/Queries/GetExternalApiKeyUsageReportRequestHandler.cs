@@ -1,14 +1,14 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 using Explore.Application.Lookups;
-using MediatR;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 
-public class GetExternalApiKeyUsageReportRequestHandler : IRequestHandler<GetExternalApiKeyUsageReportRequest, List<ExternalApiKeyUsageReportDto>>
+public class GetExternalApiKeyUsageReportRequestHandler : IQueryHandler<GetExternalApiKeyUsageReportRequest, List<ExternalApiKeyUsageReportDto>>
 {
     private readonly IExternalApiKeyQuotaRepository _quotaRepository;
     private readonly IAdminContext _adminContext;
@@ -21,7 +21,7 @@ public class GetExternalApiKeyUsageReportRequestHandler : IRequestHandler<GetExt
         _adminContext = adminContext;
     }
 
-    public async Task<List<ExternalApiKeyUsageReportDto>> Handle(GetExternalApiKeyUsageReportRequest request, CancellationToken cancellationToken)
+    public async Task<List<ExternalApiKeyUsageReportDto>> QueryAsync(GetExternalApiKeyUsageReportRequest request, CancellationToken cancellationToken)
     {
         IReadOnlyList<TenantApiKeyUsageSummary> summaries;
 

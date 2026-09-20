@@ -3,7 +3,7 @@ name: application-layer
 description: Apply when editing Explore.Application CQRS handlers, requests, DTOs, and validators.
 paths:
   - "src/Explore.Application/**/*.cs"
-related_skills: [cqrs-mediatr-guidelines, clean-architecture-rules]
+related_skills: [cqrs-guidelines, clean-architecture-rules]
 related_docs: [docs/internal/ARCHITECTURE.md, docs/internal/GOVERNANCE.md, docs/internal/QUICK_REFERENCE.md]
 minimum_tests: [Event.Application.UnitTests, Event.Architecture.Tests]
 related_intents: [add-cqrs-handler, add-get-endpoint, add-write-endpoint, update-repository-query]
@@ -24,7 +24,8 @@ related_intents: [add-cqrs-handler, add-get-endpoint, add-write-endpoint, update
 - **Cancellation**: Always pass `CancellationToken` through to all async calls (repository, cache, etc.).
 - **Domain Rules Belong Here**: a rule that validates or normalizes command input must run in the handler, not at a transport boundary. A rule enforced only in a controller is bypassed by MCP tools and internal callers. Report the outcome as a `FailureCode` on the response; the API layer decides its HTTP shape.
 - **Identity Semantics**: `Explore.Application.Authentication.PlatformIdentityPrincipalExtensions` owns the `sub -> nameidentifier -> sid -> internal_user_id` chain and provider-account reconstruction. `IUserContext` delegates to it. Add identity semantics there, never in a second place — three divergent chains previously coexisted and disagreed.
-- **Record Requests And Results**: Follow the [canonical record-selection policy](../../docs/internal/GOVERNANCE.md#canonical-record-selection-policy). Concrete handwritten MediatR requests default to sealed records; choose positional versus nominal form for construction safety. `BaseCommandResponse<T>` and its concrete result descendants are immutable records created through valid-state factories. Current `UserId`/`TenantId` never comes from a body; a legitimate target ID still requires server authorization.
+- **Record Requests And Results**: Follow the [canonical record-selection policy](../../docs/internal/GOVERNANCE.md#canonical-record-selection-policy). Concrete handwritten native and remaining MediatR requests default to sealed records; choose positional versus nominal form for construction safety. `BaseCommandResponse<T>` and its concrete result descendants are immutable records created through valid-state factories. Current `UserId`/`TenantId` never comes from a body; a legitimate target ID still requires server authorization.
+- **Native Operations**: Use exactly one `ICommand`, `ICommand<TResult>` or `IQuery<TResult>` contract with Task-based `ExecuteAsync`/`QueryAsync`. Inject closed handler interfaces, not concrete handlers or a generic sender. Authorization wraps timing for all three shapes; preserve handler-owned authority, manual validation and transaction ownership. Native and MediatR contracts must never coexist on one request.
 - **Published Collections**: Every collection-bearing record exposes a serializer-compatible read-only/immutable shape and snapshots mutable input. Preserve JSON arrays/objects, PATCH presence, HAL extension data, and base64 bytes; do not relabel a mutable `List`, array, dictionary, or set as immutable.
 
 ## Must Read

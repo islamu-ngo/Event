@@ -2,15 +2,15 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
-public class GetEventCreationContextRequestHandler : IRequestHandler<GetEventCreationContextRequest, EventCreationContextDto>
+public class GetEventCreationContextRequestHandler : IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto>
 {
     private const string PersonalPublisherMode = "personal";
     private const string OrganizationPublisherMode = "organization";
@@ -36,7 +36,7 @@ public class GetEventCreationContextRequestHandler : IRequestHandler<GetEventCre
         _groupMemberRepository = groupMemberRepository;
     }
 
-    public async Task<EventCreationContextDto> Handle(GetEventCreationContextRequest request, CancellationToken cancellationToken)
+    public async Task<EventCreationContextDto> QueryAsync(GetEventCreationContextRequest request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
         var tenantPolicy = await _tenantPolicySettingService.ReadEffectiveTenantSettingsAsync(_tenantContext.TenantId);

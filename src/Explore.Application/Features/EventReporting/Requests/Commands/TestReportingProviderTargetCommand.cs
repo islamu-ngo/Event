@@ -1,7 +1,7 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
@@ -9,7 +9,7 @@ namespace Explore.Application.Features.EventReporting.Requests.Commands;
 public sealed record TestReportingProviderTargetCommand(
     Guid TenantId,
     Guid UserId,
-    EventReportExternalProvider Provider) : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    EventReportExternalProvider Provider) : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     private const string SettingKey = "moderation-reporting";
 

@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -8,18 +7,17 @@ using Explore.Application.Features.EventSessionCustomProperties.Requests.Command
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHandler<SetEventSessionCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
+public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHandler<SetEventSessionCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
     private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetEventSessionCustomPropertyMultiValuesCommandHandler(
@@ -28,7 +26,6 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         IUnitOfWork unitOfWork)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
@@ -36,11 +33,10 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SetEventSessionCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SetEventSessionCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
     {
         var validator = new SetEventSessionCustomPropertyValueDtoValidator();
         var errors = new List<string>();
@@ -95,22 +91,26 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         }
 
         var values = request.Values
-            .Select((dto, index) =>
+            .Select((dto, index) => new EventSessionCustomPropertyValue
             {
-                var value = _mapper.Map<EventSessionCustomPropertyValue>(dto);
-                value.EventSessionCustomPropertyDefinitionId = request.DefinitionId;
-                value.EventSessionId = request.EventSessionId;
-                value.TenantId = _tenantContext.TenantId;
-                value.Ordinal = index;
-                value.CreatedBy = _currentUserService.UserId;
-                value.UpdatedBy = _currentUserService.UserId;
-                return value;
+                EventSessionCustomPropertyDefinitionId = request.DefinitionId,
+                EventSessionId = request.EventSessionId,
+                Ordinal = index,
+                TextValue = dto.TextValue,
+                NumberValue = dto.NumberValue,
+                BooleanValue = dto.BooleanValue,
+                DateTimeValue = dto.DateTimeValue,
+                OptionId = dto.OptionId,
+                TenantId = _tenantContext.TenantId,
+                CreatedBy = _currentUserService.UserId,
+                UpdatedBy = _currentUserService.UserId
             })
             .ToList();
 
         await _unitOfWork.ExecuteInTransactionAsync(
             async ct =>
             {
+                await _projectionUpdater.RemoveForDefinitionAsync(request.DefinitionId, ct);
                 await _sessionCustomPropertyRepository.SetMultiValues(request.DefinitionId, request.EventSessionId, values, ct);
                 await _projectionUpdater.UpdateForDefinitionAsync(request.DefinitionId, ct);
             },

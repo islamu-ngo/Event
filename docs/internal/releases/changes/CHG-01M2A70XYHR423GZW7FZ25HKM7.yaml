@@ -1,0 +1,33 @@
+# Event response projections and truthful optional-label metadata.
+Change-Id: CHG-01M2A70XYHR423GZW7FZ25HKM7
+Title: "Reflect nullable event response labels"
+Type: fix
+Scope: events
+Summary: "Generated event projections preserve bounded disclosure and existing null labels; DTO, OpenAPI and client annotations now represent absent lookup and actor data accurately."
+Group: event-mapping-closure
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Existing response values and required property presence are unchanged; nullable annotations correct the documented output contract.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Bounded projections preserve hidden authority fields, public-action filtering, location disclosure and absent PII.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No database schema or persisted-data migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration or secret changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Raw and HAL event detail/list schemas and generated clients acknowledge nullable actor and lookup labels.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Consumers render optional labels without inferring changed ownership or action authority.

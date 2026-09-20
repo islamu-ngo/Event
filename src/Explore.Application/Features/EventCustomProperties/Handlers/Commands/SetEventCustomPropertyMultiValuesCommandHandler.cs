@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -8,18 +7,17 @@ using Explore.Application.Features.EventCustomProperties.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
+public class SetEventCustomPropertyMultiValuesCommandHandler : ICommandHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetEventCustomPropertyMultiValuesCommandHandler(
@@ -28,7 +26,6 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         IUnitOfWork unitOfWork)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
@@ -36,11 +33,10 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SetEventCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SetEventCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
     {
         var validator = new SetEventCustomPropertyValueDtoValidator();
         var errors = new List<string>();
@@ -95,16 +91,19 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         }
 
         var values = request.Values
-            .Select((dto, index) =>
+            .Select((dto, index) => new EventCustomPropertyValue
             {
-                var value = _mapper.Map<EventCustomPropertyValue>(dto);
-                value.EventCustomPropertyDefinitionId = request.DefinitionId;
-                value.EventId = request.EventId;
-                value.TenantId = _tenantContext.TenantId;
-                value.Ordinal = index;
-                value.CreatedBy = _currentUserService.UserId;
-                value.UpdatedBy = _currentUserService.UserId;
-                return value;
+                EventCustomPropertyDefinitionId = request.DefinitionId,
+                EventId = request.EventId,
+                Ordinal = index,
+                TextValue = dto.TextValue,
+                NumberValue = dto.NumberValue,
+                BooleanValue = dto.BooleanValue,
+                DateTimeValue = dto.DateTimeValue,
+                OptionId = dto.OptionId,
+                TenantId = _tenantContext.TenantId,
+                CreatedBy = _currentUserService.UserId,
+                UpdatedBy = _currentUserService.UserId
             })
             .ToList();
 

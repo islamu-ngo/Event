@@ -3,11 +3,11 @@ using Explore.API.Attributes;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,7 +17,13 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/events/{eventId:guid}/registration-orders")]
 [ApiController]
-public sealed class GuestRegistrationOrderPaymentController(IMediator mediator) : RegistrationOrderPaymentControllerBase(mediator)
+public sealed class GuestRegistrationOrderPaymentController(
+    ICommandHandler<StartGuestRegistrationPaymentCommand, RegistrationPaymentCommandResultDto> startCommandHandler,
+    IQueryHandler<GetGuestPaidOrderAcceptanceQuery, PaidOrderAcceptanceDisclosureDto?> acceptanceQueryHandler,
+    IQueryHandler<GetGuestRegistrationPaymentQuery, RegistrationPaymentDto?> statusQueryHandler,
+    ICommandHandler<RetryGuestRegistrationPaymentCommand, RegistrationPaymentCommandResultDto> retryCommandHandler,
+    IQueryHandler<GetGuestRegistrationPaymentCheckoutTargetQuery, RegistrationPaymentCheckoutTargetDto?> checkoutTargetQueryHandler)
+    : RegistrationOrderPaymentControllerBase
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
@@ -41,7 +47,7 @@ public sealed class GuestRegistrationOrderPaymentController(IMediator mediator) 
         CancellationToken cancellationToken = default)
     {
         _ = idempotencyKey;
-        return MapResult(await Mediator.Send(new StartGuestRegistrationPaymentCommand(eventId, orderId, capability, acceptance), cancellationToken), eventId, orderId, true);
+        return MapResult(await startCommandHandler.ExecuteAsync(new StartGuestRegistrationPaymentCommand(eventId, orderId, capability, acceptance), cancellationToken), eventId, orderId, true);
     }
 
     [AllowAnonymous]
@@ -53,7 +59,7 @@ public sealed class GuestRegistrationOrderPaymentController(IMediator mediator) 
     public async Task<ActionResult<PaidOrderAcceptanceDisclosureDto>> GetAcceptance(
         Guid eventId, Guid orderId, [FromHeader(Name = CapabilityHeader)] string? capability, CancellationToken cancellationToken = default)
     {
-        PaidOrderAcceptanceDisclosureDto? disclosure = await Mediator.Send(
+        PaidOrderAcceptanceDisclosureDto? disclosure = await acceptanceQueryHandler.QueryAsync(
             new GetGuestPaidOrderAcceptanceQuery(eventId, orderId, capability), cancellationToken);
         return disclosure is null ? PaymentNotFoundResult() : Ok(disclosure);
     }
@@ -67,7 +73,7 @@ public sealed class GuestRegistrationOrderPaymentController(IMediator mediator) 
     public async Task<ActionResult<HalResource<RegistrationPaymentDto>>> GetStatus(
         Guid eventId, Guid orderId, [FromHeader(Name = CapabilityHeader)] string? capability, CancellationToken cancellationToken = default)
     {
-        RegistrationPaymentDto? payment = await Mediator.Send(new GetGuestRegistrationPaymentQuery(eventId, orderId, capability), cancellationToken);
+        RegistrationPaymentDto? payment = await statusQueryHandler.QueryAsync(new GetGuestRegistrationPaymentQuery(eventId, orderId, capability), cancellationToken);
         return payment is null ? PaymentNotFoundResult() : Ok(ToResource(payment, eventId, orderId, true));
     }
 
@@ -92,7 +98,7 @@ public sealed class GuestRegistrationOrderPaymentController(IMediator mediator) 
         CancellationToken cancellationToken = default)
     {
         _ = idempotencyKey;
-        return MapResult(await Mediator.Send(new RetryGuestRegistrationPaymentCommand(eventId, orderId, capability), cancellationToken), eventId, orderId, true);
+        return MapResult(await retryCommandHandler.ExecuteAsync(new RetryGuestRegistrationPaymentCommand(eventId, orderId, capability), cancellationToken), eventId, orderId, true);
     }
 
     [AllowAnonymous]
@@ -103,5 +109,5 @@ public sealed class GuestRegistrationOrderPaymentController(IMediator mediator) 
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RegistrationPaymentCheckoutTargetDto>> GetCheckoutTarget(
         Guid eventId, Guid orderId, [FromHeader(Name = CapabilityHeader)] string? capability, CancellationToken cancellationToken = default) =>
-        TargetOrNotFound(await Mediator.Send(new GetGuestRegistrationPaymentCheckoutTargetQuery(eventId, orderId, capability), cancellationToken));
+        TargetOrNotFound(await checkoutTargetQueryHandler.QueryAsync(new GetGuestRegistrationPaymentCheckoutTargetQuery(eventId, orderId, capability), cancellationToken));
 }

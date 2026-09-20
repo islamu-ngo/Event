@@ -17,12 +17,12 @@ using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
 using Explore.Infrastructure.Ai;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -34,7 +34,28 @@ using NSubstitute;
 
 public sealed class AiAssistantControllerTests
 {
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetAiAssistantBootstrapQuery, AiAssistantBootstrapDto> _getBootstrapHandler =
+        Substitute.For<IQueryHandler<GetAiAssistantBootstrapQuery, AiAssistantBootstrapDto>>();
+    private readonly IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>> _getConversationsHandler =
+        Substitute.For<IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>>>();
+    private readonly IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?> _getConversationDetailHandler =
+        Substitute.For<IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?>>();
+    private readonly IQueryHandler<SearchAiReferencesQuery, IReadOnlyList<AiReferenceSearchResultDto>> _searchReferencesHandler =
+        Substitute.For<IQueryHandler<SearchAiReferencesQuery, IReadOnlyList<AiReferenceSearchResultDto>>>();
+    private readonly IQueryHandler<GetAiRunStatusQuery, AiRunDto?> _getRunStatusHandler =
+        Substitute.For<IQueryHandler<GetAiRunStatusQuery, AiRunDto?>>();
+    private readonly ICommandHandler<CreateAiConversationCommand, BaseCommandResponse<Guid>> _createConversationHandler =
+        Substitute.For<ICommandHandler<CreateAiConversationCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<SendAiMessageCommand, BaseCommandResponse<Guid>> _sendMessageHandler =
+        Substitute.For<ICommandHandler<SendAiMessageCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>> _confirmProposedActionHandler =
+        Substitute.For<ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>> _rejectProposedActionHandler =
+        Substitute.For<ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>> _cancelRunHandler =
+        Substitute.For<ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>>>();
+    private readonly IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> _tenantOnboardingStatus =
+        Substitute.For<IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto>>();
     private readonly IHateoasLinkGenerator _linkGenerator = Substitute.For<IHateoasLinkGenerator>();
     private readonly IResourceAssembler<AiConversationDto, AiConversationSummaryDto> _conversationAssembler =
         Substitute.For<IResourceAssembler<AiConversationDto, AiConversationSummaryDto>>();
@@ -73,7 +94,7 @@ public sealed class AiAssistantControllerTests
             pageSize: 20,
             totalCount: 1,
             links: new Dictionary<string, HalLink>());
-        _mediator.Send(Arg.Any<GetAiConversationListQuery>(), Arg.Any<CancellationToken>())
+        _getConversationsHandler.QueryAsync(Arg.Any<GetAiConversationListQuery>(), Arg.Any<CancellationToken>())
             .Returns(conversations);
         _conversationAssembler.ToCollectionResource(
                 Arg.Any<IEnumerable<AiConversationSummaryDto>>(),
@@ -88,7 +109,7 @@ public sealed class AiAssistantControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(expected);
-        await _mediator.Received(1).Send(
+        await _getConversationsHandler.Received(1).QueryAsync(
             Arg.Is<GetAiConversationListQuery>(query => query.Limit == 25),
             Arg.Any<CancellationToken>());
         await _conversationAssembler.Received(1).ToCollectionResource(
@@ -134,7 +155,7 @@ public sealed class AiAssistantControllerTests
             null,
             null,
             null);
-        _mediator.Send(Arg.Any<SearchAiReferencesQuery>(), Arg.Any<CancellationToken>())
+        _searchReferencesHandler.QueryAsync(Arg.Any<SearchAiReferencesQuery>(), Arg.Any<CancellationToken>())
             .Returns([eventReference, actorReference, organizationReference]);
         _linkGenerator.GeneratePath(RouteNames.SearchAiReferences, Arg.Any<object>(), Arg.Any<HttpContext>())
             .Returns("/api/ai/assistant/references?searchTerm=iftar&limit=20");
@@ -162,7 +183,7 @@ public sealed class AiAssistantControllerTests
         await Assert.That(actorItem.Links[LinkRelations.Actor].Href).Contains(actorId.ToString());
         var organizationItem = resource.Embedded.Items.Single(item => item.Data.Kind == "Organization");
         await Assert.That(organizationItem.Links[LinkRelations.Organization].Href).Contains(organizationId.ToString());
-        await _mediator.Received(1).Send(
+        await _searchReferencesHandler.Received(1).QueryAsync(
             Arg.Is<SearchAiReferencesQuery>(query => query.SearchTerm == "iftar" && query.Limit == 20),
             Arg.Any<CancellationToken>());
     }
@@ -188,7 +209,7 @@ public sealed class AiAssistantControllerTests
             }
             """));
         var httpClientFactory = new StaticHttpClientFactory(new HttpClient(handler));
-        _mediator.Send(Arg.Any<GetTenantOnboardingStatusQuery>(), Arg.Any<CancellationToken>())
+        _tenantOnboardingStatus.QueryAsync(Arg.Any<GetTenantOnboardingStatusQuery>(), Arg.Any<CancellationToken>())
             .Returns(new TenantOnboardingStatusDto
             {
                 IsAuthenticated = true,
@@ -236,7 +257,7 @@ public sealed class AiAssistantControllerTests
             IdempotencyKey = "body-key"
         };
         var response = Success(runId);
-        _mediator.Send(Arg.Any<SendAiMessageCommand>(), Arg.Any<CancellationToken>())
+        _sendMessageHandler.ExecuteAsync(Arg.Any<SendAiMessageCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -248,7 +269,7 @@ public sealed class AiAssistantControllerTests
         await Assert.That(accepted.Value).IsEqualTo(response);
         await Assert.That(RouteValue<Guid>(accepted.RouteValues, "conversationId")).IsEqualTo(conversationId);
         await Assert.That(RouteValue<Guid>(accepted.RouteValues, "runId")).IsEqualTo(runId);
-        await _mediator.Received(1).Send(
+        await _sendMessageHandler.Received(1).ExecuteAsync(
             Arg.Is<SendAiMessageCommand>(command =>
                 command.ConversationId == conversationId &&
                 command.Message.Content == dto.Content &&
@@ -274,7 +295,7 @@ public sealed class AiAssistantControllerTests
         var proposedActionId = Guid.CreateVersion7();
         var eventId = Guid.CreateVersion7();
         var response = Success(eventId);
-        _mediator.Send(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
+        _confirmProposedActionHandler.ExecuteAsync(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -287,7 +308,7 @@ public sealed class AiAssistantControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _mediator.Received(1).Send(
+        await _confirmProposedActionHandler.Received(1).ExecuteAsync(
             Arg.Is<ConfirmAiProposedActionCommand>(command =>
                 command.ProposedActionId == proposedActionId &&
                 command.IdempotencyKey == "confirm-key"),
@@ -297,7 +318,7 @@ public sealed class AiAssistantControllerTests
     [Test]
     public async Task ConfirmProposedAction_WhenRejectedStateConflict_ReturnsSafeProblemDetails()
     {
-        _mediator.Send(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
+        _confirmProposedActionHandler.ExecuteAsync(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Failure("AI proposed action was already rejected.", "proposed_action_rejected"));
         var controller = CreateController();
 
@@ -322,7 +343,7 @@ public sealed class AiAssistantControllerTests
     public async Task ConfirmProposedAction_WhenToolFailureIsBadRequest_ReturnsUnderlyingFailureDetail()
     {
         const string underlyingError = "Selected AI actor context is not allowed to create events.";
-        _mediator.Send(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
+        _confirmProposedActionHandler.ExecuteAsync(Arg.Any<ConfirmAiProposedActionCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure(
                 "actor_context_not_allowed",
                 "AI proposed action confirmation failed.",
@@ -353,7 +374,7 @@ public sealed class AiAssistantControllerTests
         var conversationId = Guid.CreateVersion7();
         var proposedActionId = Guid.CreateVersion7();
         var response = Success(proposedActionId);
-        _mediator.Send(Arg.Any<RejectAiProposedActionCommand>(), Arg.Any<CancellationToken>())
+        _rejectProposedActionHandler.ExecuteAsync(Arg.Any<RejectAiProposedActionCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -362,7 +383,7 @@ public sealed class AiAssistantControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _mediator.Received(1).Send(
+        await _rejectProposedActionHandler.Received(1).ExecuteAsync(
             Arg.Is<RejectAiProposedActionCommand>(command => command.ProposedActionId == proposedActionId),
             Arg.Any<CancellationToken>());
     }
@@ -387,7 +408,7 @@ public sealed class AiAssistantControllerTests
         var conversationId = Guid.CreateVersion7();
         var runId = Guid.CreateVersion7();
         var response = Success(runId);
-        _mediator.Send(Arg.Any<CancelAiRunCommand>(), Arg.Any<CancellationToken>())
+        _cancelRunHandler.ExecuteAsync(Arg.Any<CancelAiRunCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -396,7 +417,7 @@ public sealed class AiAssistantControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _mediator.Received(1).Send(
+        await _cancelRunHandler.Received(1).ExecuteAsync(
             Arg.Is<CancelAiRunCommand>(command => command.ConversationId == conversationId && command.RunId == runId),
             Arg.Any<CancellationToken>());
     }
@@ -404,7 +425,7 @@ public sealed class AiAssistantControllerTests
     [Test]
     public async Task CancelRun_WhenRunIsComplete_ReturnsSafeConflictProblemDetails()
     {
-        _mediator.Send(Arg.Any<CancelAiRunCommand>(), Arg.Any<CancellationToken>())
+        _cancelRunHandler.ExecuteAsync(Arg.Any<CancelAiRunCommand>(), Arg.Any<CancellationToken>())
             .Returns(Failure("Completed AI runs cannot be cancelled.", "run_not_cancellable"));
         var controller = CreateController();
 
@@ -426,7 +447,7 @@ public sealed class AiAssistantControllerTests
     {
         var conversationId = Guid.CreateVersion7();
         var runId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<GetAiRunStatusQuery>(), Arg.Any<CancellationToken>())
+        _getRunStatusHandler.QueryAsync(Arg.Any<GetAiRunStatusQuery>(), Arg.Any<CancellationToken>())
             .Returns(new AiRunDto
             {
                 Id = runId,
@@ -458,7 +479,7 @@ public sealed class AiAssistantControllerTests
     {
         var conversationId = Guid.CreateVersion7();
         var runId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<GetAiRunStatusQuery>(), Arg.Any<CancellationToken>())
+        _getRunStatusHandler.QueryAsync(Arg.Any<GetAiRunStatusQuery>(), Arg.Any<CancellationToken>())
             .Returns(new AiRunDto
             {
                 Id = runId,
@@ -496,7 +517,7 @@ public sealed class AiAssistantControllerTests
     public async Task SendMessage_WhenProviderNotReady_ReturnsSafeProblemDetails()
     {
         var conversationId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<SendAiMessageCommand>(), Arg.Any<CancellationToken>())
+        _sendMessageHandler.ExecuteAsync(Arg.Any<SendAiMessageCommand>(), Arg.Any<CancellationToken>())
             .Returns(Failure("AI provider is not ready.", "provider_not_ready"));
         var controller = CreateController();
 
@@ -523,7 +544,7 @@ public sealed class AiAssistantControllerTests
     {
         var conversationId = Guid.CreateVersion7();
         var runId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<GetAiRunStatusQuery>(), Arg.Any<CancellationToken>())
+        _getRunStatusHandler.QueryAsync(Arg.Any<GetAiRunStatusQuery>(), Arg.Any<CancellationToken>())
             .Returns(new AiRunDto
             {
                 Id = runId,
@@ -592,7 +613,22 @@ public sealed class AiAssistantControllerTests
 
         _tenantContext.TenantId.Returns(Guid.CreateVersion7());
 
-        return new AiAssistantController(_mediator, _linkGenerator, _conversationAssembler, _runQueue, _tenantContext)
+        return new AiAssistantController(
+            _getBootstrapHandler,
+            _getConversationsHandler,
+            _getConversationDetailHandler,
+            _searchReferencesHandler,
+            _getRunStatusHandler,
+            _createConversationHandler,
+            _sendMessageHandler,
+            _confirmProposedActionHandler,
+            _rejectProposedActionHandler,
+            _cancelRunHandler,
+            _tenantOnboardingStatus,
+            _linkGenerator,
+            _conversationAssembler,
+            _runQueue,
+            _tenantContext)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

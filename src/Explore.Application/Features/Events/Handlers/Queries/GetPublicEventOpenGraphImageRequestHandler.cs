@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.Events.OpenGraph;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Models.Storage;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
@@ -15,9 +15,9 @@ public sealed class GetPublicEventOpenGraphImageRequestHandler(
     ITenantPolicySettingService tenantPolicySettingService,
     IStorageObjectContentReader contentReader,
     IEventOpenGraphImageRenderer renderer)
-    : IRequestHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>
+    : IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>
 {
-    public async Task<EventOpenGraphImageRenderResult?> Handle(
+    public async Task<EventOpenGraphImageRenderResult?> QueryAsync(
         GetPublicEventOpenGraphImageRequest request,
         CancellationToken cancellationToken)
     {

@@ -1,5 +1,3 @@
-using AutoMapper;
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group.Validators;
@@ -9,12 +7,12 @@ using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Groups.Handlers.Commands;
 
-public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, BaseCommandResponse<Guid>>
+public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupTenantRepository _groupTenantRepository;
@@ -22,8 +20,6 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IActorRepository _actorRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IAdminCacheInvalidator _adminCacheInvalidator;
-    private readonly IMapper _mapper;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
@@ -35,8 +31,6 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
         IGroupMemberRepository groupMemberRepository,
         IActorRepository actorRepository,
         IStorageObjectRepository storageObjectRepository,
-        IAdminCacheInvalidator adminCacheInvalidator,
-        IMapper mapper,
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics)
@@ -47,14 +41,12 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
         _groupMemberRepository = groupMemberRepository;
         _actorRepository = actorRepository;
         _storageObjectRepository = storageObjectRepository;
-        _adminCacheInvalidator = adminCacheInvalidator;
-        _mapper = mapper;
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateGroupCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateGroupDtoValidator();
         var validationResult = await validator.ValidateAsync(request.GroupDto, cancellationToken);
@@ -87,7 +79,11 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
 
                 var currentUserId = request.CreatorUserId;
 
-                var group = _mapper.Map<Group>(request.GroupDto);
+                var group = new Group
+                {
+                    FullName = request.GroupDto.FullName,
+                    Description = request.GroupDto.Description
+                };
 
                 group.CreatedAt = DateTime.UtcNow;
 
@@ -157,11 +153,6 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
                     "Group created successfully. You are now the creator and admin of this group.");
             },
             cancellationToken);
-
-        if (result.IsSuccess)
-        {
-            _adminCacheInvalidator.InvalidateUser(request.CreatorUserId);
-        }
 
         return result;
     }

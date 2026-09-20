@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Requests.Commands;
 
-public sealed record ProcessAiRunCommand : IRequest
+public sealed record ProcessAiRunCommand : ICommand
 {
     public Guid TenantId { get; init; }
     public Guid ConversationId { get; init; }

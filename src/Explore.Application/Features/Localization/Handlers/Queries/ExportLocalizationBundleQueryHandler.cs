@@ -4,11 +4,11 @@ using Explore.Application.Telemetry;
 using Explore.Domain.Common.Localization;
 using FluentValidation;
 using FluentValidation.Results;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Localization.Handlers.Queries;
 
-public class ExportLocalizationBundleQueryHandler : IRequestHandler<ExportLocalizationBundleQuery, IReadOnlyDictionary<string, string>>
+public class ExportLocalizationBundleQueryHandler : IQueryHandler<ExportLocalizationBundleQuery, IReadOnlyDictionary<string, string>>
 {
     private readonly IStaticTranslationBundleReader _bundleReader;
     private readonly TranslationMetrics _metrics;
@@ -21,7 +21,7 @@ public class ExportLocalizationBundleQueryHandler : IRequestHandler<ExportLocali
         _metrics = metrics;
     }
 
-    public async Task<IReadOnlyDictionary<string, string>> Handle(
+    public async Task<IReadOnlyDictionary<string, string>> QueryAsync(
         ExportLocalizationBundleQuery request,
         CancellationToken cancellationToken)
     {

@@ -2,33 +2,30 @@ namespace Explore.Application.Features.EventAspects.Handlers.Queries;
 
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.EventAspects.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Handler for retrieving the Tech aspect of an event.
 /// </summary>
 public class GetEventTechAspectRequestHandler :
-    IRequestHandler<GetEventTechAspectRequest, EventTechAspectDto?>
+    IQueryHandler<GetEventTechAspectRequest, EventTechAspectDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventTechAspectRepository _techAspectRepository;
-    private readonly IMapper _mapper;
 
     public GetEventTechAspectRequestHandler(
         IEventRepository eventRepository,
-        IEventTechAspectRepository techAspectRepository,
-        IMapper mapper)
+        IEventTechAspectRepository techAspectRepository)
     {
         _eventRepository = eventRepository;
         _techAspectRepository = techAspectRepository;
-        _mapper = mapper;
     }
 
-    public async Task<EventTechAspectDto?> Handle(GetEventTechAspectRequest request, CancellationToken cancellationToken)
+    public async Task<EventTechAspectDto?> QueryAsync(GetEventTechAspectRequest request, CancellationToken cancellationToken)
     {
         var parentEvent = await _eventRepository.GetById(request.EventId);
         if (parentEvent is null || !await _eventRepository.IsPubliclyEligibleAsync(
@@ -49,20 +46,19 @@ public class GetEventTechAspectRequestHandler :
             return null;
         }
 
-        return _mapper.Map<EventTechAspectDto>(aspect);
+        return EventMapper.ToDetail(aspect);
     }
 }
 
 public sealed class GetManagedEventTechAspectRequestHandler(
-    IEventTechAspectRepository techAspectRepository,
-    IMapper mapper)
-    : IRequestHandler<GetManagedEventTechAspectRequest, EventTechAspectDto?>
+    IEventTechAspectRepository techAspectRepository)
+    : IQueryHandler<GetManagedEventTechAspectRequest, EventTechAspectDto?>
 {
-    public async Task<EventTechAspectDto?> Handle(
+    public async Task<EventTechAspectDto?> QueryAsync(
         GetManagedEventTechAspectRequest request,
         CancellationToken cancellationToken)
     {
         var aspect = await techAspectRepository.GetByEventId(request.EventId);
-        return aspect is null ? null : mapper.Map<EventTechAspectDto>(aspect);
+        return EventMapper.ToDetail(aspect);
     }
 }

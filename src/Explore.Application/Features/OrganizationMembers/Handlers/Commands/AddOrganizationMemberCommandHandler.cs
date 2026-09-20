@@ -2,40 +2,36 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationMembers.Handlers.Commands;
 
-public class AddOrganizationMemberCommandHandler : IRequestHandler<AddOrganizationMemberCommand, BaseCommandResponse<Guid>>
+public class AddOrganizationMemberCommandHandler : ICommandHandler<AddOrganizationMemberCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationTenantRepository _organizationTenantRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IMapper _mapper;
 
     public AddOrganizationMemberCommandHandler(
         IOrganizationMemberRepository organizationMemberRepository,
         IOrganizationRepository organizationRepository,
         IOrganizationTenantRepository organizationTenantRepository,
-        IUserRepository userRepository,
-        IMapper mapper)
+        IUserRepository userRepository)
     {
         _organizationMemberRepository = organizationMemberRepository;
         _organizationRepository = organizationRepository;
         _organizationTenantRepository = organizationTenantRepository;
         _userRepository = userRepository;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(AddOrganizationMemberCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddOrganizationMemberCommand request, CancellationToken cancellationToken)
     {
         var dto = request.AddOrganizationMemberDto;
 

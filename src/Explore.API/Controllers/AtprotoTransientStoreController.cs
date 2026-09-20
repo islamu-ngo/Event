@@ -4,9 +4,11 @@ using Explore.API.Authentication;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
-using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
-using MediatR;
+using Explore.Application.Features.Authentication.Atproto.Requests.Queries;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -31,14 +33,18 @@ namespace Explore.API.Controllers;
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
-public sealed class AtprotoTransientStoreController(IMediator mediator) : ControllerBase
+public sealed class AtprotoTransientStoreController(
+    ICommandHandler<ProbeAtprotoTransientCommand, BaseCommandResponse<Guid>> probeHandler,
+    ICommandHandler<CreateAtprotoTransientCommand, AtprotoTransientCommandResult> createHandler,
+    IQueryHandler<ReadAtprotoTransientQuery, AtprotoTransientValue?> readHandler,
+    ICommandHandler<ConsumeAtprotoTransientCommand, AtprotoTransientCommandResult> consumeHandler) : ControllerBase
 {
     [SuppressIdempotencyResponseStorage]
     [HttpPost("probe", Name = RouteNames.ProbeAtprotoTransient)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> Probe(CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(new ProbeAtprotoTransientCommand(), cancellationToken);
+        var result = await probeHandler.ExecuteAsync(new ProbeAtprotoTransientCommand(), cancellationToken);
         return Failures.Map(this, result, () => NoContent());
     }
 
@@ -54,7 +60,7 @@ public sealed class AtprotoTransientStoreController(IMediator mediator) : Contro
     public async Task<ActionResult<AtprotoTransientResponse>> Create([FromBody] CreateAtprotoTransientRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(request.ToCommand(), cancellationToken);
+        var result = await createHandler.ExecuteAsync(request.ToCommand(), cancellationToken);
         return Failures.Map(this, result, () => Ok(AtprotoTransientResponse.From(result.Value!)));
     }
 
@@ -64,7 +70,7 @@ public sealed class AtprotoTransientStoreController(IMediator mediator) : Contro
     public async Task<ActionResult<AtprotoTransientResponse>> Read([FromBody] ReadAtprotoTransientRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(request.ToQuery(), cancellationToken);
+        var result = await readHandler.QueryAsync(request.ToQuery(), cancellationToken);
         return result is null ? this.ToNotFoundProblem(Missing) : Ok(AtprotoTransientResponse.From(result));
     }
 
@@ -74,7 +80,7 @@ public sealed class AtprotoTransientStoreController(IMediator mediator) : Contro
     public async Task<ActionResult<AtprotoTransientResponse>> Consume([FromBody] ConsumeAtprotoTransientRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(request.ToCommand(), cancellationToken);
+        var result = await consumeHandler.ExecuteAsync(request.ToCommand(), cancellationToken);
         return Failures.Map(this, result, () => Ok(AtprotoTransientResponse.From(result.Value!)));
     }
 }

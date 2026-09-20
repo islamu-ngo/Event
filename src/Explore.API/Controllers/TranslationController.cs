@@ -2,7 +2,7 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.Features.Localization.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +13,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class TranslationController(IMediator mediator) : ControllerBase
+public class TranslationController(
+    IQueryHandler<GetTranslationsQuery, Dictionary<string, string>> translationsQuery,
+    IQueryHandler<GetAvailableLanguagesQuery, List<string>> languagesQuery) : ControllerBase
 {
 
     /// <summary>
@@ -29,7 +31,7 @@ public class TranslationController(IMediator mediator) : ControllerBase
         string languageCode,
         CancellationToken cancellationToken = default)
     {
-        var translations = await mediator.Send(
+        var translations = await translationsQuery.QueryAsync(
             new GetTranslationsQuery { LanguageCode = languageCode },
             cancellationToken);
         return Ok(translations);
@@ -45,7 +47,7 @@ public class TranslationController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<string>>> GetLanguages(CancellationToken cancellationToken = default)
     {
-        var languages = await mediator.Send(new GetAvailableLanguagesQuery(), cancellationToken);
+        var languages = await languagesQuery.QueryAsync(new GetAvailableLanguagesQuery(), cancellationToken);
         return Ok(languages);
     }
 }

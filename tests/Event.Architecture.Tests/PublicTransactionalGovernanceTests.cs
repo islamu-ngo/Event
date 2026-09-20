@@ -38,7 +38,11 @@ public class PublicTransactionalGovernanceTests
     public async Task PublicTransactionalRules_AcceptNativeChallengeIssuanceAndProofGuardedAllocation()
     {
         var violations = PublicTransactionalEndpointGovernance.FindViolations(
-            [typeof(AnonymousRegistrationChallengeController), typeof(GuestRegistrationOrderController)]);
+            [
+                typeof(AnonymousRegistrationChallengeController), typeof(GuestRegistrationOrderController),
+                typeof(GuestRegistrationOrderRequirementsController), typeof(GuestRegistrationOrderParticipantsController),
+                typeof(GuestRegistrationOrderPromotionsController), typeof(GuestRegistrationOrderClaimController)
+            ]);
         await Assert.That(violations).IsEmpty();
     }
 

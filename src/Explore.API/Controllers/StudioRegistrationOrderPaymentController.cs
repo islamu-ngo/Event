@@ -3,11 +3,11 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +18,11 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/events/{eventId:guid}/registration-orders")]
 [ApiController]
-public sealed class StudioRegistrationOrderPaymentController(IMediator mediator) : RegistrationOrderPaymentControllerBase(mediator)
+public sealed class StudioRegistrationOrderPaymentController(
+    IQueryHandler<GetStudioRegistrationPaymentQuery, RegistrationPaymentDto?> statusQueryHandler,
+    ICommandHandler<CreateStudioRegistrationRefundCommand, RegistrationRefundCommandResultDto> refundCommandHandler,
+    ICommandHandler<RetryStudioRegistrationRefundCommand, RegistrationRefundCommandResultDto> retryCommandHandler)
+    : RegistrationOrderPaymentControllerBase
 {
     private static readonly Explore.API.ExceptionHandling.ApiNotFoundProblemDescriptor PaymentNotFoundProblem = new(
         "Registration payment not found", "Registration payment was not found.");
@@ -34,7 +38,7 @@ public sealed class StudioRegistrationOrderPaymentController(IMediator mediator)
     public async Task<ActionResult<HalResource<RegistrationPaymentDto>>> GetStatus(
         Guid eventId, Guid orderId, CancellationToken cancellationToken = default)
     {
-        RegistrationPaymentDto? payment = await Mediator.Send(new GetStudioRegistrationPaymentQuery(eventId, orderId), cancellationToken);
+        RegistrationPaymentDto? payment = await statusQueryHandler.QueryAsync(new GetStudioRegistrationPaymentQuery(eventId, orderId), cancellationToken);
         if (payment is null)
         {
             return this.ToNotFoundProblem(PaymentNotFoundProblem);
@@ -77,7 +81,7 @@ public sealed class StudioRegistrationOrderPaymentController(IMediator mediator)
         [FromBody] RegistrationRefundRequestDto request,
         CancellationToken cancellationToken = default) =>
         MapRefundResult(
-            await Mediator.Send(new CreateStudioRegistrationRefundCommand(
+            await refundCommandHandler.ExecuteAsync(new CreateStudioRegistrationRefundCommand(
                 eventId, orderId, request, idempotencyKey), cancellationToken),
             eventId,
             orderId,
@@ -100,7 +104,7 @@ public sealed class StudioRegistrationOrderPaymentController(IMediator mediator)
     {
         _ = idempotencyKey;
         return MapRefundResult(
-            await Mediator.Send(
+            await retryCommandHandler.ExecuteAsync(
                 new RetryStudioRegistrationRefundCommand(eventId, orderId, refundAttemptId), cancellationToken),
             eventId,
             orderId,

@@ -1,6 +1,7 @@
 namespace Explore.Application.Features.LegalDocuments.Handlers.Queries;
 
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.LegalDocuments;
@@ -8,7 +9,6 @@ using Explore.Application.Features.ConfigurationManifest.LegalDocuments;
 using Explore.Application.Features.LegalDocuments.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 public sealed class GetPublicLegalDocumentQueryHandler(
     ILegalDocumentRepository repository,
@@ -16,11 +16,11 @@ public sealed class GetPublicLegalDocumentQueryHandler(
     ITenantContext tenantContext,
     ITenantDirectoryOperatorReadinessEvaluator tenantIdentityReadiness,
     IInstanceOperatorIdentityReadinessEvaluator instanceIdentityReadiness)
-    : IRequestHandler<
+    : IQueryHandler<
         GetPublicLegalDocumentQuery,
         PublicLegalDocumentQueryResult>
 {
-    public async Task<PublicLegalDocumentQueryResult> Handle(
+    public async Task<PublicLegalDocumentQueryResult> QueryAsync(
         GetPublicLegalDocumentQuery request,
         CancellationToken cancellationToken)
     {

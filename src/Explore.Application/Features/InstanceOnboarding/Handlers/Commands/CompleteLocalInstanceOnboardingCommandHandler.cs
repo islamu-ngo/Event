@@ -1,14 +1,15 @@
 
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
@@ -17,9 +18,9 @@ public sealed class CompleteLocalInstanceOnboardingCommandHandler(
     IAuthenticationProviderDispatcher providers,
     ISetupSecretProvider setup,
     IDeploymentModeProvider deployment,
-    ISender sender) : IRequestHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>>
+    IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto> preflightHandler) : ICommandHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CompleteLocalInstanceOnboardingCommand command, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CompleteLocalInstanceOnboardingCommand command, CancellationToken cancellationToken)
     {
         if (!command.SetupPrincipal.Identities.Any(identity => identity.IsAuthenticated
                 && identity.AuthenticationType == ApiAuthenticationSchemeNames.SetupSecret)
@@ -39,7 +40,7 @@ public sealed class CompleteLocalInstanceOnboardingCommandHandler(
         };
         var validation = await new CompleteLocalInstanceOnboardingRequestDtoValidator().ValidateAsync(request, cancellationToken);
         if (!validation.IsValid) return Failure("local_bootstrap_request_invalid");
-        var preflight = await sender.Send(new GetOnboardingPreflightQuery(), cancellationToken);
+        var preflight = await preflightHandler.QueryAsync(new GetOnboardingPreflightQuery(), cancellationToken);
         if (!preflight.IsReadyToLaunch) return Failure("local_bootstrap_preflight_blocked");
 
         return await operation.CompleteInteractiveAsync(

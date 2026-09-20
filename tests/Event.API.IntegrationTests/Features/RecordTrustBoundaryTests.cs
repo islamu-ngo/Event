@@ -1,19 +1,18 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Category;
-using Explore.Application.Features.Categories.Requests.Commands;
-using Explore.Application.Responses;
-using MediatR;
+using Explore.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -57,17 +56,25 @@ public sealed class RecordTrustBoundaryTests
     {
         var forgedTenantId = Guid.CreateVersion7();
         var authenticatedUserId = Guid.CreateVersion7();
-        CreateCategoryCommand? dispatched = null;
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(
-                Arg.Do<CreateCategoryCommand>(command => dispatched = command),
-                Arg.Any<CancellationToken>())
-            .Returns(BaseCommandResponse.Success(
-                Guid.CreateVersion7(),
-                "Category created."));
-
-        await using var factory = CreateFactoryWithMediator(mediator);
+        var categoryChecks = new ConcurrentQueue<AuthorizationRequest>();
+        await using var factory = new AuthenticatedWebApplicationFactory
+        {
+            AuthorizationProviderOverride = new StubAuthorizationProvider
+            {
+                CheckPredicate = check =>
+                {
+                    if (check.ResourceKind == ResourceKinds.Category)
+                    {
+                        categoryChecks.Enqueue(check);
+                    }
+                    return true;
+                }
+            }
+        };
         using var client = factory.CreateClient();
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var categoryCount = await db.Categories.IgnoreQueryFilters().CountAsync();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/category")
         {
             Content = JsonContent.Create(new
@@ -90,7 +97,8 @@ public sealed class RecordTrustBoundaryTests
         var responseBody = await response.Content.ReadAsStringAsync();
         await Assert.That(responseBody).DoesNotContain(forgedTenantId.ToString("D"));
         await Assert.That(responseBody).DoesNotContain(authenticatedUserId.ToString("D"));
-        await Assert.That(dispatched).IsNull();
+        await Assert.That(categoryChecks).IsEmpty();
+        await Assert.That(await db.Categories.IgnoreQueryFilters().CountAsync()).IsEqualTo(categoryCount);
         await Assert.That(typeof(CreateCategoryDto).GetProperty("TenantId")).IsNull();
     }
 
@@ -112,13 +120,4 @@ public sealed class RecordTrustBoundaryTests
         }
     }
 
-    private static WebApplicationFactory<Program> CreateFactoryWithMediator(IMediator mediator)
-    {
-        var factory = new AuthenticatedWebApplicationFactory();
-        return factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-        {
-            services.RemoveAll<IMediator>();
-            services.AddSingleton(mediator);
-        }));
-    }
 }

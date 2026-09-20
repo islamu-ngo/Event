@@ -1,20 +1,20 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Tenant.Validators;
 using Explore.Application.Features.Tenants.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands;
 
 public sealed class UpdateTenantCommandHandler(
     ITenantRepository tenantRepository,
     ITenantSlugCache tenantSlugCache)
-    : IRequestHandler<UpdateTenantCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateTenantCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateTenantCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validator = new UpdateTenantDtoValidator();
         var validationResult = await validator.ValidateAsync(request.Update, cancellationToken);

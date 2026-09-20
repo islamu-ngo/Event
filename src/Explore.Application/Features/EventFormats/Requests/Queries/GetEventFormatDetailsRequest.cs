@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.EventFormat;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventFormats.Requests.Queries;
 
-public sealed record GetEventFormatDetailsRequest(int Id) : IRequest<EventFormatDto>;
+public sealed record GetEventFormatDetailsRequest(int Id) : IQuery<EventFormatDto?>;

@@ -5,6 +5,7 @@ namespace Explore.Application.Contracts.Persistence;
 public interface IStorageUploadSessionRepository : IGenericRepository<StorageUploadSession, Guid>
 {
     Task<StorageUploadSession?> GetActiveByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<StorageUploadSession?> GetForAuthorizationAsync(Guid id, CancellationToken cancellationToken);
     Task<StorageUploadSession?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
     Task<StorageUploadSession?> GetByTenantAndIdempotencyKeyForUpdateAsync(
         Guid tenantId,

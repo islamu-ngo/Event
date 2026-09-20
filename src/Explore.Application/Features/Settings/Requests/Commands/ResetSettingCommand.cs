@@ -2,13 +2,13 @@ namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Removes the override for a setting key at the specified scope. The effective value
 /// reverts to the next higher scope in the cascade (e.g., removing user override → tenant value applies).
 /// </summary>
-public sealed record ResetSettingCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record ResetSettingCommand : ICommand<BaseCommandResponse<Guid>>
 {
     /// <summary>
     /// Fully qualified setting key (e.g., "event_list.page_size"). Must exist in SettingRegistry.

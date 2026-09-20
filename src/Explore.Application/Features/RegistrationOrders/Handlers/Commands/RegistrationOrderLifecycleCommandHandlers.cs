@@ -1,19 +1,19 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Responses;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
 public sealed class SubmitRegistrationOrderCommandHandler(
     RegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant)
-    : IRequestHandler<SubmitRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<SubmitRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(SubmitRegistrationOrderCommand request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(SubmitRegistrationOrderCommand request, CancellationToken cancellationToken)
     {
         var validator = new RegistrationOrderLifecycleCommandValidator<SubmitRegistrationOrderCommand>();
         var validation = await validator.ValidateAsync(request, cancellationToken);
@@ -25,9 +25,9 @@ public sealed class SubmitRegistrationOrderCommandHandler(
 public sealed class ReadyRegistrationOrderForCheckoutCommandHandler(
     RegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant)
-    : IRequestHandler<ReadyRegistrationOrderForCheckoutCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<ReadyRegistrationOrderForCheckoutCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(ReadyRegistrationOrderForCheckoutCommand request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(ReadyRegistrationOrderForCheckoutCommand request, CancellationToken cancellationToken)
     {
         var validator = new RegistrationOrderLifecycleCommandValidator<ReadyRegistrationOrderForCheckoutCommand>();
         var validation = await validator.ValidateAsync(request, cancellationToken);
@@ -39,9 +39,9 @@ public sealed class ReadyRegistrationOrderForCheckoutCommandHandler(
 public sealed class FinalizeFreeRegistrationOrderCommandHandler(
     RegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant)
-    : IRequestHandler<FinalizeFreeRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<FinalizeFreeRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(FinalizeFreeRegistrationOrderCommand request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(FinalizeFreeRegistrationOrderCommand request, CancellationToken cancellationToken)
     {
         var validator = new RegistrationOrderLifecycleCommandValidator<FinalizeFreeRegistrationOrderCommand>();
         var validation = await validator.ValidateAsync(request, cancellationToken);
@@ -53,9 +53,9 @@ public sealed class FinalizeFreeRegistrationOrderCommandHandler(
 public sealed class CancelRegistrationOrderCommandHandler(
     RegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant)
-    : IRequestHandler<CancelRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<CancelRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(CancelRegistrationOrderCommand request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(CancelRegistrationOrderCommand request, CancellationToken cancellationToken)
     {
         var validator = new RegistrationOrderLifecycleCommandValidator<CancelRegistrationOrderCommand>();
         var validation = await validator.ValidateAsync(request, cancellationToken);
@@ -67,9 +67,9 @@ public sealed class CancelRegistrationOrderCommandHandler(
 public sealed class ApproveRegistrationOrderCommandHandler(
     RegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant)
-    : IRequestHandler<ApproveRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<ApproveRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(ApproveRegistrationOrderCommand request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(ApproveRegistrationOrderCommand request, CancellationToken cancellationToken)
     {
         var validator = new RegistrationOrderLifecycleCommandValidator<ApproveRegistrationOrderCommand>();
         var validation = await validator.ValidateAsync(request, cancellationToken);
@@ -81,9 +81,9 @@ public sealed class ApproveRegistrationOrderCommandHandler(
 public sealed class RejectRegistrationOrderCommandHandler(
     RegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant)
-    : IRequestHandler<RejectRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
+    : ICommandHandler<RejectRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>
 {
-    public async Task<RegistrationOrderLifecycleResponseDto> Handle(RejectRegistrationOrderCommand request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderLifecycleResponseDto> ExecuteAsync(RejectRegistrationOrderCommand request, CancellationToken cancellationToken)
     {
         var validator = new RegistrationOrderLifecycleCommandValidator<RejectRegistrationOrderCommand>();
         var validation = await validator.ValidateAsync(request, cancellationToken);

@@ -8,7 +8,8 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
@@ -36,7 +37,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(firstContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var first = await handler.Handle(
+                var first = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
                 await Assert.That(first.IsSuccess).IsTrue();
@@ -51,7 +52,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(secondContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var second = await handler.Handle(
+                var second = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
                 await Assert.That(second.IsSuccess).IsTrue();
@@ -149,7 +150,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(apply)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("existing", "new")),
                     CancellationToken.None);
@@ -266,7 +267,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     new ConfigurationManifestFailureRepository(factory),
                     useRealPolicyBoundary: true);
 
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.GuardedSource("guarded")),
                     CancellationToken.None);
@@ -318,8 +319,8 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(firstContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory),
-                    effectPublisher: new ThrowingPublisher());
-                await Assert.That(() => handler.Handle(
+                    effectConsumer: new ThrowingConsumer());
+                await Assert.That(() => handler.ExecuteAsync(
                         new ApplyConfigurationManifestCommand(source),
                         CancellationToken.None))
                     .Throws<AggregateException>();
@@ -334,7 +335,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(secondContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
                 await Assert.That(response.IsSuccess).IsTrue();
@@ -383,7 +384,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     new ThrowingOperationRepository(inner),
                     new ConfigurationManifestFailureRepository(factory));
 
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("rollback")),
                     CancellationToken.None);
@@ -444,7 +445,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     new ConfigurationManifestFailureRepository(factory),
                     tenantCreationService: new FailOnSecondTenantCreationService(innerCreation));
 
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("first", "second")),
                     CancellationToken.None);
@@ -491,7 +492,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                 new TenantRepository(context)),
             repository,
             new ConfigurationManifestFailureRepository(factory));
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new ApplyConfigurationManifestCommand(source),
             CancellationToken.None);
         await Assert.That(response.IsSuccess).IsTrue();
@@ -574,17 +575,11 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
         }
     }
 
-    private sealed class ThrowingPublisher : IPublisher
+    private sealed class ThrowingConsumer : INotificationHandler<SettingChangedNotification>
     {
-        public Task Publish<TNotification>(
-            TNotification notification,
-            CancellationToken cancellationToken = default)
-            where TNotification : INotification =>
-            throw new InvalidOperationException("Simulated post-commit effect failure.");
-
-        public Task Publish(
-            object notification,
-            CancellationToken cancellationToken = default) =>
+        public Task HandleAsync(
+            SettingChangedNotification notification,
+            CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Simulated post-commit effect failure.");
     }
 }

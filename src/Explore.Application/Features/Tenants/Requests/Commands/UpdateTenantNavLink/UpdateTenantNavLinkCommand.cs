@@ -1,7 +1,7 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Requests.Commands.UpdateTenantNavLink;
 
@@ -10,7 +10,7 @@ namespace Explore.Application.Features.Tenants.Requests.Commands.UpdateTenantNav
 /// Returns a boolean indicating success or failure.
 /// </summary>
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record UpdateTenantNavLinkCommand : IRequest<BaseCommandResponse<bool>>, ISecureRequest
+public sealed record UpdateTenantNavLinkCommand : ICommand<BaseCommandResponse<bool>>, ISecureRequest
 {
     /// <summary>
     /// DTO containing the updated navigation link data.

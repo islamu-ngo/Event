@@ -55,7 +55,7 @@ public sealed class TenantBrandingSettingsDocumentProvisioningService(
         }
 
         var document = TenantBrandingSettingsDocumentDefaults.Create(tenantId, fallbackDisplayName);
-        var created = await tenantSettingsDocumentRepository.Create(document);
+        var created = await tenantSettingsDocumentRepository.CreateIfMissingAsync(document, cancellationToken);
         typedSettingsDocumentResolver.InvalidateTenantDocumentCache(tenantId, SettingsDocumentKeys.Tenant.Branding);
         return created;
     }

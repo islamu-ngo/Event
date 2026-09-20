@@ -7,14 +7,15 @@ using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Infrastructure.Ai;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -48,20 +49,50 @@ public sealed class AiAssistantController : ControllerBase
         "AI run not found",
         "AI run not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetAiAssistantBootstrapQuery, AiAssistantBootstrapDto> _getBootstrapHandler;
+    private readonly IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>> _getConversationsHandler;
+    private readonly IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?> _getConversationDetailHandler;
+    private readonly IQueryHandler<SearchAiReferencesQuery, IReadOnlyList<AiReferenceSearchResultDto>> _searchReferencesHandler;
+    private readonly IQueryHandler<GetAiRunStatusQuery, AiRunDto?> _getRunStatusHandler;
+    private readonly ICommandHandler<CreateAiConversationCommand, BaseCommandResponse<Guid>> _createConversationHandler;
+    private readonly ICommandHandler<SendAiMessageCommand, BaseCommandResponse<Guid>> _sendMessageHandler;
+    private readonly ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>> _confirmProposedActionHandler;
+    private readonly ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>> _rejectProposedActionHandler;
+    private readonly ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>> _cancelRunHandler;
+    private readonly IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> _tenantOnboardingStatus;
     private readonly IHateoasLinkGenerator _linkGenerator;
     private readonly IResourceAssembler<AiConversationDto, AiConversationSummaryDto> _conversationAssembler;
     private readonly IAiAssistantRunQueue _runQueue;
     private readonly ITenantContext _tenantContext;
 
     public AiAssistantController(
-        IMediator mediator,
+        IQueryHandler<GetAiAssistantBootstrapQuery, AiAssistantBootstrapDto> getBootstrapHandler,
+        IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>> getConversationsHandler,
+        IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?> getConversationDetailHandler,
+        IQueryHandler<SearchAiReferencesQuery, IReadOnlyList<AiReferenceSearchResultDto>> searchReferencesHandler,
+        IQueryHandler<GetAiRunStatusQuery, AiRunDto?> getRunStatusHandler,
+        ICommandHandler<CreateAiConversationCommand, BaseCommandResponse<Guid>> createConversationHandler,
+        ICommandHandler<SendAiMessageCommand, BaseCommandResponse<Guid>> sendMessageHandler,
+        ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>> confirmProposedActionHandler,
+        ICommandHandler<RejectAiProposedActionCommand, BaseCommandResponse<Guid>> rejectProposedActionHandler,
+        ICommandHandler<CancelAiRunCommand, BaseCommandResponse<Guid>> cancelRunHandler,
+        IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> tenantOnboardingStatus,
         IHateoasLinkGenerator linkGenerator,
         IResourceAssembler<AiConversationDto, AiConversationSummaryDto> conversationAssembler,
         IAiAssistantRunQueue runQueue,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _getBootstrapHandler = getBootstrapHandler;
+        _getConversationsHandler = getConversationsHandler;
+        _getConversationDetailHandler = getConversationDetailHandler;
+        _searchReferencesHandler = searchReferencesHandler;
+        _getRunStatusHandler = getRunStatusHandler;
+        _createConversationHandler = createConversationHandler;
+        _sendMessageHandler = sendMessageHandler;
+        _confirmProposedActionHandler = confirmProposedActionHandler;
+        _rejectProposedActionHandler = rejectProposedActionHandler;
+        _cancelRunHandler = cancelRunHandler;
+        _tenantOnboardingStatus = tenantOnboardingStatus;
         _linkGenerator = linkGenerator;
         _conversationAssembler = conversationAssembler;
         _runQueue = runQueue;
@@ -77,7 +108,7 @@ public sealed class AiAssistantController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalResource<AiAssistantBootstrapDto>>> GetBootstrap(CancellationToken cancellationToken = default)
     {
-        var bootstrap = await _mediator.Send(new GetAiAssistantBootstrapQuery(), cancellationToken);
+        var bootstrap = await _getBootstrapHandler.QueryAsync(new GetAiAssistantBootstrapQuery(), cancellationToken);
         var resource = new HalResource<AiAssistantBootstrapDto>(bootstrap);
         var selfPath = _linkGenerator.GeneratePath(RouteNames.GetAiAssistantBootstrap, null, HttpContext);
 
@@ -104,7 +135,7 @@ public sealed class AiAssistantController : ControllerBase
         [FromServices] IOptions<AiProviderSettings> providerOptions,
         CancellationToken cancellationToken = default)
     {
-        var status = await _mediator.Send(new GetTenantOnboardingStatusQuery(), cancellationToken);
+        var status = await _tenantOnboardingStatus.QueryAsync(new GetTenantOnboardingStatusQuery(), cancellationToken);
         if (!status.IsCurrentUserTenantAdministrator && !status.IsCurrentUserPlatformAdministrator)
         {
             return this.ToForbiddenProblem(detail: "Tenant or platform administrator authority is required to discover AI assistant models.");
@@ -202,7 +233,7 @@ public sealed class AiAssistantController : ControllerBase
         [FromQuery] int limit = 20,
         CancellationToken cancellationToken = default)
     {
-        var conversations = await _mediator.Send(new GetAiConversationListQuery { Limit = limit }, cancellationToken);
+        var conversations = await _getConversationsHandler.QueryAsync(new GetAiConversationListQuery { Limit = limit }, cancellationToken);
         var resource = await _conversationAssembler.ToCollectionResource(
             conversations,
             RouteNames.GetAiConversations,
@@ -224,7 +255,7 @@ public sealed class AiAssistantController : ControllerBase
         [FromBody] CreateAiConversationRequestDto dto,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CreateAiConversationCommand { Conversation = dto }, cancellationToken);
+        var response = await _createConversationHandler.ExecuteAsync(new CreateAiConversationCommand { Conversation = dto }, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -245,7 +276,7 @@ public sealed class AiAssistantController : ControllerBase
         Guid conversationId,
         CancellationToken cancellationToken = default)
     {
-        var conversation = await _mediator.Send(new GetAiConversationDetailQuery { ConversationId = conversationId }, cancellationToken);
+        var conversation = await _getConversationDetailHandler.QueryAsync(new GetAiConversationDetailQuery { ConversationId = conversationId }, cancellationToken);
 
         if (conversation is null)
         {
@@ -270,7 +301,7 @@ public sealed class AiAssistantController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         int normalizedLimit = NormalizeReferenceLimit(limit);
-        IReadOnlyList<AiReferenceSearchResultDto> references = await _mediator.Send(new SearchAiReferencesQuery
+        IReadOnlyList<AiReferenceSearchResultDto> references = await _searchReferencesHandler.QueryAsync(new SearchAiReferencesQuery
         {
             SearchTerm = searchTerm,
             Limit = normalizedLimit
@@ -314,7 +345,7 @@ public sealed class AiAssistantController : ControllerBase
             dto = dto with { IdempotencyKey = idempotencyKey };
         }
 
-        var response = await _mediator.Send(new SendAiMessageCommand
+        var response = await _sendMessageHandler.ExecuteAsync(new SendAiMessageCommand
         {
             ConversationId = conversationId,
             Message = dto
@@ -357,7 +388,7 @@ public sealed class AiAssistantController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         _ = conversationId;
-        var response = await _mediator.Send(new ConfirmAiProposedActionCommand
+        var response = await _confirmProposedActionHandler.ExecuteAsync(new ConfirmAiProposedActionCommand
         {
             ProposedActionId = proposedActionId,
             IdempotencyKey = idempotencyKey
@@ -388,7 +419,7 @@ public sealed class AiAssistantController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         _ = conversationId;
-        var response = await _mediator.Send(new RejectAiProposedActionCommand
+        var response = await _rejectProposedActionHandler.ExecuteAsync(new RejectAiProposedActionCommand
         {
             ProposedActionId = proposedActionId
         }, cancellationToken);
@@ -413,7 +444,7 @@ public sealed class AiAssistantController : ControllerBase
         Guid runId,
         CancellationToken cancellationToken = default)
     {
-        var run = await _mediator.Send(new GetAiRunStatusQuery
+        var run = await _getRunStatusHandler.QueryAsync(new GetAiRunStatusQuery
         {
             ConversationId = conversationId,
             RunId = runId
@@ -451,7 +482,7 @@ public sealed class AiAssistantController : ControllerBase
         Guid runId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CancelAiRunCommand
+        var response = await _cancelRunHandler.ExecuteAsync(new CancelAiRunCommand
         {
             ConversationId = conversationId,
             RunId = runId

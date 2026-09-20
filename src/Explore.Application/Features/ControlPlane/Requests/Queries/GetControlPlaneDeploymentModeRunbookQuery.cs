@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
-public sealed record GetControlPlaneDeploymentModeRunbookQuery : IRequest<ControlPlaneDeploymentModeRunbookDto>, ISecureRequest
+public sealed record GetControlPlaneDeploymentModeRunbookQuery : IQuery<ControlPlaneDeploymentModeRunbookDto>, ISecureRequest
 {
     public const string SettingKey = "control-plane.deployment-mode.runbook";
 

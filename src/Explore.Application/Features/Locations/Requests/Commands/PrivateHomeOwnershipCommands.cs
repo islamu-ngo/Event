@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Requests.Commands;
 
@@ -9,7 +9,7 @@ namespace Explore.Application.Features.Locations.Requests.Commands;
 /// </summary>
 [AuthorizeResource(ResourceKinds.Location, AuthorizationActions.Update)]
 public sealed record ClassifyLocationAsPrivateHomeCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid LocationId { get; init; }
     public Guid ExpectedConcurrencyStamp { get; init; }
@@ -30,7 +30,7 @@ public sealed record ClassifyLocationAsPrivateHomeCommand
 /// </summary>
 [AuthorizeResource(ResourceKinds.Location, AuthorizationActions.Update)]
 public sealed record AcceptPrivateHomeOwnershipCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid LocationId { get; init; }
     public Guid ExpectedConcurrencyStamp { get; init; }

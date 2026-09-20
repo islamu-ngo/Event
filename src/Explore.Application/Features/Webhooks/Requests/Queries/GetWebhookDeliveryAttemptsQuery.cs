@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Webhooks;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Webhook, AuthorizationActions.Webhooks.ViewDelivery)]
 public sealed record GetWebhookDeliveryAttemptsQuery
-    : IRequest<IReadOnlyList<WebhookDeliveryAttemptDto>>, ISecureRequest, IWebhookOwnerScopedRequest
+    : IQuery<IReadOnlyList<WebhookDeliveryAttemptDto>>, ISecureRequest, IWebhookOwnerScopedRequest
 {
     public int OwnerKindId { get; init; }
 

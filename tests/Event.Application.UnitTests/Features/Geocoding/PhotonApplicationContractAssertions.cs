@@ -39,15 +39,16 @@ internal static class PhotonApplicationContractAssertions
 
     internal static void RequireAsyncCallBefore(
         Type handler,
+        string entryPoint,
         Type firstContract,
         string firstMethod,
         Type secondContract,
         string secondMethod,
         string behavior)
     {
-        MethodInfo handle = handler.GetMethod("Handle", BindingFlags.Instance | BindingFlags.Public)
-            ?? throw Red($"{behavior}; {handler.FullName} has no public Handle method.");
-        Type? stateMachine = handle.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType;
+        MethodInfo method = handler.GetMethod(entryPoint, BindingFlags.Instance | BindingFlags.Public)
+            ?? throw Red($"{behavior}; {handler.FullName} has no public {entryPoint} method.");
+        Type? stateMachine = method.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType;
         MethodInfo? body = stateMachine?.GetMethod(
             "MoveNext",
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);

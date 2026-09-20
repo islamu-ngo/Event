@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
@@ -15,14 +15,14 @@ public sealed class ReserveTicketPurchaseCommandHandler(
     ITicketPurchaseOrderResolver orders,
     ITicketPurchaseGovernanceRepository governance,
     ITenantContext tenant) :
-    IRequestHandler<
+    ICommandHandler<
         ReserveTicketPurchaseCommand,
         BaseCommandResponse<Guid>>
 {
-    public Task<BaseCommandResponse<Guid>> Handle(
-        ReserveTicketPurchaseCommand request,
-        CancellationToken cancellationToken) =>
-        HandleCoreAsync(request, cancellationToken);
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ReserveTicketPurchaseCommand command,
+        CancellationToken cancellationToken = default) =>
+        HandleCoreAsync(command, cancellationToken);
 
     private async Task<BaseCommandResponse<Guid>> HandleCoreAsync(
         ReserveTicketPurchaseCommand request,

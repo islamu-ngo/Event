@@ -1,0 +1,33 @@
+# Correct email dispatch status runtime HAL serialization.
+Change-Id: CHG-01M2D82SWC8M4CHBA8AGE5VQYR
+Title: "Return completed HAL email dispatch status"
+Type: fix
+Scope: notifications
+Summary: "Email dispatch status now returns its declared root HAL collection instead of a Task envelope or an asynchronous serialization failure."
+Group: email-dispatch-status-hal
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/communications-and-notifications/email-smtp.md
+    Disposition: documented
+    Detail: Clients relying on the erroneous result wrapper must read root _links and _embedded.items instead; no compatibility wrapper is retained.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Real asynchronous HAL link authorization completes before serialization; tenant authorization and sanitized operational fields remain unchanged.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: No database or stored-data migration.
+  Configuration:
+    Reference: docs/public/documentation/readme/communications-and-notifications/email-smtp.md
+    Disposition: not-applicable
+    Detail: No configuration changes or mail delivery side effects.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Runtime output now matches the existing HalCollectionResourceOfEmailDispatchStatusDto success schema. Route, operationId and generated client contracts are unchanged; regeneration is unnecessary.
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/email-smtp.md
+    Disposition: documented
+    Detail: Authorized status inspection returns a bounded HAL collection even when link authorization is asynchronous, rather than a Task envelope or serialization failure.

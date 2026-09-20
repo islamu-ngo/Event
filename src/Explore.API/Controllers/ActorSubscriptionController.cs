@@ -8,7 +8,7 @@ using Explore.Application.Features.ActorSubscriptions.Requests.Commands;
 using Explore.Application.Features.ActorSubscriptions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,14 +41,26 @@ public sealed class ActorSubscriptionController : EventControllerBase
         "Actor subscription not found",
         "Actor subscription not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetActorSubscriptionsRequest, PaginatedResult<ActorSubscriptionListDto>> _subscriptionsQuery;
+    private readonly IQueryHandler<GetActorSubscriptionRequest, ActorSubscriptionDto?> _subscriptionQuery;
+    private readonly ICommandHandler<SubscribeToActorCommand, BaseCommandResponse<Guid>> _subscribeCommand;
+    private readonly ICommandHandler<UpdateActorSubscriptionNotificationLevelCommand, BaseCommandResponse<Guid>> _updateNotificationLevelCommand;
+    private readonly ICommandHandler<UnsubscribeFromActorCommand, BaseCommandResponse<Guid>> _unsubscribeCommand;
     private readonly IResourceAssembler<ActorSubscriptionDto, ActorSubscriptionListDto> _resourceAssembler;
 
     public ActorSubscriptionController(
-        IMediator mediator,
+        IQueryHandler<GetActorSubscriptionsRequest, PaginatedResult<ActorSubscriptionListDto>> subscriptionsQuery,
+        IQueryHandler<GetActorSubscriptionRequest, ActorSubscriptionDto?> subscriptionQuery,
+        ICommandHandler<SubscribeToActorCommand, BaseCommandResponse<Guid>> subscribeCommand,
+        ICommandHandler<UpdateActorSubscriptionNotificationLevelCommand, BaseCommandResponse<Guid>> updateNotificationLevelCommand,
+        ICommandHandler<UnsubscribeFromActorCommand, BaseCommandResponse<Guid>> unsubscribeCommand,
         IResourceAssembler<ActorSubscriptionDto, ActorSubscriptionListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _subscriptionsQuery = subscriptionsQuery;
+        _subscriptionQuery = subscriptionQuery;
+        _subscribeCommand = subscribeCommand;
+        _updateNotificationLevelCommand = updateNotificationLevelCommand;
+        _unsubscribeCommand = unsubscribeCommand;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -62,7 +74,7 @@ public sealed class ActorSubscriptionController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetActorSubscriptionsRequest
+        var result = await _subscriptionsQuery.QueryAsync(new GetActorSubscriptionsRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -86,7 +98,7 @@ public sealed class ActorSubscriptionController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<ActorSubscriptionDto>>> GetByActor(Guid targetActorId, CancellationToken cancellationToken = default)
     {
-        var subscription = await _mediator.Send(new GetActorSubscriptionRequest
+        var subscription = await _subscriptionQuery.QueryAsync(new GetActorSubscriptionRequest
         {
             TargetActorId = targetActorId
         }, cancellationToken);
@@ -110,7 +122,7 @@ public sealed class ActorSubscriptionController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Subscribe([FromBody] SubscribeToActorDto dto, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SubscribeToActorCommand { Subscription = dto }, cancellationToken);
+        var response = await _subscribeCommand.ExecuteAsync(new SubscribeToActorCommand { Subscription = dto }, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -134,7 +146,7 @@ public sealed class ActorSubscriptionController : EventControllerBase
         [FromBody] UpdateActorSubscriptionNotificationLevelDto dto,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateActorSubscriptionNotificationLevelCommand
+        var response = await _updateNotificationLevelCommand.ExecuteAsync(new UpdateActorSubscriptionNotificationLevelCommand
         {
             TargetActorId = targetActorId,
             Patch = dto
@@ -165,7 +177,7 @@ public sealed class ActorSubscriptionController : EventControllerBase
     {
         dto = dto with { TargetActorId = targetActorId };
 
-        var response = await _mediator.Send(new UnsubscribeFromActorCommand { Subscription = dto }, cancellationToken);
+        var response = await _unsubscribeCommand.ExecuteAsync(new UnsubscribeFromActorCommand { Subscription = dto }, cancellationToken);
 
         if (!response.IsSuccess)
         {

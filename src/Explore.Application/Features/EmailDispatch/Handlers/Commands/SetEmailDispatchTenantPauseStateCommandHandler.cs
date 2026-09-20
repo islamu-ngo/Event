@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
-public sealed class SetEmailDispatchTenantPauseStateCommandHandler : IRequestHandler<SetEmailDispatchTenantPauseStateCommand, BaseCommandResponse<Guid>>
+public sealed class SetEmailDispatchTenantPauseStateCommandHandler : ICommandHandler<SetEmailDispatchTenantPauseStateCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEmailDispatchOutboxRepository _repository;
 
@@ -15,7 +15,7 @@ public sealed class SetEmailDispatchTenantPauseStateCommandHandler : IRequestHan
         _repository = repository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SetEmailDispatchTenantPauseStateCommand request,
         CancellationToken cancellationToken)
     {

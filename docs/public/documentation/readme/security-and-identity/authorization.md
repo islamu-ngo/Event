@@ -16,7 +16,7 @@ Every mutation and sensitive query passes through a multi-stage, fail-closed aut
 graph TD
     A[Incoming HTTP Request] --> B{Endpoint Policy Check}
     B -- Denied --> X[401 Unauthorized / 403 Forbidden]
-    B -- Allowed --> C[MediatR Request Pipeline]
+    B -- Allowed --> C[Application Operation Authorization]
     C --> D{Authorization Provider<br>Local RBAC vs. Cerbos}
     D -- Denied / Unreachable --> X
     D -- Allowed --> E[Handler Executes Domain Logic]
@@ -25,11 +25,43 @@ graph TD
 ```
 
 1. **Endpoint Boundary**: Broad policy checks verify caller identity and minimum claims.
-2. **MediatR Pipeline**: The request evaluates the caller, tenant context, resource state, and requested action against policy rules.
+2. **Operation Authorization**: The request evaluates the caller, tenant context, resource state, and requested action against policy rules.
 3. **Execution Gate**: Handlers only execute if authorization explicitly returns `Allow`.
 4. **HATEOAS Affordance Gating**: The response dynamically attaches allowed actions in HAL `_links` (e.g., `_links.edit`, `_links.refund`). The client renders UI buttons strictly based on the presence of these links.
 
 ---
+
+## Event category assignment permissions
+
+Category assignments are governed by permission to update their event, not by
+permission to administer category definitions. An event owner with update
+permission can remove its category assignments. Moving an assignment between
+events requires update permission on **both** the source and destination, even
+when both events belong to the same tenant. Permission on the source alone does
+not authorize writing into another organizer's event.
+
+Missing or tenant-invisible assignments cannot be deleted. Denied authorization
+and authorization-provider outages both prevent writes, while remaining distinct
+failure outcomes; neither silently falls back or changes the assignment. These
+rules apply with Local RBAC and with Cerbos selected. No policy grants, database
+migration, new configuration, or new category-assignment API endpoint accompany
+this repair. Upgrade the application normally; EventTags and category-definition
+administration are unchanged.
+
+## Event tag assignment permissions
+
+Tag assignments use permission to update their event, not permission to administer
+tag definitions. Event owners with update permission can remove their assignments.
+Moving an assignment requires update permission on **both** events, even within
+the same tenant; changing its tag at the same time does not avoid this check.
+Missing or tenant-invisible assignments cannot be changed or deleted.
+
+Denied permission and an unavailable authorization provider both prevent writes
+without changing the assignment. They remain distinct failure outcomes; provider
+outages do not silently allow a move. These checks apply with Local RBAC or Cerbos
+selected. Upgrade the application normally: this repair adds no endpoint, policy
+grant, database migration or configuration, and does not change tag-definition
+administration.
 
 ## Choosing Your Authorization Provider
 
@@ -37,7 +69,7 @@ graph TD
 |---|---|---|
 | **Ideal For** | Single-tenant communities, standard organizations, minimal resource footprint | Enterprise operators, dynamic policy authoring, audit-heavy deployments |
 | **Infrastructure** | **Zero extra containers**; runs in-process using primary database | Dedicated Cerbos container or external PDP cluster over gRPC |
-| **Latency** | Sub-millisecond (in-memory & direct database query) | 1–3 ms network round-trip via HTTP/2 cleartext (`h2c`) |
+| **Latency** | Database-query latency; one authority profile per optimized batch | 1–3 ms network round-trip via HTTP/2 cleartext (`h2c`) |
 | **Policy Updates** | Governed via software releases and database migrations | Decoupled policy file uploads via `cerbosctl` without rebuilding the app |
 | **Failure Mode** | Database down = app down | PDP down = **fails closed** (access strictly denied; no silent fallback) |
 
@@ -53,7 +85,34 @@ graph TD
 When `AUTHORIZATION_PROVIDER=local` is set:
 - Evaluates permissions against user roles (`InstanceAdmin`, `TenantAdmin`, `OrganizationOwner`, `Member`, `Attendee`).
 - Automatically enforces multi-tenant boundaries via EF Core global query filters.
-- Fast, lightweight, and requires no external network calls or gRPC configuration.
+- Requires no external policy service or gRPC configuration; authority reads use the primary database.
+
+### Tenant administrator membership eligibility
+
+When tenant administrator authority is resolved, suspended, banned, removed, or deleted memberships do not contribute administrator tenant IDs, even if an unrevoked role grant remains in inventory. This applies to Cerbos principals, user-owned API-key authority, and administrator UI authority responses. Other tenants' active memberships remain independent. Grant inventory and tenant lifecycle behavior are unchanged; no database migration or configuration change is required. Eligibility is separate from the next-request freshness guarantee below.
+
+### Administrator role changes take effect on the next request
+
+After a role grant or revocation commits, new API requests read current administrator
+authority from the database, even when the caller's authentication claims are unchanged.
+No cache flush or sign-in refresh is required. This applies to Local RBAC and the
+administrator attributes sent to Cerbos, across nodes reading the same authoritative
+database and for changes committed by external administration tools.
+
+Requests or database snapshots already in progress may finish using their earlier
+view. Independent databases or lagging read replicas are not covered by this guarantee.
+Browser display claims can still lag; server-issued HAL links and server authorization
+remain the action boundary. Existing role permissions and tenant isolation are unchanged.
+The development-only administrator cache-invalidation endpoint is removed; the identity
+snapshot diagnostic remains available. No database migration or new configuration is required.
+
+### SQLite event-role permissions
+
+SQLite deployments support the same persisted event-role permissions as other primary database providers. The event-role permission lookup uses a portable query, restoring authorized session-language writes and their HAL edit links where SQLite previously reported an unsupported SQL APPLY operation. Tenant boundaries, active assignment periods, permission checks and machine-account restrictions are unchanged; this does not grant new access. Upgrade the application normally: no database migration, configuration change or policy republishing is required. Continue using server-issued HAL links rather than inferring actions from a role name.
+
+### Organization evidence actions
+
+Organization administrators can submit and view their organization's legitimacy evidence. Tenant administrators can view and review evidence in their tenant; tenant administration alone does not grant submission, and organization administration alone does not grant review. Accounts with both roles can perform both actions. With Local RBAC, these permission decisions remain the same whether checked individually or together when building HAL links. Clients must continue using server-issued links rather than inferring authority from roles.
 
 ---
 

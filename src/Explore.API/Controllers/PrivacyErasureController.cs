@@ -3,9 +3,9 @@ using Explore.API.Attributes;
 using Explore.API.Authentication;
 using Explore.API.Hateoas;
 using Explore.Application.Constants;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.Features.PrivacyErasure.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,8 @@ namespace Explore.API.Controllers;
 [Route("api/privacy-erasure")]
 [ApiController]
 [EndpointClassification(EndpointClass.Authenticated)]
-public sealed class PrivacyErasureController(IMediator mediator) : ControllerBase
+public sealed class PrivacyErasureController(
+    IQueryHandler<GetPrivacyErasureStatusQuery, PrivacyErasureStatusDto?> queryHandler) : ControllerBase
 {
     [HttpGet("status", Name = RouteNames.GetPrivacyErasureStatus)]
     [Authorize(AuthenticationSchemes = ApiAuthenticationSchemeNames.PrivacyErasureReceipt)]
@@ -31,7 +32,7 @@ public sealed class PrivacyErasureController(IMediator mediator) : ControllerBas
             return Unauthorized();
         }
 
-        PrivacyErasureStatusDto? status = await mediator.Send(
+        PrivacyErasureStatusDto? status = await queryHandler.QueryAsync(
             new GetPrivacyErasureStatusQuery(intentId),
             cancellationToken);
         return status is null ? Unauthorized() : Ok(status);

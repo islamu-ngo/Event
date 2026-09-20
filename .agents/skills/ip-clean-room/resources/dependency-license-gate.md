@@ -23,11 +23,19 @@ For each added or changed dependency, record:
 
 Passing `.ci/scripts/validate-dependency-license-policy.cs` is mandatory metadata evidence, not legal certification. Unknown metadata, source-available terms, commercial contracts, scanner overrides, assets, datasets, and generated output require human review.
 
-## Existing Dual-Version Precedent
+## Single Supported Dependency Graph
 
-`Directory.Packages.props` defaults to AutoMapper `14.0.0` and MediatR `12.5.0`, the last permissively licensed releases documented by this repository. `UseCommercialLuckyPennyLibraries=true` or Docker build argument `USE_COMMERCIAL_LUCKYPENNY_LIBS=true` explicitly opts into newer commercial versions; `AUTOMAPPER_COMMERCIAL_VERSION` and `MEDIATR_COMMERCIAL_VERSION` may feed build-time overrides, while `LUCKYPENNY_LICENSE_KEY` remains runtime-only. FOSS lock files preserve the default graph.
+`Directory.Packages.props` pins one supported graph. AutoMapper, MediatR and
+MediatR.Contracts, their edition selectors, commercial version overrides and
+vendor license inputs are retired. CI and the API/Blazor Dockerfiles enforce
+locked restore; there is no commercial restore bypass.
 
-Reuse the pattern only after a new dependency independently passes this gate. The precedent demonstrates explicit default/opt-in separation; it does not approve another package or license.
+[Mapperly provenance](../../../../docs/internal/legal/dependencies/mapperly.md)
+records the Apache-2.0 build-time generator, notice obligations and limits of
+generated-output claims. Native operations use repository-owned contracts and
+Microsoft DI, not a substitute mediator package. Every new dependency must
+independently pass this gate; neither the old edition arrangement nor the CLA
+authorizes another vendor's terms.
 
 ## Verification
 
@@ -36,4 +44,6 @@ dotnet run .ci/scripts/validate-dependency-license-policy.cs -- .
 dotnet restore --locked-mode
 ```
 
-Also inspect the actual release artifact/SBOM for each supported edition when dependency resolution differs by build mode.
+Also inspect the actual artifact/SBOM for each distributed runtime and topology.
+One build graph does not waive third-party terms or prove container contents;
+record the exact artifact identity and keep unrelated exceptions visible.

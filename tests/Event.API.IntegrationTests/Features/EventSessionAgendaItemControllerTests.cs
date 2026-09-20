@@ -2,14 +2,16 @@ using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Commands;
+using Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
 using Explore.Application.Models.Common;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -62,14 +64,20 @@ public sealed class EventSessionAgendaItemControllerTests
             Schedule = schedule,
             Location = location
         };
-        var mediator = new EventSessionAgendaItemMediatorStub();
+        var updateHandler = new UpdateEventSessionAgendaItemCommandHandlerStub();
         var controller = new EventSessionAgendaItemController(
-            mediator,
+            Substitute.For<IQueryHandler<GetEventSessionAgendaItemListRequest, PaginatedResult<EventSessionAgendaItemListDto>>>(),
+            Substitute.For<IQueryHandler<GetEventSessionAgendaItemDetailsRequest, EventSessionAgendaItemDto?>>(),
+            Substitute.For<IQueryHandler<GetAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>>>(),
+            Substitute.For<IQueryHandler<GetManagedAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>?>>(),
+            Substitute.For<ICommandHandler<CreateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>>>(),
+            updateHandler,
+            Substitute.For<ICommandHandler<DeleteEventSessionAgendaItemCommand, bool>>(),
             NullLogger<EventSessionAgendaItemController>.Instance);
 
         await controller.Update(routeId, dto);
 
-        UpdateEventSessionAgendaItemCommand command = mediator.LastRequest!;
+        UpdateEventSessionAgendaItemCommand command = updateHandler.LastCommand!;
         await Assert.That(command.EventSessionAgendaItemId).IsEqualTo(routeId);
         await Assert.That(command.AgendaItemDto).IsSameReferenceAs(dto);
         await Assert.That(command.AgendaItemDto.Relationship).IsSameReferenceAs(relationship);
@@ -78,41 +86,18 @@ public sealed class EventSessionAgendaItemControllerTests
         await Assert.That(command.AgendaItemDto.Location).IsSameReferenceAs(location);
     }
 
-    private sealed class EventSessionAgendaItemMediatorStub : IMediator
+    private sealed class UpdateEventSessionAgendaItemCommandHandlerStub : ICommandHandler<UpdateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>>
     {
-        public UpdateEventSessionAgendaItemCommand? LastRequest { get; private set; }
+        public UpdateEventSessionAgendaItemCommand? LastCommand { get; private set; }
 
-        public Task<TResponse> Send<TResponse>(
-            IRequest<TResponse> request,
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            UpdateEventSessionAgendaItemCommand command,
             CancellationToken cancellationToken = default)
         {
-            LastRequest = (UpdateEventSessionAgendaItemCommand)(object)request;
-            object response = BaseCommandResponse.Success(
-                LastRequest.EventSessionAgendaItemId,
-                "Agenda item updated.");
-            return Task.FromResult((TResponse)response);
+            LastCommand = command;
+            return Task.FromResult(BaseCommandResponse.Success(
+                command.EventSessionAgendaItemId,
+                "Agenda item updated."));
         }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest => Task.CompletedTask;
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-
-        public Task Publish<TNotification>(
-            TNotification notification,
-            CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(
-            IStreamRequest<TResponse> request,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(
-            object request,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

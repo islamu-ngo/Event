@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public class PreviewKeycloakRealmSyncQueryHandler : IRequestHandler<PreviewKeycloakRealmSyncQuery, KeycloakRealmSyncPlanDto>
+public class PreviewKeycloakRealmSyncQueryHandler : IQueryHandler<PreviewKeycloakRealmSyncQuery, KeycloakRealmSyncPlanDto>
 {
     private readonly IAuthProviderConfigurationService _configurationService;
     private readonly IKeycloakBootstrapService _keycloakBootstrapService;
@@ -18,7 +18,7 @@ public class PreviewKeycloakRealmSyncQueryHandler : IRequestHandler<PreviewKeycl
         _keycloakBootstrapService = keycloakBootstrapService;
     }
 
-    public async Task<KeycloakRealmSyncPlanDto> Handle(PreviewKeycloakRealmSyncQuery request, CancellationToken cancellationToken)
+    public async Task<KeycloakRealmSyncPlanDto> QueryAsync(PreviewKeycloakRealmSyncQuery request, CancellationToken cancellationToken)
     {
         var configuration = await _configurationService.ReadConfigurationAsync();
         return await _keycloakBootstrapService.PreviewRealmSyncAsync(configuration, request.Request, cancellationToken);

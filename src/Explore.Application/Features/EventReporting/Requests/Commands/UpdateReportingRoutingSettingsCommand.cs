@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.TenantSetting, AuthorizationActions.TenantSettings.Update)]
 public sealed record UpdateReportingRoutingSettingsCommand(Guid TenantId, Guid UserId, UpdateReportingRoutingSettingsDto Settings)
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     private const string SettingKey = "moderation-reporting";
 

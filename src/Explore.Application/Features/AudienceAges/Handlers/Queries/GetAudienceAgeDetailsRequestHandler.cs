@@ -1,30 +1,28 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceAge;
 using Explore.Application.Features.AudienceAges.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceAges.Handlers.Queries;
 
-public class GetAudienceAgeDetailsRequestHandler : IRequestHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>
+public class GetAudienceAgeDetailsRequestHandler : IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto?>
 {
     private readonly IAudienceAgeRepository _audienceAgeRepository;
-    private readonly IMapper _mapper;
 
-    public GetAudienceAgeDetailsRequestHandler(IAudienceAgeRepository audienceAgeRepository, IMapper mapper)
+    public GetAudienceAgeDetailsRequestHandler(IAudienceAgeRepository audienceAgeRepository)
     {
         _audienceAgeRepository = audienceAgeRepository;
-        _mapper = mapper;
     }
 
-    public async Task<AudienceAgeDto> Handle(GetAudienceAgeDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<AudienceAgeDto?> QueryAsync(GetAudienceAgeDetailsRequest query, CancellationToken cancellationToken)
     {
-        var audienceAge = await _audienceAgeRepository.GetById(request.Id);
+        var audienceAge = await _audienceAgeRepository.GetById(query.Id);
         if (audienceAge == null)
         {
             return null;
         }
 
-        return _mapper.Map<AudienceAgeDto>(audienceAge);
+        return EventMapper.ToDetail(audienceAge);
     }
 }

@@ -1,44 +1,50 @@
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Contracts.Services;
+using Explore.Application.Exceptions;
 using Explore.Application.DTOs.CustomPropertyGovernance;
 using Explore.Application.Features.CustomPropertyGovernance.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using Explore.Domain.Settings.Definitions;
-using MediatR;
 
 namespace Explore.Application.Features.CustomPropertyGovernance.Handlers.Queries;
 
 public class GetCustomPropertyGovernanceReportQueryHandler
-    : IRequestHandler<GetCustomPropertyGovernanceReportQuery, PaginatedResult<CustomPropertyGovernanceRowDto>>
+    : IQueryHandler<GetCustomPropertyGovernanceReportQuery, PaginatedResult<CustomPropertyGovernanceRowDto>>
 {
     private readonly ICustomPropertyGovernanceRepository _governanceRepository;
-    private readonly ICustomPropertyQuotaResolver _quotaResolver;
+    private readonly ITenantContext _tenantContext;
 
     public GetCustomPropertyGovernanceReportQueryHandler(
         ICustomPropertyGovernanceRepository governanceRepository,
-        ICustomPropertyQuotaResolver quotaResolver)
+        ITenantContext tenantContext)
     {
         _governanceRepository = governanceRepository;
-        _quotaResolver = quotaResolver;
+        _tenantContext = tenantContext;
     }
 
-    public async Task<PaginatedResult<CustomPropertyGovernanceRowDto>> Handle(
+    public async Task<PaginatedResult<CustomPropertyGovernanceRowDto>> QueryAsync(
         GetCustomPropertyGovernanceReportQuery request,
         CancellationToken cancellationToken)
     {
+        if (request.TenantId != _tenantContext.TenantId || request.TenantId == Guid.Empty)
+            throw new AuthorizationException(ResourceKinds.CustomPropertyGovernance, AuthorizationActions.View);
+
         var (pageNumber, pageSize) = PaginatedResult<CustomPropertyGovernanceRowDto>
             .NormalizeParameters(request.Filter.PageNumber, request.Filter.PageSize);
+
+        var totalEventCount = await _governanceRepository.GetTotalEventCountForTenantAsync(
+            request.TenantId,
+            cancellationToken);
 
         var (rows, totalCount) = await _governanceRepository.GetGovernanceRowsAsync(
             request.TenantId,
             request.Filter.EntityScope,
             pageNumber,
             pageSize,
-            cancellationToken);
-
-        var totalEventCount = await _governanceRepository.GetTotalEventCountForTenantAsync(
-            request.TenantId,
+            request.Filter.Recommendation,
+            totalEventCount,
             cancellationToken);
 
         var dtos = new List<CustomPropertyGovernanceRowDto>(rows.Count);
@@ -46,9 +52,6 @@ public class GetCustomPropertyGovernanceReportQueryHandler
         foreach (var row in rows)
         {
             var recommendation = ComputeRecommendation(row, totalEventCount);
-
-            if (request.Filter.Recommendation.HasValue && recommendation != request.Filter.Recommendation.Value)
-                continue;
 
             dtos.Add(new CustomPropertyGovernanceRowDto
             {
@@ -89,7 +92,7 @@ public class GetCustomPropertyGovernanceReportQueryHandler
         var hasModerationOrAnalytics = row.IsModerationRelevant || row.IsAnalyticsRelevant;
         var adoptionThresholdPct = 30;
         var isWidelyAdopted = totalEventCount > 0
-            && (row.ActiveInstanceCount * 100 / totalEventCount) >= adoptionThresholdPct;
+            && ((long)row.ActiveInstanceCount * 100 / totalEventCount) >= adoptionThresholdPct;
 
         if (row.IsModerationRelevant && hasSearchFilter && isWidelyAdopted)
             return PromotionRecommendation.ConsiderLayer1Promotion;

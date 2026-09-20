@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Commands;
 
@@ -8,7 +8,7 @@ namespace Explore.Application.Features.ControlPlane.Requests.Commands;
 public sealed record ApplyControlPlaneTenantPlanAssignmentCommand(
     Guid TenantId,
     Guid AssignmentId,
-    Guid AppliedByUserId) : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    Guid AppliedByUserId) : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public const string SettingKey = "control-plane.tenant-plan-assignments";
 

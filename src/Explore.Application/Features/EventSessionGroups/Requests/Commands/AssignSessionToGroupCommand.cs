@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EventSessionGroup, AuthorizationActions.Update)]
-public sealed record AssignSessionToGroupCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record AssignSessionToGroupCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public required AssignSessionToGroupRequestDto Assignment { get; init; }
 

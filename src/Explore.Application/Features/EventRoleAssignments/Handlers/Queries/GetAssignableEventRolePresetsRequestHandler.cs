@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Queries;
 
 public sealed class GetAssignableEventRolePresetsRequestHandler
-    : IRequestHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>>
+    : IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>>
 {
     private readonly IEventRoleAuthorityCeilingService _authorityCeilingService;
 
@@ -15,14 +15,14 @@ public sealed class GetAssignableEventRolePresetsRequestHandler
         _authorityCeilingService = authorityCeilingService;
     }
 
-    public async Task<List<EventRolePresetDto>> Handle(
-        GetAssignableEventRolePresetsRequest request,
-        CancellationToken cancellationToken)
+    public async Task<List<EventRolePresetDto>> QueryAsync(
+        GetAssignableEventRolePresetsRequest query,
+        CancellationToken cancellationToken = default)
     {
         var presets = await _authorityCeilingService.GetAssignableRolePresetsAsync(
-            request.TenantId,
-            request.EventId,
-            request.AssignerUserId,
+            query.TenantId,
+            query.EventId,
+            query.AssignerUserId,
             cancellationToken);
 
         return presets

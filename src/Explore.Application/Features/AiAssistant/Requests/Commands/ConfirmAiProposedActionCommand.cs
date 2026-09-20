@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.AiConversation, AuthorizationActions.AiConversations.ConfirmAction)]
-public sealed record ConfirmAiProposedActionCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ConfirmAiProposedActionCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid ProposedActionId { get; init; }
 

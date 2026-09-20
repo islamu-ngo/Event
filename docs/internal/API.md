@@ -57,6 +57,12 @@ The OpenAPI document defines wire shape; repository generation policy defines th
 
 This is a source-level breaking change for consumers of the generated C# client: use object initializers or `with` copies instead of post-construction mutation. It is not a wire-format compatibility layer, and the pre-v1 repository carries no legacy generated-client variant.
 
+Build `Explore.API` in Release to export the schema, then build `Explore.Blazor.Client` to regenerate the client. Generation alone uses `dotnet msbuild src/Explore.Blazor.Client/Explore.Blazor.Client.csproj -t:GenerateApiClient -p:Configuration=Release`, not a direct NSwag invocation: the target includes repository repairs, validation, and publication. API export and client preparation write private intermediates; publication replaces each canonical file through a closed temporary sibling and same-filesystem rename. Failed preparation leaves the published file unchanged, and identical bytes do not change its timestamp.
+
+Within a solution build, client builds wait for the API's normal build/export target before preparing or compiling the client. The standalone architecture-project entry point establishes the same order before resolving its references. These dependencies preserve ordinary global-property identities; verification does not request another API/client variant or propagate a schema-path override. Standalone client builds remain canonical-schema-driven, and the generation-only command above operates on the selected schema without compiling either application. Incremental preparation compares selected schema bytes with the captured schema, so switching to an older-timestamp input cannot reuse another contract's completion stamp.
+
+The client compiles its captured intermediate source. Architecture builds embed that completed schema, client source, and mutable policy into the test assembly. Generated-contract checks read those embedded inputs, including during `--no-build` runs, rather than live source-tree artifacts. Missing captures fail collection instead of falling back to canonical files; normal generation restores missing outputs. When selected, the existing OpenAPI CI workflow regenerates and compares canonical schema/client artifacts. Its pre-existing path filter does not cover changes limited to `nswag.pertag.json` or `EventApiTagClients.g.cs`, so contributors must also run the generation command and inspect the generated diff locally. Concurrent external builds sharing the same project `bin`/`obj` are not supported; ordinary consumers within one solution build share their producer identity. Test serialization is not the publication mechanism.
+
 See [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) for exact eligibility, privacy-safe diagnostics, generation steps, and focused tests.
 
 ## Runtime Endpoints
@@ -153,6 +159,173 @@ Three-reader non-URL versioning — clients may use any of the following; all th
    - **Domain-Family Base Classes**: Permitted only when two or more split controllers share an exact, multi-step domain protocol or security check (e.g. `RegistrationOrderControllerBase` for guest vs. authenticated checkout; `InstanceSettingsControllerBase` for setup-secret vs. admin).
    - **Composition Over Inheritance**: Shared mechanics belong in `CommandFailurePolicy`, `IResourceAssembler`, MediatR commands/queries, and extension methods (`ToCommandValidationProblem`, `ToNotFoundProblem`), leaving controller actions explicit, declarative, and independent.
 
+### Event Program Summary Queries
+
+`EventManagementReadController.GetProgramSummary` and `GetManagedProgramSummary`
+inject separate closed `IQueryHandler<..., EventProgramSummaryDto?>` ports. Both
+ports are implemented by `GetEventProgramSummaryRequestHandler` and discovered
+under one scoped owner, with authorization outside performance instrumentation.
+These are pure reads: no transaction, notification, outbox, or mutation is added.
+The managed request retains `Event:ViewManagement`; public eligibility and
+public session/group/agenda repositories remain distinct from managed reads.
+Public location fields come only through `PublicEventLocationProjection` and
+`IEventLocationDisclosureService`. Managed summaries do not project physical
+location details or public location envelopes.
+
+Null still maps to the existing 404 ProblemDetails; authorization may reject a
+missing or inaccessible management target before the query runs. Managed HTTP
+responses retain private/no-store. `EventManagementMcpTools` uses the public
+native summary port after its public-event gate, then applies the AI disclosure
+ceiling and existing bounded descriptor mapping (including the 100-item budget).
+Its grouped management context still uses separate managed session/group/agenda
+queries and the native managed-day port, not the managed summary query.
+
+Grouping, local dates, timezone fallback and warning paths are unchanged. Tokens
+flow through existing token-bearing reads and disclosure calls; inherited
+`GetEventWithDetails` and managed `GetSessionsByEvent` remain tokenless. Full
+in-flight cancellation of those database reads is not claimed. The focused
+`NativeEventProgramHttpTests` exercise the real HTTP and MCP adapters, protected
+ports and repositories on PostgreSQL and SQLite, including positive approved
+venue fields and retained public/managed authority and suppression boundaries.
+
+`EventLocationConfiguration` restores `DateTimeKind.Utc` when materializing only
+`CreatedAt` and nullable `RevealFullDetailsFromUtc`. These columns already store
+UTC instants: the domain factory normalizes creation time, and the policy audit
+rejects non-UTC explicit reveal inputs. The EF converters leave writes and ticks
+unchanged and preserve null reveal times; they do not reinterpret domain input.
+Without this read-side restoration, SQLite materializes `DateTime` as
+`Unspecified`, causing the unchanged strict disclosure evaluator to suppress even
+approved venue names. The evaluator still rejects invalid UTC facts, and pending
+privacy review still suppresses fields after the fix. Real SQLite round-trip and
+HTTP tests cover both null and explicit reveal dates. No global/base-entity time
+convention, policy relaxation, store-type change or migration is introduced.
+
+The task-local agenda ordering prerequisite is repaired in
+`EventAgendaItemRepository.GetByEventAsync` and `GetPublicByEventAsync`.
+Both methods materialize their existing event-filtered, no-tracking lists with
+the supplied cancellation token before sorting by `SortOrder`, then absolute
+`DateTimeOffset` start instant. Tenant, soft-delete and public-eligibility filters
+remain in SQL. These methods already returned the complete event-scoped list;
+client ordering fetches no additional rows and adds no provider-name branch,
+UTC SQL conversion, pagination or equal-key tie-breaker contract. SQLite therefore
+no longer rejects the summary's agenda query with an unsupported ORDER BY.
+Repository tests cover conflicting local-clock/instant order, sort priority,
+unpublished days, deleted items and event/tenant isolation. The original failure
+was a direct summary-path prerequisite, not unrelated suite rot.
+No route, schema, generated-client, configuration or migration change is required.
+
+### Native Event Agenda Item Operations
+
+The seven `Features/EventAgendaItems` operations use closed native command/query
+ports, discovered under authorization -> performance -> handler composition.
+`EventAgendaItemController` injects all seven; `EventManagementMcpTools` injects
+only the managed agenda-list port alongside its existing native Day/Program
+ports. The separate `Features/Agenda` projection now uses its own native public
+query port and reads repositories directly, as described below. DTO assemblers,
+routes, response types and generated contracts are unchanged.
+
+`EventAgendaItemAuthorizationContextEnricher` is explicitly registered for the
+three writes. It loads the agenda item's persisted source parent (or create's
+target parent), rejects missing/deleted/foreign-tenant rows, and supplies
+`EventScopedAuthorizationFacts` to the existing AgendaItem create/update/delete
+capabilities. This fixes legitimate owner writes denied for missing event
+context without adding grants. A reparenting update separately checks the
+persisted destination's `Event:update` authority before attachment or mutation;
+submitted destination authority never replaces source authority.
+
+Public list/detail retain canonical eligibility and policy-filtered location
+disclosure; managed list/detail retain `Event:ViewManagement`, parent binding
+and private/no-store HTTP responses. Managed detail alone retains exact location
+IDs. MCP management descriptors omit physical location information. Nullable
+detail results still map to 404. PATCH preserves required strong `If-Match`,
+409 stale-write responses and explicit field-operation semantics.
+
+Handlers retain manual validators, UTC rescheduling, destination timezone/day
+reprojection, transaction-owned location attachment/detachment and post-commit
+update cache invalidation. The existing unit of work rolls back placement and
+agenda changes together and translates optimistic conflicts. Real SQLite tests
+exercise seven registered ports, HTTP and MCP transport, denied/forged/foreign
+access, positive moves, venue review suppression, storage failure rollback and
+two previously authorized snapshots with one durable winner. The concurrency
+fixture gates actual provider decisions with signals; it never grants authority.
+Inherited tokenless repository methods remain tokenless; full in-flight
+cancellation of those reads is not claimed. No provider matrix or performance
+claim accompanies this slice.
+
+### Native Public Agenda Projection
+
+`GetEventAgendaProjectionRequest` implements only `IQuery<EventAgendaProjectionDto?>`;
+its handler exposes Task-based `QueryAsync`. `EventAgendaItemController` injects
+that exact closed port alongside its seven native agenda-item ports, removing
+its last mediator dependency. Automatic native registration retains authorization
+-> performance -> handler composition. This is a public query, not a management
+grant: the handler checks canonical persisted public eligibility before reading
+published days, public sessions and public agenda items. It has no nested sender.
+
+The existing merge omits sessions missing required schedule projections, groups
+entries by local date, orders entries by local start minute then sort order, and
+orders day groups by day sort order then date. Published empty days remain;
+entry dates without a published day receive an unlabelled group. Timezone remains
+`EventTimeZoneId ?? Timezone`. Physical location and room IDs are redacted;
+public location envelopes come only from the existing batched disclosure service,
+including approved venue fields and renewed privacy-review suppression. The
+portable agenda ordering and UTC venue materialization repairs remain unchanged.
+
+Null retains the controller's existing 404 ProblemDetails mapping. Real SQLite
+HTTP tests observe that error body with `application/json`; this migration does
+not change the shared response policy. `NativeAgendaProjectionHttpTests` proves
+the registered port, complete HTTP/native JSON parity, meaningful merged dates
+and order, approved venue disclosure, private/draft/foreign/deleted/missing denial
+even for an owner, fresh actor-suspension denial and privacy-review tightening.
+In-memory `AgendaProjectionTests` covers input permutation, incomplete sessions,
+published/implicit/empty day behavior and timezone fallback without extracting
+the handler's existing algorithm. Tokens still flow through token-bearing reads
+and disclosure; inherited parent `GetById` remains tokenless. The SQLite command
+interceptor observes real read tokens and cancels at a read boundary without
+sleeping or replacing repositories. No full in-flight cancellation, provider
+matrix, performance, route, schema, client or configuration change is claimed.
+
+### Event Session Status Lookup Absence
+
+`GetEventSessionStatusDetailsQuery` and its native handler/closed controller port
+return `EventSessionStatusDto?`: absence is a query result, not a fabricated DTO
+or a mapping exception. `EventSessionStatusController.GetById` maps null through
+`ApiNotFoundProblemDescriptor` and `ToNotFoundProblem`, producing the existing
+404 ProblemDetails convention (`resource_not_found`, request instance and tracing
+extensions). Present rows still return the unchanged 200 DTO.
+
+This repairs the former `Ok(null)` -> 204 mismatch without changing the declared
+OpenAPI paths, response schemas, operation IDs, or generated client. Both reads
+remain anonymous global lookups; list contents (IDs 1-10) and LookupData/DetailData
+cache policies are unchanged. The supplied cancellation token continues through
+the native decorators to the handler; `IEventSessionStatusRepository.GetById(int)`
+and `GetAll()` have no token parameter, so database-read interruption is not
+claimed or introduced by this repair.
+
+### Duplicate Session Language Assignments
+
+`CreateEventSessionLanguageCommand` retains session authorization and manual input validation. The repository insert remains arbitrated by the existing unique `(TenantId, EventSessionId, LanguageId)` index, including concurrent requests; there is no check-then-insert substitute for that constraint. `EventSessionLanguageRepository` translates only that exact model-derived index violation through the existing provider-aware constraint classifier into `EventSessionLanguageAlreadyAssignedException`, detaching the rejected assignment. The command maps that exception to its established validation result, and the controller returns HTTP 400 ValidationProblemDetails (`validation_failed`, `errors.program`). Unrelated primary-key, foreign-key and other database failures are not classified as duplicate assignments.
+
+This replaces provider-dependent duplicate-create 500 responses without changing routes, successful 201 payloads, OpenAPI/client shapes or the unique index. No migration or configuration change is required. The inherited repository create signature remains tokenless; this repair does not claim database-write cancellation support. `NativeEventSessionLanguageHttpTests` covers sequential duplicates, two real inserts synchronized before persistence, durable uniqueness, and unrelated constraint failures on canonical SQLite; other provider execution remains part of the workstream matrix.
+
+### Registration Provider Management Capabilities
+
+The 25 actions under `api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers`
+are partitioned into `RegistrationProviderConnectionsController` (connections and approved
+origins), `RegistrationProviderBindingsController` (external schema import, bindings,
+publication, and mappings), `RegistrationProviderChannelsController` (channels and launch
+descriptors), and `RegistrationProviderOperationsController` (health, queue, and reconciliation).
+External schema import retains its `connections/{connectionId:guid}/external-imports` route.
+
+Each concrete controller declares the same route prefix, API version `0.1`, authenticated
+classification, authorization, JSON/HAL media types, and explicit
+`Tags("RegistrationProviderManagement")`. Named routes, action contracts, rate limits,
+timeouts, private/no-store behavior, and HAL assembly remain unchanged.
+Each controller uses `EventControllerBase` and keeps its small validation descriptor and
+result mapping local, using the existing `ToCommandValidationProblem` extension.
+Controllers still dispatch through `IMediator` and inject only their own HAL assemblers;
+this partition does not change Application request or handler execution.
+
 ### Grouped Entity PATCH Contracts
 
 Tag, Tenant metadata, tenant navigation links, footer link groups, footer links, control-plane tenant-plan drafts, current-user appearance localization, user appearance profiles, UI themes, EventLocation disclosure, EventSession agenda items, EventSession groups, EventSession speaker assignments, EventTemplate, EventSessionTemplate, and shared/Event/EventSession custom-property definitions use route-ID or current-resource `PATCH`. Their bodies contain only nullable logical groups; omitted groups preserve persisted values, and identity comes from the route plus trusted tenant context rather than body-owned IDs. Template PATCH uses metadata and definitions groups: supplied definitions atomically replace definitions and nested options, while omission preserves the existing set. Template detail reads expose the required concurrency stamp, and sync diff/apply/history remain dedicated operations. Custom-property definition PATCH uses metadata, validation, and options groups; the shared definition additionally exposes its entity-type relation group. Supplying options atomically replaces the option set, while omitting options leaves it untouched. Template and custom-property definition updates require the observed concurrency stamp through strong `If-Match`; Event and EventSession projection refresh remains inside the write transaction. Session-group and speaker updates also require strong `If-Match`; group list/detail reads expose that stamp. Islamic and Tech aspects use separate `POST` create operations and grouped `PATCH` update operations. Appearance active-profile selection, current theme mode, profile archive, Tenant lifecycle, navigation reorder, footer reorder, and tenant-plan publish/archive/clone remain dedicated actions rather than generic property groups. UI-theme PATCH keeps the observed row version at the wrapper level and validates the merged metadata/state/palette candidate before one transactional update.
@@ -162,6 +335,22 @@ Tag, Tenant metadata, tenant navigation links, footer link groups, footer links,
 Current caller/tenant authority never comes from a request body. Controllers derive it from `EventControllerBase`, `ITenantContext`, an authoritative route/persisted resource, or a purpose-bound trusted adapter, then place it on the Application request only when authorization or business intent needs it. A body `UserId`/`TenantId` is valid only as an explicit target that is independently authorized and tenant-checked.
 
 Tenant navigation and footer-link URLs accept relative paths or HTTPS URLs by default. The instance-only `security.require_https_external_urls` setting defaults to `true`; setting it to `false` permits HTTP only for deployments that explicitly trust an HTTP-only private network.
+
+### Guest Registration HTTP Capabilities
+
+The guest routes under `api/events/{eventId:guid}/registration-orders` have five
+concrete owners: `GuestRegistrationOrderController` for start, read and lifecycle;
+`GuestRegistrationOrderRequirementsController` for native/provider requirements;
+`GuestRegistrationOrderParticipantsController` for participants and ticket assignments;
+`GuestRegistrationOrderPromotionsController` for promotions; and
+`GuestRegistrationOrderClaimController` for authenticated account claim.
+
+All use the existing `RegistrationOrderControllerBase` protocol helpers and retain
+the `GuestRegistrationOrder` tag. Only the lifecycle owner needs `TimeProvider`.
+Capability headers, challenge admission, idempotency/replay protections, per-action
+authorization, rate limits and HAL mapping retain their original contracts.
+The participant helper still constructs one concrete guest mutation command;
+Application operation migration remains owned by its corresponding cohort.
 
 ### Event Provenance, Public Actions, And Organizer Claims
 
@@ -245,7 +434,7 @@ Storage object metadata and general download routes are authenticated, resource-
 
 EmailDispatch admin routes live under `/api/admin/email-dispatch` and are authenticated operator APIs for Basic Dispatch Mode. They expose tenant-scoped delivery state and controls without exposing recipient email, subject, body, provider message ids, or raw provider errors.
 
-- `GET /api/admin/email-dispatch/status` requires a tenant id query value and authorizes `islamuevent_email_dispatch:view`.
+- `GET /api/admin/email-dispatch/status` requires a tenant id query value and authorizes `islamuevent_email_dispatch:view`. Its `limit` defaults to 50 and accepts 1 through 200. `EmailDispatchAdminController.GetStatus` passes cancellation to the native query and awaits `IResourceAssembler.ToCollectionResource` before constructing `Ok`, including asynchronous link authorization. The success body is the declared `HalCollectionResource<EmailDispatchStatusDto>`: root `_links` and `_embedded.items`, with sanitized rows and permission-filtered item links. It never serializes a Task or a `result` envelope. This repairs runtime conformance to the existing OpenAPI response; route names, schemas and generated clients are unchanged.
 - `PUT /api/admin/email-dispatch/tenants/{tenantId}/pause` and `DELETE /api/admin/email-dispatch/tenants/{tenantId}/pause` authorize `islamuevent_email_dispatch:manage_tenant`.
 - `PUT /api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/park` authorizes `islamuevent_email_dispatch:park`.
 - `POST /api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/replay` authorizes `islamuevent_email_dispatch:replay`.

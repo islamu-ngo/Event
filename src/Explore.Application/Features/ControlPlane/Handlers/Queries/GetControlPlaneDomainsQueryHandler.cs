@@ -1,7 +1,7 @@
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
@@ -9,9 +9,9 @@ namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
 public sealed class GetControlPlaneDomainsQueryHandler(
     IInstanceGovernanceSettingService governanceSettingService,
     IConfiguration configuration)
-    : IRequestHandler<GetControlPlaneDomainsQuery, ControlPlaneDomainOverviewDto>
+    : IQueryHandler<GetControlPlaneDomainsQuery, ControlPlaneDomainOverviewDto>
 {
-    public async Task<ControlPlaneDomainOverviewDto> Handle(
+    public async Task<ControlPlaneDomainOverviewDto> QueryAsync(
         GetControlPlaneDomainsQuery request,
         CancellationToken cancellationToken)
     {

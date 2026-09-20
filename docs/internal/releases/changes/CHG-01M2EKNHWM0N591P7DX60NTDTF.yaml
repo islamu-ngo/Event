@@ -1,0 +1,30 @@
+Change-Id: CHG-01M2EKNHWM0N591P7DX60NTDTF
+Title: "Protect native event aspect operations and public absence"
+Type: fix
+Scope: events
+Summary: "Event aspect management uses protected native operations; unavailable public aspects return the documented 404 response."
+Group: native-event-aspects
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/architecture/native-event-aspects.md#ownership-and-composition
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Ten protected native ports preserve persisted Event/Update and ViewManagement authority and public eligibility. SQLite tests reject foreign-owner and forged authority without aspect mutation.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/architecture/native-event-aspects.md#public-absence-repair
+    Disposition: documented
+    Detail: Public aspect absence now returns the existing documented404 ProblemDetails response rather than204. All ten shipped operations and aspect schemas remain unchanged.
+  Operator:
+    Reference: docs/public/features/event-aspect-management.md
+    Disposition: documented
+    Detail: No migration or configuration change. Public unavailable aspects return404; managed absence and delete/cache behavior remain unchanged. Dormant AI aspect actions are not activated and tokenless persistence does not gain full cancellation.

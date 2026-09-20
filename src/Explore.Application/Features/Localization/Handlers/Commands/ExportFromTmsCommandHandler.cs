@@ -3,12 +3,12 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Localization.Handlers.Commands;
 
-public class ExportFromTmsCommandHandler : IRequestHandler<ExportFromTmsCommand, BaseCommandResponse<Guid>>
+public class ExportFromTmsCommandHandler : ICommandHandler<ExportFromTmsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly ITranslationManagementProvider _translationProvider;
@@ -33,7 +33,7 @@ public class ExportFromTmsCommandHandler : IRequestHandler<ExportFromTmsCommand,
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(ExportFromTmsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ExportFromTmsCommand request, CancellationToken cancellationToken)
     {
         var actor = await _adminContext.ResolveUserIdAsync(cancellationToken);
         if (!actor.HasValue || !await _adminContext.IsInstanceAdminAsync(actor.Value, cancellationToken))

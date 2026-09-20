@@ -40,7 +40,7 @@ public sealed class FederationGenericCrudAbsenceTests
             await Assert.That(File.Exists(Path.Combine(root, relativePath))).IsTrue();
         }
 
-        var openApi = await File.ReadAllTextAsync(Path.Combine(root, "schemas", "openapi_islamu-event.json"));
+        var openApi = GeneratedContractInputs.Schema;
         await Assert.That(openApi).DoesNotContain("/api/actorkeystore");
         await Assert.That(openApi).DoesNotContain("/api/syncstate");
         await Assert.That(openApi).DoesNotContain("/api/indexeddid");
@@ -54,12 +54,7 @@ public sealed class FederationGenericCrudAbsenceTests
         await Assert.That(actorDetail.TryGetProperty("patch", out _)).IsFalse();
         await Assert.That(actorDetail.TryGetProperty("delete", out _)).IsFalse();
 
-        var generatedClient = await File.ReadAllTextAsync(Path.Combine(
-            root,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs"));
+        var generatedClient = GeneratedContractInputs.Client;
         await Assert.That(generatedClient).DoesNotContain("CreateActorAsync(");
         await Assert.That(generatedClient).DoesNotContain("UpdateActorAsync(");
         await Assert.That(generatedClient).DoesNotContain("DeleteActorAsync(");

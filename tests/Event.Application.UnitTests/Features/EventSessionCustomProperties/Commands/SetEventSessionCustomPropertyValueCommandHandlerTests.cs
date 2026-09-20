@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -23,7 +22,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
         repository.GetDefinitionWithDetails(definitionId).Returns(CreateDefinition(definitionId, sessionId, isMulti: false));
         var handler = CreateSut(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             CreateCommand(definitionId, sessionId, ordinal: 1, textValue: "Arabic"),
             CancellationToken.None);
 
@@ -53,7 +52,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
         repository.GetDefinitionWithDetails(definitionId).Returns(definition);
         var handler = CreateSut(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             CreateCommand(definitionId, sessionId, ordinal: 1, textValue: " alpha "),
             CancellationToken.None);
 
@@ -86,7 +85,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
         repository.GetDefinitionWithDetails(definitionId).Returns(definition);
         var handler = CreateSut(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             CreateOptionCommand(definitionId, sessionId, optionId),
             CancellationToken.None);
 
@@ -102,8 +101,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
             Substitute.For<IEventSessionCustomPropertyProjectionUpdater>(),
             Substitute.For<IUnitOfWork>(),
             Substitute.For<ITenantContext>(),
-            Substitute.For<ICurrentUserService>(),
-            Substitute.For<IMapper>());
+            Substitute.For<ICurrentUserService>());
     }
 
     private static SetEventSessionCustomPropertyValueCommand CreateCommand(Guid definitionId, Guid sessionId, int ordinal, string textValue)

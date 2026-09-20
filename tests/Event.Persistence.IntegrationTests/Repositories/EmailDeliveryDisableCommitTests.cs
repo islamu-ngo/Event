@@ -4,9 +4,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Handlers.Commands;
-using Explore.Application.Features.EmailDispatch.Handlers.Queries;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
-using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -57,7 +55,7 @@ public sealed class EmailDeliveryDisableCommitTests
                 await Assert.That(preview.AffectedScopes.Any(scope => scope.TenantId == scenario.InheritedTenantId)).IsTrue();
             }
 
-            var response = await handlers.Disable.Handle(Command(preview), CancellationToken.None);
+            var response = await handlers.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
             await Assert.That(response.IsSuccess).IsTrue();
             await using var observer = CreateContext(path);
@@ -111,7 +109,7 @@ public sealed class EmailDeliveryDisableCommitTests
                 await Assert.That(fresh.ExpectedRevision).IsGreaterThan(preview.ExpectedRevision);
             var before = await ReadStateAsync(context, target: null);
 
-            var response = await handlers.Disable.Handle(Command(preview), CancellationToken.None);
+            var response = await handlers.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
             await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
             await using var observer = CreateContext(path);
@@ -148,7 +146,7 @@ public sealed class EmailDeliveryDisableCommitTests
             if (invalid == InvalidConfirmation.DifferentActor)
             {
                 using var differentActor = new InstanceSettingsCommandFixture(context: context, userId: scenario.OtherPlatformActorId);
-                response = await Handlers(differentActor, target, tokenService).Disable.Handle(request, CancellationToken.None);
+                response = await Handlers(differentActor, target, tokenService).Disable.ExecuteAsync(request, CancellationToken.None);
                 await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
                 await Assert.That(differentActor.Notifications.Published.Count).IsEqualTo(0);
             }
@@ -168,11 +166,11 @@ public sealed class EmailDeliveryDisableCommitTests
                 else
                     handlers = Handlers(fixture, scenario.InheritedTenantId, tokenService);
 
-                response = await handlers.Disable.Handle(request, CancellationToken.None);
+                response = await handlers.Disable.ExecuteAsync(request, CancellationToken.None);
                 if (tenantScope)
                 {
                     await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
-                    var deniedPreview = await handlers.Preview.Handle(new PreviewEmailDeliveryDisableQuery(TenantId: target), CancellationToken.None);
+                    var deniedPreview = await handlers.Preview.ExecuteAsync(new PreviewEmailDeliveryDisableCommand(TenantId: target), CancellationToken.None);
                     await Assert.That(deniedPreview.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
                 }
                 else
@@ -201,7 +199,7 @@ public sealed class EmailDeliveryDisableCommitTests
                 userId: tenantScope ? scenario.TenantActorId : scenario.PlatformActorId);
             var handlers = Handlers(fixture, target, Tokens());
             var preview = await PreviewAsync(handlers.Preview, target);
-            await Assert.That((await handlers.Disable.Handle(Command(preview), CancellationToken.None)).IsSuccess).IsTrue();
+            await Assert.That((await handlers.Disable.ExecuteAsync(Command(preview), CancellationToken.None)).IsSuccess).IsTrue();
             await using (var writer = CreateContext(path))
             {
                 if (target is Guid tenantId)
@@ -213,7 +211,7 @@ public sealed class EmailDeliveryDisableCommitTests
             }
             var reenabled = await ReadStateAsync(context, target);
 
-            var replay = await handlers.Disable.Handle(Command(preview), CancellationToken.None);
+            var replay = await handlers.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
             await Assert.That(replay.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
             await using var observer = CreateContext(path);
@@ -246,7 +244,7 @@ public sealed class EmailDeliveryDisableCommitTests
             await context.Database.ExecuteSqlRawAsync($"CREATE TRIGGER reject_confirmed_disable AFTER UPDATE ON {table} BEGIN SELECT RAISE(ABORT, 'disable_revision_rejected'); END");
 
             bool rejected = false;
-            try { await handlers.Disable.Handle(Command(preview), CancellationToken.None); }
+            try { await handlers.Disable.ExecuteAsync(Command(preview), CancellationToken.None); }
             catch (Exception exception) when (exception is SqliteException or DbUpdateException) { rejected = true; }
 
             await Assert.That(rejected).IsTrue();
@@ -274,7 +272,7 @@ public sealed class EmailDeliveryDisableCommitTests
             var before = await ReadStateAsync(context, scenario.TenantId);
             var metadata = await ReadRetainedMetadataAsync(context);
 
-            var result = await handlers.Disable.Handle(Command(preview), CancellationToken.None);
+            var result = await handlers.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
             await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
             await using var observer = CreateContext(path);
@@ -285,7 +283,7 @@ public sealed class EmailDeliveryDisableCommitTests
         finally { DeleteDatabase(path); }
     }
 
-    private static (PreviewEmailDeliveryDisableQueryHandler Preview, DisableEmailDeliveryCommandHandler Disable) Handlers(
+    private static (PreviewEmailDeliveryDisableCommandHandler Preview, DisableEmailDeliveryCommandHandler Disable) Handlers(
         InstanceSettingsCommandFixture fixture, Guid? target, EmailDeliveryDisableTokenService tokenService)
     {
         var tenantContext = new BoundTenantContext(TenantId: target ?? Guid.Empty);
@@ -293,7 +291,7 @@ public sealed class EmailDeliveryDisableCommitTests
         var impact = new EmailDeliveryDisableImpactReader(context: fixture.Context);
         var platformRoles = new PlatformUserRoleRepository(fixture.Context);
         var tenantRoles = new TenantUserRoleGrantRepository(fixture.Context);
-        return (new PreviewEmailDeliveryDisableQueryHandler(
+        return (new PreviewEmailDeliveryDisableCommandHandler(
             adminContext: fixture.AdminContext, tenantContext: tenantContext, impactReader: impact,
             tokenService: tokenService, mutationLock: fixture.MutationLock, unitOfWork: fixture.UnitOfWork,
             platformRoles: platformRoles, tenantRoles: tenantRoles),
@@ -301,12 +299,12 @@ public sealed class EmailDeliveryDisableCommitTests
                 adminContext: fixture.AdminContext, tenantContext: tenantContext,
                 emailSettingsWriter: CreateEmailSettingsWriter(fixture.Context, fixture.MutationLock, tokenService),
                 mutationLock: fixture.MutationLock, unitOfWork: fixture.UnitOfWork,
-                publisher: fixture.Mediator, platformRoles: platformRoles, tenantRoles: tenantRoles));
+                notificationHandlers: fixture.NotificationHandlers, platformRoles: platformRoles, tenantRoles: tenantRoles));
     }
 
-    private static async Task<EmailDeliveryDisablePreviewDto> PreviewAsync(PreviewEmailDeliveryDisableQueryHandler handler, Guid? target)
+    private static async Task<EmailDeliveryDisablePreviewDto> PreviewAsync(PreviewEmailDeliveryDisableCommandHandler handler, Guid? target)
     {
-        var result = await handler.Handle(new PreviewEmailDeliveryDisableQuery(TenantId: target), CancellationToken.None);
+        var result = await handler.ExecuteAsync(new PreviewEmailDeliveryDisableCommand(TenantId: target), CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.CanDisable).IsTrue();
         await Assert.That(result.Id.ConfirmationToken).IsNotNull();

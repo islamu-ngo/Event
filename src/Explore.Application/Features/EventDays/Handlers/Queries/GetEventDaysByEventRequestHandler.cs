@@ -1,29 +1,26 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.Features.EventDays.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Handlers.Queries;
 
 public class GetEventDaysByEventRequestHandler :
-    IRequestHandler<GetEventDaysByEventRequest, List<EventDayListDto>>
+    IQueryHandler<GetEventDaysByEventRequest, List<EventDayListDto>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDayRepository _eventDayRepository;
-    private readonly IMapper _mapper;
 
     public GetEventDaysByEventRequestHandler(
         IEventRepository eventRepository,
-        IEventDayRepository eventDayRepository,
-        IMapper mapper)
+        IEventDayRepository eventDayRepository)
     {
         _eventRepository = eventRepository;
         _eventDayRepository = eventDayRepository;
-        _mapper = mapper;
     }
 
-    public async Task<List<EventDayListDto>> Handle(GetEventDaysByEventRequest request, CancellationToken cancellationToken)
+    public async Task<List<EventDayListDto>> QueryAsync(GetEventDaysByEventRequest request, CancellationToken cancellationToken)
     {
         var parentEvent = await _eventRepository.GetById(request.EventId);
         if (parentEvent is null || !await _eventRepository.IsPubliclyEligibleAsync(
@@ -33,21 +30,20 @@ public class GetEventDaysByEventRequestHandler :
             return [];
 
         var eventDays = await _eventDayRepository.GetByEventAsync(request.EventId, cancellationToken);
-        return _mapper.Map<List<EventDayListDto>>(eventDays);
+        return eventDays.Select(EventMapper.ToListItem).ToList();
     }
 
 }
 
 public sealed class GetManagedEventDaysByEventRequestHandler(
-    IEventDayRepository eventDayRepository,
-    IMapper mapper)
-    : IRequestHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>
+    IEventDayRepository eventDayRepository)
+    : IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>
 {
-    public async Task<List<EventDayListDto>> Handle(
+    public async Task<List<EventDayListDto>> QueryAsync(
         GetManagedEventDaysByEventRequest request,
         CancellationToken cancellationToken)
     {
         var eventDays = await eventDayRepository.GetByEventAsync(request.EventId, cancellationToken);
-        return mapper.Map<List<EventDayListDto>>(eventDays);
+        return eventDays.Select(EventMapper.ToListItem).ToList();
     }
 }

@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 
-public sealed record GetSystemOnboardingStatusQuery : IRequest<SystemOnboardingStatusDto>;
+public sealed record GetSystemOnboardingStatusQuery : IQuery<SystemOnboardingStatusDto>;

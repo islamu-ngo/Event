@@ -7,11 +7,11 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Commands;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,12 +36,32 @@ public class EventSessionAgendaItemController : ControllerBase
         "Event session agenda item validation failed",
         "Event session agenda item update failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventSessionAgendaItemListRequest, PaginatedResult<EventSessionAgendaItemListDto>> _getAllHandler;
+    private readonly IQueryHandler<GetEventSessionAgendaItemDetailsRequest, EventSessionAgendaItemDto?> _getByIdHandler;
+    private readonly IQueryHandler<GetAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>> _getBySessionHandler;
+    private readonly IQueryHandler<GetManagedAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>?> _getManagedBySessionHandler;
+    private readonly ICommandHandler<CreateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>> _createHandler;
+    private readonly ICommandHandler<UpdateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>> _updateHandler;
+    private readonly ICommandHandler<DeleteEventSessionAgendaItemCommand, bool> _deleteHandler;
     private readonly ILogger<EventSessionAgendaItemController> _logger;
 
-    public EventSessionAgendaItemController(IMediator mediator, ILogger<EventSessionAgendaItemController> logger)
+    public EventSessionAgendaItemController(
+        IQueryHandler<GetEventSessionAgendaItemListRequest, PaginatedResult<EventSessionAgendaItemListDto>> getAllHandler,
+        IQueryHandler<GetEventSessionAgendaItemDetailsRequest, EventSessionAgendaItemDto?> getByIdHandler,
+        IQueryHandler<GetAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>> getBySessionHandler,
+        IQueryHandler<GetManagedAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>?> getManagedBySessionHandler,
+        ICommandHandler<CreateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>> createHandler,
+        ICommandHandler<UpdateEventSessionAgendaItemCommand, BaseCommandResponse<Guid>> updateHandler,
+        ICommandHandler<DeleteEventSessionAgendaItemCommand, bool> deleteHandler,
+        ILogger<EventSessionAgendaItemController> logger)
     {
-        _mediator = mediator;
+        _getAllHandler = getAllHandler;
+        _getByIdHandler = getByIdHandler;
+        _getBySessionHandler = getBySessionHandler;
+        _getManagedBySessionHandler = getManagedBySessionHandler;
+        _createHandler = createHandler;
+        _updateHandler = updateHandler;
+        _deleteHandler = deleteHandler;
         _logger = logger;
     }
 
@@ -57,7 +77,7 @@ public class EventSessionAgendaItemController : ControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var agendaItems = await _mediator.Send(new GetEventSessionAgendaItemListRequest
+        var agendaItems = await _getAllHandler.QueryAsync(new GetEventSessionAgendaItemListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -75,7 +95,7 @@ public class EventSessionAgendaItemController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EventSessionAgendaItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var agendaItem = await _mediator.Send(new GetEventSessionAgendaItemDetailsRequest { Id = id }, cancellationToken);
+        var agendaItem = await _getByIdHandler.QueryAsync(new GetEventSessionAgendaItemDetailsRequest { Id = id }, cancellationToken);
         if (agendaItem is null)
         {
             return this.ToNotFoundProblem(AgendaItemNotFoundProblem);
@@ -92,7 +112,7 @@ public class EventSessionAgendaItemController : ControllerBase
     [EndpointDescription("Get all agenda items for a specific event session")]
     public async Task<ActionResult<List<EventSessionAgendaItemListDto>>> GetBySession(Guid sessionId, CancellationToken cancellationToken = default)
     {
-        var agendaItems = await _mediator.Send(new GetAgendaItemsBySessionRequest { EventSessionId = sessionId }, cancellationToken);
+        var agendaItems = await _getBySessionHandler.QueryAsync(new GetAgendaItemsBySessionRequest { EventSessionId = sessionId }, cancellationToken);
         return Ok(agendaItems);
     }
 
@@ -113,7 +133,7 @@ public class EventSessionAgendaItemController : ControllerBase
         Guid sessionId,
         CancellationToken cancellationToken = default)
     {
-        var agendaItems = await _mediator.Send(new GetManagedAgendaItemsBySessionRequest
+        var agendaItems = await _getManagedBySessionHandler.QueryAsync(new GetManagedAgendaItemsBySessionRequest
         {
             EventId = eventId,
             EventSessionId = sessionId
@@ -139,7 +159,7 @@ public class EventSessionAgendaItemController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateEventSessionAgendaItemDto agendaItem, CancellationToken cancellationToken = default)
     {
         var command = new CreateEventSessionAgendaItemCommand { AgendaItemDto = agendaItem };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -171,7 +191,7 @@ public class EventSessionAgendaItemController : ControllerBase
             EventSessionAgendaItemId = id,
             AgendaItemDto = agendaItem
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -190,7 +210,7 @@ public class EventSessionAgendaItemController : ControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventSessionAgendaItemCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteHandler.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

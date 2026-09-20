@@ -1,4 +1,5 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;
 using Explore.Application.Exceptions;
@@ -6,12 +7,11 @@ using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Commands;
 
-public class UpdateEventSessionGroupCommandHandler : IRequestHandler<UpdateEventSessionGroupCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionGroupCommandHandler : ICommandHandler<UpdateEventSessionGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
     private readonly IEventRepository _eventRepository;
@@ -39,10 +39,10 @@ public class UpdateEventSessionGroupCommandHandler : IRequestHandler<UpdateEvent
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionGroupCommand command, CancellationToken cancellationToken = default)
     {
         var validator = new UpdateEventSessionGroupRequestDtoValidator();
-        var validationResult = await validator.ValidateAsync(request.EventSessionGroup, cancellationToken);
+        var validationResult = await validator.ValidateAsync(command.EventSessionGroup, cancellationToken);
 
         if (!validationResult.IsValid)
         {
@@ -51,19 +51,19 @@ public class UpdateEventSessionGroupCommandHandler : IRequestHandler<UpdateEvent
                 "Event session group update failed.");
         }
 
-        var group = await _eventSessionGroupRepository.GetForUpdateAsync(request.EventSessionGroupId, cancellationToken);
+        var group = await _eventSessionGroupRepository.GetForUpdateAsync(command.EventSessionGroupId, cancellationToken);
         if (group is null)
         {
             return BaseCommandResponse.NotFound<Guid>("Event session group not found.");
         }
 
-        request = request with
+        command = command with
         {
             EventId = group.EventId,
             TenantId = group.TenantId,
         };
 
-        if (group.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
+        if (group.ConcurrencyStamp != command.ExpectedConcurrencyStamp)
         {
             throw new ConcurrencyConflictException(
                 ConcurrencyConflictException.ConcurrentUpdate,
@@ -76,15 +76,15 @@ public class UpdateEventSessionGroupCommandHandler : IRequestHandler<UpdateEvent
         if (parentEvent is null || parentEvent.TenantId != group.TenantId)
             return ValidationFailure("Event session group parent event was not found in the current tenant.");
 
-        string name = request.EventSessionGroup.Metadata?.Name ?? group.Name;
-        string? slug = request.EventSessionGroup.Metadata?.Slug.HasValue == true
-            ? request.EventSessionGroup.Metadata.Slug.Value
+        string name = command.EventSessionGroup.Metadata?.Name ?? group.Name;
+        string? slug = command.EventSessionGroup.Metadata?.Slug.HasValue == true
+            ? command.EventSessionGroup.Metadata.Slug.Value
             : group.Slug;
-        Guid? locationId = request.EventSessionGroup.Placement?.LocationId.HasValue == true
-            ? request.EventSessionGroup.Placement.LocationId.Value
+        Guid? locationId = command.EventSessionGroup.Placement?.LocationId.HasValue == true
+            ? command.EventSessionGroup.Placement.LocationId.Value
             : group.LocationId;
-        Guid? roomId = request.EventSessionGroup.Placement?.RoomId.HasValue == true
-            ? request.EventSessionGroup.Placement.RoomId.Value
+        Guid? roomId = command.EventSessionGroup.Placement?.RoomId.HasValue == true
+            ? command.EventSessionGroup.Placement.RoomId.Value
             : group.RoomId;
 
         if (string.IsNullOrWhiteSpace(name))
@@ -118,18 +118,18 @@ public class UpdateEventSessionGroupCommandHandler : IRequestHandler<UpdateEvent
         Guid? previousEventLocationId = group.EventLocationId;
         group.Name = name;
         group.Slug = slug;
-        if (request.EventSessionGroup.Metadata?.Description.HasValue == true)
-            group.Description = request.EventSessionGroup.Metadata.Description.Value;
-        if (request.EventSessionGroup.Metadata?.Color.HasValue == true)
-            group.Color = request.EventSessionGroup.Metadata.Color.Value;
-        if (request.EventSessionGroup.Ordering?.SortOrder is { } sortOrder)
+        if (command.EventSessionGroup.Metadata?.Description.HasValue == true)
+            group.Description = command.EventSessionGroup.Metadata.Description.Value;
+        if (command.EventSessionGroup.Metadata?.Color.HasValue == true)
+            group.Color = command.EventSessionGroup.Metadata.Color.Value;
+        if (command.EventSessionGroup.Ordering?.SortOrder is { } sortOrder)
             group.SortOrder = sortOrder;
-        if (request.EventSessionGroup.Publication?.IsPublished is { } isPublished)
+        if (command.EventSessionGroup.Publication?.IsPublished is { } isPublished)
             group.IsPublished = isPublished;
 
         await _unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            if (request.EventSessionGroup.Placement?.LocationId.HasValue == true)
+            if (command.EventSessionGroup.Placement?.LocationId.HasValue == true)
             {
                 EventLocation eventLocation = await _eventLocationAttachmentService.ResolveAsync(
                     group.EventId,
@@ -138,10 +138,10 @@ public class UpdateEventSessionGroupCommandHandler : IRequestHandler<UpdateEvent
                     token);
                 group.AssignEventLocation(eventLocation);
             }
-            if (request.EventSessionGroup.Placement?.RoomId.HasValue == true)
+            if (command.EventSessionGroup.Placement?.RoomId.HasValue == true)
                 group.RoomId = roomId;
             await _eventSessionGroupRepository.Update(group);
-            if (request.EventSessionGroup.Placement?.LocationId.HasValue == true)
+            if (command.EventSessionGroup.Placement?.LocationId.HasValue == true)
                 await _eventLocationAttachmentService.DetachIfUnreferencedAsync(previousEventLocationId, token);
         }, cancellationToken);
 

@@ -1,0 +1,37 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DDMMSYK6CRVM3B08QTJZF6
+Title: "Restore persisted-owner storage content downloads"
+Type: fix
+Scope: access
+Summary: "Exact storage content downloads now load tenant, creator, visibility and lifecycle facts from persistence without accepting request-authored collection or ownership facts; provider decisions and reader privacy checks remain authoritative."
+Group: organization-evidence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Exact content queries cannot substitute collection or caller-authored
+      ownership facts for persisted object authority. Selected-provider decisions,
+      private-owner checks, lifecycle, retention and quarantine remain enforced.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: >-
+      Restore uploader content access, including after organization-role revocation,
+      without granting another account's PrivateOwner bytes to tenant reviewers.
+      No configuration, credentials or data migration are required.

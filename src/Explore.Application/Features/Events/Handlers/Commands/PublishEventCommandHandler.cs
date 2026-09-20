@@ -1,17 +1,17 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
 
 public sealed class PublishEventCommandHandler(EventPublicationExecutor executor)
-    : IRequestHandler<PublishEventCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PublishEventCommand, BaseCommandResponse<Guid>>
 {
     public const string EventPublishedNotificationFanoutRequestedEventType =
         EventPublishedOutboxMessageFactory.EventPublishedNotificationFanoutRequestedEventType;
 
-    public Task<BaseCommandResponse<Guid>> Handle(
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
         PublishEventCommand request,
         CancellationToken cancellationToken) =>
         executor.ExecuteAsync(

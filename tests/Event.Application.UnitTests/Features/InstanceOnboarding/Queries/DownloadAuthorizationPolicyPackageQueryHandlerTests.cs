@@ -32,7 +32,7 @@ public sealed class DownloadAuthorizationPolicyPackageQueryHandlerTests
             Manifest: manifest);
         _policyPackageService.ExportArchiveAsync(Arg.Any<CancellationToken>()).Returns(archive);
 
-        var result = await _handler.Handle(new DownloadAuthorizationPolicyPackageQuery(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new DownloadAuthorizationPolicyPackageQuery(), CancellationToken.None);
 
         await Assert.That(result).IsSameReferenceAs(archive);
         await _policyPackageService.Received(1).ExportArchiveAsync(Arg.Any<CancellationToken>());

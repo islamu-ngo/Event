@@ -1,9 +1,9 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
@@ -18,9 +18,9 @@ namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 public sealed class GetAuthorizationPolicyPackageStatusQueryHandler(
     IPolicyPackageService policyPackageService,
     IAuthorizationProviderConfigurationService providerConfigurationService)
-    : IRequestHandler<GetAuthorizationPolicyPackageStatusQuery, AuthorizationPolicyPackageStatusDto>
+    : IQueryHandler<GetAuthorizationPolicyPackageStatusQuery, AuthorizationPolicyPackageStatusDto>
 {
-    public async Task<AuthorizationPolicyPackageStatusDto> Handle(
+    public async Task<AuthorizationPolicyPackageStatusDto> QueryAsync(
         GetAuthorizationPolicyPackageStatusQuery request,
         CancellationToken cancellationToken)
     {

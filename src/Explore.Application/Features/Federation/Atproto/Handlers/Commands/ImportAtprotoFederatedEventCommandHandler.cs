@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Requests.Commands;
@@ -6,18 +7,17 @@ using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Models.Storage;
 using Explore.Domain;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Federation.Atproto.Handlers.Commands;
 
 public sealed class ImportAtprotoFederatedEventCommandHandler(
     IAtprotoJetstreamRepository repository,
     IAtprotoThumbnailBlobGateway thumbnailGateway)
-    : IRequestHandler<ImportAtprotoFederatedEventCommand, bool>
+    : ICommandHandler<ImportAtprotoFederatedEventCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         ImportAtprotoFederatedEventCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         AtprotoJetstreamApplyRequest applyRequest = request.ApplyRequest;
         IReadOnlyList<AtprotoFederatedEventImportPlan> importPlans =

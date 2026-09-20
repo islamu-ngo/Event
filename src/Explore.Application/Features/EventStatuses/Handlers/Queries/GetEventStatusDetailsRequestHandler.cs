@@ -1,27 +1,25 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventStatus;
 using Explore.Application.Features.EventStatuses.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventStatuses.Handlers.Queries;
 
-public class GetEventStatusDetailsRequestHandler : IRequestHandler<GetEventStatusDetailsRequest, EventStatusDto>
+public class GetEventStatusDetailsRequestHandler : IQueryHandler<GetEventStatusDetailsRequest, EventStatusDto?>
 {
     private readonly IEventStatusRepository _eventStatusRepository;
-    private readonly IMapper _mapper;
 
-    public GetEventStatusDetailsRequestHandler(IEventStatusRepository eventStatusRepository, IMapper mapper)
+    public GetEventStatusDetailsRequestHandler(IEventStatusRepository eventStatusRepository)
     {
         _eventStatusRepository = eventStatusRepository;
-        _mapper = mapper;
     }
 
-    public async Task<EventStatusDto> Handle(GetEventStatusDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventStatusDto?> QueryAsync(GetEventStatusDetailsRequest request, CancellationToken cancellationToken)
     {
         var eventStatus = await _eventStatusRepository.GetById(request.Id);
-        return _mapper.Map<EventStatusDto>(eventStatus);
+        return EventStatusMapper.ToDetail(eventStatus);
     }
 }

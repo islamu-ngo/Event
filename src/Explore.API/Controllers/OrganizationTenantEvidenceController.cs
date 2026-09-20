@@ -10,7 +10,7 @@ using Explore.Application.Features.OrganizationTenantEvidence.Requests.Commands;
 using Explore.Application.Features.OrganizationTenantEvidence.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -37,14 +37,26 @@ public sealed class OrganizationTenantEvidenceController : EventControllerBase
         "Organization legitimacy evidence not found",
         "The requested Organization legitimacy evidence was not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetOrganizationTenantEvidenceCollectionRequest, IReadOnlyList<OrganizationTenantEvidenceDto>> _collection;
+    private readonly IQueryHandler<GetOrganizationTenantEvidenceRequest, OrganizationTenantEvidenceDto?> _detail;
+    private readonly ICommandHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _createUpload;
+    private readonly ICommandHandler<SubmitOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>> _submit;
+    private readonly ICommandHandler<ReviewOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>> _review;
     private readonly IResourceAssembler<OrganizationTenantEvidenceDto, OrganizationTenantEvidenceDto> _resourceAssembler;
 
     public OrganizationTenantEvidenceController(
-        IMediator mediator,
+        IQueryHandler<GetOrganizationTenantEvidenceCollectionRequest, IReadOnlyList<OrganizationTenantEvidenceDto>> collection,
+        IQueryHandler<GetOrganizationTenantEvidenceRequest, OrganizationTenantEvidenceDto?> detail,
+        ICommandHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
+        ICommandHandler<SubmitOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>> submit,
+        ICommandHandler<ReviewOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>> review,
         IResourceAssembler<OrganizationTenantEvidenceDto, OrganizationTenantEvidenceDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _collection = collection;
+        _detail = detail;
+        _createUpload = createUpload;
+        _submit = submit;
+        _review = review;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -60,7 +72,7 @@ public sealed class OrganizationTenantEvidenceController : EventControllerBase
         Guid organizationId,
         CancellationToken cancellationToken = default)
     {
-        var evidence = await _mediator.Send(
+        var evidence = await _collection.QueryAsync(
             new GetOrganizationTenantEvidenceCollectionRequest(organizationId),
             cancellationToken);
         var resource = await _resourceAssembler.ToCollectionResource(
@@ -85,7 +97,7 @@ public sealed class OrganizationTenantEvidenceController : EventControllerBase
         Guid evidenceId,
         CancellationToken cancellationToken = default)
     {
-        var evidence = await _mediator.Send(
+        var evidence = await _detail.QueryAsync(
             new GetOrganizationTenantEvidenceRequest(organizationId, evidenceId),
             cancellationToken);
         if (evidence is null)
@@ -110,7 +122,7 @@ public sealed class OrganizationTenantEvidenceController : EventControllerBase
         [FromBody] CreateOrganizationTenantEvidenceUploadSessionDto upload,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _createUpload.ExecuteAsync(
             new CreateOrganizationTenantEvidenceUploadSessionCommand
             {
                 OrganizationId = organizationId,
@@ -139,7 +151,7 @@ public sealed class OrganizationTenantEvidenceController : EventControllerBase
         [FromBody] SubmitOrganizationTenantEvidenceDto evidence,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _submit.ExecuteAsync(
             new SubmitOrganizationTenantEvidenceCommand
             {
                 OrganizationId = organizationId,
@@ -172,7 +184,7 @@ public sealed class OrganizationTenantEvidenceController : EventControllerBase
         [FromBody] ReviewOrganizationTenantEvidenceDto review,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _review.ExecuteAsync(
             new ReviewOrganizationTenantEvidenceCommand
             {
                 OrganizationId = organizationId,

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Notifications;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Models;
@@ -19,7 +21,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
-    private readonly MediatR.IMediator _mediator;
+    private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
     public AuthProviderConfigurationService(
         ISystemSettingRepository systemSettingRepository,
@@ -27,14 +29,14 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         IUnitOfWork unitOfWork,
         ISettingMutationLock mutationLock,
         IVisitorAccessSettingsWriter visitorSettings,
-        MediatR.IMediator mediator)
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
         _systemSettingRepository = systemSettingRepository;
         _configuration = configuration;
         _unitOfWork = unitOfWork;
         _mutationLock = mutationLock;
         _visitorSettings = visitorSettings;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
     }
 
     // This single projection is shared by authoritative reads and detached proposed-state validation.
@@ -153,7 +155,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 innerToken => ApplyConfigurationInCurrentTransactionAsync(configuration, suppliedKeys, innerToken), token),
             cancellationToken);
         foreach (var notification in notifications)
-            await _mediator.Publish(notification, CancellationToken.None);
+            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
     }
 
     private async Task<System.Collections.Immutable.ImmutableArray<Explore.Application.Notifications.SettingChangedNotification>> ApplyConfigurationInCurrentTransactionAsync(

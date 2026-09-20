@@ -1,17 +1,17 @@
 using Explore.Application.Features.EventPublicActions.Requests.Commands;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Commands;
 
 public sealed class RecordEventPublicActionEngagementCommandHandler(BusinessMetrics metrics)
-    : IRequestHandler<RecordEventPublicActionEngagementCommand, Unit>
+    : ICommandHandler<RecordEventPublicActionEngagementCommand>
 {
-    public Task<Unit> Handle(
+    public Task ExecuteAsync(
         RecordEventPublicActionEngagementCommand request,
         CancellationToken cancellationToken)
     {
         metrics.RecordEventPublicActionEngagement(request.ActionKind, request.Surface);
-        return Task.FromResult(Unit.Value);
+        return Task.CompletedTask;
     }
 }

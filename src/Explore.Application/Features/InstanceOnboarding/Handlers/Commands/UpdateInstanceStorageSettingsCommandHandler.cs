@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
@@ -7,11 +8,10 @@ using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public class UpdateInstanceStorageSettingsCommandHandler : IRequestHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateInstanceStorageSettingsCommandHandler : ICommandHandler<UpdateInstanceStorageSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceStorageSettingService _storageSettingService;
@@ -27,7 +27,7 @@ public class UpdateInstanceStorageSettingsCommandHandler : IRequestHandler<Updat
         _s3ConfigResolver = s3ConfigResolver;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateInstanceStorageSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateInstanceStorageSettingsCommand request, CancellationToken cancellationToken)
     {
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
         if (!isInstanceAdmin)

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
@@ -6,7 +7,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Models.Storage;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
@@ -22,9 +22,9 @@ public sealed class GetOnboardingPreflightQueryHandler(
     IS3ConfigResolver? s3ConfigResolver = null,
     ISmtpConfigResolver? smtpConfigResolver = null,
     IS3PreflightVerifier? s3PreflightVerifier = null)
-    : IRequestHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto>
+    : IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto>
 {
-    public async Task<OnboardingPreflightDto> Handle(GetOnboardingPreflightQuery request, CancellationToken cancellationToken)
+    public async Task<OnboardingPreflightDto> QueryAsync(GetOnboardingPreflightQuery request, CancellationToken cancellationToken)
     {
         var result = new OnboardingPreflightDto();
         var bootstrap = await instanceBootstrapStateRepository.GetCurrent(cancellationToken);

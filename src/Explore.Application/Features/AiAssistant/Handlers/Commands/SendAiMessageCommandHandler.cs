@@ -12,14 +12,14 @@ using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
-public sealed class SendAiMessageCommandHandler : IRequestHandler<SendAiMessageCommand, BaseCommandResponse<Guid>>
+public sealed class SendAiMessageCommandHandler : ICommandHandler<SendAiMessageCommand, BaseCommandResponse<Guid>>
 {
     private const string IdempotencyMethod = "AI_SEND";
     private const string JsonContentType = "application/json";
@@ -55,7 +55,7 @@ public sealed class SendAiMessageCommandHandler : IRequestHandler<SendAiMessageC
         _actorContextService = actorContextService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SendAiMessageCommand request,
         CancellationToken cancellationToken)
     {

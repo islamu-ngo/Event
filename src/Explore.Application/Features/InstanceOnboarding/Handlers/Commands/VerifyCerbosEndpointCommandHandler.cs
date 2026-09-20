@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Utilities;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public class VerifyCerbosEndpointCommandHandler : IRequestHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>>
+public class VerifyCerbosEndpointCommandHandler : ICommandHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAuthorizationProviderConfigurationService _configurationService;
 
@@ -15,7 +15,7 @@ public class VerifyCerbosEndpointCommandHandler : IRequestHandler<VerifyCerbosEn
         _configurationService = configurationService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(VerifyCerbosEndpointCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(VerifyCerbosEndpointCommand request, CancellationToken cancellationToken)
     {
         var normalizedEndpoint = GrpcEndpointNormalizer.Normalize(request.GrpcEndpoint);
 

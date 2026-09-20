@@ -1,10 +1,10 @@
 using System;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionAgendaItem;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
 
-public sealed record GetEventSessionAgendaItemDetailsRequest : IRequest<EventSessionAgendaItemDto?>
+public sealed record GetEventSessionAgendaItemDetailsRequest : IQuery<EventSessionAgendaItemDto?>
 {
     public Guid Id { get; init; }
 }

@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetWebhookBulkReplayOperationQueryHandler(IWebhookBulkReplayRepository repository)
-    : IRequestHandler<GetWebhookBulkReplayOperationQuery, WebhookBulkReplayOperationDto?>
+    : IQueryHandler<GetWebhookBulkReplayOperationQuery, WebhookBulkReplayOperationDto?>
 {
-    public async Task<WebhookBulkReplayOperationDto?> Handle(
+    public async Task<WebhookBulkReplayOperationDto?> QueryAsync(
         GetWebhookBulkReplayOperationQuery request,
         CancellationToken cancellationToken)
     {

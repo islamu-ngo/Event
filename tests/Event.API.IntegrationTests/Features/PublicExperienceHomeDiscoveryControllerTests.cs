@@ -4,11 +4,12 @@ using Explore.API.Attributes;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Models.PublicExperience;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +21,12 @@ namespace Explore.Api.IntegrationTests.Features;
 
 public sealed class PublicExperienceHomeDiscoveryControllerTests
 {
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto> _settingsHandler =
+        Substitute.For<IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>>();
+    private readonly IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> _shellHandler =
+        Substitute.For<IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>>();
+    private readonly IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto> _homeDiscoveryHandler =
+        Substitute.For<IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>>();
     private readonly ILinkPolicy<EventDiscoveryItemDto> _linkPolicy =
         Substitute.For<ILinkPolicy<EventDiscoveryItemDto>>();
     private readonly IHateoasLinkGenerator _linkGenerator =
@@ -53,7 +59,7 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
                 SelectedAreaId = areaId
             }
         };
-        _mediator.Send(Arg.Any<GetHomeDiscoveryQuery>(), Arg.Any<CancellationToken>())
+        _homeDiscoveryHandler.QueryAsync(Arg.Any<GetHomeDiscoveryQuery>(), Arg.Any<CancellationToken>())
             .Returns(expected);
         var controller = CreateController();
 
@@ -62,7 +68,7 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
         var ok = action.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsSameReferenceAs(expected);
-        await _mediator.Received(1).Send(
+        await _homeDiscoveryHandler.Received(1).QueryAsync(
             Arg.Is<GetHomeDiscoveryQuery>(query =>
                 query != null && query.AreaId == areaId && query.Mode == "online"),
             Arg.Any<CancellationToken>());
@@ -81,7 +87,7 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
             }
         };
         var expected = new HomeDiscoveryDto { UpcomingInArea = [item] };
-        _mediator.Send(Arg.Any<GetHomeDiscoveryQuery>(), Arg.Any<CancellationToken>())
+        _homeDiscoveryHandler.QueryAsync(Arg.Any<GetHomeDiscoveryQuery>(), Arg.Any<CancellationToken>())
             .Returns(expected);
         var definition = new LinkDefinition(
             "source",
@@ -109,7 +115,7 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
     }
 
     private PublicExperienceController CreateController() =>
-        new(_mediator, _linkPolicy, _linkGenerator)
+        new(_settingsHandler, _shellHandler, _homeDiscoveryHandler, _linkPolicy, _linkGenerator)
         {
             ControllerContext = new ControllerContext
             {

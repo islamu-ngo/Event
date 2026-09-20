@@ -1,18 +1,18 @@
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
 public sealed class RequestLocalPasswordRecoveryCommandHandler(
     ILocalIdentityLifecycleStore lifecycle,
     IAccountAuthorityLifecycleEmailService email)
-    : IRequestHandler<RequestLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RequestLocalPasswordRecoveryCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(RequestLocalPasswordRecoveryCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RequestLocalPasswordRecoveryCommand request, CancellationToken cancellationToken = default)
     {
         var validation = await new LocalPasswordRecoveryRequestDtoValidator().ValidateAsync(request.Request, cancellationToken);
         if (!validation.IsValid)

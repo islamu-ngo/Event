@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Explore.API.Mcp;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using NSubstitute;
 using TUnit.Core;
 
@@ -13,20 +13,25 @@ namespace ApiIntegrationTests.Features;
 
 public sealed class McpAiAssistantAdapterTests
 {
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly ICommandHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>> _proposeHandler =
+        Substitute.For<ICommandHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>>>();
+    private readonly IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>> _listHandler =
+        Substitute.For<IQueryHandler<GetAiConversationListQuery, IReadOnlyList<AiConversationSummaryDto>>>();
+    private readonly IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?> _detailHandler =
+        Substitute.For<IQueryHandler<GetAiConversationDetailQuery, AiConversationDto?>>();
     private readonly IAiContextRedactor _redactor = Substitute.For<IAiContextRedactor>();
 
     [Test]
-    public async Task ProposeAiToolActionAsync_DelegatesToMediatRAndReturnsSafeResult()
+    public async Task ProposeAiToolActionAsync_DelegatesToCommandHandlerAndReturnsSafeResult()
     {
         var conversationId = Guid.CreateVersion7();
         var proposedActionId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<ProposeAiToolActionCommand>(), Arg.Any<CancellationToken>())
+        _proposeHandler.ExecuteAsync(Arg.Any<ProposeAiToolActionCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 proposedActionId,
                 "AI tool action proposed. Confirm before execution."));
 
-        var tool = new AiAssistantMcpTools(_mediator);
+        var tool = new AiAssistantMcpTools(_proposeHandler);
 
         var json = await tool.ProposeAiToolActionAsync(
             conversationId,
@@ -40,7 +45,7 @@ public sealed class McpAiAssistantAdapterTests
         await Assert.That(document.RootElement.GetProperty("Id").GetGuid()).IsEqualTo(proposedActionId);
         await Assert.That(document.RootElement.GetProperty("Message").GetString()).Contains("Confirm");
 
-        await _mediator.Received(1).Send(
+        await _proposeHandler.Received(1).ExecuteAsync(
             Arg.Is<ProposeAiToolActionCommand>(command =>
                 command.ConversationId == conversationId &&
                 command.ToolName == "CreateEventDraft" &&
@@ -53,7 +58,7 @@ public sealed class McpAiAssistantAdapterTests
     public async Task ListConversationsAsync_ReturnsSafeConversationSummaries()
     {
         var conversationId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<GetAiConversationListQuery>(), Arg.Any<CancellationToken>())
+        _listHandler.QueryAsync(Arg.Any<GetAiConversationListQuery>(), Arg.Any<CancellationToken>())
             .Returns([
                 new AiConversationSummaryDto
                 {
@@ -67,7 +72,7 @@ public sealed class McpAiAssistantAdapterTests
                 }
             ]);
 
-        var resources = new AiAssistantMcpResources(_mediator, _redactor);
+        var resources = new AiAssistantMcpResources(_listHandler, _detailHandler, _redactor);
 
         var json = await resources.ListConversationsAsync(CancellationToken.None);
 
@@ -78,7 +83,7 @@ public sealed class McpAiAssistantAdapterTests
         await Assert.That(conversations[0].GetProperty("Title").GetString()).IsEqualTo("Event planning");
         await Assert.That(json).DoesNotContain("PayloadJson");
 
-        await _mediator.Received(1).Send(
+        await _listHandler.Received(1).QueryAsync(
             Arg.Is<GetAiConversationListQuery>(query => query.Limit == 10),
             Arg.Any<CancellationToken>());
     }
@@ -88,7 +93,7 @@ public sealed class McpAiAssistantAdapterTests
     {
         var conversationId = Guid.CreateVersion7();
         var proposedActionId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<GetAiConversationDetailQuery>(), Arg.Any<CancellationToken>())
+        _detailHandler.QueryAsync(Arg.Any<GetAiConversationDetailQuery>(), Arg.Any<CancellationToken>())
             .Returns(new AiConversationDto
             {
                 Id = conversationId,
@@ -118,7 +123,7 @@ public sealed class McpAiAssistantAdapterTests
                 ]
             });
 
-        var resources = new AiAssistantMcpResources(_mediator, _redactor);
+        var resources = new AiAssistantMcpResources(_listHandler, _detailHandler, _redactor);
 
         var json = await resources.GetConversationAsync(conversationId, CancellationToken.None);
 

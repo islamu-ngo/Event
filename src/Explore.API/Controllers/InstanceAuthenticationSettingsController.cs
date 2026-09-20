@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -20,7 +22,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -43,18 +44,39 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class InstanceAuthenticationSettingsController : InstanceSettingsControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IAuthProviderConfigurationService _authProviderConfigurationService;
+    private readonly IQueryHandler<GetAuthProviderConfigurationQuery, AuthProviderConfigurationDto> _getAuthProviderConfigHandler;
+    private readonly ICommandHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>> _updateAuthConfigDuringSetupHandler;
+    private readonly ICommandHandler<UpdateAuthProviderConfigurationCommand, BaseCommandResponse<Guid>> _updateAuthConfigHandler;
+    private readonly IQueryHandler<RunKeycloakRealmDoctorQuery, KeycloakRealmDoctorResultDto> _realmDoctorHandler;
+    private readonly IQueryHandler<PreviewKeycloakRealmSyncQuery, KeycloakRealmSyncPlanDto> _previewRealmSyncHandler;
+    private readonly ICommandHandler<ApplyKeycloakRealmSyncCommand, KeycloakRealmSyncPlanDto> _applyRealmSyncHandler;
+    private readonly ICommandHandler<RotateKeycloakClientSecretCommand, KeycloakClientSecretRotationResultDto> _rotateClientSecretHandler;
 
     public InstanceAuthenticationSettingsController(
-        IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAuthProviderConfigurationService authProviderConfigurationService,
+        IQueryHandler<GetAuthProviderConfigurationQuery, AuthProviderConfigurationDto> getAuthProviderConfigHandler,
+        ICommandHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>> updateAuthConfigDuringSetupHandler,
+        ICommandHandler<UpdateAuthProviderConfigurationCommand, BaseCommandResponse<Guid>> updateAuthConfigHandler,
+        IQueryHandler<RunKeycloakRealmDoctorQuery, KeycloakRealmDoctorResultDto> realmDoctorHandler,
+        IQueryHandler<PreviewKeycloakRealmSyncQuery, KeycloakRealmSyncPlanDto> previewRealmSyncHandler,
+        ICommandHandler<ApplyKeycloakRealmSyncCommand, KeycloakRealmSyncPlanDto> applyRealmSyncHandler,
+        ICommandHandler<RotateKeycloakClientSecretCommand, KeycloakClientSecretRotationResultDto> rotateClientSecretHandler,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
-        _mediator = mediator;
+        _identityQuery = identityQuery;
         _authProviderConfigurationService = authProviderConfigurationService;
+        _getAuthProviderConfigHandler = getAuthProviderConfigHandler;
+        _updateAuthConfigDuringSetupHandler = updateAuthConfigDuringSetupHandler;
+        _updateAuthConfigHandler = updateAuthConfigHandler;
+        _realmDoctorHandler = realmDoctorHandler;
+        _previewRealmSyncHandler = previewRealmSyncHandler;
+        _applyRealmSyncHandler = applyRealmSyncHandler;
+        _rotateClientSecretHandler = rotateClientSecretHandler;
     }
 
     [HttpGet("auth-provider", Name = RouteNames.GetInstanceAuthProviderConfiguration)]
@@ -66,7 +88,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
     public async Task<ActionResult<AuthProviderConfigurationDto>> GetAuthProviderConfiguration(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var configuration = await _mediator.Send(new GetAuthProviderConfigurationQuery(), cancellationToken);
+        var configuration = await _getAuthProviderConfigHandler.QueryAsync(new GetAuthProviderConfigurationQuery(), cancellationToken);
         return Ok(configuration);
     }
 
@@ -86,16 +108,16 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         BaseCommandResponse<Guid> response;
         if (IsSetupSecretAuthenticated())
         {
-            response = await _mediator.Send(
+            response = await _updateAuthConfigDuringSetupHandler.ExecuteAsync(
                 new UpdateAuthProviderConfigurationDuringSetupCommand { Patch = configuration },
                 cancellationToken);
         }
         else
         {
-            var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+            var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
             if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-            response = await _mediator.Send(
+            response = await _updateAuthConfigHandler.ExecuteAsync(
                 new UpdateAuthProviderConfigurationCommand { UserId = userId.Value, Patch = configuration },
                 cancellationToken);
         }
@@ -115,7 +137,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var result = await _mediator.Send(new RunKeycloakRealmDoctorQuery { Request = request }, cancellationToken);
+        var result = await _realmDoctorHandler.QueryAsync(new RunKeycloakRealmDoctorQuery { Request = request }, cancellationToken);
         return Ok(result);
     }
 
@@ -131,7 +153,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var result = await _mediator.Send(new PreviewKeycloakRealmSyncQuery { Request = request }, cancellationToken);
+        var result = await _previewRealmSyncHandler.QueryAsync(new PreviewKeycloakRealmSyncQuery { Request = request }, cancellationToken);
         return Ok(result);
     }
 
@@ -147,7 +169,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var result = await _mediator.Send(new ApplyKeycloakRealmSyncCommand { Request = request }, cancellationToken);
+        var result = await _applyRealmSyncHandler.ExecuteAsync(new ApplyKeycloakRealmSyncCommand { Request = request }, cancellationToken);
         return Ok(result);
     }
 
@@ -162,11 +184,11 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         [FromBody] KeycloakClientSecretRotationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         if (!await AdminContext.IsInstanceAdminAsync(userId.Value, cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator authority is required for this operation.");
 
-        var result = await _mediator.Send(
+        var result = await _rotateClientSecretHandler.ExecuteAsync(
             new RotateKeycloakClientSecretCommand { UserId = userId.Value, Request = request },
             cancellationToken);
         return Ok(result);

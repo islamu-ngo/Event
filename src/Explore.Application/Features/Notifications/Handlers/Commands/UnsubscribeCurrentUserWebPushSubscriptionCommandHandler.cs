@@ -2,7 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
@@ -10,9 +10,9 @@ public sealed class UnsubscribeCurrentUserWebPushSubscriptionCommandHandler(
     IWebPushSubscriptionRepository repository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<UnsubscribeCurrentUserWebPushSubscriptionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UnsubscribeCurrentUserWebPushSubscriptionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UnsubscribeCurrentUserWebPushSubscriptionCommand request,
         CancellationToken cancellationToken)
     {

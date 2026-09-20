@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.CustomPropertyProjection, AuthorizationActions.Update)]
-public sealed record RebuildSingleEventCustomPropertyProjectionCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record RebuildSingleEventCustomPropertyProjectionCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
 

@@ -1,14 +1,13 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Agenda;
 using Explore.Application.Features.Agenda.Requests.Queries;
 using Explore.Application.Services;
-using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Agenda.Handlers.Queries;
 
-public class GetEventAgendaProjectionRequestHandler : IRequestHandler<GetEventAgendaProjectionRequest, EventAgendaProjectionDto?>
+public class GetEventAgendaProjectionRequestHandler : IQueryHandler<GetEventAgendaProjectionRequest, EventAgendaProjectionDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDayRepository _eventDayRepository;
@@ -30,7 +29,7 @@ public class GetEventAgendaProjectionRequestHandler : IRequestHandler<GetEventAg
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventAgendaProjectionDto?> Handle(GetEventAgendaProjectionRequest request, CancellationToken cancellationToken)
+    public async Task<EventAgendaProjectionDto?> QueryAsync(GetEventAgendaProjectionRequest request, CancellationToken cancellationToken)
     {
         var parentEvent = await _eventRepository.GetById(request.EventId);
         if (parentEvent is null || !await _eventRepository.IsPubliclyEligibleAsync(

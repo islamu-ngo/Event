@@ -218,6 +218,22 @@ The platform isolates **physical venue master records** from **per-event disclos
 - Physical sub-divisions (e.g. "Hall A", "Room 204") reside in `LocationRoom` (`ak_location_rooms_tenant_id_location_id_id`).
 - Governed by privacy states (`PublicVenue`, `PrivateHome`, `Erased`).
 
+Room relocation preserves the room identity and tenant. Because `LocationId` belongs
+to an alternate key referenced by schedule carriers, it cannot be changed through
+ordinary EF tracked-property mutation. `UpdateLocationRoomCommandHandler` uses an
+`IUnitOfWork` transaction only for relocation: `LocationRoomRepository.MoveToLocationAsync`
+performs a tenant-bound, active-row compare-and-swap against the original location
+and concurrency stamp, updating the final name and location in one statement. It
+then synchronizes and reattaches the entity before the normal update advances audit
+fields and the concurrency stamp. Any failure rolls back the entire PATCH.
+
+`HasScheduleReferencesAsync` retains the tenant filter and disables only `SoftDelete`
+when checking sessions, session groups, and agenda items. Any physically retained
+room reference blocks relocation; the move never clears historical carrier links.
+Composite foreign keys remain the final guard against concurrent attachment.
+Relocation constraint races become concurrency conflicts, and destination-name
+collisions become validation errors rather than partial writes.
+
 #### 2. `EventLocation` (Per-Event Association & Disclosure Policy Authority)
 - Acts as the first-class link between an `Event` and a `Location` (or an explicit To-Be-Announced / TBA placeholder when `IsToBeAnnounced = true` and `LocationId = null`).
 - Controls what attendees and the general public can see:

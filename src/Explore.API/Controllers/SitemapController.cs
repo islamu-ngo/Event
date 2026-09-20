@@ -4,8 +4,9 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.Seo;
 using Explore.Application.Features.Seo.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -16,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("sitemap.xml")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public sealed class SitemapController(IMediator mediator, IPublicUrlBuilder publicUrlBuilder) : ControllerBase
+public sealed class SitemapController(
+    IQueryHandler<GetSitemapEventsQuery, IReadOnlyList<SitemapEventEntryDto>> sitemapQuery,
+    IPublicUrlBuilder publicUrlBuilder) : ControllerBase
 {
     private static readonly IReadOnlyList<StaticSitemapEntry> StaticRoutes =
     [
@@ -39,7 +42,7 @@ public sealed class SitemapController(IMediator mediator, IPublicUrlBuilder publ
     public async Task<ContentResult> Get(CancellationToken cancellationToken = default)
     {
         var baseUrl = publicUrlBuilder.GetBaseUrl().TrimEnd('/');
-        var eventEntries = await mediator.Send(new GetSitemapEventsQuery(), cancellationToken);
+        var eventEntries = await sitemapQuery.QueryAsync(new GetSitemapEventsQuery(), cancellationToken);
 
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
         var document = new XDocument(

@@ -21,8 +21,7 @@ public sealed class TenantSettingsBroadWriteAbsenceTests
             Path.Combine(root, "src/Explore.API/Controllers/TenantOnboardingController.cs"));
         string routeNames = await File.ReadAllTextAsync(
             Path.Combine(root, "src/Explore.API/Hateoas/RouteNames.cs"));
-        string generatedClient = await File.ReadAllTextAsync(
-            Path.Combine(root, "src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs"));
+        string generatedClient = GeneratedContractInputs.Client;
 
         await Assert.That(controller).DoesNotContain("UpdateTenantOnboardingPolicySettings");
         await Assert.That(routeNames).DoesNotContain("UpdateTenantOnboardingPolicySettings");

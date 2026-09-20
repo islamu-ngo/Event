@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.Features.OrganizationTenantEvidence.Requests.Queries;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using OrganizationLegitimacyEvidence = Explore.Domain.OrganizationTenantEvidence;
 
 namespace Explore.Application.Features.OrganizationTenantEvidence.Handlers.Queries;
@@ -12,9 +12,9 @@ public sealed class GetOrganizationTenantEvidenceRequestHandler(
     IOrganizationTenantRepository organizationTenantRepository,
     IOrganizationTenantEvidenceRepository evidenceRepository,
     ITenantContext tenantContext)
-    : IRequestHandler<GetOrganizationTenantEvidenceRequest, OrganizationTenantEvidenceDto?>
+    : IQueryHandler<GetOrganizationTenantEvidenceRequest, OrganizationTenantEvidenceDto?>
 {
-    public async Task<OrganizationTenantEvidenceDto?> Handle(
+    public async Task<OrganizationTenantEvidenceDto?> QueryAsync(
         GetOrganizationTenantEvidenceRequest request,
         CancellationToken cancellationToken)
     {
@@ -69,9 +69,9 @@ public sealed class GetOrganizationTenantEvidenceCollectionRequestHandler(
     IOrganizationTenantRepository organizationTenantRepository,
     IOrganizationTenantEvidenceRepository evidenceRepository,
     ITenantContext tenantContext)
-    : IRequestHandler<GetOrganizationTenantEvidenceCollectionRequest, IReadOnlyList<OrganizationTenantEvidenceDto>>
+    : IQueryHandler<GetOrganizationTenantEvidenceCollectionRequest, IReadOnlyList<OrganizationTenantEvidenceDto>>
 {
-    public async Task<IReadOnlyList<OrganizationTenantEvidenceDto>> Handle(
+    public async Task<IReadOnlyList<OrganizationTenantEvidenceDto>> QueryAsync(
         GetOrganizationTenantEvidenceCollectionRequest request,
         CancellationToken cancellationToken)
     {

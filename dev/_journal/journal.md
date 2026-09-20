@@ -768,7 +768,7 @@ When startup is blocked by data that violates an earlier migration, do not try t
 **Promotion Consideration**:
 - [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
 - [ ] Candidate for new `.claude/rules/*.md` entry
-- [ ] Candidate for skill update: `cqrs-mediatr-guidelines`
+- [ ] Candidate for skill update: `cqrs-guidelines`
 - [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
 - [x] Stays in journal only (one-off debugging lesson)
 
@@ -1511,7 +1511,7 @@ closed phase manifests manufactures evidence that pass never produced.
 **Promotion Consideration**:
 - [x] Candidate for `docs/QUICK_REFERENCE.md` (promoted)
 - [x] Candidate for new `.agents/rules/*.md` entry (promoted)
-- [ ] Candidate for skill update: `cqrs-mediatr-guidelines`
+- [ ] Candidate for skill update: `cqrs-guidelines`
 - [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
 - [ ] Stays in journal only (one-off debugging lesson)
 
@@ -2355,5 +2355,49 @@ and compare an unassigned control before attributing the issue to new callers.
 
 **Promotion Consideration**:
 - [x] Stays in journal only (inherited defect awaiting a separate repair)
+
+---
+
+[2026-09-12 Europe/Brussels] — Soft deletion must precede required relationship cascade processing
+
+**Context**: Actual HTTP verification of the native Groups migration reached a
+previously failing deletion path with tracked tenant participations.
+
+**Symptom / Observation**: DELETE returned HTTP 500 without persisting deletion.
+A direct repository reproduction raised: "The association between entity types
+'Group' and 'GroupTenant' has been severed, but the relationship is either marked
+as required or is implicitly required because the foreign key is not nullable."
+The exception occurred while assigning `EntityState.Deleted`, before saving.
+
+**Root Cause**: EF's immediate cascade processing evaluates the required Restrict
+relationship before `ExploreDbContext.PrepareTrackedEntities` can convert a
+deleted principal into a modified soft-deleted row and populate its audit fields.
+Changing save-time conversion alone is too late for an already tracked graph.
+
+**Resolution**: Commit `0d4cd193` defers `CascadeDeleteTiming` to `OnSaveChanges`
+only inside the generic repository's soft-delete branch and restores the incoming
+value in `finally`. The existing context retains audit ownership; hard deletion,
+orphan timing, pooling configuration and database constraints are unchanged.
+Verification passed with `dotnet run --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj -c Release --no-build -- --treenode-filter "/*/*/GenericRepositorySoftDeleteTests/*" --minimum-expected-tests 5`
+and the same runner with `--treenode-filter "/*/*/GenericRepositoryTests|EventSoftDeleteTests|TenantNavigationLinkSoftDeleteTests/*" --minimum-expected-tests 8`
+against real PostgreSQL. The original Groups HTTP deletion also passed.
+
+**Why This Matters for Future Work**: Test soft deletion with required dependents
+already tracked, not only isolated principals. Preserve context-owned deletion
+and audit conversion instead of changing FK cascades or setting flags directly.
+The scoped timing change is not a guarantee for arbitrary direct `Remove` calls.
+Regression coverage includes non-default timing, deterministic save failure,
+dependent retention and unchanged hard-deletion behavior.
+
+**References**:
+- `src/Explore.Persistence/Repositories/GenericRepository.cs:43`
+- `src/Explore.Persistence/ExploreDbContext.SaveChanges.cs:63`
+- `src/Explore.Persistence/Configurations/Entities/SubjectParticipationConfiguration.cs:61`
+- `tests/Event.Persistence.IntegrationTests/Repositories/GenericRepositorySoftDeleteTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/GenericRepositoryTests.cs`
+- Commit: `0d4cd193`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (protected by focused repository regressions)
 
 ---

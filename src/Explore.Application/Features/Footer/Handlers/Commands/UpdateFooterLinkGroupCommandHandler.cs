@@ -4,7 +4,7 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Footer.Requests.Commands;
 using Explore.Application.Responses;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
@@ -12,9 +12,9 @@ public sealed class UpdateFooterLinkGroupCommandHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
     ITenantContext tenantContext,
     FooterLinkMutationGuard mutationGuard)
-    : IRequestHandler<UpdateFooterLinkGroupCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateFooterLinkGroupCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateFooterLinkGroupCommand request, CancellationToken cancellationToken)
     {
         var validator = new PatchFooterLinkGroupDtoValidator();

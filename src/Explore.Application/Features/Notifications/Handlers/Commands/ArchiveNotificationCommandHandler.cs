@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
-public class ArchiveNotificationCommandHandler : IRequestHandler<ArchiveNotificationCommand, BaseCommandResponse<Guid>>
+public class ArchiveNotificationCommandHandler : ICommandHandler<ArchiveNotificationCommand, BaseCommandResponse<Guid>>
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -19,7 +19,7 @@ public class ArchiveNotificationCommandHandler : IRequestHandler<ArchiveNotifica
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(ArchiveNotificationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ArchiveNotificationCommand request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

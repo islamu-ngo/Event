@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.OrganizationTenantEvidence.Validators;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.OrganizationTenantEvidence.Requests.Commands;
@@ -8,7 +9,6 @@ using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.OrganizationTenantEvidence.Handlers.Commands;
 
@@ -16,10 +16,10 @@ public sealed class CreateOrganizationTenantEvidenceUploadSessionCommandHandler(
     IOrganizationTenantRepository organizationTenantRepository,
     IAdminContext adminContext,
     ITenantContext tenantContext,
-    ISender sender)
-    : IRequestHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload)
+    : ICommandHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
 {
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> Handle(
+    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
         CreateOrganizationTenantEvidenceUploadSessionCommand request,
         CancellationToken cancellationToken)
     {
@@ -49,7 +49,7 @@ public sealed class CreateOrganizationTenantEvidenceUploadSessionCommandHandler(
         }
 
         var fileName = request.Upload.FileName.Trim();
-        return await sender.Send(
+        return await createUpload.ExecuteAsync(
             new CreateStorageUploadSessionCommand
             {
                 TenantId = participation.TenantId,

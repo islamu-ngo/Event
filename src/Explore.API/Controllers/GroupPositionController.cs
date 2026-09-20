@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.GroupPosition;
 using Explore.Application.Features.GroupPositions.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class GroupPositionController(IMediator mediator) : ControllerBase
+public class GroupPositionController(
+    IQueryHandler<GetGroupPositionListRequest, List<GroupPositionListDto>> groupPositionList,
+    IQueryHandler<GetGroupPositionDetailsRequest, GroupPositionDto?> groupPositionDetails) : ControllerBase
 {
 
     [HttpGet(Name = RouteNames.GetGroupPositions)]
@@ -28,7 +30,7 @@ public class GroupPositionController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<GroupPositionListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var groupPositions = await mediator.Send(new GetGroupPositionListRequest(), cancellationToken);
+        var groupPositions = await groupPositionList.QueryAsync(new GetGroupPositionListRequest(), cancellationToken);
         return Ok(groupPositions);
     }
 
@@ -41,7 +43,7 @@ public class GroupPositionController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<GroupPositionDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var groupPosition = await mediator.Send(new GetGroupPositionDetailsRequest { Id = id }, cancellationToken);
+        var groupPosition = await groupPositionDetails.QueryAsync(new GetGroupPositionDetailsRequest { Id = id }, cancellationToken);
         return Ok(groupPosition);
     }
 }

@@ -2,13 +2,13 @@ using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.Update)]
 public sealed record TransitionControlPlaneTenantLifecycleCommand
-    : IRequest<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>>, ISecureRequest
+    : ICommand<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>>, ISecureRequest
 {
     public TransitionControlPlaneTenantLifecycleCommand(
         Guid tenantId,

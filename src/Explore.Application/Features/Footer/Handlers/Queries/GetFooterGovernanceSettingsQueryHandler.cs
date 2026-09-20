@@ -3,15 +3,15 @@ using Explore.Application.DTOs.Footer;
 using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterGovernanceSettingsQueryHandler(
     IHierarchicalSettingsResolver settingsResolver)
-    : IRequestHandler<GetFooterGovernanceSettingsQuery, FooterGovernanceSettingsDto>
+    : IQueryHandler<GetFooterGovernanceSettingsQuery, FooterGovernanceSettingsDto>
 {
-    public async Task<FooterGovernanceSettingsDto> Handle(
+    public async Task<FooterGovernanceSettingsDto> QueryAsync(
         GetFooterGovernanceSettingsQuery request, CancellationToken cancellationToken)
     {
         var group = await settingsResolver.ResolveGroupAsync<FooterSettingGroup>(

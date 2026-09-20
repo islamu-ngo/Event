@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using static Explore.Application.Features.RegistrationProviders.Commands.RegistrationProviderManagementHandlerHelpers;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
@@ -11,7 +11,7 @@ namespace Explore.Application.Features.RegistrationSubmissions.Commands;
 public sealed record GetNativeRegistrationRequirementProgressQuery(
     Guid TenantId,
     Guid EventId,
-    Guid OrderId) : IRequest<NativeRegistrationRequirementProgressCollectionDto?>;
+    Guid OrderId) : IQuery<NativeRegistrationRequirementProgressCollectionDto?>;
 
 public sealed class GetNativeRegistrationRequirementProgressQueryHandler(
     IRegistrationInventoryRepository inventory,
@@ -20,9 +20,9 @@ public sealed class GetNativeRegistrationRequirementProgressQueryHandler(
     IRegistrationProviderRegistry providerRegistry,
     IRegistrationParticipantRepository participantRepository,
     IRegistrationFinalizationRepository finalization)
-    : IRequestHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
+    : IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
-    public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
+    public async Task<NativeRegistrationRequirementProgressCollectionDto?> QueryAsync(
         GetNativeRegistrationRequirementProgressQuery request,
         CancellationToken cancellationToken)
     {

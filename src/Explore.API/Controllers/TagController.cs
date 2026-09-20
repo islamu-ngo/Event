@@ -4,12 +4,12 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.Features.Tags.Requests.Commands;
 using Explore.Application.Features.Tags.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -41,18 +41,30 @@ public class TagController : ControllerBase
         "Tag not found",
         "Tag not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateTagCommand, BaseCommandResponse<Guid>> _createTag;
+    private readonly ICommandHandler<UpdateTagCommand, BaseCommandResponse<Guid>> _updateTag;
+    private readonly ICommandHandler<DeleteTagCommand, bool> _deleteTag;
+    private readonly IQueryHandler<GetTagDetailsRequest, TagDto?> _getTagDetails;
+    private readonly IQueryHandler<GetTagListRequest, PaginatedResult<TagListDto>> _getTagList;
     private readonly ILogger<TagController> _logger;
     private readonly IResourceAssembler<TagDto, TagListDto> _resourceAssembler;
     private readonly ITenantContext _tenantContext;
 
     public TagController(
-        IMediator mediator,
+        ICommandHandler<CreateTagCommand, BaseCommandResponse<Guid>> createTag,
+        ICommandHandler<UpdateTagCommand, BaseCommandResponse<Guid>> updateTag,
+        ICommandHandler<DeleteTagCommand, bool> deleteTag,
+        IQueryHandler<GetTagDetailsRequest, TagDto?> getTagDetails,
+        IQueryHandler<GetTagListRequest, PaginatedResult<TagListDto>> getTagList,
         ILogger<TagController> logger,
         IResourceAssembler<TagDto, TagListDto> resourceAssembler,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _createTag = createTag;
+        _updateTag = updateTag;
+        _deleteTag = deleteTag;
+        _getTagDetails = getTagDetails;
+        _getTagList = getTagList;
         _logger = logger;
         _resourceAssembler = resourceAssembler;
         _tenantContext = tenantContext;
@@ -76,7 +88,7 @@ public class TagController : ControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetTagListRequest
+        var result = await _getTagList.QueryAsync(new GetTagListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -105,7 +117,7 @@ public class TagController : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<TagDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var tag = await _mediator.Send(new GetTagDetailsRequest { Id = id }, cancellationToken);
+        var tag = await _getTagDetails.QueryAsync(new GetTagDetailsRequest { Id = id }, cancellationToken);
         if (tag == null)
         {
             return this.ToNotFoundProblem(TagNotFoundProblem);
@@ -131,7 +143,7 @@ public class TagController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateTagDto tag, CancellationToken cancellationToken = default)
     {
         var command = new CreateTagCommand { TagDto = tag, TenantId = _tenantContext.TenantId };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createTag.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -165,7 +177,7 @@ public class TagController : ControllerBase
             TenantId = _tenantContext.TenantId,
             Update = tag
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateTag.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -191,7 +203,7 @@ public class TagController : ControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteTagCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteTag.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

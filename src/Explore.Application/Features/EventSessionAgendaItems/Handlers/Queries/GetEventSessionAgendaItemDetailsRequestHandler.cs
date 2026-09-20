@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionAgendaItem;
@@ -8,32 +9,27 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Queries;
 
-public class GetEventSessionAgendaItemDetailsRequestHandler : IRequestHandler<GetEventSessionAgendaItemDetailsRequest, EventSessionAgendaItemDto?>
+public class GetEventSessionAgendaItemDetailsRequestHandler : IQueryHandler<GetEventSessionAgendaItemDetailsRequest, EventSessionAgendaItemDto?>
 {
     private readonly IEventSessionAgendaItemRepository _agendaItemRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventSessionAgendaItemDetailsRequestHandler(
         IEventSessionAgendaItemRepository agendaItemRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _agendaItemRepository = agendaItemRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventSessionAgendaItemDto?> Handle(GetEventSessionAgendaItemDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionAgendaItemDto?> QueryAsync(GetEventSessionAgendaItemDetailsRequest query, CancellationToken cancellationToken = default)
     {
-        var agendaItem = await _agendaItemRepository.GetPublicByIdWithDetailsAsync(request.Id, cancellationToken);
+        var agendaItem = await _agendaItemRepository.GetPublicByIdWithDetailsAsync(query.Id, cancellationToken);
         return await PublicEventSessionAgendaItemLocationProjector.ProjectAsync(
             agendaItem,
-            _mapper,
             _disclosureService,
             cancellationToken);
     }
@@ -43,7 +39,6 @@ internal static class PublicEventSessionAgendaItemLocationProjector
 {
     public static async Task<EventSessionAgendaItemDto?> ProjectAsync(
         EventSessionAgendaItem? item,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -57,7 +52,7 @@ internal static class PublicEventSessionAgendaItemLocationProjector
                 disclosureService,
                 [Placement(item)],
                 cancellationToken);
-        EventSessionAgendaItemDto dto = mapper.Map<EventSessionAgendaItemDto>(item);
+        EventSessionAgendaItemDto dto = EventSessionMapper.ToDetail(item);
         dto.LocationId = null;
         dto.LocationFullName = null;
         dto.EventLocation = item.EventLocationId is { } eventLocationId
@@ -68,7 +63,6 @@ internal static class PublicEventSessionAgendaItemLocationProjector
 
     public static async Task<List<EventSessionAgendaItemListDto>> ProjectAsync(
         IReadOnlyCollection<EventSessionAgendaItem> items,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -77,7 +71,7 @@ internal static class PublicEventSessionAgendaItemLocationProjector
                 disclosureService,
                 items.Select(Placement),
                 cancellationToken);
-        List<EventSessionAgendaItemListDto> dtos = mapper.Map<List<EventSessionAgendaItemListDto>>(items);
+        List<EventSessionAgendaItemListDto> dtos = items.Select(EventSessionMapper.ToListItem).ToList();
         IReadOnlyDictionary<Guid, EventSessionAgendaItem> itemById = items.ToDictionary(item => item.Id);
         foreach (EventSessionAgendaItemListDto dto in dtos)
         {

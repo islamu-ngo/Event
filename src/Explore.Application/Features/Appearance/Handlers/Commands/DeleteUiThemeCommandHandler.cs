@@ -4,9 +4,9 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Appearance.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public class DeleteUiThemeCommandHandler : IRequestHandler<DeleteUiThemeCommand, bool>
+public class DeleteUiThemeCommandHandler : ICommandHandler<DeleteUiThemeCommand, bool>
 {
     private readonly IUiThemeRepository _uiThemeRepository;
     private readonly IAdminContext _adminContext;
@@ -19,7 +19,7 @@ public class DeleteUiThemeCommandHandler : IRequestHandler<DeleteUiThemeCommand,
         _adminContext = adminContext;
     }
 
-    public async Task<bool> Handle(DeleteUiThemeCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteUiThemeCommand request, CancellationToken cancellationToken)
     {
         var theme = await _uiThemeRepository.GetById(request.Id);
         if (theme is null)

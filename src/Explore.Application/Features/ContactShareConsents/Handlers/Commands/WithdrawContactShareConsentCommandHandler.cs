@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ContactShareConsents.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.ContactShareConsents.Handlers.Commands;
 
-public class WithdrawContactShareConsentCommandHandler : IRequestHandler<WithdrawContactShareConsentCommand, BaseCommandResponse<Guid>>
+public class WithdrawContactShareConsentCommandHandler : ICommandHandler<WithdrawContactShareConsentCommand, BaseCommandResponse<Guid>>
 {
     private readonly IContactShareConsentService _consentService;
     private readonly ILogger<WithdrawContactShareConsentCommandHandler> _logger;
@@ -19,7 +19,7 @@ public class WithdrawContactShareConsentCommandHandler : IRequestHandler<Withdra
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(WithdrawContactShareConsentCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(WithdrawContactShareConsentCommand request, CancellationToken cancellationToken = default)
     {
         try
         {

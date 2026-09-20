@@ -7,7 +7,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
 
@@ -21,7 +21,7 @@ public sealed record RegistrationSubmissionAnswerInput(
 public sealed record NormalizeRegistrationSubmissionCommand(
     Guid TenantId,
     Guid SubmissionId,
-    IReadOnlyList<RegistrationSubmissionAnswerInput> Answers) : IRequest<RegistrationSubmissionNormalizationResult>;
+    IReadOnlyList<RegistrationSubmissionAnswerInput> Answers) : ICommand<RegistrationSubmissionNormalizationResult>;
 
 public sealed record RegistrationSubmissionIssueDto(string Code, string? FieldKey);
 
@@ -55,11 +55,11 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
     IRegistrationFormAuthoringRepository formRepository,
     IRegistrationParticipantRepository participantRepository,
     IRegistrationSensitiveValueProtector protector,
-    ISender sender,
+    ICommandHandler<RecordRegistrationRequirementFulfillmentCommand, bool> recordFulfillmentHandler,
     TimeProvider timeProvider)
-    : IRequestHandler<NormalizeRegistrationSubmissionCommand, RegistrationSubmissionNormalizationResult>
+    : ICommandHandler<NormalizeRegistrationSubmissionCommand, RegistrationSubmissionNormalizationResult>
 {
-    public async Task<RegistrationSubmissionNormalizationResult> Handle(
+    public async Task<RegistrationSubmissionNormalizationResult> ExecuteAsync(
         NormalizeRegistrationSubmissionCommand request,
         CancellationToken cancellationToken)
     {
@@ -79,7 +79,7 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
             protector, timeProvider, cancellationToken);
         await submissionRepository.PersistNormalizationAsync(
             draft.Answers, draft.ConsentRecords, draft.Issues, cancellationToken);
-        await RecordFulfillmentAsync(submission, draft.CompletedSubjects, draft.IsValid, sender, cancellationToken);
+        await RecordFulfillmentAsync(submission, draft.CompletedSubjects, draft.IsValid, recordFulfillmentHandler, cancellationToken);
         return new(draft.IsValid, draft.Answers.Count, draft.Issues.Count) { Issues = draft.SafeIssues };
     }
 
@@ -246,14 +246,14 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
         RegistrationSubmission submission,
         IReadOnlyList<NativeRegistrationAnswerSubjectDto> completedSubjects,
         bool normalizationIsValid,
-        ISender sender,
+        ICommandHandler<RecordRegistrationRequirementFulfillmentCommand, bool> recordFulfillmentHandler,
         CancellationToken cancellationToken)
     {
         if (normalizationIsValid && submission.IsFinalizable)
         {
             foreach (NativeRegistrationAnswerSubjectDto subject in completedSubjects)
             {
-                await sender.Send(new RecordRegistrationRequirementFulfillmentCommand(
+                await recordFulfillmentHandler.ExecuteAsync(new RecordRegistrationRequirementFulfillmentCommand(
                     submission.TenantId,
                     submission.RegistrationOrderId,
                     submission.RegistrationRequirementId,

@@ -8,7 +8,7 @@ using Explore.Application.Features.Geocoding.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Geocoding.Handlers.Commands;
 
@@ -18,11 +18,11 @@ public sealed class PromoteLocationAddressCommandHandler(
     ICurrentUserService currentUser,
     IAuthorizationProvider authorizationProvider,
     TimeProvider timeProvider)
-    : IRequestHandler<PromoteLocationAddressCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PromoteLocationAddressCommand, BaseCommandResponse<Guid>>
 {
     private const string ValidationFailureCode = "address_promotion_validation_failed";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         PromoteLocationAddressCommand request,
         CancellationToken cancellationToken)
     {

@@ -63,8 +63,8 @@ public sealed class EventCustomPropertyDefinitionCollectionLinkPolicy : ICollect
 
     public IEnumerable<LinkDefinition> GetCollectionLinks(ClaimsPrincipal? user)
     {
-        // Create link - requires Create permission
+        // Create link - requires tenant Update permission
         yield return LinkDefinition.Create(RouteNames.CreateEventCustomPropertyDefinition)
-            .RequirePermission(AuthorizationActions.Create, typeof(EventCustomPropertyDefinitionDto), "eventCustomPropertyDefinition");
+            .RequirePermission(AuthorizationActions.Update, ResourceKinds.Tenant);
     }
 }

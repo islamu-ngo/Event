@@ -1,8 +1,6 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
-using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -18,7 +16,6 @@ public sealed class EventDetailsProjectionServiceTests
     private readonly IEventModerationRecordRepository _eventModerationRecordRepository = Substitute.For<IEventModerationRecordRepository>();
     private readonly IEventTagsRepository _eventTagsRepository = Substitute.For<IEventTagsRepository>();
     private readonly IEventCategoriesRepository _eventCategoriesRepository = Substitute.For<IEventCategoriesRepository>();
-    private readonly IMapper _mapper = Substitute.For<IMapper>();
     private readonly IObjectStorageService _objectStorageService = Substitute.For<IObjectStorageService>();
     private readonly EventDetailsProjectionService _service;
 
@@ -29,7 +26,6 @@ public sealed class EventDetailsProjectionServiceTests
             _eventModerationRecordRepository,
             _eventTagsRepository,
             _eventCategoriesRepository,
-            _mapper,
             _objectStorageService,
             Substitute.For<ILogger<EventDetailsProjectionService>>());
     }
@@ -37,9 +33,9 @@ public sealed class EventDetailsProjectionServiceTests
     [Test]
     public async Task BuildAsync_WithReversibleLightModeration_EnrichesEventDetails()
     {
-        var tenantId = Guid.NewGuid();
-        var eventId = Guid.NewGuid();
-        var eventEntity = new Explore.Domain.Event
+        var tenantId = Guid.Parse("01900000-0000-7000-8000-000000000102");
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000104");
+        var eventEntity = new Explore.Domain.Event(EventStatusEnum.Moderated)
         {
             Id = eventId,
             TenantId = tenantId,
@@ -47,38 +43,23 @@ public sealed class EventDetailsProjectionServiceTests
             Actor = null!,
             Tenant = null!,
             VisibilityType = null!,
-            EventStatus = null!,
+            EventStatus = new EventStatus { FullName = "Moderated", MasterCode = "MODERATED" },
             EventFormat = null!
         };
-        var eventDto = new EventDto
-        {
-            Id = eventId,
-            TenantId = tenantId,
-            Title = "Moderated Event",
-            ActorDisplayName = string.Empty,
-            ActorTypeFullName = string.Empty,
-            EventStatusId = (int)EventStatusEnum.Moderated,
-            EventStatusFullName = "Moderated",
-            EventStatusMasterCode = "MODERATED",
-            VisibilityTypeFullName = string.Empty,
-            VisibilityTypeMasterCode = string.Empty,
-            EventFormatFullName = string.Empty,
-            EventFormatMasterCode = string.Empty
-        };
         var latestModerationRecord = EventModerationRecord.CreateLightModeration(
-            Guid.CreateVersion7(),
+            Guid.Parse("01900000-0000-7000-8000-000000000106"),
             tenantId,
             eventId,
-            Guid.NewGuid(),
+            Guid.Parse("01900000-0000-7000-8000-000000000107"),
             "policy_review",
             (int)EventStatusEnum.Published,
             null,
-            DateTimeOffset.UtcNow);
+            new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero));
         var tags = new List<Tag>
         {
             new()
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.Parse("01900000-0000-7000-8000-000000000101"),
                 TenantId = tenantId,
                 MasterCode = "COMMUNITY",
                 FullName = "Community",
@@ -89,22 +70,22 @@ public sealed class EventDetailsProjectionServiceTests
         {
             new()
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.Parse("01900000-0000-7000-8000-000000000105"),
                 TenantId = tenantId,
                 MasterCode = "LECTURE",
                 FullName = "Lecture",
                 Tenant = null!
             }
         };
-        var tagDtos = new List<TagListDto>
-        {
+        TagListDto[] expectedTagDtos =
+        [
             new()
             {
-                Id = tags[0].Id,
-                MasterCode = tags[0].MasterCode,
-                FullName = tags[0].FullName
+                Id = Guid.Parse("01900000-0000-7000-8000-000000000101"),
+                MasterCode = "COMMUNITY",
+                FullName = "Community"
             }
-        };
+        ];
         var categoryDtos = new List<CategoryListDto>
         {
             new()
@@ -114,17 +95,13 @@ public sealed class EventDetailsProjectionServiceTests
                 FullName = categories[0].FullName
             }
         };
-        var expectedTagDtos = tagDtos.ToArray();
         var expectedCategoryDtos = categoryDtos.ToArray();
 
         _eventRepository.GetEventWithDetails(eventId).Returns(eventEntity);
-        _mapper.Map<EventDto>(eventEntity).Returns(eventDto);
         _eventModerationRecordRepository.GetLatestByEventAsync(tenantId, eventId, Arg.Any<CancellationToken>())
             .Returns(latestModerationRecord);
         _eventTagsRepository.GetTagsByEvent(eventId).Returns(tags);
         _eventCategoriesRepository.GetCategoriesByEvent(eventId).Returns(categories);
-        _mapper.Map<List<TagListDto>>(tags).Returns(tagDtos);
-        _mapper.Map<List<CategoryListDto>>(categories).Returns(categoryDtos);
 
         var result = await _service.BuildAsync(eventId, CancellationToken.None);
 
@@ -133,8 +110,10 @@ public sealed class EventDetailsProjectionServiceTests
         await Assert.That(result.Tags.SequenceEqual(expectedTagDtos)).IsTrue();
         await Assert.That(result.Categories.SequenceEqual(expectedCategoryDtos)).IsTrue();
 
-        tagDtos.Clear();
-        categoryDtos.Clear();
+        tags[0].FullName = "Changed";
+        tags.Clear();
+        categories[0].FullName = "Changed";
+        categories.Clear();
 
         await Assert.That(result.Tags.SequenceEqual(expectedTagDtos)).IsTrue();
         await Assert.That(result.Categories.SequenceEqual(expectedCategoryDtos)).IsTrue();

@@ -4,12 +4,12 @@ using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public class UpdateResolverConfigurationCommandHandler : IRequestHandler<UpdateResolverConfigurationCommand, BaseCommandResponse<Guid>>
+public class UpdateResolverConfigurationCommandHandler : ICommandHandler<UpdateResolverConfigurationCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IResolverConfigService _resolverConfigService;
@@ -22,7 +22,7 @@ public class UpdateResolverConfigurationCommandHandler : IRequestHandler<UpdateR
         _resolverConfigService = resolverConfigService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateResolverConfigurationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateResolverConfigurationCommand request, CancellationToken cancellationToken)
     {
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
         if (!isInstanceAdmin)

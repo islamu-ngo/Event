@@ -6,11 +6,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationMembers.Handlers.Commands;
 
-public class DeleteOrganizationMemberCommandHandler : IRequestHandler<DeleteOrganizationMemberCommand, BaseCommandResponse<Guid>>
+public class DeleteOrganizationMemberCommandHandler : ICommandHandler<DeleteOrganizationMemberCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IOrganizationRepository _organizationRepository;
@@ -23,9 +23,9 @@ public class DeleteOrganizationMemberCommandHandler : IRequestHandler<DeleteOrga
         _organizationRepository = organizationRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteOrganizationMemberCommand request, CancellationToken cancellationToken)
     {
-        var memberToDelete = await _organizationMemberRepository.GetById(request.MemberId);
+        var memberToDelete = await _organizationMemberRepository.GetOrganizationMemberWithDetails(request.MemberId);
 
         if (memberToDelete == null)
         {

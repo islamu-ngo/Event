@@ -1,9 +1,9 @@
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Commands;
 
-public sealed record SubscribeCurrentUserWebPushSubscriptionCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record SubscribeCurrentUserWebPushSubscriptionCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public required string DeviceIdentifier { get; init; }
     public required string Endpoint { get; init; }

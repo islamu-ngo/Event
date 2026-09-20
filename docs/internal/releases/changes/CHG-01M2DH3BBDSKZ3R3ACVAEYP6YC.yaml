@@ -1,0 +1,30 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DH3BBDSKZ3R3ACVAEYP6YC
+Title: "Exclude inactive tenant memberships from administrator authority"
+Type: fix
+Scope: access
+Summary: "Tenant administrator ID enumeration excludes inactive memberships without narrowing grant inventory or changing tenant lifecycle rules."
+Group: tenant-authority-membership-parity
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: "Require active non-deleted membership for tenant authority ID projection; preserve generic grant inventory, tenant lifecycle predicates, and existing cache behavior."
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "No migration or configuration change. Inactive memberships no longer contribute resolved tenant administrator IDs; this change does not establish immediate cache revocation freshness."

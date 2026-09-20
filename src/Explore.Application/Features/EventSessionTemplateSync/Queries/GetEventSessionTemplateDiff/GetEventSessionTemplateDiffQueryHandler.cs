@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;
 
 public sealed class GetEventSessionTemplateDiffQueryHandler
-    : IRequestHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<TemplateDiffDto>>
+    : IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<TemplateDiffDto>>
 {
     private readonly IEventSessionTemplateDiffService _diffService;
 
@@ -15,7 +15,7 @@ public sealed class GetEventSessionTemplateDiffQueryHandler
         _diffService = diffService;
     }
 
-    public async Task<BaseCommandResponse<TemplateDiffDto>> Handle(
+    public async Task<BaseCommandResponse<TemplateDiffDto>> QueryAsync(
         GetEventSessionTemplateDiffQuery request,
         CancellationToken cancellationToken)
     {

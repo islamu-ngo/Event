@@ -1,25 +1,23 @@
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.TenantUserRoleGrants.Handlers.Queries;
 
-public class GetTenantUserRoleGrantListRequestHandler : IRequestHandler<GetTenantUserRoleGrantListRequest, List<TenantUserRoleGrantListDto>>
+public class GetTenantUserRoleGrantListRequestHandler : IQueryHandler<GetTenantUserRoleGrantListRequest, List<TenantUserRoleGrantListDto>>
 {
     private readonly ITenantUserRoleGrantRepository _tenantUserRoleGrantRepository;
-    private readonly IMapper _mapper;
 
-    public GetTenantUserRoleGrantListRequestHandler(ITenantUserRoleGrantRepository tenantUserRoleGrantRepository, IMapper mapper)
+    public GetTenantUserRoleGrantListRequestHandler(ITenantUserRoleGrantRepository tenantUserRoleGrantRepository)
     {
         _tenantUserRoleGrantRepository = tenantUserRoleGrantRepository;
-        _mapper = mapper;
     }
 
-    public async Task<List<TenantUserRoleGrantListDto>> Handle(GetTenantUserRoleGrantListRequest request, CancellationToken cancellationToken)
+    public async Task<List<TenantUserRoleGrantListDto>> QueryAsync(GetTenantUserRoleGrantListRequest request, CancellationToken cancellationToken)
     {
         var tenantUserRoleGrants = await _tenantUserRoleGrantRepository.GetGrantsWithDetails();
-        return _mapper.Map<List<TenantUserRoleGrantListDto>>(tenantUserRoleGrants);
+        return tenantUserRoleGrants.Select(TenantUserRoleGrantMapper.ToListItem).ToList();
     }
 }

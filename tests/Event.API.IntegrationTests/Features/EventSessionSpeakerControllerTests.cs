@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;
@@ -5,20 +6,17 @@ using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
-using Explore.Application.DTOs.EventSession;
+using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionSpeaker;
-using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Commands;
+using Explore.Application.Features.EventSessionSpeakers.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -50,6 +48,22 @@ public sealed class EventSessionSpeakerControllerTests
     }
 
     [Test]
+    public async Task Controller_ConsumesOnlyExactSpeakerOperationPortsAndAssembler()
+    {
+        var parameters = typeof(EventSessionSpeakerController).GetConstructors().Single()
+            .GetParameters().Select(parameter => parameter.ParameterType);
+
+        await Assert.That(parameters).IsEquivalentTo(new[]
+        {
+            typeof(IQueryHandler<GetSpeakersBySessionQuery, List<EventSessionSpeakerListDto>>),
+            typeof(ICommandHandler<CreateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<DeleteEventSessionSpeakerCommand, bool>),
+            typeof(IResourceAssembler<EventSessionSpeakerDto, EventSessionSpeakerListDto>)
+        });
+    }
+
+    [Test]
     public async Task DetailEditLink_UsesOnlyRelationshipIdForCanonicalPatchRoute()
     {
         var assignmentId = Guid.NewGuid();
@@ -61,8 +75,7 @@ public sealed class EventSessionSpeakerControllerTests
             EventId = Guid.NewGuid(),
             TenantId = Guid.NewGuid(),
             ActorId = Guid.NewGuid()
-        }, null)
-            .Single(link => link.Rel == LinkRelations.Edit);
+        }, null).Single(link => link.Rel == LinkRelations.Edit);
 
         await Assert.That(edit.RouteName).IsEqualTo(RouteNames.UpdateEventSessionSpeaker);
         await Assert.That(edit.Method).IsEqualTo(HttpMethods.Patch);
@@ -93,95 +106,59 @@ public sealed class EventSessionSpeakerControllerTests
     }
 
     [Test]
-    public async Task Create_StampsSessionAndTenantContextFromRouteAuthorizationContext()
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("not-a-stamp")]
+    [Arguments("01900000-0000-7000-8000-000000000099")]
+    public async Task Update_WhenIfMatchIsInvalid_ReturnsValidationProblemDetails(string? ifMatch)
     {
-        var eventSessionId = Guid.NewGuid();
-        var eventId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
-        var actorId = Guid.NewGuid();
-        var clientSuppliedSessionId = Guid.NewGuid();
-
-        using var mediator = new EventSessionSpeakerMediatorStub(request => request switch
+        await using var factory = new AuthenticatedWebApplicationFactory();
+        using var client = factory.CreateClient();
+        using var request = CreateAuthenticatedJsonRequest(
+            HttpMethod.Patch,
+            $"/api/eventsessionspeaker/management/{Guid.NewGuid():D}",
+            new UpdateEventSessionSpeakerDto
+            {
+                Actor = new UpdateEventSessionSpeakerActorDto { ActorId = Guid.NewGuid() }
+            });
+        if (ifMatch is not null)
         {
-            GetEventSessionAuthorizationContextRequest contextRequest => new EventSessionAuthorizationContextDto
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        using var response = await client.SendAsync(request);
+
+        await ProblemDetailsAssertions.AssertProblemDetailsAsync(
+            response,
+            HttpStatusCode.BadRequest,
+            "Event session speaker validation failed");
+    }
+
+    [Test]
+    public async Task Update_InvalidIfMatchRejectsBeforeExactNativePortIngress()
+    {
+        var controller = new EventSessionSpeakerController(
+            null!,
+            null!,
+            new RejectDispatchUpdatePort(),
+            null!,
+            null!)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var action = await controller.Update(
+            Guid.CreateVersion7(),
+            new UpdateEventSessionSpeakerDto
             {
-                Id = contextRequest.EventSessionId,
-                EventId = eventId,
-                TenantId = tenantId
+                Actor = new UpdateEventSessionSpeakerActorDto { ActorId = Guid.CreateVersion7() }
             },
-            CreateEventSessionSpeakerCommand => BaseCommandResponse.Success(
-                Guid.NewGuid(),
-                "Speaker assignment created successfully."),
-            _ => throw new InvalidOperationException($"Unexpected request: {request.GetType().Name}")
-        });
-        await using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedJsonRequest(
-            HttpMethod.Post,
-            $"/api/eventsessionspeaker/management/by-session/{eventSessionId:D}",
-            new CreateEventSessionSpeakerDto
-            {
-                ActorId = actorId,
-                EventSessionId = clientSuppliedSessionId
-            });
+            "01900000-0000-7000-8000-000000000099",
+            CancellationToken.None);
 
-        var response = await client.SendAsync(request);
-
-        await Assert.That(response.StatusCode).IsEqualTo(System.Net.HttpStatusCode.Created);
-        var command = mediator.LastRequest as CreateEventSessionSpeakerCommand;
-        await Assert.That(command).IsNotNull();
-        await Assert.That(command!.EventId).IsEqualTo(eventId);
-        await Assert.That(command.TenantId).IsEqualTo(tenantId);
-        await Assert.That(command.SpeakerDto.ActorId).IsEqualTo(actorId);
-        await Assert.That(command.SpeakerDto.EventSessionId).IsEqualTo(eventSessionId);
-        await Assert.That(command.SpeakerDto.EventSessionId).IsNotEqualTo(clientSuppliedSessionId);
-    }
-
-    [Test]
-    public async Task Update_WhenIfMatchIsMissing_ReturnsValidationProblemDetails()
-    {
-        using var mediator = new EventSessionSpeakerMediatorStub(_ => throw new InvalidOperationException("Mediator should not run when If-Match is missing."));
-        await using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedJsonRequest(
-            HttpMethod.Patch,
-            $"/api/eventsessionspeaker/management/{Guid.NewGuid():D}",
-            new UpdateEventSessionSpeakerDto
-            {
-                Actor = new UpdateEventSessionSpeakerActorDto { ActorId = Guid.NewGuid() }
-            });
-
-        var response = await client.SendAsync(request);
-
-        await ProblemDetailsAssertions.AssertProblemDetailsAsync(
-            response,
-            System.Net.HttpStatusCode.BadRequest,
-            "Event session speaker validation failed");
-        await Assert.That(mediator.LastRequest).IsNull();
-    }
-
-    [Test]
-    public async Task Update_WhenIfMatchIsUnquoted_ReturnsValidationProblemDetails()
-    {
-        using var mediator = new EventSessionSpeakerMediatorStub(_ => throw new InvalidOperationException("Mediator should not run when If-Match is unquoted."));
-        await using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedJsonRequest(
-            HttpMethod.Patch,
-            $"/api/eventsessionspeaker/management/{Guid.NewGuid():D}",
-            new UpdateEventSessionSpeakerDto
-            {
-                Actor = new UpdateEventSessionSpeakerActorDto { ActorId = Guid.NewGuid() }
-            });
-        request.Headers.TryAddWithoutValidation("If-Match", Guid.NewGuid().ToString("D"));
-
-        var response = await client.SendAsync(request);
-
-        await ProblemDetailsAssertions.AssertProblemDetailsAsync(
-            response,
-            System.Net.HttpStatusCode.BadRequest,
-            "Event session speaker validation failed");
-        await Assert.That(mediator.LastRequest).IsNull();
+        var result = action.Result as ObjectResult;
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result!.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
     }
 
     private static async Task AssertRoute(
@@ -201,20 +178,6 @@ public sealed class EventSessionSpeakerControllerTests
         await Assert.That(action.GetCustomAttribute<AuthorizeAttribute>()).IsNotNull();
     }
 
-    private static WebApplicationFactory<Program> CreateFactoryWithMediator(IMediator mediator)
-    {
-        var factory = new AuthenticatedWebApplicationFactory();
-
-        return factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
-            });
-        });
-    }
-
     private static HttpRequestMessage CreateAuthenticatedJsonRequest<TValue>(
         HttpMethod method,
         string url,
@@ -228,44 +191,12 @@ public sealed class EventSessionSpeakerControllerTests
         return request;
     }
 
-    private sealed class EventSessionSpeakerMediatorStub(Func<object, object> responseFactory) : IMediator, IDisposable
+    private sealed class RejectDispatchUpdatePort
+        : ICommandHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>
     {
-        public object? LastRequest { get; private set; }
-
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            object response = responseFactory(request);
-            return Task.FromResult((TResponse)response);
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-        {
-            LastRequest = request;
-            return Task.CompletedTask;
-        }
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            return Task.FromResult<object?>(responseFactory(request));
-        }
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public void Dispose()
-        {
-        }
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            UpdateEventSessionSpeakerCommand command,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Invalid If-Match reached the native update operation ingress.");
     }
 }

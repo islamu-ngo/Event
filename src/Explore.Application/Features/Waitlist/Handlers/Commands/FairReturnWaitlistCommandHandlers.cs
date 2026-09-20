@@ -1,13 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Waitlist;
 using Explore.Application.DTOs.Waitlist;
 using Explore.Application.Features.Waitlist.Requests.Commands;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Waitlist.Handlers.Commands;
 
@@ -17,22 +17,23 @@ public sealed class JoinFairReturnWaitlistCommandHandler(
     ICurrentUserService currentUser,
     IPaidCheckoutActivationService activation,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         JoinFairReturnWaitlistCommand,
         FairReturnWaitlistDto?>
 {
-    public async Task<FairReturnWaitlistDto?> Handle(
-        JoinFairReturnWaitlistCommand request,
+    public async Task<FairReturnWaitlistDto?> ExecuteAsync(
+        JoinFairReturnWaitlistCommand command,
         CancellationToken cancellationToken)
     {
         Guid? userId = currentUser.UserId;
         FairReturnWaitlistAccessContext? access =
             await repository.GetAccessAsync(
                 tenantContext.TenantId,
-                request.EventId,
-                request.RegistrationOrderId,
-                request.RegistrationOrderLineId,
+                command.EventId,
+                command.RegistrationOrderId,
+                command.RegistrationOrderLineId,
                 cancellationToken);
+
         if (!currentUser.IsAuthenticated
             || !userId.HasValue
             || access is null
@@ -131,12 +132,12 @@ public sealed class LeaveFairReturnWaitlistCommandHandler(
     ICurrentUserService currentUser,
     IPaidCheckoutActivationService activation,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         LeaveFairReturnWaitlistCommand,
         FairReturnWaitlistDto?>
 {
-    public async Task<FairReturnWaitlistDto?> Handle(
-        LeaveFairReturnWaitlistCommand request,
+    public async Task<FairReturnWaitlistDto?> ExecuteAsync(
+        LeaveFairReturnWaitlistCommand command,
         CancellationToken cancellationToken)
     {
         FairReturnWaitlistAccessContext? access =
@@ -145,9 +146,9 @@ public sealed class LeaveFairReturnWaitlistCommandHandler(
                     repository,
                     activation,
                     tenantContext.TenantId,
-                    request.EventId,
-                    request.RegistrationOrderId,
-                    request.RegistrationOrderLineId,
+                    command.EventId,
+                    command.RegistrationOrderId,
+                    command.RegistrationOrderLineId,
                     currentUser,
                     cancellationToken);
         if (access?.Entry is null)
@@ -181,12 +182,12 @@ public sealed class AcceptFairReturnOfferCommandHandler(
     ICurrentUserService currentUser,
     IPaidCheckoutActivationService activation,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         AcceptFairReturnOfferCommand,
         FairReturnWaitlistDto?>
 {
-    public async Task<FairReturnWaitlistDto?> Handle(
-        AcceptFairReturnOfferCommand request,
+    public async Task<FairReturnWaitlistDto?> ExecuteAsync(
+        AcceptFairReturnOfferCommand command,
         CancellationToken cancellationToken)
     {
         FairReturnWaitlistAccessContext? access =
@@ -195,12 +196,12 @@ public sealed class AcceptFairReturnOfferCommandHandler(
                     repository,
                     activation,
                     tenantContext.TenantId,
-                    request.EventId,
-                    request.RegistrationOrderId,
-                    request.RegistrationOrderLineId,
+                    command.EventId,
+                    command.RegistrationOrderId,
+                    command.RegistrationOrderLineId,
                     currentUser,
                     cancellationToken);
-        if (access?.Offer?.Id != request.OfferId
+        if (access?.Offer?.Id != command.OfferId
             || access.Binding is null
             || !await repository
                 .HasReplacementSettlementAsync(
@@ -217,7 +218,7 @@ public sealed class AcceptFairReturnOfferCommandHandler(
                         WaitlistReplacementFinalizeRequest(
                             access.Order.TenantId,
                             access.Order.EventId,
-                            request.OfferId,
+                            command.OfferId,
                             timeProvider.GetUtcNow()
                                 .UtcDateTime),
                     cancellationToken);
@@ -242,12 +243,12 @@ public sealed class WithdrawFairReturnSupplyCommandHandler(
     ICurrentUserService currentUser,
     IPaidCheckoutActivationService activation,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         WithdrawFairReturnSupplyCommand,
         FairReturnWaitlistDto?>
 {
-    public async Task<FairReturnWaitlistDto?> Handle(
-        WithdrawFairReturnSupplyCommand request,
+    public async Task<FairReturnWaitlistDto?> ExecuteAsync(
+        WithdrawFairReturnSupplyCommand command,
         CancellationToken cancellationToken)
     {
         FairReturnWaitlistAccessContext? access =
@@ -256,12 +257,12 @@ public sealed class WithdrawFairReturnSupplyCommandHandler(
                     repository,
                     activation,
                     tenantContext.TenantId,
-                    request.EventId,
-                    request.RegistrationOrderId,
-                    request.RegistrationOrderLineId,
+                    command.EventId,
+                    command.RegistrationOrderId,
+                    command.RegistrationOrderLineId,
                     currentUser,
                     cancellationToken);
-        if (access?.Supply?.Id != request.SupplyId)
+        if (access?.Supply?.Id != command.SupplyId)
         {
             return null;
         }
@@ -270,7 +271,7 @@ public sealed class WithdrawFairReturnSupplyCommandHandler(
                 new FairReturnWithdrawalRequest(
                     access.Order.TenantId,
                     access.Order.EventId,
-                    request.SupplyId,
+                    command.SupplyId,
                     timeProvider.GetUtcNow()
                         .UtcDateTime),
                 cancellationToken);

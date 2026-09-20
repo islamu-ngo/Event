@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -14,13 +9,12 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Domain.ValueObjects;
 using Explore.Domain.Services.Scheduling;
-using MediatR;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
 
-public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionCommandHandler : ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly IEventRepository _eventRepository;
@@ -37,7 +31,6 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
-    private readonly IMapper _mapper;
 
     public CreateEventSessionCommandHandler(
         IEventSessionRepository eventSessionRepository,
@@ -54,8 +47,7 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
         IEventDayRepository eventDayRepository,
         IStorageObjectRepository storageObjectRepository,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService,
-        IMapper mapper)
+        EventLocationAttachmentService eventLocationAttachmentService)
     {
         _eventSessionRepository = eventSessionRepository;
         _eventRepository = eventRepository;
@@ -72,10 +64,9 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
         _storageObjectRepository = storageObjectRepository;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventSessionDtoValidator(
             _eventRepository,
@@ -112,9 +103,26 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
                 "Event session creation failed.");
         }
 
-        var eventSession = _mapper.Map<EventSession>(request.EventSessionDto);
-        eventSession.CurrentAudienceAttendees = 0;
-        eventSession.TenantId = parentEvent.TenantId;
+        // Allow only client-owned business fields. Scheduling, lifecycle and template state stay handler-owned.
+        var input = request.EventSessionDto;
+        var eventSession = new EventSession(EventSessionStatusEnum.Draft)
+        {
+            EventId = input.EventId,
+            Event = null!,
+            Tenant = null!,
+            TenantId = parentEvent.TenantId,
+            LocationId = input.LocationId,
+            RoomId = input.RoomId,
+            FeaturedImageId = input.FeaturedImageId,
+            SortOrder = input.SortOrder,
+            Title = input.Title,
+            EventSessionKindId = input.EventSessionKindId,
+            Description = input.Description,
+            Slug = input.Slug,
+            MaxAudienceAttendees = input.MaxAudienceAttendees,
+            RegistrationModeId = input.RegistrationModeId,
+            CurrentAudienceAttendees = 0
+        };
 
         // Populate cached local projection fields via the single authorized write path on EventSession.
         // Handlers never touch LocalStart*/LocalEnd* directly; the aggregate method consumes the calculator.

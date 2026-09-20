@@ -21,7 +21,7 @@ using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -92,15 +92,35 @@ public class EventLifecycleController : EventControllerBase
             "Event approval-publication conflict.",
             EventPublicationExecutor.ConcurrencyConflictCode);
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> _createHandler;
+    private readonly ICommandHandler<ImportEventCommand, BaseCommandResponse<Guid>> _importHandler;
+    private readonly ICommandHandler<PublishEventCommand, BaseCommandResponse<Guid>> _publishHandler;
+    private readonly ICommandHandler<ApprovePublishEventCommand, BaseCommandResponse<Guid>> _approvePublishHandler;
+    private readonly ICommandHandler<UpdateEventCommand, BaseCommandResponse<Guid>> _updateHandler;
+    private readonly ICommandHandler<ArchiveEventCommand, BaseCommandResponse<Guid>> _archiveHandler;
+    private readonly ICommandHandler<CancelEventCommand, BaseCommandResponse<Guid>> _cancelHandler;
+    private readonly ICommandHandler<DeleteEventCommand, bool> _deleteHandler;
     private readonly ITenantContext _tenantContext;
 
-
     public EventLifecycleController(
-        IMediator mediator,
+        ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createHandler,
+        ICommandHandler<ImportEventCommand, BaseCommandResponse<Guid>> importHandler,
+        ICommandHandler<PublishEventCommand, BaseCommandResponse<Guid>> publishHandler,
+        ICommandHandler<ApprovePublishEventCommand, BaseCommandResponse<Guid>> approvePublishHandler,
+        ICommandHandler<UpdateEventCommand, BaseCommandResponse<Guid>> updateHandler,
+        ICommandHandler<ArchiveEventCommand, BaseCommandResponse<Guid>> archiveHandler,
+        ICommandHandler<CancelEventCommand, BaseCommandResponse<Guid>> cancelHandler,
+        ICommandHandler<DeleteEventCommand, bool> deleteHandler,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _createHandler = createHandler;
+        _importHandler = importHandler;
+        _publishHandler = publishHandler;
+        _approvePublishHandler = approvePublishHandler;
+        _updateHandler = updateHandler;
+        _archiveHandler = archiveHandler;
+        _cancelHandler = cancelHandler;
+        _deleteHandler = deleteHandler;
         _tenantContext = tenantContext;
     }
 
@@ -122,7 +142,7 @@ public class EventLifecycleController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateEventDraftRequestDto draft, CancellationToken cancellationToken = default)
     {
         var command = new CreateEventCommand { EventDto = draft.ToCreateEventDto() };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -147,7 +167,7 @@ public class EventLifecycleController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Import([FromBody] ImportEventRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ImportEventCommand
+        var response = await _importHandler.ExecuteAsync(new ImportEventCommand
         {
             Request = request,
             TenantId = _tenantContext.TenantId
@@ -181,7 +201,7 @@ public class EventLifecycleController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Publish(Guid id, [FromBody] PublishEventRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new PublishEventCommand
+        var response = await _publishHandler.ExecuteAsync(new PublishEventCommand
         {
             Id = id,
             Request = request
@@ -219,7 +239,7 @@ public class EventLifecycleController : EventControllerBase
         [FromBody] PublishEventRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ApprovePublishEventCommand
+        var response = await _approvePublishHandler.ExecuteAsync(new ApprovePublishEventCommand
         {
             Id = id,
             Request = request
@@ -264,7 +284,7 @@ public class EventLifecycleController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             UpdateEventDto = updateDto
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -293,7 +313,7 @@ public class EventLifecycleController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Archive(Guid id, [FromBody] ArchiveEventRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ArchiveEventCommand
+        var response = await _archiveHandler.ExecuteAsync(new ArchiveEventCommand
         {
             Id = id,
             Request = request
@@ -326,7 +346,7 @@ public class EventLifecycleController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Cancel(Guid id, [FromBody] CancelEventRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CancelEventCommand
+        var response = await _cancelHandler.ExecuteAsync(new CancelEventCommand
         {
             Id = id,
             Request = request
@@ -364,7 +384,7 @@ public class EventLifecycleController : EventControllerBase
         }
 
         var command = new DeleteEventCommand { Id = id, UserId = userId };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteHandler.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

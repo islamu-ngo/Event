@@ -8,7 +8,7 @@ using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using static Explore.Application.Features.RegistrationProviders.Commands.RegistrationProviderManagementHandlerHelpers;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
@@ -22,7 +22,7 @@ public sealed record LaunchNativeRegistrationAttemptCommand(
     Guid FormId,
     Guid FormVersionId,
     Guid? BindingId = null,
-    Guid? SupersededAttemptId = null) : IRequest<NativeRegistrationAttemptResult>;
+    Guid? SupersededAttemptId = null) : ICommand<NativeRegistrationAttemptResult>;
 
 public sealed record LaunchRegistrationProviderAttemptCommand(
     Guid TenantId,
@@ -33,7 +33,7 @@ public sealed record LaunchRegistrationProviderAttemptCommand(
     Guid BindingId,
     Guid FormId,
     Guid FormVersionId,
-    Guid? SupersededAttemptId = null) : IRequest<RegistrationProviderAttemptResult>;
+    Guid? SupersededAttemptId = null) : ICommand<RegistrationProviderAttemptResult>;
 
 public sealed record SubmitNativeRegistrationAttemptCommand(
     Guid TenantId,
@@ -43,7 +43,7 @@ public sealed record SubmitNativeRegistrationAttemptCommand(
     Guid AttemptId,
     string? AttemptCapabilityToken,
     string? IdempotencyKey,
-    IReadOnlyList<RegistrationSubmissionAnswerInput> Answers) : IRequest<NativeRegistrationSubmissionResult>;
+    IReadOnlyList<RegistrationSubmissionAnswerInput> Answers) : ICommand<NativeRegistrationSubmissionResult>;
 
 public sealed record NativeRegistrationAttemptResult(
     bool Success,
@@ -131,9 +131,9 @@ public sealed class LaunchNativeRegistrationAttemptCommandHandler(
     IRegistrationFinalizationRepository finalization,
     IGuestCapabilityTokenService capabilities,
     TimeProvider timeProvider)
-    : IRequestHandler<LaunchNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
+    : ICommandHandler<LaunchNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>
 {
-    public async Task<NativeRegistrationAttemptResult> Handle(
+    public async Task<NativeRegistrationAttemptResult> ExecuteAsync(
         LaunchNativeRegistrationAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -266,9 +266,9 @@ public sealed class LaunchRegistrationProviderAttemptCommandHandler(
     IRegistrationFinalizationRepository finalization,
     IGuestCapabilityTokenService capabilities,
     TimeProvider timeProvider)
-    : IRequestHandler<LaunchRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
+    : ICommandHandler<LaunchRegistrationProviderAttemptCommand, RegistrationProviderAttemptResult>
 {
-    public async Task<RegistrationProviderAttemptResult> Handle(
+    public async Task<RegistrationProviderAttemptResult> ExecuteAsync(
         LaunchRegistrationProviderAttemptCommand request,
         CancellationToken cancellationToken)
     {
@@ -390,9 +390,9 @@ public sealed class SubmitNativeRegistrationAttemptCommandHandler(
     IGuestCapabilityTokenService capabilities,
     IRegistrationProviderRegistry providerRegistry,
     TimeProvider timeProvider)
-    : IRequestHandler<SubmitNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
+    : ICommandHandler<SubmitNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>
 {
-    public async Task<NativeRegistrationSubmissionResult> Handle(
+    public async Task<NativeRegistrationSubmissionResult> ExecuteAsync(
         SubmitNativeRegistrationAttemptCommand request,
         CancellationToken cancellationToken)
     {

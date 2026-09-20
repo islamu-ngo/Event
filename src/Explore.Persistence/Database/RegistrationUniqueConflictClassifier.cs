@@ -74,7 +74,7 @@ internal static class RegistrationUniqueConflictClassifier
             number,
             physicalKeyName);
 
-    private static bool IsExpectedConflict(
+    internal static bool IsExpectedConflict(
         DbUpdateException exception,
         IReadOnlyList<RelationalConstraintDescriptor> expectedConstraints)
     {

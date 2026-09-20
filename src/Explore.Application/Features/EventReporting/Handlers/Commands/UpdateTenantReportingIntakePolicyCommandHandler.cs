@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
@@ -8,7 +9,6 @@ using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -17,12 +17,12 @@ public sealed class UpdateTenantReportingIntakePolicyCommandHandler(
     IPublicationPolicyMutationBoundary mutationBoundary,
     IUnitOfWork unitOfWork,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator)
-    : IRequestHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
+    : ICommandHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>
 {
     private const string TenantContextMismatchCode = "tenant_context_mismatch";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateTenantReportingIntakePolicyCommand request,
         CancellationToken cancellationToken)
     {
@@ -80,7 +80,7 @@ public sealed class UpdateTenantReportingIntakePolicyCommandHandler(
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
             foreach (SettingChangedNotification notification in mutation.DeferredNotifications)
             {
-                await mediator.Publish(notification, CancellationToken.None);
+                await notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
         }
 

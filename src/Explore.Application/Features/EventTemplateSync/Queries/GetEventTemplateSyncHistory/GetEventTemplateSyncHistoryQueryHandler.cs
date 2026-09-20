@@ -2,13 +2,13 @@ using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
 
 public sealed class GetEventTemplateSyncHistoryQueryHandler
-    : IRequestHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>
+    : IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>
 {
     private readonly IAuditLogRepository _auditLogRepository;
 
@@ -17,7 +17,7 @@ public sealed class GetEventTemplateSyncHistoryQueryHandler
         _auditLogRepository = auditLogRepository;
     }
 
-    public async Task<PaginatedResult<EventTemplateSyncHistoryItemDto>> Handle(
+    public async Task<PaginatedResult<EventTemplateSyncHistoryItemDto>> QueryAsync(
         GetEventTemplateSyncHistoryQuery request,
         CancellationToken cancellationToken)
     {

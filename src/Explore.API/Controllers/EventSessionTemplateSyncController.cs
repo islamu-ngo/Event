@@ -7,13 +7,13 @@ using Explore.API.Hateoas.Resources;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.Features.EventSessionTemplateSync.Commands.ApplyEventSessionTemplateSync;
 using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;
 using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateSyncHistory;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -33,20 +33,26 @@ public sealed class EventSessionTemplateSyncController : EventControllerBase
         "Event session template sync validation failed",
         "Event session template diff computation failed.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<ApplyEventSessionTemplateSyncCommand, BaseCommandResponse<TemplateSyncOutcomeDto>> _applyHandler;
+    private readonly IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<TemplateDiffDto>> _getDiffHandler;
+    private readonly IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> _getHistoryHandler;
     private readonly IHateoasAuthorizationEvaluator _authorizationEvaluator;
     private readonly IHateoasLinkGenerator _linkGenerator;
     private readonly ILinkPolicy<EventSessionTemplateSyncResource> _syncLinkPolicy;
     private readonly ITenantContext _tenantContext;
 
     public EventSessionTemplateSyncController(
-        IMediator mediator,
+        ICommandHandler<ApplyEventSessionTemplateSyncCommand, BaseCommandResponse<TemplateSyncOutcomeDto>> applyHandler,
+        IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<TemplateDiffDto>> getDiffHandler,
+        IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> getHistoryHandler,
         IHateoasAuthorizationEvaluator authorizationEvaluator,
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<EventSessionTemplateSyncResource> syncLinkPolicy,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _applyHandler = applyHandler;
+        _getDiffHandler = getDiffHandler;
+        _getHistoryHandler = getHistoryHandler;
         _authorizationEvaluator = authorizationEvaluator;
         _linkGenerator = linkGenerator;
         _syncLinkPolicy = syncLinkPolicy;
@@ -68,7 +74,7 @@ public sealed class EventSessionTemplateSyncController : EventControllerBase
         [FromQuery(Name = "templateVersion")] int templateVersion,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _getDiffHandler.QueryAsync(
             new GetEventSessionTemplateDiffQuery(sessionId, templateVersion),
             cancellationToken);
 
@@ -130,7 +136,7 @@ public sealed class EventSessionTemplateSyncController : EventControllerBase
         [FromBody] EventSessionTemplateSyncApplyRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _applyHandler.ExecuteAsync(
             new ApplyEventSessionTemplateSyncCommand(sessionId, request.Plan, request.BaseProvenanceVersion),
             cancellationToken);
 
@@ -152,7 +158,7 @@ public sealed class EventSessionTemplateSyncController : EventControllerBase
         [FromQuery] TemplateSyncHistoryQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _getHistoryHandler.QueryAsync(
             new GetEventSessionTemplateSyncHistoryQuery(sessionId, query.Page, query.PageSize),
             cancellationToken);
 

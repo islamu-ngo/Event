@@ -9,18 +9,18 @@ using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 public class UnlockSettingCommandHandler
-    : IRequestHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAdminContext _adminContext;
     private readonly ICerbosConfigResolver? _cerbosConfigResolver;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly ILogger<UnlockSettingCommandHandler> _logger;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
@@ -32,7 +32,7 @@ public class UnlockSettingCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAdminContext adminContext,
-        IMediator mediator,
+        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
         ILogger<UnlockSettingCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
@@ -45,7 +45,7 @@ public class UnlockSettingCommandHandler
         _currentUserService = currentUserService;
         _adminContext = adminContext;
         _cerbosConfigResolver = cerbosConfigResolver;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
         _logger = logger;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
@@ -53,7 +53,7 @@ public class UnlockSettingCommandHandler
         _visitorSettings = visitorSettings;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UnlockSettingCommand request, CancellationToken cancellationToken)
     {
         // Validate key exists
@@ -87,7 +87,7 @@ public class UnlockSettingCommandHandler
             var result = await _visitorSettings.ApplyAsync(
                 [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
                     VisitorAccessSettingMutationKind.SetLock, IsLocked: false)], actorId, cancellationToken);
-            return await result.CompleteAsync(_resolver, _mediator, request.Scope, scopeId);
+            return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, scopeId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
@@ -98,7 +98,7 @@ public class UnlockSettingCommandHandler
                 actorUserId: actorId, cancellationToken: cancellationToken);
             if (result.IsAccepted())
                 foreach (var notification in result.ToNotifications(actorId))
-                    await _mediator.Publish(notification, CancellationToken.None);
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             return result.ToCommandResponse(scopeId, "SMTP setting unlocked.");
         }
 
@@ -146,7 +146,7 @@ public class UnlockSettingCommandHandler
             _resolver.InvalidateCache(request.Scope, scopeId);
             foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
             {
-                await _mediator.Publish(notification, CancellationToken.None);
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
 
             return BaseCommandResponse.Success(
@@ -169,7 +169,7 @@ public class UnlockSettingCommandHandler
             "Setting unlocked: {SettingKey} at {Scope} scope. Actor: {ActorId}",
             request.Key, request.Scope, actorId);
 
-        await _mediator.Publish(new SettingChangedNotification(
+        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
             request.Key, null, null, unlockSource,
             _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
 

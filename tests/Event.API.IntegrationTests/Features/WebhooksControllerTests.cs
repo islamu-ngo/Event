@@ -17,8 +17,8 @@ using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Infrastructure.Configuration;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -35,7 +35,55 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class WebhooksControllerTests
 {
     private readonly Guid _tenantId = Guid.CreateVersion7();
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetWebhookEventTypesQuery, IReadOnlyList<WebhookEventTypeDto>> _getEventTypesHandler =
+        Substitute.For<IQueryHandler<GetWebhookEventTypesQuery, IReadOnlyList<WebhookEventTypeDto>>>();
+    private readonly IQueryHandler<GetWebhookConsumersQuery, IReadOnlyList<WebhookConsumerDto>> _getConsumersHandler =
+        Substitute.For<IQueryHandler<GetWebhookConsumersQuery, IReadOnlyList<WebhookConsumerDto>>>();
+    private readonly IQueryHandler<GetWebhookConsumerByIdQuery, WebhookConsumerDto?> _getConsumerHandler =
+        Substitute.For<IQueryHandler<GetWebhookConsumerByIdQuery, WebhookConsumerDto?>>();
+    private readonly ICommandHandler<CreateWebhookConsumerCommand, BaseCommandResponse<Guid>> _createConsumerHandler =
+        Substitute.For<ICommandHandler<CreateWebhookConsumerCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<UpdateWebhookConsumerProviderModeCommand, BaseCommandResponse<Guid>> _updateConsumerProviderModeHandler =
+        Substitute.For<ICommandHandler<UpdateWebhookConsumerProviderModeCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<RepairWebhookProviderBindingCommand, BaseCommandResponse<Guid>> _repairProviderBindingHandler =
+        Substitute.For<ICommandHandler<RepairWebhookProviderBindingCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<OpenSvixAppPortalCommand, WebhookProviderPortalAccessCommandResponse> _openSvixAppPortalHandler =
+        Substitute.For<ICommandHandler<OpenSvixAppPortalCommand, WebhookProviderPortalAccessCommandResponse>>();
+
+    private readonly IQueryHandler<GetWebhookEndpointsQuery, IReadOnlyList<WebhookEndpointDto>> _getEndpointsHandler =
+        Substitute.For<IQueryHandler<GetWebhookEndpointsQuery, IReadOnlyList<WebhookEndpointDto>>>();
+    private readonly IQueryHandler<GetWebhookEndpointByIdQuery, WebhookEndpointDto?> _getEndpointHandler =
+        Substitute.For<IQueryHandler<GetWebhookEndpointByIdQuery, WebhookEndpointDto?>>();
+    private readonly ICommandHandler<CreateWebhookEndpointCommand, BaseCommandResponse<Guid>> _createEndpointHandler =
+        Substitute.For<ICommandHandler<CreateWebhookEndpointCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<UpdateWebhookEndpointCommand, BaseCommandResponse<Guid>> _updateEndpointHandler =
+        Substitute.For<ICommandHandler<UpdateWebhookEndpointCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<ArchiveWebhookEndpointCommand, BaseCommandResponse<Guid>> _archiveEndpointHandler =
+        Substitute.For<ICommandHandler<ArchiveWebhookEndpointCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<RotateWebhookEndpointSecretCommand, BaseCommandResponse<Guid>> _rotateSecretHandler =
+        Substitute.For<ICommandHandler<RotateWebhookEndpointSecretCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<TestWebhookEndpointCommand, BaseCommandResponse<Guid>> _testEndpointHandler =
+        Substitute.For<ICommandHandler<TestWebhookEndpointCommand, BaseCommandResponse<Guid>>>();
+
+    private readonly ICommandHandler<PauseWebhookEndpointCommand, BaseCommandResponse<Guid>> _pauseEndpointHandler =
+        Substitute.For<ICommandHandler<PauseWebhookEndpointCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<ResumeWebhookEndpointCommand, BaseCommandResponse<Guid>> _resumeEndpointHandler =
+        Substitute.For<ICommandHandler<ResumeWebhookEndpointCommand, BaseCommandResponse<Guid>>>();
+
+    private readonly IQueryHandler<GetWebhookMessagesQuery, IReadOnlyList<WebhookMessageDto>> _getMessagesHandler =
+        Substitute.For<IQueryHandler<GetWebhookMessagesQuery, IReadOnlyList<WebhookMessageDto>>>();
+    private readonly IQueryHandler<GetWebhookMessageByIdQuery, WebhookMessageDto?> _getMessageHandler =
+        Substitute.For<IQueryHandler<GetWebhookMessageByIdQuery, WebhookMessageDto?>>();
+    private readonly IQueryHandler<GetWebhookMessagePayloadQuery, WebhookMessagePayloadReadResult> _getMessagePayloadHandler =
+        Substitute.For<IQueryHandler<GetWebhookMessagePayloadQuery, WebhookMessagePayloadReadResult>>();
+    private readonly IQueryHandler<GetWebhookDeliveryAttemptsQuery, IReadOnlyList<WebhookDeliveryAttemptDto>> _getDeliveryAttemptsHandler =
+        Substitute.For<IQueryHandler<GetWebhookDeliveryAttemptsQuery, IReadOnlyList<WebhookDeliveryAttemptDto>>>();
+    private readonly IQueryHandler<GetWebhookDeliveryAttemptByIdQuery, WebhookDeliveryAttemptDto?> _getDeliveryAttemptHandler =
+        Substitute.For<IQueryHandler<GetWebhookDeliveryAttemptByIdQuery, WebhookDeliveryAttemptDto?>>();
+    private readonly ICommandHandler<RetryWebhookDeliveryAttemptCommand, BaseCommandResponse<Guid>> _retryDeliveryAttemptHandler =
+        Substitute.For<ICommandHandler<RetryWebhookDeliveryAttemptCommand, BaseCommandResponse<Guid>>>();
+    private readonly ICommandHandler<RedriveIncomingWebhookCommand, BaseCommandResponse<Guid>> _redriveIncomingHandler =
+        Substitute.For<ICommandHandler<RedriveIncomingWebhookCommand, BaseCommandResponse<Guid>>>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly IWebhookOwnershipScopeResolver _ownershipScopeResolver =
         Substitute.For<IWebhookOwnershipScopeResolver>();
@@ -108,7 +156,7 @@ public sealed class WebhooksControllerTests
                 ]
             }
         ];
-        _mediator.Send(Arg.Any<GetWebhookEventTypesQuery>(), Arg.Any<CancellationToken>())
+        _getEventTypesHandler.QueryAsync(Arg.Any<GetWebhookEventTypesQuery>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController<WebhooksController>("keycloak-subject-event-types");
 
@@ -117,7 +165,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _mediator.Received(1).Send(Arg.Any<GetWebhookEventTypesQuery>(), Arg.Any<CancellationToken>());
+        await _getEventTypesHandler.Received(1).QueryAsync(Arg.Any<GetWebhookEventTypesQuery>(), Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -166,7 +214,7 @@ public sealed class WebhooksControllerTests
     public async Task RepairProviderBinding_DispatchesServerTenantAndConsumerIdentity()
     {
         var consumerId = Guid.CreateVersion7();
-        _mediator.Send(
+        _repairProviderBindingHandler.ExecuteAsync(
                 Arg.Any<RepairWebhookProviderBindingCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
@@ -185,7 +233,7 @@ public sealed class WebhooksControllerTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await _mediator.Received(1).Send(
+        await _repairProviderBindingHandler.Received(1).ExecuteAsync(
             Arg.Is<RepairWebhookProviderBindingCommand>(command =>
                 command.ConsumerId == consumerId &&
                 command.ExternalApplicationId == request.ExternalApplicationId &&
@@ -450,7 +498,7 @@ public sealed class WebhooksControllerTests
                 Items = [new HalResource<WebhookConsumerDto>(consumer)]
             }
         };
-        _mediator.Send(Arg.Any<GetWebhookConsumersQuery>(), Arg.Any<CancellationToken>())
+        _getConsumersHandler.QueryAsync(Arg.Any<GetWebhookConsumersQuery>(), Arg.Any<CancellationToken>())
             .Returns(consumers);
         _consumerAssembler.ToCollectionResource(
                 consumers,
@@ -469,7 +517,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halCollection);
-        await _mediator.Received(1).Send(
+        await _getConsumersHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookConsumersQuery>(query =>
                 query.OwnerKindId == (int)WebhookConsumerKind.Tenant &&
                 query.OwnerId == _tenantId &&
@@ -482,7 +530,7 @@ public sealed class WebhooksControllerTests
     {
         var consumer = CreateConsumerDto();
         var halResource = new HalResource<WebhookConsumerDto>(consumer);
-        _mediator.Send(Arg.Any<GetWebhookConsumerByIdQuery>(), Arg.Any<CancellationToken>())
+        _getConsumerHandler.QueryAsync(Arg.Any<GetWebhookConsumerByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns(consumer);
         _consumerAssembler.ToResource(consumer, Arg.Any<HttpContext>())
             .Returns(halResource);
@@ -493,7 +541,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halResource);
-        await _mediator.Received(1).Send(
+        await _getConsumerHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookConsumerByIdQuery>(query =>
                 query.ConsumerId == consumer.Id),
             Arg.Any<CancellationToken>());
@@ -502,7 +550,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task GetConsumer_WhenMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<GetWebhookConsumerByIdQuery>(), Arg.Any<CancellationToken>())
+        _getConsumerHandler.QueryAsync(Arg.Any<GetWebhookConsumerByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns((WebhookConsumerDto?)null);
         var controller = CreateController<WebhooksController>("keycloak-subject-consumer-missing");
 
@@ -520,7 +568,7 @@ public sealed class WebhooksControllerTests
     public async Task CreateConsumer_DispatchesTenantScopedCommandAndReturnsCreatedRoute()
     {
         var consumerId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<CreateWebhookConsumerCommand>(), Arg.Any<CancellationToken>())
+        _createConsumerHandler.ExecuteAsync(Arg.Any<CreateWebhookConsumerCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 consumerId,
                 "Webhook consumer created."));
@@ -540,7 +588,7 @@ public sealed class WebhooksControllerTests
         await Assert.That(created).IsNotNull();
         await Assert.That(created!.RouteName).IsEqualTo(RouteNames.GetWebhookConsumerById);
         await Assert.That(created.RouteValues!["consumerId"]).IsEqualTo(consumerId);
-        await _mediator.Received(1).Send(
+        await _createConsumerHandler.Received(1).ExecuteAsync(
             Arg.Is<CreateWebhookConsumerCommand>(command =>
                 command.OwnerId == _tenantId &&
                 command.ConsumerKindId == 1 &&
@@ -552,7 +600,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task CreateConsumer_WhenNameConflicts_ReturnsConflictProblem()
     {
-        _mediator.Send(Arg.Any<CreateWebhookConsumerCommand>(), Arg.Any<CancellationToken>())
+        _createConsumerHandler.ExecuteAsync(Arg.Any<CreateWebhookConsumerCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_consumer_name_conflict",
                 "Webhook consumer name is already in use.",
@@ -589,7 +637,7 @@ public sealed class WebhooksControllerTests
                 Items = [new HalResource<WebhookEndpointDto>(endpoint)]
             }
         };
-        _mediator.Send(Arg.Any<GetWebhookEndpointsQuery>(), Arg.Any<CancellationToken>())
+        _getEndpointsHandler.QueryAsync(Arg.Any<GetWebhookEndpointsQuery>(), Arg.Any<CancellationToken>())
             .Returns(endpoints);
         _endpointAssembler.ToCollectionResource(
                 endpoints,
@@ -609,7 +657,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halCollection);
-        await _mediator.Received(1).Send(
+        await _getEndpointsHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookEndpointsQuery>(query =>
                 query.OwnerKindId == (int)WebhookConsumerKind.Tenant &&
                 query.OwnerId == _tenantId &&
@@ -623,7 +671,7 @@ public sealed class WebhooksControllerTests
     {
         var endpoint = CreateEndpointDto();
         var halResource = new HalResource<WebhookEndpointDto>(endpoint);
-        _mediator.Send(Arg.Any<GetWebhookEndpointByIdQuery>(), Arg.Any<CancellationToken>())
+        _getEndpointHandler.QueryAsync(Arg.Any<GetWebhookEndpointByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns(endpoint);
         _endpointAssembler.ToResource(endpoint, Arg.Any<HttpContext>())
             .Returns(halResource);
@@ -634,7 +682,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halResource);
-        await _mediator.Received(1).Send(
+        await _getEndpointHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookEndpointByIdQuery>(query =>
                 query.EndpointId == endpoint.Id),
             Arg.Any<CancellationToken>());
@@ -643,7 +691,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task GetEndpoint_WhenMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<GetWebhookEndpointByIdQuery>(), Arg.Any<CancellationToken>())
+        _getEndpointHandler.QueryAsync(Arg.Any<GetWebhookEndpointByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns((WebhookEndpointDto?)null);
         var controller = CreateController<WebhookEndpointsController>("keycloak-subject-endpoint-missing");
 
@@ -663,7 +711,7 @@ public sealed class WebhooksControllerTests
         var consumerId = Guid.CreateVersion7();
         var endpointId = Guid.CreateVersion7();
         var eventTypeId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<CreateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _createEndpointHandler.ExecuteAsync(Arg.Any<CreateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 endpointId,
                 "Webhook endpoint created."));
@@ -687,7 +735,7 @@ public sealed class WebhooksControllerTests
         await Assert.That(created).IsNotNull();
         await Assert.That(created!.RouteName).IsEqualTo(RouteNames.GetWebhookEndpointById);
         await Assert.That(created.RouteValues!["endpointId"]).IsEqualTo(endpointId);
-        await _mediator.Received(1).Send(
+        await _createEndpointHandler.Received(1).ExecuteAsync(
             Arg.Is<CreateWebhookEndpointCommand>(command =>
                 command.ConsumerId == consumerId &&
                 command.Url == "https://integrator.example/webhooks/islamu" &&
@@ -703,7 +751,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task CreateEndpoint_WhenUrlConflicts_ReturnsConflictProblem()
     {
-        _mediator.Send(Arg.Any<CreateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _createEndpointHandler.ExecuteAsync(Arg.Any<CreateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_endpoint_url_conflict",
                 "Webhook endpoint URL is already configured for this consumer.",
@@ -733,7 +781,7 @@ public sealed class WebhooksControllerTests
     {
         var endpointId = Guid.CreateVersion7();
         var eventTypeId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<UpdateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _updateEndpointHandler.ExecuteAsync(Arg.Any<UpdateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 endpointId,
                 "Webhook endpoint updated."));
@@ -768,7 +816,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsTypeOf<BaseCommandResponse<Guid>>();
-        await _mediator.Received(1).Send(
+        await _updateEndpointHandler.Received(1).ExecuteAsync(
             Arg.Is<UpdateWebhookEndpointCommand>(command =>
                 command.EndpointId == endpointId &&
                 command.Destination!.Url == "https://integrator.example/hooks/updated" &&
@@ -788,7 +836,7 @@ public sealed class WebhooksControllerTests
     public async Task UpdateConsumerProviderMode_DispatchesGovernedTenantScopedCommandAndReturnsOk()
     {
         var consumerId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<UpdateWebhookConsumerProviderModeCommand>(), Arg.Any<CancellationToken>())
+        _updateConsumerProviderModeHandler.ExecuteAsync(Arg.Any<UpdateWebhookConsumerProviderModeCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 consumerId,
                 "Webhook consumer provider mode changed."));
@@ -811,7 +859,7 @@ public sealed class WebhooksControllerTests
 
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
-        await _mediator.Received(1).Send(
+        await _updateConsumerProviderModeHandler.Received(1).ExecuteAsync(
             Arg.Is<UpdateWebhookConsumerProviderModeCommand>(command =>
                 command.ConsumerId == consumerId &&
                 command.ProviderModeId == (int)WebhookProviderMode.Svix &&
@@ -825,7 +873,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task UpdateConsumerProviderMode_WhenConfigurationConflicts_ReturnsConflictProblem()
     {
-        _mediator.Send(Arg.Any<UpdateWebhookConsumerProviderModeCommand>(), Arg.Any<CancellationToken>())
+        _updateConsumerProviderModeHandler.ExecuteAsync(Arg.Any<UpdateWebhookConsumerProviderModeCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_consumer_configuration_conflict",
                 "Webhook consumer configuration changed.",
@@ -868,7 +916,7 @@ public sealed class WebhooksControllerTests
         var objectResult = result.Result as ObjectResult;
         await Assert.That(objectResult).IsNotNull();
         await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
-        await _mediator.DidNotReceive().Send(
+        await _updateConsumerProviderModeHandler.DidNotReceive().ExecuteAsync(
             Arg.Any<UpdateWebhookConsumerProviderModeCommand>(),
             Arg.Any<CancellationToken>());
     }
@@ -876,7 +924,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task UpdateEndpoint_WhenMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<UpdateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _updateEndpointHandler.ExecuteAsync(Arg.Any<UpdateWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_endpoint_not_found",
                 "Webhook endpoint was not found.",
@@ -916,7 +964,7 @@ public sealed class WebhooksControllerTests
     public async Task RotateEndpointSecret_DispatchesTenantScopedCommandAndReturnsOk()
     {
         var endpointId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<RotateWebhookEndpointSecretCommand>(), Arg.Any<CancellationToken>())
+        _rotateSecretHandler.ExecuteAsync(Arg.Any<RotateWebhookEndpointSecretCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 endpointId,
                 "Webhook endpoint secret rotated."));
@@ -938,7 +986,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsTypeOf<BaseCommandResponse<Guid>>();
-        await _mediator.Received(1).Send(
+        await _rotateSecretHandler.Received(1).ExecuteAsync(
             Arg.Is<RotateWebhookEndpointSecretCommand>(command =>
                 command.EndpointId == endpointId &&
                 command.NewSecretRef == "configuration:Webhooks:EndpointSecrets:integrator:v2" &&
@@ -953,7 +1001,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task RotateEndpointSecret_WhenEndpointMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<RotateWebhookEndpointSecretCommand>(), Arg.Any<CancellationToken>())
+        _rotateSecretHandler.ExecuteAsync(Arg.Any<RotateWebhookEndpointSecretCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_endpoint_not_found",
                 "Webhook endpoint was not found.",
@@ -984,7 +1032,7 @@ public sealed class WebhooksControllerTests
     {
         var endpointId = Guid.CreateVersion7();
         var messageId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<TestWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _testEndpointHandler.ExecuteAsync(Arg.Any<TestWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 messageId,
                 "Webhook endpoint test scheduled."));
@@ -997,7 +1045,7 @@ public sealed class WebhooksControllerTests
         var response = ok!.Value as BaseCommandResponse<Guid>;
         await Assert.That(response).IsNotNull();
         await Assert.That(response!.Id).IsEqualTo(messageId);
-        await _mediator.Received(1).Send(
+        await _testEndpointHandler.Received(1).ExecuteAsync(
             Arg.Is<TestWebhookEndpointCommand>(command =>
                 command.EndpointId == endpointId),
             Arg.Any<CancellationToken>());
@@ -1006,7 +1054,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task TestEndpoint_WhenEndpointMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<TestWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _testEndpointHandler.ExecuteAsync(Arg.Any<TestWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_endpoint_not_found",
                 "Webhook endpoint was not found.",
@@ -1027,7 +1075,7 @@ public sealed class WebhooksControllerTests
     public async Task DeleteEndpoint_DispatchesTenantScopedArchiveCommandAndReturnsNoContent()
     {
         var endpointId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<ArchiveWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _archiveEndpointHandler.ExecuteAsync(Arg.Any<ArchiveWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 endpointId,
                 "Webhook endpoint archived."));
@@ -1036,7 +1084,7 @@ public sealed class WebhooksControllerTests
         var result = await controller.DeleteEndpoint(endpointId, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<NoContentResult>();
-        await _mediator.Received(1).Send(
+        await _archiveEndpointHandler.Received(1).ExecuteAsync(
             Arg.Is<ArchiveWebhookEndpointCommand>(command =>
                 command.EndpointId == endpointId),
             Arg.Any<CancellationToken>());
@@ -1128,7 +1176,7 @@ public sealed class WebhooksControllerTests
     {
         var endpointId = Guid.CreateVersion7();
         var actorUserId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<PauseWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _pauseEndpointHandler.ExecuteAsync(Arg.Any<PauseWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 endpointId,
                 "Webhook endpoint paused."));
@@ -1144,7 +1192,7 @@ public sealed class WebhooksControllerTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await _mediator.Received(1).Send(
+        await _pauseEndpointHandler.Received(1).ExecuteAsync(
             Arg.Is<PauseWebhookEndpointCommand>(command =>
                 command.EndpointId == endpointId &&
                 command.ActorUserId == actorUserId &&
@@ -1179,7 +1227,7 @@ public sealed class WebhooksControllerTests
     {
         var endpointId = Guid.CreateVersion7();
         var actorUserId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<ResumeWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
+        _resumeEndpointHandler.ExecuteAsync(Arg.Any<ResumeWebhookEndpointCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 endpointId,
                 "Webhook endpoint resumed."));
@@ -1195,7 +1243,7 @@ public sealed class WebhooksControllerTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await _mediator.Received(1).Send(
+        await _resumeEndpointHandler.Received(1).ExecuteAsync(
             Arg.Is<ResumeWebhookEndpointCommand>(command =>
                 command.EndpointId == endpointId
                 && command.ActorUserId == actorUserId
@@ -1421,7 +1469,7 @@ public sealed class WebhooksControllerTests
                 Items = [new HalResource<WebhookMessageDto>(message)]
             }
         };
-        _mediator.Send(Arg.Any<GetWebhookMessagesQuery>(), Arg.Any<CancellationToken>())
+        _getMessagesHandler.QueryAsync(Arg.Any<GetWebhookMessagesQuery>(), Arg.Any<CancellationToken>())
             .Returns(messages);
         _messageAssembler.ToCollectionResource(
                 messages,
@@ -1440,7 +1488,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halCollection);
-        await _mediator.Received(1).Send(
+        await _getMessagesHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookMessagesQuery>(query =>
                 query != null &&
                 query.OwnerKindId == (int)WebhookConsumerKind.Tenant &&
@@ -1454,7 +1502,7 @@ public sealed class WebhooksControllerTests
     {
         var message = CreateMessageDto();
         var halResource = new HalResource<WebhookMessageDto>(message);
-        _mediator.Send(Arg.Any<GetWebhookMessageByIdQuery>(), Arg.Any<CancellationToken>())
+        _getMessageHandler.QueryAsync(Arg.Any<GetWebhookMessageByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns(message);
         _messageAssembler.ToResource(message, Arg.Any<HttpContext>())
             .Returns(halResource);
@@ -1465,7 +1513,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halResource);
-        await _mediator.Received(1).Send(
+        await _getMessageHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookMessageByIdQuery>(query =>
                 query != null &&
                 query.MessageId == message.Id),
@@ -1475,7 +1523,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task GetMessage_WhenMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<GetWebhookMessageByIdQuery>(), Arg.Any<CancellationToken>())
+        _getMessageHandler.QueryAsync(Arg.Any<GetWebhookMessageByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns((WebhookMessageDto?)null);
         var controller = CreateController<WebhookMessagesController>("keycloak-subject-webhook-message-missing");
 
@@ -1504,7 +1552,7 @@ public sealed class WebhooksControllerTests
             PayloadRetentionUntil = DateTime.UtcNow.AddHours(1),
             RetrievedAt = DateTime.UtcNow
         };
-        _mediator.Send(Arg.Any<GetWebhookMessagePayloadQuery>(), Arg.Any<CancellationToken>())
+        _getMessagePayloadHandler.QueryAsync(Arg.Any<GetWebhookMessagePayloadQuery>(), Arg.Any<CancellationToken>())
             .Returns(WebhookMessagePayloadReadResult.Available(payload));
         var controller = CreateController<WebhookMessagesController>("keycloak-subject-webhook-payload");
 
@@ -1513,7 +1561,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(payload);
-        await _mediator.Received(1).Send(
+        await _getMessagePayloadHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookMessagePayloadQuery>(query =>
                 query.MessageId == messageId),
             Arg.Any<CancellationToken>());
@@ -1522,7 +1570,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task GetMessagePayload_WhenOutsideTenant_ReturnsGenericNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<GetWebhookMessagePayloadQuery>(), Arg.Any<CancellationToken>())
+        _getMessagePayloadHandler.QueryAsync(Arg.Any<GetWebhookMessagePayloadQuery>(), Arg.Any<CancellationToken>())
             .Returns(WebhookMessagePayloadReadResult.NotFound());
         var controller = CreateController<WebhookMessagesController>("keycloak-subject-webhook-payload-missing");
 
@@ -1539,7 +1587,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task GetMessagePayload_WhenRetentionEnded_ReturnsGoneProblem()
     {
-        _mediator.Send(Arg.Any<GetWebhookMessagePayloadQuery>(), Arg.Any<CancellationToken>())
+        _getMessagePayloadHandler.QueryAsync(Arg.Any<GetWebhookMessagePayloadQuery>(), Arg.Any<CancellationToken>())
             .Returns(WebhookMessagePayloadReadResult.Gone());
         var controller = CreateController<WebhookMessagesController>("keycloak-subject-webhook-payload-gone");
 
@@ -1566,7 +1614,7 @@ public sealed class WebhooksControllerTests
                 Items = [new HalResource<WebhookDeliveryAttemptDto>(attempt)]
             }
         };
-        _mediator.Send(Arg.Any<GetWebhookDeliveryAttemptsQuery>(), Arg.Any<CancellationToken>())
+        _getDeliveryAttemptsHandler.QueryAsync(Arg.Any<GetWebhookDeliveryAttemptsQuery>(), Arg.Any<CancellationToken>())
             .Returns(attempts);
         _attemptAssembler.ToCollectionResource(
                 attempts,
@@ -1587,7 +1635,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halCollection);
-        await _mediator.Received(1).Send(
+        await _getDeliveryAttemptsHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookDeliveryAttemptsQuery>(query =>
                 query != null &&
                 query.OwnerKindId == (int)WebhookConsumerKind.Tenant &&
@@ -1603,7 +1651,7 @@ public sealed class WebhooksControllerTests
     {
         var attempt = CreateDeliveryAttemptDto();
         var halResource = new HalResource<WebhookDeliveryAttemptDto>(attempt);
-        _mediator.Send(Arg.Any<GetWebhookDeliveryAttemptByIdQuery>(), Arg.Any<CancellationToken>())
+        _getDeliveryAttemptHandler.QueryAsync(Arg.Any<GetWebhookDeliveryAttemptByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns(attempt);
         _attemptAssembler.ToResource(attempt, Arg.Any<HttpContext>())
             .Returns(halResource);
@@ -1614,7 +1662,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(halResource);
-        await _mediator.Received(1).Send(
+        await _getDeliveryAttemptHandler.Received(1).QueryAsync(
             Arg.Is<GetWebhookDeliveryAttemptByIdQuery>(query =>
                 query != null &&
                 query.AttemptId == attempt.Id),
@@ -1624,7 +1672,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task GetDeliveryAttempt_WhenMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<GetWebhookDeliveryAttemptByIdQuery>(), Arg.Any<CancellationToken>())
+        _getDeliveryAttemptHandler.QueryAsync(Arg.Any<GetWebhookDeliveryAttemptByIdQuery>(), Arg.Any<CancellationToken>())
             .Returns((WebhookDeliveryAttemptDto?)null);
         var controller = CreateController<WebhookMessagesController>("keycloak-subject-webhook-attempt-missing");
 
@@ -1643,7 +1691,7 @@ public sealed class WebhooksControllerTests
     {
         var attemptId = Guid.CreateVersion7();
         var retryAttemptId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<RetryWebhookDeliveryAttemptCommand>(), Arg.Any<CancellationToken>())
+        _retryDeliveryAttemptHandler.ExecuteAsync(Arg.Any<RetryWebhookDeliveryAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 retryAttemptId,
                 "Webhook delivery retry scheduled."));
@@ -1656,7 +1704,7 @@ public sealed class WebhooksControllerTests
         var response = ok!.Value as BaseCommandResponse<Guid>;
         await Assert.That(response).IsNotNull();
         await Assert.That(response!.Id).IsEqualTo(retryAttemptId);
-        await _mediator.Received(1).Send(
+        await _retryDeliveryAttemptHandler.Received(1).ExecuteAsync(
             Arg.Is<RetryWebhookDeliveryAttemptCommand>(command =>
                 command != null &&
                 command.AttemptId == attemptId),
@@ -1666,7 +1714,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task RetryDeliveryAttempt_WhenAttemptIsNotRetryable_ReturnsConflictProblem()
     {
-        _mediator.Send(Arg.Any<RetryWebhookDeliveryAttemptCommand>(), Arg.Any<CancellationToken>())
+        _retryDeliveryAttemptHandler.ExecuteAsync(Arg.Any<RetryWebhookDeliveryAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "webhook_delivery_attempt_not_retryable",
                 "Webhook delivery retry cannot be scheduled for this attempt.",
@@ -1687,7 +1735,7 @@ public sealed class WebhooksControllerTests
     public async Task RedriveIncomingWebhook_DispatchesServerTenantAndExpectedGeneration()
     {
         var messageId = Guid.CreateVersion7();
-        _mediator.Send(Arg.Any<RedriveIncomingWebhookCommand>(), Arg.Any<CancellationToken>())
+        _redriveIncomingHandler.ExecuteAsync(Arg.Any<RedriveIncomingWebhookCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(
                 messageId,
                 "Incoming webhook redrive scheduled."));
@@ -1702,7 +1750,7 @@ public sealed class WebhooksControllerTests
 
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
-        await _mediator.Received(1).Send(
+        await _redriveIncomingHandler.Received(1).ExecuteAsync(
             Arg.Is<RedriveIncomingWebhookCommand>(command =>
                 command.TenantId == _tenantId &&
                 command.IncomingWebhookMessageId == messageId &&
@@ -1714,7 +1762,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task RedriveIncomingWebhook_WhenGenerationIsStale_ReturnsConflictProblem()
     {
-        _mediator.Send(Arg.Any<RedriveIncomingWebhookCommand>(), Arg.Any<CancellationToken>())
+        _redriveIncomingHandler.ExecuteAsync(Arg.Any<RedriveIncomingWebhookCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(
                 "incoming_webhook_redrive_generation_conflict",
                 "Incoming webhook processing generation changed before redrive.",
@@ -1826,7 +1874,7 @@ public sealed class WebhooksControllerTests
             Token = "portal-token",
             ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15)
         };
-        _mediator.Send(Arg.Any<OpenSvixAppPortalCommand>(), Arg.Any<CancellationToken>())
+        _openSvixAppPortalHandler.ExecuteAsync(Arg.Any<OpenSvixAppPortalCommand>(), Arg.Any<CancellationToken>())
             .Returns(WebhookProviderPortalAccessCommandResponse.Success(
                 responseDto,
                 message: null,
@@ -1844,7 +1892,7 @@ public sealed class WebhooksControllerTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(responseDto);
-        await _mediator.Received(1).Send(
+        await _openSvixAppPortalHandler.Received(1).ExecuteAsync(
             Arg.Is<OpenSvixAppPortalCommand>(command =>
                 command.ConsumerId == consumerId &&
                 command.SessionId == "keycloak-subject-1" &&
@@ -1855,7 +1903,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task OpenSvixAppPortal_WhenConsumerMissing_ReturnsNotFoundProblem()
     {
-        _mediator.Send(Arg.Any<OpenSvixAppPortalCommand>(), Arg.Any<CancellationToken>())
+        _openSvixAppPortalHandler.ExecuteAsync(Arg.Any<OpenSvixAppPortalCommand>(), Arg.Any<CancellationToken>())
             .Returns(WebhookProviderPortalAccessCommandResponse.Failure(
                 BaseCommandResponse.Failure<WebhookProviderPortalAccessDto>(
                     "webhook_consumer_not_found",
@@ -1877,7 +1925,7 @@ public sealed class WebhooksControllerTests
     [Test]
     public async Task OpenSvixAppPortal_WhenProviderFailureRetryable_ReturnsServiceUnavailableProblem()
     {
-        _mediator.Send(Arg.Any<OpenSvixAppPortalCommand>(), Arg.Any<CancellationToken>())
+        _openSvixAppPortalHandler.ExecuteAsync(Arg.Any<OpenSvixAppPortalCommand>(), Arg.Any<CancellationToken>())
             .Returns(WebhookProviderPortalAccessCommandResponse.Failure(
                 BaseCommandResponse.Failure<WebhookProviderPortalAccessDto>(
                     "svix_provider_unavailable",
@@ -1916,7 +1964,27 @@ public sealed class WebhooksControllerTests
         // matched to the target constructor by type rather than assuming one shared arity.
         object[] pool =
         [
-            _mediator,
+            _getEventTypesHandler,
+            _getConsumersHandler,
+            _getConsumerHandler,
+            _createConsumerHandler,
+            _updateConsumerProviderModeHandler,
+            _repairProviderBindingHandler,
+            _openSvixAppPortalHandler,
+            _getEndpointsHandler,
+            _getEndpointHandler,
+            _createEndpointHandler,
+            _updateEndpointHandler,
+            _archiveEndpointHandler,
+            _rotateSecretHandler,
+            _testEndpointHandler,
+            _getMessagesHandler,
+            _getMessageHandler,
+            _getMessagePayloadHandler,
+            _getDeliveryAttemptsHandler,
+            _getDeliveryAttemptHandler,
+            _retryDeliveryAttemptHandler,
+            _redriveIncomingHandler,
             _tenantContext,
             _ownershipScopeResolver,
             _consumerAssembler,
@@ -1948,7 +2016,7 @@ public sealed class WebhooksControllerTests
                 authenticationType: "TestAuth"))
         };
 
-        return new WebhookEndpointOperationsController(_mediator)
+        return new WebhookEndpointOperationsController(_pauseEndpointHandler, _resumeEndpointHandler)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

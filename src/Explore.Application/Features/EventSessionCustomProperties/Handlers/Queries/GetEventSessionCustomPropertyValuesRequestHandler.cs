@@ -1,27 +1,24 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Queries;
 
-public class GetEventSessionCustomPropertyValuesRequestHandler : IRequestHandler<GetEventSessionCustomPropertyValuesRequest, List<EventSessionCustomPropertyValueDto>>
+public class GetEventSessionCustomPropertyValuesRequestHandler : IQueryHandler<GetEventSessionCustomPropertyValuesRequest, List<EventSessionCustomPropertyValueDto>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
-    private readonly IMapper _mapper;
 
     public GetEventSessionCustomPropertyValuesRequestHandler(
-        IEventSessionCustomPropertyRepository sessionCustomPropertyRepository,
-        IMapper mapper)
+        IEventSessionCustomPropertyRepository sessionCustomPropertyRepository)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
-        _mapper = mapper;
     }
 
-    public async Task<List<EventSessionCustomPropertyValueDto>> Handle(GetEventSessionCustomPropertyValuesRequest request, CancellationToken cancellationToken)
+    public async Task<List<EventSessionCustomPropertyValueDto>> QueryAsync(GetEventSessionCustomPropertyValuesRequest request, CancellationToken cancellationToken)
     {
         var values = await _sessionCustomPropertyRepository.GetValuesForSession(request.EventSessionId);
-        return _mapper.Map<List<EventSessionCustomPropertyValueDto>>(values);
+        return values.Select(CustomPropertyMapper.ToValue).ToList();
     }
 }

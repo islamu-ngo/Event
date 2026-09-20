@@ -1,16 +1,16 @@
 using System.Security.Cryptography;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 
 public sealed class ProbeAtprotoTransientCommandHandler(IAtprotoTransientStoreRepository store, TimeProvider clock)
-    : IRequestHandler<ProbeAtprotoTransientCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ProbeAtprotoTransientCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ProbeAtprotoTransientCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ProbeAtprotoTransientCommand request, CancellationToken cancellationToken = default)
     {
         var row = AtprotoTransientRecord.CreateHealthProbe(
             Convert.ToHexStringLower(SHA256.HashData(RandomNumberGenerator.GetBytes(32))),

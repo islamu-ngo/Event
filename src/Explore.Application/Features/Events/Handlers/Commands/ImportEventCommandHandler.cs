@@ -7,9 +7,9 @@ using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Services.Lifecycle;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
@@ -23,12 +23,12 @@ public sealed class ImportEventCommandHandler(
     IEventLifecycleReadinessEvaluator readinessEvaluator,
     TimeProvider timeProvider,
     ISettingMutationLock mutationLock,
-    IVisitorAccessCapabilityResolver visitorCapabilities) : IRequestHandler<ImportEventCommand, BaseCommandResponse<Guid>>
+    IVisitorAccessCapabilityResolver visitorCapabilities) : ICommandHandler<ImportEventCommand, BaseCommandResponse<Guid>>
 {
     private const string ValidationFailedCode = "event_import_validation_failed";
     private const string ReadinessFailedCode = "event_import_readiness_failed";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(ImportEventCommand command, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ImportEventCommand command, CancellationToken cancellationToken)
     {
         var validator = new ImportEventRequestDtoValidator();
         var validation = await validator.ValidateAsync(command.Request, cancellationToken);

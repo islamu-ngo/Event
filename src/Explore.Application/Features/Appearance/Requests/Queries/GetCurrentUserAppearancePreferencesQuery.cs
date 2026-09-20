@@ -1,8 +1,8 @@
 namespace Explore.Application.Features.Appearance.Requests.Queries;
 
 using Explore.Application.DTOs.Appearance;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public sealed record GetCurrentUserAppearancePreferencesQuery : IRequest<UserAppearancePreferencesDto>
+public sealed record GetCurrentUserAppearancePreferencesQuery : IQuery<UserAppearancePreferencesDto>
 {
 }

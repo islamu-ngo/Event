@@ -1,10 +1,10 @@
 
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Requests.Commands;
 
-public sealed record ResetLocalCredentialCommand : IRequest<LocalCredentialIssueCommandResponse>
+public sealed record ResetLocalCredentialCommand : ICommand<LocalCredentialIssueCommandResponse>
 {
     public ResetLocalCredentialCommand(
         Guid operationId, Guid localSubjectId, Guid expectedCurrentOperationId,

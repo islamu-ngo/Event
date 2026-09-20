@@ -9,10 +9,10 @@ using Explore.API.Middleware;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -24,7 +24,9 @@ namespace Explore.API.Controllers;
 [Route("api/events/{eventId:guid}")]
 [ApiController]
 public sealed class AnonymousRegistrationChallengeController(
-    IMediator mediator, ITenantContext tenant, RecyclableMemoryStreamManager streams) : ControllerBase
+    ICommandHandler<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult> issueCommandHandler,
+    ITenantContext tenant,
+    RecyclableMemoryStreamManager streams) : ControllerBase
 {
     private static readonly CommandFailurePolicy Failures = CommandFailurePolicy
         .ValidatedBy(new("anonymousRegistrationChallenge", "Invalid registration challenge", "The challenge request is invalid."))
@@ -64,7 +66,7 @@ public sealed class AnonymousRegistrationChallengeController(
         IdempotencyRequestIdentity identity = await IdempotencyRequestIdentityFactory.CreateIntendedGuestStartAsync(
             HttpContext, eventId, streams, cancellationToken);
         string digest = IdempotencyRequestIdentityFactory.ComputeGuestStartDigest(identity, tenant.TenantId, eventId, idempotencyKey);
-        AnonymousRegistrationChallengeIssueResult result = await mediator.Send(
+        AnonymousRegistrationChallengeIssueResult result = await issueCommandHandler.ExecuteAsync(
             new IssueAnonymousRegistrationChallengeCommand(eventId, digest, idempotencyKey), cancellationToken);
         if (!result.IsSuccess)
             return Failures.Map(this, result);

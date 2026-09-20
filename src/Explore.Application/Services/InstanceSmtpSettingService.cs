@@ -4,7 +4,8 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Notifications;
 
 namespace Explore.Application.Services;
 
@@ -12,16 +13,16 @@ public class InstanceSmtpSettingService : IInstanceSmtpSettingService
 {
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
-    private readonly IPublisher _publisher;
+    private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
     public InstanceSmtpSettingService(
         ISystemSettingRepository systemSettingRepository,
         IEmailDeliverySettingsWriter emailSettingsWriter,
-        IPublisher publisher)
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
         _systemSettingRepository = systemSettingRepository;
         _emailSettingsWriter = emailSettingsWriter;
-        _publisher = publisher;
+        _notificationHandlers = notificationHandlers;
     }
 
     public async Task<InstanceSmtpSettingsDto> ReadSettingsAsync()
@@ -81,7 +82,7 @@ public class InstanceSmtpSettingService : IInstanceSmtpSettingService
             actorUserId: actorUserId, cancellationToken: cancellationToken);
         result.EnsureAccepted();
         foreach (var notification in result.ToNotifications(actorUserId))
-            await _publisher.Publish(notification, CancellationToken.None);
+            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
     }
 
     private static int DeserializeInt(string? rawValue, int defaultValue)

@@ -19,6 +19,23 @@ Notifications are authenticated, user-owned, and strictly [tenant-scoped](../sec
 
 ---
 
+### Group notification preferences
+
+Administrators of a group's parent organization can manage that group's notification
+preferences, as can administrators of the current tenant and instance administrators.
+A GroupAdmin role alone does not grant permission to change these preferences.
+The available save and mute controls follow the server's HAL links, not locally
+inferred roles.
+
+Group preference reads and changes require authentication and a group participation
+in the current tenant. A missing, deleted, or foreign participation (including the
+referenced parent organization participation) is rejected, even for an instance
+administrator. A group without a parent organization remains manageable by tenant
+and instance administrators, but cannot borrow authority from an unrelated organization.
+
+This restores parent-organization administration without changing notification
+category/channel restrictions or mute behavior.
+
 ## 2. Outbox Fanout & Deduplication
 
 Event publication, ticket confirmations, and moderation alerts utilize the **Transactional Outbox Pattern** (see [Architecture & Request Flows](../getting-started/architecture-and-request-flows.md#2-write-command-flow)):

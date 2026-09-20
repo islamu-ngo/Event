@@ -2,12 +2,12 @@ using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.CustomPropertyProjection, AuthorizationActions.CustomPropertyProjections.View)]
-public sealed record GetEventCustomPropertyProjectionsForEventQuery : IRequest<BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>>, ISecureRequest
+public sealed record GetEventCustomPropertyProjectionsForEventQuery : IQuery<BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public ExposureLevel? ExposureCeiling { get; init; }

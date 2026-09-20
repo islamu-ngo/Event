@@ -1,5 +1,5 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;
-using MediatR;
 
 namespace Explore.Application.Features.EventAddOns.Requests.Commands;
 
@@ -7,7 +7,7 @@ public sealed record EventAddOnSelection(Guid CatalogItemId, int Quantity);
 
 public sealed record CreateEventAddOnCatalogDraftCommand(
     Guid EventId,
-    string CurrencyCode) : IRequest<EventAddOnCatalogDto?>;
+    string CurrencyCode) : ICommand<EventAddOnCatalogDto?>;
 
 public sealed record AddEventAddOnCatalogItemCommand(
     Guid EventId,
@@ -16,18 +16,18 @@ public sealed record AddEventAddOnCatalogItemCommand(
     long UnitPriceMinor,
     int InventoryCapacity,
     string FulfillmentDisclosure,
-    string RefundDisclosure) : IRequest<EventAddOnCatalogDto?>;
+    string RefundDisclosure) : ICommand<EventAddOnCatalogDto?>;
 
 public sealed record PublishEventAddOnCatalogCommand(
     Guid EventId,
-    DateTime PublishedAtUtc) : IRequest<EventAddOnCatalogDto?>;
+    DateTime PublishedAtUtc) : ICommand<EventAddOnCatalogDto?>;
 
 public sealed record RetireEventAddOnCatalogCommand(
     Guid EventId,
-    DateTime RetiredAtUtc) : IRequest<EventAddOnCatalogDto?>;
+    DateTime RetiredAtUtc) : ICommand<EventAddOnCatalogDto?>;
 
 public sealed record ReserveRegistrationOrderAddOnsCommand :
-    IRequest<RegistrationOrderAddOnSummaryDto?>
+    ICommand<RegistrationOrderAddOnSummaryDto?>
 {
     public ReserveRegistrationOrderAddOnsCommand(
         Guid eventId,
@@ -59,7 +59,7 @@ public sealed record FulfillRegistrationOrderAddOnCommand(
     Guid RegistrationOrderId,
     Guid RegistrationOrderAddOnLineId,
     Guid OperationId,
-    DateTime FulfilledAtUtc) : IRequest<RegistrationOrderAddOnSummaryDto?>;
+    DateTime FulfilledAtUtc) : ICommand<RegistrationOrderAddOnSummaryDto?>;
 
 public sealed record RefundRegistrationOrderAddOnCommand(
     Guid EventId,
@@ -67,4 +67,4 @@ public sealed record RefundRegistrationOrderAddOnCommand(
     Guid RegistrationOrderAddOnLineId,
     Guid OperationId,
     int Quantity,
-    DateTime AllocatedAtUtc) : IRequest<RegistrationOrderAddOnSummaryDto?>;
+    DateTime AllocatedAtUtc) : ICommand<RegistrationOrderAddOnSummaryDto?>;

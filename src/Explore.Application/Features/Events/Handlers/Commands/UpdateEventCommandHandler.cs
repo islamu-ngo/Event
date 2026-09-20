@@ -19,13 +19,13 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Services.Scheduling;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
 
-public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, BaseCommandResponse<Guid>>
+public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IAudienceAgeRepository _audienceAgeRepository;
@@ -89,7 +89,7 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, Bas
         _timeProvider = timeProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventDtoValidator(
             _audienceAgeRepository,

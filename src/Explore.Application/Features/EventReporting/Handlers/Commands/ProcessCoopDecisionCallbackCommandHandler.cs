@@ -1,5 +1,6 @@
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Models;
@@ -8,7 +9,6 @@ using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -16,9 +16,10 @@ public sealed class ProcessCoopDecisionCallbackCommandHandler(
     IEventReportRepository eventReportRepository,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
-    IMediator mediator) : IRequestHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>> executeReportDecisionCommandHandler)
+    : ICommandHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ProcessCoopDecisionCallbackCommand request,
         CancellationToken cancellationToken)
     {
@@ -72,7 +73,7 @@ public sealed class ProcessCoopDecisionCallbackCommandHandler(
             return stage.Response;
         }
 
-        var execution = await mediator.Send(new ExecuteReportDecisionCommand
+        var execution = await executeReportDecisionCommandHandler.ExecuteAsync(new ExecuteReportDecisionCommand
         {
             EventId = decision.EventId,
             ReportId = decision.ReportId,

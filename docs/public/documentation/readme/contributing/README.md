@@ -50,7 +50,7 @@ Interested in how we leverage autonomous AI agents with deterministic rigor? Rea
 
 * **[Agentic Engineering & AI Workflow](agentic-engineering.md)** — Understand our 5-stage AI lifecycle, worktree isolation, and agent governance.
 * **[Local Development Guide](local-development.md)** — Set up your developer workstation with .NET 10, Docker, and .NET Aspire.
-* **[Clean Architecture Conventions](clean-architecture.md)** — Understand domain invariants, MediatR CQRS slices, and HAL link assembly.
+* **[Clean Architecture Conventions](clean-architecture.md)** — Understand domain invariants, explicit application operations, and HAL link assembly.
 * **[TUnit Testing Conventions](tunit.md)** — Run fast, targeted unit and integration test slices with TUnit.
 * **[Clean-Room IP & Licensing](clean-room-ip-and-licensing.md)** — AGPLv3 guidelines, CLA requirements, and clean-room provenance rules.
 * **[Sponsorship & Sustainability](sponsorship.md)** — Support the project through individual donations or corporate sponsorship.

@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.Update)]
-public sealed record SetEmailDispatchGlobalRateLimitOverrideCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record SetEmailDispatchGlobalRateLimitOverrideCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public int? RateLimitPerMinute { get; init; }
     public Guid? ChangedBy { get; init; }

@@ -28,6 +28,6 @@ Before delegating an administrative area:
 ## Related Guides & Next Steps
 
 * **[Administration Web Walkthrough](admin-guide.md)** — Step-by-step console navigation guide.
-* **[Authorization & Access Control](../security-and-identity/authorization.md)** — Learn how MediatR handlers enforce role permissions.
+* **[Authorization & Access Control](../security-and-identity/authorization.md)** — Learn how application operations enforce role permissions.
 * **[Multi-Tenancy Architecture](../security-and-identity/multi-tenancy.md)** — Understand tenant boundaries and query filters.
 * **[Configuration Manifests](../configuration-and-operations/configuration-manifests.md)** — Export and import declarative tenant settings.

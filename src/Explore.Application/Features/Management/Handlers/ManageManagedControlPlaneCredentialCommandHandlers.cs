@@ -1,17 +1,17 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Management.Handlers.Commands;
 
 public sealed class RotateManagedControlPlaneCredentialCommandHandler(
     IManagedControlPlaneRegistrationRepository registrationRepository)
-    : IRequestHandler<RotateManagedControlPlaneCredentialCommand, bool>
+    : ICommandHandler<RotateManagedControlPlaneCredentialCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         RotateManagedControlPlaneCredentialCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var registration = await registrationRepository.GetCurrentAsync(cancellationToken);
         if (registration?.Status != ManagedControlPlaneRegistrationStatus.Registered
@@ -47,11 +47,11 @@ public sealed class RotateManagedControlPlaneCredentialCommandHandler(
 
 public sealed class RevokeManagedControlPlaneRegistrationCommandHandler(
     IManagedControlPlaneRegistrationRepository registrationRepository)
-    : IRequestHandler<RevokeManagedControlPlaneRegistrationCommand, bool>
+    : ICommandHandler<RevokeManagedControlPlaneRegistrationCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         RevokeManagedControlPlaneRegistrationCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var registration = await registrationRepository.GetCurrentAsync(cancellationToken);
         if (registration?.Status != ManagedControlPlaneRegistrationStatus.Registered)

@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.ActorSubscription, AuthorizationActions.ActorSubscriptions.View)]
-public sealed record GetActorSubscriptionRequest : IRequest<ActorSubscriptionDto?>, ISecureRequest
+public sealed record GetActorSubscriptionRequest : IQuery<ActorSubscriptionDto?>, ISecureRequest
 {
     public Guid TargetActorId { get; init; }
 

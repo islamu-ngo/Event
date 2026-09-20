@@ -5,8 +5,10 @@ using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Features.RegistrationForms.Handlers.Commands;
+using Explore.Application.Operations.Decorators;
+using Explore.Application.Responses;
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -16,7 +18,6 @@ using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Explore.Persistence.Seed;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -32,16 +33,16 @@ public sealed class ParticipationRequirementAttachmentRuntimeTests(
     ParticipationRequirementAttachmentRuntimeFixture fixture)
 {
     [Test]
-    public async Task RealRuntimeHostKeepsProductionMediatREfAndFallbackServices()
+    public async Task RealRuntimeHostKeepsProductionEfAndFallbackServices()
     {
         RuntimeServiceGraph graph = await fixture.GetServiceGraphAsync();
 
         await Assert.That(graph.DatabaseProvider).IsEqualTo("Npgsql.EntityFrameworkCore.PostgreSQL");
-        await Assert.That(graph.AttachHandler).IsEqualTo(typeof(AttachRegistrationRequirementCommandHandler));
+        await Assert.That(graph.AttachHandler).IsEqualTo(typeof(
+            AuthorizationCommandHandlerDecorator<AttachRegistrationRequirementCommand, BaseCommandResponse<Guid>>));
         await Assert.That(graph.Repository).IsEqualTo(typeof(ParticipationRequirementAttachmentRepository));
         await Assert.That(graph.UnitOfWork).IsEqualTo(typeof(EfCoreUnitOfWork));
         await Assert.That(graph.AuthorizationProvider).IsEqualTo(typeof(FallbackAuthorizationService));
-        await Assert.That(graph.Mediator.Namespace).IsEqualTo("MediatR");
     }
 
     [Test]
@@ -843,8 +844,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
         ExploreDbContext context = services.GetRequiredService<ExploreDbContext>();
         return new(
             context.Database.ProviderName,
-            services.GetRequiredService<IMediator>().GetType(),
-            services.GetRequiredService<IRequestHandler<
+            services.GetRequiredService<ICommandHandler<
                 AttachRegistrationRequirementCommand,
                 Explore.Application.Responses.BaseCommandResponse<Guid>>>().GetType(),
             services.GetRequiredService<IParticipationRequirementAttachmentRepository>().GetType(),
@@ -932,7 +932,6 @@ public sealed record AttachmentRuntimeScenario(
 
 public sealed record RuntimeServiceGraph(
     string? DatabaseProvider,
-    Type Mediator,
     Type AttachHandler,
     Type Repository,
     Type UnitOfWork,

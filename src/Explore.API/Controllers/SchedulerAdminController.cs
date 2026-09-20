@@ -4,13 +4,13 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.DTOs.Scheduling;
 using Explore.Application.Features.Scheduling.Requests.Commands;
 using Explore.Application.Features.Scheduling.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -44,20 +44,44 @@ public sealed class SchedulerAdminController : EventControllerBase
         "Scheduled job not found",
         "The requested scheduled job does not exist in this instance's scheduler.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetSchedulerAdminOverviewQuery, SchedulerAdminOverviewDto> _overviewHandler;
+    private readonly IQueryHandler<GetSchedulerAdminJobsQuery, IReadOnlyList<SchedulerAdminJobDto>> _jobsHandler;
+    private readonly ICommandHandler<PauseSchedulerCommand, BaseCommandResponse<string>> _pauseSchedulerHandler;
+    private readonly ICommandHandler<ResumeSchedulerCommand, BaseCommandResponse<string>> _resumeSchedulerHandler;
+    private readonly ICommandHandler<PauseSchedulerJobCommand, BaseCommandResponse<string>> _pauseJobHandler;
+    private readonly ICommandHandler<ResumeSchedulerJobCommand, BaseCommandResponse<string>> _resumeJobHandler;
+    private readonly ICommandHandler<TriggerSchedulerJobCommand, BaseCommandResponse<string>> _triggerJobHandler;
+    private readonly ICommandHandler<ResetSchedulerJobErrorStateCommand, BaseCommandResponse<string>> _resetJobErrorStateHandler;
+    private readonly ICommandHandler<InterruptSchedulerJobCommand, BaseCommandResponse<string>> _interruptJobHandler;
     private readonly ISchedulerAdminPolicy _policy;
     private readonly IResourceAssembler<SchedulerAdminOverviewDto, SchedulerAdminOverviewDto> _overviewAssembler;
     private readonly IResourceAssembler<SchedulerAdminJobDto, SchedulerAdminJobDto> _jobAssembler;
     private readonly ISchedulerAdminAuditSink _auditSink;
 
     public SchedulerAdminController(
-        IMediator mediator,
+        IQueryHandler<GetSchedulerAdminOverviewQuery, SchedulerAdminOverviewDto> overviewHandler,
+        IQueryHandler<GetSchedulerAdminJobsQuery, IReadOnlyList<SchedulerAdminJobDto>> jobsHandler,
+        ICommandHandler<PauseSchedulerCommand, BaseCommandResponse<string>> pauseSchedulerHandler,
+        ICommandHandler<ResumeSchedulerCommand, BaseCommandResponse<string>> resumeSchedulerHandler,
+        ICommandHandler<PauseSchedulerJobCommand, BaseCommandResponse<string>> pauseJobHandler,
+        ICommandHandler<ResumeSchedulerJobCommand, BaseCommandResponse<string>> resumeJobHandler,
+        ICommandHandler<TriggerSchedulerJobCommand, BaseCommandResponse<string>> triggerJobHandler,
+        ICommandHandler<ResetSchedulerJobErrorStateCommand, BaseCommandResponse<string>> resetJobErrorStateHandler,
+        ICommandHandler<InterruptSchedulerJobCommand, BaseCommandResponse<string>> interruptJobHandler,
         ISchedulerAdminPolicy policy,
         IResourceAssembler<SchedulerAdminOverviewDto, SchedulerAdminOverviewDto> overviewAssembler,
         IResourceAssembler<SchedulerAdminJobDto, SchedulerAdminJobDto> jobAssembler,
         ISchedulerAdminAuditSink auditSink)
     {
-        _mediator = mediator;
+        _overviewHandler = overviewHandler;
+        _jobsHandler = jobsHandler;
+        _pauseSchedulerHandler = pauseSchedulerHandler;
+        _resumeSchedulerHandler = resumeSchedulerHandler;
+        _pauseJobHandler = pauseJobHandler;
+        _resumeJobHandler = resumeJobHandler;
+        _triggerJobHandler = triggerJobHandler;
+        _resetJobErrorStateHandler = resetJobErrorStateHandler;
+        _interruptJobHandler = interruptJobHandler;
         _policy = policy;
         _overviewAssembler = overviewAssembler;
         _jobAssembler = jobAssembler;
@@ -81,7 +105,7 @@ public sealed class SchedulerAdminController : EventControllerBase
             return this.ToNotFoundProblem(SchedulerSurfaceDisabledProblem);
         }
 
-        var overview = await _mediator.Send(new GetSchedulerAdminOverviewQuery(), cancellationToken);
+        var overview = await _overviewHandler.QueryAsync(new GetSchedulerAdminOverviewQuery(), cancellationToken);
         var resource = await _overviewAssembler.ToResource(overview, HttpContext);
 
         return Ok(resource);
@@ -104,7 +128,7 @@ public sealed class SchedulerAdminController : EventControllerBase
             return this.ToNotFoundProblem(SchedulerSurfaceDisabledProblem);
         }
 
-        var jobs = await _mediator.Send(new GetSchedulerAdminJobsQuery(), cancellationToken);
+        var jobs = await _jobsHandler.QueryAsync(new GetSchedulerAdminJobsQuery(), cancellationToken);
         var resource = await _jobAssembler.ToCollectionResource(
             jobs,
             RouteNames.GetSchedulerAdminJobs,
@@ -129,6 +153,7 @@ public sealed class SchedulerAdminController : EventControllerBase
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
             new PauseSchedulerCommand { ConfirmationText = request?.ConfirmationText },
+            _pauseSchedulerHandler,
             SchedulerAdminAuditActions.PauseScheduler,
             jobGroup: null,
             jobName: null,
@@ -147,6 +172,7 @@ public sealed class SchedulerAdminController : EventControllerBase
     public Task<ActionResult<BaseCommandResponse<string>>> Resume(CancellationToken cancellationToken = default) =>
         ExecuteAsync(
             new ResumeSchedulerCommand(),
+            _resumeSchedulerHandler,
             SchedulerAdminAuditActions.ResumeScheduler,
             jobGroup: null,
             jobName: null,
@@ -166,7 +192,13 @@ public sealed class SchedulerAdminController : EventControllerBase
         string group,
         string name,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(new PauseSchedulerJobCommand { Group = group, Name = name }, SchedulerAdminAuditActions.PauseJob, group, name, cancellationToken);
+        ExecuteAsync(
+            new PauseSchedulerJobCommand { Group = group, Name = name },
+            _pauseJobHandler,
+            SchedulerAdminAuditActions.PauseJob,
+            group,
+            name,
+            cancellationToken);
 
     [HttpPost("jobs/{group}/{name}/resume", Name = RouteNames.ResumeSchedulerJob)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -182,7 +214,13 @@ public sealed class SchedulerAdminController : EventControllerBase
         string group,
         string name,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(new ResumeSchedulerJobCommand { Group = group, Name = name }, SchedulerAdminAuditActions.ResumeJob, group, name, cancellationToken);
+        ExecuteAsync(
+            new ResumeSchedulerJobCommand { Group = group, Name = name },
+            _resumeJobHandler,
+            SchedulerAdminAuditActions.ResumeJob,
+            group,
+            name,
+            cancellationToken);
 
     [HttpPost("jobs/{group}/{name}/trigger", Name = RouteNames.TriggerSchedulerJob)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -198,7 +236,13 @@ public sealed class SchedulerAdminController : EventControllerBase
         string group,
         string name,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(new TriggerSchedulerJobCommand { Group = group, Name = name }, SchedulerAdminAuditActions.TriggerJob, group, name, cancellationToken);
+        ExecuteAsync(
+            new TriggerSchedulerJobCommand { Group = group, Name = name },
+            _triggerJobHandler,
+            SchedulerAdminAuditActions.TriggerJob,
+            group,
+            name,
+            cancellationToken);
 
     [HttpPost("jobs/{group}/{name}/reset-error", Name = RouteNames.ResetSchedulerJobErrorState)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -214,7 +258,13 @@ public sealed class SchedulerAdminController : EventControllerBase
         string group,
         string name,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(new ResetSchedulerJobErrorStateCommand { Group = group, Name = name }, SchedulerAdminAuditActions.ResetJobErrorState, group, name, cancellationToken);
+        ExecuteAsync(
+            new ResetSchedulerJobErrorStateCommand { Group = group, Name = name },
+            _resetJobErrorStateHandler,
+            SchedulerAdminAuditActions.ResetJobErrorState,
+            group,
+            name,
+            cancellationToken);
 
     [HttpPost("jobs/{group}/{name}/interrupt", Name = RouteNames.InterruptSchedulerJob)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
@@ -230,25 +280,33 @@ public sealed class SchedulerAdminController : EventControllerBase
         string group,
         string name,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(new InterruptSchedulerJobCommand { Group = group, Name = name }, SchedulerAdminAuditActions.InterruptJob, group, name, cancellationToken);
+        ExecuteAsync(
+            new InterruptSchedulerJobCommand { Group = group, Name = name },
+            _interruptJobHandler,
+            SchedulerAdminAuditActions.InterruptJob,
+            group,
+            name,
+            cancellationToken);
 
     /// <summary>
     /// Runs one scheduler command and maps its structured refusal onto HTTP semantics. Mapping lives here so the
     /// handlers stay transport-neutral and every action reports the same status for the same refusal.
     /// </summary>
-    private async Task<ActionResult<BaseCommandResponse<string>>> ExecuteAsync(
-        IRequest<BaseCommandResponse<string>> command,
+    private async Task<ActionResult<BaseCommandResponse<string>>> ExecuteAsync<TCommand>(
+        TCommand command,
+        ICommandHandler<TCommand, BaseCommandResponse<string>> handler,
         string auditAction,
         string? jobGroup,
         string? jobName,
         CancellationToken cancellationToken)
+        where TCommand : ICommand<BaseCommandResponse<string>>
     {
         if (!_policy.IsEnabled)
         {
             return this.ToNotFoundProblem(SchedulerSurfaceDisabledProblem);
         }
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await handler.ExecuteAsync(command, cancellationToken);
 
         // Audited at the boundary, where the principal and correlation id are available, and for refusals as well
         // as successes: a denied privileged action is the one most worth having a record of.

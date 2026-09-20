@@ -8,12 +8,12 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessionLanguages.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionLanguages.Handlers.Commands;
 
-public class UpdateEventSessionLanguageCommandHandler : IRequestHandler<UpdateEventSessionLanguageCommand, BaseCommandResponse<int>>
+public class UpdateEventSessionLanguageCommandHandler : ICommandHandler<UpdateEventSessionLanguageCommand, BaseCommandResponse<int>>
 {
     private readonly IEventSessionLanguageRepository _repository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -32,7 +32,7 @@ public class UpdateEventSessionLanguageCommandHandler : IRequestHandler<UpdateEv
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<int>> Handle(UpdateEventSessionLanguageCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<int>> ExecuteAsync(UpdateEventSessionLanguageCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventSessionLanguageDtoValidator();
         var validationResult = await validator.ValidateAsync(request.EventSessionLanguageDto, cancellationToken);

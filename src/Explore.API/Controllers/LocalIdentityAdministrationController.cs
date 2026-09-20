@@ -9,9 +9,9 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -26,7 +26,11 @@ namespace Explore.API.Controllers;
 [PrivateNoStore]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class LocalIdentityAdministrationController(
-    ISender sender,
+    IQueryHandler<ListLocalIdentitiesQuery, LocalIdentityPage> listIdentitiesHandler,
+    ICommandHandler<CreateLocalIdentityCommand, LocalCredentialIssueCommandResponse> createIdentityHandler,
+    ICommandHandler<ResetLocalCredentialCommand, LocalCredentialIssueCommandResponse> resetCredentialHandler,
+    IQueryHandler<GetLocalCredentialOperationQuery, LocalCredentialOperationStatus?> getOperationHandler,
+    ICommandHandler<ReconcileLocalCredentialOperationCommand, BaseCommandResponse<Guid>> reconcileOperationHandler,
     IResourceAssembler<LocalIdentitySummary, LocalIdentitySummary> identityAssembler,
     IResourceAssembler<LocalCredentialOperationStatus, LocalCredentialOperationStatus> operationAssembler,
     IResourceAssembler<LocalCredentialIssueDto, LocalCredentialIssueDto> issueAssembler) : ControllerBase
@@ -62,7 +66,7 @@ public sealed class LocalIdentityAdministrationController(
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        LocalIdentityPage page = await sender.Send(
+        LocalIdentityPage page = await listIdentitiesHandler.QueryAsync(
             new ListLocalIdentitiesQuery(pageNumber: pageNumber, pageSize: pageSize), cancellationToken);
         var paginated = new PaginatedResult<LocalIdentitySummary>(
             items: page.Items.ToList(), totalCount: page.TotalCount,
@@ -89,7 +93,7 @@ public sealed class LocalIdentityAdministrationController(
         [FromBody] CreateLocalIdentityRequestDto body,
         CancellationToken cancellationToken = default)
     {
-        LocalCredentialIssueCommandResponse response = await sender.Send(
+        LocalCredentialIssueCommandResponse response = await createIdentityHandler.ExecuteAsync(
             new CreateLocalIdentityCommand(operationId: body.OperationId, email: body.Email,
                 firstName: body.FirstName, lastName: body.LastName), cancellationToken);
         if (!response.IsSuccess)
@@ -126,7 +130,7 @@ public sealed class LocalIdentityAdministrationController(
         Guid userId, [FromBody] ResetLocalCredentialRequestDto body,
         CancellationToken cancellationToken = default)
     {
-        LocalCredentialIssueCommandResponse response = await sender.Send(
+        LocalCredentialIssueCommandResponse response = await resetCredentialHandler.ExecuteAsync(
             new ResetLocalCredentialCommand(operationId: body.OperationId, localSubjectId: userId,
                 expectedCurrentOperationId: body.ExpectedCurrentOperationId,
                 expectedCurrentOperationConcurrencyStamp: body.ExpectedCurrentOperationConcurrencyStamp,
@@ -155,7 +159,7 @@ public sealed class LocalIdentityAdministrationController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult> GetOperation(Guid operationId, CancellationToken cancellationToken = default)
     {
-        LocalCredentialOperationStatus? operation = await sender.Send(
+        LocalCredentialOperationStatus? operation = await getOperationHandler.QueryAsync(
             new GetLocalCredentialOperationQuery(operationId: operationId), cancellationToken);
         return operation is null
             ? this.ToNotFoundProblem(MissingOperation)
@@ -176,13 +180,13 @@ public sealed class LocalIdentityAdministrationController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult> Reconcile(Guid operationId, CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<Guid> response = await sender.Send(
+        BaseCommandResponse<Guid> response = await reconcileOperationHandler.ExecuteAsync(
             new ReconcileLocalCredentialOperationCommand(operationId: operationId), cancellationToken);
         if (!response.IsSuccess)
         {
             return Failures.Map(this, response);
         }
-        LocalCredentialOperationStatus? operation = await sender.Send(
+        LocalCredentialOperationStatus? operation = await getOperationHandler.QueryAsync(
             new GetLocalCredentialOperationQuery(operationId: operationId), cancellationToken);
         return operation is null
             ? this.ToNotFoundProblem(MissingOperation)

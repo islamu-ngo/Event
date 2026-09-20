@@ -16,21 +16,21 @@ public sealed record EventListDto
 
     // Event Type
     public int EventTypeId { get; init; }
-    public required string EventTypeFullName { get; init; }
+    public required string? EventTypeFullName { get; init; }
 
     // Audience
     public int AudienceGenderId { get; init; }
-    public required string AudienceGenderFullName { get; init; }
+    public required string? AudienceGenderFullName { get; init; }
     public int AudienceAgeId { get; init; }
-    public required string AudienceAgeFullName { get; init; }
+    public required string? AudienceAgeFullName { get; init; }
     public int? AudienceAgeMinAge { get; init; }
     public int? AudienceAgeMaxAge { get; init; }
 
     // Actor (Owner - User or Organization)
     public Guid ActorId { get; init; }
-    public required string ActorDisplayName { get; init; }
+    public required string? ActorDisplayName { get; init; }
     public int ActorTypeId { get; init; }
-    public required string ActorTypeFullName { get; init; }
+    public required string? ActorTypeFullName { get; init; }
     public Guid? ActorUserId { get; init; }
     public Guid? ActorOrganizationId { get; init; }
     public Guid? ActorGroupId { get; init; }
@@ -51,13 +51,13 @@ public sealed record EventListDto
 
     // Status & Visibility
     public int EventStatusId { get; init; }
-    public required string EventStatusFullName { get; init; }
+    public required string? EventStatusFullName { get; init; }
     public int VisibilityTypeId { get; init; }
-    public required string VisibilityTypeFullName { get; init; }
+    public required string? VisibilityTypeFullName { get; init; }
 
     // Format
     public int EventFormatId { get; init; }
-    public required string EventFormatFullName { get; init; }
+    public required string? EventFormatFullName { get; init; }
 
     // Islamic Context
     public int? MadhabId { get; init; }

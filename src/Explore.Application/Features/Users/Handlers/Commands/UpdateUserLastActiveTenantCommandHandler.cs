@@ -1,13 +1,13 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Users.Requests.Commands;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Users.Handlers.Commands;
 
-public class UpdateUserLastActiveTenantCommandHandler : IRequestHandler<UpdateUserLastActiveTenantCommand, bool>
+public class UpdateUserLastActiveTenantCommandHandler : ICommandHandler<UpdateUserLastActiveTenantCommand, bool>
 {
     private readonly IUserRepository _userRepository;
     private readonly ITenantUserRepository _tenantUserRepository;
@@ -23,7 +23,7 @@ public class UpdateUserLastActiveTenantCommandHandler : IRequestHandler<UpdateUs
         _cache = cache;
     }
 
-    public async Task<bool> Handle(UpdateUserLastActiveTenantCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(UpdateUserLastActiveTenantCommand request, CancellationToken cancellationToken = default)
     {
         // 1. Verify user is actually a member of the target tenant
         var isActive = await _tenantUserRepository.IsActiveTenantUserAsync(request.TenantId, request.UserId, cancellationToken);

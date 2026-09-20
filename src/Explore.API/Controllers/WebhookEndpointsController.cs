@@ -14,7 +14,7 @@ using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -38,7 +38,13 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class WebhookEndpointsController(
-    IMediator mediator,
+    IQueryHandler<GetWebhookEndpointsQuery, IReadOnlyList<WebhookEndpointDto>> getEndpointsHandler,
+    IQueryHandler<GetWebhookEndpointByIdQuery, WebhookEndpointDto?> getEndpointHandler,
+    ICommandHandler<CreateWebhookEndpointCommand, BaseCommandResponse<Guid>> createEndpointHandler,
+    ICommandHandler<UpdateWebhookEndpointCommand, BaseCommandResponse<Guid>> updateEndpointHandler,
+    ICommandHandler<ArchiveWebhookEndpointCommand, BaseCommandResponse<Guid>> archiveEndpointHandler,
+    ICommandHandler<RotateWebhookEndpointSecretCommand, BaseCommandResponse<Guid>> rotateSecretHandler,
+    ICommandHandler<TestWebhookEndpointCommand, BaseCommandResponse<Guid>> testEndpointHandler,
     ITenantContext tenantContext,
     IResourceAssembler<WebhookEndpointDto, WebhookEndpointDto> webhookEndpointAssembler,
     IWebhookOwnershipScopeResolver webhookOwnershipScopeResolver) : WebhooksControllerBase(webhookOwnershipScopeResolver)
@@ -84,7 +90,7 @@ public sealed class WebhookEndpointsController(
         CancellationToken cancellationToken = default)
     {
         var normalizedConsumerId = consumerId == Guid.Empty ? null : consumerId;
-        var endpoints = await mediator.Send(
+        var endpoints = await getEndpointsHandler.QueryAsync(
             new GetWebhookEndpointsQuery
             {
                 OwnerKindId = ownerKindId,
@@ -112,7 +118,8 @@ public sealed class WebhookEndpointsController(
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [EndpointSummary("Get webhook endpoint")]
-    [EndpointDescription("Returns one owner-authorized outgoing webhook endpoint with subscription metadata.")]
+    [EndpointDescription("Returns an outgoing webhook endpoint by identifier with state-authorized actions.")]
+    [OutputCache(PolicyName = "LookupData")]
     [ProducesResponseType(typeof(HalResource<WebhookEndpointDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -122,7 +129,7 @@ public sealed class WebhookEndpointsController(
         Guid endpointId,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = await mediator.Send(
+        var endpoint = await getEndpointHandler.QueryAsync(
             new GetWebhookEndpointByIdQuery
             {
                 EndpointId = endpointId
@@ -154,7 +161,7 @@ public sealed class WebhookEndpointsController(
         [FromBody] CreateWebhookEndpointRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await createEndpointHandler.ExecuteAsync(
             new CreateWebhookEndpointCommand
             {
                 ConsumerId = request.ConsumerId,
@@ -196,7 +203,7 @@ public sealed class WebhookEndpointsController(
         [FromBody] UpdateWebhookEndpointRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await updateEndpointHandler.ExecuteAsync(
             new UpdateWebhookEndpointCommand
             {
                 EndpointId = endpointId,
@@ -229,7 +236,7 @@ public sealed class WebhookEndpointsController(
         Guid endpointId,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await archiveEndpointHandler.ExecuteAsync(
             new ArchiveWebhookEndpointCommand
             {
                 EndpointId = endpointId
@@ -260,7 +267,7 @@ public sealed class WebhookEndpointsController(
         [FromBody] RotateWebhookEndpointSecretRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await rotateSecretHandler.ExecuteAsync(
             new RotateWebhookEndpointSecretCommand
             {
                 EndpointId = endpointId,
@@ -295,7 +302,7 @@ public sealed class WebhookEndpointsController(
         Guid endpointId,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await testEndpointHandler.ExecuteAsync(
             new TestWebhookEndpointCommand
             {
                 EndpointId = endpointId,

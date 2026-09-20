@@ -2,14 +2,14 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
 public sealed class SetEmailDispatchProcessorPauseStateCommandHandler(IEmailDispatchOutboxRepository repository)
-    : IRequestHandler<SetEmailDispatchProcessorPauseStateCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SetEmailDispatchProcessorPauseStateCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SetEmailDispatchProcessorPauseStateCommand request,
         CancellationToken cancellationToken)
     {

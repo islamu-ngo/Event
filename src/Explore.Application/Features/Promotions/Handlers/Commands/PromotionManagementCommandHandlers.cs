@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Features.Promotions.Requests.Commands;
@@ -7,7 +8,6 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Promotions.Handlers.Commands;
 
@@ -18,21 +18,21 @@ public sealed class CreatePromotionDraftCommandHandler(
     IPromotionCodeDigestService digests,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : IRequestHandler<CreatePromotionDraftCommand, PromotionCodeIssuedCommandResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<CreatePromotionDraftCommand, PromotionCodeIssuedCommandResponseDto>
 {
-    public async Task<PromotionCodeIssuedCommandResponseDto> Handle(CreatePromotionDraftCommand request, CancellationToken cancellationToken)
+    public async Task<PromotionCodeIssuedCommandResponseDto> ExecuteAsync(CreatePromotionDraftCommand command, CancellationToken cancellationToken)
     {
-        await new CreatePromotionDraftCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new CreatePromotionDraftCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
 
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
             if (!PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenant.TenantId))
             {
                 return PromotionManagementHandlerSupport.IssuedNotFound();
             }
 
-            EventTicketCatalogVersion? catalog = await PromotionManagementHandlerSupport.GetScopedCatalogAsync(catalogs, request.EventId, tenant.TenantId, request.TicketCatalogVersionId, token);
+            EventTicketCatalogVersion? catalog = await PromotionManagementHandlerSupport.GetScopedCatalogAsync(catalogs, command.EventId, tenant.TenantId, command.TicketCatalogVersionId, token);
             if (catalog is null)
             {
                 return PromotionManagementHandlerSupport.IssuedNotFound();
@@ -41,16 +41,16 @@ public sealed class CreatePromotionDraftCommandHandler(
             PromotionDefinition definition;
             try
             {
-                PromotionScopeMetadata scope = PromotionScopeMetadata.Create(tenant.TenantId, request.EventId, catalog.Id, catalog.VersionNumber, catalog.CurrencyCode);
+                PromotionScopeMetadata scope = PromotionScopeMetadata.Create(tenant.TenantId, command.EventId, catalog.Id, catalog.VersionNumber, catalog.CurrencyCode);
                 definition = PromotionDefinition.CreateDraft(
                     scope,
-                    request.DisplayLabel,
-                    PromotionManagementHandlerSupport.CreateEligibility(request.EligibleTicketTypeIds),
-                    PromotionManagementHandlerSupport.CreateDiscount(scope.CurrencyCode, request.DiscountKind, request.FixedDiscountMinor, request.BasisPointDiscount, request.MaximumDiscountMinor),
-                    request.StartsAtUtc,
-                    request.EndsAtUtc,
-                    request.TotalRedemptionLimit,
-                    request.PerVerifiedPurchaserLimit);
+                    command.DisplayLabel,
+                    PromotionManagementHandlerSupport.CreateEligibility(command.EligibleTicketTypeIds),
+                    PromotionManagementHandlerSupport.CreateDiscount(scope.CurrencyCode, command.DiscountKind, command.FixedDiscountMinor, command.BasisPointDiscount, command.MaximumDiscountMinor),
+                    command.StartsAtUtc,
+                    command.EndsAtUtc,
+                    command.TotalRedemptionLimit,
+                    command.PerVerifiedPurchaserLimit);
             }
             catch (ArgumentOutOfRangeException exception)
             {
@@ -61,11 +61,11 @@ public sealed class CreatePromotionDraftCommandHandler(
                 return PromotionManagementHandlerSupport.IssuedValidationFailed(exception.Message);
             }
 
-            await digests.ComputeActiveAsync(tenant.TenantId, request.EventId, request.Code, token);
+            await digests.ComputeActiveAsync(tenant.TenantId, command.EventId, command.Code, token);
             await promotions.AddDefinitionAsync(definition, token);
             await promotions.SaveChangesAsync(token);
 
-            return PromotionManagementHandlerSupport.IssuedSuccess(definition.Id, "Promotion draft created.", PromotionManagementMapper.Map(definition, null, eventTarget!), request.Code);
+            return PromotionManagementHandlerSupport.IssuedSuccess(definition.Id, "Promotion draft created.", PromotionManagementMapper.Map(definition, null, eventTarget!), command.Code);
         }, cancellationToken);
     }
 }
@@ -74,21 +74,21 @@ public sealed class RevisePromotionCommandHandler(
     IEventRepository events,
     IPromotionManagementRepository promotions,
     ITenantContext tenant,
-    IUnitOfWork unitOfWork) : IRequestHandler<RevisePromotionCommand, PromotionManagementCommandResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<RevisePromotionCommand, PromotionManagementCommandResponseDto>
 {
-    public async Task<PromotionManagementCommandResponseDto> Handle(RevisePromotionCommand request, CancellationToken cancellationToken)
+    public async Task<PromotionManagementCommandResponseDto> ExecuteAsync(RevisePromotionCommand command, CancellationToken cancellationToken)
     {
-        await new RevisePromotionCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new RevisePromotionCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
 
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
             if (!PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenant.TenantId))
             {
                 return PromotionManagementHandlerSupport.NotFound();
             }
 
-            PromotionDefinition? current = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, request.EventId, request.PromotionDefinitionId, token);
+            PromotionDefinition? current = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, command.EventId, command.PromotionDefinitionId, token);
             if (current is null)
             {
                 return PromotionManagementHandlerSupport.NotFound();
@@ -98,13 +98,13 @@ public sealed class RevisePromotionCommandHandler(
             try
             {
                 revision = current.CreateRevision(
-                    request.DisplayLabel,
-                    PromotionManagementHandlerSupport.CreateEligibility(request.EligibleTicketTypeIds),
-                    PromotionManagementHandlerSupport.CreateDiscount(current.ScopeMetadata.CurrencyCode, request.DiscountKind, request.FixedDiscountMinor, request.BasisPointDiscount, request.MaximumDiscountMinor),
-                    request.StartsAtUtc,
-                    request.EndsAtUtc,
-                    request.TotalRedemptionLimit,
-                    request.PerVerifiedPurchaserLimit);
+                    command.DisplayLabel,
+                    PromotionManagementHandlerSupport.CreateEligibility(command.EligibleTicketTypeIds),
+                    PromotionManagementHandlerSupport.CreateDiscount(current.ScopeMetadata.CurrencyCode, command.DiscountKind, command.FixedDiscountMinor, command.BasisPointDiscount, command.MaximumDiscountMinor),
+                    command.StartsAtUtc,
+                    command.EndsAtUtc,
+                    command.TotalRedemptionLimit,
+                    command.PerVerifiedPurchaserLimit);
             }
             catch (ArgumentOutOfRangeException exception)
             {
@@ -133,22 +133,22 @@ public sealed class PublishPromotionCommandHandler(
     IPromotionCodeDigestService digests,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : IRequestHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>
 {
-    public async Task<PromotionManagementCommandResponseDto> Handle(PublishPromotionCommand request, CancellationToken cancellationToken)
+    public async Task<PromotionManagementCommandResponseDto> ExecuteAsync(PublishPromotionCommand command, CancellationToken cancellationToken)
     {
-        await new PublishPromotionCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new PublishPromotionCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         DateTime publishedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
             if (!PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenant.TenantId))
             {
                 return PromotionManagementHandlerSupport.NotFound();
             }
 
-            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, request.EventId, request.PromotionDefinitionId, token);
+            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, command.EventId, command.PromotionDefinitionId, token);
             if (definition is null)
             {
                 return PromotionManagementHandlerSupport.NotFound();
@@ -157,8 +157,8 @@ public sealed class PublishPromotionCommandHandler(
             try
             {
                 definition.Publish(publishedAtUtc);
-                PromotionCodeDigest digest = await digests.ComputeActiveAsync(tenant.TenantId, request.EventId, request.Code, token);
-                PromotionCode code = PromotionCode.Create(definition, PromotionManagementHandlerSupport.MaskSuffix(digests.NormalizeCode(request.Code)), definition.ScopeMetadata);
+                PromotionCodeDigest digest = await digests.ComputeActiveAsync(tenant.TenantId, command.EventId, command.Code, token);
+                PromotionCode code = PromotionCode.Create(definition, PromotionManagementHandlerSupport.MaskSuffix(digests.NormalizeCode(command.Code)), definition.ScopeMetadata);
                 await promotions.AddPublishedCodeAsync(code, digest, token);
                 await promotions.SaveChangesAsync(token);
                 return PromotionManagementHandlerSupport.Success(definition.Id, "Promotion published.", PromotionManagementMapper.Map(definition, code, eventTarget!));
@@ -180,22 +180,22 @@ public sealed class RevokePromotionCommandHandler(
     IPromotionManagementRepository promotions,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : IRequestHandler<RevokePromotionCommand, PromotionManagementCommandResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<RevokePromotionCommand, PromotionManagementCommandResponseDto>
 {
-    public async Task<PromotionManagementCommandResponseDto> Handle(RevokePromotionCommand request, CancellationToken cancellationToken)
+    public async Task<PromotionManagementCommandResponseDto> ExecuteAsync(RevokePromotionCommand command, CancellationToken cancellationToken)
     {
-        await new RevokePromotionCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new RevokePromotionCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         DateTime decisionAtUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
             if (!PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenant.TenantId))
             {
                 return PromotionManagementHandlerSupport.NotFound();
             }
 
-            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, request.EventId, request.PromotionDefinitionId, token);
+            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, command.EventId, command.PromotionDefinitionId, token);
             if (definition is null)
             {
                 return PromotionManagementHandlerSupport.NotFound();
@@ -225,22 +225,22 @@ public sealed class RotatePromotionCodeCommandHandler(
     IPromotionCodeDigestService digests,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : IRequestHandler<RotatePromotionCodeCommand, PromotionCodeIssuedCommandResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<RotatePromotionCodeCommand, PromotionCodeIssuedCommandResponseDto>
 {
-    public async Task<PromotionCodeIssuedCommandResponseDto> Handle(RotatePromotionCodeCommand request, CancellationToken cancellationToken)
+    public async Task<PromotionCodeIssuedCommandResponseDto> ExecuteAsync(RotatePromotionCodeCommand command, CancellationToken cancellationToken)
     {
-        await new RotatePromotionCodeCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new RotatePromotionCodeCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         DateTime rotatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+            Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, token);
             if (!PromotionManagementHandlerSupport.IsPlatformManaged(eventTarget, tenant.TenantId))
             {
                 return PromotionManagementHandlerSupport.IssuedNotFound();
             }
 
-            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, request.EventId, request.PromotionDefinitionId, token);
+            PromotionDefinition? definition = await promotions.GetDefinitionForUpdateAsync(tenant.TenantId, command.EventId, command.PromotionDefinitionId, token);
             if (definition is null)
             {
                 return PromotionManagementHandlerSupport.IssuedNotFound();
@@ -248,11 +248,11 @@ public sealed class RotatePromotionCodeCommandHandler(
 
             try
             {
-                PromotionCodeDigest digest = await digests.ComputeActiveAsync(tenant.TenantId, request.EventId, request.Code, token);
-                PromotionCode code = PromotionCode.Create(definition, PromotionManagementHandlerSupport.MaskSuffix(digests.NormalizeCode(request.Code)), definition.ScopeMetadata);
+                PromotionCodeDigest digest = await digests.ComputeActiveAsync(tenant.TenantId, command.EventId, command.Code, token);
+                PromotionCode code = PromotionCode.Create(definition, PromotionManagementHandlerSupport.MaskSuffix(digests.NormalizeCode(command.Code)), definition.ScopeMetadata);
                 await promotions.ReplaceActiveCodeAsync(definition, code, digest, rotatedAtUtc, token);
                 await promotions.SaveChangesAsync(token);
-                return PromotionManagementHandlerSupport.IssuedSuccess(definition.Id, "Promotion code rotated.", PromotionManagementMapper.Map(definition, code, eventTarget!), request.Code);
+                return PromotionManagementHandlerSupport.IssuedSuccess(definition.Id, "Promotion code rotated.", PromotionManagementMapper.Map(definition, code, eventTarget!), command.Code);
             }
             catch (ArgumentException exception)
             {

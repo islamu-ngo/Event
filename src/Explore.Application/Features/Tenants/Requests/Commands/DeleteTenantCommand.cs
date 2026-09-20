@@ -1,6 +1,6 @@
 using System;
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Tenants.Requests.Commands;
 
@@ -9,7 +9,7 @@ namespace Explore.Application.Features.Tenants.Requests.Commands;
 /// Returns true if the tenant was successfully deleted, false if not found.
 /// </summary>
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Delete)]
-public sealed record DeleteTenantCommand : IRequest<bool>, ISecureRequest
+public sealed record DeleteTenantCommand : ICommand<bool>, ISecureRequest
 {
     /// <summary>
     /// The ID of the tenant to delete.

@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.RegistrationMode;
 using Explore.Application.Features.RegistrationModes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class RegistrationModeController(IMediator mediator) : ControllerBase
+public class RegistrationModeController(
+    IQueryHandler<GetRegistrationModeListRequest, List<RegistrationModeListDto>> registrationModeList,
+    IQueryHandler<GetRegistrationModeDetailsRequest, RegistrationModeDto?> registrationModeDetails) : ControllerBase
 {
 
     // GET: api/registrationmode
@@ -29,7 +31,7 @@ public class RegistrationModeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<RegistrationModeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var registrationModes = await mediator.Send(new GetRegistrationModeListRequest(), cancellationToken);
+        var registrationModes = await registrationModeList.QueryAsync(new GetRegistrationModeListRequest(), cancellationToken);
         return Ok(registrationModes);
     }
 
@@ -43,7 +45,7 @@ public class RegistrationModeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<RegistrationModeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var registrationMode = await mediator.Send(new GetRegistrationModeDetailsRequest { Id = id }, cancellationToken);
+        var registrationMode = await registrationModeDetails.QueryAsync(new GetRegistrationModeDetailsRequest { Id = id }, cancellationToken);
         return Ok(registrationMode);
     }
 }

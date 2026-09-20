@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
@@ -13,21 +14,20 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.PublicExperience.Handlers.Queries;
 
 public class GetPublicExperienceShellQueryHandler(
-    IRequestHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto> settingsHandler,
-    IRequestHandler<GetTenantNavLinksQuery, List<TenantNavigationLinkDto>> navigationLinksHandler,
+    IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto> settingsHandler,
+    IQueryHandler<GetTenantNavLinksQuery, List<TenantNavigationLinkDto>> navigationLinksHandler,
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver hierarchicalSettingsResolver,
     IOrganizationRepository organizationRepository)
-    : IRequestHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>
+    : IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>
 {
-    public async Task<PublicExperienceShellDto> Handle(GetPublicExperienceShellQuery request, CancellationToken cancellationToken)
+    public async Task<PublicExperienceShellDto> QueryAsync(GetPublicExperienceShellQuery query, CancellationToken cancellationToken)
     {
-        var settings = await settingsHandler.Handle(new GetPublicExperienceSettingsQuery(), cancellationToken);
+        var settings = await settingsHandler.QueryAsync(new GetPublicExperienceSettingsQuery(), cancellationToken);
         if (!settings.IsAvailable)
         {
             return new PublicExperienceShellDto
@@ -37,7 +37,7 @@ public class GetPublicExperienceShellQueryHandler(
             };
         }
 
-        var navigationLinks = await navigationLinksHandler.Handle(new GetTenantNavLinksQuery(), cancellationToken);
+        var navigationLinks = await navigationLinksHandler.QueryAsync(new GetTenantNavLinksQuery(), cancellationToken);
         var tenantId = tenantContext.TenantId;
         var settingContext = new SettingContext(TenantId: tenantId);
 

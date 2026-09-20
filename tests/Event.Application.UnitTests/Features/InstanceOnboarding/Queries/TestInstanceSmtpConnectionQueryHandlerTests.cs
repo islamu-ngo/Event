@@ -18,7 +18,7 @@ public sealed class TestInstanceSmtpConnectionQueryHandlerTests
             .Returns(EmailResult.Ok("Provider accepted the connection.", TimeSpan.FromMilliseconds(17)));
 
         var result = await new TestInstanceSmtpConnectionQueryHandler(connectionTester)
-            .Handle(new TestInstanceSmtpConnectionQuery(), cancellationToken);
+            .QueryAsync(new TestInstanceSmtpConnectionQuery(), cancellationToken);
 
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.Message).IsEqualTo("Provider accepted the connection.");
@@ -36,7 +36,7 @@ public sealed class TestInstanceSmtpConnectionQueryHandlerTests
             .Returns(EmailResult.Fail("Provider rejected the credentials.", TimeSpan.FromMilliseconds(29)));
 
         var result = await new TestInstanceSmtpConnectionQueryHandler(connectionTester)
-            .Handle(new TestInstanceSmtpConnectionQuery(), cancellationSource.Token);
+            .QueryAsync(new TestInstanceSmtpConnectionQuery(), cancellationSource.Token);
 
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.Message).IsNull();

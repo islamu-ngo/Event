@@ -10,7 +10,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
@@ -23,14 +23,14 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
     ISettingMutationLock mutationLock,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
     IVisitorAccessSettingsWriter visitorSettingsWriter)
-    : IRequestHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
 {
     private const string InvalidPublicationPolicyCode = "event_reporting_intake_policy_invalid";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ApplyControlPlaneTenantPlanAssignmentCommand request,
         CancellationToken cancellationToken)
     {
@@ -142,7 +142,7 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
             foreach (SettingChangedNotification notification in outcome.Notifications)
             {
-                await mediator.Publish(notification, CancellationToken.None);
+                await notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
         }
 

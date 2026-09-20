@@ -87,11 +87,72 @@ For authentication, JWT validation, and security-header behavior, see [SECURITY_
 
 ### 3.2. Resource-Level Authorization (MediatR)
 
-This is the core of the fine-grained authorization system, enforced within the MediatR request pipeline.
+The same resource authority protects native operations and the remaining MediatR cohort during migration.
 
--   **Enforcement Point**: `AuthorizationBehavior<TRequest, TResponse>`. This pipeline behavior intercepts CQRS requests before they reach their handlers.
--   **Denial Behavior**: If authorization fails, the behavior throws an `AuthorizationException`. This is caught by the `GlobalExceptionHandler`, which returns an HTTP `403 Forbidden` response.
--   **Trigger Patterns**: The behavior is triggered by decorating CQRS request objects with specific interfaces or attributes. (See Implementation Patterns section below).
+- **Enforcement point:** `RequestAuthorization<TRequest>` is shared by native authorization decorators and `AuthorizationBehavior<TRequest,TResponse>`. Native void commands, result commands and queries are always wrapped, with authorization outside timing.
+- **Trust ordering:** `[AuthorizeResource]` selects the catalog capability; `ISecureRequest` supplies optional typed facts; a typed enricher may refine context; the persisted-resource resolver has final authority before the provider call.
+- **Failure behavior:** ordinary denial throws `AuthorizationException` (HTTP 403); provider-unavailable decisions throw `AuthorizationProviderUnavailableException` with the existing distinct unavailable response. Neither reaches the business operation.
+- **Composition:** final descriptor validation rejects raw native replacements; runtime startup checks cached parameter metadata, while CI deeply resolves the actual provider in disposable scopes. See [Protected Native Operations](ARCHITECTURE.md#protected-native-operations).
+
+### Event Category Assignment Authority
+
+The seven EventCategories operations use protected native command/query ports.
+`DeleteEventCategoriesAuthorizationContextEnricher`, registered in
+`ApplicationServicesRegistration`, loads the tenant-visible assignment and supplies
+its persisted `EventId` to `RequestAuthorization`. The shared resource resolver
+then loads event facts for the existing `Event:update` capability; an assignment
+ID is not an event authority. Missing or tenant-invisible assignments throw
+`AuthorizationException` before provider evaluation, even with an allowing provider.
+
+Update retains source-event enrichment. When the event changes,
+`UpdateEventCategoriesCommandHandler` resolves persisted destination event facts
+and asks `IAuthorizationProvider` for the same `Event:update` capability before
+assigning any entity field. Source authority never transfers to the destination;
+both event checks must allow. Denial throws `AuthorizationException`; a
+provider-unavailable decision throws `AuthorizationProviderUnavailableException`.
+Neither changes assignment fields, concurrency stamps, or persisted readback.
+Same-tenant validation, duplicate checks, optimistic concurrency, repositories and
+cache invalidation remain in their existing handler-owned order. These checks do
+not introduce atomic authorization-revocation/mutation fencing or cancellation
+support inside tokenless repositories.
+
+`NativeEventCategoriesOperationTests` exercises production-registered ports in a
+real SQLite host, including owner deletion, missing/foreign assignments,
+unauthorized same-tenant relocation, an explicit persisted destination grant,
+and source/destination denial versus provider outage with unchanged readback.
+This changes neither category-definition administration nor EventTags policy,
+and adds no HTTP endpoint, schema migration, policy grant, or configuration.
+See the [operator guide](../public/documentation/readme/security-and-identity/authorization.md#event-category-assignment-permissions).
+
+### Event Tag Assignment Authority
+
+All seven EventTags operations use protected scoped native command/query ports.
+The scoped `DeleteEventTagsAuthorizationContextEnricher` resolves the tenant-visible
+assignment's persisted parent before the shared resolver evaluates `Event:update`.
+An assignment ID is not an event ID. Missing or tenant-invisible assignments fail
+closed before the provider, just as they do for the existing update enricher.
+Request-supplied `EventId` and `TenantId` do not replace persisted source authority.
+
+For relocation, `UpdateEventTagsCommandHandler` resolves persisted destination
+facts and requires the same `Event:update` capability on the destination before
+changing either the event or tag field. Source permission alone is insufficient,
+even within one tenant. Denial and provider unavailability retain distinct
+`AuthorizationException` and `AuthorizationProviderUnavailableException` outcomes;
+neither changes tracked or fresh assignment state, concurrency stamps, or caches.
+Successful updates retain source/destination detail and tenant-list cache eviction.
+Manual validators, entity repositories, grouped update semantics, immutable mapping
+snapshots, tenant filters, composite foreign keys and uniqueness remain unchanged.
+
+`NativeEventTagsOperationTests` reproduces the legacy owner-delete denial and
+source-only relocation defect, then exercises production-registered native ports
+with real Local RBAC and a controlled external-provider boundary. In-memory and
+SQLite lanes cover both-authorized relocation, missing/foreign assignments,
+source/destination denial and outage, unchanged tracked/fresh state and relational
+constraints. There is no new API, policy grant, schema or configuration. This does
+not add atomic revocation/mutation fencing or cancellation inside the existing
+tokenless repositories; validators, cache operations and the new provider check
+receive the supplied token. Live Cerbos transport is outside this cohort's tests.
+See the [operator guide](../public/documentation/readme/security-and-identity/authorization.md#event-tag-assignment-permissions).
 
 ### Reviewed Handler And Worker Authorities
 
@@ -178,8 +239,32 @@ existing registration access retain their own authority.
 -   **Batching & Performance**: To avoid $N+1$ performance issues, the evaluator implements a **4-Phase Capability Planning Pipeline** (Candidate → Normalize → Batch Decision → Materialize). Deduplication includes resource kind/id/action, scope, and canonicalized attributes so scoped or attribute-sensitive links do not collapse into the wrong decision.
 -   **Provider Optimizations**:
     -   **Cerbos**: Uses the official gRPC SDK to send deduplicated checks in a **single batch request** (`CheckResourcesAsync`).
-    -   **Fallback (Local)**: Resolves the user's **Authority Profile** (admin status, tenant membership) **exactly once** per batch to eliminate redundant database/async overhead during individual link evaluation.
+    -   **Fallback (Local)**: Resolves the user's **Authority Profile** (admin status, tenant membership) once for profiled batch checks. Organization evidence actions (`submit-evidence`, `view-evidence`, `review-evidence`) instead reuse the single-request evaluator with the original immutable facts and scope: OrgAdmin can submit/view, TenantAdmin can review/view, and combined authority permits both. Batch size and neighboring capabilities cannot confer submission on a tenant-only reviewer or review on an organization-only submitter. Other organization actions retain their existing batch evaluation.
 -   **Collection Support**: For "Get All" endpoints, all link definitions for all items in the paginated result are flattened into a single massive batch, ensuring high-scale efficiency.
+
+### Committed administrator-authority freshness
+
+`AdminContext` reads platform roles, tenant grants, organization memberships, and group
+memberships from their existing no-tracking repositories on every authority call.
+It does not cache positive or negative authority results across calls or requests.
+Local authorization and Cerbos principal construction therefore observe committed
+role changes without mutation hooks, cache invalidation, or revised claims. The
+optimized local batch still resolves one immutable `AuthorityProfile` for its checks;
+small batches, machine callers, and evidence actions retain their existing paths.
+
+The guarantee applies when a new request's database read/snapshot starts after the
+mutation commits and every node reads the same authoritative primary database. It
+also covers out-of-process writes. An already-running read, batch, or older transaction
+snapshot may retain its earlier view; this does not promise retroactive cancellation
+or solve authorization/write races. Rollback creates no reusable cached grant or denial.
+Existing role predicates, tenant filters, and provider-identity binding resolution
+remain authoritative; missing provider bindings are re-read after same-scope onboarding.
+BFF display claims, permission-registry caching, and unrelated content caches are unchanged.
+
+The obsolete `IAdminCacheInvalidator` contract and diagnostic
+`POST /api/_internal/admin-cache/users/{userId}/invalidate` action are removed.
+`POST /api/_internal/admin-cache/current-user/snapshot` remains available under its
+existing Development/Testing configuration gate; it diagnoses identity, not cached authority.
 
 Registration-form authoring uses the scoped `islamuevent_registration_form` resource with `view`, `create`, `update`, `delete`, `preflight`, `publish`, and `manage-requirements` actions. Its trusted resource context is enriched from the persisted parent Event; request bodies cannot author tenant or organizer identity. The event-level `manage-registration-workflow` entry relation and all form-level actions share the same authority: a verified organizer controller or exact tenant/event `event.registration_manager` assignment carrying `event_registration:manage`. Contributors, listing submitters, tenant-only curators, instance administrators, machine principals, missing/ambiguous organizer state, and unrelated tenant/event assignments fail closed in both Cerbos and fallback authorization.
 
@@ -312,6 +397,7 @@ If the password contains spaces, wrap it in quotes:
     -   `FallbackAuthorizationService.MachineCaller.cs`: Scope-ceiling and owner-type evaluation for API key machine principals.
 -   **Notable Evaluation Rules**:
     -   **Instance Admin Bypass**: Instance administrators bypass standard checks except for direct event authority requirements (e.g., `event:manage-tickets` requires explicit event authority).
+    -   **Custom Property Governance Reports**: The instance-admin local allowlist includes exactly `islamuevent_custom_property_governance:view`, matching the bundled Cerbos report permission. Single and optimized batch checks share that allowlist; safe mode retains instance-admin access and denies non-instance administrators. The native report handler still requires its target tenant to equal trusted `ITenantContext`, including for instance administrators. Machine callers retain their existing scope ceilings. This adds no governance write permission or authority for other resources.
     -   **Tenant Settings & Governance Locks**: Updates check `isLockedByInstance == true`. If locked by infrastructure operators, non-instance admin update attempts are denied. `tenant.branding` document updates are explicitly exempted from instance locks.
     -   **Event Moderation**: `moderate-light`, `moderate-heavy`, and `unmoderate` actions require Instance Admin or Tenant Admin authority in scope. Event managers, owners, and organization admins cannot moderate events.
     -   **User Profiles**: Authenticated users can view/update their own profile (`targetUserId == currentUserId`); other targets require Tenant Admin or Instance Admin authority.
@@ -361,6 +447,8 @@ To prevent $N+1$ database queries during HATEOAS link evaluation for paginated r
 1.  **Authority Profile Pre-Resolution**: `FallbackAuthorizationService.Batch.cs` resolves an immutable `AuthorityProfile` (Instance Admin, Tenant Admin, Admin Org IDs, Admin Group IDs, Event Create Org/Group IDs) in **a single pass** at the start of a batch check.
 2.  **Batch Event Authority Snapshots**: `IEventAuthoritySnapshotService.GetForUserAndEventsAsync()` extracts distinct event IDs from all event-scoped checks and loads active `EventRoleAssignment` records in **a single SQL query**.
 3.  **In-Memory Evaluation Loop**: `EvaluateWithProfile()` evaluates all checks in CPU memory against the pre-resolved `AuthorityProfile` and event authority snapshot, executing batch checks in **$O(1)$ database calls**.
+
+`EventAuthoritySnapshotService` keeps tenant, user, requested event IDs and effective assignment-window filtering in SQL. Its second query reads only role IDs and active permission codes for the roles found by the first query. Distinct permission sets are grouped in memory with ordinal comparison; no events, user profiles or navigation graphs are materialized for this grouping. This flat scalar projection avoids SQL APPLY, which SQLite cannot execute, without changing owner/manager flags, permission unions, caller-selected actions or machine-principal boundaries. Both reads retain their cancellation token and existing ambient transaction behavior; the service does not introduce a new transaction or promise a stronger cross-query snapshot. `EventAuthoritySnapshotSqliteTests` and `NativeEventSessionLanguageHttpTests` cover the portable projection and real authorization/HAL consumers. No schema, policy-package or configuration migration is required.
 
 ### 4.7. Policy Revision, Drift, and Convergence
 
@@ -421,6 +509,8 @@ Strict boundaries are enforced to protect tenant autonomy and platform integrity
 
 Tenant user participation is tenant-local. A global `User` authenticates the person or external identity, but tenant-admin-controlled lifecycle and moderation state lives in `TenantUser`/`TenantUserProfile`. Tenant role authority lives in `TenantUserRoleGrant`, an auditable child of `TenantUser`. Local membership checks require an active tenant-local user record plus an unrevoked tenant-scoped grant, so a suspension, ban, removal, or profile moderation action in one tenant does not affect the same external identity in another tenant.
 
+`AdminContext.GetAdminTenantIdsAsync` applies the same active, non-deleted membership requirement when projecting distinct tenant-admin IDs from unrevoked grants. This authority projection feeds Cerbos human/user-owned-machine principals, Local user-owned-machine checks, and admin-authority UI responses. Generic grant inventory (`GetByUserId` and grant detail/list queries) retains its existing semantics; an inactive membership's unrevoked grants remain inventory, not effective authority. Tenant lifecycle status is not a new authority predicate. This eligibility correction does not change cache lifetime or establish immediate cross-request revocation freshness.
+
 Managed-provider provisioning follows the same boundary. Provider/operator automation must authenticate through instance-admin authority before it can create customer tenants. The provisioned ERP customer/admin receives tenant-local `TenantUser`, `TenantUserProfile`, user actor, external-login binding, and `TenantUserRoleGrant` tenant-admin authority for that tenant only; this flow must not create `PlatformUserRole` rows or `InstanceAdmin` API keys for customer/admin identities.
 
 Organization membership authority is also resource scoped. `OrganizationMember` list/detail reads use `ISecureRequest` plus `[AuthorizeResource(ResourceKinds.OrganizationMember, AuthorizationActions.OrganizationMembers.View)]`; list reads send the resolved tenant id and organization id, while detail reads send the member id and are enriched by `AuthorizationBehavior` with tenant, organization, and user attributes before the provider decision. The Cerbos resource kind is `islamuevent_organization_member`. Local fallback mirrors the policy by allowing tenant administrators in the resolved tenant and organization administrators for the target organization, while denying regular authenticated users. HAL collection/item affordances must use the same resource/action metadata instead of local role or claim checks.
@@ -439,19 +529,13 @@ Paid-event policy settings follow the settings boundary: instance `view`/`update
 
 ### 6.1. CQRS Authorization Patterns
 
-Authorization is triggered in the MediatR pipeline based on one of three patterns applied to a command or query request class.
+Native decorators and the remaining MediatR behavior use the same request contract:
 
-1.  **`IAuthorizedRequest` Interface**:
-    -   **Use When**: The resource kind, ID, and action are dynamic and depend on the request's properties.
-    -   **Implementation**: The request class implements `IAuthorizedRequest` and provides the `ResourceKind`, `ResourceId`, and `Action`.
+1. `[AuthorizeResource(ResourceKind, Action)]` declares the fixed catalog capability.
+2. Optional `ISecureRequest.ResourceId` and `AuthorizationFacts` provide typed initial context.
+3. Optional `IAuthorizationContextEnricher<TRequest>` resolves feature context before `AuthorizationResourceContextResolver` applies persisted-resource authority.
 
-2.  **`[AuthorizeResource]` Attribute**:
-    -   **Use When**: The resource kind and action are static for all requests of this type.
-    -   **Implementation**: The request class is decorated with `[AuthorizeResource(ResourceKind, Action)]`.
-
-3.  **`[AuthorizeResource]` Attribute + `ISecureRequest` Interface**:
-    -   **Use When**: The resource kind and action are static, but the resource ID or other attributes needed for the policy are determined at runtime.
-    -   **Implementation**: A combination of the attribute and the interface. The behavior prefers the dynamic values from `ISecureRequest` at runtime.
+There is no `IAuthorizedRequest` contract. An unannotated request is not newly granted authority: its reviewed handler, public capability or worker boundary remains responsible, and compiled native-aware discovery rejects new unclassified mutations.
 
 Notification preference organization and group queries/commands use this pattern with `ResourceKinds.Organization` or `ResourceKinds.Group` and `AuthorizationActions.View`/`AuthorizationActions.Update`. Current-user preference endpoints are authenticated user-self endpoints; organization/group preference endpoints still pass through the resource authorization pipeline before handlers run.
 
@@ -461,7 +545,7 @@ Participation requirement writes use `[AuthorizeResource(ResourceKinds.Registrat
 
 -   **User ID Extraction**: `Explore.Application.Authentication.PlatformIdentityPrincipalExtensions` is the single authority. The chain is `sub` -> `nameidentifier` -> `sid` -> `internal_user_id`, accepting only GUID-parseable values. Call `principal.GetPlatformUserId()` / `GetRequiredPlatformUserId()` — or `CurrentUserId` / `RequiredUserId` on `EventControllerBase` — never a hand-rolled `FindFirst`.
 -   **`internal_user_id`**: A BFF-enriched local-user claim added after external identity resolution. It is the **last** link in the chain: the provider claims are tried first because for platform-managed accounts the provider subject *is* the local user id.
--   **Non-GUID subjects**: ATProto DIDs and Google subjects yield `null` from the chain. Resolve the linked local account with `IMediator.ResolveCurrentUserIdAsync(principal, ct)`; treat `null` as an authentication outcome to map, not as a prompt to read another claim.
+-   **Provider-linked identities**: Inject `IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>` and call `identityQuery.ResolveCurrentUserIdAsync(principal, ct)`. A reconstructed provider account takes precedence over GUID/internal-user claims; an unlinked account returns `null`, never an email or claim fallback. The native query remains unannotated identity resolution, not a new PDP capability.
 -   **Admin Claims**: A `BffAdminClaimsTransformation` service enriches the user's principal with specific `admin` claims after authentication, which can be used for UI-level authorization checks.
 
 ## 7. Related Documentation

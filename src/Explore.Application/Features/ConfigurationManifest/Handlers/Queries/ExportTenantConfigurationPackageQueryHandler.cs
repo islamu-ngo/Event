@@ -1,20 +1,20 @@
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Queries;
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Domain;
-using MediatR;
 
 public sealed class ExportTenantConfigurationPackageQueryHandler(
-    IRequestHandler<ExportConfigurationManifestQuery, ConfigurationManifestExportResult>
-        manifestExporter,
+    ConfigurationManifestCurrentStateReader currentState,
     ConfigurationImportArtifactParser parser,
-    ITenantRepository tenants) : IRequestHandler<
+    ITenantRepository tenants) : IQueryHandler<
         ExportTenantConfigurationPackageQuery,
         TenantConfigurationPackageExportResult>
 {
-    public async Task<TenantConfigurationPackageExportResult> Handle(
+    public async Task<TenantConfigurationPackageExportResult> QueryAsync(
         ExportTenantConfigurationPackageQuery request,
         CancellationToken cancellationToken)
     {
@@ -23,8 +23,8 @@ public sealed class ExportTenantConfigurationPackageQueryHandler(
                 cancellationToken)
             ?? throw new ConfigurationImportSessionException(
                 ConfigurationImportFailureCodes.ArtifactMissing);
-        ConfigurationManifestExportResult manifest = await manifestExporter.Handle(
-            new ExportConfigurationManifestQuery(request.View),
+        ConfigurationManifestExportResult manifest = await currentState.ReadAsync(
+            request.View,
             cancellationToken);
         ConfigurationImportParsedArtifact parsed = parser.Parse(manifest.Utf8Json);
         var selected = parsed.Manifest.Spec.Tenants

@@ -1,14 +1,14 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationAnswerFiles.Commands;
 
 public sealed record ReleaseRegistrationAnswerFileCommand(Guid TenantId, Guid Id, string Reason)
-    : IRequest<BaseCommandResponse<Guid>>;
+    : ICommand<BaseCommandResponse<Guid>>;
 
 public sealed class ReleaseRegistrationAnswerFileCommandValidator
     : AbstractValidator<ReleaseRegistrationAnswerFileCommand>
@@ -25,30 +25,30 @@ public sealed class ReleaseRegistrationAnswerFileCommandHandler(
     IRegistrationAnswerFileRepository repository,
     ICurrentUserService currentUserService,
     TimeProvider timeProvider)
-    : IRequestHandler<ReleaseRegistrationAnswerFileCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReleaseRegistrationAnswerFileCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        ReleaseRegistrationAnswerFileCommand request,
-        CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ReleaseRegistrationAnswerFileCommand command,
+        CancellationToken cancellationToken = default)
     {
-        await new ReleaseRegistrationAnswerFileCommandValidator().ValidateAndThrowAsync(request, cancellationToken);
+        await new ReleaseRegistrationAnswerFileCommandValidator().ValidateAndThrowAsync(command, cancellationToken);
         Guid? actorId = currentUserService.UserId;
         if (!currentUserService.IsAuthenticated || actorId is null || actorId == Guid.Empty)
         {
-            return Failure(request.Id, "Authenticated release operator could not be resolved.",
+            return Failure(command.Id, "Authenticated release operator could not be resolved.",
                 "registration_answer_file_release_operator_required");
         }
 
         RegistrationAnswerFileReleaseResult? result = await repository.ReleaseAsync(
-            request.TenantId,
-            request.Id,
+            command.TenantId,
+            command.Id,
             actorId.Value,
-            request.Reason,
+            command.Reason,
             timeProvider.GetUtcNow().UtcDateTime,
             cancellationToken);
         if (result is null)
         {
-            return Failure(request.Id, "Registration answer file was not found.",
+            return Failure(command.Id, "Registration answer file was not found.",
                 "registration_answer_file_not_found");
         }
 

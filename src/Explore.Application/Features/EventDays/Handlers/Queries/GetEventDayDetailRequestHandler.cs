@@ -1,28 +1,25 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.Features.EventDays.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Handlers.Queries;
 
-public class GetEventDayDetailRequestHandler : IRequestHandler<GetEventDayDetailRequest, EventDayDto?>
+public class GetEventDayDetailRequestHandler : IQueryHandler<GetEventDayDetailRequest, EventDayDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDayRepository _eventDayRepository;
-    private readonly IMapper _mapper;
 
     public GetEventDayDetailRequestHandler(
         IEventRepository eventRepository,
-        IEventDayRepository eventDayRepository,
-        IMapper mapper)
+        IEventDayRepository eventDayRepository)
     {
         _eventRepository = eventRepository;
         _eventDayRepository = eventDayRepository;
-        _mapper = mapper;
     }
 
-    public async Task<EventDayDto?> Handle(GetEventDayDetailRequest request, CancellationToken cancellationToken)
+    public async Task<EventDayDto?> QueryAsync(GetEventDayDetailRequest request, CancellationToken cancellationToken)
     {
         var eventDay = await _eventDayRepository.GetById(request.Id);
         if (eventDay == null)
@@ -34,6 +31,6 @@ public class GetEventDayDetailRequestHandler : IRequestHandler<GetEventDayDetail
                 cancellationToken))
             return null;
 
-        return _mapper.Map<EventDayDto>(eventDay);
+        return EventMapper.ToDetail(eventDay);
     }
 }

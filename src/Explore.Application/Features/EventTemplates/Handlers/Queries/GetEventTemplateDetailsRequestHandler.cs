@@ -1,27 +1,24 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTemplates.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Queries;
 
-public class GetEventTemplateDetailsRequestHandler : IRequestHandler<GetEventTemplateDetailsRequest, EventTemplateDto>
+public class GetEventTemplateDetailsRequestHandler : IQueryHandler<GetEventTemplateDetailsRequest, EventTemplateDto>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
-    private readonly IMapper _mapper;
 
     public GetEventTemplateDetailsRequestHandler(
-        IEventTemplateRepository eventTemplateRepository,
-        IMapper mapper)
+        IEventTemplateRepository eventTemplateRepository)
     {
         _eventTemplateRepository = eventTemplateRepository;
-        _mapper = mapper;
     }
 
-    public async Task<EventTemplateDto> Handle(GetEventTemplateDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventTemplateDto> QueryAsync(GetEventTemplateDetailsRequest request, CancellationToken cancellationToken)
     {
         var template = await _eventTemplateRepository.GetTemplateWithDetails(request.Id);
         if (template == null)
@@ -29,6 +26,6 @@ public class GetEventTemplateDetailsRequestHandler : IRequestHandler<GetEventTem
             throw new NotFoundException(nameof(EventTemplate), request.Id);
         }
 
-        return _mapper.Map<EventTemplateDto>(template);
+        return CustomPropertyMapper.ToDetail(template);
     }
 }

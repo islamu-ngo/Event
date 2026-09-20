@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
 using Quartz;
 
 namespace Explore.API.Scheduling;
@@ -33,9 +33,9 @@ public sealed class RegistrationFinalizationDrainJob(
         // A scope per pass, matching the worker: the drain command resolves scoped persistence services and
         // must not accumulate tracked state across passes.
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        var drainHandler = scope.ServiceProvider.GetRequiredService<ICommandHandler<DrainRegistrationFinalizationEffectsCommand, int>>();
 
-        var drained = await sender.Send(
+        var drained = await drainHandler.ExecuteAsync(
             new DrainRegistrationFinalizationEffectsCommand(ConsumerId),
             context.CancellationToken);
 

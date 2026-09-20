@@ -27,7 +27,7 @@ public sealed class CurrentAtprotoOAuthSessionHandlerTests
         gateway.GetCurrentAsync(Identity, Arg.Any<CancellationToken>()).Returns(expected);
 
         var result = await new GetCurrentAtprotoOAuthSessionQueryHandler(gateway)
-            .Handle(new GetCurrentAtprotoOAuthSessionQuery(Identity), CancellationToken.None);
+            .QueryAsync(new GetCurrentAtprotoOAuthSessionQuery(Identity), CancellationToken.None);
 
         await Assert.That(result).IsEqualTo(expected);
         await gateway.Received(1).GetCurrentAsync(Identity, Arg.Any<CancellationToken>());
@@ -41,7 +41,7 @@ public sealed class CurrentAtprotoOAuthSessionHandlerTests
 
         await Assert.ThrowsAsync<ValidationException>(() =>
             new GetCurrentAtprotoOAuthSessionQueryHandler(gateway)
-                .Handle(new GetCurrentAtprotoOAuthSessionQuery(invalid), CancellationToken.None));
+                .QueryAsync(new GetCurrentAtprotoOAuthSessionQuery(invalid), CancellationToken.None));
 
         await gateway.DidNotReceiveWithAnyArgs().GetCurrentAsync(default!, default);
     }
@@ -54,7 +54,7 @@ public sealed class CurrentAtprotoOAuthSessionHandlerTests
 
         await Assert.ThrowsAsync<ValidationException>(() =>
             new GetCurrentAtprotoOAuthSessionQueryHandler(gateway)
-                .Handle(new GetCurrentAtprotoOAuthSessionQuery(invalid), CancellationToken.None));
+                .QueryAsync(new GetCurrentAtprotoOAuthSessionQuery(invalid), CancellationToken.None));
 
         await gateway.DidNotReceiveWithAnyArgs().GetCurrentAsync(default!, default);
     }

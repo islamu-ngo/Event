@@ -1,33 +1,35 @@
-using AutoMapper;
+using Explore.Application.Mappings;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Features.EventCustomProperties.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Queries;
 
-public class GetEventCustomPropertyDefinitionListRequestHandler : IRequestHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>
+public class GetEventCustomPropertyDefinitionListRequestHandler : IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
+    private readonly ITenantContext _tenantContext;
 
     public GetEventCustomPropertyDefinitionListRequestHandler(
         IEventCustomPropertyRepository eventCustomPropertyRepository,
-        IMapper mapper,
-        HybridCache cache)
+        HybridCache cache,
+        ITenantContext tenantContext)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
-        _mapper = mapper;
         _cache = cache;
+        _tenantContext = tenantContext;
     }
 
-    public async Task<PaginatedResult<EventCustomPropertyDefinitionListDto>> Handle(GetEventCustomPropertyDefinitionListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventCustomPropertyDefinitionListDto>> QueryAsync(GetEventCustomPropertyDefinitionListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<EventCustomPropertyDefinitionListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
-        var cacheKey = GetCacheKey(request.EventId, pageNumber, pageSize);
+        var tenantId = _tenantContext.TenantId;
+        var cacheKey = EventCustomPropertyCache.ListKey(tenantId, request.EventId, pageNumber, pageSize);
 
         return await _cache.GetOrCreateAsync(
             cacheKey,
@@ -37,7 +39,7 @@ public class GetEventCustomPropertyDefinitionListRequestHandler : IRequestHandle
                     request.EventId,
                     pageNumber,
                     pageSize);
-                var dtos = _mapper.Map<List<EventCustomPropertyDefinitionListDto>>(definitions);
+                var dtos = definitions.Select(CustomPropertyMapper.ToListItem).ToList();
                 return PaginatedResult<EventCustomPropertyDefinitionListDto>.Create(dtos, totalCount, pageNumber, pageSize);
             },
             new HybridCacheEntryOptions
@@ -45,11 +47,8 @@ public class GetEventCustomPropertyDefinitionListRequestHandler : IRequestHandle
                 Expiration = TimeSpan.FromMinutes(5),
                 LocalCacheExpiration = TimeSpan.FromMinutes(1)
             },
+            tags: [EventCustomPropertyCache.ListsByTenant(tenantId), EventCustomPropertyCache.ListsByEvent(tenantId, request.EventId)],
             cancellationToken: cancellationToken);
     }
 
-    private static string GetCacheKey(Guid eventId, int pageNumber, int pageSize)
-    {
-        return $"event-custom-properties:list:{eventId}:{pageNumber}:{pageSize}";
-    }
 }

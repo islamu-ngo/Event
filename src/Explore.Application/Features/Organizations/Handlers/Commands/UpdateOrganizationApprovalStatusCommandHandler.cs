@@ -4,12 +4,12 @@ using Explore.Application.DTOs.Organization.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Organizations.Requests.Commands;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Organizations.Handlers.Commands;
 
-public class UpdateOrganizationApprovalStatusCommandHandler : IRequestHandler<UpdateOrganizationApprovalStatusCommand, Unit>
+public class UpdateOrganizationApprovalStatusCommandHandler : ICommandHandler<UpdateOrganizationApprovalStatusCommand>
 {
     private readonly IOrganizationTenantRepository _organizationTenantRepository;
     private readonly IApprovalStatusRepository _statusTypeRepository;
@@ -28,7 +28,7 @@ public class UpdateOrganizationApprovalStatusCommandHandler : IRequestHandler<Up
         _cache = cache;
     }
 
-    public async Task<Unit> Handle(UpdateOrganizationApprovalStatusCommand request, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(UpdateOrganizationApprovalStatusCommand request, CancellationToken cancellationToken)
     {
         var participation = await _organizationTenantRepository.GetByOrganizationAndTenant(
             request.OrganizationId,
@@ -51,6 +51,5 @@ public class UpdateOrganizationApprovalStatusCommandHandler : IRequestHandler<Up
         await _organizationTenantRepository.Update(participation);
         await _cache.RemoveAsync($"organization:detail:{participation.OrganizationId}", cancellationToken);
 
-        return Unit.Value;
     }
 }

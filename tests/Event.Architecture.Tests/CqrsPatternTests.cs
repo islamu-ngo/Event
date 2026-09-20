@@ -11,6 +11,25 @@ public class CqrsPatternTests
 {
     private static readonly Assembly ApplicationAssembly = typeof(Explore.Application.ApplicationServicesRegistration).Assembly;
 
+    [Test]
+    public async Task NativeRequestsMustHaveExactlyOneDispatchShapeAndMatchingHandler()
+    {
+        var types = ApplicationAssembly.GetTypes();
+        var failures = types
+            .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false })
+            .Where(OperationContractDiscovery.IsNativeRequest)
+            .Where(request => request.GetInterfaces().Count(contract =>
+                    contract == typeof(Explore.Application.Contracts.Operations.ICommand)
+                    || OperationContractDiscovery.IsResultContract(contract)) != 1
+                || types.Count(handler => handler is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }
+                    && handler.GetInterfaces().Any(contract => OperationContractDiscovery.IsNativeHandler(contract)
+                        && contract.GetGenericArguments()[0] == request)) != 1)
+            .Select(type => type.FullName)
+            .ToArray();
+
+        await Assert.That(failures).IsEmpty();
+    }
+
     #region Command Pattern Tests
 
     [Test]

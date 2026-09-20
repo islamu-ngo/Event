@@ -1,0 +1,37 @@
+Change-Id: CHG-01M2EKC1S03YAP04DZH0SM9TWV
+Title: "Restore authorized agenda item management"
+Type: fix
+Scope: events
+Summary: "Use protected native agenda operations with persisted parent authority so authorized organizers can manage agenda items without allowing unauthorized moves."
+Group: event-agenda-items
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md#native-event-agenda-item-operations
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Resolve create/update/delete authority from current-tenant persisted
+      parents and require separate destination event update authority for moves.
+      Preserve existing grants, managed-read authorization, public eligibility,
+      venue disclosure ceilings and transactional concurrency protection.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/api-reference/README.md#agenda-item-management
+    Disposition: documented
+    Detail: >-
+      Authorized organizer agenda writes no longer fail for missing parent
+      context. Moves require source and destination permission. Routes, payloads,
+      If-Match handling, local-time reprojection and location privacy remain
+      stable. No database or configuration upgrade is required.

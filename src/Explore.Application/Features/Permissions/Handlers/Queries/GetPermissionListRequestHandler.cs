@@ -1,26 +1,23 @@
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Permission;
 using Explore.Application.Features.Permissions.Requests.Queries;
 using Explore.Application.Lookups;
-using MediatR;
 
 namespace Explore.Application.Features.Permissions.Handlers.Queries;
 
-public class GetPermissionListRequestHandler : IRequestHandler<GetPermissionListRequest, List<PermissionListDto>>
+public class GetPermissionListRequestHandler : IQueryHandler<GetPermissionListRequest, List<PermissionListDto>>
 {
     private readonly IPermissionRegistryService _permissionRegistry;
-    private readonly IMapper _mapper;
 
     public GetPermissionListRequestHandler(
-        IPermissionRegistryService permissionRegistry,
-        IMapper mapper)
+        IPermissionRegistryService permissionRegistry)
     {
         _permissionRegistry = permissionRegistry;
-        _mapper = mapper;
     }
 
-    public async Task<List<PermissionListDto>> Handle(GetPermissionListRequest request, CancellationToken cancellationToken)
+    public async Task<List<PermissionListDto>> QueryAsync(GetPermissionListRequest request, CancellationToken cancellationToken)
     {
         var roleScopeId = request.RoleScopeId.HasValue && NormalizedLookupMetadata.IsRoleScopeId(request.RoleScopeId.Value)
             ? request.RoleScopeId
@@ -38,6 +35,6 @@ public class GetPermissionListRequestHandler : IRequestHandler<GetPermissionList
                 .AsReadOnly();
         }
 
-        return _mapper.Map<List<PermissionListDto>>(permissions);
+        return permissions.Select(PermissionMapper.ToListItem).ToList();
     }
 }

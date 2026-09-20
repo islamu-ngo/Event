@@ -2,7 +2,6 @@ namespace Explore.Infrastructure.Tests.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
-using Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Infrastructure.ConfigurationManifest;
@@ -46,7 +45,7 @@ public sealed class ConfigurationManifestStartupCompositionTests
             .GetRequiredService<IConfigurationManifestEffectDeliveryStrategy>();
 
         await Assert.That(runner).IsTypeOf<ConfigurationManifestStartupRunner>();
-        await Assert.That(applier).IsTypeOf<ApplyConfigurationManifestCommandHandler>();
+        await Assert.That(applier).IsTypeOf<ConfigurationManifestApplier>();
         await Assert.That(effects)
             .IsTypeOf<DeferredConfigurationManifestEffectDelivery>();
         await Assert.That(scope.ServiceProvider

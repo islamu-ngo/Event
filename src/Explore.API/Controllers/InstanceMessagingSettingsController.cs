@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -7,8 +9,8 @@ using Explore.API.Hateoas;
 using Explore.API.Filters;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
-using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.API.Models;
+using Explore.Application.Models;
 using Explore.Application.Authorization;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Hateoas;
@@ -24,7 +26,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -47,15 +48,36 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class InstanceMessagingSettingsController : InstanceSettingsControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
+    private readonly ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>> _previewDisableCommand;
+    private readonly ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>> _disableCommand;
+    private readonly IQueryHandler<GetInstanceSmtpSettingsQuery, InstanceSmtpSettingsDto> _instanceSmtpQuery;
+    private readonly ICommandHandler<UpdateInstanceSmtpSettingsCommand, BaseCommandResponse<Guid>> _updateInstanceSmtpHandler;
+    private readonly IQueryHandler<TestInstanceSmtpConnectionQuery, EmailResult> _testSmtpConnectionQuery;
+    private readonly IQueryHandler<GetResolverConfigurationQuery, ResolverConfigurationDto> _resolverConfigQuery;
+    private readonly ICommandHandler<UpdateResolverConfigurationCommand, BaseCommandResponse<Guid>> _updateResolverConfigHandler;
 
     public InstanceMessagingSettingsController(
-        IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAdminContext adminContext,
-        ISetupSecretProvider setupSecretProvider)
+        ISetupSecretProvider setupSecretProvider,
+        ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>> previewDisableCommand,
+        ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>> disableCommand,
+        IQueryHandler<GetInstanceSmtpSettingsQuery, InstanceSmtpSettingsDto> instanceSmtpQuery,
+        ICommandHandler<UpdateInstanceSmtpSettingsCommand, BaseCommandResponse<Guid>> updateInstanceSmtpHandler,
+        IQueryHandler<TestInstanceSmtpConnectionQuery, EmailResult> testSmtpConnectionQuery,
+        IQueryHandler<GetResolverConfigurationQuery, ResolverConfigurationDto> resolverConfigQuery,
+        ICommandHandler<UpdateResolverConfigurationCommand, BaseCommandResponse<Guid>> updateResolverConfigHandler)
         : base(adminContext, setupSecretProvider)
     {
-        _mediator = mediator;
+        _identityQuery = identityQuery;
+        _previewDisableCommand = previewDisableCommand;
+        _disableCommand = disableCommand;
+        _instanceSmtpQuery = instanceSmtpQuery;
+        _updateInstanceSmtpHandler = updateInstanceSmtpHandler;
+        _testSmtpConnectionQuery = testSmtpConnectionQuery;
+        _resolverConfigQuery = resolverConfigQuery;
+        _updateResolverConfigHandler = updateResolverConfigHandler;
     }
 
     [HttpGet("smtp", Name = RouteNames.GetInstanceSmtpSettings)]
@@ -70,7 +92,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
         CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var settings = await _mediator.Send(new GetInstanceSmtpSettingsQuery(), cancellationToken);
+        var settings = await _instanceSmtpQuery.QueryAsync(new GetInstanceSmtpSettingsQuery(), cancellationToken);
         return Ok(await assembler.ToResource(settings, HttpContext));
     }
 
@@ -90,7 +112,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
         [FromServices] IResourceAssembler<EmailDeliveryDisablePreviewDto, EmailDeliveryDisablePreviewDto> assembler,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new PreviewEmailDeliveryDisableQuery(TenantId: null), cancellationToken);
+        var response = await _previewDisableCommand.ExecuteAsync(new PreviewEmailDeliveryDisableCommand(TenantId: null), cancellationToken);
         return response.IsSuccess
             ? Ok(await assembler.ToResource(response.Id!, HttpContext))
             : this.ToEmailDeliveryDisableProblem(response);
@@ -112,7 +134,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     public async Task<ActionResult<BaseCommandResponse<Guid>>> DisableSmtp(
         [FromBody] EmailDeliveryDisableRequest body, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new DisableEmailDeliveryCommand(TenantId: null,
+        var response = await _disableCommand.ExecuteAsync(new DisableEmailDeliveryCommand(TenantId: null,
             ExpectedRevision: body.ExpectedRevision, Acknowledgement: body.Acknowledgement,
             ConfirmationToken: body.ConfirmationToken), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToEmailDeliveryDisableProblem(response);
@@ -129,10 +151,10 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateSmtpSettings(
         [FromBody] PatchInstanceSmtpSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateInstanceSmtpSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
+        var response = await _updateInstanceSmtpHandler.ExecuteAsync(new UpdateInstanceSmtpSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
         return HandleCommandResponse(response);
     }
 
@@ -145,7 +167,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var result = await _mediator.Send(new TestInstanceSmtpConnectionQuery(), cancellationToken);
+        var result = await _testSmtpConnectionQuery.QueryAsync(new TestInstanceSmtpConnectionQuery(), cancellationToken);
 
         var message = result.Success
             ? (string.IsNullOrWhiteSpace(result.Message) ? "Connection successful." : result.Message)
@@ -162,7 +184,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     [ProducesResponseType(typeof(ResolverConfigurationDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ResolverConfigurationDto>> GetResolverConfiguration(CancellationToken cancellationToken = default)
     {
-        var configuration = await _mediator.Send(new GetResolverConfigurationQuery(), cancellationToken);
+        var configuration = await _resolverConfigQuery.QueryAsync(new GetResolverConfigurationQuery(), cancellationToken);
         return Ok(configuration);
     }
 
@@ -175,10 +197,10 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateResolverConfiguration(
         [FromBody] PatchResolverConfigurationDto configuration, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-        var response = await _mediator.Send(new UpdateResolverConfigurationCommand { UserId = userId.Value, Patch = configuration }, cancellationToken);
+        var response = await _updateResolverConfigHandler.ExecuteAsync(new UpdateResolverConfigurationCommand { UserId = userId.Value, Patch = configuration }, cancellationToken);
         return HandleCommandResponse(response);
     }
 }

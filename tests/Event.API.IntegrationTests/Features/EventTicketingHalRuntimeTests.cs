@@ -3,13 +3,17 @@ using System.Text;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
+using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTicketing;
+using Explore.Application.Features.EventTicketing.Handlers.Commands;
+using Explore.Application.Features.EventTicketing.Handlers.Queries;
 using Explore.Application.Features.EventTicketing.Requests.Commands;
 using Explore.Application.Features.EventTicketing.Requests.Queries;
+using Explore.Application.Operations;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -223,6 +227,12 @@ public sealed class EventTicketingHalRuntimeTests
         };
     }
 
+    private sealed class TicketingState
+    {
+        public EventTicketCatalogManagementDto? QueryResult { get; init; }
+        public BaseCommandResponse<Guid> PublishResult { get; init; } = BaseCommandResponse.Success(Guid.Empty);
+    }
+
     private sealed class TicketingFactory(
         EventTicketCatalogManagementDto? queryResult,
         IAuthorizationProvider authorizationProvider,
@@ -234,30 +244,57 @@ public sealed class EventTicketingHalRuntimeTests
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IRequestHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>>();
-                services.AddSingleton<IRequestHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>>(
-                    new QueryHandler(queryResult));
-                services.RemoveAll<IRequestHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>>();
-                services.AddSingleton<IRequestHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>>(
-                    new PublishHandler(publishResult ?? BaseCommandResponse.Success(Guid.Empty)));
+                services.AddSingleton(new TicketingState
+                {
+                    QueryResult = queryResult,
+                    PublishResult = publishResult ?? BaseCommandResponse.Success(Guid.Empty)
+                });
+
+                var catalog = services.SingleOrDefault(d => d.ServiceType == typeof(NativeOperationCatalog))?.ImplementationInstance as NativeOperationCatalog;
+                Type[] prodHandlers =
+                [
+                    typeof(GetEventTicketCatalogManagementQueryHandler),
+                    typeof(PublishEventTicketCatalogCommandHandler)
+                ];
+
+                if (catalog is not null)
+                {
+                    foreach (var prod in prodHandlers)
+                    {
+                        var entries = catalog.Registrations.Where(r => r.Implementation == prod).ToArray();
+                        foreach (var entry in entries)
+                        {
+                            catalog.Registrations.Remove(entry);
+                            services.Remove(entry.PublicDescriptor);
+                            services.Remove(entry.ConcreteDescriptor);
+                        }
+                    }
+                }
+
+                services.AddNativeOperations([
+                    typeof(GetEventTicketCatalogManagementQuery),
+                    typeof(QueryHandler),
+                    typeof(PublishEventTicketCatalogCommand),
+                    typeof(PublishHandler)
+                ]);
             });
         }
     }
 
-    private sealed class QueryHandler(EventTicketCatalogManagementDto? result)
-        : IRequestHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>
+    private sealed class QueryHandler(TicketingState state)
+        : IQueryHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>
     {
-        public Task<EventTicketCatalogManagementDto?> Handle(
-            GetEventTicketCatalogManagementQuery request,
-            CancellationToken cancellationToken) => Task.FromResult(result);
+        public Task<EventTicketCatalogManagementDto?> QueryAsync(
+            GetEventTicketCatalogManagementQuery query,
+            CancellationToken cancellationToken = default) => Task.FromResult(state.QueryResult);
     }
 
-    private sealed class PublishHandler(BaseCommandResponse<Guid> result)
-        : IRequestHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>
+    private sealed class PublishHandler(TicketingState state)
+        : ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>
     {
-        public Task<BaseCommandResponse<Guid>> Handle(
-            PublishEventTicketCatalogCommand request,
-            CancellationToken cancellationToken) => Task.FromResult(result);
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            PublishEventTicketCatalogCommand command,
+            CancellationToken cancellationToken = default) => Task.FromResult(state.PublishResult);
     }
 
     private sealed class TicketingAuthorizationProvider : IAuthorizationProvider

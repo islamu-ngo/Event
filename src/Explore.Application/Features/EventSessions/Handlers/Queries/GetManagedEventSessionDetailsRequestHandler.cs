@@ -1,17 +1,16 @@
-using AutoMapper;
+using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 
 public sealed class GetManagedEventSessionDetailsRequestHandler(
-    IEventSessionRepository eventSessionRepository,
-    IMapper mapper)
-    : IRequestHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?>
+    IEventSessionRepository eventSessionRepository)
+    : IQueryHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?>
 {
-    public async Task<EventSessionDto?> Handle(
+    public async Task<EventSessionDto?> QueryAsync(
         GetManagedEventSessionDetailsRequest request,
         CancellationToken cancellationToken)
     {
@@ -19,7 +18,7 @@ public sealed class GetManagedEventSessionDetailsRequestHandler(
         if (session?.EventId != request.EventId)
             return null;
 
-        var dto = mapper.Map<EventSessionDto>(session);
+        var dto = EventSessionMapper.ToDetail(session);
         dto.LocationId = session.LocationId;
         dto.LocationFullName = session.Location?.FullName;
         dto.LocationAddress = session.Location?.Address;

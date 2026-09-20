@@ -6,8 +6,8 @@ using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Application.Features.Webhooks.Validators;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Commands;
 
@@ -19,9 +19,9 @@ public sealed class RedriveIncomingWebhookEffectCommandHandler(
     ICurrentUserService currentUserService,
     IMachinePrincipalAccessor machinePrincipalAccessor,
     TimeProvider timeProvider)
-    : IRequestHandler<RedriveIncomingWebhookEffectCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RedriveIncomingWebhookEffectCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         RedriveIncomingWebhookEffectCommand request,
         CancellationToken cancellationToken)
     {

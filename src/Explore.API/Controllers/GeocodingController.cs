@@ -4,10 +4,10 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Geocoding;
-using Explore.Application.Features.Geocoding.Requests.Queries;
+using Explore.Application.Features.Geocoding.Requests.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -20,7 +20,7 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Route("api/geocoding")]
 public sealed class GeocodingController(
-    IMediator mediator,
+    ICommandHandler<CreateAddressSuggestionsCommand, AddressSuggestionsResponseDto> createSuggestions,
     ITenantContext tenantContext,
     IResourceAssembler<AddressSuggestionDto, AddressSuggestionDto> assembler)
     : ControllerBase
@@ -44,8 +44,8 @@ public sealed class GeocodingController(
             [FromBody] AddressSuggestionsRequestDto request,
             CancellationToken cancellationToken = default)
     {
-        AddressSuggestionsResponseDto response = await mediator.Send(
-            new GetAddressSuggestionsQuery(tenantContext.TenantId, request),
+        AddressSuggestionsResponseDto response = await createSuggestions.ExecuteAsync(
+            new CreateAddressSuggestionsCommand(tenantContext.TenantId, request),
             cancellationToken);
         HalCollectionResource<AddressSuggestionDto> suggestionResources =
             await assembler.ToCollectionResource(

@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageTeam)]
-public sealed record AssignEventRoleByEmailCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record AssignEventRoleByEmailCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid EventId { get; init; }

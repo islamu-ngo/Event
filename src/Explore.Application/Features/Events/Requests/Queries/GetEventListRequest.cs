@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Requests.Queries;
 
-public sealed record GetEventListRequest : IRequest<PaginatedResult<EventListDto>>
+public sealed record GetEventListRequest : IQuery<PaginatedResult<EventListDto>>
 {
     public Guid Id { get; init; }
 

@@ -10,7 +10,7 @@ using Explore.Application.Features.EventPublicActions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -43,14 +43,29 @@ public sealed class EventPublicActionController : EventControllerBase
         "Event public action not found",
         "The requested event public action was not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventPublicActionsRequest, IReadOnlyList<EventPublicActionDto>> _listQuery;
+    private readonly IQueryHandler<GetEventPublicActionRequest, EventPublicActionDto?> _detailQuery;
+    private readonly ICommandHandler<CreateEventPublicActionCommand, BaseCommandResponse<Guid>> _createCommand;
+    private readonly ICommandHandler<UpdateEventPublicActionCommand, BaseCommandResponse<Guid>> _updateCommand;
+    private readonly ICommandHandler<DeleteEventPublicActionCommand, BaseCommandResponse<Guid>> _deleteCommand;
+    private readonly ICommandHandler<RecordEventPublicActionEngagementCommand> _engagementCommand;
     private readonly IResourceAssembler<EventPublicActionDto, EventPublicActionDto> _resourceAssembler;
 
     public EventPublicActionController(
-        IMediator mediator,
+        IQueryHandler<GetEventPublicActionsRequest, IReadOnlyList<EventPublicActionDto>> listQuery,
+        IQueryHandler<GetEventPublicActionRequest, EventPublicActionDto?> detailQuery,
+        ICommandHandler<CreateEventPublicActionCommand, BaseCommandResponse<Guid>> createCommand,
+        ICommandHandler<UpdateEventPublicActionCommand, BaseCommandResponse<Guid>> updateCommand,
+        ICommandHandler<DeleteEventPublicActionCommand, BaseCommandResponse<Guid>> deleteCommand,
+        ICommandHandler<RecordEventPublicActionEngagementCommand> engagementCommand,
         IResourceAssembler<EventPublicActionDto, EventPublicActionDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _listQuery = listQuery;
+        _detailQuery = detailQuery;
+        _createCommand = createCommand;
+        _updateCommand = updateCommand;
+        _deleteCommand = deleteCommand;
+        _engagementCommand = engagementCommand;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -67,7 +82,7 @@ public sealed class EventPublicActionController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var actions = await _mediator.Send(
+        var actions = await _listQuery.QueryAsync(
             new GetEventPublicActionsRequest(eventId),
             cancellationToken);
 
@@ -94,7 +109,7 @@ public sealed class EventPublicActionController : EventControllerBase
         Guid actionId,
         CancellationToken cancellationToken = default)
     {
-        var action = await _mediator.Send(
+        var action = await _detailQuery.QueryAsync(
             new GetEventPublicActionRequest(eventId, actionId),
             cancellationToken);
         if (action is null)
@@ -120,7 +135,7 @@ public sealed class EventPublicActionController : EventControllerBase
         [FromQuery] string? surface,
         CancellationToken cancellationToken = default)
     {
-        var action = await _mediator.Send(
+        var action = await _detailQuery.QueryAsync(
             new GetEventPublicActionRequest(eventId, actionId),
             cancellationToken);
         if (action is null)
@@ -128,7 +143,7 @@ public sealed class EventPublicActionController : EventControllerBase
             return this.ToNotFoundProblem(PublicActionNotFoundProblem);
         }
 
-        await _mediator.Send(
+        await _engagementCommand.ExecuteAsync(
             new RecordEventPublicActionEngagementCommand((EventPublicActionKindEnum)action.KindId, surface),
             cancellationToken);
 
@@ -151,7 +166,7 @@ public sealed class EventPublicActionController : EventControllerBase
         [FromBody] ManageEventPublicActionDto action,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _createCommand.ExecuteAsync(
             new CreateEventPublicActionCommand
             {
                 EventId = eventId,
@@ -187,7 +202,7 @@ public sealed class EventPublicActionController : EventControllerBase
         [FromBody] ManageEventPublicActionDto action,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _updateCommand.ExecuteAsync(
             new UpdateEventPublicActionCommand
             {
                 EventId = eventId,
@@ -227,7 +242,7 @@ public sealed class EventPublicActionController : EventControllerBase
                 "If-Match header is required and must contain the current event public action concurrency stamp.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _deleteCommand.ExecuteAsync(
             new DeleteEventPublicActionCommand
             {
                 EventId = eventId,

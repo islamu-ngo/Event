@@ -1,10 +1,10 @@
 using System.ComponentModel;
 using System.Text.Json;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
@@ -13,7 +13,8 @@ namespace Explore.API.Mcp;
 
 [McpServerResourceType]
 public sealed class EventManagementMcpResources(
-    IMediator mediator,
+    IQueryHandler<GetEventManagementDetailsRequest, EventDto?> eventManagementDetailsHandler,
+    IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?> eventPublishReadinessHandler,
     IResourceAssembler<EventDto, EventListDto> eventResourceAssembler,
     IHttpContextAccessor httpContextAccessor)
 {
@@ -45,7 +46,7 @@ public sealed class EventManagementMcpResources(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        EventDto? eventDto = await mediator.Send(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
+        EventDto? eventDto = await eventManagementDetailsHandler.QueryAsync(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
         if (eventDto is null)
         {
             return Serialize(EventMcpManagementContextResultDescriptor.NotFound(eventId));
@@ -56,7 +57,7 @@ public sealed class EventManagementMcpResources(
 
         var halResource = await eventResourceAssembler.ToResource(eventDto, httpContext);
         var publishReadiness = halResource.Links.ContainsKey(LinkRelations.PublishReadiness)
-            ? await mediator.Send(new GetEventPublishReadinessRequest { Id = eventDto.Id }, cancellationToken)
+            ? await eventPublishReadinessHandler.QueryAsync(new GetEventPublishReadinessRequest { Id = eventDto.Id }, cancellationToken)
             : null;
 
         var descriptor = new EventMcpManagementContextResultDescriptor(

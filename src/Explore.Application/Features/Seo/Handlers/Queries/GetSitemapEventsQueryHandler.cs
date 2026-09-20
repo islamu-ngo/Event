@@ -1,16 +1,16 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Seo;
 using Explore.Application.Features.Seo.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Seo.Handlers.Queries;
 
 public sealed class GetSitemapEventsQueryHandler(IEventRepository eventRepository)
-    : IRequestHandler<GetSitemapEventsQuery, IReadOnlyList<SitemapEventEntryDto>>
+    : IQueryHandler<GetSitemapEventsQuery, IReadOnlyList<SitemapEventEntryDto>>
 {
     private const int SitemapProtocolUrlLimit = 50_000;
 
-    public async Task<IReadOnlyList<SitemapEventEntryDto>> Handle(
+    public async Task<IReadOnlyList<SitemapEventEntryDto>> QueryAsync(
         GetSitemapEventsQuery request,
         CancellationToken cancellationToken)
     {

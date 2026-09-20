@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding.Validators;
@@ -6,7 +7,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
@@ -15,9 +15,9 @@ public sealed class CompleteInstanceOnboardingCommandHandler(
     IUserRepository userRepository,
     IDeploymentModeProvider deploymentModeProvider,
     InstanceOnboardingCompletionOperation completionOperation)
-    : IRequestHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CompleteInstanceOnboardingCommand request,
         CancellationToken cancellationToken)
     {

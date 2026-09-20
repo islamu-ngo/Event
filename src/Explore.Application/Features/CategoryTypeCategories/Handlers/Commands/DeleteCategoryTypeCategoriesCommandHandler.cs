@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.CategoryTypeCategories.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CategoryTypeCategories.Handlers.Commands;
 
-public class DeleteCategoryTypeCategoriesCommandHandler : IRequestHandler<DeleteCategoryTypeCategoriesCommand, bool>
+public class DeleteCategoryTypeCategoriesCommandHandler : ICommandHandler<DeleteCategoryTypeCategoriesCommand, bool>
 {
     private readonly ICategoryTypeCategoriesRepository _repository;
 
@@ -13,7 +13,7 @@ public class DeleteCategoryTypeCategoriesCommandHandler : IRequestHandler<Delete
         _repository = repository;
     }
 
-    public async Task<bool> Handle(DeleteCategoryTypeCategoriesCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteCategoryTypeCategoriesCommand request, CancellationToken cancellationToken)
     {
         var categoryTypeCategories = await _repository.GetById(request.Id);
         if (categoryTypeCategories == null)

@@ -7,8 +7,8 @@ using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationOrders.Validators;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
 
@@ -18,9 +18,9 @@ public sealed class GetGuestRegistrationOrderQueryHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider)
-    : IRequestHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>
+    : IQueryHandler<GetGuestRegistrationOrderQuery, GuestRegistrationOrderDto?>
 {
-    public async Task<GuestRegistrationOrderDto?> Handle(GetGuestRegistrationOrderQuery request, CancellationToken cancellationToken)
+    public async Task<GuestRegistrationOrderDto?> QueryAsync(GetGuestRegistrationOrderQuery request, CancellationToken cancellationToken)
     {
         var command = new ContinueGuestRegistrationOrderCommand(request.EventId, request.OrderId, request.CapabilityToken);
         if (!(await new GuestRegistrationOrderAccessCommandValidator<ContinueGuestRegistrationOrderCommand>()
@@ -48,10 +48,10 @@ public sealed class GetGuestNativeRegistrationRequirementProgressQueryHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
-    : IRequestHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
+    IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler)
+    : IQueryHandler<GetGuestNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
-    public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
+    public async Task<NativeRegistrationRequirementProgressCollectionDto?> QueryAsync(
         GetGuestNativeRegistrationRequirementProgressQuery request,
         CancellationToken cancellationToken)
     {
@@ -68,7 +68,7 @@ public sealed class GetGuestNativeRegistrationRequirementProgressQueryHandler(
             return null;
         }
 
-        return await sender.Send(new GetNativeRegistrationRequirementProgressQuery(
+        return await progressHandler.QueryAsync(new GetNativeRegistrationRequirementProgressQuery(
             tenant.TenantId, request.EventId, request.OrderId), cancellationToken);
     }
 }

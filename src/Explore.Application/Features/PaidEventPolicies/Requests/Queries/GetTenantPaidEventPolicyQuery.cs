@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.PaidEventPolicies;
-using MediatR;
 
 namespace Explore.Application.Features.PaidEventPolicies.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.TenantSetting, AuthorizationActions.TenantSettings.View)]
-public sealed record GetTenantPaidEventPolicyQuery(Guid TenantId) : IRequest<PaidEventPolicyDto?>, ISecureRequest
+public sealed record GetTenantPaidEventPolicyQuery(Guid TenantId) : IQuery<PaidEventPolicyDto?>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => TenantId == Guid.Empty ? null : $"{TenantId}:paid-event-policy";
 
@@ -14,7 +14,7 @@ public sealed record GetTenantPaidEventPolicyQuery(Guid TenantId) : IRequest<Pai
 
 [AuthorizeResource(ResourceKinds.TenantSetting, AuthorizationActions.TenantSettings.View)]
 public sealed record GetTenantPaidEventPolicyConfigurationQuery(Guid TenantId)
-    : IRequest<TenantPaidEventPolicyConfigurationDto?>, ISecureRequest
+    : IQuery<TenantPaidEventPolicyConfigurationDto?>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => TenantId == Guid.Empty ? null : $"{TenantId}:paid-event-policy";
 

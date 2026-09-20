@@ -7,7 +7,7 @@ using Explore.Application.DTOs.CustomPropertyGovernance;
 using Explore.Application.Features.CustomPropertyGovernance.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -21,7 +21,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
-public class CustomPropertyGovernanceController(IMediator mediator) : ControllerBase
+public class CustomPropertyGovernanceController(
+    IQueryHandler<GetCustomPropertyGovernanceReportQuery, PaginatedResult<CustomPropertyGovernanceRowDto>> governanceQuery) : ControllerBase
 {
 
     /// <summary>
@@ -36,7 +37,7 @@ public class CustomPropertyGovernanceController(IMediator mediator) : Controller
         [FromQuery] CustomPropertyGovernanceReportQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await governanceQuery.QueryAsync(
             new GetCustomPropertyGovernanceReportQuery
             {
                 TenantId = query.TenantId,

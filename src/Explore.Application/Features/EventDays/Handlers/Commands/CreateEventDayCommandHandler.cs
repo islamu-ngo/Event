@@ -1,34 +1,30 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay.Validators;
 using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Handlers.Commands;
 
-public class CreateEventDayCommandHandler : IRequestHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>
+public class CreateEventDayCommandHandler : ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventDayRepository _eventDayRepository;
     private readonly IEventRepository _eventRepository;
-    private readonly IMapper _mapper;
     private readonly IStorageObjectRepository _storageObjectRepository;
 
     public CreateEventDayCommandHandler(
         IEventDayRepository eventDayRepository,
         IEventRepository eventRepository,
-        IStorageObjectRepository storageObjectRepository,
-        IMapper mapper)
+        IStorageObjectRepository storageObjectRepository)
     {
         _eventDayRepository = eventDayRepository;
         _eventRepository = eventRepository;
         _storageObjectRepository = storageObjectRepository;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventDayCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventDayCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventDayDtoValidator(_eventRepository, _eventDayRepository);
         var validationResult = await validator.ValidateAsync(request.EventDayDto, cancellationToken);
@@ -58,7 +54,20 @@ public class CreateEventDayCommandHandler : IRequestHandler<CreateEventDayComman
                 "Event day creation failed.");
         }
 
-        var eventDay = _mapper.Map<EventDay>(request.EventDayDto);
+        var eventDay = new EventDay
+        {
+            EventId = request.EventDayDto.EventId,
+            LocalDate = request.EventDayDto.LocalDate,
+            Label = request.EventDayDto.Label,
+            Description = request.EventDayDto.Description,
+            BannerText = request.EventDayDto.BannerText,
+            BannerImageId = request.EventDayDto.BannerImageId,
+            IsPublished = request.EventDayDto.IsPublished,
+            SortOrder = request.EventDayDto.SortOrder,
+            AllowsDayScopeRegistration = request.EventDayDto.AllowsDayScopeRegistration,
+            Event = null!,
+            Tenant = null!
+        };
         eventDay.TenantId = parentEvent.TenantId;
 
         eventDay = await _eventDayRepository.Create(eventDay);

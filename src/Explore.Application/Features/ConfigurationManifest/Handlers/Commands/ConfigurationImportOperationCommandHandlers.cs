@@ -2,14 +2,14 @@ namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public sealed class ApplyInstanceConfigurationImportCommandHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : ICommandHandler<
         ApplyInstanceConfigurationImportCommand,
         ConfigurationImportOperationResult>
 {
-    public Task<ConfigurationImportOperationResult> Handle(
+    public Task<ConfigurationImportOperationResult> ExecuteAsync(
         ApplyInstanceConfigurationImportCommand request,
         CancellationToken cancellationToken) =>
         service.ApplyInstanceAsync(
@@ -22,11 +22,11 @@ public sealed class ApplyInstanceConfigurationImportCommandHandler(
 }
 
 public sealed class ApplyTenantConfigurationImportCommandHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : ICommandHandler<
         ApplyTenantConfigurationImportCommand,
         ConfigurationImportOperationResult>
 {
-    public Task<ConfigurationImportOperationResult> Handle(
+    public Task<ConfigurationImportOperationResult> ExecuteAsync(
         ApplyTenantConfigurationImportCommand request,
         CancellationToken cancellationToken) =>
         service.ApplyTenantAsync(
@@ -40,11 +40,11 @@ public sealed class ApplyTenantConfigurationImportCommandHandler(
 }
 
 public sealed class CreateInstanceConfigurationRollbackSessionCommandHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : ICommandHandler<
         CreateInstanceConfigurationRollbackSessionCommand,
         ConfigurationImportRollbackSessionCreatedResult>
 {
-    public Task<ConfigurationImportRollbackSessionCreatedResult> Handle(
+    public Task<ConfigurationImportRollbackSessionCreatedResult> ExecuteAsync(
         CreateInstanceConfigurationRollbackSessionCommand request,
         CancellationToken cancellationToken) =>
         service.CreateRollbackSessionAsync(
@@ -54,11 +54,11 @@ public sealed class CreateInstanceConfigurationRollbackSessionCommandHandler(
 }
 
 public sealed class CreateTenantConfigurationRollbackSessionCommandHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : ICommandHandler<
         CreateTenantConfigurationRollbackSessionCommand,
         ConfigurationImportRollbackSessionCreatedResult>
 {
-    public Task<ConfigurationImportRollbackSessionCreatedResult> Handle(
+    public Task<ConfigurationImportRollbackSessionCreatedResult> ExecuteAsync(
         CreateTenantConfigurationRollbackSessionCommand request,
         CancellationToken cancellationToken) =>
         service.CreateRollbackSessionAsync(

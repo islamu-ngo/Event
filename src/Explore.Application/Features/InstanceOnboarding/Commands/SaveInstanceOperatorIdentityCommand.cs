@@ -4,12 +4,12 @@ using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Settings.Documents.Payloads;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Command to save candidate instance operator identity settings.
 /// </summary>
-public sealed record SaveInstanceOperatorIdentityCommand : IRequest<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>
+public sealed record SaveInstanceOperatorIdentityCommand : ICommand<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>
 {
     public SaveInstanceOperatorIdentityRequestDto Request { get; init; } = new();
 }
@@ -19,9 +19,9 @@ public sealed record SaveInstanceOperatorIdentityCommand : IRequest<BaseCommandR
 /// </summary>
 public sealed class SaveInstanceOperatorIdentityCommandHandler(
     InstanceOperatorIdentityService identityService)
-    : IRequestHandler<SaveInstanceOperatorIdentityCommand, BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>
+    : ICommandHandler<SaveInstanceOperatorIdentityCommand, BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>
 {
-    public async Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>> Handle(
+    public async Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>> ExecuteAsync(
         SaveInstanceOperatorIdentityCommand command,
         CancellationToken cancellationToken)
     {

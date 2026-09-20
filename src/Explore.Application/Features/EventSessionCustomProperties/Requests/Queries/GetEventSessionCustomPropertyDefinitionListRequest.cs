@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Requests.Queries;
 
-public sealed record GetEventSessionCustomPropertyDefinitionListRequest : IRequest<PaginatedResult<EventSessionCustomPropertyDefinitionListDto>>
+public sealed record GetEventSessionCustomPropertyDefinitionListRequest : IQuery<PaginatedResult<EventSessionCustomPropertyDefinitionListDto>>
 {
     public Guid EventSessionId { get; init; }
     public int PageNumber { get; init; } = 1;

@@ -17,7 +17,8 @@ using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -33,7 +34,7 @@ internal static class ConfigurationManifestApplicationTestSupport
         IConfigurationManifestFailureRecorder failureRecorder,
         bool useRealPolicyBoundary = false,
         ITenantCreationService? tenantCreationService = null,
-        IPublisher? effectPublisher = null,
+        INotificationHandler<SettingChangedNotification>? effectConsumer = null,
         ISettingMutationLock? mutationLock = null)
     {
         var unitOfWork = new EfCoreUnitOfWork(context);
@@ -63,13 +64,12 @@ internal static class ConfigurationManifestApplicationTestSupport
 
         var settingsResolver = Substitute.For<IHierarchicalSettingsResolver>();
         var typedSettingsDocumentResolver = Substitute.For<ITypedSettingsDocumentResolver>();
-        IPublisher publisher = effectPublisher ?? new NullPublisher();
         var effectDispatcher = new ConfigurationManifestEffectDispatcher(
             operationRepository,
             settingsResolver,
             typedSettingsDocumentResolver,
-            publisher);
-        return new ApplyConfigurationManifestCommandHandler(
+            effectConsumer is null ? [] : [effectConsumer]);
+        var applier = new ConfigurationManifestApplier(
             preflight,
             lockBoundary,
             unitOfWork,
@@ -84,7 +84,7 @@ internal static class ConfigurationManifestApplicationTestSupport
             new ConfigurationManifestInstanceSettingMutationBoundary(
                 new SettingUpsertService(
                     new SystemSettingRepository(context, lockBoundary),
-                    Substitute.For<IMediator>(),
+                    [],
                     policyBoundary,
                     Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, lockBoundary)),
                 policyBoundary),
@@ -95,7 +95,8 @@ internal static class ConfigurationManifestApplicationTestSupport
             new ConfigurationManifestEffectDelivery(
                 new OutboxRepository(context),
                 effectDispatcher),
-            NullLogger<ApplyConfigurationManifestCommandHandler>.Instance);
+            NullLogger<ConfigurationManifestApplier>.Instance);
+        return new ApplyConfigurationManifestCommandHandler(applier);
     }
 
     public static ConfigurationManifestReadResult Source(params string[] slugs)
@@ -362,15 +363,4 @@ internal static class ConfigurationManifestApplicationTestSupport
         return document.RootElement.Clone();
     }
 
-    private sealed class NullPublisher : IPublisher
-    {
-        public Task Publish<TNotification>(
-            TNotification notification,
-            CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
-
-        public Task Publish(
-            object notification,
-            CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
 }

@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Roles.Requests.Commands;
 
-public sealed record CreateCustomRoleCommand : IRequest<BaseCommandResponse<int>>
+public sealed record CreateCustomRoleCommand : ICommand<BaseCommandResponse<int>>
 {
     public required string FullName { get; init; }
     public string? Description { get; init; }

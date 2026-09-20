@@ -1,14 +1,14 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
 public sealed class DownloadAuthorizationPolicyPackageQueryHandler(IPolicyPackageService policyPackageService)
-    : IRequestHandler<DownloadAuthorizationPolicyPackageQuery, PolicyPackageArchive>
+    : IQueryHandler<DownloadAuthorizationPolicyPackageQuery, PolicyPackageArchive>
 {
-    public Task<PolicyPackageArchive> Handle(
+    public Task<PolicyPackageArchive> QueryAsync(
         DownloadAuthorizationPolicyPackageQuery request,
         CancellationToken cancellationToken)
     {

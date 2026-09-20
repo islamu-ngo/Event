@@ -1,0 +1,29 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DG2DDBD2KP4PPQPD6F3SN1
+Title: "Assign shared definition identity before creating options"
+Type: fix
+Scope: discovery
+Summary: "Shared option definitions can be created with their choices and default using server-owned identifiers in one transaction."
+Group: custom-property-option-identities
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/custom-properties.md
+    Disposition: documented
+    Detail: "Creating shared option definitions no longer fails because their child references use an empty parent identity. No migration or manual data repair is required."

@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
@@ -14,9 +14,9 @@ public class RotateKeycloakClientSecretCommandHandler(
     IKeycloakBootstrapService keycloakBootstrapService,
     IJwtAuthorityRefreshNotifier jwtAuthorityRefreshNotifier,
     ILogger<RotateKeycloakClientSecretCommandHandler> logger)
-    : IRequestHandler<RotateKeycloakClientSecretCommand, KeycloakClientSecretRotationResultDto>
+    : ICommandHandler<RotateKeycloakClientSecretCommand, KeycloakClientSecretRotationResultDto>
 {
-    public async Task<KeycloakClientSecretRotationResultDto> Handle(
+    public async Task<KeycloakClientSecretRotationResultDto> ExecuteAsync(
         RotateKeycloakClientSecretCommand request,
         CancellationToken cancellationToken)
     {

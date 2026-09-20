@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Requests.Commands;
 using Explore.Infrastructure.Services.Federation;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -14,15 +14,15 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task ReconcilePdsSnapshotsDispatchesExactCommandAndCancellationThroughFreshAsyncScope()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var command = RecoveryCommand();
         using var cancellation = new CancellationTokenSource();
         var expected = new AtprotoPdsRecoveryResult(AtprotoPdsRecoveryOutcome.Unchanged, new string('a', 64));
-        mediator.Send(command, cancellation.Token).Returns(expected);
+        handler.ExecuteAsync(command, cancellation.Token).Returns(expected);
         IAsyncDisposable scopeProbe = Substitute.For<IAsyncDisposable>();
         (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) fixture =
-            CreateRecoveryStore(mediator, invalidator, scopeProbe);
+            CreateRecoveryStore(handler, invalidator, scopeProbe);
         await using ServiceProvider provider = fixture.Provider;
 
         AtprotoPdsRecoveryResult result = await fixture.Store.ReconcilePdsSnapshotsAsync(
@@ -30,7 +30,7 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
             cancellation.Token);
 
         await Assert.That(result).IsEqualTo(expected);
-        await mediator.Received(1).Send(
+        await handler.Received(1).ExecuteAsync(
             Arg.Is<ReconcileAtprotoPdsSnapshotsCommand>(actual => ReferenceEquals(actual, command)),
             cancellation.Token);
         await scopeProbe.Received(1).DisposeAsync();
@@ -39,15 +39,15 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task CompletedRecoveryInvalidatesDiscoveryCacheOnceAfterMediatorCompletes()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var command = RecoveryCommand();
         using var cancellation = new CancellationTokenSource();
         var completion = new TaskCompletionSource<AtprotoPdsRecoveryResult>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        mediator.Send(command, cancellation.Token).Returns(completion.Task);
+        handler.ExecuteAsync(command, cancellation.Token).Returns(completion.Task);
         (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) fixture =
-            CreateRecoveryStore(mediator, invalidator);
+            CreateRecoveryStore(handler, invalidator);
         await using ServiceProvider provider = fixture.Provider;
 
         Task<AtprotoPdsRecoveryResult> recovery = fixture.Store.ReconcilePdsSnapshotsAsync(
@@ -76,13 +76,13 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     public async Task NonCompletedRecoveryDoesNotInvalidateDiscoveryCache(
         AtprotoPdsRecoveryOutcome outcome)
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var command = RecoveryCommand();
         var expected = new AtprotoPdsRecoveryResult(outcome, new string('d', 64));
-        mediator.Send(command, CancellationToken.None).Returns(expected);
+        handler.ExecuteAsync(command, CancellationToken.None).Returns(expected);
         (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) fixture =
-            CreateRecoveryStore(mediator, invalidator);
+            CreateRecoveryStore(handler, invalidator);
         await using ServiceProvider provider = fixture.Provider;
 
         AtprotoPdsRecoveryResult result = await fixture.Store.ReconcilePdsSnapshotsAsync(
@@ -96,14 +96,14 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task CompletedRecoveryWithoutRegisteredInvalidatorReturnsResult()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>();
         var command = RecoveryCommand();
         var expected = new AtprotoPdsRecoveryResult(
             AtprotoPdsRecoveryOutcome.Completed,
             new string('e', 64));
-        mediator.Send(command, CancellationToken.None).Returns(expected);
+        handler.ExecuteAsync(command, CancellationToken.None).Returns(expected);
         (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) fixture =
-            CreateRecoveryStore(mediator);
+            CreateRecoveryStore(handler);
         await using ServiceProvider provider = fixture.Provider;
 
         AtprotoPdsRecoveryResult result = await fixture.Store.ReconcilePdsSnapshotsAsync(
@@ -116,14 +116,14 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task MediatorFailureDoesNotInvalidateDiscoveryCache()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var command = RecoveryCommand();
         var expected = new InvalidOperationException("simulated_mediator_failure");
-        mediator.Send(command, CancellationToken.None)
+        handler.ExecuteAsync(command, CancellationToken.None)
             .Returns(Task.FromException<AtprotoPdsRecoveryResult>(expected));
         (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) fixture =
-            CreateRecoveryStore(mediator, invalidator);
+            CreateRecoveryStore(handler, invalidator);
         await using ServiceProvider provider = fixture.Provider;
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -136,39 +136,39 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task CanceledMediatorSendDoesNotInvalidateDiscoveryCache()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var command = RecoveryCommand();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        mediator.Send(command, cancellation.Token)
+        handler.ExecuteAsync(command, cancellation.Token)
             .Returns(Task.FromCanceled<AtprotoPdsRecoveryResult>(cancellation.Token));
         (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) fixture =
-            CreateRecoveryStore(mediator, invalidator);
+            CreateRecoveryStore(handler, invalidator);
         await using ServiceProvider provider = fixture.Provider;
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => fixture.Store.ReconcilePdsSnapshotsAsync(command, cancellation.Token));
 
-        await mediator.Received(1).Send(command, cancellation.Token);
+        await handler.Received(1).ExecuteAsync(command, cancellation.Token);
         await invalidator.DidNotReceiveWithAnyArgs().InvalidateAsync(default);
     }
 
     [Test]
     public async Task ApplyDispatchesImportCommandWithExactRequestCancellationAndResult()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ImportAtprotoFederatedEventCommand, bool>>();
         IAtprotoJetstreamRepository repository = Substitute.For<IAtprotoJetstreamRepository>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         AtprotoJetstreamApplyRequest request = Request(affectsDiscovery: false);
         using var cancellation = new CancellationTokenSource();
-        mediator.Send(
+        handler.ExecuteAsync(
                 Arg.Any<ImportAtprotoFederatedEventCommand>(),
                 cancellation.Token)
             .Returns(true);
         repository.TryApplyAndAdvanceAsync(request, cancellation.Token).Returns(false);
         var services = new ServiceCollection();
-        services.AddScoped(_ => mediator);
+        services.AddScoped(_ => handler);
         services.AddScoped(_ => repository);
         services.AddScoped(_ => invalidator);
         await using ServiceProvider provider = services.BuildServiceProvider();
@@ -179,7 +179,7 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
         bool applied = await store.TryApplyAndAdvanceAsync(request, cancellation.Token);
 
         await Assert.That(applied).IsTrue();
-        await mediator.Received(1).Send(
+        await handler.Received(1).ExecuteAsync(
             Arg.Is<ImportAtprotoFederatedEventCommand>(
                 command => command != null
                     && ReferenceEquals(command.ApplyRequest, request)),
@@ -191,11 +191,11 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task SuccessfulApplyInvalidatesDiscoveryCacheAfterImportCommandCompletes()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ImportAtprotoFederatedEventCommand, bool>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
-        mediator.Send(Arg.Any<ImportAtprotoFederatedEventCommand>(), Arg.Any<CancellationToken>())
+        handler.ExecuteAsync(Arg.Any<ImportAtprotoFederatedEventCommand>(), Arg.Any<CancellationToken>())
             .Returns(true);
-        AtprotoJetstreamRuntimeStore store = CreateStore(mediator, invalidator);
+        AtprotoJetstreamRuntimeStore store = CreateStore(handler, invalidator);
 
         bool applied = await store.TryApplyAndAdvanceAsync(Request(affectsDiscovery: true), CancellationToken.None);
 
@@ -206,11 +206,11 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task RejectedApplyDoesNotInvalidateDiscoveryCache()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ImportAtprotoFederatedEventCommand, bool>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
-        mediator.Send(Arg.Any<ImportAtprotoFederatedEventCommand>(), Arg.Any<CancellationToken>())
+        handler.ExecuteAsync(Arg.Any<ImportAtprotoFederatedEventCommand>(), Arg.Any<CancellationToken>())
             .Returns(false);
-        AtprotoJetstreamRuntimeStore store = CreateStore(mediator, invalidator);
+        AtprotoJetstreamRuntimeStore store = CreateStore(handler, invalidator);
 
         bool applied = await store.TryApplyAndAdvanceAsync(Request(affectsDiscovery: true), CancellationToken.None);
 
@@ -221,11 +221,11 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task SuccessfulUnrelatedApplyDoesNotInvalidateDiscoveryCache()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ImportAtprotoFederatedEventCommand, bool>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
-        mediator.Send(Arg.Any<ImportAtprotoFederatedEventCommand>(), Arg.Any<CancellationToken>())
+        handler.ExecuteAsync(Arg.Any<ImportAtprotoFederatedEventCommand>(), Arg.Any<CancellationToken>())
             .Returns(true);
-        AtprotoJetstreamRuntimeStore store = CreateStore(mediator, invalidator);
+        AtprotoJetstreamRuntimeStore store = CreateStore(handler, invalidator);
 
         bool applied = await store.TryApplyAndAdvanceAsync(Request(affectsDiscovery: false), CancellationToken.None);
 
@@ -236,38 +236,38 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
     [Test]
     public async Task CanceledApplyCommandDoesNotInvalidateDiscoveryCache()
     {
-        IMediator mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ImportAtprotoFederatedEventCommand, bool>>();
         IAtprotoDiscoveryCacheInvalidator invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        mediator.Send(
+        handler.ExecuteAsync(
                 Arg.Any<ImportAtprotoFederatedEventCommand>(),
                 cancellation.Token)
             .Returns(Task.FromCanceled<bool>(cancellation.Token));
-        AtprotoJetstreamRuntimeStore store = CreateStore(mediator, invalidator);
+        AtprotoJetstreamRuntimeStore store = CreateStore(handler, invalidator);
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => store.TryApplyAndAdvanceAsync(Request(affectsDiscovery: true), cancellation.Token));
 
-        await mediator.Received(1).Send(
+        await handler.Received(1).ExecuteAsync(
             Arg.Any<ImportAtprotoFederatedEventCommand>(),
             cancellation.Token);
         await invalidator.DidNotReceiveWithAnyArgs().InvalidateAsync(default);
     }
 
     private static AtprotoJetstreamRuntimeStore CreateStore(
-        IMediator mediator,
+        ICommandHandler<ImportAtprotoFederatedEventCommand, bool> handler,
         IAtprotoDiscoveryCacheInvalidator invalidator)
     {
         var services = new ServiceCollection();
-        services.AddScoped(_ => mediator);
+        services.AddScoped(_ => handler);
         services.AddScoped(_ => invalidator);
         ServiceProvider provider = services.BuildServiceProvider();
         return new AtprotoJetstreamRuntimeStore(provider.GetRequiredService<IServiceScopeFactory>());
     }
 
     private static (AtprotoJetstreamRuntimeStore Store, ServiceProvider Provider) CreateRecoveryStore(
-        IMediator mediator,
+        ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult> handler,
         IAtprotoDiscoveryCacheInvalidator? invalidator = null,
         IAsyncDisposable? scopeProbe = null)
     {
@@ -282,10 +282,10 @@ public sealed class AtprotoJetstreamRuntimeStoreTests
             services.AddScoped(_ => scopeProbe);
         }
 
-        services.AddScoped<IMediator>(provider =>
+        services.AddScoped<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>(provider =>
         {
             _ = provider.GetService<IAsyncDisposable>();
-            return mediator;
+            return handler;
         });
         ServiceProvider provider = services.BuildServiceProvider();
         return (

@@ -3,16 +3,16 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
 public sealed class ReconcileUnknownEmailDispatchCommandHandler(
     IEmailDispatchOutboxRepository repository,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<ReconcileUnknownEmailDispatchCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReconcileUnknownEmailDispatchCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ReconcileUnknownEmailDispatchCommand request,
         CancellationToken cancellationToken)
     {

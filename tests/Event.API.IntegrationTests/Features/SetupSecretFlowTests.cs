@@ -106,6 +106,7 @@ public class SetupSecretFlowTests
         await EnsureUserExistsAsync(factory, userId);
 
         // Complete onboarding to end setup mode
+        await SaveReadyOperatorIdentityAsync(client);
         var completePayload = CreateValidSettings();
         using var completeRequest = CreateInstanceAdminRequest(
             HttpMethod.Post, $"{BaseUrl}/complete", userId, completePayload, includeSetupSecret: true);
@@ -138,6 +139,7 @@ public class SetupSecretFlowTests
 
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
+        await SaveReadyOperatorIdentityAsync(client);
 
         var completePayload = CreateValidSettings();
         using var completeRequest = CreateInstanceAdminRequest(
@@ -211,6 +213,7 @@ public class SetupSecretFlowTests
 
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
+        await SaveReadyOperatorIdentityAsync(client);
 
         using var completeRequest = CreateInstanceAdminRequest(
             HttpMethod.Post, $"{BaseUrl}/complete", userId, CreateValidSettings(), includeSetupSecret: true);
@@ -226,6 +229,29 @@ public class SetupSecretFlowTests
     }
 
     #region Helpers
+
+    private static async Task SaveReadyOperatorIdentityAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/instance-operator-identity");
+        request.Headers.Add("X-Setup-Secret", SetupSecret);
+        request.Content = JsonContent.Create(new SaveInstanceOperatorIdentityRequestDto
+        {
+            PublicName = "Test Operator",
+            LegalName = "Test Operator",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            PublicContactEmail = "operator@integration.test",
+            WebsiteUrl = "https://integration.test",
+            OfficialOrigin = "https://integration.test",
+            LegalNoticeUrl = "https://integration.test/legal",
+            TermsUrl = "https://integration.test/terms",
+            PrivacyUrl = "https://integration.test/privacy"
+        });
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var saved = await response.Content.ReadFromJsonAsync<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>();
+        await Assert.That(saved!.Id!.IsReady).IsTrue();
+    }
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret()
     {

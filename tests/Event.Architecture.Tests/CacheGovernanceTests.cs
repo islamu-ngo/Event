@@ -16,7 +16,7 @@ public sealed partial class CacheGovernanceTests
             ["categories:detail"] = CacheFamilyClassification.BoundedTag("categories.detail"),
             ["categories:list"] = CacheFamilyClassification.PublicList("categories.list"),
             ["custom-property-definitions:detail"] = CacheFamilyClassification.EntityScoped("custom-property-definitions.detail"),
-            ["custom-property-definitions:list"] = CacheFamilyClassification.BoundedList("custom-property-definitions.list"),
+            ["custom-property-definitions:list:tenant"] = CacheFamilyClassification.TenantScopedList("custom-property-definitions.list.tenant"),
             ["event-aggregate:detail"] = CacheFamilyClassification.EntityScoped("event-aggregate.detail"),
             ["event-aggregate:list"] = CacheFamilyClassification.FilteredList("event-aggregate.list"),
             ["event-custom-properties:detail"] = CacheFamilyClassification.EntityScoped("event-custom-properties.detail"),

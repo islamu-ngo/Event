@@ -39,7 +39,7 @@ public sealed class TenantPlanEmailMutationTests
 
             await using var writerContext = CreateContext(databasePath);
             using var fixture = new InstanceSettingsCommandFixture(writerContext, scenario.ActorId);
-            var result = await CreateHandler(fixture).Handle(Request(scenario), CancellationToken.None);
+            var result = await CreateHandler(fixture).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsTrue();
             await AssertAppliedAsync(fixture, scenario, mixed);
@@ -84,7 +84,7 @@ public sealed class TenantPlanEmailMutationTests
             try
             {
                 await holderReady.Task.WaitAsync(TimeSpan.FromSeconds(15));
-                write = CreateHandler(fixture).Handle(Request(scenario), cancellation.Token);
+                write = CreateHandler(fixture).ExecuteAsync(Request(scenario), cancellation.Token);
                 observed = await Task.WhenAny(writerReachedLock.Task, transaction.Started.Task, write)
                     .WaitAsync(TimeSpan.FromSeconds(15));
                 transactionStartedBeforeRelease = transaction.Started.Task.IsCompleted;
@@ -129,7 +129,7 @@ public sealed class TenantPlanEmailMutationTests
             await using var writerContext = CreateContext(databasePath);
             using var fixture = new InstanceSettingsCommandFixture(writerContext, scenario.ActorId);
             var request = locked ? Request(scenario) : Request(scenario) with { TenantId = Guid.CreateVersion7() };
-            var result = await CreateHandler(fixture).Handle(request, CancellationToken.None);
+            var result = await CreateHandler(fixture).ExecuteAsync(request, CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.FailureCode).IsEqualTo(locked
@@ -164,7 +164,7 @@ public sealed class TenantPlanEmailMutationTests
 
             await using var writerContext = CreateContext(databasePath);
             using var fixture = new InstanceSettingsCommandFixture(writerContext, scenario.ActorId);
-            var result = await CreateHandler(fixture).Handle(Request(scenario), CancellationToken.None);
+            var result = await CreateHandler(fixture).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.FailureCode).IsEqualTo("tenant_plan_quota_ceiling_exceeded");
@@ -199,7 +199,7 @@ public sealed class TenantPlanEmailMutationTests
                 .SingleAsync(row => row.TenantId == scenario.TenantId);
             var assignmentBefore = (await new TenantPlanRepository(context).GetAssignmentAsync(scenario.AssignmentId))!;
 
-            var result = await CreateHandler(fixture).Handle(Request(scenario), CancellationToken.None);
+            var result = await CreateHandler(fixture).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.FailureCode).IsEqualTo(ReportingIntakePolicyReasonCodes.UnsafePublicationPolicy);
             await Assert.That(smtpWrite.SawProposedHostInsideTransaction).IsTrue();
@@ -229,7 +229,7 @@ public sealed class TenantPlanEmailMutationTests
     private static ApplyControlPlaneTenantPlanAssignmentCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
         new(new TenantPlanRepository(fixture.Context), new TenantSettingRepository(fixture.Context, fixture.MutationLock), fixture.SystemSettings,
             new TenantPlanStorageQuotaCeilingPolicy(fixture.SystemSettings), fixture.UnitOfWork, fixture.MutationLock,
-            fixture.PublicationPolicyBoundary, fixture.Settings, fixture.Mediator, fixture.EmailDeliverySettingsWriter,
+            fixture.PublicationPolicyBoundary, fixture.Settings, fixture.NotificationHandlers, fixture.EmailDeliverySettingsWriter,
             fixture.VisitorSettings);
 
     private static ApplyControlPlaneTenantPlanAssignmentCommand Request(PlanScenario scenario) =>

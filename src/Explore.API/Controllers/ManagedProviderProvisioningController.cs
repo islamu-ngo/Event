@@ -3,10 +3,10 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,12 +24,14 @@ public class ManagedProviderProvisioningController : ControllerBase
         "Managed provider provisioning validation failed",
         "Managed provider client provisioning failed.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> _provisioningCommandHandler;
     private readonly IAdminContext _adminContext;
 
-    public ManagedProviderProvisioningController(IMediator mediator, IAdminContext adminContext)
+    public ManagedProviderProvisioningController(
+        ICommandHandler<EnsureManagedProviderClientProvisionedCommand, BaseCommandResponse<ManagedProviderClientProvisioningResultDto>> provisioningCommandHandler,
+        IAdminContext adminContext)
     {
-        _mediator = mediator;
+        _provisioningCommandHandler = provisioningCommandHandler;
         _adminContext = adminContext;
     }
 
@@ -48,7 +50,7 @@ public class ManagedProviderProvisioningController : ControllerBase
             return this.ToForbiddenProblem(detail: "Instance administrator authority is required to provision managed provider clients.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _provisioningCommandHandler.ExecuteAsync(
             new EnsureManagedProviderClientProvisionedCommand { ProvisioningDto = provisioningDto },
             cancellationToken);
 

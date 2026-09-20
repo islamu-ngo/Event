@@ -1,25 +1,25 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.AdmissionTickets;
 using Explore.Application.Features.AdmissionTickets.Requests.Commands;
 using Explore.Application.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.AdmissionTickets.Handlers.Commands;
 
 public sealed class RequestAdmissionTicketRecoveryCommandHandler(
     AdmissionRecoveryService recoveryService,
     ITenantContext tenantContext) :
-    IRequestHandler<RequestAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryRequestResultDto>
+    ICommandHandler<RequestAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryRequestResultDto>
 {
-    public async Task<AdmissionTicketRecoveryRequestResultDto> Handle(
-        RequestAdmissionTicketRecoveryCommand request,
-        CancellationToken cancellationToken)
+    public async Task<AdmissionTicketRecoveryRequestResultDto> ExecuteAsync(
+        RequestAdmissionTicketRecoveryCommand command,
+        CancellationToken cancellationToken = default)
     {
         _ = await recoveryService.RequestAsync(
             new AdmissionRecoveryRequest(
                 tenantContext.TenantId,
-                request.Email,
+                command.Email,
                 AdmissionRecoveryPurpose.TicketRecovery),
             cancellationToken);
         return new AdmissionTicketRecoveryRequestResultDto(true, true);
@@ -30,15 +30,15 @@ public sealed class RedeemAdmissionTicketRecoveryCommandHandler(
     AdmissionRecoveryRedemptionService redemptionService,
     IAdmissionTicketPresentationResolver presentationResolver,
     ITenantContext tenantContext) :
-    IRequestHandler<RedeemAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryConsumeResultDto>
+    ICommandHandler<RedeemAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryConsumeResultDto>
 {
-    public async Task<AdmissionTicketRecoveryConsumeResultDto> Handle(
-        RedeemAdmissionTicketRecoveryCommand request,
-        CancellationToken cancellationToken)
+    public async Task<AdmissionTicketRecoveryConsumeResultDto> ExecuteAsync(
+        RedeemAdmissionTicketRecoveryCommand command,
+        CancellationToken cancellationToken = default)
     {
         AdmissionRecoveryConsumeResult result = await redemptionService.RedeemAsync(
             tenantContext.TenantId,
-            request.Capability,
+            command.Capability,
             cancellationToken);
         AdmissionRecoveryTicketDocument? document = result.Document;
         if (result.Outcome != AdmissionRecoveryConsumeOutcome.Consumed || document is null)

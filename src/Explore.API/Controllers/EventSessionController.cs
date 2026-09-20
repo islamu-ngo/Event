@@ -5,12 +5,12 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -71,18 +71,57 @@ public class EventSessionController : EventControllerBase
         "Program validation failed",
         "Event session update failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventSessionListRequest, PaginatedResult<EventSessionListDto>> _getAllHandler;
+    private readonly IQueryHandler<GetEventSessionDetailsRequest, EventSessionDto?> _getByIdHandler;
+    private readonly IQueryHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?> _getManagedByIdHandler;
+    private readonly IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>> _getByEventHandler;
+    private readonly IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> _getManagedByEventHandler;
+    private readonly ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>> _createHandler;
+    private readonly ICommandHandler<CreateDraftEventSessionCommand, BaseCommandResponse<Guid>> _createDraftHandler;
+    private readonly ICommandHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>> _scheduleHandler;
+    private readonly ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>> _publishHandler;
+    private readonly ICommandHandler<ArchiveEventSessionCommand, BaseCommandResponse<Guid>> _archiveHandler;
+    private readonly ICommandHandler<CancelEventSessionCommand, BaseCommandResponse<Guid>> _cancelHandler;
+    private readonly ICommandHandler<CompleteEventSessionCommand, BaseCommandResponse<Guid>> _completeHandler;
+    private readonly ICommandHandler<UpdateEventSessionCommand, BaseCommandResponse<Guid>> _updateHandler;
+    private readonly ICommandHandler<DeleteEventSessionCommand, BaseCommandResponse<Guid>> _deleteHandler;
     private readonly ILogger<EventSessionController> _logger;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<EventSessionDto, EventSessionListDto> _resourceAssembler;
 
     public EventSessionController(
-        IMediator mediator,
+        IQueryHandler<GetEventSessionListRequest, PaginatedResult<EventSessionListDto>> getAllHandler,
+        IQueryHandler<GetEventSessionDetailsRequest, EventSessionDto?> getByIdHandler,
+        IQueryHandler<GetManagedEventSessionDetailsRequest, EventSessionDto?> getManagedByIdHandler,
+        IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>> getByEventHandler,
+        IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> getManagedByEventHandler,
+        ICommandHandler<CreateEventSessionCommand, BaseCommandResponse<Guid>> createHandler,
+        ICommandHandler<CreateDraftEventSessionCommand, BaseCommandResponse<Guid>> createDraftHandler,
+        ICommandHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>> scheduleHandler,
+        ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>> publishHandler,
+        ICommandHandler<ArchiveEventSessionCommand, BaseCommandResponse<Guid>> archiveHandler,
+        ICommandHandler<CancelEventSessionCommand, BaseCommandResponse<Guid>> cancelHandler,
+        ICommandHandler<CompleteEventSessionCommand, BaseCommandResponse<Guid>> completeHandler,
+        ICommandHandler<UpdateEventSessionCommand, BaseCommandResponse<Guid>> updateHandler,
+        ICommandHandler<DeleteEventSessionCommand, BaseCommandResponse<Guid>> deleteHandler,
         ILogger<EventSessionController> logger,
         ITenantContext tenantContext,
         IResourceAssembler<EventSessionDto, EventSessionListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _getAllHandler = getAllHandler;
+        _getByIdHandler = getByIdHandler;
+        _getManagedByIdHandler = getManagedByIdHandler;
+        _getByEventHandler = getByEventHandler;
+        _getManagedByEventHandler = getManagedByEventHandler;
+        _createHandler = createHandler;
+        _createDraftHandler = createDraftHandler;
+        _scheduleHandler = scheduleHandler;
+        _publishHandler = publishHandler;
+        _archiveHandler = archiveHandler;
+        _cancelHandler = cancelHandler;
+        _completeHandler = completeHandler;
+        _updateHandler = updateHandler;
+        _deleteHandler = deleteHandler;
         _logger = logger;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
@@ -107,7 +146,7 @@ public class EventSessionController : EventControllerBase
         [FromQuery] EventSessionFilterRequest filter,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEventSessionListRequest
+        var result = await _getAllHandler.QueryAsync(new GetEventSessionListRequest
         {
             PageNumber = filter.PageNumber,
             PageSize = filter.PageSize,
@@ -137,7 +176,7 @@ public class EventSessionController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<EventSessionDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var session = await _mediator.Send(new GetEventSessionDetailsRequest { Id = id }, cancellationToken);
+        var session = await _getByIdHandler.QueryAsync(new GetEventSessionDetailsRequest { Id = id }, cancellationToken);
         if (session == null)
         {
             return this.ToNotFoundProblem(EventSessionNotFoundProblem);
@@ -162,7 +201,7 @@ public class EventSessionController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var session = await _mediator.Send(new GetManagedEventSessionDetailsRequest
+        var session = await _getManagedByIdHandler.QueryAsync(new GetManagedEventSessionDetailsRequest
         {
             EventId = eventId,
             Id = id
@@ -187,7 +226,7 @@ public class EventSessionController : EventControllerBase
     [ProducesResponseType(typeof(HalCollectionResource<EventSessionListDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<HalCollectionResource<EventSessionListDto>>> GetByEvent(Guid eventId, CancellationToken cancellationToken = default)
     {
-        var sessions = await _mediator.Send(new GetSessionsByEventRequest { EventId = eventId }, cancellationToken);
+        var sessions = await _getByEventHandler.QueryAsync(new GetSessionsByEventRequest { EventId = eventId }, cancellationToken);
 
         var halResource = await _resourceAssembler.ToCollectionResource(
             sessions,
@@ -210,7 +249,7 @@ public class EventSessionController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var sessions = await _mediator.Send(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
+        var sessions = await _getManagedByEventHandler.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
 
         var halResource = await _resourceAssembler.ToCollectionResource(
             sessions,
@@ -240,7 +279,7 @@ public class EventSessionController : EventControllerBase
             EventSessionDto = session,
             TenantId = _tenantContext.TenantId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -268,7 +307,7 @@ public class EventSessionController : EventControllerBase
         [FromBody] CreateDraftEventSessionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CreateDraftEventSessionCommand
+        var response = await _createDraftHandler.ExecuteAsync(new CreateDraftEventSessionCommand
         {
             TenantId = _tenantContext.TenantId,
             Request = request
@@ -302,7 +341,7 @@ public class EventSessionController : EventControllerBase
         [FromBody] ScheduleEventSessionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ScheduleEventSessionCommand
+        var response = await _scheduleHandler.ExecuteAsync(new ScheduleEventSessionCommand
         {
             Id = id,
             Request = request
@@ -335,7 +374,7 @@ public class EventSessionController : EventControllerBase
         [FromBody] PublishEventSessionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new PublishEventSessionCommand
+        var response = await _publishHandler.ExecuteAsync(new PublishEventSessionCommand
         {
             Id = id,
             Request = request
@@ -368,7 +407,7 @@ public class EventSessionController : EventControllerBase
         [FromBody] EventSessionLifecycleRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ArchiveEventSessionCommand
+        var response = await _archiveHandler.ExecuteAsync(new ArchiveEventSessionCommand
         {
             Id = id,
             Request = request
@@ -401,7 +440,7 @@ public class EventSessionController : EventControllerBase
         [FromBody] EventSessionLifecycleRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CancelEventSessionCommand
+        var response = await _cancelHandler.ExecuteAsync(new CancelEventSessionCommand
         {
             Id = id,
             Request = request
@@ -434,7 +473,7 @@ public class EventSessionController : EventControllerBase
         [FromBody] EventSessionLifecycleRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CompleteEventSessionCommand
+        var response = await _completeHandler.ExecuteAsync(new CompleteEventSessionCommand
         {
             Id = id,
             Request = request
@@ -484,7 +523,7 @@ public class EventSessionController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             EventSessionDto = session
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -511,7 +550,7 @@ public class EventSessionController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventSessionCommand { Id = id };
-        BaseCommandResponse<Guid> response = await _mediator.Send(command, cancellationToken);
+        BaseCommandResponse<Guid> response = await _deleteHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {

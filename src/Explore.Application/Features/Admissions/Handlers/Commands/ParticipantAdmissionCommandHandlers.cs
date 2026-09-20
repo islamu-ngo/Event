@@ -1,12 +1,12 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Admissions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Handlers.Commands;
 
@@ -31,24 +31,24 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         CompleteParticipantAdmissionCommand,
         BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        CompleteParticipantAdmissionCommand request,
-        CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        CompleteParticipantAdmissionCommand command,
+        CancellationToken cancellationToken = default)
     {
         var validation =
             await new ParticipantAdmissionCommandValidator<
                     CompleteParticipantAdmissionCommand>()
-                .ValidateAsync(request, cancellationToken);
+                .ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
             return BaseCommandResponse.Validation<Guid>(
                 validation.Errors.Select(
                     error => error.ErrorMessage),
-                id: request.RegistrationTicketAssignmentId);
+                id: command.RegistrationTicketAssignmentId);
         }
         if (!currentUser.IsAuthenticated
             || currentUser.UserId is not Guid subjectUserId)
@@ -56,7 +56,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
             return Failure(
                 ParticipantAdmissionFailureCodes
                     .SubjectAuthorityRequired,
-                request.RegistrationTicketAssignmentId);
+                command.RegistrationTicketAssignmentId);
         }
 
         return await unitOfWork.ExecuteInTransactionAsync(
@@ -66,11 +66,11 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
                     await repository
                         .LoadCompletionForUpdateAsync(
                             tenant.TenantId,
-                            request.EventId,
-                            request.RegistrationOrderId,
-                            request
+                            command.EventId,
+                            command.RegistrationOrderId,
+                            command
                                 .RegistrationTicketAssignmentId,
-                            request.ParticipantId,
+                            command.ParticipantId,
                             subjectUserId,
                             token);
                 if (context is null)
@@ -78,7 +78,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
                     return Failure(
                         ParticipantAdmissionFailureCodes
                             .ParticipantUnavailable,
-                        request
+                        command
                             .RegistrationTicketAssignmentId);
                 }
                 if (!context.RequirementsComplete)
@@ -86,7 +86,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
                     return Failure(
                         ParticipantAdmissionFailureCodes
                             .CompletionEvidenceIncomplete,
-                        request
+                        command
                             .RegistrationTicketAssignmentId);
                 }
                 if (context.Eligibility.ConsentRequired
@@ -95,7 +95,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
                     return Failure(
                         ParticipantAdmissionFailureCodes
                             .ConsentEvidenceRequired,
-                        request
+                        command
                             .RegistrationTicketAssignmentId);
                 }
                 if (context.Eligibility.RevokedAt.HasValue)
@@ -103,7 +103,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
                     return Failure(
                         ParticipantAdmissionFailureCodes
                             .AdmissionRevoked,
-                        request
+                        command
                             .RegistrationTicketAssignmentId);
                 }
 
@@ -120,7 +120,7 @@ public sealed class CompleteParticipantAdmissionCommandHandler(
                     context.Eligibility,
                     token);
                 return BaseCommandResponse.Success(
-                    request.RegistrationTicketAssignmentId);
+                    command.RegistrationTicketAssignmentId);
             },
             cancellationToken);
     }
@@ -140,15 +140,15 @@ public sealed class ApproveParticipantAdmissionCommandHandler(
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         ApproveParticipantAdmissionCommand,
         BaseCommandResponse<Guid>>
 {
-    public Task<BaseCommandResponse<Guid>> Handle(
-        ApproveParticipantAdmissionCommand request,
-        CancellationToken cancellationToken) =>
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ApproveParticipantAdmissionCommand command,
+        CancellationToken cancellationToken = default) =>
         ParticipantAdmissionDecisionHandler.ExecuteAsync(
-            request,
+            command,
             approve: true,
             repository,
             actors,
@@ -166,15 +166,15 @@ public sealed class RevokeParticipantAdmissionCommandHandler(
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         RevokeParticipantAdmissionCommand,
         BaseCommandResponse<Guid>>
 {
-    public Task<BaseCommandResponse<Guid>> Handle(
-        RevokeParticipantAdmissionCommand request,
-        CancellationToken cancellationToken) =>
+    public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        RevokeParticipantAdmissionCommand command,
+        CancellationToken cancellationToken = default) =>
         ParticipantAdmissionDecisionHandler.ExecuteAsync(
-            request,
+            command,
             approve: false,
             repository,
             actors,

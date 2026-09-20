@@ -8,11 +8,11 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.ManagedProviderProvisioning;
 using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Management.Handlers.Commands;
 
@@ -31,12 +31,12 @@ public sealed class ScheduleManagedTenantProvisioningCommandHandler(
     ISettingMutationLock mutationLock,
     TenantActivationCapacityPolicy capacityPolicy,
     ManagedTenantProvisioningPreflight preflight)
-    : IRequestHandler<ScheduleManagedTenantProvisioningCommand,
+    : ICommandHandler<ScheduleManagedTenantProvisioningCommand,
         BaseCommandResponse<ManagementTenantProvisioningOperationDto>>
 {
-    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> Handle(
+    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ExecuteAsync(
         ScheduleManagedTenantProvisioningCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validator = new ManagementTenantProvisioningRequestValidator();
         await validator.ValidateAndThrowAsync(request.Request, cancellationToken);
@@ -405,12 +405,12 @@ public sealed class ScheduleManagedTenantProvisioningCommandHandler(
 
 public sealed class CancelManagedTenantProvisioningOperationCommandHandler(
     IManagedTenantProvisioningOperationRepository operationRepository)
-    : IRequestHandler<CancelManagedTenantProvisioningOperationCommand,
+    : ICommandHandler<CancelManagedTenantProvisioningOperationCommand,
         BaseCommandResponse<ManagementTenantProvisioningOperationDto>>
 {
-    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> Handle(
+    public async Task<BaseCommandResponse<ManagementTenantProvisioningOperationDto>> ExecuteAsync(
         CancelManagedTenantProvisioningOperationCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         DateTime cancelledAt = DateTime.UtcNow;
         bool cancelled = await operationRepository.TryCancelAsync(
@@ -453,11 +453,11 @@ public sealed class CancelManagedTenantProvisioningOperationCommandHandler(
 public sealed class ProcessManagedTenantProvisioningOperationCommandHandler(
     IManagedTenantProvisioningOperationRepository operationRepository,
     IManagedProviderClientProvisioner provisioner)
-    : IRequestHandler<ProcessManagedTenantProvisioningOperationCommand, bool>
+    : ICommandHandler<ProcessManagedTenantProvisioningOperationCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         ProcessManagedTenantProvisioningOperationCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ManagedTenantProvisioningOperation? operation =
             await operationRepository.GetByIdAsNoTrackingAsync(request.OperationId, cancellationToken);
@@ -596,13 +596,13 @@ public sealed class ProcessManagedTenantProvisioningOperationCommandHandler(
 
 public sealed class ReconcileManagedTenantProvisioningDeadLetterCommandHandler(
     IManagedTenantProvisioningOperationRepository operationRepository)
-    : IRequestHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>
+    : ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>
 {
     public const string FailureCode = "tenant_provisioning_dispatch_exhausted";
 
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         ReconcileManagedTenantProvisioningDeadLetterCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ManagedTenantProvisioningOperation? operation =
             await operationRepository.GetByIdAsNoTrackingAsync(request.OperationId, cancellationToken);

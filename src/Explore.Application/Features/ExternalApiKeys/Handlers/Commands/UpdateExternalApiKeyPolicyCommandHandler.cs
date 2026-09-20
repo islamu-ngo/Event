@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey.Validators;
 using Explore.Application.Features.ExternalApiKeys.Requests.Commands;
@@ -6,12 +7,11 @@ using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Commands;
 
-public class UpdateExternalApiKeyPolicyCommandHandler : IRequestHandler<UpdateExternalApiKeyPolicyCommand, BaseCommandResponse<Guid>>
+public class UpdateExternalApiKeyPolicyCommandHandler : ICommandHandler<UpdateExternalApiKeyPolicyCommand, BaseCommandResponse<Guid>>
 {
     private readonly IExternalApiKeyRepository _externalApiKeyRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
@@ -39,7 +39,7 @@ public class UpdateExternalApiKeyPolicyCommandHandler : IRequestHandler<UpdateEx
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateExternalApiKeyPolicyCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateExternalApiKeyPolicyCommand request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
         var externalApiKey = await _externalApiKeyRepository.GetByIdIgnoringTenantFilter(request.ExternalApiKeyId, cancellationToken);

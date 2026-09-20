@@ -1,6 +1,7 @@
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Exceptions;
@@ -10,7 +11,6 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventLocations.Handlers.Commands;
@@ -23,9 +23,9 @@ public sealed class UpdateEventLocationPolicyCommandHandler(
     ITenantContext tenantContext,
     IUserContext userContext,
     TimeProvider timeProvider)
-    : IRequestHandler<UpdateEventLocationPolicyCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateEventLocationPolicyCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateEventLocationPolicyCommand request,
         CancellationToken cancellationToken)
     {
@@ -153,9 +153,9 @@ public sealed class ConfirmEventLocationRemediationCommandHandler(
     ITenantContext tenantContext,
     IUserContext userContext,
     TimeProvider timeProvider)
-    : IRequestHandler<ConfirmEventLocationRemediationCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ConfirmEventLocationRemediationCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ConfirmEventLocationRemediationCommand request,
         CancellationToken cancellationToken)
     {

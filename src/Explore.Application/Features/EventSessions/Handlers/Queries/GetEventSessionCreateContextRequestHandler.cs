@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 
-public class GetEventSessionCreateContextRequestHandler : IRequestHandler<GetEventSessionCreateContextRequest, EventSessionCreateContextDto?>
+public class GetEventSessionCreateContextRequestHandler : IQueryHandler<GetEventSessionCreateContextRequest, EventSessionCreateContextDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly ILocationRepository _locationRepository;
@@ -31,7 +31,7 @@ public class GetEventSessionCreateContextRequestHandler : IRequestHandler<GetEve
         _eventAgendaItemRepository = eventAgendaItemRepository;
     }
 
-    public async Task<EventSessionCreateContextDto?> Handle(GetEventSessionCreateContextRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionCreateContextDto?> QueryAsync(GetEventSessionCreateContextRequest request, CancellationToken cancellationToken)
     {
         var eventEntity = await _eventRepository.GetEventWithDetails(request.EventId);
         if (eventEntity is null)

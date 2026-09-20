@@ -1,7 +1,7 @@
 namespace Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 [AuthorizeResource(
     ResourceKinds.TenantSetting,
@@ -9,7 +9,7 @@ using MediatR;
 public sealed record ExportTenantConfigurationPackageQuery(
     Guid TenantId,
     ConfigurationManifestExportView View = ConfigurationManifestExportView.Overrides)
-    : IRequest<TenantConfigurationPackageExportResult>, ISecureRequest
+    : IQuery<TenantConfigurationPackageExportResult>, ISecureRequest
 {
     public const string ResourceKey = "tenant.configuration-package.export";
     string? ISecureRequest.ResourceId => ResourceKey;

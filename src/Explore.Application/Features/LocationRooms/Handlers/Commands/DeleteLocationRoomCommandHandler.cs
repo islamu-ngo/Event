@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.LocationRooms.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.LocationRooms.Handlers.Commands;
 
-public class DeleteLocationRoomCommandHandler : IRequestHandler<DeleteLocationRoomCommand, BaseCommandResponse<Guid>>
+public class DeleteLocationRoomCommandHandler : ICommandHandler<DeleteLocationRoomCommand, BaseCommandResponse<Guid>>
 {
     private readonly ILocationRoomRepository _locationRoomRepository;
 
@@ -14,7 +14,7 @@ public class DeleteLocationRoomCommandHandler : IRequestHandler<DeleteLocationRo
         _locationRoomRepository = locationRoomRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteLocationRoomCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteLocationRoomCommand request, CancellationToken cancellationToken)
     {
         var room = await _locationRoomRepository.GetById(request.Id);
         if (room == null)

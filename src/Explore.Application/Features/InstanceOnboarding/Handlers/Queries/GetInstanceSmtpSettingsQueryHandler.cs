@@ -1,13 +1,13 @@
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public class GetInstanceSmtpSettingsQueryHandler : IRequestHandler<GetInstanceSmtpSettingsQuery, InstanceSmtpSettingsDto>
+public class GetInstanceSmtpSettingsQueryHandler : IQueryHandler<GetInstanceSmtpSettingsQuery, InstanceSmtpSettingsDto>
 {
     private readonly IInstanceSmtpSettingService _smtpSettingService;
     private readonly IAdminContext _adminContext;
@@ -21,7 +21,7 @@ public class GetInstanceSmtpSettingsQueryHandler : IRequestHandler<GetInstanceSm
         _platformRoles = platformRoles;
     }
 
-    public async Task<InstanceSmtpSettingsDto> Handle(GetInstanceSmtpSettingsQuery request, CancellationToken cancellationToken)
+    public async Task<InstanceSmtpSettingsDto> QueryAsync(GetInstanceSmtpSettingsQuery request, CancellationToken cancellationToken)
     {
         var settings = await _smtpSettingService.ReadSettingsAsync();
         var actorId = await _adminContext.ResolveUserIdAsync(cancellationToken);

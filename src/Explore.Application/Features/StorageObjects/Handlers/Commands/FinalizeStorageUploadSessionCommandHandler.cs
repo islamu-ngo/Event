@@ -9,12 +9,12 @@ using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
 public class FinalizeStorageUploadSessionCommandHandler
-    : IRequestHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    : ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
@@ -53,7 +53,7 @@ public class FinalizeStorageUploadSessionCommandHandler
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> Handle(
+    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
         FinalizeStorageUploadSessionCommand request,
         CancellationToken cancellationToken)
     {

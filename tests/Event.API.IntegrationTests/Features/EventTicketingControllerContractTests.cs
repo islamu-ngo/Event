@@ -3,12 +3,15 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.DTOs.OrganizerPaymentConnections;
+using Explore.Application.Features.EventTicketing.Requests.Commands;
+using Explore.Application.Features.EventTicketing.Requests.Queries;
+using Explore.Application.Features.OrganizerPaymentConnections;
 using Explore.Application.Features.OrganizerPaymentConnections.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -144,7 +147,7 @@ public sealed class EventTicketingControllerContractTests
             await Assert.That(action.IsDefined(typeof(PrivateNoStoreAttribute), inherit: true)).IsTrue();
         }
 
-        var controller = CreateController(Substitute.For<IMediator>());
+        var controller = CreateController();
         Guid eventId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000003");
 
         var returned = (RedirectResult)controller.ReturnPaymentOnboarding(eventId);
@@ -155,28 +158,42 @@ public sealed class EventTicketingControllerContractTests
     }
 
     [Test]
-    public async Task PaymentOnboarding_UrlGenerationFailureSkipsMediator()
+    public async Task PaymentOnboarding_UrlGenerationFailureSkipsHandler()
     {
-        IMediator mediator = Substitute.For<IMediator>();
-        EventTicketingController controller = CreateController(mediator);
+        var onboardingHandler = Substitute.For<ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>>();
+        EventTicketingController controller = CreateController(onboardingHandler: onboardingHandler);
         IUrlHelper url = Substitute.For<IUrlHelper>();
         url.RouteUrl(Arg.Any<UrlRouteContext>()).Returns((string?)null);
         controller.Url = url;
 
         ActionResult<BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>> result = await controller.StartPaymentOnboarding(Guid.CreateVersion7(), CancellationToken.None);
 
-        await mediator.DidNotReceiveWithAnyArgs().Send(Arg.Any<object>(), Arg.Any<CancellationToken>());
+        await onboardingHandler.DidNotReceiveWithAnyArgs().ExecuteAsync(Arg.Any<CreateOrganizerPaymentOnboardingLinkCommand>(), Arg.Any<CancellationToken>());
         await Assert.That(result.Result).IsTypeOf<ObjectResult>();
         await Assert.That(((ObjectResult)result.Result!).StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
     }
 
-    private static EventTicketingController CreateController(IMediator mediator)
+    private static EventTicketingController CreateController(
+        ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>? onboardingHandler = null)
     {
         var controller = new EventTicketingController(
-            mediator,
             Substitute.For<IResourceAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementDto>>(),
             Substitute.For<IResourceAssembler<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightDto>>(),
-            Substitute.For<IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto>>());
+            Substitute.For<IResourceAssembler<EventOrganizerPaymentConnectionManagementDto, EventOrganizerPaymentConnectionManagementDto>>(),
+            Substitute.For<IQueryHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>>(),
+            Substitute.For<ICommandHandler<CreateEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CloneEventTicketCatalogDraftCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateEventTicketTypeCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateEventTicketTypeCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteEventTicketTypeCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateEventCapacityPoolCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateEventCapacityPoolCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteEventCapacityPoolCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<IQueryHandler<GetPaidEventPublicationPreflightQuery, PaidEventPublicationPreflightDto>>(),
+            Substitute.For<ICommandHandler<UpdateEventTicketCatalogCommercialDisclosuresCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<IQueryHandler<GetEventOrganizerPaymentConnectionQuery, EventOrganizerPaymentConnectionManagementDto?>>(),
+            onboardingHandler ?? Substitute.For<ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         controller.ControllerContext.HttpContext.Request.Scheme = "https";
         controller.ControllerContext.HttpContext.Request.Host = new HostString("api.example");

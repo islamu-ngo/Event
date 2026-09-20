@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.ContactShareConsents.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EventContactShareConsent, AuthorizationActions.ExportSharedContacts)]
-public sealed record ExportSharedContactsCommand : IRequest<BaseCommandResponse<SharedContactExportResultDto>>, ISecureRequest
+public sealed record ExportSharedContactsCommand : ICommand<BaseCommandResponse<SharedContactExportResultDto>>, ISecureRequest
 {
     public Guid RecipientActorId { get; init; }
     public Guid OrganizationId { get; init; }

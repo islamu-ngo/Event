@@ -1,6 +1,7 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Studio;
 using Explore.Application.Exceptions;
@@ -9,7 +10,6 @@ using Explore.Application.Features.Studio.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Studio.Handlers.Queries;
 
@@ -19,16 +19,16 @@ public sealed class GetStudioContextQueryHandler(
     IAiAssistantActorContextService actorContexts,
     IEventRepository events,
     IAuthorizationProvider authorization)
-    : IRequestHandler<GetStudioContextQuery, StudioContextDto>
+    : IQueryHandler<GetStudioContextQuery, StudioContextDto>
 {
-    public async Task<StudioContextDto> Handle(GetStudioContextQuery request, CancellationToken cancellationToken)
+    public async Task<StudioContextDto> QueryAsync(GetStudioContextQuery query, CancellationToken cancellationToken)
     {
         Guid userId = userContext.GetRequiredUserId();
         Guid tenantId = tenantContext.TenantId;
         AiAssistantActorContextResolution actor = await actorContexts.ResolveAuthorizedActorAsync(
             tenantId,
             userId,
-            request.ActorId,
+            query.ActorId,
             cancellationToken);
 
         if (!actor.Succeeded)

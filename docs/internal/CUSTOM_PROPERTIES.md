@@ -231,6 +231,58 @@ Lifecycle:
 - projection rebuild tooling must be able to recompute them from source-of-truth rows,
 - projection tables are a read-side optimization, not a business-rule engine.
 
+### Event Projection Administration
+
+The three event projection reads (status, dirty-scope pages and event rows) use
+scoped `IQueryHandler` ports. Tenant rebuild, single-event refresh and dirty-scope
+drain use scoped `ICommandHandler` ports. `CustomPropertyProjectionAdminController`
+constructor-injects all six protected event ports and four protected session ports.
+Drain deliberately calls either the event or session updater service
+according to the validated projection name, not another operation.
+
+Authorization resolves event ownership from persisted state and requires the
+projection permission for the target tenant. Body/query tenant IDs are targets,
+not evidence of administrator authority. The local provider checks persisted
+tenant-administrator grants and rejects foreign-tenant targets. Projection row
+inspection is an administrator value-bearing surface, unlike the value-free
+governance report. A supplied exposure ceiling narrows rows before mapping;
+omitting it permits the authorized administrator to inspect all exposure levels.
+Status and dirty-scope responses contain operational metadata, not collected values.
+
+Dirty-scope pages apply an ID-ordered database offset before the page limit; reads
+never settle work. Updaters retain transaction/lock ownership: full rebuild drains
+pending work and persists status, single-event refresh does not claim settlement,
+and drain settles only its selected projection. Failed or cancelled drains roll
+back projection replacements and retain pending scopes for retry. This cohort does
+not change provider locking or execution-strategy semantics. SQLite HTTP/registered
+port tests verify committed results, failed-drain rollback and cancellation; they
+do not establish PostgreSQL advisory-lock concurrency guarantees.
+
+Event rebuild validation now uses the existing ProblemDetails factory instead of
+returning a raw command response. Validation remains HTTP 400 and quota exhaustion
+HTTP 422 with quota metadata; successful response and route contracts are unchanged.
+### Session Projection Administration
+
+Session status and row reads implement `IQuery<TResult>`; tenant rebuild and
+single-session refresh implement `ICommand<TResult>`. The controller injects their
+exact closed handler interfaces, with no remaining mediator dependency. Application
+discovery supplies authorization -> performance -> handler without feature-specific
+registration. The existing resource resolver derives session/event/tenant ownership
+from persisted state; supplied tenant IDs remain independently authorized targets.
+
+Manual validation, exposure filtering before mapping, quotas and projection metrics
+are unchanged. Full rebuild retains the session updater transaction and status/dirty
+scope settlement; single refresh retains its unit-of-work transaction without
+claiming backlog settlement. Event drain still reaches both updater service ports.
+
+Session batch validation now returns HTTP 400 ProblemDetails with `validation_failed`
+and the `eventSessionCustomPropertyProjection` error key, not a raw command result.
+Status tests retain the same session key and the event `customPropertyProjection`
+key. Quota exhaustion remains HTTP 422. Real SQLite HTTP and registered-port tests
+cover tenant denial, durable rows/status, all exposure ceilings, failure rollback
+and retry, and cancellation signalled after projection deletion reaches its value
+read. These receipts do not establish multi-provider or advisory-lock concurrency.
+
 ## Automation Condition Guardrails
 
 Custom properties may participate in Event lifecycle automation conditions only
@@ -324,6 +376,36 @@ accidental hard deletes.
 Template-sync retirement is not a hard purge. Retiring a template-derived
 definition or option deactivates the runtime row, clears defaults when needed,
 and preserves historical value rows and provenance for supportability.
+
+### Shared Definition List Cache Isolation And Commit Boundary
+
+`GetCustomPropertyDefinitionListQueryHandler` keys HybridCache entries by trusted ambient `ITenantContext.TenantId`, entity type and normalized page number/page size. The tenant-namespaced key deliberately does not reuse the former tenantless key. Every entry carries the existing `CacheTags` convention's tenant-list tag and tenant/entity-scope tag. Request-body tenant values never select the cache partition.
+
+Create and delete invalidate the persisted definition's tenant/entity-scope tag after their owning `IUnitOfWork` transaction commits. Update invalidates both previous and current entity scopes after either its metadata-only or options transaction commits. Purge commits physical deletion and its audit together, then invalidates the persisted dependency summary's tenant-list tag; that summary deliberately has no entity-type field and also supports already-retired definitions. This conservative purge invalidation stays inside one tenant. Detail queries remain uncached, so no synthetic detail-key invalidation is needed.
+
+Delete now owns an explicit unit-of-work transaction rather than relying on an implicit `SaveChanges` transaction. The shared unit of work rejects nested transactions and rolls back failed commits, preventing an outer caller from rolling back a write after its handler has already invalidated caches. The only production dispatcher for these six operations remains `CustomPropertyDefinitionController`; the update authorization enricher and its explicit registration remain required and unchanged. The cache repair itself retained MediatR; the subsequent native dispatch conversion is described below.
+
+Post-commit tag invalidation uses `CancellationToken.None`: disconnecting or cancelling the initiating request after commit must not skip coherence work. Validation failures, missing rows, dependency-blocked purge and failed commits do not invalidate. An invalidation exception is not swallowed and does not undo the database commit; callers must reload before retrying. This uses HybridCache's tag semantics, not custom locks, generation counters, a TTL workaround or all-tenant flushing.
+
+`CustomPropertyDefinitionPrerequisiteTests` uses the real API host, local persisted role grants, real handlers/repositories and a shared HybridCache over disposable SQLite. It verifies cross-tenant HTTP non-disclosure, nondefault pages across create, both update paths, delete and purge, retained option identities, rollback/audit consistency, independent foreign cache hits, a signal-coordinated pending commit and cancellation immediately after commit. Deployment must replace older API hosts: the new partition prevents reuse of old unscoped entries but cannot repair requests still handled by old binaries.
+
+### Shared Definition Native Dispatch
+
+`CustomPropertyDefinitionController` consumes six closed native ports: create/update return `BaseCommandResponse<Guid>`, delete returns `bool`, purge returns `BaseCommandResponse<CustomPropertyPurgeResultDto>`, detail returns non-null `CustomPropertyDefinitionDto`, and list returns `PaginatedResult<CustomPropertyDefinitionListDto>`. The detail/list contracts and handlers are named `GetCustomPropertyDefinitionDetailsQuery` / `GetCustomPropertyDefinitionListQuery` and their `QueryHandler` counterparts. Missing detail still throws `NotFoundException`; missing delete still maps to HTTP 204. Public routes, request bodies, concurrency headers, error mappings and HAL remain unchanged.
+
+Application discovery supplies authorization -> performance -> business-handler decoration. Commands retain tenant-update resource protection and manually constructed validators; `UpdateCustomPropertyDefinitionAuthorizationContextEnricher` and its explicit registration continue to replace caller-supplied tenant facts with persisted, ambient-tenant-checked authority. No request keeps a MediatR marker or compatibility alias. The cache/transaction implementation above is preserved independently of dispatch. Real SQLite/native tests retain prior cache and lifecycle assertions and replace the shared purge mediator stub with actual anonymous/member/admin HTTP and audit evidence.
+
+### Shared Definition Creation Identity
+
+`CreateCustomPropertyDefinitionCommandHandler` allocates the definition UUIDv7 before constructing option entities. Their foreign keys must reference that server-owned identity, not the empty ID that exists before EF adds a new parent. The repository still saves the parent, options and selected default inside the existing unit-of-work transaction; cache invalidation remains post-commit. The native HTTP creation test checks nonempty distinct option IDs, matching parent foreign keys, the selected default and rollback without publishing a partial definition or evicting a valid cached page.
+
+### Shared Definition Option Presentation Order
+
+The shared `CustomPropertyDefinitionDto` projection in `CustomPropertyMapper` stably orders options by ascending `SortOrder` before creating immutable option snapshots. This is an Application presentation rule, not a UI-only correction: native detail callers and HTTP/admin consumers receive the same ordered array. The detail page and option editor render that array directly.
+
+EF identity-resolution fixup can materialize the separately included `DefaultOption` into the backing option collection before a lower-ranked option, despite the repository's ordered include. Sorting at the DTO boundary prevents that materialization order from overriding presentation rank. Equal ranks retain their existing relative order; no new identifier-based tie breaker or default-priority rule is introduced. The default option ID, retained/retired option IDs, active/default flags and stored sort values are unchanged. The repository graph is not mutated, and other custom-property cohorts are not affected.
+
+`DetailOptions_AreAscendingWithStableTiesAndRetainedDefaultAndRetiredIdentities` covers both the protected native detail port and actual HTTP DTO consumed by administration, using real SQLite definitions/options with a default at rank 10, a new option at rank 5 and a retained equal-rank option. The mutation/cache regression also asserts the global returned option order after replacement.
 
 ## Template Provenance And Versioning
 

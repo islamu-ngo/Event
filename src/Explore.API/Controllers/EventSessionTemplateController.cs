@@ -4,12 +4,12 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Features.EventSessionTemplates.Requests.Commands;
 using Explore.Application.Features.EventSessionTemplates.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -41,14 +41,26 @@ public class EventSessionTemplateController : EventControllerBase
         "Event session template not found",
         "Event session template not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateEventSessionTemplateCommand, BaseCommandResponse<Guid>> _createHandler;
+    private readonly ICommandHandler<UpdateEventSessionTemplateCommand, BaseCommandResponse<Guid>> _updateHandler;
+    private readonly ICommandHandler<DeleteEventSessionTemplateCommand, bool> _deleteHandler;
+    private readonly IQueryHandler<GetEventSessionTemplateDetailsRequest, EventSessionTemplateDto> _getDetailsHandler;
+    private readonly IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>> _getListHandler;
     private readonly IResourceAssembler<EventSessionTemplateDto, EventSessionTemplateListDto> _resourceAssembler;
 
     public EventSessionTemplateController(
-        IMediator mediator,
+        ICommandHandler<CreateEventSessionTemplateCommand, BaseCommandResponse<Guid>> createHandler,
+        ICommandHandler<UpdateEventSessionTemplateCommand, BaseCommandResponse<Guid>> updateHandler,
+        ICommandHandler<DeleteEventSessionTemplateCommand, bool> deleteHandler,
+        IQueryHandler<GetEventSessionTemplateDetailsRequest, EventSessionTemplateDto> getDetailsHandler,
+        IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>> getListHandler,
         IResourceAssembler<EventSessionTemplateDto, EventSessionTemplateListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _createHandler = createHandler;
+        _updateHandler = updateHandler;
+        _deleteHandler = deleteHandler;
+        _getDetailsHandler = getDetailsHandler;
+        _getListHandler = getListHandler;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -70,7 +82,7 @@ public class EventSessionTemplateController : EventControllerBase
         [FromQuery] EventSessionTemplateListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEventSessionTemplateListRequest
+        var result = await _getListHandler.QueryAsync(new GetEventSessionTemplateListRequest
         {
             EventTemplateId = query.EventTemplateId,
             PageNumber = query.PageNumber,
@@ -100,7 +112,7 @@ public class EventSessionTemplateController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<EventSessionTemplateDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var template = await _mediator.Send(new GetEventSessionTemplateDetailsRequest { Id = id }, cancellationToken);
+        var template = await _getDetailsHandler.QueryAsync(new GetEventSessionTemplateDetailsRequest { Id = id }, cancellationToken);
         if (template == null)
         {
             return this.ToNotFoundProblem(EventSessionTemplateNotFoundProblem);
@@ -129,7 +141,7 @@ public class EventSessionTemplateController : EventControllerBase
             SessionTemplateDto = sessionTemplate
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createHandler.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -175,7 +187,7 @@ public class EventSessionTemplateController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp
         };
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _updateHandler.ExecuteAsync(command, cancellationToken);
 
         if (!result.IsSuccess)
         {
@@ -199,7 +211,7 @@ public class EventSessionTemplateController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventSessionTemplateCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteHandler.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

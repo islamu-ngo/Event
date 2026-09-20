@@ -4,12 +4,12 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventLocations.Requests.Commands;
 using Explore.Application.Features.EventLocations.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +19,13 @@ namespace Explore.API.Controllers;
 [Route("api/events/{eventId:guid}/locations")]
 [ApiController]
 public sealed class EventLocationController(
-    IMediator mediator,
+    IQueryHandler<GetPublicEventLocationsRequest, IReadOnlyList<EventLocationPublicDto>?> getPublicLocationsHandler,
+    IQueryHandler<GetAttendeeEventLocationsRequest, IReadOnlyList<EventLocationAttendeeDto>?> getAttendeeLocationsHandler,
+    IQueryHandler<GetManagementEventLocationRequest, EventLocationManagementDto?> getManagementLocationHandler,
+    IQueryHandler<GetManagementEventLocationsRequest, IReadOnlyList<EventLocationManagementDto>?> getManagementLocationsHandler,
+    IQueryHandler<GetEventLocationReviewQueueRequest, IReadOnlyList<EventLocationManagementDto>?> getReviewQueueHandler,
+    ICommandHandler<UpdateEventLocationPolicyCommand, BaseCommandResponse<Guid>> updatePolicyHandler,
+    ICommandHandler<ConfirmEventLocationRemediationCommand, BaseCommandResponse<Guid>> confirmRemediationHandler,
     IResourceAssembler<EventLocationManagementDto, EventLocationManagementDto> resourceAssembler)
     : ControllerBase
 {
@@ -48,7 +54,7 @@ public sealed class EventLocationController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<EventLocationPublicDto>? result = await mediator.Send(
+        IReadOnlyList<EventLocationPublicDto>? result = await getPublicLocationsHandler.QueryAsync(
             new GetPublicEventLocationsRequest(eventId),
             cancellationToken);
         return result is null
@@ -69,7 +75,7 @@ public sealed class EventLocationController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<EventLocationAttendeeDto>? result = await mediator.Send(
+        IReadOnlyList<EventLocationAttendeeDto>? result = await getAttendeeLocationsHandler.QueryAsync(
             new GetAttendeeEventLocationsRequest(eventId),
             cancellationToken);
         return result is null
@@ -92,7 +98,7 @@ public sealed class EventLocationController(
         Guid eventLocationId,
         CancellationToken cancellationToken = default)
     {
-        EventLocationManagementDto? result = await mediator.Send(
+        EventLocationManagementDto? result = await getManagementLocationHandler.QueryAsync(
             new GetManagementEventLocationRequest(eventId, eventLocationId),
             cancellationToken);
         return result is null
@@ -114,7 +120,7 @@ public sealed class EventLocationController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<EventLocationManagementDto>? result = await mediator.Send(
+        IReadOnlyList<EventLocationManagementDto>? result = await getManagementLocationsHandler.QueryAsync(
             new GetManagementEventLocationsRequest(eventId),
             cancellationToken);
         if (result is null)
@@ -145,7 +151,7 @@ public sealed class EventLocationController(
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<EventLocationManagementDto>? result = await mediator.Send(
+        IReadOnlyList<EventLocationManagementDto>? result = await getReviewQueueHandler.QueryAsync(
             new GetEventLocationReviewQueueRequest(eventId),
             cancellationToken);
         if (result is null)
@@ -181,7 +187,7 @@ public sealed class EventLocationController(
         [FromBody] UpdateEventLocationDisclosureDto request,
         CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await updatePolicyHandler.ExecuteAsync(
             new UpdateEventLocationPolicyCommand
             {
                 EventId = eventId,
@@ -223,7 +229,7 @@ public sealed class EventLocationController(
         [FromBody] ConfirmEventLocationRemediationDto request,
         CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<Guid> response = await mediator.Send(
+        BaseCommandResponse<Guid> response = await confirmRemediationHandler.ExecuteAsync(
             new ConfirmEventLocationRemediationCommand
             {
                 EventId = eventId,

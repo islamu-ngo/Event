@@ -37,11 +37,11 @@ public sealed record EventDto
 
     // Actor (Owner - User or Organization)
     public Guid ActorId { get; init; }
-    public required string ActorDisplayName { get; init; }
+    public required string? ActorDisplayName { get; init; }
     public string? ActorHandle { get; init; }
     public string? ActorDid { get; init; }
     public int ActorTypeId { get; init; }
-    public required string ActorTypeFullName { get; init; }
+    public required string? ActorTypeFullName { get; init; }
     public Guid? ActorUserId { get; init; }
     public Guid? ActorOrganizationId { get; init; }
     public Guid? ActorGroupId { get; init; }
@@ -88,17 +88,17 @@ public sealed record EventDto
 
     // Status & Visibility
     public int EventStatusId { get; init; }
-    public required string EventStatusFullName { get; init; }
-    public required string EventStatusMasterCode { get; init; }
+    public required string? EventStatusFullName { get; init; }
+    public required string? EventStatusMasterCode { get; init; }
     public bool IsUnmoderationEligible { get; set; }
     public int VisibilityTypeId { get; init; }
-    public required string VisibilityTypeFullName { get; init; }
-    public required string VisibilityTypeMasterCode { get; init; }
+    public required string? VisibilityTypeFullName { get; init; }
+    public required string? VisibilityTypeMasterCode { get; init; }
 
     // Format
     public int EventFormatId { get; init; }
-    public required string EventFormatFullName { get; init; }
-    public required string EventFormatMasterCode { get; init; }
+    public required string? EventFormatFullName { get; init; }
+    public required string? EventFormatMasterCode { get; init; }
 
     // Islamic Context
     public int? MadhabId { get; init; }

@@ -6,13 +6,13 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Geocoding.Requests.Commands;
 using Explore.Application.Features.Locations.Requests.Commands;
 using Explore.Application.Features.Locations.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -54,18 +54,39 @@ public class LocationController : EventControllerBase
         "Address approval validation failed",
         "The address could not be approved for tenant reuse.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<PromoteLocationAddressCommand, BaseCommandResponse<Guid>> _promoteAddress;
+    private readonly ICommandHandler<CreateLocationCommand, BaseCommandResponse<Guid>> _createLocation;
+    private readonly ICommandHandler<UpdateLocationCommand, BaseCommandResponse<Guid>> _updateLocation;
+    private readonly ICommandHandler<DeleteLocationCommand, bool> _deleteLocation;
+    private readonly ICommandHandler<ClassifyLocationAsPrivateHomeCommand, BaseCommandResponse<Guid>> _classifyHome;
+    private readonly ICommandHandler<AcceptPrivateHomeOwnershipCommand, BaseCommandResponse<Guid>> _acceptHomeOwnership;
+    private readonly IQueryHandler<GetLocationDetailsRequest, LocationDto?> _locationDetails;
+    private readonly IQueryHandler<GetLocationListRequest, PaginatedResult<LocationListDto>> _locations;
     private readonly ILogger<LocationController> _logger;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<LocationDto, LocationListDto> _resourceAssembler;
 
     public LocationController(
-        IMediator mediator,
+        ICommandHandler<PromoteLocationAddressCommand, BaseCommandResponse<Guid>> promoteAddress,
+        ICommandHandler<CreateLocationCommand, BaseCommandResponse<Guid>> createLocation,
+        ICommandHandler<UpdateLocationCommand, BaseCommandResponse<Guid>> updateLocation,
+        ICommandHandler<DeleteLocationCommand, bool> deleteLocation,
+        ICommandHandler<ClassifyLocationAsPrivateHomeCommand, BaseCommandResponse<Guid>> classifyHome,
+        ICommandHandler<AcceptPrivateHomeOwnershipCommand, BaseCommandResponse<Guid>> acceptHomeOwnership,
+        IQueryHandler<GetLocationDetailsRequest, LocationDto?> locationDetails,
+        IQueryHandler<GetLocationListRequest, PaginatedResult<LocationListDto>> locations,
         ILogger<LocationController> logger,
         ITenantContext tenantContext,
         IResourceAssembler<LocationDto, LocationListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _promoteAddress = promoteAddress;
+        _createLocation = createLocation;
+        _updateLocation = updateLocation;
+        _deleteLocation = deleteLocation;
+        _classifyHome = classifyHome;
+        _acceptHomeOwnership = acceptHomeOwnership;
+        _locationDetails = locationDetails;
+        _locations = locations;
         _logger = logger;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
@@ -89,7 +110,7 @@ public class LocationController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetLocationListRequest
+        var result = await _locations.QueryAsync(new GetLocationListRequest
         {
             TenantId = _tenantContext.TenantId,
             PageNumber = query.PageNumber,
@@ -118,7 +139,7 @@ public class LocationController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalResource<LocationDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var location = await _mediator.Send(new GetLocationDetailsRequest
+        var location = await _locationDetails.QueryAsync(new GetLocationDetailsRequest
         {
             Id = id,
             TenantId = _tenantContext.TenantId
@@ -148,7 +169,7 @@ public class LocationController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateLocationDto location, CancellationToken cancellationToken = default)
     {
         var command = new CreateLocationCommand { LocationDto = location, TenantId = _tenantContext.TenantId };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createLocation.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -195,7 +216,7 @@ public class LocationController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             UpdateLocationDto = location
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateLocation.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -236,7 +257,7 @@ public class LocationController : EventControllerBase
                 "If-Match header is required and must contain the current location concurrency stamp.");
         }
 
-        BaseCommandResponse<Guid> response = await _mediator.Send(
+        BaseCommandResponse<Guid> response = await _classifyHome.ExecuteAsync(
             new ClassifyLocationAsPrivateHomeCommand
             {
                 LocationId = id,
@@ -278,7 +299,7 @@ public class LocationController : EventControllerBase
                 "If-Match header is required and must contain the current location concurrency stamp.");
         }
 
-        BaseCommandResponse<Guid> response = await _mediator.Send(
+        BaseCommandResponse<Guid> response = await _acceptHomeOwnership.ExecuteAsync(
             new AcceptPrivateHomeOwnershipCommand
             {
                 LocationId = id,
@@ -320,7 +341,7 @@ public class LocationController : EventControllerBase
                 "If-Match header is required and must contain the current location concurrency stamp.");
         }
 
-        BaseCommandResponse<Guid> response = await _mediator.Send(
+        BaseCommandResponse<Guid> response = await _promoteAddress.ExecuteAsync(
             new PromoteLocationAddressCommand
             {
                 LocationId = id,
@@ -364,7 +385,7 @@ public class LocationController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteLocationCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteLocation.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

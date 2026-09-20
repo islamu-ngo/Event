@@ -1,11 +1,13 @@
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
+using Explore.Domain;
 using FluentValidation.Results;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -23,7 +25,7 @@ public class ExceptionHandlingIntegrationTests
     }
 
     [Test]
-    public async Task ExceptionPipeline_WhenMediatorThrowsValidationException_ReturnsProblemDetailsBadRequest()
+    public async Task ExceptionPipeline_WhenHandlerThrowsValidationException_ReturnsProblemDetailsBadRequest()
     {
         var validationResult = new ValidationResult([
             new ValidationFailure("ApprovalStatusId", "ApprovalStatusId does not exist.")
@@ -42,7 +44,7 @@ public class ExceptionHandlingIntegrationTests
     }
 
     [Test]
-    public async Task ExceptionPipeline_WhenMediatorThrowsNotFoundException_ReturnsProblemDetailsNotFound()
+    public async Task ExceptionPipeline_WhenHandlerThrowsNotFoundException_ReturnsProblemDetailsNotFound()
     {
         using var client = CreateClientThatThrows(new NotFoundException("Organization", Guid.NewGuid()));
         var response = await client.GetAsync($"/api/actor/{Guid.NewGuid()}");
@@ -55,7 +57,7 @@ public class ExceptionHandlingIntegrationTests
     }
 
     [Test]
-    public async Task ExceptionPipeline_WhenMediatorThrowsUnhandledException_ReturnsSanitizedProblemDetails()
+    public async Task ExceptionPipeline_WhenHandlerThrowsUnhandledException_ReturnsSanitizedProblemDetails()
     {
         const string sensitiveMessage = "Sensitive internals should not be exposed";
 
@@ -75,54 +77,19 @@ public class ExceptionHandlingIntegrationTests
 
     private HttpClient CreateClientThatThrows(Exception exception)
     {
+        var actorRepository = Substitute.For<IActorRepository>();
+        actorRepository.GetPublicActorProfileAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns<Actor?>(_ => throw exception);
+
         var app = _fixture.Factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton<IMediator>(new ThrowingMediator(exception));
+                services.RemoveAll<IActorRepository>();
+                services.AddSingleton(actorRepository);
             });
         });
 
         return app.CreateClient();
-    }
-
-    private sealed class ThrowingMediator(Exception exception) : IMediator
-    {
-        public Task Publish(object notification, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            throw exception;
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default) where TRequest : IRequest
-        {
-            throw exception;
-        }
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-        {
-            throw exception;
-        }
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            throw exception;
-        }
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-        {
-            throw exception;
-        }
     }
 }

@@ -1,16 +1,16 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetWebhookBulkReplayOperationsQueryHandler(IWebhookBulkReplayRepository repository)
-    : IRequestHandler<GetWebhookBulkReplayOperationsQuery, IReadOnlyList<WebhookBulkReplayOperationDto>>
+    : IQueryHandler<GetWebhookBulkReplayOperationsQuery, IReadOnlyList<WebhookBulkReplayOperationDto>>
 {
     private const int MaximumLimit = 500;
 
-    public async Task<IReadOnlyList<WebhookBulkReplayOperationDto>> Handle(
+    public async Task<IReadOnlyList<WebhookBulkReplayOperationDto>> QueryAsync(
         GetWebhookBulkReplayOperationsQuery request,
         CancellationToken cancellationToken)
     {

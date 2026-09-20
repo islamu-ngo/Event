@@ -8,8 +8,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Federation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +27,7 @@ namespace Explore.Application.Features.Events.Handlers.Commands;
 /// When an event is deleted, all associated EventSessions are also soft deleted.
 /// This ensures referential integrity and proper audit trail with DeletedAt/DeletedBy fields.
 /// </summary>
-public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand, bool>
+public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, bool>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -70,7 +70,7 @@ public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand, boo
         _atprotoPublicationPlanner = atprotoPublicationPlanner;
     }
 
-    public async Task<bool> Handle(DeleteEventCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventCommand request, CancellationToken cancellationToken)
     {
         // Get current user ID from authentication context
         var userId = _currentUserService.UserId;

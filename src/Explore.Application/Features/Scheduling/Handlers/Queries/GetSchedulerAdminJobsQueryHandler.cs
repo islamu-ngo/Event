@@ -1,20 +1,20 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.DTOs.Scheduling;
 using Explore.Application.Features.Scheduling.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Scheduling.Handlers.Queries;
 
 public sealed class GetSchedulerAdminJobsQueryHandler(
     ISchedulerOperations schedulerOperations,
     IScheduledJobRegistry jobRegistry)
-    : IRequestHandler<GetSchedulerAdminJobsQuery, IReadOnlyList<SchedulerAdminJobDto>>
+    : IQueryHandler<GetSchedulerAdminJobsQuery, IReadOnlyList<SchedulerAdminJobDto>>
 {
-    public async Task<IReadOnlyList<SchedulerAdminJobDto>> Handle(
-        GetSchedulerAdminJobsQuery request,
+    public async Task<IReadOnlyList<SchedulerAdminJobDto>> QueryAsync(
+        GetSchedulerAdminJobsQuery query,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(query);
 
         var snapshot = await schedulerOperations.GetSnapshotAsync(cancellationToken);
 

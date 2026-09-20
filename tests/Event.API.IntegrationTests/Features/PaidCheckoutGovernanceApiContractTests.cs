@@ -2,11 +2,12 @@ using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Filters;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Payments;
 using Explore.Application.Features.PaidCheckoutGovernance.Commands;
 using Explore.Application.Hateoas;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -37,18 +38,30 @@ public sealed class PaidCheckoutGovernanceApiContractTests
     public async Task SaleControlGetEmitsOnlyCurrentAuthorizedTransitionAndEveryEndpointIsNoStore()
     {
         Guid tenantId = Guid.CreateVersion7();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetPaidCheckoutSaleControlQuery>(), Arg.Any<CancellationToken>()).Returns(new PaidCheckoutSaleControlDto
+        var getSaleControlQueryHandler = Substitute.For<IQueryHandler<GetPaidCheckoutSaleControlQuery, PaidCheckoutSaleControlDto?>>();
+        getSaleControlQueryHandler.QueryAsync(Arg.Any<GetPaidCheckoutSaleControlQuery>(), Arg.Any<CancellationToken>()).Returns(new PaidCheckoutSaleControlDto
         {
             TenantId = tenantId,
             IsStopped = true,
             ResumeReviewPending = false,
             Version = 2
         });
+        var stopSalesCommandHandler = Substitute.For<ICommandHandler<StopPaidCheckoutSalesCommand, BaseCommandResponse<Guid>>>();
+        var requestResumeCommandHandler = Substitute.For<ICommandHandler<RequestPaidCheckoutResumeCommand, BaseCommandResponse<Guid>>>();
+        var reviewResumeCommandHandler = Substitute.For<ICommandHandler<ReviewPaidCheckoutResumeCommand, BaseCommandResponse<Guid>>>();
+        var requestReviewCommandHandler = Substitute.For<ICommandHandler<RequestPaidCheckoutReviewCommand, BaseCommandResponse<Guid>>>();
+        var decideReviewCommandHandler = Substitute.For<ICommandHandler<DecidePaidCheckoutReviewCommand, BaseCommandResponse<Guid>>>();
         var authorization = Substitute.For<IAuthorizationProvider>();
         authorization.AuthorizeAsync(Arg.Any<AuthorizationRequest>(), Arg.Any<CancellationToken>())
             .Returns(AuthorizationDecision.Allow(AuthorizationProviderMetadata.Runtime));
-        var controller = new PaidCheckoutGovernanceController(mediator, authorization)
+        var controller = new PaidCheckoutGovernanceController(
+            authorization,
+            getSaleControlQueryHandler,
+            stopSalesCommandHandler,
+            requestResumeCommandHandler,
+            reviewResumeCommandHandler,
+            requestReviewCommandHandler,
+            decideReviewCommandHandler)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
             Url = RouteUrl()

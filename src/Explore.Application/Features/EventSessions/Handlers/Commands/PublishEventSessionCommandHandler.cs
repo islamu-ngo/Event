@@ -1,4 +1,5 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;
 using Explore.Application.Exceptions;
@@ -7,7 +8,6 @@ using Explore.Application.Responses;
 using Explore.Application.Services.Lifecycle;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
@@ -19,12 +19,12 @@ public sealed class PublishEventSessionCommandHandler(
     IEventLifecycleReadinessEvaluator readinessEvaluator,
     IUnitOfWork unitOfWork,
     HybridCache cache,
-    TimeProvider timeProvider) : IRequestHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<PublishEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private const string ConcurrencyConflictCode = "event_session_publish_concurrency_conflict";
     private const string ReadinessFailedCode = "event_session_publish_readiness_failed";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(PublishEventSessionCommand command, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventSessionCommand command, CancellationToken cancellationToken)
     {
         var validator = new PublishEventSessionRequestDtoValidator();
         var validationResult = await validator.ValidateAsync(command.Request, cancellationToken);

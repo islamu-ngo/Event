@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;
 using Explore.API.Attributes;
+using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventSessionStatus;
 using Explore.Application.Features.EventSessionStatuses.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,8 +18,13 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class EventSessionStatusController(IMediator mediator) : ControllerBase
+public class EventSessionStatusController(
+    IQueryHandler<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>> listQuery,
+    IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?> detailsQuery) : ControllerBase
 {
+    private static readonly ApiNotFoundProblemDescriptor StatusNotFoundProblem = new(
+        "Event session status not found",
+        "Event session status not found.");
 
     [HttpGet(Name = RouteNames.GetEventSessionStatuses)]
     [EndpointSummary("Get all Event Session Statuses")]
@@ -28,7 +34,7 @@ public class EventSessionStatusController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<EventSessionStatusListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var statuses = await mediator.Send(new GetEventSessionStatusListRequest(), cancellationToken);
+        var statuses = await listQuery.QueryAsync(new GetEventSessionStatusListQuery(), cancellationToken);
         return Ok(statuses);
     }
 
@@ -41,7 +47,7 @@ public class EventSessionStatusController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<EventSessionStatusDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var status = await mediator.Send(new GetEventSessionStatusDetailsRequest { Id = id }, cancellationToken);
-        return Ok(status);
+        var status = await detailsQuery.QueryAsync(new GetEventSessionStatusDetailsQuery { Id = id }, cancellationToken);
+        return status is null ? this.ToNotFoundProblem(StatusNotFoundProblem) : Ok(status);
     }
 }

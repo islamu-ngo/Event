@@ -1,8 +1,6 @@
 using System.Reflection;
-using AutoMapper.Internal;
 using Explore.Application.Analytics;
 using Explore.Application.Authorization;
-using Explore.Application.Behaviors;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Identity;
@@ -21,10 +19,14 @@ using Explore.Application.Features.Authentication.Atproto.Services;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.CustomPropertyDefinitions.Authorization;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
+using Explore.Application.Features.EventAgendaItems.Authorization;
+using Explore.Application.Features.EventAgendaItems.Requests.Commands;
 using Explore.Application.Features.EventCategories.Authorization;
 using Explore.Application.Features.EventCategories.Requests.Commands;
 using Explore.Application.Features.EventCustomProperties.Authorization;
 using Explore.Application.Features.EventCustomProperties.Requests.Commands;
+using Explore.Application.Features.EventDays.Authorization;
+using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Features.EventOrganizerClaims.Authorization;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Features.EventReporting;
@@ -60,6 +62,7 @@ using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Notifications;
+using Explore.Application.Notifications.Handlers;
 using Explore.Application.Services;
 using Explore.Application.Services.Federation;
 using Explore.Application.Services.Lifecycle;
@@ -70,7 +73,6 @@ using Explore.Application.Settings;
 using Explore.Application.Telemetry;
 using Explore.Application.Webhooks;
 using Explore.Domain.Services.Scheduling;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -106,42 +108,19 @@ public static class ApplicationServicesRegistration
             }, "Privacy-erasure lifecycle settings are invalid.")
             .ValidateOnStart();
 
-        services.AddAutoMapper(cfg =>
-        {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-            // AutoMapper 15+ requires a Lucky Penny commercial license key at runtime.
-            // Injected from Infisical /api folder: LUCKYPENNY_LICENSE_KEY → Licensing:LuckyPenny:LicenseKey.
-            // No throw here: the OpenAPI doc generator runs Program.Main at build time without secrets.
-            // Lucky Penny libraries themselves enforce licensing at runtime.
-            var licenseKey = configuration["Licensing:LuckyPenny:LicenseKey"];
-            if (!string.IsNullOrEmpty(licenseKey))
-            {
-                cfg.LicenseKey = licenseKey;
-            }
-#endif
-            // Bound every map traversal in the FOSS line to mitigate CVE-2026-32933.
-            // The same ceiling is defense in depth for commercial vendor-patched builds.
-            cfg.Internal().ForAllMaps((_, mapping) => mapping.MaxDepth(64));
-            cfg.AddMaps(Assembly.GetExecutingAssembly());
-        });
+        services.AddScoped<Contracts.Operations.INotificationHandler<SettingChangedNotification>, SettingCacheInvalidationHandler>();
+        services.AddScoped<Contracts.Operations.INotificationHandler<SettingChangedNotification>, SettingAuditLogHandler>();
+        services.AddScoped<Contracts.Operations.INotificationHandler<PolicyChangedNotification>, PolicyChangedCacheInvalidationHandler>();
+        services.AddScoped<Features.RegistrationOrders.Handlers.Commands.IRegistrationParticipantMutationDispatcher, Features.RegistrationOrders.Handlers.Commands.RegistrationParticipantMutationDispatcher>();
 
-        services.AddMediatR(cfg =>
-        {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-            // MediatR 13+ requires a Lucky Penny commercial license key at runtime.
-            // Same key as AutoMapper — single LUCKYPENNY_LICENSE_KEY from Infisical.
-            var licenseKey = configuration["Licensing:LuckyPenny:LicenseKey"];
-            if (!string.IsNullOrEmpty(licenseKey))
-            {
-                cfg.LicenseKey = licenseKey;
-            }
-#endif
-            cfg.RegisterServicesFromAssembly(typeof(ApplicationServicesRegistration).Assembly);
-        });
-
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
         services.AddTransient<AuthorizationResourceContextResolver>();
+        services.AddTransient<IAuthorizationContextEnricher<Features.EventSeries.Requests.Commands.UpdateEventSeriesCommand>, Features.EventSeries.Authorization.UpdateEventSeriesAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<CreateEventDayCommand>, EventDayAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<UpdateEventDayCommand>, EventDayAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<DeleteEventDayCommand>, EventDayAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<CreateEventAgendaItemCommand>, EventAgendaItemAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<UpdateEventAgendaItemCommand>, EventAgendaItemAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<DeleteEventAgendaItemCommand>, EventAgendaItemAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateCustomPropertyDefinitionCommand>, UpdateCustomPropertyDefinitionAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventCustomPropertyDefinitionCommand>, UpdateEventCustomPropertyDefinitionAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionCustomPropertyDefinitionCommand>, UpdateEventSessionCustomPropertyDefinitionAuthorizationContextEnricher>();
@@ -149,7 +128,9 @@ public static class ApplicationServicesRegistration
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionTemplateCommand>, UpdateEventSessionTemplateAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionLanguageCommand>, UpdateEventSessionLanguageAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventCategoriesCommand>, UpdateEventCategoriesAuthorizationContextEnricher>();
-        services.AddTransient<IAuthorizationContextEnricher<UpdateEventTagsCommand>, UpdateEventTagsAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<DeleteEventCategoriesCommand>, DeleteEventCategoriesAuthorizationContextEnricher>();
+        services.AddScoped<IAuthorizationContextEnricher<UpdateEventTagsCommand>, UpdateEventTagsAuthorizationContextEnricher>();
+        services.AddScoped<IAuthorizationContextEnricher<DeleteEventTagsCommand>, DeleteEventTagsAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionAgendaItemCommand>, UpdateEventSessionAgendaItemAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionGroupCommand>, UpdateEventSessionGroupAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionSpeakerCommand>, UpdateEventSessionSpeakerAuthorizationContextEnricher>();
@@ -445,6 +426,7 @@ public static class ApplicationServicesRegistration
         // Appearance resolution and palette generation
         services.AddScoped<IAppearanceResolutionService, AppearanceResolutionService>();
 
+        services.AddNativeOperations();
         return services;
     }
 }

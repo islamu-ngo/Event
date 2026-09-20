@@ -10,12 +10,12 @@ using Explore.Application.Features.Groups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Groups.Handlers.Commands;
 
-public class UpdateGroupCommandHandler : IRequestHandler<UpdateGroupCommand, BaseCommandResponse<Guid>>
+public class UpdateGroupCommandHandler : ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupTenantRepository _groupTenantRepository;
@@ -43,7 +43,7 @@ public class UpdateGroupCommandHandler : IRequestHandler<UpdateGroupCommand, Bas
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateGroupCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateGroupDtoValidator();
         var validationResult = await validator.ValidateAsync(request.UpdateGroupDto, cancellationToken);

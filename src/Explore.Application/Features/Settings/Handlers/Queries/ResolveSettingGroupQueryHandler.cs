@@ -9,11 +9,11 @@ using Explore.Application.Lookups;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 public class ResolveSettingGroupQueryHandler
-    : IRequestHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>
+    : IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly ITenantContext _tenantContext;
@@ -41,7 +41,7 @@ public class ResolveSettingGroupQueryHandler
         _logger = logger;
     }
 
-    public async Task<SettingGroupResponseDto> Handle(
+    public async Task<SettingGroupResponseDto> QueryAsync(
         ResolveSettingGroupQuery request, CancellationToken cancellationToken)
     {
         var definitions = SettingRegistry.GetByCategory(request.Category);

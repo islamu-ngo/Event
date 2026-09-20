@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Models;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
@@ -12,9 +12,9 @@ public sealed class RunAiRetentionCleanupCommandHandler(
     IAiConversationRepository conversationRepository,
     IHierarchicalSettingsResolver settingsResolver,
     ITenantContext tenantContext)
-    : IRequestHandler<RunAiRetentionCleanupCommand, AiRetentionCleanupResult>
+    : ICommandHandler<RunAiRetentionCleanupCommand, AiRetentionCleanupResult>
 {
-    public async Task<AiRetentionCleanupResult> Handle(
+    public async Task<AiRetentionCleanupResult> ExecuteAsync(
         RunAiRetentionCleanupCommand request,
         CancellationToken cancellationToken)
     {

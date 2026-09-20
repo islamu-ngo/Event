@@ -1,14 +1,12 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Commands;
-using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class DeleteEventSessionCustomPropertyDefinitionCommandHandler : IRequestHandler<DeleteEventSessionCustomPropertyDefinitionCommand, bool>
+public class DeleteEventSessionCustomPropertyDefinitionCommandHandler : ICommandHandler<DeleteEventSessionCustomPropertyDefinitionCommand, bool>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
     private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
@@ -27,7 +25,7 @@ public class DeleteEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         _cache = cache;
     }
 
-    public async Task<bool> Handle(DeleteEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var definition = await _sessionCustomPropertyRepository.GetDefinitionWithDetails(request.Id);
         if (definition == null)
@@ -48,10 +46,9 @@ public class DeleteEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             return false;
         }
 
-        await _cache.RemoveAsync(
-            $"session-custom-properties:list:{definition.EventSessionId}:1:{PaginatedResult<object>.DefaultPageSize}",
-            cancellationToken);
-        await _cache.RemoveAsync($"session-custom-properties:detail:{definition.Id}", cancellationToken);
+        await _cache.RemoveByTagAsync(
+            SessionCustomPropertyCache.ListsBySession(definition.TenantId, definition.EventSessionId),
+            CancellationToken.None);
 
         return true;
     }

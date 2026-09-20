@@ -1,9 +1,9 @@
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupMembers.Requests.Commands;
 
-public sealed record DeleteGroupMemberCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record DeleteGroupMemberCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public Guid MemberId { get; init; }
     public string? RequesterUserId { get; init; }

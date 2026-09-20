@@ -9,11 +9,11 @@ using Explore.Application.Features.GroupMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupMembers.Handlers.Commands;
 
-public class DeleteGroupMemberCommandHandler : IRequestHandler<DeleteGroupMemberCommand, BaseCommandResponse<Guid>>
+public class DeleteGroupMemberCommandHandler : ICommandHandler<DeleteGroupMemberCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IUserContext _userContext;
@@ -29,7 +29,7 @@ public class DeleteGroupMemberCommandHandler : IRequestHandler<DeleteGroupMember
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteGroupMemberCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteGroupMemberCommand request, CancellationToken cancellationToken)
     {
         var memberToDelete = await _groupMemberRepository.GetById(request.MemberId);
         if (memberToDelete == null)

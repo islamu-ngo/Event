@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing.Validators;
 using Explore.Application.Exceptions;
@@ -8,7 +9,6 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
@@ -19,23 +19,23 @@ public sealed class UpdateEventTicketTypeCommandHandler(
     TicketTypeEntitlementResolver entitlementResolver,
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
-    HybridCache cache) : IRequestHandler<UpdateEventTicketTypeCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<UpdateEventTicketTypeCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        UpdateEventTicketTypeCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        UpdateEventTicketTypeCommand command,
         CancellationToken cancellationToken)
     {
         var validation = await new ManageEventTicketTypeDtoValidator()
-            .ValidateAsync(request.TicketType, cancellationToken);
+            .ValidateAsync(command.TicketType, cancellationToken);
         if (!validation.IsValid)
         {
-            return Bad(request.TicketTypeId, validation.Errors.Select(error => error.ErrorMessage));
+            return Bad(command.TicketTypeId, validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.TicketTypeId);
+            return Missing(command.TicketTypeId);
         }
 
         try
@@ -43,24 +43,24 @@ public sealed class UpdateEventTicketTypeCommandHandler(
             Guid? ticketTypeId = await unitOfWork.ExecuteInTransactionAsync<Guid?>(async token =>
             {
                 EventTicketCatalogVersion? catalog = await catalogs.GetDraftCatalogForUpdateAsync(
-                    request.EventId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
                 EventTicketType? ticketType = catalog?.TicketTypes.SingleOrDefault(
-                    candidate => candidate.Id == request.TicketTypeId && !candidate.IsDeleted);
+                    candidate => candidate.Id == command.TicketTypeId && !candidate.IsDeleted);
                 if (ticketType is null)
                 {
                     return null;
                 }
 
-                EventCapacityPool? pool = request.TicketType.CapacityPoolId.HasValue
+                EventCapacityPool? pool = command.TicketType.CapacityPoolId.HasValue
                     ? await catalogs.GetActiveCapacityPoolForUpdateAsync(
-                        request.TicketType.CapacityPoolId.Value,
-                        request.EventId,
+                        command.TicketType.CapacityPoolId.Value,
+                        command.EventId,
                         tenant.TenantId,
                         token)
                     : null;
-                if (request.TicketType.CapacityPoolId.HasValue && pool is null)
+                if (command.TicketType.CapacityPoolId.HasValue && pool is null)
                 {
                     return null;
                 }
@@ -69,29 +69,29 @@ public sealed class UpdateEventTicketTypeCommandHandler(
 
                 IReadOnlyList<TicketTypeEntitlement> entitlements = await entitlementResolver.ResolveAsync(
                     ticketType.Id,
-                    request.TicketType.Entitlements,
-                    request.EventId,
+                    command.TicketType.Entitlements,
+                    command.EventId,
                     token);
 
                 TicketTypeEntitlement[] existingEntitlements = ticketType.Entitlements.ToArray();
                 await catalogs.RemoveEntitlementsAsync(existingEntitlements, token);
                 catalog!.UpdateTicketType(
                     ticketType,
-                    request.TicketType.Name,
-                    (TicketPricingModeEnum)request.TicketType.TicketPricingModeId,
-                    CreateMoney(request.TicketType.FixedPriceMinor, catalog.CurrencyCode),
-                    CreateMoney(request.TicketType.MinimumPriceMinor, catalog.CurrencyCode),
-                    CreateMoney(request.TicketType.SuggestedPriceMinor, catalog.CurrencyCode),
-                    (ParticipantDataCollectionModeEnum)request.TicketType.ParticipantDataCollectionModeId,
+                    command.TicketType.Name,
+                    (TicketPricingModeEnum)command.TicketType.TicketPricingModeId,
+                    CreateMoney(command.TicketType.FixedPriceMinor, catalog.CurrencyCode),
+                    CreateMoney(command.TicketType.MinimumPriceMinor, catalog.CurrencyCode),
+                    CreateMoney(command.TicketType.SuggestedPriceMinor, catalog.CurrencyCode),
+                    (ParticipantDataCollectionModeEnum)command.TicketType.ParticipantDataCollectionModeId,
                     pool,
-                    request.TicketType.MinimumAge,
-                    request.TicketType.MaximumAge,
-                    request.TicketType.RequiresGuardian,
-                    request.TicketType.RequiresApproval,
-                    request.TicketType.PerOrderLimit,
-                    request.TicketType.PerAccountLimit,
-                    request.TicketType.PerVerifiedContactLimit,
-                    request.TicketType.PerBookingPartyLimit,
+                    command.TicketType.MinimumAge,
+                    command.TicketType.MaximumAge,
+                    command.TicketType.RequiresGuardian,
+                    command.TicketType.RequiresApproval,
+                    command.TicketType.PerOrderLimit,
+                    command.TicketType.PerAccountLimit,
+                    command.TicketType.PerVerifiedContactLimit,
+                    command.TicketType.PerBookingPartyLimit,
                     entitlements);
                 await catalogs.UpdateAsync(catalog, token);
                 return ticketType.Id;
@@ -99,23 +99,23 @@ public sealed class UpdateEventTicketTypeCommandHandler(
 
             if (ticketTypeId is null)
             {
-                return Missing(request.TicketTypeId);
+                return Missing(command.TicketTypeId);
             }
 
-            await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
             return Ok(ticketTypeId.Value, "Ticket type updated.");
         }
         catch (TicketingNotFoundException)
         {
-            return Missing(request.TicketTypeId);
+            return Missing(command.TicketTypeId);
         }
         catch (ConcurrencyConflictException exception)
         {
-            return Conflict(request.TicketTypeId, exception.Message);
+            return Conflict(command.TicketTypeId, exception.Message);
         }
         catch (ArgumentException exception)
         {
-            return Bad(request.TicketTypeId, exception.Message);
+            return Bad(command.TicketTypeId, exception.Message);
         }
     }
 

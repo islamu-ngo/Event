@@ -1,12 +1,12 @@
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Responses;
 using Explore.Domain.Ai;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
@@ -16,9 +16,9 @@ public sealed class ProposeAiToolActionCommandHandler(
     IAiToolContractRegistry toolRegistry,
     ICurrentUserService currentUserService,
     IAuthorizationProvider authorizationProvider)
-    : IRequestHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ProposeAiToolActionCommand request,
         CancellationToken cancellationToken)
     {

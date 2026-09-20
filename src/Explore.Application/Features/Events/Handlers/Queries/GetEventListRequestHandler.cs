@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -12,18 +12,17 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
-public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, PaginatedResult<EventListDto>>
+public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IActorRepository _actorRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetEventListRequestHandler> _logger;
     private readonly HybridCache _cache;
@@ -34,7 +33,6 @@ public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, P
     public GetEventListRequestHandler(
         IEventRepository eventRepository,
         IActorRepository actorRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetEventListRequestHandler> logger,
         HybridCache cache,
@@ -44,7 +42,6 @@ public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, P
     {
         _eventRepository = eventRepository;
         _actorRepository = actorRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
         _cache = cache;
@@ -53,7 +50,7 @@ public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, P
         _quotaResolver = quotaResolver;
     }
 
-    public async Task<PaginatedResult<EventListDto>> Handle(GetEventListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventListDto>> QueryAsync(GetEventListRequest request, CancellationToken cancellationToken)
     {
         var ownershipActorId = await ResolveOwnershipActorIdAsync(request);
         if (ownershipActorId == MissingOwnershipActorId)
@@ -75,7 +72,7 @@ public class GetEventListRequestHandler : IRequestHandler<GetEventListRequest, P
             {
                 var (events, totalCount) = await _eventRepository.GetEventsWithDetailsPaged(
                     request.PageNumber, request.PageSize, specification);
-                var eventDtos = _mapper.Map<List<EventListDto>>(events);
+                var eventDtos = events.Select(EventMapper.ToListItem).ToList();
                 return PaginatedResult<EventListDto>.Create(eventDtos, totalCount, request.PageNumber, request.PageSize);
             },
             new HybridCacheEntryOptions

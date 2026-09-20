@@ -3,18 +3,18 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionSpeaker.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionSpeakers.Handlers.Commands;
 
-public class UpdateEventSessionSpeakerCommandHandler : IRequestHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionSpeakerCommandHandler : ICommandHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionSpeakerRepository _speakerRepository;
     private readonly IActorRepository _actorRepository;
@@ -33,7 +33,7 @@ public class UpdateEventSessionSpeakerCommandHandler : IRequestHandler<UpdateEve
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionSpeakerCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionSpeakerCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventSessionSpeakerDtoValidator();
         var validationResult = await validator.ValidateAsync(request.SpeakerDto, cancellationToken);
@@ -65,13 +65,6 @@ public class UpdateEventSessionSpeakerCommandHandler : IRequestHandler<UpdateEve
             return ValidationFailure("Speaker assignment context no longer matches its persisted event session.");
         }
 
-        request = request with
-        {
-            EventSessionId = speaker.EventSessionId,
-            EventId = previousSession.EventId,
-            TenantId = previousSession.TenantId,
-        };
-
         var targetSessionId = request.SpeakerDto.Session?.EventSessionId ?? speaker.EventSessionId;
         var targetActorId = request.SpeakerDto.Actor?.ActorId ?? speaker.ActorId;
 
@@ -86,7 +79,7 @@ public class UpdateEventSessionSpeakerCommandHandler : IRequestHandler<UpdateEve
             return ValidationFailure("Event session must belong to the same tenant as the speaker assignment.");
         }
 
-        if (targetSession.EventId != request.EventId)
+        if (targetSession.EventId != previousSession.EventId)
         {
             return ValidationFailure("Event session must belong to the same event as the speaker assignment.");
         }
@@ -111,7 +104,7 @@ public class UpdateEventSessionSpeakerCommandHandler : IRequestHandler<UpdateEve
         ApplyActor(speaker, request.SpeakerDto.Actor);
 
         await _speakerRepository.Update(speaker);
-        await InvalidateCachesAsync(previousSession?.EventId, targetSession.EventId, targetSession.TenantId, cancellationToken);
+        await InvalidateCachesAsync(previousSession.EventId, targetSession.EventId, targetSession.TenantId, cancellationToken);
 
         return BaseCommandResponse.Success(speaker.Id, "Speaker assignment updated successfully.");
     }

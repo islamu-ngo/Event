@@ -8,7 +8,6 @@ using Explore.API.Filters;
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +20,14 @@ public sealed class AuthorizationSurfaceGuardrailTests
 
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
+        new(
+            "Explore.Application.Features.TenantSettingsDocuments.Requests.Commands.EnsureTenantBrandingSettingsDocumentCommand",
+            "authenticated-ambient-tenant-provisioning",
+            "The existing authenticated branding GET and post-patch reload retain their ambient tenant authority. The no-input command reads or provisions the default non-secret branding row without accepting a tenant target. TenantSettingsDocumentsControllerTests verifies anonymous denial, authenticated-member provisioning, repeated reads, concurrent uniqueness and retry; both patches retain separate persisted tenant grants."),
+        new(
+            "Explore.Application.Features.TenantStorageSettings.Requests.Commands.TestTenantStorageProviderCommand",
+            "handler-contained-admin",
+            "The provider write/delete probe checks persisted administrator authority for the ambient tenant or instance before resolving storage. NativeTenantStorageHttpTests verifies forged grants, wrong-tenant denial without probing, instance grants, safe provider failures and cancellation."),
         new(
             "Explore.Application.Features.Authentication.Atproto.Requests.Commands.ProbeAtprotoTransientCommand",
             "private-pre-authentication-machine",
@@ -86,9 +93,9 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "handler-current-scope-administrator",
             "Current platform admin or exact ambient tenant/admin grant is rechecked after the ordered SMTP lease inside Serializable execution; writer binds actor, target, revision, protected confirmation and acknowledgement. Evidence: EmailDeliveryDisableCommandHandlerTests.AuthorityRevokedWhileAcquiringLeaseIsRechecked and ConfirmedTokenCannotReplayImmediatelyOrAfterReenable; EmailDeliveryDisableHttpTests."),
         new(
-            "Explore.Application.Features.EmailDispatch.Requests.Queries.PreviewEmailDeliveryDisableQuery",
+            "Explore.Application.Features.EmailDispatch.Requests.Commands.PreviewEmailDeliveryDisableCommand",
             "handler-current-scope-administrator-proof-preview",
-            "Command-response discovery deliberately includes this Query: fresh scoped admin is checked before and within the lease/Serializable snapshot; only actionable impact issues confirmation. Evidence: EmailDeliveryDisableCommandHandlerTests.UnauthorizedTargetsCannotPreviewOrDisable and LockedOrNoOpPreviewNeverIssuesConfirmation."),
+            "Confirmation-issuance command: fresh scoped admin is checked before and within the lease/Serializable snapshot; only actionable impact issues confirmation. Evidence: EmailDeliveryDisableCommandHandlerTests.UnauthorizedTargetsCannotPreviewOrDisable and LockedOrNoOpPreviewNeverIssuesConfirmation."),
         new(
             "Explore.Application.Features.InstanceOnboarding.Requests.Commands.CompleteLocalInstanceOnboardingCommand",
             "handler-active-setup-secret-bootstrap",
@@ -109,6 +116,14 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "Explore.Application.Features.RegistrationOrders.Commands.IssueAnonymousRegistrationChallengeCommand",
             "handler-bounded-public-proof-issuance",
             "Current tenant, publicly eligible published event, guest visitor/participation mode, finite live end promise, bounded difficulty and transactional tenant/event quotas gate issuance under the settings lease without allocation. Evidence: AnonymousRegistrationChallengeIssueTests; AnonymousRegistrationChallengeQuotaTests; AnonymousRegistrationChallengeHttpTests.EffectiveIpBudgetCoversIssuanceAndStartWithoutLoopbackBypass."),
+        new(
+            "Explore.Application.Features.AiAssistant.Requests.Commands.ProcessAiRunCommand",
+            "host-local-worker",
+            "Executed only by the background AiAssistantRunWorker within the hosting process boundary; no HTTP route or user principal dispatches it directly."),
+        new(
+            "Explore.Application.Features.UserAuthenticationTokens.Requests.Commands.DeleteUserAuthenticationTokenCommand",
+            "handler-contained-user-token-authority",
+            "The handler directly resolves the authenticated current user identity via ICurrentUserService and verifies ownership against persisted user authentication tokens before deleting."),
     ];
     private static readonly string[] NamedMediatRViolations =
     [
@@ -198,13 +213,13 @@ public sealed class AuthorizationSurfaceGuardrailTests
         "Explore.Application.Features.InstanceOnboarding.Requests.Commands.VerifyCerbosEndpointCommand",
         "Explore.Application.Features.InstanceOnboarding.Requests.Queries.GetActiveTenantCountQuery",
         "Explore.Application.Features.InstanceOnboarding.Requests.Queries.RunKeycloakRealmDoctorQuery",
-        "Explore.Application.Features.Integrations.Listmonk.Requests.Commands.TestListmonkConnectionCommand",
+        "Explore.Application.Features.Integrations.Listmonk.Requests.Queries.TestListmonkConnectionQuery",
         "Explore.Application.Features.Integrations.Listmonk.Requests.Commands.UpdateListmonkIntegrationSettingsCommand",
         "Explore.Application.Features.Localization.Requests.Commands.ExportFromTmsCommand",
         "Explore.Application.Features.Localization.Requests.Commands.ImportLocalizationBundleCommand",
-        "Explore.Application.Features.Localization.Requests.Commands.TestTmsConnectionCommand",
         "Explore.Application.Features.Localization.Requests.Commands.UpdateLocalizationGovernanceCommand",
         "Explore.Application.Features.Localization.Requests.Queries.GetLocalizationTmsApiKeyConfiguredQuery",
+        "Explore.Application.Features.Localization.Requests.Queries.TestTmsConnectionQuery",
         "Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands.EnsureManagedProviderClientProvisionedCommand",
         "Explore.Application.Features.Management.Requests.Commands.CancelManagedTenantProvisioningOperationCommand",
         "Explore.Application.Features.Management.Requests.Commands.ProcessManagedTenantProvisioningOperationCommand",
@@ -222,8 +237,8 @@ public sealed class AuthorizationSurfaceGuardrailTests
         "Explore.Application.Features.Notifications.Requests.Commands.SubscribeCurrentUserWebPushSubscriptionCommand",
         "Explore.Application.Features.Notifications.Requests.Commands.UnsubscribeCurrentUserWebPushSubscriptionCommand",
         "Explore.Application.Features.Notifications.Requests.Commands.UpdateCurrentUserNotificationPreferenceMatrixCommand",
-        "Explore.Application.Features.OrganizationMembers.Requests.Commands.AcceptInvitationCommand",
         "Explore.Application.Features.OrganizationMembers.Requests.Commands.DeclineInvitationCommand",
+        "Explore.Application.Features.OrganizationMembers.Requests.Queries.ValidateOrganizationInvitationQuery",
         "Explore.Application.Features.OrganizationReviews.Commands.CreateOrganizationReview.CreateOrganizationReviewCommand",
         "Explore.Application.Features.OrganizerPaymentConnections.Commands.CreateOrganizerPaymentOnboardingLinkCommand",
         "Explore.Application.Features.OrganizerPaymentConnections.Commands.DisableOrganizerPaymentConnectionCommand",
@@ -479,9 +494,9 @@ public sealed class AuthorizationSurfaceGuardrailTests
         await Assert.That(anonymousMutations.Any(item => item.IsReviewedLocalLifecycle)).IsFalse();
     }
 
-    private sealed record SyntheticUnclassifiedCommand : IRequest<BaseCommandResponse<Guid>>;
-    private sealed record SyntheticLocalLifecycleCommand : IRequest<BaseCommandResponse<Guid>>;
-    private sealed record SyntheticProofPreviewQuery : IRequest<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticUnclassifiedCommand : Explore.Application.Contracts.Operations.ICommand<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticLocalLifecycleCommand : Explore.Application.Contracts.Operations.ICommand<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticProofPreviewQuery : Explore.Application.Contracts.Operations.ICommand<BaseCommandResponse<Guid>>;
 
     private sealed class SyntheticAnonymousMutationController : ControllerBase
     {
@@ -595,18 +610,20 @@ internal static class AuthorizationSurfaceInventory
 
     private static bool IsConcreteMediatRRequest(Type type) =>
         type is { IsAbstract: false, IsInterface: false }
-        && GetResponseType(type) is not null;
+        && (GetResponseType(type) is not null || OperationContractDiscovery.IsNativeRequest(type));
 
     private static Type? GetResponseType(Type type) =>
         type.GetInterfaces()
-            .Where(interfaceType => interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IRequest<>))
+            .Where(interfaceType => interfaceType.IsGenericType
+                && OperationContractDiscovery.IsResultContract(interfaceType))
             .Select(interfaceType => interfaceType.GetGenericArguments()[0])
             .FirstOrDefault();
 
     private static bool IsMutatingRequest(Type type)
     {
         var responseType = GetResponseType(type);
-        return type.Name.EndsWith("Command", StringComparison.Ordinal)
+        return OperationContractDiscovery.IsCommand(type)
+            || type.Name.EndsWith("Command", StringComparison.Ordinal)
             || (type.Namespace?.Contains(".Commands", StringComparison.Ordinal) ?? false)
             || MutatingNamePrefixes.Any(prefix => type.Name.StartsWith(prefix, StringComparison.Ordinal))
             || IsCommandResponse(responseType)

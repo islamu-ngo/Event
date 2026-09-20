@@ -1,12 +1,12 @@
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
@@ -18,11 +18,11 @@ public sealed class ReconcileLocalCredentialOperationCommandHandler(
     IUserRepository userRepository,
     IActorRepository actorRepository,
     IUserExternalLoginRepository externalLoginRepository)
-    : IRequestHandler<ReconcileLocalCredentialOperationCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReconcileLocalCredentialOperationCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ReconcileLocalCredentialOperationCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         Guid? actorUserId = await LocalCredentialAdministrator.ResolveAsync(
             adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)

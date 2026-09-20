@@ -73,13 +73,13 @@ public partial class OrganizationDetails
         {
             editModel = new OrganizationProfileEditModel
             {
-                FullName = organization.FullName,
-                Email = organization.Email,
+                FullName = organization.FullName ?? string.Empty,
+                Email = organization.Email ?? string.Empty,
                 WebsiteUrl = organization.WebsiteUrl,
-                Country = organization.Country,
-                City = organization.City,
+                Country = organization.Country ?? string.Empty,
+                City = organization.City ?? string.Empty,
                 Postcode = int.TryParse(organization.Postcode, out var pc) ? pc : 0,
-                Address = organization.Address
+                Address = organization.Address ?? string.Empty
             };
 
             _appearance = new AppearanceSettings

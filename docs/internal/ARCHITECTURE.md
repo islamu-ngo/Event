@@ -14,7 +14,7 @@ ABOUTME: Captures key runtime patterns and boundaries that are not obvious from 
 | Metric / Dimension | Value as of 2026-09-03 | Architectural Context |
 |---|---|---|
 | **Runtime & SDK** | .NET 10 (`net10.0`) | Pinned preview SDK in `global.json`, C# 13 features |
-| **Architectural Style** | Clean Architecture + CQRS + BFF | Compile-enforced assembly boundaries + MediatR pipeline |
+| **Architectural Style** | Clean Architecture + CQRS + BFF | Compile-enforced assembly boundaries + protected native operations |
 | **Backend Production LOC** | **500,837 LOC** | API 73k, Application 224k, Domain 55k, Persistence 81k, Infrastructure 67k |
 | **Frontend / Client LOC** | **378,000 LOC** | `Explore.Blazor.Client` (incl. 182,524 LOC generated `EventApiClient.g.cs`) |
 | **Feature Slices** | **126 slices** | CQRS vertical slices under `Explore.Application/Features/` |
@@ -146,7 +146,7 @@ readiness limitations.
 The platform enforces Clean Architecture through **separate .NET project assemblies** with compile-time boundary enforcement, reinforced by 89 architecture test files (22,792 LOC):
 
 1. **`Explore.Domain` (55k LOC)**: Entities, enums, domain rules, state machines, and lifecycle specifications. References only `Event.Wire.Contracts`.
-2. **`Explore.Application` (224k LOC)**: CQRS requests/handlers (MediatR), DTOs, FluentValidation validators, application contracts. Depends only on `Explore.Domain`. Cannot reference Persistence, Infrastructure, or API.
+2. **`Explore.Application` (224k LOC)**: Native command/query requests and handlers, DTOs, FluentValidation validators, application contracts. Depends only on `Explore.Domain`. Cannot reference Persistence, Infrastructure, or API.
 3. **`Explore.Persistence` (81k LOC) + `Explore.Infrastructure` (67k LOC)**: EF Core DbContext, repositories, provider primitives, migrations, email, storage, Keycloak, webhooks. Depend on `Explore.Application`.
 4. **`Explore.API` (73k LOC)**: REST API host, composition root for all backend layers, HTTP middleware, controllers, Swagger/OpenAPI.
 5. **`Explore.Blazor` & `Explore.Blazor.Client` (378k LOC)**: Isolated BFF server and WebAssembly client. The client has **zero** source or project dependencies on Domain, Application, or Persistence; its backend boundary is strictly the generated `IEventApiClient` contract (182,524 LOC).
@@ -228,8 +228,8 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 
 ## Request Flow
 1. HTTP request enters the middleware pipeline (exception handling → security headers → correlation ID → logging → compression → HATEOAS → routing → timeouts → auth → rate limiting → authorization → output cache → ETag → idempotency).
-2. Controller receives request, dispatches MediatR command/query.
-3. MediatR pipeline behaviors execute: `PerformanceBehavior` (>500ms warning), `AuthorizationBehavior` (resource-level permission checks via `IAuthorizedRequest` / `[AuthorizeResource]`; uses reflection caching and emits OpenTelemetry activity spans).
+2. Controllers invoke explicitly injected closed command/query handler interfaces, never a generic sender.
+3. Native composition is authorization -> performance -> handler. Authorization uses `RequestAuthorization<TRequest>` and the existing `[AuthorizeResource]`/typed-facts contract.
 4. Handler orchestrates validation (manually instantiated validators), repository calls, mapping.
 5. Persistence layer returns entities; handlers map to DTO/response contracts.
 6. Controller delegates to an `IResourceAssembler<TDto, TListDto>` — by default the generic `HalResourceAssembler<TDto, TListDto>` over `ResourceAssemblerBase` — for HATEOAS HAL wrapping with authorization-aware link generation.
@@ -251,7 +251,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 
 ## Authorization Architecture
 1. Endpoint-level auth is handled via ASP.NET attributes/policies. `[AuthorizeResource]` attribute pairs a resource kind with a domain action constant from `AuthorizationActions`.
-2. Resource-level auth is handled in the `AuthorizationBehavior` MediatR pipeline. Checks route to `IAuthorizationProvider` which resolves to Cerbos PDP or local fallback.
+2. `RequestAuthorization<TRequest>` owns resource-level evaluation for native authorization decorators. Checks route to `IAuthorizationProvider`, which resolves to Cerbos PDP or local fallback.
 3. `AuthorizationActions` (string constants) and `ResourceKinds` (string constants) form the canonical action/resource catalogs shared by commands, link policies, and Cerbos policies.
 4. `IAuthorizableResourceDescriptor<T>` + `ResourceDescriptors` extract resource metadata (kind, id, attributes, scope) from DTOs — eliminating manual attribute dictionaries in HATEOAS link policies.
 5. HATEOAS capability planning uses a 4-phase pipeline: candidate links → normalized `AuthorizationCheck` with dedup key → batch evaluate unique checks → map decisions back to links. Fail-closed on batch failure.
@@ -271,7 +271,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 2. MCP hosting uses ASP.NET Core Streamable HTTP through the official C# MCP SDK, with stateless transport selected explicitly.
 3. The adapter is mapped by default through `Mcp:Enabled=true` at `/mcp`; self-hosted deployments can still unmap it with startup `Mcp:Enabled=false` or disable it at runtime with `mcp.enabled=false`.
 4. MCP tools, resources, and prompts must be registry-backed. Tool definitions and JSON schemas come from `IAiToolContractRegistry`; first-class projected MCP proposal tools add only the `conversationId`/`summary` envelope around registry payload fields, and mutating tools follow the existing proposal/confirmation path.
-5. MCP endpoint mapping is anonymous at the transport edge so official SDK authorization filters can expose only explicitly anonymous-safe registry discovery. Scoped tools, resources, prompts, proposals, and conversation data remain tenant-resolved and authenticated through `[Authorize]`, API-key/bearer principals, MediatR authorization, and HAL/API confirmation; no key or an invalid key can use only anonymous-safe capabilities.
+5. MCP endpoint mapping is anonymous at the transport edge so official SDK authorization filters can expose only explicitly anonymous-safe registry discovery. Scoped tools, resources, prompts, proposals, and conversation data remain tenant-resolved and authenticated through `[Authorize]`, API-key/bearer principals, native operation authorization, and HAL/API confirmation; no key or an invalid key can use only anonymous-safe capabilities.
 6. Stateful MCP sessions, runtime legacy SSE transport, sampling, elicitation, roots, completions, progress/list-changed notifications, resource subscriptions, and client-specific compatibility shims are ADR-gated protocol changes, not incidental adapter tweaks.
 7. MCP logs, health, metrics, and errors must not expose prompts, provider responses, tool payloads, tenant IDs, provider endpoint URLs, API keys, or raw provider exceptions.
 
@@ -305,16 +305,107 @@ No PostGIS extension, spatial entity/index, proximity endpoint, or readiness che
 
 ## Caching Architecture (3 Layers)
 1. **Output Cache** (HTTP response level): `LookupData` (1h), `ListData` (30s, varies by `Authorization` header), `DetailData` (60s, varies by `Authorization` header), `PublicData` (1h, no auth variance). Applied via `[OutputCache]` on endpoints.
-2. **HybridCache** (application level, L1 in-memory + L2 distributed): 30min default expiration, 5min local, 10MB max payload. Used in MediatR handlers with read-through and explicit invalidation patterns.
+2. **HybridCache** (application level, L1 in-memory + L2 distributed): 30min default expiration, 5min local, 10MB max payload. Used in native handlers with read-through and explicit invalidation patterns.
 3. **ETag Middleware** (conditional requests): RecyclableMemoryStream-based, SHA256 weak ETags on JSON/HAL responses, returns `304 Not Modified`. Skips bodies larger than 256KB.
 
-## MediatR Pipeline Behaviors
-1. `PerformanceBehavior` — logs any request taking >500ms as a warning.
-2. `AuthorizationBehavior` — checks `IAuthorizedRequest` interface or `[AuthorizeResource]` attribute. Optionally enhanced by `ISecureRequest` for dynamic resource context. Throws `AuthorizationException` on deny. Uses `ConcurrentDictionary` reflection caching for attribute lookups and emits activity spans via the `Explore.Authorization` ActivitySource for distributed tracing.
+## Protected Native Operations
+
+[Mapping and operations](MAPPING_AND_OPERATIONS.md) owns the authoring boundaries;
+[ADR-030](adr/ADR-030-generated-mapping-and-native-operations.md) records the decision.
+AutoMapper and MediatR have no runtime registration or package dependency.
+
+`Explore.Application.Contracts.Operations` defines void commands (`Task ExecuteAsync`), result commands (`Task<TResult> ExecuteAsync`), queries (`Task<TResult> QueryAsync`), and typed notifications (`Task HandleAsync`). Requests implement exactly one operation shape. For example, provider identity resolution uses `ResolveCurrentUserIdByIdentityRequest`, returning `Guid?`, and its callers inject the exact closed query handler. Commands, queries and typed settings notifications use repository-owned contracts; there is no legacy dispatch fallback.
+
+Settings producers inject `IEnumerable<INotificationHandler<SettingChangedNotification>>` and await `NotificationHandlerExtensions.HandleAsync`. Application explicitly registers the setting-cache consumer before the audit consumer, and the separate policy-cache consumer for `PolicyChangedNotification`; there is no event bus or reflection dispatch. Cache-before-audit is an intentional ordering change from the former MediatR discovery order. Delivery is sequential in DI registration order and stops on the first consumer failure, preserving the exception and supplied token. Producer-owned tenant/user and specialized output-cache invalidation boundaries remain unchanged, including deliberate post-commit `CancellationToken.None` sites and sensitive-value redaction. A notification failure does not undo committed writes; investigate the failed cache/audit effect separately rather than report a rollback. The existing configuration-manifest durable outbox still owns aggregation across separate effects and its established replay policy; each individual notification remains fail-first.
+
+`OperationServicesRegistration` scans Application once, registers scoped concrete owners and closed decorated interfaces, and caches wrapper factories during registration. Every native operation resolves as authorization -> performance -> business handler. Non-disposable handlers retain same-instance scoped service aliases. Disposable handlers have one concrete disposal owner: final validation rejects direct aliases and assignable opaque factories that could capture the handler again. Handlers needing service ports keep disposable resources in injected scoped dependencies instead. Validators remain manual; transactions and durable outbox writes remain handler-owned. Consumers must inject closed interfaces rather than concrete handlers or service locators.
+
+`RequestAuthorization<TRequest>` caches the attribute per closed request type and preserves request facts -> optional typed enricher -> persisted-resource resolver -> capability catalog -> provider ordering. Existing unannotated public, worker and handler-owned authorities retain their reviewed enforcement; universal decorator presence does not invent a universal PDP requirement. Ordinary denial throws `AuthorizationException`; provider unavailability throws `AuthorizationProviderUnavailableException`. Authorization emits existing `Explore.Authorization` spans and safe decision metadata.
+
+Native timing intentionally excludes authorization. Invocation-local timestamps use `TimeProvider.System`'s monotonic Stopwatch clock; successful calls exceeding 500ms log only request type and elapsed milliseconds. Denied, failed and cancelled operations produce no successful timing warning. No allocation, throughput or cold-start latency claim is made.
+
+The API and standalone shared host composition validate final descriptors after all modules and test substitutions, rejecting missing, duplicate, open-generic or late raw native entries. Microsoft DI scope/build validation covers inspectable registrations; it does not prove open-generic or opaque factory graphs. A scoped native construction guard detects reentry through aliases and clears its state in `finally`, with bounded type-only errors. It does not analyze cycles wholly inside unrelated opaque factories.
+
+Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent. CI calls `ValidateNativeOperationsDeepAsync` against the actual final provider in a disposable scope, resolving every closed native handler without calling business operations. Constructors must remain free of network and business side effects.
+
+## Settings Capability Dispatch
+
+The shared settings family uses five native result commands and one native query.
+`UserSettingsController` owns the four existing personal-preference routes and
+depends only on their four closed operation ports. Tenant and ATProto instance
+settings use the same native ports through separate capability controllers.
+Email-disable confirmation and execution have their own native command ports.
+
+Handler-owned scope authorization, manual validation, mutation locks and dedicated
+publication/visitor/SMTP transactional boundaries are unchanged. Cache eviction
+still follows successful mutation, and typed notification delivery remains
+post-commit. `SettingsCapabilityControllerBase` shares only HTTP problem mapping;
+it is not an operation dispatcher. Routes, operation IDs, response contracts,
+authentication classification and the `Settings` OpenAPI tag are preserved.
+
+`TenantSettingsController` owns tenant resolution, scalar/batch writes, reset and
+lock transitions through those same native ports. It retains the HAL assembler,
+private/no-store reads, strict batch default and successful-write shell eviction.
+No instance or email workflow dependency is injected into this capability.
+
+`InstanceAtprotoSettingsController` owns the five ATProto instance actions through
+five closed native ports, the admin context and HAL assembler. Reads require
+instance-administrator authority and filter the registered administrator keys;
+writes reject unknown keys before dispatch. This capability does not inherit the
+setup-authority exception used by other instance settings controllers.
+
+`EmailDeliverySettingsController` owns the two tenant SMTP-disable routes.
+`InstanceMessagingSettingsController` consumes the same two command ports for its
+instance routes; its other onboarding operations retain their separate ownership.
+`PreviewEmailDeliveryDisableCommand` is a command because it issues a protected
+confirmation token, not a pure read. Both handlers retain persisted administrator
+rechecks inside ordered setting locks and serializable transactions. Disable
+retains actor/scope/revision/token binding, rollback and post-commit sequential
+notifications using `CancellationToken.None`. HTTP previews and results remain
+private/no-store and excluded from idempotency response storage.
+
+## Tenant Role-Grant Projections
+
+`TenantUserRoleGrantMapper` emits separate detail and list disclosures without
+copying user, tenant, role or audit navigation graphs. Missing user PII preserves
+null email/name labels and does not remove the persisted grant/user identity.
+`UserEmail` and `UserFullName` are explicitly nullable in both DTOs, the generated
+OpenAPI schemas and the NSwag client. Required property presence remains intact;
+this corrects metadata to match existing JSON rather than adding empty strings or
+reconstructing erased PII. Repository filtering and handler authority are unchanged.
+
+## Event Response Projections
+
+`EventMapper` generates separate bounded event detail, list, series, aspect and
+public-action DTOs. Series children are event-list snapshots, never recursive
+domain graphs. Public actions retain the active-state and participation-mode
+filter, stable ordering and hidden authority scalars; location disclosure remains
+in its existing service. Handlers construct new series/aspects through explicit
+input allowlists after their existing authorization and manual validation.
+
+Absent actor PII or lookup navigations preserve null labels. Event detail/list
+label annotations, OpenAPI schemas and generated clients now represent those
+existing null values explicitly while retaining required property presence.
+Nullable source identifiers retain their existing empty/zero response defaults.
+`EventMcpSummaryDescriptor` and `EventMcpDetailDescriptor` carry the same nullable
+labels through the MCP output contract without adding display-text fallbacks.
+`EventSessionMapper` likewise preserves a null parent title for unloaded event
+navigation; session DTOs, schemas and clients declare that title nullable while
+retaining the parent identity and status fields.
+No profile data is reconstructed, and this mapping change does not alter
+repository tenant filtering, authorization, transactions or cache ownership.
+
+## Location Response Nullability
+
+`LocationMapper` preserves absent address PII as null `Address` and `Postcode`
+values. The detail/list DTO annotations, generated schemas and client types
+represent those existing values directly, without a null-forgiving identity
+conversion. This does not change location classification, ownership, consent,
+coordinate extraction or the existing location disclosure service.
 
 ## Contract Value Semantics
 
-Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.
+Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.
 
 NSwag remains the sole OpenAPI-to-C# source generator. `Explore.Blazor.Client` applies the repository-owned SDK-Roslyn transformer before final byte normalization; it adds no package dependency or copied template and produces byte-identical output for identical input. `GeneratedClientRecordArchitectureTests` ratchets the compiled record/init surface and exact mutable-class manifest alongside the cross-layer `PublishedCollectionContractArchitectureTests`.
 
@@ -335,6 +426,42 @@ Implemented today:
 Not fully implemented today:
 - Complete ActivityPub gateway endpoint surface.
 - First-party ATProto PDS/AppView hosting and ActivityPub interoperability expected by third-party federated servers.
+
+### Actor Projection And Creation
+
+`ActorFederationMapper` generates bounded actor and storage DTO projections. When
+an actor's `Pii` row is absent, its projection defaults to an empty display name and
+null profile-picture URI instead of dereferencing the missing row. Loaded PII scalar
+values remain unchanged; projections never recreate PII or identities. Repository
+visibility and handler-owned tenant overrides and storage disclosure remain the
+authority; authorized tenant participation overrides still take precedence.
+
+`CreateActorCommandHandler` explicitly initializes `ActorPii` on a new actor after
+validation and image eligibility checks, avoiding the uninitialized proxy setter.
+This is an Application handler guarantee, not a new public creation endpoint.
+
+## Organization Projections
+
+`OrganizationMapper` reads contact PII explicitly rather than invoking the
+organization's PII-backed proxy getters. Missing PII now produces null base name
+and contact fields instead of a mapping exception. It never reconstructs PII.
+Existing repository visibility, handler-owned participation overrides, identity
+enrichment and creation authority remain unchanged.
+
+Organization-member and invitation projections use the same absent-PII rule for
+organization names. Participation-derived invitation identity and role values
+remain intact; projecting a missing name neither reconstructs PII nor changes
+membership authority.
+
+Contact, invitation and unresolved list-approval labels are explicitly nullable
+in the DTOs and generated contracts. The organization list's existing approval
+alias carries the same nullable value. These annotations preserve the existing
+response values without mapper null-forgiving conversions or reconstructed PII.
+
+Organization client search treats absent names/emails as non-matches. Avatars use
+existing organization fallback labels, and editable text models use their normal
+empty-field defaults. HAL still controls edit affordances; empty form values must
+pass the existing validation before any write.
 
 ## AT Protocol Ownership
 

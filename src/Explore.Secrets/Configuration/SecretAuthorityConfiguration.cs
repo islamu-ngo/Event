@@ -74,7 +74,8 @@ public static class SecretAuthorityConfiguration
             source.Paths.AddRange(infisicalPaths);
             source.ThrowOnFirstLoadFailure = true;
         }, environmentName);
-        return PreserveProviderSelection(builder.Build(), provider, bootstrapConfiguration, environmentName);
+        var source = (InfisicalConfigurationSource)builder.Sources.Single();
+        return PreserveProviderSelection(builder.Build(), provider, source);
     }
 
     public static string GetEnvironmentName(IConfiguration configuration) =>
@@ -90,33 +91,28 @@ public static class SecretAuthorityConfiguration
     internal static IConfiguration PreserveProviderSelection(
         IConfiguration authority,
         SecretProviderType provider,
-        IConfiguration? bootstrapConfiguration = null,
-        string? environmentName = null)
+        InfisicalConfigurationSource? infisicalSource = null)
     {
-        var entries = new Dictionary<string, string?>
+        const string prefix = "SecretProvider:Infisical";
+        var runtime = authority.GetSection(prefix).AsEnumerable()
+            .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
+        runtime[$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString();
+        runtime["SECRET_PROVIDER"] = null;
+        if (infisicalSource is not null)
         {
-            [$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString(),
-            ["SECRET_PROVIDER"] = null,
-        };
-
-        if (provider == SecretProviderType.Infisical && bootstrapConfiguration is not null)
-        {
-            string env = environmentName ?? GetEnvironmentName(bootstrapConfiguration);
-            entries[$"{SecretProviderOptions.SectionName}:Infisical:Url"] =
-                ConfigurationBuilderExtensions.ReadBootstrapValue("Url", "INFISICAL_URL", bootstrapConfiguration, env);
-            entries[$"{SecretProviderOptions.SectionName}:Infisical:ProjectId"] =
-                ConfigurationBuilderExtensions.ReadBootstrapValue("ProjectId", "INFISICAL_PROJECT_ID", bootstrapConfiguration, env);
-            entries[$"{SecretProviderOptions.SectionName}:Infisical:ClientId"] =
-                ConfigurationBuilderExtensions.ReadBootstrapValue("ClientId", "INFISICAL_CLIENT_ID", bootstrapConfiguration, env);
-            entries[$"{SecretProviderOptions.SectionName}:Infisical:ClientSecret"] =
-                ConfigurationBuilderExtensions.ReadBootstrapValue("ClientSecret", "INFISICAL_CLIENT_SECRET", bootstrapConfiguration, env);
-            entries[$"{SecretProviderOptions.SectionName}:Infisical:Environment"] =
-                ConfigurationBuilderExtensions.ReadBootstrapValue("Environment", "INFISICAL_ENV", bootstrapConfiguration, env);
+            // Reuse the source that actually authenticated, never values returned by the vault
+            // or a second bootstrap read that could select a different runtime authority.
+            runtime[$"{prefix}:Url"] = infisicalSource.Url;
+            runtime[$"{prefix}:ProjectId"] = infisicalSource.ProjectId;
+            runtime[$"{prefix}:ClientId"] = infisicalSource.ClientId;
+            runtime[$"{prefix}:ClientSecret"] = infisicalSource.ClientSecret;
+            runtime[$"{prefix}:Environment"] = infisicalSource.Environment;
+            for (int index = 0; index < infisicalSource.Paths.Count; index++)
+                runtime[$"{prefix}:Paths:{index}"] = infisicalSource.Paths[index];
         }
-
         return new ConfigurationBuilder()
             .AddConfiguration(authority)
-            .AddInMemoryCollection(entries)
+            .AddInMemoryCollection(runtime)
             .Build();
     }
 

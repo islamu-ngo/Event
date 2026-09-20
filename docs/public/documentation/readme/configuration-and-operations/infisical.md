@@ -27,7 +27,7 @@ ISLAMU Event authenticates with **Universal Auth** only.
 
 1. Create a Machine Identity in the organization.
 2. Attach a **Universal Auth** authentication method and generate a Client ID and Client Secret.
-3. Add the identity to the `ISLAMU Event` project with **read** access to every folder in the tree below. Write access is required only if you use the in-app Setup secret-write capability.
+3. Grant each service identity **read** access only to its required folders. The browser-facing BFF identity must be limited to `/keycloak`, `/blazor` and `/atproto` frontend values, not `/`, `/database` or `/api`. Use separate backend/provisioning identities for database and container credentials. Write access belongs only to the backend identity that performs an enabled Setup secret-write capability.
 4. Copy the project UUID from the project settings page.
 
 These four values plus the environment slug are *secret zero*: they live in the deployment environment, never inside Infisical itself.
@@ -54,6 +54,34 @@ When `SECRET_PROVIDER=Infisical`, only Infisical results are authoritative. The 
 
 ---
 
+## Configuration boundary upgrade
+
+Before upgrading:
+
+1. Replace an obsolete `PrivacyErasure:Durability:Mode` selector (including its
+   double-underscore form) with an explicit supported `ERASURE_DATABASE_TOPOLOGY`
+   value. Preserve the intended authority;
+   do not simply remove the old input and accept a default. Startup rejects the
+   obsolete input instead of silently choosing a replacement. Consult the
+   [privacy-erasure deployment guidance](../security-and-identity/privacy-erasure.md)
+   before intentionally changing topology or resetting existing state.
+2. Remove database credentials from BFF-readable folders. This includes
+   `KEYCLOAK_DB_PASSWORD`, even though its name begins with `KEYCLOAK`.
+   Supply such values through the provisioning/container environment only to the
+   backend service that owns them. BFF loading now rejects backend/root paths and
+   database configuration placed inside frontend folders.
+3. Retain the actual `secretPath` in recursive Infisical responses. Custom proxies
+   must not strip it: missing or out-of-scope provenance fails startup. Child
+   folders keep their own namespace and cannot overwrite parent database values.
+4. Keep the same five bootstrap inputs and explicit provider selection. Startup
+   and runtime provider binding now use the same validated authority and path set;
+   there is no implicit runtime root-folder read.
+
+This repair does not migrate data or switch authority automatically. Back up and
+follow the existing reset/restore procedure before any deliberate topology change.
+Keep API, BFF and database provisioning credentials separated; never broaden the
+BFF identity to work around an upgrade failure.
+
 ## 4. Folder Layout
 
 Create the following folders at the root of the selected environment. Folder names are lowercase and exact; key names are `SCREAMING_SNAKE_CASE` and exact.
@@ -70,7 +98,6 @@ Create the following folders at the root of the selected environment. Folder nam
 ├── database
 │   ├── erasure             (optional: external privacy erasure authority)
 │   └── identity            (optional: external local identity store)
-├── licensing               (optional: commercial license keys)
 ├── ai                      (optional: assistant provider)
 ├── atproto                 (optional: Bluesky / AT Protocol OAuth)
 ├── cerbos                  (optional: authorization PDP)
@@ -106,6 +133,10 @@ Core instance-level platform credentials read by `Explore.API`.
 | `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | Local Identity lockout duration in minutes (default: `15`). |
 | `AUTHORIZATION_PROVIDER` | `local` or `cerbos`. Blank keeps interactive Local-first onboarding. |
 | `DEPLOYMENT_MODE` | `SingleTenant` or `MultiTenant`. |
+| `VAPID_SUBJECT` | Web Push contact subject (`mailto:` or origin URL). |
+| `VAPID_PUBLIC_KEY` | Web Push public key. Intentionally public; served to browsers. |
+| `VAPID_PRIVATE_KEY` | Web Push private key. Server-only; never leaves the API process. |
+| `WEB_PUSH_ENABLED` | `true` or `false`. Defaults to enabled when all three VAPID values are present. |
 | `SETUP_SECRET` | Pre-shared secret that unlocks `/setup`. Leave unset to generate a single-use secret in the volume on first boot. |
 | `SETUP_SECRET_REQUIRED` | `true` (default) or `false`; whether the setup surface demands the secret. |
 
@@ -146,17 +177,10 @@ Optional rate-limiting overrides for DDoS and anti-abuse protection (aliases `/a
 | `ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | Concurrency limit (default: `8`). |
 | `ANONYMOUSREGISTRATION__QUEUELIMIT` | Queue limit (default: `0`). |
 
-### `/licensing`
-
-Commercial module licensing (also accepted under `/api/licensing` or legacy `/api`).
-
-| Key | Purpose |
-|---|---|
-| `USE_COMMERCIAL_LUCKYPENNY` | `true` or `false`; selects the commercial Lucky Penny licensing path. |
-| `LUCKYPENNY_LICENSE_KEY` | Lucky Penny commercial license key. |
-
-> [!WARNING]
-> `AUTOMAPPER_COMMERCIAL_VERSION` and `MEDIATR_COMMERCIAL_VERSION` are **build-time MSBuild properties**, not runtime configuration. Storing them in Infisical has no effect on a running instance; supply them to the build environment instead.
+The build no longer consumes Lucky Penny licensing or edition-selection secrets.
+Remove obsolete entries from the selected authority using the
+[removed-input checklist](environment-variables.md#removed-edition-inputs).
+Do not remove unrelated provider credentials or change the selected secret authority.
 
 ### `/blazor`
 
@@ -184,9 +208,6 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_ADMIN_USERNAME` | Keycloak administrator username used by bootstrap sync (alias: `KEYCLOAK_ADMIN`). |
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak administrator password used by bootstrap sync. |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | `true` (default) or `false`; enforce HTTPS metadata validation for OIDC endpoints. |
-| `KEYCLOAK_DB_DATABASE` | Database name for Keycloak container (default: `keycloak`). |
-| `KEYCLOAK_DB_USERNAME` | Database username for Keycloak container (default: `keycloak`). |
-| `KEYCLOAK_DB_PASSWORD` | Password for the Keycloak database container. |
 | `KEYCLOAK_BLAZOR_REDIRECT_URIS` | Optional comma-separated allowed redirect URIs. |
 | `KEYCLOAK_BLAZOR_WEB_ORIGINS` | Optional allowed CORS web origins. |
 | `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` | Optional allowed post-logout redirect URIs. |
@@ -203,7 +224,9 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME` | Optional reply-to display name. |
 | `KEYCLOAK_SMTP_ENVELOPE_FROM` | Optional envelope-from address. |
 
-Keycloak's own account emails are configured here and are separate from ISLAMU Event's `/smtp` delivery.
+`KEYCLOAK_DB_DATABASE`, `KEYCLOAK_DB_USERNAME`, and `KEYCLOAK_DB_PASSWORD` are backend provisioning inputs, not BFF-readable `/keycloak` entries. Inject them only into their owning container/provisioning environment; database keys in frontend folders fail closed.
+
+Keycloak's own account emails are configured here and are separate from ISLAMU Event's `/smtp` delivery. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak settings.
 
 ### `/database`
 

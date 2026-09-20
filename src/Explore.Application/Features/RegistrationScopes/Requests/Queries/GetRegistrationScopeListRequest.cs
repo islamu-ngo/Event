@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.RegistrationScope;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationScopes.Requests.Queries;
 
-public sealed record GetRegistrationScopeListRequest : IRequest<List<RegistrationScopeListDto>>
+public sealed record GetRegistrationScopeListRequest : IQuery<List<RegistrationScopeListDto>>
 {
 }

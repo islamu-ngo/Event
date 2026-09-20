@@ -1,20 +1,20 @@
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Authentication.Local.Requests.Queries;
 using FluentValidation.Results;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Queries;
 
 public sealed class ListLocalIdentitiesQueryHandler(
     IAdminContext adminContext,
     IPlatformUserRoleRepository platformUserRoles,
-    ILocalCredentialAdministration credentialAdministration) : IRequestHandler<ListLocalIdentitiesQuery, LocalIdentityPage>
+    ILocalCredentialAdministration credentialAdministration) : IQueryHandler<ListLocalIdentitiesQuery, LocalIdentityPage>
 {
-    public async Task<LocalIdentityPage> Handle(ListLocalIdentitiesQuery request, CancellationToken cancellationToken)
+    public async Task<LocalIdentityPage> QueryAsync(ListLocalIdentitiesQuery request, CancellationToken cancellationToken = default)
     {
         Guid? actor = await LocalCredentialAdministrator.ResolveAsync(
             adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)

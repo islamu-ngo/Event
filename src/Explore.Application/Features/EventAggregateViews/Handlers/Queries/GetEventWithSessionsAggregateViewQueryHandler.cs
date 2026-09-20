@@ -1,15 +1,15 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventAggregateViews.Requests.Queries;
 using Explore.Application.Responses;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventAggregateViews.Handlers.Queries;
 
 public sealed class GetEventWithSessionsAggregateViewQueryHandler
-    : IRequestHandler<GetEventWithSessionsAggregateViewQuery, BaseCommandResponse<DTOs.EventAggregateView.EventWithSessionsViewDto>>
+    : IQueryHandler<GetEventWithSessionsAggregateViewQuery, BaseCommandResponse<DTOs.EventAggregateView.EventWithSessionsViewDto>>
 {
     private readonly IEventAggregateViewRepository _repository;
     private readonly HybridCache _cache;
@@ -25,7 +25,7 @@ public sealed class GetEventWithSessionsAggregateViewQueryHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<DTOs.EventAggregateView.EventWithSessionsViewDto>> Handle(
+    public async Task<BaseCommandResponse<DTOs.EventAggregateView.EventWithSessionsViewDto>> QueryAsync(
         GetEventWithSessionsAggregateViewQuery request,
         CancellationToken cancellationToken)
     {

@@ -1,23 +1,23 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.PaidEventPolicies.Handlers.Commands;
 
 public sealed class ReviseInstancePaidEventPolicyCommandHandler(
     IPaidEventPolicyMutationBoundary mutationBoundary)
-    : IRequestHandler<ReviseInstancePaidEventPolicyCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReviseInstancePaidEventPolicyCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        ReviseInstancePaidEventPolicyCommand request,
-        CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ReviseInstancePaidEventPolicyCommand command,
+        CancellationToken cancellationToken = default)
     {
         var validation = await new RevisePaidEventPolicyCommandValidator()
-            .ValidateAsync(request.Policy, cancellationToken);
+            .ValidateAsync(command.Policy, cancellationToken);
         if (!validation.IsValid)
         {
             return ValidationFailure(validation.Errors[0].ErrorMessage);
@@ -25,7 +25,7 @@ public sealed class ReviseInstancePaidEventPolicyCommandHandler(
 
         PaidEventPolicyMutationResult result =
             await mutationBoundary.ReviseInstanceAsync(
-                request.Policy,
+                command.Policy,
                 cancellationToken);
         return ToResponse(result);
     }
@@ -86,20 +86,20 @@ internal sealed class PaidEventPolicyCurrencyRiskLimitDtoValidator : AbstractVal
 
 public sealed class ReviseTenantPaidEventPolicyCommandHandler(
     IPaidEventPolicyMutationBoundary mutationBoundary)
-    : IRequestHandler<ReviseTenantPaidEventPolicyCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReviseTenantPaidEventPolicyCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        ReviseTenantPaidEventPolicyCommand request,
-        CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        ReviseTenantPaidEventPolicyCommand command,
+        CancellationToken cancellationToken = default)
     {
-        if (request.TenantId == Guid.Empty)
+        if (command.TenantId == Guid.Empty)
         {
             return ReviseInstancePaidEventPolicyCommandHandler.ValidationFailure(
                 "Tenant is required.");
         }
 
         var validation = await new RevisePaidEventPolicyCommandValidator()
-            .ValidateAsync(request.Policy, cancellationToken);
+            .ValidateAsync(command.Policy, cancellationToken);
         if (!validation.IsValid)
         {
             return ReviseInstancePaidEventPolicyCommandHandler.ValidationFailure(
@@ -109,8 +109,8 @@ public sealed class ReviseTenantPaidEventPolicyCommandHandler(
         return ReviseInstancePaidEventPolicyCommandHandler.ToResponse(
             await mutationBoundary.ReviseTenantAsync(
                 new TenantPaidEventPolicyMutationInput(
-                    request.TenantId,
-                    request.Policy),
+                    command.TenantId,
+                    command.Policy),
                 cancellationToken));
     }
 }

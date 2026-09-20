@@ -1,12 +1,12 @@
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
@@ -14,10 +14,10 @@ public sealed class ResetLocalCredentialCommandHandler(
     IAdminContext adminContext,
     IPlatformUserRoleRepository platformUserRoles,
     ILocalCredentialAdministration credentialAdministration)
-    : IRequestHandler<ResetLocalCredentialCommand, LocalCredentialIssueCommandResponse>
+    : ICommandHandler<ResetLocalCredentialCommand, LocalCredentialIssueCommandResponse>
 {
-    public async Task<LocalCredentialIssueCommandResponse> Handle(
-        ResetLocalCredentialCommand request, CancellationToken cancellationToken)
+    public async Task<LocalCredentialIssueCommandResponse> ExecuteAsync(
+        ResetLocalCredentialCommand request, CancellationToken cancellationToken = default)
     {
         Guid? actor = await LocalCredentialAdministrator.ResolveAsync(
             adminContext: adminContext, platformUserRoles: platformUserRoles, cancellationToken: cancellationToken)

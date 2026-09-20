@@ -2,6 +2,10 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Notifications.Requests.Commands;
+using Explore.Application.Features.Notifications.Requests.Queries;
+using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Domain;
 
 namespace Explore.Application.Authorization;
@@ -23,7 +27,10 @@ public sealed class AuthorizationResourceContextResolver(
     IEventSessionRepository? eventSessionRepository = null,
     IRegistrationInventoryRepository? registrationInventoryRepository = null,
     IWebhookOwnershipScopeResolver? webhookOwnershipScopeResolver = null,
-    ITenantContext? tenantContext = null)
+    ITenantContext? tenantContext = null,
+    IGroupTenantRepository? groupTenantRepository = null,
+    IOrganizationTenantRepository? organizationTenantRepository = null,
+    IStorageUploadSessionRepository? storageUploadSessionRepository = null)
 {
     public async Task<AuthorizationContext> ResolveAsync<TRequest>(
         TRequest request,
@@ -50,6 +57,39 @@ public sealed class AuthorizationResourceContextResolver(
                 WebhookOwnershipAuthorizationFacts.From(ownership));
         }
 
+        Guid? preferenceGroupId = request switch
+        {
+            GetGroupNotificationPreferenceMatrixQuery query => query.GroupId,
+            UpdateGroupNotificationPreferenceMatrixCommand command => command.GroupId,
+            SetGroupNotificationPreferenceMuteCommand command => command.GroupId,
+            _ => null
+        };
+        if (resourceKind == ResourceKinds.Group && preferenceGroupId is { } groupId)
+        {
+            var groupFacts = await ResolveGroupPreferenceFactsAsync(groupId, action, cancellationToken);
+            return new AuthorizationContext(groupId.ToString("D"), groupFacts);
+        }
+
+        if (request is FinalizeStorageUploadSessionCommand finalization
+            && resourceKind == ResourceKinds.StorageObject
+            && action == AuthorizationActions.StorageObjects.Create)
+        {
+            return new AuthorizationContext(finalization.UploadSessionId.ToString("D"),
+                await ResolveStorageUploadFinalizationFactsAsync(finalization.UploadSessionId, cancellationToken));
+        }
+
+        if (request is GetStorageObjectContentRequest download
+            && resourceKind == ResourceKinds.StorageObject
+            && action == AuthorizationActions.StorageObjects.Download)
+        {
+            var objectId = download.StorageObjectId.ToString("D");
+            // Do not populate EF's identity map before the awaited policy decision: the content
+            // reader must load current metadata after authorization, not reuse this snapshot.
+            var snapshot = tenantContext is null || storageObjectRepository is null ? null :
+                await storageObjectRepository.GetForAuthorizationAsync(download.StorageObjectId, tenantContext.TenantId, cancellationToken);
+            return new AuthorizationContext(objectId, snapshot is null ? null : CreateStorageObjectFacts(snapshot));
+        }
+
         var facts = await ResolveTrustedFactsAsync(resourceKind, resourceId, declaredFacts, cancellationToken);
 
         if (resourceKind is ResourceKinds.RegistrationForm or ResourceKinds.RegistrationOrder && facts is null)
@@ -58,6 +98,31 @@ public sealed class AuthorizationResourceContextResolver(
         }
 
         return new AuthorizationContext(resourceId, facts);
+    }
+
+    private async Task<GroupAuthorizationFacts> ResolveGroupPreferenceFactsAsync(
+        Guid groupId,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext is null || groupTenantRepository is null || organizationTenantRepository is null)
+            throw new AuthorizationException(ResourceKinds.Group, action);
+
+        var tenantId = tenantContext.TenantId;
+        var group = await groupTenantRepository.GetByGroupAndTenant(groupId, tenantId, cancellationToken);
+        if (group is null || group.TenantId != tenantId || group.IsDeleted || group.Group.IsDeleted)
+            throw new AuthorizationException(ResourceKinds.Group, action);
+
+        OrganizationTenant? parent = null;
+        if (group.ParentOrganizationTenantId is { } parentId)
+        {
+            parent = await organizationTenantRepository.GetById(parentId);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (parent is null || parent.TenantId != tenantId || parent.IsDeleted)
+                throw new AuthorizationException(ResourceKinds.Group, action);
+        }
+
+        return new GroupAuthorizationFacts(tenantId, groupId, parent?.OrganizationId);
     }
 
     private async Task<IAuthorizationFacts?> ResolveTrustedFactsAsync(
@@ -245,6 +310,31 @@ public sealed class AuthorizationResourceContextResolver(
             member.UserId);
     }
 
+    private async Task<IAuthorizationFacts?> ResolveStorageUploadFinalizationFactsAsync(
+        Guid sessionId, CancellationToken cancellationToken)
+    {
+        if (sessionId == Guid.Empty || storageUploadSessionRepository is null || tenantContext is null)
+            return null;
+
+        // Read every lifecycle state without tracking: the handler must re-read under its transaction,
+        // including finalized retries and expired reservations whose quota still needs releasing.
+        var session = await storageUploadSessionRepository.GetForAuthorizationAsync(sessionId, cancellationToken);
+        if (session is null || session.TenantId != tenantContext.TenantId)
+            return null;
+
+        // Only OrganizationTenant reservations use the evidence-specific authorization contract.
+        // Non-OrganizationTenant reservations retain their existing Cerbos create policy and handler checks.
+        if (session.OwningResourceKind != StorageOwningResourceKinds.OrganizationTenant)
+            return new StorageObjectCollectionAuthorizationFacts(session.TenantId);
+
+        if (session.UserId is not { } ownerUserId)
+            return null;
+
+        return new StorageUploadFinalizationFacts(session.Id, session.TenantId, ownerUserId,
+            session.Purpose, session.Visibility, session.OwningResourceKind, session.OwningResourceId,
+            session.ContentType, session.Extension, session.ExpectedSizeBytes);
+    }
+
     /// <summary>
     /// Collection scopes have no single object to load, so their declared tenant facts stand. A persisted
     /// object is always re-read: visibility and lifecycle drive content access and must not come from input.
@@ -264,15 +354,12 @@ public sealed class AuthorizationResourceContextResolver(
         if (!IsInCurrentTenant(storageObject?.TenantId))
             return null;
 
-        return new PersistedStorageObjectAuthorizationFacts(
-            storageObject!.TenantId,
-            storageObject.Id,
-            storageObject.Visibility,
-            storageObject.LifecycleState,
-            storageObject.CreatedBy,
-            storageObject.OwningResourceKind,
-            storageObject.OwningResourceId);
+        return CreateStorageObjectFacts(storageObject!);
     }
+
+    private static PersistedStorageObjectAuthorizationFacts CreateStorageObjectFacts(StorageObject storageObject) =>
+        new(storageObject.TenantId, storageObject.Id, storageObject.Visibility, storageObject.LifecycleState,
+            storageObject.CreatedBy, storageObject.OwningResourceKind, storageObject.OwningResourceId);
 
     /// <summary>
     /// Custom-property projections are tenant-administered but addressed by event or session, so the

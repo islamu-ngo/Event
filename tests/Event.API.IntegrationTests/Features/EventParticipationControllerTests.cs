@@ -9,12 +9,15 @@ using Explore.API.Attributes;
 using Explore.API.Controllers;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.Application;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
+using Explore.Application.Features.EventParticipation.Handlers.Commands;
 using Explore.Application.Features.EventParticipation.Requests.Commands;
 using Explore.Application.Hateoas;
+using Explore.Application.Operations;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -98,16 +101,12 @@ public sealed class EventParticipationControllerTests
     }
 
     [Test]
-    public async Task Configure_WhenCommandSucceeds_ForwardsHeaderAndBodyToMediator()
+    public async Task Configure_WhenCommandSucceeds_ForwardsHeaderAndBodyToCommandHandler()
     {
-        using var mediator = new EventParticipationMediatorStub(request => request switch
-        {
-            ConfigureEventParticipationCommand command => BaseCommandResponse.Success(
-                command.EventId,
-                "Event participation configuration updated."),
-            _ => throw new InvalidOperationException($"Unexpected request: {request.GetType().Name}")
-        });
-        await using var factory = CreateFactoryWithMediator(mediator);
+        var context = new EventParticipationTestContext(command => BaseCommandResponse.Success(
+            command.EventId,
+            "Event participation configuration updated."));
+        await using var factory = CreateFactoryWithHandler(context);
         using var client = factory.CreateClient();
 
         Guid eventId = Guid.NewGuid();
@@ -122,7 +121,7 @@ public sealed class EventParticipationControllerTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        var command = mediator.LastRequest as ConfigureEventParticipationCommand;
+        var command = context.LastCommand;
         await Assert.That(command).IsNotNull();
         await Assert.That(command!.EventId).IsEqualTo(eventId);
         await Assert.That(command.ExpectedConcurrencyStamp).IsEqualTo(concurrencyStamp);
@@ -135,14 +134,10 @@ public sealed class EventParticipationControllerTests
     [Test]
     public async Task Configure_WhenCommandReportsConcurrencyConflict_UsesConflictHelper()
     {
-        using var mediator = new EventParticipationMediatorStub(request => request switch
-        {
-            ConfigureEventParticipationCommand => BaseCommandResponse.Failure<Guid>(
-                "event_participation_configuration_concurrency_conflict",
-                "Event participation configuration conflict."),
-            _ => throw new InvalidOperationException($"Unexpected request: {request.GetType().Name}")
-        });
-        await using var factory = CreateFactoryWithMediator(mediator);
+        var context = new EventParticipationTestContext(_ => BaseCommandResponse.Failure<Guid>(
+            "event_participation_configuration_concurrency_conflict",
+            "Event participation configuration conflict."));
+        await using var factory = CreateFactoryWithHandler(context);
         using var client = factory.CreateClient();
 
         using var request = CreateAuthenticatedJsonRequest(
@@ -179,16 +174,36 @@ public sealed class EventParticipationControllerTests
     public Task Configure_WhenIfMatchIsMalformed_ReturnsValidationProblemDetails()
         => AssertInvalidIfMatchRejectedAsync("\"not-a-guid\"");
 
-    private static WebApplicationFactory<Program> CreateFactoryWithMediator(IMediator mediator)
+    private static WebApplicationFactory<Program> CreateFactoryWithHandler(EventParticipationTestContext testContext)
     {
-        var factory = new AuthenticatedWebApplicationFactory();
+        var factory = new AuthenticatedWebApplicationFactory
+        {
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
+        };
 
         return factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
+                var catalog = services.SingleOrDefault(d => d.ServiceType == typeof(NativeOperationCatalog))?.ImplementationInstance as NativeOperationCatalog;
+                if (catalog is not null)
+                {
+                    var entries = catalog.Registrations
+                        .Where(r => r.Implementation == typeof(ConfigureEventParticipationCommandHandler))
+                        .ToArray();
+                    foreach (var entry in entries)
+                    {
+                        catalog.Registrations.Remove(entry);
+                        services.Remove(entry.PublicDescriptor);
+                        services.Remove(entry.ConcreteDescriptor);
+                    }
+                }
+
+                services.AddSingleton(testContext);
+                services.AddNativeOperations([
+                    typeof(ConfigureEventParticipationCommand),
+                    typeof(TestConfigureParticipationHandler)
+                ]);
             });
         });
     }
@@ -230,9 +245,9 @@ public sealed class EventParticipationControllerTests
 
     private static async Task AssertInvalidIfMatchRejectedAsync(string? ifMatch)
     {
-        using var mediator = new EventParticipationMediatorStub(_ =>
-            throw new InvalidOperationException("Mediator should not run when If-Match is invalid."));
-        await using var factory = CreateFactoryWithMediator(mediator);
+        var context = new EventParticipationTestContext(_ =>
+            throw new InvalidOperationException("Command handler should not run when If-Match is invalid."));
+        await using var factory = CreateFactoryWithHandler(context);
         using var client = factory.CreateClient();
         using var request = CreateAuthenticatedJsonRequest(
             HttpMethod.Patch,
@@ -250,47 +265,24 @@ public sealed class EventParticipationControllerTests
         await Assert.That(problem).IsNotNull();
         await Assert.That(problem!.Status).IsEqualTo(StatusCodes.Status400BadRequest);
         await Assert.That(problem.Errors).IsNotEmpty();
-        await Assert.That(mediator.LastRequest).IsNull();
+        await Assert.That(context.LastCommand).IsNull();
     }
 
-    private sealed class EventParticipationMediatorStub(Func<object, object> responseFactory) : IMediator, IDisposable
+    private sealed class TestConfigureParticipationHandler(EventParticipationTestContext context)
+        : ICommandHandler<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>
     {
-        public object? LastRequest { get; private set; }
-
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            ConfigureEventParticipationCommand command,
+            CancellationToken cancellationToken = default)
         {
-            LastRequest = request;
-            object response = responseFactory(request);
-            return Task.FromResult((TResponse)response);
+            context.LastCommand = command;
+            return Task.FromResult(context.ResponseFactory(command));
         }
+    }
 
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-        {
-            LastRequest = request;
-            return Task.CompletedTask;
-        }
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            return Task.FromResult<object?>(responseFactory(request));
-        }
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public void Dispose()
-        {
-        }
+    private sealed class EventParticipationTestContext(Func<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>> responseFactory)
+    {
+        public Func<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>> ResponseFactory { get; set; } = responseFactory;
+        public ConfigureEventParticipationCommand? LastCommand { get; set; }
     }
 }

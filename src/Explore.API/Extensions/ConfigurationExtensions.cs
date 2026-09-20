@@ -1,5 +1,6 @@
 namespace Explore.API.Extensions;
 
+using Explore.Application.Configuration;
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
 using Explore.Secrets.Abstractions;
@@ -9,21 +10,37 @@ using Explore.Secrets.Database;
 public static class ConfigurationExtensions
 {
     /// <summary>
-    /// Adds Infisical secrets and maps them to canonical .NET configuration keys.
+    /// Maps the selected secret authority to canonical keys and returns isolated runtime provider configuration.
     /// </summary>
-    public static void AddSecretAuthorityConfiguration(
+    public static IConfiguration AddSecretAuthorityConfiguration(
         this IConfigurationBuilder configBuilder,
         string environmentName)
     {
         var bootstrapConfig = configBuilder.Build();
+        _ = PrivacyErasureDurabilityOptions.FromConfiguration(bootstrapConfig);
         IConfiguration authority = SecretAuthorityConfiguration.Build(
             bootstrapConfig,
             environmentName,
             "/keycloak", "/database", "/database/erasure", "/database/identity", "/api",
             "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/integrations/listmonk");
+        _ = PrivacyErasureDurabilityOptions.FromConfiguration(authority);
         var isolatedAuthority = new ConfigurationBuilder().AddConfiguration(authority);
         PrivacyErasureAuthorityDatabaseConfiguration.ProjectDiscreteConfiguration(isolatedAuthority);
         ApplyMapping(configBuilder, isolatedAuthority.Build());
+
+        // Runtime provider binding must use the authority and bootstrap source that loaded
+        // startup secrets, not lower-priority settings or a vault-supplied provider selector.
+        var runtimeProvider = bootstrapConfig.GetSection("SecretProvider:Infisical").AsEnumerable()
+            .ToDictionary(pair => pair.Key, _ => (string?)null, StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in authority.GetSection(SecretProviderOptions.SectionName).AsEnumerable())
+            runtimeProvider[pair.Key] = pair.Value;
+        configBuilder.AddInMemoryCollection(runtimeProvider);
+
+        // Null overlays hide values, not collection children. Bind the provider from a
+        // separate root so suppressed paths cannot become null members at runtime.
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(runtimeProvider.Where(pair => pair.Value is not null))
+            .Build();
     }
 
     /// <summary>
@@ -40,7 +57,6 @@ public static class ConfigurationExtensions
     ///   /storage:  STORAGE_S3_ENDPOINT, STORAGE_S3_BUCKET_NAME, STORAGE_S3_ACCESS_KEY_ID, etc.
     ///   /smtp:     MAIL_SMTP_HOST, MAIL_SMTP_PORT, MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD, etc.
     ///   /api:      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
-    ///   /api:      USE_COMMERCIAL_LUCKYPENNY, LUCKYPENNY_LICENSE_KEY (Lucky Penny dual-versioning)
     /// </remarks>
     private static void ApplyMapping(IConfigurationBuilder configBuilder, IConfiguration config)
     {
@@ -245,7 +261,6 @@ public static class ConfigurationExtensions
             ["WebPush:VapidPublicKey"] = null,
             ["WebPush:VapidPrivateKey"] = null,
             ["WebPush:VapidSubject"] = null,
-            ["Licensing:LuckyPenny:LicenseKey"] = null,
         };
 
         static void TrySet(IDictionary<string, string?> dict, IConfiguration root, string key, string? value)
@@ -463,15 +478,6 @@ public static class ConfigurationExtensions
             TrySet(mappedConfig, config, "AiProvider:Provider", aiProviderId ?? "3");
         }
 
-        // Lucky Penny dual-versioning (AutoMapper 15+ / MediatR 13+ commercial licensing).
-        // USE_COMMERCIAL_LUCKYPENNY and LUCKYPENNY_LICENSE_KEY come from Infisical /api folder.
-        // Version secrets (AUTOMAPPER_COMMERCIAL_VERSION, MEDIATR_COMMERCIAL_VERSION) are build-time
-        // MSBuild properties only — they are not mapped to runtime configuration.
-        TrySet(mappedConfig, config, "Licensing:LuckyPenny:Enabled",
-            NormalizeBoolean(ReadFirst(config, "USE_COMMERCIAL_LUCKYPENNY", "Licensing:LuckyPenny:Enabled")));
-        TrySet(mappedConfig, config, "Licensing:LuckyPenny:LicenseKey",
-            ReadFirst(config, "LUCKYPENNY_LICENSE_KEY", "Licensing:LuckyPenny:LicenseKey"));
-
         // Instance Operator Identity (/api/operator-identity, /api/operatoridentity, or flat /api)
         TrySet(mappedConfig, config, "Instance:OperatorIdentity:OperatorId",
             ReadFirst(config, "Instance:OperatorIdentity:OperatorId", "INSTANCE__OPERATORIDENTITY__OPERATORID"));
@@ -518,20 +524,9 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
             ReadFirst(config, "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD", "Instance:Bootstrap:LocalPassword"));
 
-        // Secret Provider Options
-        var secretProvider = config[$"{SecretProviderOptions.SectionName}:Provider"];
-        if (!string.IsNullOrWhiteSpace(secretProvider))
-        {
-            mappedConfig[$"{SecretProviderOptions.SectionName}:Provider"] = secretProvider;
-            if (string.Equals(secretProvider, nameof(SecretProviderType.Infisical), StringComparison.OrdinalIgnoreCase))
-            {
-                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:Url", config[$"{SecretProviderOptions.SectionName}:Infisical:Url"]);
-                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:ProjectId", config[$"{SecretProviderOptions.SectionName}:Infisical:ProjectId"]);
-                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:ClientId", config[$"{SecretProviderOptions.SectionName}:Infisical:ClientId"]);
-                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:ClientSecret", config[$"{SecretProviderOptions.SectionName}:Infisical:ClientSecret"]);
-                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:Environment", config[$"{SecretProviderOptions.SectionName}:Infisical:Environment"]);
-            }
-        }
+        // Modular Infisical rate-limit keys must reach the same section consumed by the API policies.
+        foreach (var pair in config.GetSection("RateLimiting").AsEnumerable())
+            mappedConfig[pair.Key] = pair.Value;
 
         configBuilder.AddInMemoryCollection(mappedConfig);
     }

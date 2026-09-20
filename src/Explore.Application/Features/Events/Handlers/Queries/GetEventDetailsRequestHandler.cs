@@ -1,34 +1,35 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
+using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
-public class GetEventDetailsRequestHandler : IRequestHandler<GetEventDetailsRequest, EventDto>
+public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsRequest, EventDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDetailsProjectionService _detailsProjectionService;
     private readonly HybridCache _cache;
-    private readonly ISender _sender;
+    private readonly IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> _optionalQuestionnaireHandler;
 
     public GetEventDetailsRequestHandler(
         IEventRepository eventRepository,
         IEventDetailsProjectionService detailsProjectionService,
         HybridCache cache,
-        ISender sender)
+        IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> optionalQuestionnaireHandler)
     {
         _eventRepository = eventRepository;
         _detailsProjectionService = detailsProjectionService;
         _cache = cache;
-        _sender = sender;
+        _optionalQuestionnaireHandler = optionalQuestionnaireHandler;
     }
 
-    public async Task<EventDto> Handle(GetEventDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventDto?> QueryAsync(GetEventDetailsRequest request, CancellationToken cancellationToken)
     {
         var cacheKey = $"event:detail:{request.Id}";
 
@@ -62,7 +63,7 @@ public class GetEventDetailsRequestHandler : IRequestHandler<GetEventDetailsRequ
         if (!isPubliclyEligible)
             return null;
 
-        var optionalQuestionnaire = await _sender.Send(
+        var optionalQuestionnaire = await _optionalQuestionnaireHandler.QueryAsync(
             new GetOptionalQuestionnaireQuery(request.Id), cancellationToken);
         var responseDto = eventDto.CreateRequestCopy();
         if (responseDto.ParticipationConfiguration is not null)

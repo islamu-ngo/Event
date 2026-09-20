@@ -1,6 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Notifications;
 

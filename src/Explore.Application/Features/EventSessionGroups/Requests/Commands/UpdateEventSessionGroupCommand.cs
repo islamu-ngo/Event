@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EventSessionGroup, AuthorizationActions.Update)]
-public sealed record UpdateEventSessionGroupCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateEventSessionGroupCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventSessionGroupId { get; init; }
     public Guid ExpectedConcurrencyStamp { get; init; }

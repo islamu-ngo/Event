@@ -12,15 +12,15 @@ using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Commands;
 
-public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessionCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly IEventRepository _eventRepository;
@@ -84,7 +84,7 @@ public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessi
         _timeProvider = timeProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventSessionDtoValidator(
             _eventRepository,

@@ -1,14 +1,12 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Features.EventCustomProperties.Requests.Commands;
-using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public class DeleteEventCustomPropertyDefinitionCommandHandler : IRequestHandler<DeleteEventCustomPropertyDefinitionCommand, bool>
+public class DeleteEventCustomPropertyDefinitionCommandHandler : ICommandHandler<DeleteEventCustomPropertyDefinitionCommand, bool>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
@@ -27,7 +25,7 @@ public class DeleteEventCustomPropertyDefinitionCommandHandler : IRequestHandler
         _cache = cache;
     }
 
-    public async Task<bool> Handle(DeleteEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var definition = await _eventCustomPropertyRepository.GetDefinitionWithDetails(request.Id);
         if (definition == null)
@@ -48,10 +46,9 @@ public class DeleteEventCustomPropertyDefinitionCommandHandler : IRequestHandler
             return false;
         }
 
-        await _cache.RemoveAsync(
-            $"event-custom-properties:list:{definition.EventId}:1:{PaginatedResult<object>.DefaultPageSize}",
-            cancellationToken);
-        await _cache.RemoveAsync($"event-custom-properties:detail:{definition.Id}", cancellationToken);
+        await _cache.RemoveByTagAsync(
+            EventCustomPropertyCache.ListsByEvent(definition.TenantId, definition.EventId),
+            CancellationToken.None);
 
         return true;
     }

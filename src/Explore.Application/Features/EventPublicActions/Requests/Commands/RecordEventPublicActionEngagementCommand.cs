@@ -1,8 +1,8 @@
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Requests.Commands;
 
 public sealed record RecordEventPublicActionEngagementCommand(
     EventPublicActionKindEnum ActionKind,
-    string? Surface) : IRequest<Unit>;
+    string? Surface) : ICommand;

@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventOrganizerClaim;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.EventOrganizerClaim, AuthorizationActions.Events.ViewOrganizerClaims)]
 public sealed record GetEventOrganizerClaimsRequest(Guid EventId)
-    : IRequest<IReadOnlyList<EventOrganizerClaimDto>>, ISecureRequest
+    : IQuery<IReadOnlyList<EventOrganizerClaimDto>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString();
     IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>

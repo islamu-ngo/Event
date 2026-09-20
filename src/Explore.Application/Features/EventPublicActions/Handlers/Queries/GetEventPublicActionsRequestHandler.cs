@@ -1,20 +1,19 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.EventPublicActions.Requests.Queries;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Queries;
 
 public sealed class GetEventPublicActionsRequestHandler(
     IEventRepository eventRepository,
-    IEventPublicActionRepository actionRepository,
-    IMapper mapper)
-    : IRequestHandler<GetEventPublicActionsRequest, IReadOnlyList<EventPublicActionDto>>
+    IEventPublicActionRepository actionRepository)
+    : IQueryHandler<GetEventPublicActionsRequest, IReadOnlyList<EventPublicActionDto>>
 {
-    public async Task<IReadOnlyList<EventPublicActionDto>> Handle(
+    public async Task<IReadOnlyList<EventPublicActionDto>> QueryAsync(
         GetEventPublicActionsRequest request,
         CancellationToken cancellationToken)
     {
@@ -39,11 +38,11 @@ public sealed class GetEventPublicActionsRequestHandler(
             request.EventId,
             trackChanges: false,
             cancellationToken);
-        return mapper.Map<List<EventPublicActionDto>>(
-            actions.Where(action =>
+        return actions.Where(action =>
                 action.HealthStateId == (int)EventPublicActionHealthStateEnum.Active
                 && EventAuthorityRules.IsPublicActionAllowed(
                     @event.ParticipationConfiguration.ParticipationHandlingModeId,
-                    action.EventPublicActionKindId)));
+                    action.EventPublicActionKindId))
+            .Select(EventMapper.ToDetail).ToList();
     }
 }

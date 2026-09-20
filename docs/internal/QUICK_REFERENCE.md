@@ -101,7 +101,7 @@ Every new controller action MUST have:
 
 6. **No container access** — no `HttpContext.RequestServices`; dependencies arrive through the constructor
 7. **No private failure switch** — declare a `CommandFailurePolicy` (or use `MapCommandResponse`) instead of a per-action `switch` over `FailureCode`
-8. **Identity from the principal** — `CurrentUserId` / `RequiredUserId` from `EventControllerBase`, or `mediator.ResolveCurrentUserIdAsync(User, ct)` when the provider subject is not a platform user id
+8. **Identity from the principal** — `CurrentUserId` / `RequiredUserId` from `EventControllerBase`, or `identityQuery.ResolveCurrentUserIdAsync(User, ct)` for provider-linked accounts, explicitly injecting `IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>`. Provider bindings take precedence over claims; an unlinked account has no email fallback.
 9. **No generic CRUD or lookup base controllers** — keep controllers concrete and explicit; do not introduce `CrudControllerBase<...>` or `LookupControllerBase<...>`. Controllers are HTTP presentation adapters that dispatch MediatR; reuse mechanics via `EventControllerBase` (identity, concurrency stamps), domain-family bases, or composition (`CommandFailurePolicy`, `IResourceAssembler`, extension methods), keeping action signatures declarative, explicit, and customizable for backlog features.
 
 Enforced through compiled architecture contracts, runtime endpoint metadata,

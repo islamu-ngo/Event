@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventDay;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Requests.Queries;
 
-public sealed record GetEventDaysByEventRequest(Guid EventId) : IRequest<List<EventDayListDto>>;
+public sealed record GetEventDaysByEventRequest(Guid EventId) : IQuery<List<EventDayListDto>>;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ViewManagement)]
-public sealed record GetManagedEventDaysByEventRequest : IRequest<List<EventDayListDto>>, ISecureRequest
+public sealed record GetManagedEventDaysByEventRequest : IQuery<List<EventDayListDto>>, ISecureRequest
 {
     public Guid EventId { get; init; }
 

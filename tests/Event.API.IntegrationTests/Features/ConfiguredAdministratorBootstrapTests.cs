@@ -19,7 +19,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -81,8 +81,8 @@ public sealed class ConfiguredAdministratorBootstrapTests
             ("idp", "keycloak"),
             ("email", "configured-admin@example.test")));
         await using var scope = factory.Services.CreateAsyncScope();
-        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-        var retry = await mediator.Send(new SyncUserCommand
+        var syncHandler = scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
+        var retry = await syncHandler.ExecuteAsync(new SyncUserCommand
         {
             AccountKey = expected,
             UserDto = new UserDto
@@ -124,8 +124,8 @@ public sealed class ConfiguredAdministratorBootstrapTests
             ("email", "configured-admin@example.test"));
         using HttpResponseMessage first = await client.SendAsync(firstRequest);
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
-        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-        BaseCommandResponse<Guid> second = await mediator.Send(new SyncUserCommand
+        var syncHandler = scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
+        BaseCommandResponse<Guid> second = await syncHandler.ExecuteAsync(new SyncUserCommand
         {
             AccountKey = expected,
             UserDto = new UserDto

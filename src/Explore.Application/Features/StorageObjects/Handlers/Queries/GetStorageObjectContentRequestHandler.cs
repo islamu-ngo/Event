@@ -1,12 +1,12 @@
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Models.Storage;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Queries;
 
 public sealed class GetStorageObjectContentRequestHandler
-    : IRequestHandler<GetStorageObjectContentRequest, StorageObjectContentResult?>
+    : IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?>
 {
     private readonly IStorageObjectContentReader _contentReader;
 
@@ -15,7 +15,7 @@ public sealed class GetStorageObjectContentRequestHandler
         _contentReader = contentReader;
     }
 
-    public async Task<StorageObjectContentResult?> Handle(
+    public async Task<StorageObjectContentResult?> QueryAsync(
         GetStorageObjectContentRequest request,
         CancellationToken cancellationToken)
     {

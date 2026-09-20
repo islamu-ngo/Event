@@ -1,23 +1,21 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.Features.AudienceGenders.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceGenders.Handlers.Queries;
 
-public class GetAudienceGenderDetailsRequestHandler : IRequestHandler<GetAudienceGenderDetailsRequest, AudienceGenderDto>
+public class GetAudienceGenderDetailsRequestHandler : IQueryHandler<GetAudienceGenderDetailsRequest, AudienceGenderDto?>
 {
     private readonly IAudienceGenderRepository _audienceGenderRepository;
-    private readonly IMapper _mapper;
 
-    public GetAudienceGenderDetailsRequestHandler(IAudienceGenderRepository audienceGenderRepository, IMapper mapper)
+    public GetAudienceGenderDetailsRequestHandler(IAudienceGenderRepository audienceGenderRepository)
     {
         _audienceGenderRepository = audienceGenderRepository;
-        _mapper = mapper;
     }
 
-    public async Task<AudienceGenderDto> Handle(GetAudienceGenderDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<AudienceGenderDto?> QueryAsync(GetAudienceGenderDetailsRequest request, CancellationToken cancellationToken)
     {
         var audienceGender = await _audienceGenderRepository.GetById(request.Id);
         if (audienceGender == null)
@@ -25,6 +23,6 @@ public class GetAudienceGenderDetailsRequestHandler : IRequestHandler<GetAudienc
             return null;
         }
 
-        return _mapper.Map<AudienceGenderDto>(audienceGender);
+        return EventMapper.ToDetail(audienceGender);
     }
 }

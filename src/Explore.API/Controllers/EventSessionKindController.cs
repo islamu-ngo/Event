@@ -3,7 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventSessionKind;
 using Explore.Application.Features.EventSessionKinds.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -14,7 +14,8 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class EventSessionKindController(IMediator mediator) : ControllerBase
+public class EventSessionKindController(
+    IQueryHandler<GetEventSessionKindListRequest, List<EventSessionKindListDto>> eventSessionKinds) : ControllerBase
 {
 
     // GET: api/eventsessionkind
@@ -26,7 +27,7 @@ public class EventSessionKindController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<EventSessionKindListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var kinds = await mediator.Send(new GetEventSessionKindListRequest(), cancellationToken);
+        var kinds = await eventSessionKinds.QueryAsync(new GetEventSessionKindListRequest(), cancellationToken);
         return Ok(kinds);
     }
 }

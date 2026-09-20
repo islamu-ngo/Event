@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionTemplates.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record UpdateEventSessionTemplateCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateEventSessionTemplateCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid SessionTemplateId { get; init; }
     public required UpdateEventSessionTemplateDto SessionTemplateDto { get; init; }

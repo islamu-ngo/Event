@@ -109,7 +109,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
             new OrganizerEarningsCalculator(),
             instanceReadiness);
 
-        var result = await handler.Handle(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
         var options = result!.TicketTypes.Single().SlidingScaleOptions;
 
         await Assert.That(options.Count).IsEqualTo(5);
@@ -185,7 +185,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
             new OrganizerEarningsCalculator(),
             instanceReadiness);
 
-        var result = await handler.Handle(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
 
         await Assert.That(result).IsNull();
     }

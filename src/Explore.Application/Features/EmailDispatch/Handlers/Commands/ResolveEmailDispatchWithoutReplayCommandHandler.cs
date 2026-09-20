@@ -3,14 +3,14 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
 public sealed class ResolveEmailDispatchWithoutReplayCommandHandler(
     IEmailDispatchOutboxRepository repository,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<ResolveEmailDispatchWithoutReplayCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ResolveEmailDispatchWithoutReplayCommand, BaseCommandResponse<Guid>>
 {
     private static readonly HashSet<EmailDispatchStatus> ResolvableStatuses =
     [
@@ -19,7 +19,7 @@ public sealed class ResolveEmailDispatchWithoutReplayCommandHandler(
         EmailDispatchStatus.Unknown
     ];
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ResolveEmailDispatchWithoutReplayCommand request,
         CancellationToken cancellationToken)
     {

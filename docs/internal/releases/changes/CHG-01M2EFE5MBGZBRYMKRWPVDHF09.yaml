@@ -1,0 +1,29 @@
+Change-Id: CHG-01M2EFE5MBGZBRYMKRWPVDHF09
+Title: "Correct session projection rebuild validation"
+Type: fix
+Scope: events
+Summary: "Return structured session rebuild validation errors through protected native session projection operations while preserving tenant authority and transactional rebuilds."
+Group: event-session-projection-administration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md#session-projection-administration
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Four protected scoped ports retain persisted tenant authority and exposure ceilings. Real SQLite HTTP tests reject forged administrator claims and foreign session owners.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/custom-properties.md#projection-administration
+    Disposition: documented
+    Detail: Session rebuild validation returns the documented ProblemDetails shape and validation_failed code. Failed and cancelled session rebuilds retain rows and pending work for retry. No migration or manual repair is required.

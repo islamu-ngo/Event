@@ -3,7 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.RegistrationScope;
 using Explore.Application.Features.RegistrationScopes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -14,7 +14,8 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class RegistrationScopeController(IMediator mediator) : ControllerBase
+public class RegistrationScopeController(
+    IQueryHandler<GetRegistrationScopeListRequest, List<RegistrationScopeListDto>> registrationScopes) : ControllerBase
 {
 
     // GET: api/registrationscope
@@ -26,7 +27,7 @@ public class RegistrationScopeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<RegistrationScopeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var scopes = await mediator.Send(new GetRegistrationScopeListRequest(), cancellationToken);
+        var scopes = await registrationScopes.QueryAsync(new GetRegistrationScopeListRequest(), cancellationToken);
         return Ok(scopes);
     }
 }

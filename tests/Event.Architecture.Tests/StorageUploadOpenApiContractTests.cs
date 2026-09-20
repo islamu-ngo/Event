@@ -7,9 +7,7 @@ public sealed class StorageUploadOpenApiContractTests
     [Test]
     public async Task StorageMetadataContracts_MustNotExposeProviderObjectKeys()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var document = await JsonDocument.ParseAsync(schemaStream);
         var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
 
@@ -26,12 +24,7 @@ public sealed class StorageUploadOpenApiContractTests
             await Assert.That(schemas.GetProperty(schemaName).GetProperty("properties").TryGetProperty("objectKey", out _)).IsFalse();
         }
 
-        var generatedClient = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs"));
+        var generatedClient = GeneratedContractInputs.Client;
 
         string[] generatedStorageMetadataTypes =
         [
@@ -69,9 +62,7 @@ public sealed class StorageUploadOpenApiContractTests
     [Test]
     public async Task StorageUploadSessionContent_MustDeclareRequiredBinaryRequestBody()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var document = await JsonDocument.ParseAsync(schemaStream);
 
         var operation = document.RootElement
@@ -93,8 +84,7 @@ public sealed class StorageUploadOpenApiContractTests
     public async Task LegacyStorageMutationArtifacts_MustRemainAbsent()
     {
         var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var document = await JsonDocument.ParseAsync(schemaStream);
         var paths = document.RootElement.GetProperty("paths");
 
@@ -121,12 +111,7 @@ public sealed class StorageUploadOpenApiContractTests
             await Assert.That(File.Exists(Path.Combine(repositoryRoot, relativePath))).IsFalse();
         }
 
-        var generatedClient = await File.ReadAllTextAsync(Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs"));
+        var generatedClient = GeneratedContractInputs.Client;
         string[] obsoleteGeneratedSymbols =
         [
             "CreateStorageObjectAsync",
@@ -271,8 +256,8 @@ public sealed class StorageUploadOpenApiContractTests
             "Features",
             "StorageObjects",
             "Handlers",
-            "Queries",
-            "GetPresignedDownloadUrlRequestHandler.cs"));
+            "Commands",
+            "IssuePresignedDownloadUrlCommandHandler.cs"));
         var finalizeHandler = await File.ReadAllTextAsync(Path.Combine(
             repositoryRoot,
             "src",

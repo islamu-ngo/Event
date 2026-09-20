@@ -1,5 +1,7 @@
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 using Explore.GeneratedContracts;
 using Explore.Blazor.Client.Clients;
@@ -13,17 +15,36 @@ public sealed class GeneratedClientRecordArchitectureTests
         "// <generated-record-policy version=\"1\">";
 
     [Test]
+    public async Task EmbeddedClientBytesMatchTheReferencedCompilersSourceChecksum()
+    {
+        using FileStream symbols = File.OpenRead(Path.ChangeExtension(typeof(ActorDto).Assembly.Location, ".pdb"));
+        using MetadataReaderProvider provider = MetadataReaderProvider.FromPortablePdbStream(symbols);
+        MetadataReader metadata = provider.GetMetadataReader();
+        Document document = metadata.Documents.Select(metadata.GetDocument).Single(candidate =>
+            metadata.GetString(candidate.Name).Replace('\\', '/')
+                .EndsWith("/generated-contracts/EventApiTagClients.g.cs", StringComparison.Ordinal));
+        await Assert.That(metadata.GetGuid(document.HashAlgorithm))
+            .IsEqualTo(new Guid("8829d00f-11b8-4213-878b-770e8597ac16"));
+        using Stream source = typeof(GeneratedContractInputs).Assembly
+            .GetManifestResourceStream("GeneratedContracts.EventApiTagClients.g.cs")
+            ?? throw new InvalidOperationException("Missing compiled client capture.");
+        await Assert.That(Convert.ToHexString(SHA256.HashData(source)))
+            .IsEqualTo(Convert.ToHexString(metadata.GetBlobBytes(document.Hash)))
+            .Because("the embedded capture must be the bytes consumed by the referenced client's compiler");
+    }
+
+    [Test]
     public async Task GeneratedNominalRecordSurfaceIsExactAndInitOnly()
     {
-        string source = File.ReadAllText(GeneratedClientPath());
+        string source = GeneratedContractInputs.Client;
         HashSet<string> mutableTypes =
-            GeneratedContractPolicy.LoadMutableStateTypes(
-                MutablePolicyPath());
+            GeneratedContractPolicy.ParseMutableStateTypes(
+                GeneratedContractInputs.MutablePolicy.Split('\n'));
         GeneratedContractClassification classification =
             GeneratedContractTransformer.Classify(
                 source,
                 mutableTypes);
-        string[] names = File.ReadLines(GeneratedClientPath())
+        string[] names = source.Split('\n')
             .Select(line => line.Trim())
             .Where(line => line.StartsWith(
                 RecordDeclaration,
@@ -102,7 +123,7 @@ public sealed class GeneratedClientRecordArchitectureTests
     [Test]
     public async Task MutableGeneratedContractManifestIsExactAndClassBased()
     {
-        string[] names = File.ReadAllLines(MutablePolicyPath())
+        string[] names = GeneratedContractInputs.MutablePolicy.Split('\n')
             .Select(line => line.Trim())
             .Where(line => line.Length != 0
                 && !line.StartsWith('#'))
@@ -160,32 +181,4 @@ public sealed class GeneratedClientRecordArchitectureTests
             | BindingFlags.NonPublic
             | BindingFlags.Instance)
         is not null;
-
-    private static string GeneratedClientPath() => Path.Combine(
-        RepositoryRoot(),
-        "src",
-        "Explore.Blazor.Client",
-        "Clients",
-        "EventApiTagClients.g.cs");
-
-    private static string MutablePolicyPath() => Path.Combine(
-        RepositoryRoot(),
-        "eng",
-        "tools",
-        "Explore.GeneratedContracts",
-        "mutable-generated-contracts.txt");
-
-    private static string RepositoryRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null
-            && !File.Exists(Path.Combine(directory.FullName, "Explore.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new DirectoryNotFoundException(
-                "Repository root containing Explore.slnx was not found.");
-    }
 }

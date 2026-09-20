@@ -85,7 +85,7 @@ public sealed class TicketTransferHandlerSecurityTests
                 capabilities,
                 new FixedTimeProvider(UtcNow));
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetTicketTransferQuery(
                 eventId,
                 ticketId,
@@ -189,7 +189,7 @@ public sealed class TicketTransferHandlerSecurityTests
                 new InlineUnitOfWork(),
                 new FixedTimeProvider(UtcNow));
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new OfferTicketTransferCommand(
                 eventId,
                 ticketId),

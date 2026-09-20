@@ -1,0 +1,35 @@
+Change-Id: CHG-01M2DP99ZKGDCNJRFC4YT3151J
+Title: "Restore event authority checks on SQLite"
+Type: fix
+Scope: access
+Summary: "Evaluate existing event role permissions through portable scalar queries without changing authorization policy."
+Group: event-authority
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Existing tenant, user, event and effective-role filters remain unchanged.
+      Portable scalar permission queries restore SQLite authorization without
+      granting new capabilities or strengthening cross-query snapshot semantics.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: >-
+      SQLite operators regain authorized event-role checks and session action
+      links. No schema migration, configuration change or policy republishing
+      is required.

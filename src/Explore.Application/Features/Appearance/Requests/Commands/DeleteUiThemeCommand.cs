@@ -1,5 +1,5 @@
 namespace Explore.Application.Features.Appearance.Requests.Commands;
 
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public sealed record DeleteUiThemeCommand(Guid Id = default) : IRequest<bool>;
+public sealed record DeleteUiThemeCommand(Guid Id = default) : ICommand<bool>;

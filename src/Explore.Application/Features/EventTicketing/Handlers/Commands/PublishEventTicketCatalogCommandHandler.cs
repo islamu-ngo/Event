@@ -1,6 +1,7 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Exceptions;
@@ -9,7 +10,6 @@ using Explore.Application.Features.EventTicketing.Services;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
@@ -23,32 +23,32 @@ public sealed class PublishEventTicketCatalogCommandHandler(
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
     PaidEventPublicationPreflightService paidPreflight,
-    HybridCache cache) : IRequestHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<PublishEventTicketCatalogCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        PublishEventTicketCatalogCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        PublishEventTicketCatalogCommand command,
         CancellationToken cancellationToken)
     {
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
-        Guid failureId = request.EventId;
+        Guid failureId = command.EventId;
         Guid? catalogId;
         try
         {
             catalogId = await unitOfWork.ExecuteInTransactionAsync<Guid?>(async token =>
             {
-                Event? trustedEventTarget = await events.GetEventWithDetails(request.EventId);
+                Event? trustedEventTarget = await events.GetEventWithDetails(command.EventId);
                 if (!IsPlatformManaged(trustedEventTarget, tenant.TenantId))
                 {
                     return null;
                 }
 
                 EventTicketCatalogVersion? draft = await catalogs.GetDraftCatalogForUpdateAsync(
-                    request.EventId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
                 if (draft is null)
@@ -58,13 +58,13 @@ public sealed class PublishEventTicketCatalogCommandHandler(
 
                 failureId = draft.Id;
                 EventTicketCatalogVersion? currentPublication = await catalogs.GetPublishedForUpdateAsync(
-                    request.EventId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
 
                 await ValidateEntitlementTargetsAsync(draft, token);
 
-                PaidEventPublicationPreflightDto preflight = await paidPreflight.AssessAsync(request.EventId, trustedEventTarget, draft, token);
+                PaidEventPublicationPreflightDto preflight = await paidPreflight.AssessAsync(command.EventId, trustedEventTarget, draft, token);
                 if (preflight.IsPaidCatalog && !preflight.IsReady)
                 {
                     if (preflight.Blockers.Any(blocker => blocker.Code == "commerce_authorization_denied"))
@@ -112,10 +112,10 @@ public sealed class PublishEventTicketCatalogCommandHandler(
 
         if (catalogId is null)
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
-        await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+        await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
         return Ok(catalogId.Value, "Ticket catalog published.");
     }
 

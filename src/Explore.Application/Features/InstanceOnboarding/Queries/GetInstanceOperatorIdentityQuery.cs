@@ -2,21 +2,21 @@ namespace Explore.Application.Features.InstanceOnboarding.Queries;
 
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Retrieves the current instance operator identity document and readiness assessment.
 /// </summary>
-public sealed record GetInstanceOperatorIdentityQuery : IRequest<InstanceOperatorIdentityDocumentDto>;
+public sealed record GetInstanceOperatorIdentityQuery : IQuery<InstanceOperatorIdentityDocumentDto>;
 
 /// <summary>
 /// Handler for <see cref="GetInstanceOperatorIdentityQuery"/>.
 /// </summary>
 public sealed class GetInstanceOperatorIdentityQueryHandler(
     InstanceOperatorIdentityService identityService)
-    : IRequestHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto>
+    : IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto>
 {
-    public async Task<InstanceOperatorIdentityDocumentDto> Handle(
+    public async Task<InstanceOperatorIdentityDocumentDto> QueryAsync(
         GetInstanceOperatorIdentityQuery request,
         CancellationToken cancellationToken)
     {

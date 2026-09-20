@@ -7,7 +7,7 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
@@ -17,9 +17,9 @@ public sealed class CreateFooterLinkCommandHandler(
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settingsResolver,
     FooterLinkMutationGuard mutationGuard)
-    : IRequestHandler<CreateFooterLinkCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateFooterLinkCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateFooterLinkCommand request, CancellationToken cancellationToken)
     {
         bool requireHttps = await settingsResolver.ResolveAsync<bool>(

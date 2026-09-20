@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -26,7 +25,6 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var eventId = Guid.NewGuid();
         var repository = Substitute.For<IEventCustomPropertyRepository>();
         var quotaResolver = Substitute.For<ICustomPropertyQuotaResolver>();
-        var mapper = Substitute.For<IMapper>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var definition = new EventCustomPropertyDefinition
         {
@@ -35,7 +33,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
             Key = "prayer_notes",
             DisplayName = "Prayer Notes"
         };
-        var handler = CreateEventHandler(repository, quotaResolver, tenantId, mapper, unitOfWork);
+        var handler = CreateEventHandler(repository, quotaResolver, tenantId, eventId, unitOfWork);
 
         repository.ExistsDefinitionKey(eventId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForEvent(eventId, Arg.Any<CancellationToken>()).Returns(2);
@@ -46,13 +44,12 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
                 Arg.Any<CancellationToken>())
             .Returns(definition);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEvent.Key, tenantId, Arg.Any<CancellationToken>()).Returns(3);
-        mapper.Map<EventCustomPropertyDefinition>(Arg.Any<CreateEventCustomPropertyDefinitionDto>()).Returns(definition);
         unitOfWork.ExecuteInTransactionAsync(
                 Arg.Any<Func<CancellationToken, Task<EventCustomPropertyDefinition>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<EventCustomPropertyDefinition>>>().Invoke(CancellationToken.None));
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = CreateEventDto(eventId) },
             CancellationToken.None);
 
@@ -67,13 +64,13 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var eventId = Guid.NewGuid();
         var repository = Substitute.For<IEventCustomPropertyRepository>();
         var quotaResolver = Substitute.For<ICustomPropertyQuotaResolver>();
-        var handler = CreateEventHandler(repository, quotaResolver, tenantId);
+        var handler = CreateEventHandler(repository, quotaResolver, tenantId, eventId);
 
         repository.ExistsDefinitionKey(eventId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForEvent(eventId, Arg.Any<CancellationToken>()).Returns(3);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEvent.Key, tenantId, Arg.Any<CancellationToken>()).Returns(3);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = CreateEventDto(eventId) },
             CancellationToken.None);
 
@@ -97,13 +94,13 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var eventId = Guid.NewGuid();
         var repository = Substitute.For<IEventCustomPropertyRepository>();
         var quotaResolver = Substitute.For<ICustomPropertyQuotaResolver>();
-        var handler = CreateEventHandler(repository, quotaResolver, tenantId);
+        var handler = CreateEventHandler(repository, quotaResolver, tenantId, eventId);
 
         repository.ExistsDefinitionKey(eventId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForEvent(eventId, Arg.Any<CancellationToken>()).Returns(4);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEvent.Key, tenantId, Arg.Any<CancellationToken>()).Returns(3);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = CreateEventDto(eventId) },
             CancellationToken.None);
 
@@ -122,7 +119,6 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var sessionId = Guid.NewGuid();
         var repository = Substitute.For<IEventSessionCustomPropertyRepository>();
         var quotaResolver = Substitute.For<ICustomPropertyQuotaResolver>();
-        var mapper = Substitute.For<IMapper>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var definition = new EventSessionCustomPropertyDefinition
         {
@@ -131,7 +127,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
             Key = "prayer_notes",
             DisplayName = "Prayer Notes"
         };
-        var handler = CreateSessionHandler(repository, quotaResolver, tenantId, mapper, unitOfWork);
+        var handler = CreateSessionHandler(repository, quotaResolver, tenantId, unitOfWork);
 
         repository.ExistsDefinitionKey(sessionId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForSession(sessionId, Arg.Any<CancellationToken>()).Returns(1);
@@ -142,13 +138,12 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
                 Arg.Any<CancellationToken>())
             .Returns(definition);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEventSession.Key, tenantId, Arg.Any<CancellationToken>()).Returns(2);
-        mapper.Map<EventSessionCustomPropertyDefinition>(Arg.Any<CreateEventSessionCustomPropertyDefinitionDto>()).Returns(definition);
         unitOfWork.ExecuteInTransactionAsync(
                 Arg.Any<Func<CancellationToken, Task<EventSessionCustomPropertyDefinition>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<EventSessionCustomPropertyDefinition>>>().Invoke(CancellationToken.None));
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventSessionCustomPropertyDefinitionCommand { DefinitionDto = CreateSessionDto(sessionId) },
             CancellationToken.None);
 
@@ -169,7 +164,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         repository.CountDefinitionsForSession(sessionId, Arg.Any<CancellationToken>()).Returns(2);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEventSession.Key, tenantId, Arg.Any<CancellationToken>()).Returns(2);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventSessionCustomPropertyDefinitionCommand { DefinitionDto = CreateSessionDto(sessionId) },
             CancellationToken.None);
 
@@ -199,7 +194,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         repository.CountDefinitionsForSession(sessionId, Arg.Any<CancellationToken>()).Returns(3);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEventSession.Key, tenantId, Arg.Any<CancellationToken>()).Returns(2);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventSessionCustomPropertyDefinitionCommand { DefinitionDto = CreateSessionDto(sessionId) },
             CancellationToken.None);
 
@@ -215,14 +210,13 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         IEventCustomPropertyRepository repository,
         ICustomPropertyQuotaResolver quotaResolver,
         Guid tenantId,
-        IMapper? mapper = null,
+        Guid eventId,
         IUnitOfWork? unitOfWork = null)
     {
         var governancePolicy = Substitute.For<ICustomPropertyGovernancePolicy>();
         var tenantContext = Substitute.For<ITenantContext>();
         var currentUserService = Substitute.For<ICurrentUserService>();
         var cache = Substitute.For<HybridCache>();
-        mapper ??= Substitute.For<IMapper>();
         unitOfWork ??= Substitute.For<IUnitOfWork>();
 
         tenantContext.TenantId.Returns(tenantId);
@@ -233,6 +227,19 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
                 NormalizedNamespace = "tenant.community",
                 NormalizedKey = "prayer_notes",
             });
+
+        var events = Substitute.For<IEventRepository>();
+        events.GetById(eventId).Returns(new Explore.Domain.Event
+        {
+            Id = eventId,
+            TenantId = tenantId,
+            Title = "Owned event",
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!
+        });
 
         return new CreateEventCustomPropertyDefinitionCommandHandler(
             repository,
@@ -240,23 +247,21 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
             quotaResolver,
             tenantContext,
             currentUserService,
-            mapper,
             cache,
-            unitOfWork);
+            unitOfWork,
+            events);
     }
 
     private static CreateEventSessionCustomPropertyDefinitionCommandHandler CreateSessionHandler(
         IEventSessionCustomPropertyRepository repository,
         ICustomPropertyQuotaResolver quotaResolver,
         Guid tenantId,
-        IMapper? mapper = null,
         IUnitOfWork? unitOfWork = null)
     {
         var governancePolicy = Substitute.For<ICustomPropertyGovernancePolicy>();
         var tenantContext = Substitute.For<ITenantContext>();
         var currentUserService = Substitute.For<ICurrentUserService>();
         var cache = Substitute.For<HybridCache>();
-        mapper ??= Substitute.For<IMapper>();
         unitOfWork ??= Substitute.For<IUnitOfWork>();
 
         tenantContext.TenantId.Returns(tenantId);
@@ -268,15 +273,24 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
                 NormalizedKey = "prayer_notes",
             });
 
+        var sessions = Substitute.For<IEventSessionRepository>();
+        sessions.GetById(Arg.Any<Guid>()).Returns(call => new EventSession
+        {
+            Id = call.Arg<Guid>(),
+            TenantId = tenantId,
+            Tenant = null!,
+            Event = null!
+        });
+
         return new CreateEventSessionCustomPropertyDefinitionCommandHandler(
             repository,
             governancePolicy,
             quotaResolver,
             tenantContext,
             currentUserService,
-            mapper,
             cache,
-            unitOfWork);
+            unitOfWork,
+            sessions);
     }
 
     private static CreateEventCustomPropertyDefinitionDto CreateEventDto(Guid eventId)

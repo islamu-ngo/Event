@@ -6,12 +6,12 @@ using Explore.Application.Telemetry;
 using Explore.Domain.Common.Localization;
 using FluentValidation;
 using FluentValidation.Results;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Localization.Handlers.Commands;
 
-public class ImportLocalizationBundleCommandHandler : IRequestHandler<ImportLocalizationBundleCommand, BaseCommandResponse<Guid>>
+public class ImportLocalizationBundleCommandHandler : ICommandHandler<ImportLocalizationBundleCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IBundleFileWriter _bundleFileWriter;
@@ -33,7 +33,7 @@ public class ImportLocalizationBundleCommandHandler : IRequestHandler<ImportLoca
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ImportLocalizationBundleCommand request,
         CancellationToken cancellationToken)
     {

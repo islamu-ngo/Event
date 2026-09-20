@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant.Validators;
@@ -11,7 +11,6 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands.CreateTenantNavLink;
 
@@ -20,26 +19,23 @@ namespace Explore.Application.Features.Tenants.Handlers.Commands.CreateTenantNav
 /// Creates a new navigation link for the current tenant.
 /// Automatically assigns the next order value.
 /// </summary>
-public class CreateTenantNavLinkCommandHandler : IRequestHandler<CreateTenantNavLinkCommand, BaseCommandResponse<Guid>>
+public class CreateTenantNavLinkCommandHandler : ICommandHandler<CreateTenantNavLinkCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
-    private readonly IMapper _mapper;
 
     public CreateTenantNavLinkCommandHandler(
         ITenantNavigationLinkRepository navigationLinkRepository,
         ITenantContext tenantContext,
-        IHierarchicalSettingsResolver settingsResolver,
-        IMapper mapper)
+        IHierarchicalSettingsResolver settingsResolver)
     {
         _navigationLinkRepository = navigationLinkRepository;
         _tenantContext = tenantContext;
         _settingsResolver = settingsResolver;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateTenantNavLinkCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantNavLinkCommand request, CancellationToken cancellationToken = default)
     {
         // Validate the DTO
         bool requireHttps = await _settingsResolver.ResolveAsync<bool>(
@@ -56,8 +52,13 @@ public class CreateTenantNavLinkCommandHandler : IRequestHandler<CreateTenantNav
                 "Validation failed.");
         }
 
-        // Map DTO to entity
-        var navigationLink = _mapper.Map<TenantNavigationLink>(request.NavigationLinkDto);
+        var navigationLink = new TenantNavigationLink
+        {
+            Label = request.NavigationLinkDto.Label,
+            Url = request.NavigationLinkDto.Url,
+            Icon = request.NavigationLinkDto.Icon,
+            OpenInNewTab = request.NavigationLinkDto.OpenInNewTab
+        };
 
         // Set tenant ID from context
         navigationLink.TenantId = _tenantContext.TenantId;

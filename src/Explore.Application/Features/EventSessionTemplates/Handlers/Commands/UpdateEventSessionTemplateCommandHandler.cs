@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -10,18 +9,17 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionTemplates.Handlers.Commands;
 
-public class UpdateEventSessionTemplateCommandHandler : IRequestHandler<UpdateEventSessionTemplateCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionTemplateCommandHandler : ICommandHandler<UpdateEventSessionTemplateCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionTemplateRepository _sessionTemplateRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -30,7 +28,6 @@ public class UpdateEventSessionTemplateCommandHandler : IRequestHandler<UpdateEv
         ICustomPropertyGovernancePolicy customPropertyGovernancePolicy,
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
         IUnitOfWork unitOfWork)
     {
@@ -38,12 +35,11 @@ public class UpdateEventSessionTemplateCommandHandler : IRequestHandler<UpdateEv
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionTemplateCommand request, CancellationToken cancellationToken)
     {
         if (request.SessionTemplateId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
@@ -235,12 +231,40 @@ public class UpdateEventSessionTemplateCommandHandler : IRequestHandler<UpdateEv
                 continue;
             }
 
-            var definition = _mapper.Map<EventSessionTemplateCustomPropertyDefinition>(defDto);
-            definition.TenantId = tenantId;
-            definition.Namespace = governance.NormalizedNamespace;
-            definition.Key = governance.NormalizedKey;
-            definition.CreatedBy = _currentUserService.UserId;
-            definition.UpdatedBy = _currentUserService.UserId;
+            var definition = new EventSessionTemplateCustomPropertyDefinition
+            {
+                Namespace = governance.NormalizedNamespace,
+                Key = governance.NormalizedKey,
+                DisplayName = defDto.DisplayName,
+                Description = defDto.Description,
+                PropertyType = defDto.PropertyType,
+                IsRequired = defDto.IsRequired,
+                IsMulti = defDto.IsMulti,
+                IsActive = defDto.IsActive,
+                SortOrder = defDto.SortOrder,
+                ExposureLevel = defDto.ExposureLevel,
+                IsSearchable = defDto.IsSearchable,
+                IsFilterable = defDto.IsFilterable,
+                IsExportable = defDto.IsExportable,
+                IsModerationRelevant = defDto.IsModerationRelevant,
+                IsAnalyticsRelevant = defDto.IsAnalyticsRelevant,
+                IsSystemOwned = defDto.IsSystemOwned,
+                DefaultTextValue = defDto.DefaultTextValue,
+                DefaultNumberValue = defDto.DefaultNumberValue,
+                DefaultBooleanValue = defDto.DefaultBooleanValue,
+                DefaultDateTimeValue = defDto.DefaultDateTimeValue,
+                MinLength = defDto.MinLength,
+                MaxLength = defDto.MaxLength,
+                RegexPattern = defDto.RegexPattern,
+                MinNumber = defDto.MinNumber,
+                MaxNumber = defDto.MaxNumber,
+                MinDateTime = defDto.MinDateTime,
+                MaxDateTime = defDto.MaxDateTime,
+                AllowedUrlSchemes = defDto.AllowedUrlSchemes,
+                TenantId = tenantId,
+                CreatedBy = _currentUserService.UserId,
+                UpdatedBy = _currentUserService.UserId
+            };
 
             var options = CreateOptionEntities(defDto.Options, definition.Id);
             var defaultOption = options.SingleOrDefault(x => x.IsDefault);

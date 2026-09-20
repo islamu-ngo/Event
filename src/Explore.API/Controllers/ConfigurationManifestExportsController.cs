@@ -6,7 +6,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +18,8 @@ using Microsoft.AspNetCore.RateLimiting;
 [EndpointClassification(EndpointClass.Admin)]
 [Route("api/control-plane/configuration-manifest/export")]
 [Tags("Control Plane Configuration")]
-public sealed class ConfigurationManifestExportsController(IMediator mediator)
+public sealed class ConfigurationManifestExportsController(
+    IQueryHandler<ExportConfigurationManifestQuery, ConfigurationManifestExportResult> exporter)
     : ControllerBase
 {
     [HttpGet("", Name = RouteNames.ExportConfigurationManifest)]
@@ -42,7 +43,7 @@ public sealed class ConfigurationManifestExportsController(IMediator mediator)
         [FromQuery] ConfigurationManifestExportView? view = null,
         CancellationToken cancellationToken = default)
     {
-        ConfigurationManifestExportResult export = await mediator.Send(
+        ConfigurationManifestExportResult export = await exporter.QueryAsync(
             new ExportConfigurationManifestQuery(
                 view ?? ConfigurationManifestExportView.Overrides),
             cancellationToken);

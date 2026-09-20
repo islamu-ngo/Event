@@ -1,14 +1,14 @@
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
-using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
+using Explore.Application.Features.Settings.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,10 +21,10 @@ public sealed class EventLocationGovernanceTests
     [Test]
     public async Task TenantWrite_UsesExistingSettingsCommandAtTenantScope()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
+        var handler = Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>();
+        handler.ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(Guid.CreateVersion7()));
-        var controller = CreateController(mediator);
+        var controller = CreateController(handler);
 
         var result = await controller.UpdateTenantSetting(
             GovernanceSettingKeys.LocationPrivacy.AllowHomeLocations,
@@ -33,7 +33,7 @@ public sealed class EventLocationGovernanceTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await handler.Received(1).ExecuteAsync(
             Arg.Is<UpdateSettingCommand>(command =>
                 command.Key == GovernanceSettingKeys.LocationPrivacy.AllowHomeLocations
                 && command.Value == "false"
@@ -42,18 +42,22 @@ public sealed class EventLocationGovernanceTests
     }
 
     [Test]
-    public async Task SettingsController_RemainsAuthenticatedForLocationGovernanceWrites()
+    public async Task TenantSettingsController_RemainsAuthenticatedForLocationGovernanceWrites()
     {
-        AuthorizeAttribute? authorize = typeof(SettingsController)
+        AuthorizeAttribute? authorize = typeof(TenantSettingsController)
             .GetCustomAttribute<AuthorizeAttribute>();
 
         await Assert.That(authorize).IsNotNull();
-        await Assert.That(typeof(SettingsController).GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
+        await Assert.That(typeof(TenantSettingsController).GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
     }
 
-    private static SettingsController CreateController(IMediator mediator) => new(
-        mediator,
-        Substitute.For<IAdminContext>(),
+    private static TenantSettingsController CreateController(ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> handler) => new(
+        Substitute.For<IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>>(),
+        handler,
+        Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>(),
+        Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
+        Substitute.For<ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>(),
+        Substitute.For<ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>(),
         Substitute.For<IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>>())
     {
         ControllerContext = new ControllerContext

@@ -6,9 +6,10 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Models;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -20,7 +21,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
-public sealed class LocalPasswordController(ISender sender) : ControllerBase
+public sealed class LocalPasswordController(
+    ICommandHandler<ChangeLocalPasswordCommand, BaseCommandResponse<Guid>> changePasswordHandler) : ControllerBase
 {
     [HttpPost(Name = RouteNames.ChangeLocalPassword)]
     [PrivateNoStore]
@@ -39,6 +41,6 @@ public sealed class LocalPasswordController(ISender sender) : ControllerBase
     public async Task<ActionResult> Change(
         [FromBody] LocalPasswordChangeRequestDto body, CancellationToken cancellationToken = default) =>
         LocalIdentityLifecycleFailurePolicy.Instance.Map(this,
-            await sender.Send(new ChangeLocalPasswordCommand(body, User.TryGetLocalSessionAuthority()), cancellationToken),
+            await changePasswordHandler.ExecuteAsync(new ChangeLocalPasswordCommand(body, User.TryGetLocalSessionAuthority()), cancellationToken),
             onSuccess: NoContent);
 }

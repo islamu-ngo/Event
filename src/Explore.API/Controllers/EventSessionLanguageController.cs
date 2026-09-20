@@ -8,7 +8,7 @@ using Explore.Application.Features.EventSessionLanguages.Requests.Commands;
 using Explore.Application.Features.EventSessionLanguages.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -43,14 +43,29 @@ public class EventSessionLanguageController : EventControllerBase
         "Program validation failed",
         "If-Match header is required and must contain the current event session language concurrency stamp.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetLanguagesBySessionQuery, List<EventSessionLanguageListDto>> _publicLanguages;
+    private readonly IQueryHandler<GetManagedLanguagesBySessionQuery, List<EventSessionLanguageListDto>> _managedLanguages;
+    private readonly IQueryHandler<GetEventSessionLanguageDetailsQuery, EventSessionLanguageDto?> _details;
+    private readonly ICommandHandler<CreateEventSessionLanguageCommand, BaseCommandResponse<int>> _create;
+    private readonly ICommandHandler<UpdateEventSessionLanguageCommand, BaseCommandResponse<int>> _update;
+    private readonly ICommandHandler<DeleteEventSessionLanguageCommand, bool> _delete;
     private readonly IResourceAssembler<EventSessionLanguageDto, EventSessionLanguageListDto> _resourceAssembler;
 
     public EventSessionLanguageController(
-        IMediator mediator,
+        IQueryHandler<GetLanguagesBySessionQuery, List<EventSessionLanguageListDto>> publicLanguages,
+        IQueryHandler<GetManagedLanguagesBySessionQuery, List<EventSessionLanguageListDto>> managedLanguages,
+        IQueryHandler<GetEventSessionLanguageDetailsQuery, EventSessionLanguageDto?> details,
+        ICommandHandler<CreateEventSessionLanguageCommand, BaseCommandResponse<int>> create,
+        ICommandHandler<UpdateEventSessionLanguageCommand, BaseCommandResponse<int>> update,
+        ICommandHandler<DeleteEventSessionLanguageCommand, bool> delete,
         IResourceAssembler<EventSessionLanguageDto, EventSessionLanguageListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _publicLanguages = publicLanguages;
+        _managedLanguages = managedLanguages;
+        _details = details;
+        _create = create;
+        _update = update;
+        _delete = delete;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -64,7 +79,7 @@ public class EventSessionLanguageController : EventControllerBase
         Guid eventSessionId,
         CancellationToken cancellationToken = default)
     {
-        var languages = await _mediator.Send(new GetLanguagesBySessionRequest
+        var languages = await _publicLanguages.QueryAsync(new GetLanguagesBySessionQuery
         {
             EventSessionId = eventSessionId
         }, cancellationToken);
@@ -92,7 +107,7 @@ public class EventSessionLanguageController : EventControllerBase
         Guid eventSessionId,
         CancellationToken cancellationToken = default)
     {
-        var languages = await _mediator.Send(new GetManagedLanguagesBySessionRequest
+        var languages = await _managedLanguages.QueryAsync(new GetManagedLanguagesBySessionQuery
         {
             EventId = eventId,
             EventSessionId = eventSessionId
@@ -120,7 +135,7 @@ public class EventSessionLanguageController : EventControllerBase
         [FromBody] CreateEventSessionLanguageDto language,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CreateEventSessionLanguageCommand
+        var response = await _create.ExecuteAsync(new CreateEventSessionLanguageCommand
         {
             EventSessionLanguageDto = language
         }, cancellationToken);
@@ -161,7 +176,7 @@ public class EventSessionLanguageController : EventControllerBase
                 IfMatchValidationProblem.FallbackDetail);
         }
 
-        var response = await _mediator.Send(new UpdateEventSessionLanguageCommand
+        var response = await _update.ExecuteAsync(new UpdateEventSessionLanguageCommand
         {
             EventSessionLanguageId = id,
             EventSessionLanguageDto = language,
@@ -188,13 +203,13 @@ public class EventSessionLanguageController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Delete(int id, CancellationToken cancellationToken = default)
     {
-        var language = await _mediator.Send(new GetEventSessionLanguageDetailsRequest { Id = id }, cancellationToken);
+        var language = await _details.QueryAsync(new GetEventSessionLanguageDetailsQuery { Id = id }, cancellationToken);
         if (language is null || language.Id == 0)
         {
             return this.ToNotFoundProblem(EventSessionLanguageNotFoundProblem);
         }
 
-        var deleted = await _mediator.Send(new DeleteEventSessionLanguageCommand
+        var deleted = await _delete.ExecuteAsync(new DeleteEventSessionLanguageCommand
         {
             Id = id,
             EventSessionId = language.EventSessionId

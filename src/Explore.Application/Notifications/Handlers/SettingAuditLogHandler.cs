@@ -1,5 +1,5 @@
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Notifications.Handlers;
@@ -13,7 +13,7 @@ public class SettingAuditLogHandler : INotificationHandler<SettingChangedNotific
         _logger = logger;
     }
 
-    public Task Handle(SettingChangedNotification notification, CancellationToken cancellationToken)
+    public Task HandleAsync(SettingChangedNotification notification, CancellationToken cancellationToken)
     {
         bool isSensitive = notification.IsSensitive
             || SettingRegistry.Get(notification.Key)?.IsSensitive == true;

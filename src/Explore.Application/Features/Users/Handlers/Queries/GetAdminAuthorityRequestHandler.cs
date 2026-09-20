@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Users.Handlers.Queries;
 
-public class GetAdminAuthorityRequestHandler : IRequestHandler<GetAdminAuthorityRequest, AdminAuthorityDto>
+public class GetAdminAuthorityRequestHandler : IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto>
 {
     private readonly IAdminContext _adminContext;
 
@@ -14,7 +14,7 @@ public class GetAdminAuthorityRequestHandler : IRequestHandler<GetAdminAuthority
         _adminContext = adminContext;
     }
 
-    public async Task<AdminAuthorityDto> Handle(GetAdminAuthorityRequest request, CancellationToken cancellationToken)
+    public async Task<AdminAuthorityDto> QueryAsync(GetAdminAuthorityRequest request, CancellationToken cancellationToken = default)
     {
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
         var tenantIds = await _adminContext.GetAdminTenantIdsAsync(request.UserId, cancellationToken);

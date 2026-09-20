@@ -7,7 +7,6 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Handlers.Commands;
-using Explore.Application.Features.EmailDispatch.Handlers.Queries;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Notifications.Handlers;
@@ -21,7 +20,7 @@ using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -80,7 +79,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         }
         using var session = scenario.Open(tenantActor: true);
         string before = await scenario.StateAsync();
-        var result = await session.Preview.Handle(new(scenario.TenantId), CancellationToken.None);
+        var result = await session.Preview.ExecuteAsync(new(scenario.TenantId), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.IsLocked).IsEqualTo(locked);
@@ -106,8 +105,8 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         if (reason == "revoked-admin") await scenario.RevokeAsync(tenantActor: true);
         Guid? target = reason == "instance-target" ? null : scenario.TenantId;
         string before = await scenario.StateAsync();
-        var preview = await session.Preview.Handle(new(target), CancellationToken.None);
-        var result = await session.Disable.Handle(new(target, 0, null, null), CancellationToken.None);
+        var preview = await session.Preview.ExecuteAsync(new(target), CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(new(target, 0, null, null), CancellationToken.None);
 
         await Assert.That(preview.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
@@ -121,8 +120,8 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         await using var scenario = await Scenario.CreateAsync();
         using var session = scenario.Open();
         string before = await scenario.StateAsync();
-        var preview = await session.Preview.Handle(new(Guid.Empty), CancellationToken.None);
-        var result = await session.Disable.Handle(new(Guid.Empty, 0,
+        var preview = await session.Preview.ExecuteAsync(new(Guid.Empty), CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(new(Guid.Empty, 0,
             DisableEmailDeliveryCommand.RequiredAcknowledgement, null), CancellationToken.None);
 
         await Assert.That(preview.IsSuccess).IsFalse();
@@ -195,13 +194,13 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     [Arguments(true, false)]
     [Arguments(false, true)]
     [Arguments(false, false)]
-    public async Task CachedAdministrationCannotOverrideRevokedGrant(bool preview, bool tenantTarget)
+    public async Task EarlierAdministrationCannotOverrideRevokedGrant(bool preview, bool tenantTarget)
     {
         await using var scenario = await Scenario.CreateAsync();
         using var session = scenario.Open(tenantActor: tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsTrue();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsTrue();
         await scenario.RevokeAsync(tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsTrue();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsFalse();
         string before = await scenario.StateAsync();
 
         string? failure = await session.FailureAsync(preview,
@@ -219,7 +218,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         using var session = scenario.Open();
         string before = await scenario.StateAsync();
         // The instance always exists; a nonexistent tenant is the native reader's missing-scope boundary.
-        var preview = await session.Preview.Handle(new(Guid.CreateVersion7()), CancellationToken.None);
+        var preview = await session.Preview.ExecuteAsync(new(Guid.CreateVersion7()), CancellationToken.None);
 
         await Assert.That(preview.FailureCode).IsEqualTo(FailureCodes.NotFound);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
@@ -233,11 +232,11 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     {
         await using var scenario = await Scenario.CreateAsync();
         using var session = scenario.Open(tenantActor: tenantTarget);
-        // A real cached denial must not override a newly granted database role.
+        // An earlier denial must not override a newly granted database role.
         await scenario.RevokeAsync(tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsFalse();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsFalse();
         await scenario.RestoreAsync(tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsFalse();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsTrue();
         Guid? target = tenantTarget ? scenario.TenantId : null;
         Guid actor = tenantTarget ? scenario.TenantActorId : scenario.PlatformActorId;
         var preview = await session.PreviewAsync(target);
@@ -261,7 +260,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             published.SetResult();
         };
 
-        var response = await session.Disable.Handle(Command(preview), CancellationToken.None);
+        var response = await session.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
         await published.Task.WaitAsync(TimeSpan.FromSeconds(15));
@@ -304,7 +303,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         };
         await session.PrimeStaleCacheAsync();
         string before = await scenario.StateAsync();
-        var result = await session.Disable.Handle(command, CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Errors).IsNotNull();
@@ -332,7 +331,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             _ => command
         };
         string before = await scenario.StateAsync();
-        var result = await session.Disable.Handle(command, CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
@@ -361,7 +360,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         else await Assert.That(fresh.ExpectedRevision).IsGreaterThan(preview.ExpectedRevision);
         string before = await scenario.StateAsync();
 
-        var result = await session.Disable.Handle(Command(preview), CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
@@ -377,16 +376,16 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         using var session = scenario.Open(tenantActor: tenantTarget);
         Guid? target = tenantTarget ? scenario.TenantId : null;
         var command = Command(await session.PreviewAsync(target));
-        await Assert.That((await session.Disable.Handle(command, CancellationToken.None)).IsSuccess).IsTrue();
+        await Assert.That((await session.Disable.ExecuteAsync(command, CancellationToken.None)).IsSuccess).IsTrue();
         string disabled = await scenario.StateAsync();
-        await Assert.That((await session.Disable.Handle(command, CancellationToken.None)).FailureCode)
+        await Assert.That((await session.Disable.ExecuteAsync(command, CancellationToken.None)).FailureCode)
             .IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(disabled);
         await using (var writer = CreateContext(scenario.Path))
             await SetEmailSettingAsync(writer, GovernanceSettingKeys.Email.DeliveryEnabled, "true", tenantId: target);
         string reenabled = await scenario.StateAsync();
 
-        var replay = await session.Disable.Handle(command, CancellationToken.None);
+        var replay = await session.Disable.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(replay.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(reenabled);
@@ -416,13 +415,51 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         }
         await context.Database.CloseConnectionAsync();
         Exception? failure = null;
-        try { await session.Disable.Handle(command, CancellationToken.None); }
+        try { await session.Disable.ExecuteAsync(command, CancellationToken.None); }
         catch (Exception exception) when (exception is SqliteException or DbUpdateException) { failure = exception; }
 
         await Assert.That(failure).IsNotNull();
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
         await Assert.That(await session.CachedSentinelAsync()).IsTrue();
         await session.AssertNoEffectsAsync();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PostCommitAuditFailurePreservesDisabledPolicyAndInvalidatedCacheAfterDisconnect(bool tenantTarget)
+    {
+        await using var scenario = await Scenario.CreateAsync();
+        using var session = scenario.Open(tenantActor: tenantTarget);
+        Guid? target = tenantTarget ? scenario.TenantId : null;
+        var command = Command(await session.PreviewAsync(target));
+        await session.PrimeStaleCacheAsync();
+        using var cancellation = new CancellationTokenSource();
+        var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Fixture.Notifications.OnPublishing = async (_, token) =>
+        {
+            await using var observer = CreateContext(scenario.Path);
+            await Assert.That((await ReadSettingAsync(observer, target)).Value).IsEqualTo("false");
+            await Assert.That(token.CanBeCanceled).IsFalse();
+            cancellation.Cancel();
+            committed.SetResult();
+        };
+        var failure = new InvalidOperationException("Post-commit audit failed.");
+        session.Audit.Failure = failure;
+
+        Exception? observed = null;
+        try { await session.Disable.ExecuteAsync(command, cancellation.Token); }
+        catch (Exception exception) { observed = exception; }
+
+        await Assert.That(observed).IsSameReferenceAs(failure);
+        await committed.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        await Assert.That(cancellation.IsCancellationRequested).IsTrue();
+        await Assert.That(await session.CachedSentinelAsync()).IsFalse();
+        await using var verification = CreateContext(scenario.Path);
+        await Assert.That((await ReadSettingAsync(verification, target)).Value).IsEqualTo("false");
+        await Assert.That((await ReadSettingAsync(verification, tenantTarget ? null : scenario.TenantId)).Value).IsEqualTo("true");
+        await Assert.That(session.Fixture.Notifications.Published.Count).IsEqualTo(1);
+        await Assert.That(session.Audit.Entries.Count).IsEqualTo(1);
     }
 
     private static DisableEmailDeliveryCommand Command(EmailDeliveryDisablePreviewDto preview) =>
@@ -611,7 +648,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         internal List<string> LeaseKeys { get; } = [];
         internal Func<string, CancellationToken, Task>? BeforeLock { get; set; }
         internal AuditSink Audit { get; }
-        internal PreviewEmailDeliveryDisableQueryHandler Preview { get; }
+        internal PreviewEmailDeliveryDisableCommandHandler Preview { get; }
         internal DisableEmailDeliveryCommandHandler Disable { get; }
 
         internal Session(Scenario scenario, Guid actor, Guid currentTenant)
@@ -639,12 +676,13 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             Preview = new(Fixture.AdminContext, tenantContext, new EmailDeliveryDisableImpactReader(context), scenario.Tokens,
                 mutationLock, Fixture.UnitOfWork, platformRoles, tenantRoles);
             Disable = new(Fixture.AdminContext, tenantContext, CreateEmailSettingsWriter(context, mutationLock, scenario.Tokens),
-                mutationLock, Fixture.UnitOfWork, new Mediator(_provider), platformRoles, tenantRoles);
+                mutationLock, Fixture.UnitOfWork,
+                _provider.GetServices<INotificationHandler<SettingChangedNotification>>(), platformRoles, tenantRoles);
         }
 
         internal async Task<EmailDeliveryDisablePreviewDto> PreviewAsync(Guid? target)
         {
-            var result = await Preview.Handle(new(target), CancellationToken.None);
+            var result = await Preview.ExecuteAsync(new(target), CancellationToken.None);
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.Id!.CanDisable).IsTrue();
             await Assert.That(result.Id.ConfirmationToken).IsNotNull();
@@ -652,10 +690,10 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         }
 
         internal async Task<string?> FailureAsync(bool preview, DisableEmailDeliveryCommand command, CancellationToken token = default) =>
-            preview ? (await Preview.Handle(new(command.TenantId), token)).FailureCode
-                : (await Disable.Handle(command, token)).FailureCode;
+            preview ? (await Preview.ExecuteAsync(new(command.TenantId), token)).FailureCode
+                : (await Disable.ExecuteAsync(command, token)).FailureCode;
 
-        internal Task<bool> CachedAdminAsync(bool tenantTarget) => tenantTarget
+        internal Task<bool> CurrentAdminAsync(bool tenantTarget) => tenantTarget
             ? Fixture.AdminContext.IsTenantAdminAsync(_scenario.TenantId) : Fixture.AdminContext.IsInstanceAdminAsync();
 
         internal Task<bool> CachedSentinelAsync() => Fixture.Settings.ResolveAsync<bool>(
@@ -717,6 +755,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     private sealed class AuditSink(ExploreDbContext context) : ILogger<SettingAuditLogHandler>
     {
         internal List<Dictionary<string, object?>> Entries { get; } = [];
+        internal Exception? Failure { get; set; }
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -724,6 +763,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             if (context.Database.CurrentTransaction is not null)
                 throw new InvalidOperationException("Audit escaped before commit.");
             Entries.Add(((IEnumerable<KeyValuePair<string, object?>>)state!).ToDictionary(pair => pair.Key, pair => pair.Value));
+            if (Failure is not null) throw Failure;
         }
     }
 

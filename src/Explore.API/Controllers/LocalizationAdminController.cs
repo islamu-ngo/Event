@@ -7,7 +7,7 @@ using Explore.Application.DTOs.Localization;
 using Explore.Application.Features.Localization.Requests.Commands;
 using Explore.Application.Features.Localization.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -41,16 +41,31 @@ public class LocalizationAdminController : ControllerBase
         "Localization bundle import validation failed",
         "Localization bundle import failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<TestTmsConnectionQuery, BaseCommandResponse<Guid>> _testConnectionQuery;
+    private readonly IQueryHandler<GetLocalizationTmsApiKeyConfiguredQuery, bool> _apiKeyConfiguredQuery;
+    private readonly IQueryHandler<ExportLocalizationBundleQuery, IReadOnlyDictionary<string, string>> _exportBundleQuery;
+    private readonly ICommandHandler<UpdateLocalizationGovernanceCommand, BaseCommandResponse<Guid>> _updateGovernanceCommand;
+    private readonly ICommandHandler<ImportLocalizationBundleCommand, BaseCommandResponse<Guid>> _importBundleCommand;
+    private readonly ICommandHandler<ExportFromTmsCommand, BaseCommandResponse<Guid>> _exportFromTmsCommand;
     private readonly ITranslationConfigResolver _configResolver;
     private readonly IBundleFileWriter _bundleFileWriter;
 
     public LocalizationAdminController(
-        IMediator mediator,
+        IQueryHandler<TestTmsConnectionQuery, BaseCommandResponse<Guid>> testConnectionQuery,
+        IQueryHandler<GetLocalizationTmsApiKeyConfiguredQuery, bool> apiKeyConfiguredQuery,
+        IQueryHandler<ExportLocalizationBundleQuery, IReadOnlyDictionary<string, string>> exportBundleQuery,
+        ICommandHandler<UpdateLocalizationGovernanceCommand, BaseCommandResponse<Guid>> updateGovernanceCommand,
+        ICommandHandler<ImportLocalizationBundleCommand, BaseCommandResponse<Guid>> importBundleCommand,
+        ICommandHandler<ExportFromTmsCommand, BaseCommandResponse<Guid>> exportFromTmsCommand,
         ITranslationConfigResolver configResolver,
         IBundleFileWriter bundleFileWriter)
     {
-        _mediator = mediator;
+        _testConnectionQuery = testConnectionQuery;
+        _apiKeyConfiguredQuery = apiKeyConfiguredQuery;
+        _exportBundleQuery = exportBundleQuery;
+        _updateGovernanceCommand = updateGovernanceCommand;
+        _importBundleCommand = importBundleCommand;
+        _exportFromTmsCommand = exportFromTmsCommand;
         _configResolver = configResolver;
         _bundleFileWriter = bundleFileWriter;
     }
@@ -66,7 +81,7 @@ public class LocalizationAdminController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult> TestConnection(CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new TestTmsConnectionCommand(), cancellationToken);
+        var result = await _testConnectionQuery.QueryAsync(new TestTmsConnectionQuery(), cancellationToken);
 
         if (result.IsSuccess)
             return Ok(result);
@@ -97,7 +112,7 @@ public class LocalizationAdminController : ControllerBase
             FallbackLanguage = config.FallbackLanguage,
             ClientPickerEnabled = config.ClientPickerEnabled,
             ForceOfflineMode = config.ForceOfflineMode,
-            TmsApiKeyConfigured = await _mediator.Send(
+            TmsApiKeyConfigured = await _apiKeyConfiguredQuery.QueryAsync(
                 new GetLocalizationTmsApiKeyConfiguredQuery(),
                 cancellationToken),
         };
@@ -132,7 +147,7 @@ public class LocalizationAdminController : ControllerBase
         [FromBody] UpdateLocalizationGovernanceDto dto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _updateGovernanceCommand.ExecuteAsync(
             new UpdateLocalizationGovernanceCommand { Dto = dto },
             cancellationToken);
 
@@ -151,7 +166,7 @@ public class LocalizationAdminController : ControllerBase
         [FromQuery] string languageCode,
         CancellationToken cancellationToken = default)
     {
-        var translations = await _mediator.Send(
+        var translations = await _exportBundleQuery.QueryAsync(
             new ExportLocalizationBundleQuery { LanguageCode = languageCode },
             cancellationToken);
 
@@ -168,7 +183,7 @@ public class LocalizationAdminController : ControllerBase
         [FromBody] ImportLocalizationBundleDto dto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _importBundleCommand.ExecuteAsync(
             new ImportLocalizationBundleCommand { Dto = dto },
             cancellationToken);
 
@@ -191,7 +206,7 @@ public class LocalizationAdminController : ControllerBase
         [FromQuery] string languageCode,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _exportFromTmsCommand.ExecuteAsync(
             new ExportFromTmsCommand { LanguageCode = languageCode },
             cancellationToken);
 

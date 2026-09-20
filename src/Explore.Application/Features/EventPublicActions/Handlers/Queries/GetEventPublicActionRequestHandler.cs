@@ -1,20 +1,19 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.EventPublicActions.Requests.Queries;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Handlers.Queries;
 
 public sealed class GetEventPublicActionRequestHandler(
     IEventRepository eventRepository,
-    IEventPublicActionRepository actionRepository,
-    IMapper mapper)
-    : IRequestHandler<GetEventPublicActionRequest, EventPublicActionDto?>
+    IEventPublicActionRepository actionRepository)
+    : IQueryHandler<GetEventPublicActionRequest, EventPublicActionDto?>
 {
-    public async Task<EventPublicActionDto?> Handle(
+    public async Task<EventPublicActionDto?> QueryAsync(
         GetEventPublicActionRequest request,
         CancellationToken cancellationToken)
     {
@@ -45,7 +44,7 @@ public sealed class GetEventPublicActionRequestHandler(
             && EventAuthorityRules.IsPublicActionAllowed(
                 @event.ParticipationConfiguration.ParticipationHandlingModeId,
                 action.EventPublicActionKindId)
-                ? mapper.Map<EventPublicActionDto>(action)
+                ? EventMapper.ToDetail(action)
                 : null;
     }
 }

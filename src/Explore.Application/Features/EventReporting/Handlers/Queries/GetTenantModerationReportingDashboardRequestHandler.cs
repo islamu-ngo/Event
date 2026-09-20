@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Queries;
@@ -12,11 +12,11 @@ public sealed class GetTenantModerationReportingDashboardRequestHandler(
     IEventReportRepository eventReportRepository,
     ITenantContext tenantContext,
     IConfiguration configuration)
-    : IRequestHandler<GetTenantModerationReportingDashboardRequest, TenantModerationReportingDashboardDto>
+    : IQueryHandler<GetTenantModerationReportingDashboardRequest, TenantModerationReportingDashboardDto>
 {
     private const int DefaultStuckSyncMinutes = 120;
 
-    public async Task<TenantModerationReportingDashboardDto> Handle(
+    public async Task<TenantModerationReportingDashboardDto> QueryAsync(
         GetTenantModerationReportingDashboardRequest request,
         CancellationToken cancellationToken)
     {

@@ -49,7 +49,7 @@ public sealed class EventVisitorCapabilityGateTests
         var participation = EventVisitorCapabilitySqliteFixture.Participation();
         BaseCommandResponse<Guid> response = command switch
         {
-            "configure" => await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
+            "configure" => await fixture.ExecuteCommandAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
             {
                 EventId = entity.Id,
                 ExpectedConcurrencyStamp = configurationStamp,
@@ -138,12 +138,12 @@ public sealed class EventVisitorCapabilityGateTests
         var ticket = await fixture.SeedTicketAsync(entity.Id);
         async Task<BaseCommandResponse<Guid>> StartAsync() => surface switch
         {
-            "authenticated" => await fixture.ExecuteAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
+            "authenticated" => await fixture.ExecuteCommandAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
                 new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)])),
-            "guest" => await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
+            "guest" => await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
                 (await fixture.IssueGuestProofAsync(new(entity.Id, ticket.CatalogId,
                     BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]))).Request),
-            _ => await fixture.ExecuteAsync<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>(new()
+            _ => await fixture.ExecuteCommandAsync<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>(new()
             {
                 EventId = entity.Id,
                 TicketCatalogVersionId = ticket.CatalogId,
@@ -170,9 +170,9 @@ public sealed class EventVisitorCapabilityGateTests
         await Assert.That(hold.RegistrationInventoryHoldStatusId).IsEqualTo((int)RegistrationInventoryHoldStatusEnum.Active);
 
         BaseCommandResponse<Guid> cancelled = existing is GuestRegistrationOrderStartDto guest
-            ? await fixture.ExecuteAsync<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
+            ? await fixture.ExecuteCommandAsync<CancelGuestRegistrationOrderCommand, GuestRegistrationOrderLifecycleResponseDto>(
                 new(entity.Id, existing.Id, guest.GuestCapabilityToken))
-            : await fixture.ExecuteAsync<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>(
+            : await fixture.ExecuteCommandAsync<CancelAuthenticatedRegistrationOrderCommand, RegistrationOrderLifecycleResponseDto>(
                 new(entity.Id, existing.Id));
         await Assert.That(cancelled.IsSuccess).IsTrue();
         fixture.Context.ChangeTracker.Clear();
@@ -191,7 +191,7 @@ public sealed class EventVisitorCapabilityGateTests
             [new(null, GovernanceSettingKeys.PublicExperience.VisitorAccessMode, VisitorAccessSettingMutationKind.SetValue,
                 "\"DirectoryListingOnly\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();
-        var response = await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
+        var response = await fixture.ExecuteCommandAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
         {
             EventId = entity.Id,
             ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,
@@ -218,7 +218,7 @@ public sealed class EventVisitorCapabilityGateTests
              new(null, GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, VisitorAccessSettingMutationKind.SetValue, "\"https://accounts.example.test/signup\"")], fixture.UserId);
         await Assert.That(changed.Success).IsTrue();
         var entity = await fixture.SeedEventAsync();
-        var response = await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
+        var response = await fixture.ExecuteCommandAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
         {
             EventId = entity.Id,
             ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,

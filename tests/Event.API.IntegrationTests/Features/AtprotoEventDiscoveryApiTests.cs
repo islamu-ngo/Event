@@ -6,8 +6,11 @@ using Explore.API.Services;
 using Explore.API.Services.Calendar;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
+using Explore.Application.Features.Events.OpenGraph;
+using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Notifications;
@@ -16,7 +19,6 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -31,7 +33,7 @@ public sealed class AtprotoEventDiscoveryApiTests
     [Test]
     public async Task EventListUsesSourceAwareDiscoveryContract()
     {
-        var mediator = Substitute.For<IMediator>();
+        var discoveryHandler = Substitute.For<IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>>();
         var assembler = Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>();
         var page = PaginatedResult<EventDiscoveryItemDto>.Create(
             [new EventDiscoveryItemDto { Source = "atproto", FederatedEvent = Federated() }],
@@ -39,14 +41,14 @@ public sealed class AtprotoEventDiscoveryApiTests
             1,
             20);
         var hal = new HalCollectionResource<EventDiscoveryItemDto>();
-        mediator.Send(Arg.Any<GetPublicEventDiscoveryRequest>(), Arg.Any<CancellationToken>()).Returns(page);
+        discoveryHandler.QueryAsync(Arg.Any<GetPublicEventDiscoveryRequest>(), Arg.Any<CancellationToken>()).Returns(page);
         assembler.ToCollectionResource(
                 page,
                 RouteNames.GetEvents,
                 Arg.Any<object?>(),
                 Arg.Any<HttpContext>())
             .Returns(hal);
-        EventController controller = Controller(mediator, assembler);
+        EventController controller = Controller(discoveryHandler: discoveryHandler, discoveryAssembler: assembler);
 
         ActionResult<HalCollectionResource<EventDiscoveryItemDto>> result = await controller.GetAll(
             new EventFilterRequest(),
@@ -55,7 +57,7 @@ public sealed class AtprotoEventDiscoveryApiTests
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsSameReferenceAs(hal);
-        await mediator.Received(1).Send(
+        await discoveryHandler.Received(1).QueryAsync(
             Arg.Is<GetPublicEventDiscoveryRequest>(request =>
                 request != null
                 && request.Criteria.PageNumber == 1
@@ -67,12 +69,12 @@ public sealed class AtprotoEventDiscoveryApiTests
     public async Task FederatedSourceRedirectUsesOnlyResolvedInternalQueryTarget()
     {
         Guid recordId = Guid.CreateVersion7();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(
+        var sourceHandler = Substitute.For<IQueryHandler<GetAtprotoEventSourceQuery, string?>>();
+        sourceHandler.QueryAsync(
                 Arg.Is<GetAtprotoEventSourceQuery>(query => query != null && query.AtprotoRecordId == recordId),
                 Arg.Any<CancellationToken>())
             .Returns("https://events.example/source");
-        EventController controller = Controller(mediator, Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>());
+        EventController controller = Controller(sourceHandler: sourceHandler);
 
         IActionResult result = await controller.GetAtprotoEventSource(recordId, CancellationToken.None);
 
@@ -83,10 +85,10 @@ public sealed class AtprotoEventDiscoveryApiTests
     [Test]
     public async Task MissingOrDisabledFederatedSourceReturnsGenericNotFound()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetAtprotoEventSourceQuery>(), Arg.Any<CancellationToken>())
+        var sourceHandler = Substitute.For<IQueryHandler<GetAtprotoEventSourceQuery, string?>>();
+        sourceHandler.QueryAsync(Arg.Any<GetAtprotoEventSourceQuery>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
-        EventController controller = Controller(mediator, Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>());
+        EventController controller = Controller(sourceHandler: sourceHandler);
 
         IActionResult result = await controller.GetAtprotoEventSource(Guid.CreateVersion7(), CancellationToken.None);
 
@@ -168,7 +170,7 @@ public sealed class AtprotoEventDiscoveryApiTests
         var invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [invalidator], []);
 
-        await handler.Handle(new SettingChangedNotification(
+        await handler.HandleAsync(new SettingChangedNotification(
             GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
             "true",
             "false",
@@ -187,7 +189,7 @@ public sealed class AtprotoEventDiscoveryApiTests
         var invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [invalidator], []);
 
-        await handler.Handle(new SettingChangedNotification(
+        await handler.HandleAsync(new SettingChangedNotification(
             GovernanceSettingKeys.LocationPrivacy.AllowHomeLocations,
             "true",
             "false",
@@ -267,13 +269,19 @@ public sealed class AtprotoEventDiscoveryApiTests
     }
 
     private static EventController Controller(
-        IMediator mediator,
-        IResourceAssembler<EventDiscoveryItemDto> discoveryAssembler)
+        IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>? discoveryHandler = null,
+        IQueryHandler<GetAtprotoEventSourceQuery, string?>? sourceHandler = null,
+        IResourceAssembler<EventDiscoveryItemDto>? discoveryAssembler = null)
     {
         var controller = new EventController(
-            mediator,
+            Substitute.For<IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>>(),
+            Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>(),
+            Substitute.For<IQueryHandler<GetPublicEventDetailsRequest, EventDto?>>(),
+            Substitute.For<IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>>(),
+            discoveryHandler ?? Substitute.For<IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>>(),
+            sourceHandler ?? Substitute.For<IQueryHandler<GetAtprotoEventSourceQuery, string?>>(),
             Substitute.For<IResourceAssembler<EventDto, EventListDto>>(),
-            discoveryAssembler)
+            discoveryAssembler ?? Substitute.For<IResourceAssembler<EventDiscoveryItemDto>>())
         {
             ControllerContext = new ControllerContext
             {

@@ -31,7 +31,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
         var eventId = Guid.NewGuid();
         _repository.GetByEventIdAsync(eventId, Arg.Any<CancellationToken>()).Returns((EventWithSessionsView?)null);
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Id).IsNull();
@@ -47,7 +47,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
             CreateEventDefinitions(eventId, ExposureLevel.Public, ExposureLevel.Internal),
             CreateSessionDefinitions(eventId, ExposureLevel.Public, ExposureLevel.Internal));
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.EventCustomProperties.Count).IsEqualTo(1);
@@ -71,7 +71,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
                 CreateSessionDefinition(eventId, "tenant.session", "internal-session-facet", ExposureLevel.Internal, isExportable: true, isModerationRelevant: true)
             ]);
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         var eventFacet = result.Id!.EventCustomProperties.Single();
@@ -105,7 +105,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
                 eventFacetJson: "{\"tenant.custom/public-facet\":[\"public\"],\"tenant.custom/tenant-admin-facet\":[\"tenant-admin\"],\"tenant.custom/organizer-facet\":[\"organizer\"]}",
                 sessionFacetJson: "{}"));
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.TenantAdminOnly), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.TenantAdminOnly), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.EventCustomProperties.Count).IsEqualTo(2);
@@ -122,7 +122,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
             CreateEventDefinitions(eventId, ExposureLevel.Public, ExposureLevel.Internal),
             CreateSessionDefinitions(eventId, ExposureLevel.Public, ExposureLevel.Internal));
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Internal), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Internal), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.EventCustomProperties.Count).IsEqualTo(2);
@@ -143,7 +143,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
             .Returns([CreateEventDefinition(eventId, "tenant.custom", "public-facet", ExposureLevel.Public)]);
         _repository.GetSessionDefinitionsForEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([]);
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Internal), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Internal), CancellationToken.None);
 
         var values = result.Id!.EventCustomProperties[0].Values;
         await Assert.That(values.Count).IsEqualTo(4);
@@ -163,7 +163,7 @@ public class GetEventWithSessionsAggregateViewQueryHandlerTests
         _repository.GetEventDefinitionsByEventIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([]);
         _repository.GetSessionDefinitionsForEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([]);
 
-        var result = await _handler.Handle(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetEventWithSessionsAggregateViewQuery(eventId, ExposureLevel.Public), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.IslamicTheme).IsNull();

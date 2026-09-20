@@ -1,14 +1,14 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Roles.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Roles.Handlers.Commands;
 
-public class DeleteCustomRoleCommandHandler : IRequestHandler<DeleteCustomRoleCommand, BaseCommandResponse<int>>
+public class DeleteCustomRoleCommandHandler : ICommandHandler<DeleteCustomRoleCommand, BaseCommandResponse<int>>
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ICapabilityCeilingService _capabilityCeiling;
@@ -30,7 +30,7 @@ public class DeleteCustomRoleCommandHandler : IRequestHandler<DeleteCustomRoleCo
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<int>> Handle(DeleteCustomRoleCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<int>> ExecuteAsync(DeleteCustomRoleCommand request, CancellationToken cancellationToken)
     {
         // Rule 4: System immutability check
         var modCheck = await _capabilityCeiling.CanModifyRoleAsync(request.RoleId);

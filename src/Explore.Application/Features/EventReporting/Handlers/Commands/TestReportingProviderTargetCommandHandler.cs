@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
@@ -14,9 +14,9 @@ public sealed class TestReportingProviderTargetCommandHandler(
     IAdminContext adminContext,
     IHierarchicalSettingsResolver settingsResolver,
     IReportingRoutingPolicyResolver routingPolicyResolver)
-    : IRequestHandler<TestReportingProviderTargetCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<TestReportingProviderTargetCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         TestReportingProviderTargetCommand request,
         CancellationToken cancellationToken)
     {

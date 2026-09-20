@@ -1,15 +1,24 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.API.Attributes;
+using Explore.API.Controllers;
+using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NSubstitute;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -40,126 +49,101 @@ public sealed class InstanceModerationReportingSettingsControllerAuthorizedTests
     private const string LocksPath = "/api/instance/settings/moderation-reporting/locks";
 
     [Test]
+    public async Task UpdateLocks_RouteAndAuthorizationContract()
+    {
+        var method = typeof(InstanceModerationReportingSettingsController).GetMethod(nameof(InstanceModerationReportingSettingsController.UpdateLocks))!;
+        await Assert.That(typeof(InstanceModerationReportingSettingsController).GetCustomAttribute<AuthorizeAttribute>()).IsNotNull();
+        await Assert.That(typeof(InstanceModerationReportingSettingsController).GetCustomAttribute<EndpointClassificationAttribute>()?.Class).IsEqualTo(EndpointClass.Authenticated);
+        var patch = method.GetCustomAttribute<HttpPatchAttribute>();
+        await Assert.That(patch).IsNotNull();
+        await Assert.That(patch!.Template).IsEqualTo("locks");
+        await Assert.That(patch.Name).IsEqualTo(RouteNames.UpdateInstanceModerationReportingProviderLocks);
+    }
+
+    [Test]
     public async Task UpdateLocks_WithAuth_ShouldSendCommand()
     {
-        var mediator = new LockMediator(allowUpdate: true);
-        using var factory = CreateFactory(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest();
-        request.Content = JsonContent.Create(new UpdateReportingProviderLocksDto
+        var handler = new LockCommandHandler(allowUpdate: true);
+        var controller = CreateController(handler);
+        var dto = new UpdateReportingProviderLocksDto
         {
             General = new ReportingProviderLockUpdateDto { Locked = false },
             Coop = new ReportingProviderLockUpdateDto { Locked = true }
-        });
+        };
 
-        var response = await client.SendAsync(request);
+        var actionResult = await controller.UpdateLocks(dto, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(mediator.LastCommand).IsNotNull();
-        await Assert.That(mediator.LastCommand!.Locks.General!.Locked).IsFalse();
-        await Assert.That(mediator.LastCommand.Locks.Osprey).IsNull();
-        await Assert.That(mediator.LastCommand.Locks.Coop!.Locked).IsTrue();
+        var okResult = actionResult.Result as OkObjectResult;
+        await Assert.That(okResult).IsNotNull();
+        await Assert.That(okResult!.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+        await Assert.That(handler.LastCommand).IsNotNull();
+        await Assert.That(handler.LastCommand!.Locks.General!.Locked).IsFalse();
+        await Assert.That(handler.LastCommand.Locks.Osprey).IsNull();
+        await Assert.That(handler.LastCommand.Locks.Coop!.Locked).IsTrue();
     }
 
     [Test]
     public async Task UpdateLocks_WhenCommandDeniesAdmin_ShouldReturnForbidden()
     {
-        using var factory = CreateFactory(new LockMediator(allowUpdate: false));
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest();
-        request.Content = JsonContent.Create(new UpdateReportingProviderLocksDto());
+        var controller = CreateController(new LockCommandHandler(allowUpdate: false));
+        var dto = new UpdateReportingProviderLocksDto();
 
-        var response = await client.SendAsync(request);
+        var actionResult = await controller.UpdateLocks(dto, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        var problem = actionResult.Result as ObjectResult;
+        await Assert.That(problem).IsNotNull();
+        await Assert.That(problem!.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
     }
 
     [Test]
     public async Task UpdateLocks_WhenFailureMessageIsUnclassified_ShouldReturnBadRequest()
     {
-        using var factory = CreateFactory(new LockMediator(
+        var controller = CreateController(new LockCommandHandler(
             allowUpdate: false,
             failureMessage: "Moderation reporting provider lock update failed."));
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest();
-        request.Content = JsonContent.Create(new UpdateReportingProviderLocksDto());
+        var dto = new UpdateReportingProviderLocksDto();
 
-        var response = await client.SendAsync(request);
+        var actionResult = await controller.UpdateLocks(dto, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        var badRequest = actionResult.Result as ObjectResult;
+        await Assert.That(badRequest).IsNotNull();
+        await Assert.That(badRequest!.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(IMediator mediator)
+    private static InstanceModerationReportingSettingsController CreateController(
+        ICommandHandler<UpdateReportingProviderLocksCommand, BaseCommandResponse<Guid>> handler)
     {
-        var factory = new AuthenticatedWebApplicationFactory
-        {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
-        };
+        var userId = Guid.NewGuid();
+        var identityQuery = Substitute.For<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>();
+        identityQuery.QueryAsync(Arg.Any<ResolveCurrentUserIdByIdentityRequest>(), Arg.Any<CancellationToken>())
+            .Returns(userId);
 
-        return factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
-            });
-        });
+        var controller = new InstanceModerationReportingSettingsController(handler, identityQuery);
+        var httpContext = new DefaultHttpContext();
+        var claims = new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId.ToString()) };
+        httpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth"));
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        return controller;
     }
 
-    private static HttpRequestMessage CreateAuthenticatedRequest()
-    {
-        var request = new HttpRequestMessage(HttpMethod.Patch, LocksPath);
-        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(Guid.NewGuid()));
-        return request;
-    }
-
-    private sealed class LockMediator(bool allowUpdate, string? failureMessage = null) : IMediator
+    private sealed class LockCommandHandler(bool allowUpdate, string? failureMessage = null)
+        : ICommandHandler<UpdateReportingProviderLocksCommand, BaseCommandResponse<Guid>>
     {
         public UpdateReportingProviderLocksCommand? LastCommand { get; private set; }
 
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            object response = request switch
-            {
-                UpdateReportingProviderLocksCommand command => Update(command),
-                _ => throw new InvalidOperationException($"Unexpected request type {request.GetType().Name}.")
-            };
-
-            return Task.FromResult((TResponse)response);
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-            => Task.CompletedTask;
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-            => request switch
-            {
-                UpdateReportingProviderLocksCommand command => Task.FromResult<object?>(Update(command)),
-                _ => throw new InvalidOperationException($"Unexpected request type {request.GetType().Name}.")
-            };
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        private BaseCommandResponse<Guid> Update(UpdateReportingProviderLocksCommand command)
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            UpdateReportingProviderLocksCommand command,
+            CancellationToken cancellationToken = default)
         {
             LastCommand = command;
 
-            return allowUpdate
+            var response = allowUpdate
                 ? BaseCommandResponse.Success(Guid.Empty, "Updated")
                 : failureMessage is null
                     ? BaseCommandResponse.Authorization<Guid>("Only instance administrators can update moderation reporting provider locks.")
                     : BaseCommandResponse.Validation<Guid>([failureMessage], failureMessage);
+
+            return Task.FromResult(response);
         }
     }
 }

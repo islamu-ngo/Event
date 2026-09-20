@@ -12,10 +12,10 @@ using Explore.Application.Models.InternalEvents;
 using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Application.Telemetry;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services.Moderation;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Infrastructure.Messaging;
@@ -41,7 +41,8 @@ public sealed class CompositeOutboxMessageDispatcher(
     IAdmissionEventCancellationService admissionEventCancellationService,
     BusinessMetrics businessMetrics,
     TimeProvider timeProvider,
-    IMediator mediator,
+    ICommandHandler<ProcessManagedTenantProvisioningOperationCommand, bool> processManagedTenantProvisioningOperationCommandHandler,
+    ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool> reconcileManagedTenantProvisioningDeadLetterCommandHandler,
     ILogger<CompositeOutboxMessageDispatcher> logger,
     IConfigurationManifestEffectDispatcher configurationManifestEffectDispatcher,
     IConfigurationImportEffectDelivery configurationImportEffectDelivery) : IOutboxMessageDispatcher
@@ -164,7 +165,7 @@ public sealed class CompositeOutboxMessageDispatcher(
                 return;
 
             case ManagedTenantProvisioningOutboxEvents.ProcessRequested:
-                await mediator.Send(
+                await processManagedTenantProvisioningOperationCommandHandler.ExecuteAsync(
                     new ProcessManagedTenantProvisioningOperationCommand(message.AggregateId, message.Id),
                     ct);
                 return;
@@ -282,7 +283,7 @@ public sealed class CompositeOutboxMessageDispatcher(
                 return;
 
             case ManagedTenantProvisioningOutboxEvents.ProcessRequested:
-                await mediator.Send(
+                await reconcileManagedTenantProvisioningDeadLetterCommandHandler.ExecuteAsync(
                     new ReconcileManagedTenantProvisioningDeadLetterCommand(message.AggregateId, message.Id),
                     ct);
                 return;

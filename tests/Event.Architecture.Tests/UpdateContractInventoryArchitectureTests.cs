@@ -7,14 +7,11 @@ public sealed class UpdateContractInventoryArchitectureTests
     [Test]
     public async Task CurrentUpdateOperationsMustReachGeneratedClient()
     {
-        string root = ResolveRepositoryRoot();
         var failures = new List<string>();
-        await using FileStream stream = File.OpenRead(Path.Combine(root, "schemas", "openapi_islamu-event.json"));
+        await using Stream stream = GeneratedContractInputs.OpenSchema();
         using JsonDocument document = await JsonDocument.ParseAsync(stream);
         var currentOperations = new HashSet<string>(StringComparer.Ordinal);
-        string generatedClient = await File.ReadAllTextAsync(Path.Combine(
-            root,
-            "src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs"));
+        string generatedClient = GeneratedContractInputs.Client;
 
         foreach (JsonProperty path in document.RootElement.GetProperty("paths").EnumerateObject())
         {

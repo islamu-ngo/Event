@@ -5,11 +5,11 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Waitlist;
 using Explore.Application.Features.Waitlist.Requests.Commands;
 using Explore.Application.Features.Waitlist.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -24,7 +24,21 @@ namespace Explore.API.Controllers;
     "{registrationOrderLineId:guid}/waitlist")]
 [ApiController]
 public sealed class FairReturnWaitlistController(
-    IMediator mediator,
+    IQueryHandler<
+        GetFairReturnWaitlistQuery,
+        FairReturnWaitlistDto?> getWaitlistHandler,
+    ICommandHandler<
+        JoinFairReturnWaitlistCommand,
+        FairReturnWaitlistDto?> joinWaitlistHandler,
+    ICommandHandler<
+        LeaveFairReturnWaitlistCommand,
+        FairReturnWaitlistDto?> leaveWaitlistHandler,
+    ICommandHandler<
+        AcceptFairReturnOfferCommand,
+        FairReturnWaitlistDto?> acceptOfferHandler,
+    ICommandHandler<
+        WithdrawFairReturnSupplyCommand,
+        FairReturnWaitlistDto?> withdrawSupplyHandler,
     IResourceAssembler<
         FairReturnWaitlistDto,
         FairReturnWaitlistDto> assembler) :
@@ -58,7 +72,7 @@ public sealed class FairReturnWaitlistController(
             string? capabilityToken,
             CancellationToken cancellationToken) =>
         await ResourceAsync(
-            await mediator.Send(
+            await getWaitlistHandler.QueryAsync(
                 new GetFairReturnWaitlistQuery(
                     eventId,
                     registrationOrderId,
@@ -92,7 +106,7 @@ public sealed class FairReturnWaitlistController(
             string? capabilityToken,
             CancellationToken cancellationToken) =>
         await ResourceAsync(
-            await mediator.Send(
+            await joinWaitlistHandler.ExecuteAsync(
                 new JoinFairReturnWaitlistCommand(
                     eventId,
                     registrationOrderId,
@@ -125,7 +139,7 @@ public sealed class FairReturnWaitlistController(
             string? capabilityToken,
             CancellationToken cancellationToken) =>
         await ResourceAsync(
-            await mediator.Send(
+            await leaveWaitlistHandler.ExecuteAsync(
                 new LeaveFairReturnWaitlistCommand(
                     eventId,
                     registrationOrderId,
@@ -162,7 +176,7 @@ public sealed class FairReturnWaitlistController(
             string? capabilityToken,
             CancellationToken cancellationToken) =>
         await ResourceAsync(
-            await mediator.Send(
+            await acceptOfferHandler.ExecuteAsync(
                 new AcceptFairReturnOfferCommand(
                     eventId,
                     registrationOrderId,
@@ -200,7 +214,7 @@ public sealed class FairReturnWaitlistController(
             string? capabilityToken,
             CancellationToken cancellationToken) =>
         await ResourceAsync(
-            await mediator.Send(
+            await withdrawSupplyHandler.ExecuteAsync(
                 new WithdrawFairReturnSupplyCommand(
                     eventId,
                     registrationOrderId,

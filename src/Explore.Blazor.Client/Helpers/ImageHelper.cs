@@ -38,12 +38,13 @@ public static class ImageHelper
     /// </summary>
     public static string GetOrganizationPlaceholder(
         string? profileImageUri,
-        string name,
+        string? name,
         int size = 240)
     {
         if (!string.IsNullOrEmpty(profileImageUri))
             return profileImageUri;
 
+        name ??= "ORG";
         var truncatedName = name.Length > MaxOrganizationNameLength
             ? name[..MaxOrganizationNameLength] + "..."
             : name;

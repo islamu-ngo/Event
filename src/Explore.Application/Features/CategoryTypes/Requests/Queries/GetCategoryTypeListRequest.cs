@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.CategoryType;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CategoryTypes.Requests.Queries;
 
-public sealed record GetCategoryTypeListRequest : IRequest<List<CategoryTypeListDto>>
+public sealed record GetCategoryTypeListRequest : IQuery<List<CategoryTypeListDto>>
 {
 }

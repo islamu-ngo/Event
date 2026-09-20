@@ -7,7 +7,7 @@
 > **Status:** Operational policy; legal conclusions and exceptions require qualified legal review
 > **Owner:** Project Steward | Contributor Experience
 > **Last Verified:** 2026-08-12
-> **Source Anchors:** `legal/CLA.md`, `LICENSE`, `Directory.Packages.props`, `Directory.Build.props`, `.ci/scripts/validate-dependency-license-policy.cs`, `.github/workflows/_build-test.yml`, `docs/DUAL_VERSIONING.md`
+> **Source Anchors:** `legal/CLA.md`, `LICENSE`, `Directory.Packages.props`, `Directory.Build.props`, `.ci/scripts/validate-dependency-license-policy.cs`, `.github/workflows/_build-test.yml`, `docs/internal/legal/dependencies/mapperly.md`
 
 This is the repository's source of truth for externally informed implementation, third-party material, dependency-license compatibility, and provenance evidence. It is an engineering control, not legal advice or a guarantee that a court, regulator, or licensor will agree with a project classification.
 
@@ -132,16 +132,25 @@ The CI command `dotnet run .ci/scripts/validate-dependency-license-policy.cs -- 
 
 A component is blocked when it would force terms onto ISLAMU-owned material, prohibit an intended distribution or hosting model, or otherwise prevent the Project Steward from offering the ISLAMU-owned work under a selected outbound license. Resolve the blocker by choosing a compatible version or replacement, or by obtaining documented separate rights that cover every intended build and distribution. Merely making a component optional, loading it dynamically, or moving it to another process does not waive review.
 
-### Existing AutoMapper And MediatR Precedent
+### Single-Edition Dependency Policy
 
-The repository's existing dual-versioning is the reference pattern, not a blanket exception:
+ISLAMU Event has one supported build graph. AutoMapper, MediatR and
+MediatR.Contracts are removed, together with their edition selectors, commercial
+version overrides, licensing configuration and package-specific exceptions.
+Their former dual-version arrangement is not approval for another dependency.
 
-- default self-hoster and contributor builds pin AutoMapper `14.0.0` and MediatR `12.5.0`, the repository-documented last permissively licensed releases;
-- newer commercial releases are selected only by the explicit `UseCommercialLuckyPennyLibraries=true` MSBuild opt-in or `USE_COMMERCIAL_LUCKYPENNY_LIBS=true` Docker build argument; `AUTOMAPPER_COMMERCIAL_VERSION` and `MEDIATR_COMMERCIAL_VERSION` may feed the corresponding build-time version overrides;
-- the commercial runtime path requires its own `LUCKYPENNY_LICENSE_KEY` configuration and is not silently imposed on the default build;
-- FOSS lock files keep the default dependency graph deterministic, while the CI dependency-license audit keeps exceptions visible.
+`Directory.Packages.props` pins the supported packages; `Directory.Build.props`
+enforces locked restore in CI, as do both API/Blazor Dockerfiles. Regenerate
+lockfiles through normal restore when package inputs change, never by hand.
+There is no alternative commercial restore path or Lucky Penny license input.
 
-See `docs/DUAL_VERSIONING.md`, `Directory.Packages.props`, `Directory.Build.props`, and `.env.example`. Any future dual-version path must document the same default/opt-in boundary, security posture, license ownership, lock-file behavior, and distribution evidence. It must not assume that the AutoMapper/MediatR decision approves another vendor or license.
+Mapping uses the Apache-2.0 build-time generator documented in
+[Mapperly provenance](dependencies/mapperly.md); native operations use
+repository-owned contracts and Microsoft DI. Generator privacy, generated-output
+obligations and distribution notices remain separate review duties. A single
+build does not change ISLAMU's outbound licensing covenant or waive any remaining
+third-party license. The dependency validator must keep unrelated exceptions
+visible.
 
 ## PR Evidence And Stop Conditions
 
@@ -163,6 +172,6 @@ Stop and request qualified legal review when rights, access terms, protectable e
 
 - [CLA](../../../legal/CLA.md)
 - [Contribution Legal Governance](CONTRIBUTION_GOVERNANCE.md)
-- [Dual-Versioning Strategy](../DUAL_VERSIONING.md)
+- [Mapperly Dependency And Projection Contract](dependencies/mapperly.md)
 - [CI/CD Governance](../CI_CD_GOVERNANCE.md)
 - [Clean-Room Skill](../../../.agents/skills/ip-clean-room/SKILL.md)

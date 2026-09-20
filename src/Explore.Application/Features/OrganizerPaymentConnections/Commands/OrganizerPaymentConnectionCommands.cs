@@ -1,6 +1,6 @@
-using Explore.Application.Responses;
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Responses;
 
 namespace Explore.Application.Features.OrganizerPaymentConnections.Commands;
 
@@ -9,25 +9,25 @@ public sealed record RecordOrganizerPaymentConnectionCommand(
     Guid OrganizerActorId,
     string ProviderCode,
     string ConnectPlatformId,
-    string ExternalAccountId) : IRequest<BaseCommandResponse<Guid>>;
+    string ExternalAccountId) : ICommand<BaseCommandResponse<Guid>>;
 
 public sealed record ReplaceOrganizerPaymentConnectionCommand(
     Guid TenantId,
     Guid OrganizerActorId,
     Guid CurrentConnectionId,
-    string NewExternalAccountId) : IRequest<BaseCommandResponse<Guid>>;
+    string NewExternalAccountId) : ICommand<BaseCommandResponse<Guid>>;
 
 public sealed record DisableOrganizerPaymentConnectionCommand(
     Guid TenantId,
     Guid OrganizerActorId,
     Guid ConnectionId,
-    string ReasonCode) : IRequest<BaseCommandResponse<Guid>>;
+    string ReasonCode) : ICommand<BaseCommandResponse<Guid>>;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManagePaidEventCommerce)]
 public sealed record CreateOrganizerPaymentOnboardingLinkCommand(
     Guid EventId,
     Uri ReturnUrl,
-    Uri RefreshUrl) : IRequest<BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>, ISecureRequest
+    Uri RefreshUrl) : ICommand<BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString();
     IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>

@@ -1,14 +1,14 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Roles.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Roles.Handlers.Commands;
 
-public class UpdateRolePermissionsCommandHandler : IRequestHandler<UpdateRolePermissionsCommand, BaseCommandResponse<int>>
+public class UpdateRolePermissionsCommandHandler : ICommandHandler<UpdateRolePermissionsCommand, BaseCommandResponse<int>>
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ICapabilityCeilingService _capabilityCeiling;
@@ -30,7 +30,7 @@ public class UpdateRolePermissionsCommandHandler : IRequestHandler<UpdateRolePer
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<int>> Handle(UpdateRolePermissionsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<int>> ExecuteAsync(UpdateRolePermissionsCommand request, CancellationToken cancellationToken)
     {
         // Rule 4: System immutability check
         var modCheck = await _capabilityCeiling.CanModifyRoleAsync(request.RoleId);

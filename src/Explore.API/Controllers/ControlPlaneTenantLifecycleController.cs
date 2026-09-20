@@ -13,8 +13,9 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Tenants.Requests.Commands;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -38,14 +39,20 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>> _createTenant;
+    private readonly IQueryHandler<GetControlPlaneTenantDetailsQuery, ControlPlaneTenantDetailDto?> _tenantQuery;
+    private readonly ICommandHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> _transitionTenant;
     private readonly IResourceAssembler<ControlPlaneTenantDetailDto, ControlPlaneTenantListItemDto> _tenantAssembler;
 
     public ControlPlaneTenantLifecycleController(
-        IMediator mediator,
+        ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>> createTenant,
+        IQueryHandler<GetControlPlaneTenantDetailsQuery, ControlPlaneTenantDetailDto?> tenantQuery,
+        ICommandHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> transitionTenant,
         IResourceAssembler<ControlPlaneTenantDetailDto, ControlPlaneTenantListItemDto> tenantAssembler)
     {
-        _mediator = mediator;
+        _createTenant = createTenant;
+        _tenantQuery = tenantQuery;
+        _transitionTenant = transitionTenant;
         _tenantAssembler = tenantAssembler;
     }
 
@@ -63,7 +70,7 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var tenant = await _mediator.Send(new GetControlPlaneTenantDetailsQuery(tenantId), cancellationToken);
+        var tenant = await _tenantQuery.QueryAsync(new GetControlPlaneTenantDetailsQuery(tenantId), cancellationToken);
         if (tenant is null)
         {
             return NotFound();
@@ -88,7 +95,7 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
         [FromBody] CreateTenantDto dto,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new Explore.Application.Features.Tenants.Requests.Commands.CreateTenantCommand
+        var response = await _createTenant.ExecuteAsync(new CreateTenantCommand
         {
             TenantDto = dto,
             RequestingUserId = CurrentUserId
@@ -188,7 +195,7 @@ public sealed class ControlPlaneTenantLifecycleController : EventControllerBase
         ControlPlaneTenantLifecycleTransitionRequestDto? dto,
         CancellationToken cancellationToken)
     {
-        var response = await _mediator.Send(
+        var response = await _transitionTenant.ExecuteAsync(
             new TransitionControlPlaneTenantLifecycleCommand(tenantId, status, dto?.Reason, dto?.ConfirmationText),
             cancellationToken);
 

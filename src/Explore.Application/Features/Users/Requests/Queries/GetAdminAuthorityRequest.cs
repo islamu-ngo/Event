@@ -1,5 +1,5 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.User;
-using MediatR;
 
 namespace Explore.Application.Features.Users.Requests.Queries;
 
@@ -7,4 +7,4 @@ namespace Explore.Application.Features.Users.Requests.Queries;
 /// Query to resolve the admin authority of a user across all hierarchy levels.
 /// Returns <see cref="AdminAuthorityDto"/> with instance, tenant, organization, and group admin status.
 /// </summary>
-public sealed record GetAdminAuthorityRequest(Guid UserId = default) : IRequest<AdminAuthorityDto>;
+public sealed record GetAdminAuthorityRequest(Guid UserId = default) : IQuery<AdminAuthorityDto>;

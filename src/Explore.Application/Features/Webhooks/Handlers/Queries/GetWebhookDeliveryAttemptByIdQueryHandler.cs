@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
 public sealed class GetWebhookDeliveryAttemptByIdQueryHandler(IWebhookDeliveryAttemptRepository attemptRepository)
-    : IRequestHandler<GetWebhookDeliveryAttemptByIdQuery, WebhookDeliveryAttemptDto?>
+    : IQueryHandler<GetWebhookDeliveryAttemptByIdQuery, WebhookDeliveryAttemptDto?>
 {
-    public async Task<WebhookDeliveryAttemptDto?> Handle(
+    public async Task<WebhookDeliveryAttemptDto?> QueryAsync(
         GetWebhookDeliveryAttemptByIdQuery request,
         CancellationToken cancellationToken)
     {

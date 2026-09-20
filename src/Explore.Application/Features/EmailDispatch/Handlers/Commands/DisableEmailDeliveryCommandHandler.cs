@@ -7,7 +7,7 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
@@ -17,11 +17,11 @@ public sealed class DisableEmailDeliveryCommandHandler(
     IEmailDeliverySettingsWriter emailSettingsWriter,
     ISettingMutationLock mutationLock,
     IUnitOfWork unitOfWork,
-    IPublisher publisher,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IPlatformUserRoleRepository platformRoles,
-    ITenantUserRoleGrantRepository tenantRoles) : IRequestHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
+    ITenantUserRoleGrantRepository tenantRoles) : ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         DisableEmailDeliveryCommand request,
         CancellationToken cancellationToken)
     {
@@ -37,7 +37,7 @@ public sealed class DisableEmailDeliveryCommandHandler(
                 transactionToken => DisableAsync(request, transactionToken), token), cancellationToken);
 
         foreach (var notification in outcome.Notifications)
-            await publisher.Publish(notification, CancellationToken.None);
+            await notificationHandlers.HandleAsync(notification, CancellationToken.None);
         return outcome.Response;
     }
 

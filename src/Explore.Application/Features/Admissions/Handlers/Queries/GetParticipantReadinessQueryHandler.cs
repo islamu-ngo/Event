@@ -1,6 +1,7 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Admissions;
@@ -8,7 +9,6 @@ using Explore.Application.Features.Admissions.Requests.Queries;
 using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Handlers.Queries;
 
@@ -22,18 +22,18 @@ public sealed class GetParticipantReadinessQueryHandler(
     ICurrentUserService currentUser,
     ITenantContext tenant,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    IQueryHandler<
         GetParticipantReadinessQuery,
         ParticipantReadinessDto?>
 {
-    public async Task<ParticipantReadinessDto?> Handle(
-        GetParticipantReadinessQuery request,
-        CancellationToken cancellationToken)
+    public async Task<ParticipantReadinessDto?> QueryAsync(
+        GetParticipantReadinessQuery query,
+        CancellationToken cancellationToken = default)
     {
-        if (request.EventId == Guid.Empty
-            || request.RegistrationOrderId == Guid.Empty
-            || request.ParticipantId == Guid.Empty
-            || request.RegistrationTicketAssignmentId ==
+        if (query.EventId == Guid.Empty
+            || query.RegistrationOrderId == Guid.Empty
+            || query.ParticipantId == Guid.Empty
+            || query.RegistrationTicketAssignmentId ==
             Guid.Empty)
         {
             return null;
@@ -41,10 +41,10 @@ public sealed class GetParticipantReadinessQueryHandler(
 
         RegistrationOrder? order =
             await inventory.GetOrderWithLinesAsync(
-                request.RegistrationOrderId,
+                query.RegistrationOrderId,
                 tenant.TenantId,
                 cancellationToken);
-        if (order is null || order.EventId != request.EventId)
+        if (order is null || order.EventId != query.EventId)
         {
             return null;
         }
@@ -52,21 +52,21 @@ public sealed class GetParticipantReadinessQueryHandler(
         ParticipantAdmissionEligibility? eligibility =
             await readiness.GetAsync(
                 tenant.TenantId,
-                request.RegistrationTicketAssignmentId,
+                query.RegistrationTicketAssignmentId,
                 cancellationToken);
         RegistrationParticipant? participant =
             await participants.GetParticipantAsync(
-                request.ParticipantId,
-                request.RegistrationOrderId,
+                query.ParticipantId,
+                query.RegistrationOrderId,
                 tenant.TenantId,
                 cancellationToken);
         if (eligibility is null
             || participant is null
-            || eligibility.EventId != request.EventId
+            || eligibility.EventId != query.EventId
             || eligibility.RegistrationOrderId !=
-            request.RegistrationOrderId
+            query.RegistrationOrderId
             || eligibility.ParticipantId !=
-            request.ParticipantId)
+            query.ParticipantId)
         {
             return null;
         }
@@ -82,8 +82,8 @@ public sealed class GetParticipantReadinessQueryHandler(
         bool hasGuestCapability =
             RegistrationOrderAccessGuard.HasGuestAccess(
                 order,
-                request.EventId,
-                request.CapabilityToken,
+                query.EventId,
+                query.CapabilityToken,
                 capabilities,
                 timeProvider);
         bool isOrganizer =
@@ -115,7 +115,7 @@ public sealed class GetParticipantReadinessQueryHandler(
         AdmissionTicket? ticket =
             await readiness.GetIssuedTicketAsync(
                 tenant.TenantId,
-                request.RegistrationTicketAssignmentId,
+                query.RegistrationTicketAssignmentId,
                 cancellationToken);
         bool activeAdmission =
             ticket?.AdmissionTicketStatusId ==

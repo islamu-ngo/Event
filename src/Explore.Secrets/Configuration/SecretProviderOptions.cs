@@ -63,8 +63,8 @@ public sealed class InfisicalOptions
     public string Environment { get; set; } = string.Empty;
 
     /// <summary>
-    /// Secret paths to load (e.g., "/api", "/keycloak").
-    /// If empty, loads from root path "/".
+    /// Explicit secret paths to load (e.g., "/api", "/keycloak").
+    /// Startup authority composition projects its actual paths here; no root path is implicit.
     /// </summary>
-    public List<string> Paths { get; set; } = new() { "/" };
+    public List<string> Paths { get; set; } = [];
 }

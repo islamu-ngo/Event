@@ -41,7 +41,6 @@ public sealed class InstanceOnboardingCompletionOperation(
     IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders,
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger auditLogger,
-    IAdminCacheInvalidator cacheInvalidator,
     IDeploymentModeProvider deploymentModeProvider,
     IJwtAuthorityRefreshNotifier jwtRefreshNotifier,
     ITenantBrandingSettingsDocumentProvisioningService brandingProvisioner,
@@ -104,7 +103,6 @@ public sealed class InstanceOnboardingCompletionOperation(
         }
 
         setupSecretProvider.Lock();
-        cacheInvalidator.InvalidateUser(input.UserId);
         await deploymentModeProvider.InvalidateCacheAsync();
         await jwtRefreshNotifier.ReloadAsync(CancellationToken.None);
         auditLogger.Log(new InstanceBootstrapAuditEvent(
@@ -212,7 +210,7 @@ public sealed class InstanceOnboardingCompletionOperation(
                 BaseCommandResponse.Failure<Guid>(
                     identityReadiness.FailureCode ?? "instance_operator_identity_incomplete",
                     "Instance operator identity is not ready for onboarding completion.",
-                    identityReadiness.ReasonCodes),
+                    identityReadiness.ReasonCodes.IsEmpty ? null : identityReadiness.ReasonCodes),
                 false,
                 admission.DeploymentMode,
                 admission.AuditOperation);

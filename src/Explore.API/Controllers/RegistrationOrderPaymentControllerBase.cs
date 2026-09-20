@@ -2,16 +2,14 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Explore.API.Controllers;
 
-public abstract class RegistrationOrderPaymentControllerBase(IMediator mediator) : ControllerBase
+public abstract class RegistrationOrderPaymentControllerBase : ControllerBase
 {
     protected const string CapabilityHeader = "X-Registration-Order-Capability";
     protected const string IdempotencyKeyHeader = "Idempotency-Key";
-    protected IMediator Mediator { get; } = mediator;
 
     private static readonly ApiValidationProblemDescriptor PaymentValidationProblem = new(
         "registrationPayment", "Registration payment request failed", "Registration payment request failed.");

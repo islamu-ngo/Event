@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.Footer;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Requests.Queries;
 
-public record GetFooterLinkGroupListQuery : IRequest<List<FooterLinkGroupListDto>>;
+public sealed record GetFooterLinkGroupListQuery : IQuery<List<FooterLinkGroupListDto>>;

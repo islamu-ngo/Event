@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Policies;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 
@@ -17,12 +17,12 @@ public sealed class GetEventReportOptionsRequestHandler(
     IEventReportingIntakeGuard intakeGuard,
     HybridCache cache,
     IOptions<EventReportSubmissionOptions> optionsAccessor)
-    : IRequestHandler<GetEventReportOptionsRequest, EventReportOptionsDto?>
+    : IQueryHandler<GetEventReportOptionsRequest, EventReportOptionsDto?>
 {
     private const string ReasonOptionsCacheKey = "event-reporting:reason-options:v1";
     private const string EventNotReportableStatusCode = "event_not_reportable_status";
 
-    public async Task<EventReportOptionsDto?> Handle(
+    public async Task<EventReportOptionsDto?> QueryAsync(
         GetEventReportOptionsRequest request,
         CancellationToken cancellationToken)
     {

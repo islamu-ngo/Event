@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -7,21 +7,19 @@ using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class CreateCustomPropertyDefinitionCommandHandler : ICommandHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -31,7 +29,6 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
         IUnitOfWork unitOfWork)
     {
@@ -40,12 +37,11 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateCustomPropertyDefinitionDtoValidator();
         var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);
@@ -113,12 +109,43 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
                     _tenantContext.TenantId));
         }
 
-        var definition = _mapper.Map<CustomPropertyDefinition>(request.DefinitionDto);
-        definition.TenantId = _tenantContext.TenantId;
-        definition.Namespace = governance.NormalizedNamespace;
-        definition.Key = governance.NormalizedKey;
-        definition.CreatedBy = _currentUserService.UserId;
-        definition.UpdatedBy = _currentUserService.UserId;
+        var dto = request.DefinitionDto;
+        var definition = new CustomPropertyDefinition
+        {
+            Id = Guid.CreateVersion7(),
+            EntityTypeName = dto.EntityTypeName,
+            Namespace = governance.NormalizedNamespace,
+            Key = governance.NormalizedKey,
+            DisplayName = dto.DisplayName,
+            Description = dto.Description,
+            PropertyType = dto.PropertyType,
+            IsRequired = dto.IsRequired,
+            IsMulti = dto.IsMulti,
+            IsActive = dto.IsActive,
+            SortOrder = dto.SortOrder,
+            ExposureLevel = dto.ExposureLevel,
+            IsSearchable = dto.IsSearchable,
+            IsFilterable = dto.IsFilterable,
+            IsExportable = dto.IsExportable,
+            IsModerationRelevant = dto.IsModerationRelevant,
+            IsAnalyticsRelevant = dto.IsAnalyticsRelevant,
+            IsSystemOwned = dto.IsSystemOwned,
+            DefaultTextValue = dto.DefaultTextValue,
+            DefaultNumberValue = dto.DefaultNumberValue,
+            DefaultBooleanValue = dto.DefaultBooleanValue,
+            DefaultDateTimeValue = dto.DefaultDateTimeValue,
+            MinLength = dto.MinLength,
+            MaxLength = dto.MaxLength,
+            RegexPattern = dto.RegexPattern,
+            MinNumber = dto.MinNumber,
+            MaxNumber = dto.MaxNumber,
+            MinDateTime = dto.MinDateTime,
+            MaxDateTime = dto.MaxDateTime,
+            AllowedUrlSchemes = dto.AllowedUrlSchemes,
+            TenantId = _tenantContext.TenantId,
+            CreatedBy = _currentUserService.UserId,
+            UpdatedBy = _currentUserService.UserId
+        };
 
         var options = CreateOptionEntities(request.DefinitionDto.Options, definition.Id);
         var defaultOption = options.SingleOrDefault(x => x.IsDefault);
@@ -127,7 +154,9 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
             ct => _customPropertyDefinitionRepository.CreateWithOptions(definition, options, defaultOption?.Id, ct),
             cancellationToken);
 
-        await _cache.RemoveAsync(GetListCacheKey(request.DefinitionDto.EntityTypeName, 1, PaginatedResult<object>.DefaultPageSize), cancellationToken);
+        await _cache.RemoveByTagAsync(
+            CacheTags.CustomPropertyDefinitionListsByScope(definition.TenantId, definition.EntityTypeName),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Custom-property definition created successfully.");
     }
@@ -153,8 +182,4 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
             .ToList();
     }
 
-    private static string GetListCacheKey(EntityTypeName entityTypeName, int pageNumber, int pageSize)
-    {
-        return $"custom-property-definitions:list:{entityTypeName}:{pageNumber}:{pageSize}";
-    }
 }

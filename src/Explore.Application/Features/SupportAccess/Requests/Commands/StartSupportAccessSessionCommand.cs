@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.SupportAccess.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.SupportAccessSession, AuthorizationActions.SupportAccessSessions.Start)]
-public sealed record StartSupportAccessSessionCommand : IRequest<SupportAccessSessionCommandResponseDto>, ISecureRequest
+public sealed record StartSupportAccessSessionCommand : ICommand<SupportAccessSessionCommandResponseDto>, ISecureRequest
 {
     public Guid TargetTenantId { get; init; }
     public Guid? TargetTenantUserId { get; init; }

@@ -2,12 +2,12 @@ using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Organizations.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Update)]
-public sealed record UpdateOrganizationCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateOrganizationCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid OrganizationId { get; init; }
 

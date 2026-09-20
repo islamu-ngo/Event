@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.Publish)]
-public sealed record PublishEventCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record PublishEventCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid Id { get; init; }
 

@@ -9,7 +9,7 @@ using Explore.Application.Lookups;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
 
@@ -17,9 +17,9 @@ public sealed class GetControlPlaneTenantEffectiveConfigurationQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     ITenantPlanRepository tenantPlanRepository,
     ITenantStorageSettingService tenantStorageSettingService)
-    : IRequestHandler<GetControlPlaneTenantEffectiveConfigurationQuery, ControlPlaneTenantEffectiveConfigurationDto>
+    : IQueryHandler<GetControlPlaneTenantEffectiveConfigurationQuery, ControlPlaneTenantEffectiveConfigurationDto>
 {
-    public async Task<ControlPlaneTenantEffectiveConfigurationDto> Handle(
+    public async Task<ControlPlaneTenantEffectiveConfigurationDto> QueryAsync(
         GetControlPlaneTenantEffectiveConfigurationQuery request,
         CancellationToken cancellationToken)
     {

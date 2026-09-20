@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageTeam)]
-public sealed record GetEventTeamListRequest : IRequest<List<EventTeamMemberDto>>, ISecureRequest
+public sealed record GetEventTeamListRequest : IQuery<List<EventTeamMemberDto>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid EventId { get; init; }

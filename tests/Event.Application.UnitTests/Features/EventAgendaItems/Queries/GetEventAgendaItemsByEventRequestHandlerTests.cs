@@ -1,84 +1,45 @@
-using AutoMapper;
-using Event.Application.UnitTests.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.Features.EventAgendaItems.Handlers.Queries;
 using Explore.Application.Features.EventAgendaItems.Requests.Queries;
 using Explore.Domain;
 using NSubstitute;
-using TUnit.Assertions;
-using TUnit.Core;
 
 namespace Event.Application.UnitTests.Features.EventAgendaItems.Queries;
 
+[Category("EventAgendaMapping")]
 public class GetEventAgendaItemsByEventRequestHandlerTests
 {
-    private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
-    private readonly IMapper _mapper;
-    private readonly IEventLocationDisclosureService _disclosureService;
-    private readonly GetEventAgendaItemsByEventRequestHandler _handler;
-
-    public GetEventAgendaItemsByEventRequestHandlerTests()
-    {
-        _eventAgendaItemRepository = Substitute.For<IEventAgendaItemRepository>();
-        _mapper = Substitute.For<IMapper>();
-        _disclosureService = Substitute.For<IEventLocationDisclosureService>();
-
-        _handler = new GetEventAgendaItemsByEventRequestHandler(
-            _eventAgendaItemRepository,
-            _mapper,
-            _disclosureService);
-    }
-
     [Test]
     public async Task Handle_WithExistingAgendaItems_ReturnsMappedList()
     {
-        // Arrange
-        var eventId = Guid.NewGuid();
-        var request = new GetEventAgendaItemsByEventRequest(eventId);
-
-        var agendaItems = new List<EventAgendaItem>
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000001");
+        var items = new List<EventAgendaItem>
         {
-            DataBuilder.EventAgendaItem.Generate(),
-            DataBuilder.EventAgendaItem.Generate(),
-            DataBuilder.EventAgendaItem.Generate()
+            new() { Id = Guid.Parse("01900000-0000-7000-8000-000000000002"), Title = "Item 1", EventId = eventId, Event = null!, Tenant = null! },
+            new() { Id = Guid.Parse("01900000-0000-7000-8000-000000000003"), Title = "Item 2", EventId = eventId, Event = null!, Tenant = null! },
+            new() { Id = Guid.Parse("01900000-0000-7000-8000-000000000004"), Title = "Item 3", EventId = eventId, Event = null!, Tenant = null! }
         };
-
-        var expectedDtos = new List<EventAgendaItemListDto>
-        {
-            new() { Id = agendaItems[0].Id, Title = "Item 1" },
-            new() { Id = agendaItems[1].Id, Title = "Item 2" },
-            new() { Id = agendaItems[2].Id, Title = "Item 3" }
-        };
-
-        _eventAgendaItemRepository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns(agendaItems);
-        _mapper.Map<List<EventAgendaItemListDto>>(agendaItems).Returns(expectedDtos);
-
-        // Act
-        var result = await _handler.Handle(request, CancellationToken.None);
-
-        // Assert
-        await Assert.That(result).IsNotNull();
+        var repository = Substitute.For<IEventAgendaItemRepository>();
+        repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns(items);
+        var handler = new GetEventAgendaItemsByEventRequestHandler(repository, Substitute.For<IEventLocationDisclosureService>());
+        var result = await handler.QueryAsync(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None);
+        items[0].Title = "Changed";
+        items.Clear();
         await Assert.That(result.Count).IsEqualTo(3);
+        await Assert.That(result[0].Title).IsEqualTo("Item 1");
+        await Assert.That(result[1].Title).IsEqualTo("Item 2");
+        await Assert.That(result[2].Title).IsEqualTo("Item 3");
     }
 
     [Test]
     public async Task Handle_WithNoAgendaItems_ReturnsEmptyList()
     {
-        // Arrange
-        var eventId = Guid.NewGuid();
-        var request = new GetEventAgendaItemsByEventRequest(eventId);
-
-        _eventAgendaItemRepository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>())
-            .Returns(new List<EventAgendaItem>());
-        _mapper.Map<List<EventAgendaItemListDto>>(Arg.Any<List<EventAgendaItem>>())
-            .Returns(new List<EventAgendaItemListDto>());
-
-        // Act
-        var result = await _handler.Handle(request, CancellationToken.None);
-
-        // Assert
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000001");
+        var repository = Substitute.For<IEventAgendaItemRepository>();
+        repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns(new List<EventAgendaItem>());
+        var handler = new GetEventAgendaItemsByEventRequestHandler(repository, Substitute.For<IEventLocationDisclosureService>());
+        var result = await handler.QueryAsync(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None);
         await Assert.That(result).IsNotNull();
         await Assert.That(result.Count).IsEqualTo(0);
     }

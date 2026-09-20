@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Promotions.Handlers.Commands;
 
@@ -13,23 +13,23 @@ public sealed class ApplyGuestPromotionCodeToRegistrationOrderCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
-    : IRequestHandler<ApplyGuestPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>
+    ICommandHandler<ApplyPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto> applyHandler)
+    : ICommandHandler<ApplyGuestPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>
 {
-    public async Task<PromotionRedemptionResponseDto> Handle(
-        ApplyGuestPromotionCodeToRegistrationOrderCommand request,
+    public async Task<PromotionRedemptionResponseDto> ExecuteAsync(
+        ApplyGuestPromotionCodeToRegistrationOrderCommand command,
         CancellationToken cancellationToken) =>
         await RegistrationOrderAccessGuard.GetGuestOrderAsync(
             inventory,
             capabilities,
             tenant.TenantId,
-            request.EventId,
-            request.OrderId,
-            request.CapabilityToken,
+            command.EventId,
+            command.OrderId,
+            command.CapabilityToken,
             timeProvider,
             cancellationToken) is null
-            ? Unavailable(request.OrderId)
-            : await sender.Send(new ApplyPromotionCodeToRegistrationOrderCommand(request.OrderId, request.Code), cancellationToken);
+            ? Unavailable(command.OrderId)
+            : await applyHandler.ExecuteAsync(new ApplyPromotionCodeToRegistrationOrderCommand(command.OrderId, command.Code), cancellationToken);
 
     private static PromotionRedemptionResponseDto Unavailable(Guid orderId) =>
         PromotionRedemptionAccessFailures.Unavailable(orderId);
@@ -40,23 +40,23 @@ public sealed class RemoveGuestPromotionFromRegistrationOrderCommandHandler(
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    ISender sender)
-    : IRequestHandler<RemoveGuestPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>
+    ICommandHandler<RemovePromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removeHandler)
+    : ICommandHandler<RemoveGuestPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>
 {
-    public async Task<PromotionRedemptionResponseDto> Handle(
-        RemoveGuestPromotionFromRegistrationOrderCommand request,
+    public async Task<PromotionRedemptionResponseDto> ExecuteAsync(
+        RemoveGuestPromotionFromRegistrationOrderCommand command,
         CancellationToken cancellationToken) =>
         await RegistrationOrderAccessGuard.GetGuestOrderAsync(
             inventory,
             capabilities,
             tenant.TenantId,
-            request.EventId,
-            request.OrderId,
-            request.CapabilityToken,
+            command.EventId,
+            command.OrderId,
+            command.CapabilityToken,
             timeProvider,
             cancellationToken) is null
-            ? Unavailable(request.OrderId)
-            : await sender.Send(new RemovePromotionFromRegistrationOrderCommand(request.OrderId), cancellationToken);
+            ? Unavailable(command.OrderId)
+            : await removeHandler.ExecuteAsync(new RemovePromotionFromRegistrationOrderCommand(command.OrderId), cancellationToken);
 
     private static PromotionRedemptionResponseDto Unavailable(Guid orderId) =>
         PromotionRedemptionAccessFailures.Unavailable(orderId);
@@ -66,21 +66,21 @@ public sealed class ApplyAuthenticatedPromotionCodeToRegistrationOrderCommandHan
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
-    : IRequestHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>
+    ICommandHandler<ApplyPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto> applyHandler)
+    : ICommandHandler<ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>
 {
-    public async Task<PromotionRedemptionResponseDto> Handle(
-        ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand request,
+    public async Task<PromotionRedemptionResponseDto> ExecuteAsync(
+        ApplyAuthenticatedPromotionCodeToRegistrationOrderCommand command,
         CancellationToken cancellationToken) =>
         await RegistrationOrderAccessGuard.GetCurrentAccountOrderAsync(
             inventory,
             currentUser,
             tenant.TenantId,
-            request.EventId,
-            request.OrderId,
+            command.EventId,
+            command.OrderId,
             cancellationToken) is null
-            ? Unavailable(request.OrderId)
-            : await sender.Send(new ApplyPromotionCodeToRegistrationOrderCommand(request.OrderId, request.Code), cancellationToken);
+            ? Unavailable(command.OrderId)
+            : await applyHandler.ExecuteAsync(new ApplyPromotionCodeToRegistrationOrderCommand(command.OrderId, command.Code), cancellationToken);
 
     private static PromotionRedemptionResponseDto Unavailable(Guid orderId) =>
         PromotionRedemptionAccessFailures.Unavailable(orderId);
@@ -90,21 +90,21 @@ public sealed class RemoveAuthenticatedPromotionFromRegistrationOrderCommandHand
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
-    : IRequestHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>
+    ICommandHandler<RemovePromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto> removeHandler)
+    : ICommandHandler<RemoveAuthenticatedPromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>
 {
-    public async Task<PromotionRedemptionResponseDto> Handle(
-        RemoveAuthenticatedPromotionFromRegistrationOrderCommand request,
+    public async Task<PromotionRedemptionResponseDto> ExecuteAsync(
+        RemoveAuthenticatedPromotionFromRegistrationOrderCommand command,
         CancellationToken cancellationToken) =>
         await RegistrationOrderAccessGuard.GetCurrentAccountOrderAsync(
             inventory,
             currentUser,
             tenant.TenantId,
-            request.EventId,
-            request.OrderId,
+            command.EventId,
+            command.OrderId,
             cancellationToken) is null
-            ? Unavailable(request.OrderId)
-            : await sender.Send(new RemovePromotionFromRegistrationOrderCommand(request.OrderId), cancellationToken);
+            ? Unavailable(command.OrderId)
+            : await removeHandler.ExecuteAsync(new RemovePromotionFromRegistrationOrderCommand(command.OrderId), cancellationToken);
 
     private static PromotionRedemptionResponseDto Unavailable(Guid orderId) =>
         PromotionRedemptionAccessFailures.Unavailable(orderId);

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Features.Promotions.Requests.Commands;
@@ -6,7 +7,6 @@ using Explore.Application.Features.Promotions.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Promotions.Handlers.Commands;
 
@@ -17,27 +17,27 @@ public sealed class ApplyPromotionCodeToRegistrationOrderCommandHandler(
     IPromotionCodeDigestService digests,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : IRequestHandler<ApplyPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<ApplyPromotionCodeToRegistrationOrderCommand, PromotionRedemptionResponseDto>
 {
-    public async Task<PromotionRedemptionResponseDto> Handle(
-        ApplyPromotionCodeToRegistrationOrderCommand request,
+    public async Task<PromotionRedemptionResponseDto> ExecuteAsync(
+        ApplyPromotionCodeToRegistrationOrderCommand command,
         CancellationToken cancellationToken)
     {
         var validator = new ApplyPromotionCodeToRegistrationOrderCommandValidator();
-        FluentValidation.Results.ValidationResult validation = await validator.ValidateAsync(request, cancellationToken);
+        FluentValidation.Results.ValidationResult validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return Invalid(request.OrderId);
+            return Invalid(command.OrderId);
         }
 
         Guid reservationId = Guid.CreateVersion7();
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            RegistrationOrder? order = await inventory.GetOrderForUpdateWithPiiAsync(request.OrderId, tenant.TenantId, token);
+            RegistrationOrder? order = await inventory.GetOrderForUpdateWithPiiAsync(command.OrderId, tenant.TenantId, token);
             if (order is null)
             {
-                return Unavailable(request.OrderId);
+                return Unavailable(command.OrderId);
             }
 
             IReadOnlyList<int> keyVersions = await promotions.GetDistinctLookupKeyVersionsAsync(
@@ -53,9 +53,10 @@ public sealed class ApplyPromotionCodeToRegistrationOrderCommandHandler(
             IReadOnlyCollection<PromotionCodeDigest> candidates = await digests.ComputeCandidatesAsync(
                 tenant.TenantId,
                 order.EventId,
-                request.Code,
+                command.Code,
                 keyVersions,
                 token);
+
             PromotionCodeMatch? match = await promotions.GetCodeForUpdateAsync(
                 tenant.TenantId,
                 order.EventId,
@@ -114,27 +115,28 @@ public sealed class RemovePromotionFromRegistrationOrderCommandHandler(
     IPlatformFeePolicyRepository feePolicies,
     ITenantContext tenant,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork) : IRequestHandler<RemovePromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>
+    IUnitOfWork unitOfWork) : ICommandHandler<RemovePromotionFromRegistrationOrderCommand, PromotionRedemptionResponseDto>
 {
-    public async Task<PromotionRedemptionResponseDto> Handle(
-        RemovePromotionFromRegistrationOrderCommand request,
+    public async Task<PromotionRedemptionResponseDto> ExecuteAsync(
+        RemovePromotionFromRegistrationOrderCommand command,
         CancellationToken cancellationToken)
     {
         var validator = new RemovePromotionFromRegistrationOrderCommandValidator();
-        FluentValidation.Results.ValidationResult validation = await validator.ValidateAsync(request, cancellationToken);
+        FluentValidation.Results.ValidationResult validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
-            return Failure(request.OrderId);
+            return Failure(command.OrderId);
         }
 
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            RegistrationOrder? order = await inventory.GetOrderForUpdateWithLinesAsync(request.OrderId, tenant.TenantId, token);
+            RegistrationOrder? order = await inventory.GetOrderForUpdateWithLinesAsync(command.OrderId, tenant.TenantId, token);
             if (order is null)
             {
-                return Failure(request.OrderId);
+                return Failure(command.OrderId);
             }
+
 
             PromotionReservation? reservation = await promotions.GetActiveReservationForUpdateAsync(tenant.TenantId, order.Id, token);
             if (reservation is null)

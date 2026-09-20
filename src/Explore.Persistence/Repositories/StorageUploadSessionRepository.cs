@@ -26,6 +26,11 @@ public class StorageUploadSessionRepository : GenericRepository<StorageUploadSes
                 cancellationToken);
     }
 
+    public Task<StorageUploadSession?> GetForAuthorizationAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.StorageUploadSessions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
+
     public async Task<StorageUploadSession?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
     {
         return await _dbContext.StorageUploadSessions

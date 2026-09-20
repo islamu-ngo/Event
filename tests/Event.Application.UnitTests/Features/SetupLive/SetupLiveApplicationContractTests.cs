@@ -1090,13 +1090,25 @@ public sealed class SetupLiveApplicationContractTests
         CustomAttributeData[] assemblyAttributes =
             ApplicationAssembly.CustomAttributes.ToArray();
         RequireContract(
-            assemblyAttributes.Length == 14,
-            $"invalid-setup-live-application-assembly-attribute-count:expected=14;actual={assemblyAttributes.Length}");
-        AssertExactManifestAttribute(
-            assemblyAttributes,
-            typeof(InternalsVisibleToAttribute),
-            [typeof(string)],
-            ["Explore.Infrastructure"]);
+            assemblyAttributes.Length == 17,
+            $"invalid-setup-live-application-assembly-attribute-count:expected=17;actual={assemblyAttributes.Length}");
+        CustomAttributeData[] friends = assemblyAttributes
+            .Where(attribute => attribute.AttributeType == typeof(InternalsVisibleToAttribute))
+            .ToArray();
+        RequireContract(friends.Length == 4, "invalid-setup-live-application-friend-count");
+        foreach (string friend in new[]
+        {
+            "Explore.Infrastructure", "Event.Application.UnitTests",
+            "Event.Architecture.Tests", "Event.API.IntegrationTests"
+        })
+        {
+            AssertExactManifestAttribute(
+                friends.Where(attribute => attribute.ConstructorArguments.Count == 1
+                    && Equals(attribute.ConstructorArguments[0].Value, friend)),
+                typeof(InternalsVisibleToAttribute),
+                [typeof(string)],
+                [friend]);
+        }
         AssertExactManifestAttribute(
             assemblyAttributes,
             typeof(CompilationRelaxationsAttribute),

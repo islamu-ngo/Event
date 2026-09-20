@@ -6,13 +6,13 @@ using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -31,20 +31,35 @@ public sealed class ModerationReportController : EventControllerBase
         "Moderation report not found",
         "Moderation report was not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetModerationReportQueueRequest, PaginatedResult<ModerationReportQueueItemDto>> _getQueueHandler;
+    private readonly IQueryHandler<GetModerationReportDetailRequest, ModerationReportDetailDto?> _getDetailHandler;
+    private readonly ICommandHandler<TriageEventReportCommand, BaseCommandResponse<Guid>> _triageHandler;
+    private readonly ICommandHandler<AssignEventReportCommand, BaseCommandResponse<Guid>> _assignHandler;
+    private readonly ICommandHandler<DecideEventReportCommand, BaseCommandResponse<Guid>> _decideHandler;
+    private readonly ICommandHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>> _executeDecisionHandler;
     private readonly IResourceAssembler<ModerationReportDetailDto, ModerationReportQueueItemDto> _resourceAssembler;
     private readonly ITenantContext _tenantContext;
     private readonly BusinessMetrics _metrics;
     private readonly ILogger<ModerationReportController> _logger;
 
     public ModerationReportController(
-        IMediator mediator,
+        IQueryHandler<GetModerationReportQueueRequest, PaginatedResult<ModerationReportQueueItemDto>> getQueueHandler,
+        IQueryHandler<GetModerationReportDetailRequest, ModerationReportDetailDto?> getDetailHandler,
+        ICommandHandler<TriageEventReportCommand, BaseCommandResponse<Guid>> triageHandler,
+        ICommandHandler<AssignEventReportCommand, BaseCommandResponse<Guid>> assignHandler,
+        ICommandHandler<DecideEventReportCommand, BaseCommandResponse<Guid>> decideHandler,
+        ICommandHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>> executeDecisionHandler,
         IResourceAssembler<ModerationReportDetailDto, ModerationReportQueueItemDto> resourceAssembler,
         ITenantContext tenantContext,
         BusinessMetrics metrics,
         ILogger<ModerationReportController> logger)
     {
-        _mediator = mediator;
+        _getQueueHandler = getQueueHandler;
+        _getDetailHandler = getDetailHandler;
+        _triageHandler = triageHandler;
+        _assignHandler = assignHandler;
+        _decideHandler = decideHandler;
+        _executeDecisionHandler = executeDecisionHandler;
         _resourceAssembler = resourceAssembler;
         _tenantContext = tenantContext;
         _metrics = metrics;
@@ -64,7 +79,7 @@ public sealed class ModerationReportController : EventControllerBase
         [FromQuery] ModerationReportQueueQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetModerationReportQueueRequest
+        var result = await _getQueueHandler.QueryAsync(new GetModerationReportQueueRequest
         {
             EventId = eventId,
             PageNumber = query.PageNumber,
@@ -113,7 +128,7 @@ public sealed class ModerationReportController : EventControllerBase
         Guid reportId,
         CancellationToken cancellationToken = default)
     {
-        var report = await _mediator.Send(new GetModerationReportDetailRequest
+        var report = await _getDetailHandler.QueryAsync(new GetModerationReportDetailRequest
         {
             EventId = eventId,
             ReportId = reportId
@@ -145,7 +160,7 @@ public sealed class ModerationReportController : EventControllerBase
         [FromBody] TriageModerationReportRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new TriageEventReportCommand
+        var response = await _triageHandler.ExecuteAsync(new TriageEventReportCommand
         {
             EventId = eventId,
             ReportId = reportId,
@@ -175,7 +190,7 @@ public sealed class ModerationReportController : EventControllerBase
         [FromBody] AssignModerationReportRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new AssignEventReportCommand
+        var response = await _assignHandler.ExecuteAsync(new AssignEventReportCommand
         {
             EventId = eventId,
             ReportId = reportId,
@@ -204,7 +219,7 @@ public sealed class ModerationReportController : EventControllerBase
         [FromBody] DecideModerationReportRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new DecideEventReportCommand
+        var response = await _decideHandler.ExecuteAsync(new DecideEventReportCommand
         {
             EventId = eventId,
             ReportId = reportId,
@@ -237,7 +252,7 @@ public sealed class ModerationReportController : EventControllerBase
         [FromBody] ExecuteModerationReportDecisionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ExecuteReportDecisionCommand
+        var response = await _executeDecisionHandler.ExecuteAsync(new ExecuteReportDecisionCommand
         {
             EventId = eventId,
             ReportId = reportId,

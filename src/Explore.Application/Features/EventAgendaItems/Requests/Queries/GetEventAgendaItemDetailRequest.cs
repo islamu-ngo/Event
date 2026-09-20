@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.EventAgendaItem;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Requests.Queries;
 
-public sealed record GetEventAgendaItemDetailRequest(Guid Id) : IRequest<EventAgendaItemDto?>;
+public sealed record GetEventAgendaItemDetailRequest(Guid Id) : IQuery<EventAgendaItemDto?>;

@@ -1,17 +1,17 @@
 
-using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
 public sealed class CompleteLocalCredentialReplacementCommandHandler(ILocalCredentialAdministration credentialAdministration)
-    : IRequestHandler<CompleteLocalCredentialReplacementCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CompleteLocalCredentialReplacementCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CompleteLocalCredentialReplacementCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();

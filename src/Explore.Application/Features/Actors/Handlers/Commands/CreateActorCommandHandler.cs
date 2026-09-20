@@ -1,16 +1,15 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor.Validators;
 using Explore.Application.Features.Actors.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Actors.Handlers.Commands;
 
-public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, BaseCommandResponse<Guid>>
+public class CreateActorCommandHandler : ICommandHandler<CreateActorCommand, BaseCommandResponse<Guid>>
 {
     private readonly IActorRepository _actorRepository;
     private readonly IActorTypeRepository _actorTypeRepository;
@@ -20,7 +19,6 @@ public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, Bas
     private readonly IUserRepository _userRepository;
     private readonly IOrganizationRepository _organizationRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
     public CreateActorCommandHandler(
         IActorRepository actorRepository,
@@ -30,8 +28,7 @@ public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, Bas
         ITenantRepository tenantRepository,
         IUserRepository userRepository,
         IOrganizationRepository organizationRepository,
-        ITenantContext tenantContext,
-        IMapper mapper)
+        ITenantContext tenantContext)
     {
         _actorRepository = actorRepository;
         _actorTypeRepository = actorTypeRepository;
@@ -41,10 +38,9 @@ public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, Bas
         _userRepository = userRepository;
         _organizationRepository = organizationRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateActorCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateActorCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateActorDtoValidator(
             _actorTypeRepository,
@@ -75,7 +71,27 @@ public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, Bas
                 "Actor creation failed.");
         }
 
-        var actor = _mapper.Map<Actor>(request.ActorDto);
+        // Only validated profile fields enter this existing property bag. Federation identities,
+        // custody and tenant participation remain owned by their authoritative workflows;
+        // persistence supplies IDs, audit and concurrency state.
+        var dto = request.ActorDto;
+        var actor = new Actor
+        {
+            ActorTypeId = dto.ActorTypeId,
+            ActorType = null!,
+            UserId = dto.UserId,
+            OrganizationId = dto.OrganizationId,
+            Pii = new ActorPii
+            {
+                DisplayName = dto.DisplayName,
+                ProfilePictureUri = dto.ProfilePictureUri
+            },
+            Description = dto.Description,
+            ProfilePictureCid = dto.ProfilePictureCid,
+            BackgroundColor = dto.BackgroundColor,
+            BackgroundEffect = dto.BackgroundEffect,
+            BannerColor = dto.BannerColor
+        };
 
         actor = await _actorRepository.Create(actor);
 

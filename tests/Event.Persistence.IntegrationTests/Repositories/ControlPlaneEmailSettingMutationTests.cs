@@ -59,17 +59,17 @@ public sealed class ControlPlaneEmailSettingMutationTests
                 ? await new LockControlPlaneTenantSettingCommandHandler(
                     repository: repository, systemSettingRepository: fixture.SystemSettings,
                     mutationLock: fixture.MutationLock, currentUserService: fixture.CurrentUserService,
-                    settingsResolver: fixture.Settings, mediator: fixture.Mediator,
+                    settingsResolver: fixture.Settings, notificationHandlers: fixture.NotificationHandlers,
                     emailDeliverySettingsWriter: fixture.EmailDeliverySettingsWriter, unitOfWork: fixture.UnitOfWork,
                     visitorSettings: fixture.VisitorSettings)
-                    .Handle(new LockControlPlaneTenantSettingCommand(tenantId: tenantId, key: GovernanceSettingKeys.Email.SmtpHost), cancellation.Token)
+                    .ExecuteAsync(new LockControlPlaneTenantSettingCommand(tenantId: tenantId, key: GovernanceSettingKeys.Email.SmtpHost), cancellation.Token)
                 : await new UnlockControlPlaneTenantSettingCommandHandler(
                     repository: repository, systemSettingRepository: fixture.SystemSettings,
                     mutationLock: fixture.MutationLock, currentUserService: fixture.CurrentUserService,
-                    settingsResolver: fixture.Settings, mediator: fixture.Mediator,
+                    settingsResolver: fixture.Settings, notificationHandlers: fixture.NotificationHandlers,
                     emailDeliverySettingsWriter: fixture.EmailDeliverySettingsWriter, unitOfWork: fixture.UnitOfWork,
                     visitorSettings: fixture.VisitorSettings)
-                    .Handle(new UnlockControlPlaneTenantSettingCommand(tenantId: tenantId, key: GovernanceSettingKeys.Email.SmtpHost), cancellation.Token);
+                    .ExecuteAsync(new UnlockControlPlaneTenantSettingCommand(tenantId: tenantId, key: GovernanceSettingKeys.Email.SmtpHost), cancellation.Token);
 
             await Assert.That(result.IsSuccess).IsTrue();
             await using var observer = CreateContext(path);

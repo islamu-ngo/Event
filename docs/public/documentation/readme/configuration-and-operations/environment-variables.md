@@ -13,6 +13,25 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Removed edition inputs
+
+There is one supported build, with the same dependency versions for contributors,
+self-hosters and hosted deployments. No Lucky Penny license key or edition choice
+is required. Remove these obsolete inputs from deployment environments, Infisical
+and CI configuration:
+
+- `USE_COMMERCIAL_LUCKYPENNY`, `LUCKYPENNY_LICENSE_KEY`,
+  `AUTOMAPPER_COMMERCIAL_VERSION`, `MEDIATR_COMMERCIAL_VERSION`.
+- `Licensing__LuckyPenny__Enabled`, `Licensing__LuckyPenny__LicenseKey` and
+  old `Licensing__AutoMapper__LicenseKey` / `Licensing__MediatR__LicenseKey` entries.
+- Docker build argument `USE_COMMERCIAL_LUCKYPENNY_LIBS` and MSBuild properties
+  `UseCommercialLuckyPennyLibraries`, `AutoMapperCommercialVersion`,
+  `MediatRCommercialVersion`.
+
+Do not replace them with another edition flag. Rebuild using the repository's
+locked dependency graph. Other provider credentials and licensing obligations
+are unchanged; no database migration is required for this removal.
+
 ## 1. Core Deployment & Networking
 
 | Variable | Status | Default | Description |
@@ -472,10 +491,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `CONTROL_PLANE_REGISTRATION_TOKEN` | deployment | sensitive | None | optional | deployment |
 | `CONTROL_PLANE_MAXIMUM_TENANT_COUNT` | deployment | public | None | optional | deployment |
 | `CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL` | deployment | public | None | optional | deployment |
-| `USE_COMMERCIAL_LUCKYPENNY` | platform | public | None | optional | process |
-| `LUCKYPENNY_LICENSE_KEY` | platform | sensitive | None | optional | process |
-| `AUTOMAPPER_COMMERCIAL_VERSION` | platform | public | None | optional | process |
-| `MEDIATR_COMMERCIAL_VERSION` | platform | public | None | optional | process |
 | `GEOCODING_PROVIDER` | integration | public | None | optional | capability |
 | `GEOCODING_ENDPOINT` | integration | public | None | optional | capability |
 | `GEOCODING_LANGUAGE` | integration | public | None | optional | capability |

@@ -6,6 +6,7 @@ using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -19,7 +20,6 @@ using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Registration;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,7 +64,7 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         var ticket = await fixture.Context.EventTicketTypes.AsNoTracking().SingleAsync();
         var proof = await fixture.IssueGuestProofAsync(new(command.EventId, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.Id, 10, null)]));
-        await Assert.That((await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request)).IsSuccess).IsTrue();
+        await Assert.That((await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request)).IsSuccess).IsTrue();
         await Assert.That(await fixture.Services.GetRequiredService<IRegistrationInventoryRepository>()
             .GetAllocatedQuantityAsync(before.CapacityPoolId, fixture.TenantId, CancellationToken.None)).IsEqualTo(10);
         await Assert.That((await CancelAsync(fixture, command)).IsSuccess).IsTrue();
@@ -204,10 +204,10 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         services.GetRequiredService<ExploreDbContext>().TenantContext = missing ? null : foreignTenant;
 
         // Even a valid proof and exact explicit tenant predicate cannot replace ambient isolation.
-        await Assert.That(await services.GetRequiredService<IRequestHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
-            .Handle(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None)).IsNull();
-        var denied = await services.GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-            .Handle(command, CancellationToken.None);
+        await Assert.That(await services.GetRequiredService<IQueryHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
+            .QueryAsync(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None)).IsNull();
+        var denied = await services.GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(command, CancellationToken.None);
         await Assert.That(denied.FailureCode).IsEqualTo("registration_order_not_found");
         await Assert.That((await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync()).ConcurrencyStamp)
             .IsEqualTo(order.ConcurrencyStamp);
@@ -363,7 +363,7 @@ public sealed partial class AnonymousCancellationConcurrencyTests
             fixture.Context.ChangeTracker.Clear();
         }
         var proof = await fixture.IssueGuestProofAsync(new(target.Id, catalog.Id, BookingPartyTypeEnum.Individual, [new(ticket.Id, 1, null)]));
-        var created = await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+        var created = await fixture.ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(created.IsSuccess).IsTrue();
         var order = await fixture.Context.RegistrationOrders.Include(value => value.Lines).SingleAsync(value => value.Id == created.Id);
         // Native issuance currently requires a delivery address. Its presence is not anonymous authority.
@@ -461,15 +461,15 @@ public sealed partial class AnonymousCancellationConcurrencyTests
     private static async Task<BaseCommandResponse<Guid>> CancelAsync(EventVisitorCapabilitySqliteFixture fixture, CancelConfirmedGuestRegistrationCommand command)
     {
         await using var scope = fixture.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-            .Handle(command, CancellationToken.None);
+        return await scope.ServiceProvider.GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(command, CancellationToken.None);
     }
 
     private static async Task<bool?> EligibleAsync(EventVisitorCapabilitySqliteFixture fixture, CancelConfirmedGuestRegistrationCommand command)
     {
         await using var scope = fixture.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<IRequestHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
-            .Handle(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None);
+        return await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
+            .QueryAsync(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None);
     }
 
     private sealed class Clock : TimeProvider

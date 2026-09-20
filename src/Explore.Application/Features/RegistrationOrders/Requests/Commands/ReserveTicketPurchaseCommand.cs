@@ -1,7 +1,7 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Commands;
 
@@ -11,7 +11,7 @@ public sealed record ReserveTicketPurchaseCommand(
     Guid PolicyVersionId,
     TicketPurchaseAccessMode AccessMode,
     Guid? RequestedPurchaserActorId,
-    string OperationKey) : IRequest<BaseCommandResponse<Guid>>;
+    string OperationKey) : ICommand<BaseCommandResponse<Guid>>;
 
 public sealed class ReserveTicketPurchaseCommandValidator :
     AbstractValidator<ReserveTicketPurchaseCommand>

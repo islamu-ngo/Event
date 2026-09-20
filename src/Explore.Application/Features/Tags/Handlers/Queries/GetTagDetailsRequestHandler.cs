@@ -1,29 +1,26 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.Features.Tags.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Tags.Handlers.Queries;
 
-public class GetTagDetailsRequestHandler : IRequestHandler<GetTagDetailsRequest, TagDto>
+public class GetTagDetailsRequestHandler : IQueryHandler<GetTagDetailsRequest, TagDto?>
 {
     private readonly ITagRepository _tagRepository;
-    private readonly IMapper _mapper;
 
     public GetTagDetailsRequestHandler(
-        ITagRepository tagRepository,
-        IMapper mapper)
+        ITagRepository tagRepository)
     {
         _tagRepository = tagRepository;
-        _mapper = mapper;
     }
 
-    public async Task<TagDto> Handle(GetTagDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<TagDto?> QueryAsync(GetTagDetailsRequest request, CancellationToken cancellationToken)
     {
         var tag = await _tagRepository.GetTagWithDetails(request.Id);
-        return _mapper.Map<TagDto>(tag);
+        return TagMapper.ToDetail(tag);
     }
 }

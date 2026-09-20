@@ -1,34 +1,31 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.Features.Actors.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Actors.Handlers.Queries;
 
-public class GetActorsByTenantRequestHandler : IRequestHandler<GetActorsByTenantRequest, List<ActorListDto>>
+public class GetActorsByTenantRequestHandler : IQueryHandler<GetActorsByTenantRequest, List<ActorListDto>>
 {
     private readonly IActorRepository _actorRepository;
-    private readonly IMapper _mapper;
     private readonly ILogger<GetActorsByTenantRequestHandler> _logger;
 
     public GetActorsByTenantRequestHandler(
         IActorRepository actorRepository,
-        IMapper mapper,
         ILogger<GetActorsByTenantRequestHandler> logger)
     {
         _actorRepository = actorRepository;
-        _mapper = mapper;
         _logger = logger;
     }
 
-    public async Task<List<ActorListDto>> Handle(GetActorsByTenantRequest request, CancellationToken cancellationToken)
+    public async Task<List<ActorListDto>> QueryAsync(GetActorsByTenantRequest request, CancellationToken cancellationToken = default)
     {
         var actors = await _actorRepository.GetActorsByTenant(request.TenantId, cancellationToken);
-        var dtos = _mapper.Map<List<ActorListDto>>(actors);
+        var dtos = actors.Select(ActorFederationMapper.ToActorListItem).ToList();
 
         foreach (var dto in dtos)
         {

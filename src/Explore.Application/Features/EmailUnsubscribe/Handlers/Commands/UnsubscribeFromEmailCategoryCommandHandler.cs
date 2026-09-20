@@ -1,19 +1,19 @@
 namespace Explore.Application.Features.EmailUnsubscribe.Handlers.Commands;
 
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailUnsubscribe.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 public sealed class UnsubscribeFromEmailCategoryCommandHandler(
     IUserNotificationPreferenceRepository preferenceRepository,
     ILogger<UnsubscribeFromEmailCategoryCommandHandler> logger)
-    : IRequestHandler<UnsubscribeFromEmailCategoryCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UnsubscribeFromEmailCategoryCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UnsubscribeFromEmailCategoryCommand request,
         CancellationToken cancellationToken)
     {

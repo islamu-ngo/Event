@@ -169,7 +169,8 @@ public sealed class SettingMutationBoundaryArchitectureTests
 
         string[] violations = handlerTypes
             .Where(type => !type.GetConstructors().Single().GetParameters()
-                .Any(parameter => parameter.ParameterType == typeof(MediatR.IMediator)))
+                .Any(parameter => parameter.ParameterType ==
+                    typeof(IEnumerable<Explore.Application.Contracts.Operations.INotificationHandler<SettingChangedNotification>>)))
             .Select(type => type.Name)
             .ToArray();
 

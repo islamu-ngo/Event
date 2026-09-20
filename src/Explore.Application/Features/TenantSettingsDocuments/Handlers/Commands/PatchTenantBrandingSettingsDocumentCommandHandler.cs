@@ -13,21 +13,21 @@ using Explore.Application.Settings;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public sealed class PatchTenantBrandingSettingsDocumentCommandHandler(
     ITenantSettingsDocumentRepository tenantSettingsDocumentRepository,
     IUnitOfWork unitOfWork,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
     ITenantBrandingSettingsDocumentLockService lockService)
-    : IRequestHandler<
+    : ICommandHandler<
         PatchTenantBrandingSettingsDocumentCommand,
         BaseCommandResponse<TenantBrandingSettingsDocumentDto>>
 {
     private const string PayloadDeserializationError = "Document 'tenant.branding' payload could not be deserialized.";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<BaseCommandResponse<TenantBrandingSettingsDocumentDto>> Handle(
+    public async Task<BaseCommandResponse<TenantBrandingSettingsDocumentDto>> ExecuteAsync(
         PatchTenantBrandingSettingsDocumentCommand request,
         CancellationToken cancellationToken)
     {

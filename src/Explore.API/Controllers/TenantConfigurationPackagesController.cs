@@ -7,7 +7,7 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +19,8 @@ using Microsoft.AspNetCore.RateLimiting;
 [EndpointClassification(EndpointClass.Admin)]
 [Route("api/tenants/{tenantId:guid}/configuration-package/export")]
 [Tags("Tenant Configuration")]
-public sealed class TenantConfigurationPackagesController(IMediator mediator)
+public sealed class TenantConfigurationPackagesController(
+    IQueryHandler<ExportTenantConfigurationPackageQuery, TenantConfigurationPackageExportResult> exporter)
     : ControllerBase
 {
     [HttpGet("", Name = RouteNames.ExportTenantConfigurationPackage)]
@@ -40,7 +41,7 @@ public sealed class TenantConfigurationPackagesController(IMediator mediator)
         [FromQuery] ConfigurationManifestExportView? view = null,
         CancellationToken cancellationToken = default)
     {
-        TenantConfigurationPackageExportResult export = await mediator.Send(
+        TenantConfigurationPackageExportResult export = await exporter.QueryAsync(
             new ExportTenantConfigurationPackageQuery(
                 tenantId,
                 view ?? ConfigurationManifestExportView.Overrides),

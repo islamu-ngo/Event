@@ -3,8 +3,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Webhooks.Handlers.Queries;
 
@@ -12,9 +12,9 @@ public sealed class GetWebhookEventTypesQueryHandler(
     IWebhookEventTypeRegistry eventTypeRegistry,
     IWebhookEventSchemaProvider schemaProvider,
     IWebhookEventTypeRepository eventTypeRepository)
-    : IRequestHandler<GetWebhookEventTypesQuery, IReadOnlyList<WebhookEventTypeDto>>
+    : IQueryHandler<GetWebhookEventTypesQuery, IReadOnlyList<WebhookEventTypeDto>>
 {
-    public async Task<IReadOnlyList<WebhookEventTypeDto>> Handle(
+    public async Task<IReadOnlyList<WebhookEventTypeDto>> QueryAsync(
         GetWebhookEventTypesQuery request,
         CancellationToken cancellationToken)
     {

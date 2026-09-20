@@ -1,10 +1,10 @@
 
 using Explore.Application.Contracts.Identity;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Authentication.Local.Requests.Queries;
 
-public sealed record ListLocalIdentitiesQuery : IRequest<LocalIdentityPage>
+public sealed record ListLocalIdentitiesQuery : IQuery<LocalIdentityPage>
 {
     public const string ResourceKey = "local-identities";
 

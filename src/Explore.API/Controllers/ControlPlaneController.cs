@@ -14,7 +14,7 @@ using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +30,10 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ControlPlaneController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetControlPlaneOverviewQuery, ControlPlaneOverviewDto> _overviewQuery;
+    private readonly IQueryHandler<GetControlPlaneDomainsQuery, ControlPlaneDomainOverviewDto> _domainsQuery;
+    private readonly IQueryHandler<GetControlPlaneOperationsQuery, ControlPlaneOperationsDto> _operationsQuery;
+    private readonly IQueryHandler<GetControlPlaneTenantListQuery, IReadOnlyList<ControlPlaneTenantListItemDto>> _tenantsQuery;
     private readonly IResourceAssembler<ControlPlaneOverviewDto, ControlPlaneOverviewDto> _overviewAssembler;
     private readonly IResourceAssembler<ControlPlaneDomainOverviewDto, ControlPlaneDomainOverviewDto> _domainAssembler;
     private readonly IResourceAssembler<ControlPlaneOperationsDto, ControlPlaneOperationsDto> _operationsAssembler;
@@ -39,7 +42,10 @@ public sealed class ControlPlaneController : EventControllerBase
     private readonly IResourceAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationDto> _tenantEffectiveConfigurationAssembler;
 
     public ControlPlaneController(
-        IMediator mediator,
+        IQueryHandler<GetControlPlaneOverviewQuery, ControlPlaneOverviewDto> overviewQuery,
+        IQueryHandler<GetControlPlaneDomainsQuery, ControlPlaneDomainOverviewDto> domainsQuery,
+        IQueryHandler<GetControlPlaneOperationsQuery, ControlPlaneOperationsDto> operationsQuery,
+        IQueryHandler<GetControlPlaneTenantListQuery, IReadOnlyList<ControlPlaneTenantListItemDto>> tenantsQuery,
         IResourceAssembler<ControlPlaneOverviewDto, ControlPlaneOverviewDto> overviewAssembler,
         IResourceAssembler<ControlPlaneDomainOverviewDto, ControlPlaneDomainOverviewDto> domainAssembler,
         IResourceAssembler<ControlPlaneOperationsDto, ControlPlaneOperationsDto> operationsAssembler,
@@ -47,7 +53,10 @@ public sealed class ControlPlaneController : EventControllerBase
         IResourceAssembler<ControlPlaneTenantPlanDetailDto, ControlPlaneTenantPlanListItemDto> tenantPlanAssembler,
         IResourceAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationDto> tenantEffectiveConfigurationAssembler)
     {
-        _mediator = mediator;
+        _overviewQuery = overviewQuery;
+        _domainsQuery = domainsQuery;
+        _operationsQuery = operationsQuery;
+        _tenantsQuery = tenantsQuery;
         _overviewAssembler = overviewAssembler;
         _domainAssembler = domainAssembler;
         _operationsAssembler = operationsAssembler;
@@ -67,7 +76,7 @@ public sealed class ControlPlaneController : EventControllerBase
     public async Task<ActionResult<HalResource<ControlPlaneOverviewDto>>> GetOverview(
         CancellationToken cancellationToken = default)
     {
-        var overview = await _mediator.Send(new GetControlPlaneOverviewQuery(), cancellationToken);
+        var overview = await _overviewQuery.QueryAsync(new GetControlPlaneOverviewQuery(), cancellationToken);
         var resource = await _overviewAssembler.ToResource(overview, HttpContext);
 
         return Ok(resource);
@@ -85,7 +94,7 @@ public sealed class ControlPlaneController : EventControllerBase
     public async Task<ActionResult<HalResource<ControlPlaneDomainOverviewDto>>> GetDomains(
         CancellationToken cancellationToken = default)
     {
-        var domains = await _mediator.Send(new GetControlPlaneDomainsQuery(), cancellationToken);
+        var domains = await _domainsQuery.QueryAsync(new GetControlPlaneDomainsQuery(), cancellationToken);
         var resource = await _domainAssembler.ToResource(domains, HttpContext);
 
         return Ok(resource);
@@ -102,7 +111,7 @@ public sealed class ControlPlaneController : EventControllerBase
     public async Task<ActionResult<HalResource<ControlPlaneOperationsDto>>> GetOperations(
         CancellationToken cancellationToken = default)
     {
-        var operations = await _mediator.Send(new GetControlPlaneOperationsQuery(), cancellationToken);
+        var operations = await _operationsQuery.QueryAsync(new GetControlPlaneOperationsQuery(), cancellationToken);
         var resource = await _operationsAssembler.ToResource(operations, HttpContext);
 
         return Ok(resource);
@@ -120,7 +129,7 @@ public sealed class ControlPlaneController : EventControllerBase
     public async Task<ActionResult<HalCollectionResource<ControlPlaneTenantListItemDto>>> GetTenants(
         CancellationToken cancellationToken = default)
     {
-        var tenants = await _mediator.Send(new GetControlPlaneTenantListQuery(), cancellationToken);
+        var tenants = await _tenantsQuery.QueryAsync(new GetControlPlaneTenantListQuery(), cancellationToken);
         var resource = await _tenantAssembler.ToCollectionResource(tenants, RouteNames.GetControlPlaneTenants, HttpContext);
 
         return Ok(resource);

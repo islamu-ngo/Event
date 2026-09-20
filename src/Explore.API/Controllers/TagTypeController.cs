@@ -1,10 +1,10 @@
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.TagType;
 using Explore.Application.Features.TagTypes.Requests.Queries;
 using Explore.Application.Features.TagTypeTags.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -15,7 +15,10 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class TagTypeController(IMediator mediator) : ControllerBase
+public class TagTypeController(
+    IQueryHandler<GetTagTypeListRequest, List<TagTypeListDto>> tagTypeList,
+    IQueryHandler<GetTagTypeDetailsRequest, TagTypeDto?> tagTypeDetails,
+    IQueryHandler<GetTagsGroupedByTagTypeRequest, List<TagTypeWithTagsDto>> groupedTags) : ControllerBase
 {
 
     // GET: api/tagtype
@@ -24,7 +27,7 @@ public class TagTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<TagTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var tagTypes = await mediator.Send(new GetTagTypeListRequest(), cancellationToken);
+        var tagTypes = await tagTypeList.QueryAsync(new GetTagTypeListRequest(), cancellationToken);
         return Ok(tagTypes);
     }
 
@@ -34,7 +37,7 @@ public class TagTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<TagTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var tagType = await mediator.Send(new GetTagTypeDetailsRequest { Id = id }, cancellationToken);
+        var tagType = await tagTypeDetails.QueryAsync(new GetTagTypeDetailsRequest { Id = id }, cancellationToken);
         return Ok(tagType);
     }
 
@@ -47,7 +50,7 @@ public class TagTypeController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(List<TagTypeWithTagsDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<TagTypeWithTagsDto>>> GetWithTags(CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetTagsGroupedByTagTypeRequest(), cancellationToken);
+        var result = await groupedTags.QueryAsync(new GetTagsGroupedByTagTypeRequest(), cancellationToken);
         return Ok(result);
     }
 }

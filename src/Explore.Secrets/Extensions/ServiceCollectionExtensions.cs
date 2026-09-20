@@ -105,6 +105,7 @@ public static class ServiceCollectionExtensions
     {
         return services.AddSecretManagement(
             configuration,
+            configuration,
             enableAuditing,
             enableRefreshService: true);
     }
@@ -115,18 +116,20 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The configuration root.</param>
     /// <param name="enableAuditing">Whether to enable audit logging decorator.</param>
+    /// <param name="providerConfiguration">The authoritative runtime provider configuration.</param>
     /// <param name="enableRefreshService">Whether to register the background refresh service.</param>
     /// <param name="enableSecretResolution">Whether to register repository-backed secret resolution services.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddSecretManagement(
         this IServiceCollection services,
         IConfiguration configuration,
+        IConfiguration providerConfiguration,
         bool enableAuditing,
         bool enableRefreshService,
         bool enableSecretResolution = true)
     {
-        // Add core secret provider
-        services.AddSecretProvider(configuration);
+        // Keep provider authority separate from application refresh settings.
+        services.AddSecretProvider(providerConfiguration);
         if (enableSecretResolution)
         {
             services.AddSecretResolution();

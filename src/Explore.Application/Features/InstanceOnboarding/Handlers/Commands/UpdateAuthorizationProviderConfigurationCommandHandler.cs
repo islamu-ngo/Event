@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
@@ -6,13 +7,12 @@ using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Utilities;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public class UpdateAuthorizationProviderConfigurationCommandHandler :
-    IRequestHandler<UpdateAuthorizationProviderConfigurationCommand, BaseCommandResponse<Guid>>,
-    IRequestHandler<UpdateAuthorizationProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<UpdateAuthorizationProviderConfigurationCommand, BaseCommandResponse<Guid>>,
+    ICommandHandler<UpdateAuthorizationProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IAuthorizationProviderConfigurationService _configurationService;
@@ -28,7 +28,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandler :
         _setupSecretProvider = setupSecretProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateAuthorizationProviderConfigurationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateAuthorizationProviderConfigurationCommand request, CancellationToken cancellationToken)
     {
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
         if (!isInstanceAdmin)
@@ -40,7 +40,7 @@ public class UpdateAuthorizationProviderConfigurationCommandHandler :
         return await ApplyConfigurationAsync(request.Patch, cancellationToken);
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateAuthorizationProviderConfigurationDuringSetupCommand request,
         CancellationToken cancellationToken)
     {

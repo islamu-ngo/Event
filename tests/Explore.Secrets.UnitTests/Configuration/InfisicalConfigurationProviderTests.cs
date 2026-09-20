@@ -287,15 +287,15 @@ public sealed class InfisicalConfigurationProviderTests
     }
 
     [Test]
-    public async Task ConvertToConfigurationKey_WhenLicensingFolderSecretsProvided_MapsToLicensing()
+    public async Task ConvertToConfigurationKey_RemovedEditionInputsDoNotCreateRuntimeLicensingOptions()
     {
         var enabled = await ConvertToConfigurationKey("USE_COMMERCIAL_LUCKYPENNY", "/licensing");
         var key = await ConvertToConfigurationKey("LUCKYPENNY_LICENSE_KEY", "/api/licensing");
         var cleanKey = await ConvertToConfigurationKey("LICENSE_KEY", "/licensing");
 
-        await Assert.That(enabled).IsEqualTo("Licensing:LuckyPenny:Enabled");
-        await Assert.That(key).IsEqualTo("Licensing:LuckyPenny:LicenseKey");
-        await Assert.That(cleanKey).IsEqualTo("Licensing:LuckyPenny:LicenseKey");
+        await Assert.That(enabled).DoesNotStartWith("Licensing:LuckyPenny:");
+        await Assert.That(key).DoesNotStartWith("Licensing:LuckyPenny:");
+        await Assert.That(cleanKey).DoesNotStartWith("Licensing:LuckyPenny:");
     }
 
     private static async Task<string> ConvertToConfigurationKey(string secretKey, string path)

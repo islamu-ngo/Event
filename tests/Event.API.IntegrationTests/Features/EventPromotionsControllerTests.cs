@@ -21,7 +21,7 @@ using Explore.Application.Hateoas;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -49,38 +49,53 @@ public sealed class EventPromotionsControllerTests
     [Test]
     public async Task PromotionManagementActions_DispatchRouteOwnedCqrsRequests()
     {
-        var mediator = Substitute.For<IMediator>();
-        var issuedCodeMediator = Substitute.For<IMediator>();
+        var listHandler = Substitute.For<IQueryHandler<ListPromotionManagementQuery, IReadOnlyList<PromotionManagementDto>>>();
+        var getHandler = Substitute.For<IQueryHandler<GetPromotionManagementQuery, PromotionManagementDto?>>();
+        var createDraftHandler = Substitute.For<ICommandHandler<CreatePromotionDraftCommand, PromotionCodeIssuedCommandResponseDto>>();
+        var reviseHandler = Substitute.For<ICommandHandler<RevisePromotionCommand, PromotionManagementCommandResponseDto>>();
+        var publishHandler = Substitute.For<ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>>();
+        var revokeHandler = Substitute.For<ICommandHandler<RevokePromotionCommand, PromotionManagementCommandResponseDto>>();
+        var rotateCodeHandler = Substitute.For<ICommandHandler<RotatePromotionCodeCommand, PromotionCodeIssuedCommandResponseDto>>();
+
         var eventId = Guid.CreateVersion7();
         var promotionId = Guid.CreateVersion7();
         var catalogId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<ListPromotionManagementQuery>(), Arg.Any<CancellationToken>()).Returns([]);
-        mediator.Send(Arg.Any<GetPromotionManagementQuery>(), Arg.Any<CancellationToken>()).Returns(CreatePromotion(eventId, promotionId, catalogId));
-        mediator.Send<PromotionManagementCommandResponseDto>(Arg.Any<RevisePromotionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(promotionId));
-        mediator.Send<PromotionManagementCommandResponseDto>(Arg.Any<PublishPromotionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(promotionId));
-        mediator.Send<PromotionManagementCommandResponseDto>(Arg.Any<RevokePromotionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(promotionId));
-        issuedCodeMediator.Send<PromotionCodeIssuedCommandResponseDto>(Arg.Any<CreatePromotionDraftCommand>(), Arg.Any<CancellationToken>()).Returns(IssuedSuccess(promotionId));
-        issuedCodeMediator.Send<PromotionCodeIssuedCommandResponseDto>(Arg.Any<RotatePromotionCodeCommand>(), Arg.Any<CancellationToken>()).Returns(IssuedSuccess(promotionId));
-        var controller = CreateController(mediator);
-        var issuedCodeController = CreateController(issuedCodeMediator);
+
+        listHandler.QueryAsync(Arg.Any<ListPromotionManagementQuery>(), Arg.Any<CancellationToken>()).Returns([]);
+        getHandler.QueryAsync(Arg.Any<GetPromotionManagementQuery>(), Arg.Any<CancellationToken>()).Returns(CreatePromotion(eventId, promotionId, catalogId));
+        createDraftHandler.ExecuteAsync(Arg.Any<CreatePromotionDraftCommand>(), Arg.Any<CancellationToken>()).Returns(IssuedSuccess(promotionId));
+        reviseHandler.ExecuteAsync(Arg.Any<RevisePromotionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(promotionId));
+        publishHandler.ExecuteAsync(Arg.Any<PublishPromotionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(promotionId));
+        revokeHandler.ExecuteAsync(Arg.Any<RevokePromotionCommand>(), Arg.Any<CancellationToken>()).Returns(Success(promotionId));
+        rotateCodeHandler.ExecuteAsync(Arg.Any<RotatePromotionCodeCommand>(), Arg.Any<CancellationToken>()).Returns(IssuedSuccess(promotionId));
+
+        var controller = CreateController(
+            listHandler,
+            getHandler,
+            createDraftHandler,
+            reviseHandler,
+            publishHandler,
+            revokeHandler,
+            rotateCodeHandler);
+
         var create = new CreatePromotionDraftRequest(catalogId, "Launch", "SAVE10", "fixed", 100, null, null, Utc(0), Utc(7), 10, 1, []);
         var revise = new RevisePromotionRequest("Launch", "fixed", 100, null, null, Utc(0), Utc(7), 10, 1, []);
 
         await controller.List(eventId, catalogId);
         await controller.Get(eventId, promotionId);
-        await issuedCodeController.CreateDraft(eventId, create, idempotencyKey: Guid.CreateVersion7().ToString("N"));
+        await controller.CreateDraft(eventId, create, idempotencyKey: Guid.CreateVersion7().ToString("N"));
         await controller.Revise(eventId, promotionId, revise, idempotencyKey: Guid.CreateVersion7().ToString("N"));
         await controller.Publish(eventId, promotionId, new PromotionCodeRequest("SAVE10"), idempotencyKey: Guid.CreateVersion7().ToString("N"));
         await controller.Revoke(eventId, promotionId, new RevokePromotionRequest(), idempotencyKey: Guid.CreateVersion7().ToString("N"));
-        await issuedCodeController.RotateCode(eventId, promotionId, new PromotionCodeRequest("SAVE20"), idempotencyKey: Guid.CreateVersion7().ToString("N"));
+        await controller.RotateCode(eventId, promotionId, new PromotionCodeRequest("SAVE20"), idempotencyKey: Guid.CreateVersion7().ToString("N"));
 
-        _ = mediator.Received(1).Send(Arg.Is<ListPromotionManagementQuery>(query => query.EventId == eventId && query.TicketCatalogVersionId == catalogId), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<GetPromotionManagementQuery>(query => query.EventId == eventId && query.PromotionDefinitionId == promotionId), Arg.Any<CancellationToken>());
-        _ = issuedCodeMediator.Received(1).Send(Arg.Is<CreatePromotionDraftCommand>(command => command.EventId == eventId && command.TicketCatalogVersionId == catalogId && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<RevisePromotionCommand>(command => command.EventId == eventId && command.PromotionDefinitionId == promotionId), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<PublishPromotionCommand>(command => command.Code == "SAVE10"), Arg.Any<CancellationToken>());
-        _ = mediator.Received(1).Send(Arg.Is<RevokePromotionCommand>(command => command.EventId == eventId && command.PromotionDefinitionId == promotionId), Arg.Any<CancellationToken>());
-        _ = issuedCodeMediator.Received(1).Send(Arg.Is<RotatePromotionCodeCommand>(command => command.Code == "SAVE20"), Arg.Any<CancellationToken>());
+        _ = listHandler.Received(1).QueryAsync(Arg.Is<ListPromotionManagementQuery>(query => query.EventId == eventId && query.TicketCatalogVersionId == catalogId), Arg.Any<CancellationToken>());
+        _ = getHandler.Received(1).QueryAsync(Arg.Is<GetPromotionManagementQuery>(query => query.EventId == eventId && query.PromotionDefinitionId == promotionId), Arg.Any<CancellationToken>());
+        _ = createDraftHandler.Received(1).ExecuteAsync(Arg.Is<CreatePromotionDraftCommand>(command => command.EventId == eventId && command.TicketCatalogVersionId == catalogId && command.Code == "SAVE10"), Arg.Any<CancellationToken>());
+        _ = reviseHandler.Received(1).ExecuteAsync(Arg.Is<RevisePromotionCommand>(command => command.EventId == eventId && command.PromotionDefinitionId == promotionId), Arg.Any<CancellationToken>());
+        _ = publishHandler.Received(1).ExecuteAsync(Arg.Is<PublishPromotionCommand>(command => command.Code == "SAVE10"), Arg.Any<CancellationToken>());
+        _ = revokeHandler.Received(1).ExecuteAsync(Arg.Is<RevokePromotionCommand>(command => command.EventId == eventId && command.PromotionDefinitionId == promotionId), Arg.Any<CancellationToken>());
+        _ = rotateCodeHandler.Received(1).ExecuteAsync(Arg.Is<RotatePromotionCodeCommand>(command => command.Code == "SAVE20"), Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -251,7 +266,14 @@ public sealed class EventPromotionsControllerTests
             PermissionCodes.EventManageFinance);
     }
 
-    private static EventPromotionsController CreateController(IMediator mediator)
+    private static EventPromotionsController CreateController(
+        IQueryHandler<ListPromotionManagementQuery, IReadOnlyList<PromotionManagementDto>>? listHandler = null,
+        IQueryHandler<GetPromotionManagementQuery, PromotionManagementDto?>? getHandler = null,
+        ICommandHandler<CreatePromotionDraftCommand, PromotionCodeIssuedCommandResponseDto>? createDraftHandler = null,
+        ICommandHandler<RevisePromotionCommand, PromotionManagementCommandResponseDto>? reviseHandler = null,
+        ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>? publishHandler = null,
+        ICommandHandler<RevokePromotionCommand, PromotionManagementCommandResponseDto>? revokeHandler = null,
+        ICommandHandler<RotatePromotionCodeCommand, PromotionCodeIssuedCommandResponseDto>? rotateCodeHandler = null)
     {
         var assembler = Substitute.For<IResourceAssembler<PromotionManagementDto, PromotionManagementDto>>();
         assembler.ToResource(Arg.Any<PromotionManagementDto>(), Arg.Any<HttpContext>())
@@ -260,7 +282,16 @@ public sealed class EventPromotionsControllerTests
             .Returns(new HalCollectionResource<PromotionManagementDto>());
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(Guid.CreateVersion7());
-        var controller = new EventPromotionsController(mediator, tenantContext, assembler)
+        var controller = new EventPromotionsController(
+            listHandler ?? Substitute.For<IQueryHandler<ListPromotionManagementQuery, IReadOnlyList<PromotionManagementDto>>>(),
+            getHandler ?? Substitute.For<IQueryHandler<GetPromotionManagementQuery, PromotionManagementDto?>>(),
+            createDraftHandler ?? Substitute.For<ICommandHandler<CreatePromotionDraftCommand, PromotionCodeIssuedCommandResponseDto>>(),
+            reviseHandler ?? Substitute.For<ICommandHandler<RevisePromotionCommand, PromotionManagementCommandResponseDto>>(),
+            publishHandler ?? Substitute.For<ICommandHandler<PublishPromotionCommand, PromotionManagementCommandResponseDto>>(),
+            revokeHandler ?? Substitute.For<ICommandHandler<RevokePromotionCommand, PromotionManagementCommandResponseDto>>(),
+            rotateCodeHandler ?? Substitute.For<ICommandHandler<RotatePromotionCodeCommand, PromotionCodeIssuedCommandResponseDto>>(),
+            tenantContext,
+            assembler)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

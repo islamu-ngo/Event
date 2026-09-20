@@ -3,21 +3,21 @@ using Explore.Application.Features.RegistrationForms.Validators;
 using Explore.Application.Responses;
 using Explore.Application.Services.Registration;
 using FluentValidation.Results;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationForms.Handlers.Commands;
 
 public sealed class CreateRegistrationFormTemplateCommandHandler(RegistrationFormTemplateCommandService service)
-    : IRequestHandler<CreateRegistrationFormTemplateCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateRegistrationFormTemplateCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateRegistrationFormTemplateCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationFormTemplateCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormTemplateCommandRunner.Run(request, service.CreateAsync, cancellationToken);
 }
 
 public sealed class InstantiateRegistrationFormTemplateCommandHandler(RegistrationFormTemplateCommandService service)
-    : IRequestHandler<InstantiateRegistrationFormTemplateCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<InstantiateRegistrationFormTemplateCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(InstantiateRegistrationFormTemplateCommand request, CancellationToken cancellationToken) =>
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(InstantiateRegistrationFormTemplateCommand request, CancellationToken cancellationToken = default) =>
         await RegistrationFormTemplateCommandRunner.Run(request, service.InstantiateAsync, cancellationToken);
 }
 
@@ -26,7 +26,7 @@ file static class RegistrationFormTemplateCommandRunner
     public static async Task<BaseCommandResponse<Guid>> Run<TCommand>(
         TCommand request,
         Func<TCommand, CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ValidationResult validation = await new RegistrationFormTemplateCommandValidator<TCommand>()
             .ValidateAsync(request, cancellationToken);

@@ -18,8 +18,13 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.EventReporting.Requests.Commands;
+using Explore.Application.Operations;
+using Explore.Application.Responses;
+using Explore.Application.Services.Webhooks;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -64,7 +69,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task AuthenticatedLaunchRequiresAuthenticationAndReturnsBoundedAttemptCapability()
     {
-        var mediator = Substitute.For<IMediator>();
+        var launchHandler = Substitute.For<ICommandHandler<LaunchAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
         Guid requirementId = Guid.CreateVersion7();
@@ -73,10 +78,13 @@ public sealed class NativeRegistrationSubmissionHttpTests
         Guid versionId = Guid.CreateVersion7();
         Guid attemptId = Guid.CreateVersion7();
         const string attemptToken = "attempt-token-secret";
-        mediator.Send(Arg.Any<LaunchAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        launchHandler.ExecuteAsync(Arg.Any<LaunchAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(CreateAttemptResult(
                 attemptId, requirementId, channelId, formId, versionId, attemptToken));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, launchHandler);
+        });
         using HttpClient client = factory.CreateClient();
         object body = new { requirementId, channelId, formId, formVersionId = versionId };
 
@@ -100,8 +108,8 @@ public sealed class NativeRegistrationSubmissionHttpTests
     public async Task GuestLaunchRequiresMatchingOrderCapability()
     {
         const string validCapability = "valid-order-capability";
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<LaunchGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        var launchHandler = Substitute.For<ICommandHandler<LaunchGuestNativeRegistrationAttemptCommand, NativeRegistrationAttemptResult>>();
+        launchHandler.ExecuteAsync(Arg.Any<LaunchGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().CapabilityToken == validCapability
                 ? new NativeRegistrationAttemptResult(
                     true, Guid.CreateVersion7(), call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().RequirementId,
@@ -117,7 +125,10 @@ public sealed class NativeRegistrationSubmissionHttpTests
                     call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().FormId,
                     call.Arg<LaunchGuestNativeRegistrationAttemptCommand>().FormVersionId,
                     default, null, [], null, false, null, "registration_order_not_found"));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, launchHandler);
+        });
         using HttpClient client = factory.CreateClient();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -144,12 +155,15 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task ValidationProblemContainsOnlyIssueCodesAndFieldKeys()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        var submitHandler = Substitute.For<ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>();
+        submitHandler.ExecuteAsync(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(new NativeRegistrationSubmissionResult(
                 false, Guid.CreateVersion7(), [new("INVALID_TEXT", "profile.display_name")],
                 "registration_submission_invalid"));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, submitHandler);
+        });
         using HttpClient client = factory.CreateClient();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -190,13 +204,14 @@ public sealed class NativeRegistrationSubmissionHttpTests
     {
         const string orderCapability = "valid-order-capability";
         const string attemptCapability = "valid-attempt-capability";
-        var mediator = Substitute.For<IMediator>();
+        var authenticatedSubmitHandler = Substitute.For<ICommandHandler<SubmitAuthenticatedNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>();
+        var guestSubmitHandler = Substitute.For<ICommandHandler<SubmitGuestNativeRegistrationAttemptCommand, NativeRegistrationSubmissionResult>>();
         Guid submissionId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        authenticatedSubmitHandler.ExecuteAsync(Arg.Any<SubmitAuthenticatedNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<SubmitAuthenticatedNativeRegistrationAttemptCommand>().AttemptCapabilityToken == attemptCapability
                 ? new NativeRegistrationSubmissionResult(true, submissionId, [])
                 : new NativeRegistrationSubmissionResult(false, Guid.Empty, [], "registration_attempt_not_found"));
-        mediator.Send(Arg.Any<SubmitGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
+        guestSubmitHandler.ExecuteAsync(Arg.Any<SubmitGuestNativeRegistrationAttemptCommand>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 SubmitGuestNativeRegistrationAttemptCommand command = call.Arg<SubmitGuestNativeRegistrationAttemptCommand>();
@@ -204,7 +219,11 @@ public sealed class NativeRegistrationSubmissionHttpTests
                     ? new NativeRegistrationSubmissionResult(true, submissionId, [])
                     : new NativeRegistrationSubmissionResult(false, Guid.Empty, [], "registration_attempt_not_found");
             });
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
+        await using WebApplicationFactory<Program> factory = CreateFactory(services =>
+        {
+            SubstituteNativeHandler(services, authenticatedSubmitHandler);
+            SubstituteNativeHandler(services, guestSubmitHandler);
+        });
         using HttpClient client = factory.CreateClient();
         Guid eventId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
@@ -424,11 +443,21 @@ public sealed class NativeRegistrationSubmissionHttpTests
     [Test]
     public async Task ProviderCallback_DuplicateEffectClaim_DispatchesFencedCommandOnce()
     {
-        var mediator = new CapturingMediator();
+        var capturingHandler = new CapturingProviderSubmissionHandler();
         await using WebApplicationFactory<Program> factory = CreateCallbackFactory<FakeRegistrationProviderCallbackVerifier>(services =>
         {
-            services.RemoveAll<IMediator>();
-            services.AddSingleton<IMediator>(mediator);
+            services.RemoveAll<IIncomingWebhookEffectProcessingService>();
+            services.AddScoped<IIncomingWebhookEffectProcessingService>(sp =>
+                new IncomingWebhookEffectProcessingService(
+                    sp.GetRequiredService<IIncomingWebhookEffectOutboxRepository>(),
+                    sp.GetRequiredService<IIncomingWebhookMessageRepository>(),
+                    sp.GetRequiredService<IIncomingWebhookEffectReceiptRepository>(),
+                    sp.GetRequiredService<IRegistrationProviderSubscriptionStateRepository>(),
+                    sp.GetRequiredService<IUnitOfWork>(),
+                    sp.GetRequiredService<ICommandHandler<ProcessCoopDecisionCallbackCommand, BaseCommandResponse<Guid>>>(),
+                    capturingHandler,
+                    sp.GetRequiredService<IOptions<IncomingWebhookProcessingSettings>>(),
+                    sp.GetRequiredService<TimeProvider>()));
         });
         Guid bindingId = await SeedRegistrationProviderBindingAsync(factory, "external-form");
         using HttpClient client = factory.CreateClient();
@@ -457,7 +486,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
         ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await Assert.That(first.Outcome).IsEqualTo(IncomingWebhookClaimExecutionOutcome.Completed);
         await Assert.That(duplicate.Outcome).IsEqualTo(IncomingWebhookClaimExecutionOutcome.LeaseLost);
-        await Assert.That(mediator.ProviderSubmissionDispatches).IsEqualTo(1);
+        await Assert.That(capturingHandler.ProviderSubmissionDispatches).IsEqualTo(1);
         await Assert.That(await db.IncomingWebhookEffectReceipts.CountAsync()).IsEqualTo(1);
         await Assert.That(await db.IncomingWebhookEffectOutboxes.CountAsync(pointer => pointer.Status == OutboxMessageStatus.Completed)).IsEqualTo(1);
     }
@@ -661,13 +690,34 @@ public sealed class NativeRegistrationSubmissionHttpTests
         await Assert.That(payload).DoesNotContain(PlatformDefaults.DefaultTenantId.ToString("D"));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(IMediator mediator) =>
+    private static WebApplicationFactory<Program> CreateFactory(Action<IServiceCollection>? configureServices = null) =>
         new AuthenticatedWebApplicationFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
+                configureServices?.Invoke(services);
             }));
+
+    /// <summary>
+    /// Replaces a native operation handler with an NSubstitute test double while keeping the
+    /// <see cref="NativeOperationCatalog"/> consistent so composition validation passes.
+    /// </summary>
+    private static void SubstituteNativeHandler<TContract>(IServiceCollection services, TContract substitute) where TContract : class
+    {
+        var contractType = typeof(TContract);
+        var catalog = (NativeOperationCatalog)services.Single(d => d.ServiceType == typeof(NativeOperationCatalog)).ImplementationInstance!;
+        var entry = catalog.Registrations.Single(r => r.Contract == contractType);
+        catalog.Registrations.Remove(entry);
+        services.Remove(entry.PublicDescriptor);
+        services.Remove(entry.ConcreteDescriptor);
+
+        var substituteType = substitute.GetType();
+        var concreteDescriptor = ServiceDescriptor.Scoped(substituteType, _ => substitute);
+        var publicDescriptor = ServiceDescriptor.Scoped(contractType, _ => substitute);
+        services.Add(concreteDescriptor);
+        services.Add(publicDescriptor);
+        catalog.Registrations.Add(new NativeOperationRegistration(
+            contractType, substituteType, publicDescriptor, concreteDescriptor, [[]]));
+    }
 
     private static WebApplicationFactory<Program> CreateCallbackFactory() =>
         CreateCallbackFactory<FakeRegistrationProviderCallbackVerifier>();
@@ -1018,37 +1068,16 @@ public sealed class NativeRegistrationSubmissionHttpTests
             CancellationToken cancellationToken) => throw new System.Security.Cryptography.CryptographicException("bad signature envelope");
     }
 
-    private sealed class CapturingMediator : IMediator
+    private sealed class CapturingProviderSubmissionHandler : ICommandHandler<ProcessProviderSubmissionEffectCommand, ProviderSubmissionEffectResult>
     {
         public int ProviderSubmissionDispatches { get; private set; }
 
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        public Task<ProviderSubmissionEffectResult> ExecuteAsync(
+            ProcessProviderSubmissionEffectCommand command,
+            CancellationToken cancellationToken = default)
         {
-            if (request is ProcessProviderSubmissionEffectCommand)
-            {
-                ProviderSubmissionDispatches++;
-                return Task.FromResult((TResponse)(object)ProviderSubmissionEffectResult.Completed());
-            }
-
-            throw new InvalidOperationException("Unexpected mediator request: " + request.GetType().Name);
+            ProviderSubmissionDispatches++;
+            return Task.FromResult(ProviderSubmissionEffectResult.Completed());
         }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-            => throw new InvalidOperationException("Unexpected mediator request: " + typeof(TRequest).Name);
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("Unexpected mediator request: " + request.GetType().Name);
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => AsyncEnumerable.Empty<TResponse>();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => AsyncEnumerable.Empty<object?>();
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
     }
 }

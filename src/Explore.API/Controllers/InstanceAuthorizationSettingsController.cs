@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -20,7 +22,6 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -43,18 +44,36 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class InstanceAuthorizationSettingsController : InstanceSettingsControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IAuthorizationProviderConfigurationService _authorizationProviderConfigurationService;
+    private readonly IQueryHandler<GetAuthorizationProviderConfigurationQuery, AuthorizationProviderConfigurationDto> _getAuthProviderConfigHandler;
+    private readonly ICommandHandler<UpdateAuthorizationProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>> _updateAuthConfigDuringSetupHandler;
+    private readonly ICommandHandler<UpdateAuthorizationProviderConfigurationCommand, BaseCommandResponse<Guid>> _updateAuthConfigHandler;
+    private readonly ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>> _syncPolicyPackageHandler;
+    private readonly IQueryHandler<DownloadAuthorizationPolicyPackageQuery, PolicyPackageArchive> _downloadPolicyPackageHandler;
+    private readonly IQueryHandler<GetAuthorizationPolicyPackageStatusQuery, AuthorizationPolicyPackageStatusDto> _getPolicyPackageStatusHandler;
 
     public InstanceAuthorizationSettingsController(
-        IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAuthorizationProviderConfigurationService authorizationProviderConfigurationService,
+        IQueryHandler<GetAuthorizationProviderConfigurationQuery, AuthorizationProviderConfigurationDto> getAuthProviderConfigHandler,
+        ICommandHandler<UpdateAuthorizationProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>> updateAuthConfigDuringSetupHandler,
+        ICommandHandler<UpdateAuthorizationProviderConfigurationCommand, BaseCommandResponse<Guid>> updateAuthConfigHandler,
+        ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>> syncPolicyPackageHandler,
+        IQueryHandler<DownloadAuthorizationPolicyPackageQuery, PolicyPackageArchive> downloadPolicyPackageHandler,
+        IQueryHandler<GetAuthorizationPolicyPackageStatusQuery, AuthorizationPolicyPackageStatusDto> getPolicyPackageStatusHandler,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
-        _mediator = mediator;
+        _identityQuery = identityQuery;
         _authorizationProviderConfigurationService = authorizationProviderConfigurationService;
+        _getAuthProviderConfigHandler = getAuthProviderConfigHandler;
+        _updateAuthConfigDuringSetupHandler = updateAuthConfigDuringSetupHandler;
+        _updateAuthConfigHandler = updateAuthConfigHandler;
+        _syncPolicyPackageHandler = syncPolicyPackageHandler;
+        _downloadPolicyPackageHandler = downloadPolicyPackageHandler;
+        _getPolicyPackageStatusHandler = getPolicyPackageStatusHandler;
     }
 
     [HttpGet("authz-provider", Name = RouteNames.GetInstanceAuthorizationProviderConfiguration)]
@@ -66,7 +85,7 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
     public async Task<ActionResult<AuthorizationProviderConfigurationDto>> GetAuthorizationProviderConfiguration(CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var configuration = await _mediator.Send(new GetAuthorizationProviderConfigurationQuery(), cancellationToken);
+        var configuration = await _getAuthProviderConfigHandler.QueryAsync(new GetAuthorizationProviderConfigurationQuery(), cancellationToken);
         return Ok(configuration);
     }
 
@@ -85,16 +104,16 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
         BaseCommandResponse<Guid> response;
         if (IsSetupSecretAuthenticated())
         {
-            response = await _mediator.Send(
+            response = await _updateAuthConfigDuringSetupHandler.ExecuteAsync(
                 new UpdateAuthorizationProviderConfigurationDuringSetupCommand { Patch = configuration },
                 cancellationToken);
         }
         else
         {
-            var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+            var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
             if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
-            response = await _mediator.Send(
+            response = await _updateAuthConfigHandler.ExecuteAsync(
                 new UpdateAuthorizationProviderConfigurationCommand { UserId = userId.Value, Patch = configuration },
                 cancellationToken);
         }
@@ -114,7 +133,7 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var response = await _mediator.Send(
+        var response = await _syncPolicyPackageHandler.ExecuteAsync(
             new SyncAuthorizationPolicyPackageCommand { Request = request },
             cancellationToken);
         return HandleCommandResponse(response);
@@ -132,7 +151,7 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
 
         try
         {
-            var archive = await _mediator.Send(new DownloadAuthorizationPolicyPackageQuery(), cancellationToken);
+            var archive = await _downloadPolicyPackageHandler.QueryAsync(new DownloadAuthorizationPolicyPackageQuery(), cancellationToken);
             return File(archive.Content.ToArray(), archive.ContentType, archive.FileName);
         }
         catch (PolicyPackageUnavailableException)
@@ -159,7 +178,7 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
 
-        var status = await _mediator.Send(new GetAuthorizationPolicyPackageStatusQuery(), cancellationToken);
+        var status = await _getPolicyPackageStatusHandler.QueryAsync(new GetAuthorizationPolicyPackageStatusQuery(), cancellationToken);
         return Ok(status);
     }
 

@@ -4,10 +4,10 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.UserAuthenticationToken;
 using Explore.Application.Features.UserAuthenticationTokens.Requests.Commands;
 using Explore.Application.Features.UserAuthenticationTokens.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +18,10 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Authenticated)]
-public class UserAuthenticationTokenController(IMediator mediator) : ControllerBase
+public class UserAuthenticationTokenController(
+    IQueryHandler<GetUserAuthenticationTokenListRequest, List<UserAuthenticationTokenListDto>> getAllHandler,
+    IQueryHandler<GetUserAuthenticationTokenDetailsRequest, UserAuthenticationTokenDto?> getByIdHandler,
+    ICommandHandler<DeleteUserAuthenticationTokenCommand> deleteHandler) : ControllerBase
 {
     private static readonly ApiNotFoundProblemDescriptor UserAuthenticationTokenNotFoundProblem = new(
         "User authentication token not found",
@@ -35,7 +38,7 @@ public class UserAuthenticationTokenController(IMediator mediator) : ControllerB
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<ActionResult<List<UserAuthenticationTokenListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var tokens = await mediator.Send(new GetUserAuthenticationTokenListRequest(), cancellationToken);
+        var tokens = await getAllHandler.QueryAsync(new GetUserAuthenticationTokenListRequest(), cancellationToken);
         return Ok(tokens);
     }
 
@@ -51,7 +54,7 @@ public class UserAuthenticationTokenController(IMediator mediator) : ControllerB
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<ActionResult<UserAuthenticationTokenDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var token = await mediator.Send(new GetUserAuthenticationTokenDetailsRequest { Id = id }, cancellationToken);
+        var token = await getByIdHandler.QueryAsync(new GetUserAuthenticationTokenDetailsRequest(id), cancellationToken);
 
         return token is null ? this.ToNotFoundProblem(UserAuthenticationTokenNotFoundProblem) : Ok(token);
     }
@@ -66,8 +69,8 @@ public class UserAuthenticationTokenController(IMediator mediator) : ControllerB
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        var command = new DeleteUserAuthenticationTokenCommand { Id = id };
-        await mediator.Send(command, cancellationToken);
+        var command = new DeleteUserAuthenticationTokenCommand(id);
+        await deleteHandler.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

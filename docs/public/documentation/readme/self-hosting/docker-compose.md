@@ -13,6 +13,13 @@ startup mode and backup topology before opening it to users. Its embedded erasur
 authority and API replica setting default to one writer; do not simply scale the
 API without changing that topology.
 
+All deployments use one build edition. API and UI Dockerfiles restore locked
+package versions without a commercial build argument or library license key.
+Before rebuilding an older deployment, remove the
+[obsolete edition inputs](../configuration-and-operations/environment-variables.md#removed-edition-inputs)
+from CI, Compose overrides and your secret authority. This changes build and
+configuration inputs, not your database schema or selected deployment topology.
+
 ---
 
 ## 1. Architecture & Service Topology

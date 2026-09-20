@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
-public sealed class GrantAiConsentCommandHandler : IRequestHandler<GrantAiConsentCommand, BaseCommandResponse<Guid>>
+public sealed class GrantAiConsentCommandHandler : ICommandHandler<GrantAiConsentCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAiConsentGrantRepository _consentRepository;
 
@@ -17,7 +17,7 @@ public sealed class GrantAiConsentCommandHandler : IRequestHandler<GrantAiConsen
         _consentRepository = consentRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(GrantAiConsentCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(GrantAiConsentCommand request, CancellationToken cancellationToken)
     {
         var validator = new GrantAiConsentCommandValidator();
         var validationResult = await validator.ValidateAsync(request, cancellationToken);

@@ -2,6 +2,7 @@ using Explore.API.Hateoas;
 using Explore.API.Mcp;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
@@ -10,19 +11,37 @@ using Explore.Application.DTOs.EventProgram;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.DTOs.Location;
+using Explore.Application.DTOs.EventCustomProperty;
+using Explore.Application.DTOs.EventRoleAssignment;
+using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.EventAgendaItems.Requests.Queries;
+using Explore.Application.Features.EventCustomProperties.Requests.Queries;
 using Explore.Application.Features.EventDays.Requests.Queries;
 using Explore.Application.Features.EventPrograms.Requests.Queries;
+using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Application.Features.EventSessions.Requests.Queries;
+using Explore.Application.Features.EventSessionTemplates.Requests.Queries;
+using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;
+using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateSyncHistory;
+using Explore.Application.Features.EventTemplates.Requests.Queries;
+using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDiff;
+using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
+using Explore.Application.DTOs.EventSessionTemplate;
+using Explore.Application.DTOs.EventTemplate;
+using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
 using TUnit.Core;
+using EventSessionTemplateDiffDto = Explore.Application.DTOs.EventSessionTemplateSync.TemplateDiffDto;
+using EventSessionTemplateSyncHistoryItemDto = Explore.Application.DTOs.EventSessionTemplateSync.EventSessionTemplateSyncHistoryItemDto;
+using EventTemplateDiffDto = Explore.Application.DTOs.EventTemplateSync.TemplateDiffDto;
+using EventTemplateSyncHistoryItemDto = Explore.Application.DTOs.EventTemplateSync.EventTemplateSyncHistoryItemDto;
 
 namespace ApiIntegrationTests.Features;
 
@@ -84,12 +103,12 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task ListPublicEventSessions_InvokesAiContextGatewayOnRealAdapterPath()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var gateway = CreateZeroDisclosureGateway();
-
-        mediator.Send(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
+        var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
+        eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
-        mediator.Send(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
+        var publicSessions = Substitute.For<IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>>();
+        publicSessions.QueryAsync(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(new List<EventSessionListDto>
             {
                 new()
@@ -105,7 +124,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 }
             });
 
-        var tools = await CreateTools(mediator, gateway);
+        var tools = await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails);
 
         await tools.ListPublicEventSessionsAsync(eventId);
 
@@ -119,11 +138,12 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task GetPublicEventProgramSummary_InvokesGatewayAndOmitsPhysicalValues()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
         var gateway = CreateZeroDisclosureGateway();
-        mediator.Send(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
+        var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
+        eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
-        mediator.Send(Arg.Any<GetEventProgramSummaryRequest>(), Arg.Any<CancellationToken>())
+        var summaryQuery = Substitute.For<IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>>();
+        summaryQuery.QueryAsync(Arg.Any<GetEventProgramSummaryRequest>(), Arg.Any<CancellationToken>())
             .Returns(new EventProgramSummaryDto
             {
                 EventId = eventId,
@@ -147,7 +167,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 ]
             });
 
-        var result = await (await CreateTools(mediator, gateway))
+        var result = await (await CreateTools(gateway, summaryQuery: summaryQuery, eventDetailsQuery: eventDetails))
             .GetPublicEventProgramSummaryAsync(eventId);
 
         await Assert.That(gateway.ReceivedCalls()).Contains(call =>
@@ -160,10 +180,11 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task PublicSessionAdapter_FailsClosedWhenGatewayDisclosesPhysicalValue()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
+        var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
+        eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
-        mediator.Send(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
+        var publicSessions = Substitute.For<IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>>();
+        publicSessions.QueryAsync(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(new List<EventSessionListDto>
             {
                 new()
@@ -180,7 +201,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 .Select(DisclosePrivateVenue)
                 .ToArray());
 
-        var act = async () => await (await CreateTools(mediator, gateway)).ListPublicEventSessionsAsync(eventId);
+        var act = async () => await (await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(act);
     }
@@ -194,10 +215,11 @@ public sealed class EventLocationPrivacyMcpContractTests
         int resultCount)
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
+        var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
+        eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
-        mediator.Send(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
+        var publicSessions = Substitute.For<IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>>();
+        publicSessions.QueryAsync(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(Enumerable.Range(0, requestCount)
                 .Select(index => new EventSessionListDto
                 {
@@ -213,7 +235,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 .Select(_ => PassThroughLocationEnvelope())
                 .ToArray());
 
-        var act = async () => await (await CreateTools(mediator, gateway)).ListPublicEventSessionsAsync(eventId);
+        var act = async () => await (await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(act);
     }
@@ -222,10 +244,11 @@ public sealed class EventLocationPrivacyMcpContractTests
     public async Task PublicSessionAdapter_FailsClosedWhenGatewayResultEntityDoesNotMatchRequest()
     {
         var eventId = Guid.NewGuid();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
+        var eventDetails = Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>();
+        eventDetails.QueryAsync(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
-        mediator.Send(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
+        var publicSessions = Substitute.For<IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>>();
+        publicSessions.QueryAsync(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(new List<EventSessionListDto>
             {
                 new()
@@ -239,7 +262,7 @@ public sealed class EventLocationPrivacyMcpContractTests
         gateway.SanitizeMany(Arg.Any<IReadOnlyList<AiContextSanitizationInput>>())
             .Returns([AiContextSanitizedEnvelope.Success("EventPii", [], [], [])]);
 
-        var act = async () => await (await CreateTools(mediator, gateway)).ListPublicEventSessionsAsync(eventId);
+        var act = async () => await (await CreateTools(gateway, publicSessionsQuery: publicSessions, eventDetailsQuery: eventDetails)).ListPublicEventSessionsAsync(eventId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(act);
     }
@@ -249,12 +272,11 @@ public sealed class EventLocationPrivacyMcpContractTests
     {
         var eventId = Guid.NewGuid();
         var eventDto = CreatePublishedEvent(eventId);
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetEventManagementDetailsRequest>(), Arg.Any<CancellationToken>())
+        var eventManagementDetails = Substitute.For<IQueryHandler<GetEventManagementDetailsRequest, EventDto?>>();
+        eventManagementDetails.QueryAsync(Arg.Any<GetEventManagementDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(eventDto);
-        mediator.Send(Arg.Any<GetManagedSessionsByEventRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new List<EventSessionListDto>());
-        mediator.Send(Arg.Any<GetManagedEventSessionGroupsByEventRequest>(), Arg.Any<CancellationToken>())
+        var sessionGroupsHandler = Substitute.For<IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>>();
+        sessionGroupsHandler.QueryAsync(Arg.Any<GetManagedEventSessionGroupsByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(new List<EventSessionGroupListDto>
             {
                 new()
@@ -268,11 +290,6 @@ public sealed class EventLocationPrivacyMcpContractTests
                     RoomName = "PRIVATE-MANAGEMENT-ROOM"
                 }
             });
-        mediator.Send(Arg.Any<GetManagedEventDaysByEventRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new List<EventDayListDto>());
-        mediator.Send(Arg.Any<GetManagedEventAgendaItemsByEventRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new List<EventAgendaItemListDto>());
-
         var assembler = Substitute.For<IResourceAssembler<EventDto, EventListDto>>();
         assembler.ToResource(eventDto, Arg.Any<HttpContext>())
             .Returns(new HalResource<EventDto>(eventDto, new Dictionary<string, HalLink>
@@ -285,16 +302,13 @@ public sealed class EventLocationPrivacyMcpContractTests
         httpContextAccessor.HttpContext.Returns(new DefaultHttpContext());
         var gateway = CreateZeroDisclosureGateway();
 
-        var result = await (await CreateTools(mediator, gateway, assembler, httpContextAccessor))
+        var result = await (await CreateTools(gateway, assembler, httpContextAccessor, managedSessionGroupsQuery: sessionGroupsHandler, eventManagementDetailsQuery: eventManagementDetails))
             .GetEventProgramManagementContextAsync(eventId);
 
         await Assert.That(gateway.ReceivedCalls()).Contains(call =>
             call.GetMethodInfo().Name == nameof(IAiContextGateway.SanitizeMany));
-        await mediator.Received(1).Send(
+        await sessionGroupsHandler.Received(1).QueryAsync(
             Arg.Any<GetManagedEventSessionGroupsByEventRequest>(),
-            Arg.Any<CancellationToken>());
-        await mediator.Received(1).Send(
-            Arg.Any<GetManagedEventAgendaItemsByEventRequest>(),
             Arg.Any<CancellationToken>());
         await Assert.That(result).Contains("PRIVATE-DRAFT-TRACK");
         await Assert.That(result).DoesNotContain("LocationName");
@@ -304,20 +318,91 @@ public sealed class EventLocationPrivacyMcpContractTests
     }
 
     private static async Task<EventManagementMcpTools> CreateTools(
-        IMediator mediator,
         IAiContextGateway gateway,
         IResourceAssembler<EventDto, EventListDto>? eventResourceAssembler = null,
-        IHttpContextAccessor? httpContextAccessor = null)
+        IHttpContextAccessor? httpContextAccessor = null,
+        IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>? summaryQuery = null,
+        IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>? managedSessionGroupsQuery = null,
+        IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>? publicSessionsQuery = null,
+        IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>>? managedSessionsQuery = null,
+        IQueryHandler<GetEventDetailsRequest, EventDto?>? eventDetailsQuery = null,
+        IQueryHandler<GetEventManagementDetailsRequest, EventDto?>? eventManagementDetailsQuery = null)
     {
+        var days = Substitute.For<IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>>();
+        days.QueryAsync(Arg.Any<GetManagedEventDaysByEventRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new List<EventDayListDto>());
+        var agenda = Substitute.For<IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>>();
+        agenda.QueryAsync(Arg.Any<GetManagedEventAgendaItemsByEventRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new List<EventAgendaItemListDto>());
+        var sessionGroups = managedSessionGroupsQuery ?? Substitute.For<IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>>();
+        if (managedSessionGroupsQuery is null)
+        {
+            sessionGroups.QueryAsync(Arg.Any<GetManagedEventSessionGroupsByEventRequest>(), Arg.Any<CancellationToken>())
+                .Returns(new List<EventSessionGroupListDto>());
+        }
+        var publicSessions = publicSessionsQuery ?? Substitute.For<IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>>();
+        if (publicSessionsQuery is null)
+        {
+            publicSessions.QueryAsync(Arg.Any<GetSessionsByEventRequest>(), Arg.Any<CancellationToken>())
+                .Returns(new List<EventSessionListDto>());
+        }
+        var managedSessions = managedSessionsQuery ?? Substitute.For<IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>>>();
+        if (managedSessionsQuery is null)
+        {
+            managedSessions.QueryAsync(Arg.Any<GetManagedSessionsByEventRequest>(), Arg.Any<CancellationToken>())
+                .Returns(new List<EventSessionListDto>());
+        }
         var dependencies = new Dictionary<Type, object>
         {
-            [typeof(IMediator)] = mediator,
+            [typeof(IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>)] = days,
+            [typeof(IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>)] = agenda,
+            [typeof(IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>)] = sessionGroups,
+            [typeof(IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>)] = summaryQuery
+                ?? Substitute.For<IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>>(),
             [typeof(IUserContext)] = Substitute.For<IUserContext>(),
             [typeof(ITenantContext)] = Substitute.For<ITenantContext>(),
             [typeof(IResourceAssembler<EventDto, EventListDto>)] = eventResourceAssembler
                 ?? Substitute.For<IResourceAssembler<EventDto, EventListDto>>(),
             [typeof(IHttpContextAccessor)] = httpContextAccessor ?? Substitute.For<IHttpContextAccessor>(),
-            [typeof(EventMcpLocationDisclosureGuard)] = new EventMcpLocationDisclosureGuard(gateway)
+            [typeof(EventMcpLocationDisclosureGuard)] = new EventMcpLocationDisclosureGuard(gateway),
+            [typeof(IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>>>(),
+            [typeof(IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>>>(),
+            [typeof(IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>>>(),
+            [typeof(IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>>)] =
+                Substitute.For<IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>>>(),
+            [typeof(IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>>>(),
+            [typeof(IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>>)] =
+                Substitute.For<IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>>>(),
+            [typeof(IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>>>(),
+            [typeof(IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>>)] =
+                Substitute.For<IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>>>(),
+            [typeof(IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>)] =
+                Substitute.For<IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>>>(),
+            [typeof(IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>>)] =
+                Substitute.For<IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>>>(),
+            [typeof(IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto>)] =
+                Substitute.For<IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto>>(),
+            [typeof(IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>>)] =
+                Substitute.For<IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>>>(),
+            [typeof(IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>>)] = publicSessions,
+            [typeof(IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>>)] = managedSessions,
+            [typeof(IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>>)] =
+                Substitute.For<IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>>>(),
+            [typeof(IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>)] =
+                Substitute.For<IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>>(),
+            [typeof(IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto>)] =
+                Substitute.For<IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto>>(),
+            [typeof(IQueryHandler<GetEventManagementDetailsRequest, EventDto?>)] = eventManagementDetailsQuery
+                ?? Substitute.For<IQueryHandler<GetEventManagementDetailsRequest, EventDto?>>(),
+            [typeof(IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?>)] =
+                Substitute.For<IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?>>(),
+            [typeof(IQueryHandler<GetEventDetailsRequest, EventDto?>)] = eventDetailsQuery
+                ?? Substitute.For<IQueryHandler<GetEventDetailsRequest, EventDto?>>()
         };
         var constructor = typeof(EventManagementMcpTools).GetConstructors().Single();
         var parameters = constructor.GetParameters();

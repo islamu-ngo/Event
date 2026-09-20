@@ -1,25 +1,26 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
 public sealed class LocalLoginCommandHandler(
     ILocalIdentityAuthService authService,
     IAuthenticationProviderDispatcher providerDispatcher,
-    ISender sender)
-    : IRequestHandler<LocalLoginCommand, LocalAuthResponseDto>
+    ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler)
+    : ICommandHandler<LocalLoginCommand, LocalAuthResponseDto>
 {
-    public async Task<LocalAuthResponseDto> Handle(
+    public async Task<LocalAuthResponseDto> ExecuteAsync(
         LocalLoginCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validation = await new LocalAuthRequestDtoValidator()
             .ValidateAsync(request.Request, cancellationToken)
@@ -44,7 +45,7 @@ public sealed class LocalLoginCommandHandler(
             return authentication;
         }
 
-        var synchronization = await sender.Send(
+        var synchronization = await syncUserCommandHandler.ExecuteAsync(
             LocalIdentitySyncCommandFactory.Create(authentication),
             cancellationToken).ConfigureAwait(false);
         return synchronization.IsSuccess

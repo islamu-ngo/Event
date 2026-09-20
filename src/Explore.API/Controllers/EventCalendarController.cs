@@ -17,9 +17,9 @@ using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -46,7 +46,8 @@ public class EventCalendarController : EventControllerBase
         "Event not found",
         "Event not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?> _calendarExportHandler;
+    private readonly IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?> _attendeeExportHandler;
     private readonly IEventCalendarFileBuilder _calendarFileBuilder;
     private readonly Explore.Application.Contracts.Infrastructure.IPublicUrlBuilder _publicUrlBuilder;
 
@@ -55,11 +56,13 @@ public class EventCalendarController : EventControllerBase
     private const string CalendarRetentionWarningHeader = "X-Calendar-Retention-Warning";
 
     public EventCalendarController(
-        IMediator mediator,
+        IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?> calendarExportHandler,
+        IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?> attendeeExportHandler,
         IEventCalendarFileBuilder calendarFileBuilder,
         Explore.Application.Contracts.Infrastructure.IPublicUrlBuilder publicUrlBuilder)
     {
-        _mediator = mediator;
+        _calendarExportHandler = calendarExportHandler;
+        _attendeeExportHandler = attendeeExportHandler;
         _calendarFileBuilder = calendarFileBuilder;
         _publicUrlBuilder = publicUrlBuilder;
     }
@@ -78,7 +81,7 @@ public class EventCalendarController : EventControllerBase
     public async Task<IActionResult> GetCalendar(Guid id, CancellationToken cancellationToken = default)
     {
         AddCalendarRetentionWarning();
-        var export = await _mediator.Send(new GetEventCalendarExportRequest(id), cancellationToken);
+        var export = await _calendarExportHandler.QueryAsync(new GetEventCalendarExportRequest(id), cancellationToken);
         if (export is null)
         {
             return this.ToNotFoundProblem(EventNotFoundProblem);
@@ -112,7 +115,7 @@ public class EventCalendarController : EventControllerBase
         CancellationToken cancellationToken = default)
     {
         AddCalendarRetentionWarning();
-        AttendeeEventCalendarExportDto? export = await _mediator.Send(
+        AttendeeEventCalendarExportDto? export = await _attendeeExportHandler.QueryAsync(
             new GetAttendeeEventCalendarExportRequest(id),
             cancellationToken);
         if (export is null)

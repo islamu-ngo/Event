@@ -1,19 +1,19 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public class ApplyKeycloakRealmSyncCommandHandler(
     IAuthProviderConfigurationService configurationService,
     IKeycloakBootstrapService keycloakBootstrapService)
-    : IRequestHandler<ApplyKeycloakRealmSyncCommand, KeycloakRealmSyncPlanDto>
+    : ICommandHandler<ApplyKeycloakRealmSyncCommand, KeycloakRealmSyncPlanDto>
 {
     private readonly IAuthProviderConfigurationService _configurationService = configurationService;
     private readonly IKeycloakBootstrapService _keycloakBootstrapService = keycloakBootstrapService;
 
-    public async Task<KeycloakRealmSyncPlanDto> Handle(
+    public async Task<KeycloakRealmSyncPlanDto> ExecuteAsync(
         ApplyKeycloakRealmSyncCommand request,
         CancellationToken cancellationToken)
     {

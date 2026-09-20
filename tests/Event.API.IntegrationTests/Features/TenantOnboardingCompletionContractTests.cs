@@ -1,13 +1,15 @@
 using System.Security.Claims;
+using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantPolicy;
 using Explore.Application.DTOs.TenantSettings;
 using Explore.Application.Features.TenantOnboarding.Requests.Commands;
+using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -21,11 +23,19 @@ public sealed class TenantOnboardingCompletionContractTests
     [Test]
     public async Task Complete_WithIdentityRequest_MapsDedicatedContractToCommand()
     {
-        Guid userId = Guid.CreateVersion7();
-        Guid expectedStamp = Guid.CreateVersion7();
-        var mediator = new CapturingMediator();
+        using var identity = new IdentityQueryTestScope();
+        Guid userId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000081");
+        Guid expectedStamp = Guid.Parse("018e4e5c-7f00-7000-8000-000000000082");
+        CompleteTenantOnboardingCommand? capturedCommand = null;
+        var completeHandler = Substitute.For<ICommandHandler<CompleteTenantOnboardingCommand, BaseCommandResponse<Guid>>>();
+        completeHandler.ExecuteAsync(Arg.Do<CompleteTenantOnboardingCommand>(c => capturedCommand = c), Arg.Any<CancellationToken>())
+            .Returns(BaseCommandResponse.Success(Guid.Parse("018e4e5c-7f00-7000-8000-000000000083"), "Completed."));
         var controller = new TenantOnboardingController(
-            mediator,
+            Substitute.For<IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto>>(),
+            Substitute.For<IQueryHandler<GetTenantPolicySettingsQuery, TenantPolicySettingsDto>>(),
+            completeHandler,
+            Substitute.For<ICommandHandler<SaveTenantOnboardingStepCommand, BaseCommandResponse<Guid>>>(),
+            identity.Query,
             Substitute.For<IResourceAssembler<TenantOnboardingStatusDto, TenantOnboardingStatusDto>>())
         {
             ControllerContext = new ControllerContext
@@ -59,33 +69,10 @@ public sealed class TenantOnboardingCompletionContractTests
             await controller.Complete(request, cache, CancellationToken.None);
 
         await Assert.That(response.Result).IsTypeOf<OkObjectResult>();
-        await Assert.That(mediator.Command).IsNotNull();
-        await Assert.That(mediator.Command!.UserId).IsEqualTo(userId);
-        await Assert.That(mediator.Command.DirectoryOperatorIdentity.PublicName).IsEqualTo("HTTP Operator");
-        await Assert.That(mediator.Command.ExpectedDirectoryOperatorIdentityConcurrencyStamp)
+        await Assert.That(capturedCommand).IsNotNull();
+        await Assert.That(capturedCommand!.UserId).IsEqualTo(userId);
+        await Assert.That(capturedCommand.DirectoryOperatorIdentity.PublicName).IsEqualTo("HTTP Operator");
+        await Assert.That(capturedCommand.ExpectedDirectoryOperatorIdentityConcurrencyStamp)
             .IsEqualTo(expectedStamp);
-    }
-
-    private sealed class CapturingMediator : IMediator
-    {
-        public CompleteTenantOnboardingCommand? Command { get; private set; }
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification => Task.CompletedTask;
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        {
-            if (request is CompleteTenantOnboardingCommand command)
-            {
-                Command = command;
-                object result = BaseCommandResponse.Success(Guid.CreateVersion7(), "Completed.");
-                return Task.FromResult((TResponse)result);
-            }
-            throw new InvalidOperationException($"Unexpected request {request.GetType().Name}.");
-        }
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest => Task.CompletedTask;
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

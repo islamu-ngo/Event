@@ -1,20 +1,20 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Validators;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 
 public sealed class RefreshAtprotoSessionCommandHandler(
     IAtprotoOAuthSecurityGateway securityGateway,
     IAtprotoSessionTokenIssuer tokenIssuer)
-    : IRequestHandler<RefreshAtprotoSessionCommand, AtprotoSessionRefreshResult>
+    : ICommandHandler<RefreshAtprotoSessionCommand, AtprotoSessionRefreshResult>
 {
-    public async Task<AtprotoSessionRefreshResult> Handle(
+    public async Task<AtprotoSessionRefreshResult> ExecuteAsync(
         RefreshAtprotoSessionCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         await new AtprotoCurrentSessionIdentityValidator()
             .ValidateAndThrowAsync(request.Identity, cancellationToken).ConfigureAwait(false);

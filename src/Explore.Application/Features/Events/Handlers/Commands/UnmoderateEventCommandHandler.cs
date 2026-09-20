@@ -7,8 +7,8 @@ using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Federation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Explore.Application.Features.Events.Moderation;
@@ -24,14 +24,14 @@ public sealed class UnmoderateEventCommandHandler(
     BusinessMetrics metrics,
     ILogger<UnmoderateEventCommandHandler> logger,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
-    TimeProvider timeProvider) : IRequestHandler<UnmoderateEventCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<UnmoderateEventCommand, BaseCommandResponse<Guid>>
 {
     private const string InvalidStatusFailureCode = "event_unmoderation_invalid_status";
     private const string NotReversibleFailureCode = "event_unmoderation_not_reversible";
     private const string UserResolutionFailureCode = "event_unmoderation_user_unresolved";
     private const string ActionKind = "unmoderated";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UnmoderateEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UnmoderateEventCommand request, CancellationToken cancellationToken)
     {
         // Reason metadata is normalized here rather than at the transport boundary so every caller of this
         // command — HTTP, MCP, or an internal moderation flow — is held to the same audit-code shape.

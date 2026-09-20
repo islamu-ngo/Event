@@ -1,8 +1,8 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAggregateView;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventAggregateViews.Requests.Queries;
 
@@ -11,4 +11,4 @@ public sealed record GetEventListAggregateViewQuery(
     AggregateViewFilterDto Filter,
     ExposureLevel ExposureCeiling,
     int Page,
-    int PageSize) : IRequest<BaseCommandResponse<PaginatedResult<EventListAggregateViewDto>>>, ISecureRequest;
+    int PageSize) : IQuery<BaseCommandResponse<PaginatedResult<EventListAggregateViewDto>>>, ISecureRequest;

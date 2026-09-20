@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.PlatformMonetization.Requests.Commands;
 using Explore.Application.Features.PlatformMonetization.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.PlatformMonetization.Handlers.Commands;
 
@@ -15,10 +15,10 @@ public sealed class UpdatePlatformMonetizationSettingsCommandHandler(
     IPlatformFeePolicyRepository feePolicies,
     IPlatformContributionSettingRepository contributions,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdatePlatformMonetizationSettingsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdatePlatformMonetizationSettingsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        UpdatePlatformMonetizationSettingsCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        UpdatePlatformMonetizationSettingsCommand command,
         CancellationToken cancellationToken)
     {
         if (!await adminContext.IsInstanceAdminAsync(cancellationToken))
@@ -26,7 +26,7 @@ public sealed class UpdatePlatformMonetizationSettingsCommandHandler(
             throw new AuthorizationException(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.Update);
         }
 
-        var validation = await new UpdatePlatformMonetizationSettingsValidator().ValidateAsync(request, cancellationToken);
+        var validation = await new UpdatePlatformMonetizationSettingsValidator().ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
             throw new ValidationException(validation);
@@ -46,7 +46,7 @@ public sealed class UpdatePlatformMonetizationSettingsCommandHandler(
                 throw new NotFoundException(nameof(PlatformContributionSetting), "active");
             }
 
-            if (fee.VersionNumber != request.Settings.ExpectedFeeVersion)
+            if (fee.VersionNumber != command.Settings.ExpectedFeeVersion)
             {
                 throw new ConcurrencyConflictException(
                     ConcurrencyConflictException.ConcurrentUpdate,
@@ -55,7 +55,7 @@ public sealed class UpdatePlatformMonetizationSettingsCommandHandler(
                     fee.Id.ToString());
             }
 
-            if (contribution.VersionNumber != request.Settings.ExpectedContributionVersion)
+            if (contribution.VersionNumber != command.Settings.ExpectedContributionVersion)
             {
                 throw new ConcurrencyConflictException(
                     ConcurrencyConflictException.ConcurrentUpdate,
@@ -65,15 +65,15 @@ public sealed class UpdatePlatformMonetizationSettingsCommandHandler(
             }
 
             PlatformFeePolicy feeRevision = fee.CreateRevision(
-                request.Settings.FeeEnabled,
-                request.Settings.FeeBasisPoints,
-                request.Settings.FixedCharges.Select(charge =>
+                command.Settings.FeeEnabled,
+                command.Settings.FeeBasisPoints,
+                command.Settings.FixedCharges.Select(charge =>
                     PlatformFeeFixedCharge.Create(charge.CurrencyCode, charge.AmountMinor)));
             PlatformContributionSetting contributionRevision = contribution.CreateRevision(
-                request.Settings.ContributionEnabled,
-                request.Settings.ContributionHeading,
-                request.Settings.ContributionBody,
-                request.Settings.ContributionOptions.Select(option =>
+                command.Settings.ContributionEnabled,
+                command.Settings.ContributionHeading,
+                command.Settings.ContributionBody,
+                command.Settings.ContributionOptions.Select(option =>
                     PlatformContributionOption.Create(option.ContributionBasisPoints, option.SortOrder, option.IsDefault)));
 
             await feePolicies.UpdateAsync(fee, token);

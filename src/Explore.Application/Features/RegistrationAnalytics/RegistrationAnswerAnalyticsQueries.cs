@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationAnalytics;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationAnalytics;
 
@@ -8,7 +8,7 @@ namespace Explore.Application.Features.RegistrationAnalytics;
 public sealed record GetRegistrationAnswerAnalyticsQuery(
     Guid EventId,
     Guid FormId,
-    Guid FormVersionId) : IRequest<RegistrationAnswerAnalyticsDto?>, ISecureRequest
+    Guid FormVersionId) : IQuery<RegistrationAnswerAnalyticsDto?>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString("D");
 

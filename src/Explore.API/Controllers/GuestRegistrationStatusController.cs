@@ -7,11 +7,12 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -22,7 +23,8 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Route("api/events/{eventId:guid}/guest-registration-orders/{orderId:guid}")]
 public sealed class GuestRegistrationStatusController(
-    ISender sender,
+    ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>> cancelCommandHandler,
+    IQueryHandler<GetGuestRegistrationStatusQuery, GuestRegistrationStatusDto?> getStatusQueryHandler,
     IResourceAssembler<GuestRegistrationStatusDto, GuestRegistrationStatusDto> assembler,
     TimeProvider timeProvider) : ControllerBase
 {
@@ -54,7 +56,7 @@ public sealed class GuestRegistrationStatusController(
         Guid orderId,
         [FromHeader(Name = "X-Registration-Order-Capability")] string? capability,
         CancellationToken cancellationToken = default) =>
-        CancellationFailures.Map(this, await sender.Send(
+        CancellationFailures.Map(this, await cancelCommandHandler.ExecuteAsync(
             new CancelConfirmedGuestRegistrationCommand(eventId, orderId, capability), cancellationToken),
             onSuccess: NoContent);
 
@@ -73,7 +75,7 @@ public sealed class GuestRegistrationStatusController(
         [FromHeader(Name = "X-Registration-Order-Capability")] string? capability,
         CancellationToken cancellationToken = default)
     {
-        GuestRegistrationStatusDto? status = await sender.Send(
+        GuestRegistrationStatusDto? status = await getStatusQueryHandler.QueryAsync(
             new GetGuestRegistrationStatusQuery(eventId, orderId, capability), cancellationToken);
         if (status is null)
         {

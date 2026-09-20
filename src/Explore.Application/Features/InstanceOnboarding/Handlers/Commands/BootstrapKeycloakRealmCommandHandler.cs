@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
@@ -5,13 +6,12 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
 public class BootstrapKeycloakRealmCommandHandler
-    : IRequestHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>>
 {
     private readonly IKeycloakBootstrapService _keycloakBootstrapService;
     private readonly IAuthProviderConfigurationService _configurationService;
@@ -33,7 +33,7 @@ public class BootstrapKeycloakRealmCommandHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         BootstrapKeycloakRealmCommand request,
         CancellationToken cancellationToken)
     {

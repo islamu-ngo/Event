@@ -263,7 +263,7 @@ Lifecycle state changes are semantic aggregate operations. Application coordinat
 | Cross-entity operation | Domain service | Coordinate multiple entities |
 | External integration | Infrastructure service | Isolate external dependencies |
 | Validation | FluentValidation | Consistent, testable rules |
-| Mapping | AutoMapper | Convention-based, less boilerplate |
+| Mapping | Named static Mapperly projections or explicit input allowlists | Compile-time mapping; handler/domain-owned mutation |
 
 ### When NOT to Use Patterns
 
@@ -272,7 +272,7 @@ Lifecycle state changes are semantic aggregate operations. Application coordinat
 | Repository for simple lookups | Over-engineering |
 | Domain service for single-entity ops | Should be in handler |
 | Generic repository for complex queries | Loses optimization |
-| MediatR behaviors for one-off logic | Use handler directly |
+| Generic decorators for one-off business logic | Keep capability-specific logic in its handler |
 
 ---
 
@@ -327,7 +327,7 @@ See [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) for the layer-by-layer implementa
 
 ### Selection
 
-- A concrete handwritten MediatR request defaults to a sealed record. A retained class needs a current, reasoned shrinking-baseline entry.
+- A concrete handwritten native command/query request defaults to a sealed record. A retained class needs a current, reasoned shrinking-baseline entry.
 - Use a positional record for a short, stable contract with semantically distinct parameters. Use a nominal record with `init`/`required` members for long or optional contracts, named-construction safety, attributes, or PATCH presence semantics.
 - Use a `readonly record struct` only for a small, self-contained value with correct copy/value semantics; use a sealed record class for reference-bearing value data when appropriate.
 
@@ -541,7 +541,7 @@ For detailed code patterns and examples, see:
 | Skill | Content |
 |-------|---------|
 | `clean-architecture-rules` | Layer boundaries, dependency rules |
-| `cqrs-mediatr-guidelines` | Commands, queries, handlers |
+| `cqrs-guidelines` | Commands, queries, handlers |
 | `dotnet-efcore-guidelines` | DbContext, repositories, queries |
 | `blazor-ui-conventions` | Component patterns, state management |
 | `auth-patterns` | User ID extraction, authorization |
@@ -559,7 +559,7 @@ Every change — human or agent — routes through the Contribution Contract bef
 | Adding read endpoint | `add-get-endpoint` | `docs/API.md`, `.agents/rules/api-controllers.md` |
 | Adding/modifying mutation endpoint | `add-write-endpoint` | `docs/API.md`, `.agents/rules/api-controllers.md`, `auth-patterns` |
 | Adding HAL affordance / link-based button | `add-hal-link` | `.agents/rules/api-hateoas.md`, `auth-patterns` |
-| New MediatR command/query | `add-cqrs-handler` | `cqrs-mediatr-guidelines`, `.agents/rules/application-layer.md` |
+| New native command/query | `add-cqrs-handler` | `cqrs-guidelines`, `.agents/rules/application-layer.md` |
 | New EF Core migration | `add-ef-migration` | `dotnet-efcore-guidelines`, `.agents/rules/efcore-migrations.md` |
 | Repository query change | `update-repository-query` | `dotnet-efcore-guidelines`, `.agents/rules/efcore-persistence.md` |
 | Repository-wide test architecture refactor | `test-suite-rationalization` | `docs/TESTING.md`, `.agents/rules/tests.md`, `refactor-safely` |

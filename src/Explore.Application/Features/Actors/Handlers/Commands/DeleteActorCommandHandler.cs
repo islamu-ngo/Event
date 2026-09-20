@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Actors.Requests.Commands;
-using MediatR;
 
 namespace Explore.Application.Features.Actors.Handlers.Commands;
 
-public class DeleteActorCommandHandler : IRequestHandler<DeleteActorCommand, bool>
+public class DeleteActorCommandHandler : ICommandHandler<DeleteActorCommand, bool>
 {
     private readonly IActorRepository _actorRepository;
 
@@ -13,7 +13,7 @@ public class DeleteActorCommandHandler : IRequestHandler<DeleteActorCommand, boo
         _actorRepository = actorRepository;
     }
 
-    public async Task<bool> Handle(DeleteActorCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteActorCommand request, CancellationToken cancellationToken)
     {
         var actor = await _actorRepository.GetById(request.Id);
 

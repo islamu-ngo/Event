@@ -18,17 +18,21 @@ public class CustomPropertyGovernanceRepository : ICustomPropertyGovernanceRepos
         string? entityScopeFilter,
         int pageNumber,
         int pageSize,
+        PromotionRecommendation? recommendationFilter,
+        int totalEventCount,
         CancellationToken cancellationToken)
     {
         var eventDefs = _dbContext.EventCustomPropertyDefinitions
             .AsNoTracking()
             .Where(d => d.TenantId == tenantId && d.IsActive)
-            .Select(d => new GovernanceDefinitionRow(
+            .Select(d => new
+            {
+                d.Id,
                 d.TenantId,
                 d.Namespace,
                 d.Key,
                 d.DisplayName,
-                "Event",
+                EntityScope = "Event",
                 d.PropertyType,
                 d.ExposureLevel,
                 d.IsSearchable,
@@ -37,18 +41,21 @@ public class CustomPropertyGovernanceRepository : ICustomPropertyGovernanceRepos
                 d.IsModerationRelevant,
                 d.IsAnalyticsRelevant,
                 d.IsSystemOwned,
-                d.Values!.Count,
-                d.Values!.Max(v => v.UpdatedAt)));
+                ActiveInstanceCount = d.Values.Count,
+                LastUsedAt = d.Values.Max(v => v.UpdatedAt)
+            });
 
         var sessionDefs = _dbContext.EventSessionCustomPropertyDefinitions
             .AsNoTracking()
             .Where(d => d.TenantId == tenantId && d.IsActive)
-            .Select(d => new GovernanceDefinitionRow(
+            .Select(d => new
+            {
+                d.Id,
                 d.TenantId,
                 d.Namespace,
                 d.Key,
                 d.DisplayName,
-                "EventSession",
+                EntityScope = "EventSession",
                 d.PropertyType,
                 d.ExposureLevel,
                 d.IsSearchable,
@@ -57,8 +64,9 @@ public class CustomPropertyGovernanceRepository : ICustomPropertyGovernanceRepos
                 d.IsModerationRelevant,
                 d.IsAnalyticsRelevant,
                 d.IsSystemOwned,
-                d.Values!.Count,
-                d.Values!.Max(v => v.UpdatedAt)));
+                ActiveInstanceCount = d.Values.Count,
+                LastUsedAt = d.Values.Max(v => v.UpdatedAt)
+            });
 
         var combined = eventDefs.Concat(sessionDefs);
 
@@ -67,14 +75,33 @@ public class CustomPropertyGovernanceRepository : ICustomPropertyGovernanceRepos
             combined = combined.Where(r => r.EntityScope == entityScopeFilter);
         }
 
+        if (recommendationFilter.HasValue)
+        {
+            combined = combined.Where(r =>
+                (r.IsModerationRelevant && (r.IsSearchable || r.IsFilterable)
+                    && totalEventCount > 0 && (long)r.ActiveInstanceCount * 100 / totalEventCount >= 30
+                    ? PromotionRecommendation.ConsiderLayer1Promotion
+                    : r.IsModerationRelevant || r.IsAnalyticsRelevant
+                        ? PromotionRecommendation.ConsiderLayer2Promotion
+                        : r.IsSearchable || r.IsFilterable
+                            ? PromotionRecommendation.ConsiderProjectionFirst
+                            : PromotionRecommendation.None) == recommendationFilter.Value);
+        }
+
         var totalCount = await combined.CountAsync(cancellationToken);
 
         var items = await combined
             .OrderBy(r => r.EntityScope)
             .ThenBy(r => r.Namespace)
             .ThenBy(r => r.Key)
+            .ThenBy(r => r.Id)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
+            .Select(r => new GovernanceDefinitionRow(
+                r.TenantId, r.Namespace, r.Key, r.DisplayName, r.EntityScope,
+                r.PropertyType, r.ExposureLevel, r.IsSearchable, r.IsFilterable,
+                r.IsExportable, r.IsModerationRelevant, r.IsAnalyticsRelevant,
+                r.IsSystemOwned, r.ActiveInstanceCount, r.LastUsedAt))
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);

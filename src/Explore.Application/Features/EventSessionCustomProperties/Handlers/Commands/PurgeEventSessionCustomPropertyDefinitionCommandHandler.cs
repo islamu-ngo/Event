@@ -5,12 +5,12 @@ using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IRequestHandler<PurgeEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
+public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : ICommandHandler<PurgeEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
 {
     private readonly IEventSessionCustomPropertyRepository _repository;
     private readonly IAuditLogRepository _auditLogRepository;
@@ -35,7 +35,7 @@ public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IR
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> Handle(PurgeEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> ExecuteAsync(PurgeEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var reason = request.Reason.Trim();
         if (string.IsNullOrWhiteSpace(reason))
@@ -97,7 +97,7 @@ public sealed class PurgeEventSessionCustomPropertyDefinitionCommandHandler : IR
 
         if (purged)
         {
-            await _cache.RemoveAsync($"session-custom-properties:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(SessionCustomPropertyCache.ListsByTenant(summary.TenantId), CancellationToken.None);
             return BaseCommandResponse.Success(result, "Session custom-property definition purged successfully.");
         }
 

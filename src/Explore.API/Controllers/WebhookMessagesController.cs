@@ -14,7 +14,7 @@ using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -38,7 +38,13 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class WebhookMessagesController(
-    IMediator mediator,
+    IQueryHandler<GetWebhookMessagesQuery, IReadOnlyList<WebhookMessageDto>> getMessagesHandler,
+    IQueryHandler<GetWebhookMessageByIdQuery, WebhookMessageDto?> getMessageHandler,
+    IQueryHandler<GetWebhookMessagePayloadQuery, WebhookMessagePayloadReadResult> getMessagePayloadHandler,
+    IQueryHandler<GetWebhookDeliveryAttemptsQuery, IReadOnlyList<WebhookDeliveryAttemptDto>> getDeliveryAttemptsHandler,
+    IQueryHandler<GetWebhookDeliveryAttemptByIdQuery, WebhookDeliveryAttemptDto?> getDeliveryAttemptHandler,
+    ICommandHandler<RetryWebhookDeliveryAttemptCommand, BaseCommandResponse<Guid>> retryDeliveryAttemptHandler,
+    ICommandHandler<RedriveIncomingWebhookCommand, BaseCommandResponse<Guid>> redriveIncomingHandler,
     ITenantContext tenantContext,
     IResourceAssembler<WebhookMessageDto, WebhookMessageDto> webhookMessageAssembler,
     IResourceAssembler<WebhookDeliveryAttemptDto, WebhookDeliveryAttemptDto> webhookDeliveryAttemptAssembler,
@@ -105,7 +111,7 @@ public sealed class WebhookMessagesController(
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var messages = await mediator.Send(
+        var messages = await getMessagesHandler.QueryAsync(
             new GetWebhookMessagesQuery
             {
                 OwnerKindId = ownerKindId,
@@ -137,7 +143,7 @@ public sealed class WebhookMessagesController(
         Guid messageId,
         CancellationToken cancellationToken = default)
     {
-        var message = await mediator.Send(
+        var message = await getMessageHandler.QueryAsync(
             new GetWebhookMessageByIdQuery
             {
                 MessageId = messageId
@@ -170,7 +176,7 @@ public sealed class WebhookMessagesController(
         Guid messageId,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await getMessagePayloadHandler.QueryAsync(
             new GetWebhookMessagePayloadQuery
             {
                 MessageId = messageId
@@ -211,7 +217,7 @@ public sealed class WebhookMessagesController(
         var normalizedEndpointId = endpointId is { } requestedEndpointId && requestedEndpointId != Guid.Empty
             ? requestedEndpointId
             : (Guid?)null;
-        var attempts = await mediator.Send(
+        var attempts = await getDeliveryAttemptsHandler.QueryAsync(
             new GetWebhookDeliveryAttemptsQuery
             {
                 OwnerKindId = ownerKindId,
@@ -251,7 +257,7 @@ public sealed class WebhookMessagesController(
         Guid attemptId,
         CancellationToken cancellationToken = default)
     {
-        var attempt = await mediator.Send(
+        var attempt = await getDeliveryAttemptHandler.QueryAsync(
             new GetWebhookDeliveryAttemptByIdQuery
             {
                 AttemptId = attemptId
@@ -282,7 +288,7 @@ public sealed class WebhookMessagesController(
         Guid attemptId,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await retryDeliveryAttemptHandler.ExecuteAsync(
             new RetryWebhookDeliveryAttemptCommand
             {
                 AttemptId = attemptId
@@ -310,7 +316,7 @@ public sealed class WebhookMessagesController(
         [FromBody] RedriveIncomingWebhookRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await redriveIncomingHandler.ExecuteAsync(
             new RedriveIncomingWebhookCommand
             {
                 TenantId = tenantContext.TenantId,

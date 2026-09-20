@@ -4,12 +4,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventAspects.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Handler for deleting the Tech aspect from an event.
 /// </summary>
-public class DeleteEventTechAspectCommandHandler : IRequestHandler<DeleteEventTechAspectCommand, bool>
+public class DeleteEventTechAspectCommandHandler : ICommandHandler<DeleteEventTechAspectCommand, bool>
 {
     private readonly IEventTechAspectRepository _techAspectRepository;
 
@@ -18,7 +18,7 @@ public class DeleteEventTechAspectCommandHandler : IRequestHandler<DeleteEventTe
         _techAspectRepository = techAspectRepository;
     }
 
-    public async Task<bool> Handle(DeleteEventTechAspectCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventTechAspectCommand request, CancellationToken cancellationToken)
     {
         var aspect = await _techAspectRepository.GetById(request.EventId);
 

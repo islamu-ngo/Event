@@ -1,4 +1,5 @@
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionGroup;
@@ -6,32 +7,27 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Queries;
 
-public class GetEventSessionGroupDetailRequestHandler : IRequestHandler<GetEventSessionGroupDetailRequest, EventSessionGroupDto?>
+public class GetEventSessionGroupDetailRequestHandler : IQueryHandler<GetEventSessionGroupDetailRequest, EventSessionGroupDto?>
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventSessionGroupDetailRequestHandler(
         IEventSessionGroupRepository eventSessionGroupRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _eventSessionGroupRepository = eventSessionGroupRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventSessionGroupDto?> Handle(GetEventSessionGroupDetailRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionGroupDto?> QueryAsync(GetEventSessionGroupDetailRequest query, CancellationToken cancellationToken = default)
     {
-        var group = await _eventSessionGroupRepository.GetPublicWithDetailsAsync(request.Id, cancellationToken);
+        var group = await _eventSessionGroupRepository.GetPublicWithDetailsAsync(query.Id, cancellationToken);
         return await PublicEventSessionGroupLocationProjector.ProjectAsync(
             group,
-            _mapper,
             _disclosureService,
             cancellationToken);
     }
@@ -41,7 +37,6 @@ internal static class PublicEventSessionGroupLocationProjector
 {
     public static async Task<EventSessionGroupDto?> ProjectAsync(
         EventSessionGroup? group,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -55,7 +50,7 @@ internal static class PublicEventSessionGroupLocationProjector
                 disclosureService,
                 [Placement(group)],
                 cancellationToken);
-        EventSessionGroupDto dto = mapper.Map<EventSessionGroupDto>(group);
+        EventSessionGroupDto dto = EventSessionMapper.ToDetail(group);
         ClearLegacyLocation(dto);
         dto.EventLocation = group.EventLocationId is { } eventLocationId
             ? locations.GetValueOrDefault(eventLocationId)
@@ -65,7 +60,6 @@ internal static class PublicEventSessionGroupLocationProjector
 
     public static async Task<List<EventSessionGroupListDto>> ProjectAsync(
         IReadOnlyCollection<EventSessionGroup> groups,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -74,7 +68,7 @@ internal static class PublicEventSessionGroupLocationProjector
                 disclosureService,
                 groups.Select(Placement),
                 cancellationToken);
-        List<EventSessionGroupListDto> dtos = mapper.Map<List<EventSessionGroupListDto>>(groups);
+        List<EventSessionGroupListDto> dtos = groups.Select(EventSessionMapper.ToListItem).ToList();
         IReadOnlyDictionary<Guid, EventSessionGroup> groupById = groups.ToDictionary(group => group.Id);
         foreach (EventSessionGroupListDto dto in dtos)
         {

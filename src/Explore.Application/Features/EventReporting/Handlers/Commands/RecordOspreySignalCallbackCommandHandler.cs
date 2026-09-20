@@ -1,5 +1,6 @@
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Models;
@@ -8,16 +9,15 @@ using Explore.Application.Features.EventReporting.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
 public sealed class RecordOspreySignalCallbackCommandHandler(
     IEventReportRepository eventReportRepository,
     IUnitOfWork unitOfWork,
-    ITenantContext tenantContext) : IRequestHandler<RecordOspreySignalCallbackCommand, BaseCommandResponse<Guid>>
+    ITenantContext tenantContext) : ICommandHandler<RecordOspreySignalCallbackCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         RecordOspreySignalCallbackCommand request,
         CancellationToken cancellationToken)
     {

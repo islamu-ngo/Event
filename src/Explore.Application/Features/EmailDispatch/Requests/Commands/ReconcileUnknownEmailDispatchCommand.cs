@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EmailDispatch, AuthorizationActions.EmailDispatches.Reconcile)]
-public sealed record ReconcileUnknownEmailDispatchCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ReconcileUnknownEmailDispatchCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid OutboxId { get; init; }

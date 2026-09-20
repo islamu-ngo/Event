@@ -2,16 +2,16 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Modules.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Modules.Handlers.Commands;
 
 public sealed class EnableTenantModuleCommandHandler(
     IModuleService moduleService,
     IAdminContext adminContext)
-    : IRequestHandler<EnableTenantModuleCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<EnableTenantModuleCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         EnableTenantModuleCommand request,
         CancellationToken cancellationToken)
     {

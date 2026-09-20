@@ -1,4 +1,5 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
@@ -6,14 +7,13 @@ using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventRoleAssignments.Handlers.Commands;
 
 public sealed class TransferEventOwnershipCommandHandler
     : EventRoleAssignmentCommandHandlerBase,
-      IRequestHandler<TransferEventOwnershipCommand, BaseCommandResponse<Guid>>
+      ICommandHandler<TransferEventOwnershipCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRoleAssignmentRepository _assignmentRepository;
     private readonly IEventRepository _eventRepository;
@@ -44,7 +44,7 @@ public sealed class TransferEventOwnershipCommandHandler
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(TransferEventOwnershipCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(TransferEventOwnershipCommand request, CancellationToken cancellationToken = default)
     {
         var @event = await GetEventInTenantAsync(_eventRepository, request.TenantId, request.EventId);
         if (@event is null)

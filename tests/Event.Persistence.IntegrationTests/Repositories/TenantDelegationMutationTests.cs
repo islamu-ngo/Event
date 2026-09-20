@@ -63,7 +63,7 @@ public sealed class TenantDelegationMutationTests
             try
             {
                 await holderOwnsLock.Task.WaitAsync(TimeSpan.FromSeconds(15));
-                write = handler.Handle(new UpdateTenantDelegationSettingsCommand
+                write = handler.ExecuteAsync(new UpdateTenantDelegationSettingsCommand
                 {
                     UserId = administrator,
                     Patch = new PatchTenantDelegationSettingsDto
@@ -134,7 +134,7 @@ public sealed class TenantDelegationMutationTests
                 return Task.CompletedTask;
             });
             using var fixture = new InstanceSettingsCommandFixture(writerContext, administrator, mutationLock);
-            var result = await CreateHandler(fixture).Handle(new UpdateTenantDelegationSettingsCommand
+            var result = await CreateHandler(fixture).ExecuteAsync(new UpdateTenantDelegationSettingsCommand
             {
                 UserId = administrator,
                 Patch = new PatchTenantDelegationSettingsDto
@@ -170,7 +170,7 @@ public sealed class TenantDelegationMutationTests
             var transaction = new TransactionObserver();
             await using var writerContext = CreateContext(databasePath, transaction);
             using var fixture = new InstanceSettingsCommandFixture(writerContext, administrator);
-            var result = await CreateHandler(fixture).Handle(new UpdateTenantDelegationSettingsCommand
+            var result = await CreateHandler(fixture).ExecuteAsync(new UpdateTenantDelegationSettingsCommand
             {
                 UserId = unauthorized ? Guid.CreateVersion7() : administrator,
                 Patch = unauthorized
@@ -187,7 +187,7 @@ public sealed class TenantDelegationMutationTests
     }
 
     private static UpdateTenantDelegationSettingsCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
-        new(fixture.AdminContext, fixture.Governance, fixture.UnitOfWork, fixture.Mediator, fixture.MutationLock);
+        new(fixture.AdminContext, fixture.Governance, fixture.UnitOfWork, fixture.NotificationHandlers, fixture.MutationLock);
 
     private static Task SetDeploymentAsync(ExploreDbContext context, RelationalSettingMutationLock mutationLock,
         string value, CancellationToken cancellationToken = default) =>

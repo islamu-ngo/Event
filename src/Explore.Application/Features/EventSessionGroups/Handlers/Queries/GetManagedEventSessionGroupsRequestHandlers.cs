@@ -1,22 +1,21 @@
-using AutoMapper;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
-using MediatR;
+using Explore.Application.Mappings;
 
 namespace Explore.Application.Features.EventSessionGroups.Handlers.Queries;
 
 public sealed class GetManagedEventSessionGroupsByEventRequestHandler(
-    IEventSessionGroupRepository repository,
-    IMapper mapper)
-    : IRequestHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>
+    IEventSessionGroupRepository repository)
+    : IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>>
 {
-    public async Task<List<EventSessionGroupListDto>> Handle(
+    public async Task<List<EventSessionGroupListDto>> QueryAsync(
         GetManagedEventSessionGroupsByEventRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var groups = await repository.GetActiveByEventAsync(request.EventId, cancellationToken);
-        var dtos = mapper.Map<List<EventSessionGroupListDto>>(groups);
+        var dtos = groups.Select(EventSessionMapper.ToListItem).ToList();
         for (var index = 0; index < dtos.Count; index++)
         {
             var group = groups[index];
@@ -32,19 +31,18 @@ public sealed class GetManagedEventSessionGroupsByEventRequestHandler(
 }
 
 public sealed class GetManagedEventSessionGroupDetailRequestHandler(
-    IEventSessionGroupRepository repository,
-    IMapper mapper)
-    : IRequestHandler<GetManagedEventSessionGroupDetailRequest, EventSessionGroupDto?>
+    IEventSessionGroupRepository repository)
+    : IQueryHandler<GetManagedEventSessionGroupDetailRequest, EventSessionGroupDto?>
 {
-    public async Task<EventSessionGroupDto?> Handle(
+    public async Task<EventSessionGroupDto?> QueryAsync(
         GetManagedEventSessionGroupDetailRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var group = await repository.GetWithDetailsAsync(request.Id, cancellationToken);
         if (group?.EventId != request.EventId)
             return null;
 
-        var dto = mapper.Map<EventSessionGroupDto>(group);
+        var dto = EventSessionMapper.ToDetail(group);
         dto.LocationId = group.LocationId;
         dto.LocationName = group.Location?.FullName;
         dto.RoomId = group.RoomId;
@@ -52,3 +50,4 @@ public sealed class GetManagedEventSessionGroupDetailRequestHandler(
         return dto;
     }
 }
+

@@ -136,16 +136,19 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 var secretValue = secret.SecretValue;
                 if (string.IsNullOrWhiteSpace(secretValue)) continue;
 
-                var effectivePath = !string.IsNullOrWhiteSpace(secret.SecretPath)
-                    ? secret.SecretPath
-                    : path;
-
-                // Convert to .NET configuration key format
-                var configKey = ConvertToConfigurationKey(secret.SecretKey, effectivePath);
+                var secretPath = ValidateSecretPath(secret.SecretPath, path);
+                var configKey = ConvertToConfigurationKey(secret.SecretKey, secretPath);
                 newData[configKey] = secretValue;
 
-                // Also store with original key for direct access
-                newData[secret.SecretKey] = secretValue;
+                // Flat deployment aliases belong to the requested folder, not recursive children.
+                // Explicit identity/erasure reads must also never publish primary database aliases.
+                if (secretPath.Equals(path.TrimEnd('/'), StringComparison.Ordinal)
+                    && (!secretPath.StartsWith("/database/", StringComparison.Ordinal)
+                        || secretPath == "/database/identity" && secret.SecretKey.StartsWith("IDENTITY_DATABASE_", StringComparison.OrdinalIgnoreCase)
+                        || secretPath == "/database/erasure" && secret.SecretKey.StartsWith("ERASURE_DATABASE_", StringComparison.OrdinalIgnoreCase)))
+                {
+                    newData[secret.SecretKey] = secretValue;
+                }
 
                 if (configKey.Equals("Database:Name", StringComparison.OrdinalIgnoreCase))
                 {
@@ -219,19 +222,6 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                             break;
                     }
                 }
-                else if (configKey.StartsWith("Licensing:LuckyPenny:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var suffix = configKey["Licensing:LuckyPenny:".Length..];
-                    switch (suffix)
-                    {
-                        case "Enabled":
-                            newData["USE_COMMERCIAL_LUCKYPENNY"] = secretValue;
-                            break;
-                        case "LicenseKey":
-                            newData["LUCKYPENNY_LICENSE_KEY"] = secretValue;
-                            break;
-                    }
-                }
 
             }
         }
@@ -253,6 +243,19 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             Console.Error.WriteLine(
                 "[Infisical] secret_authority_reload_failed; keeping the last-known-good configuration.");
         }
+    }
+
+    private static string ValidateSecretPath(string? secretPath, string requestedPath)
+    {
+        var path = secretPath?.TrimEnd('/');
+        var root = requestedPath.TrimEnd('/');
+        if (secretPath is null || !secretPath.StartsWith('/')
+            || secretPath.Split('/').Any(segment => segment is "." or "..")
+            || !(root.Length == 0 || path == root || path!.StartsWith(root + "/", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("secret_authority_invalid");
+        }
+        return path!;
     }
 
     private static InvalidOperationException ProviderFailure(HttpStatusCode statusCode) =>
@@ -316,7 +319,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     internal sealed record InfisicalRawSecret(
         [property: JsonPropertyName("secretKey")] string? SecretKey,
         [property: JsonPropertyName("secretValue")] string? SecretValue,
-        [property: JsonPropertyName("secretPath")] string? SecretPath = null,
+        [property: JsonPropertyName("secretPath")] string? SecretPath,
         [property: JsonPropertyName("version")] int? Version = null);
 
     /// <summary>
@@ -329,9 +332,8 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
         // 1. Privacy Erasure Authority Database (/database/erasure) -> Database:Erasure:*
         if (normalizedPath.Equals("database/erasure", StringComparison.OrdinalIgnoreCase))
         {
-            // Keys carry the ERASURE_DATABASE_ prefix so they stay distinct from the primary
-            // /database keys. Folder reads are recursive, so an unprefixed DATABASE_HOST stored
-            // here would also be returned by the /database read and overwrite Database:Host.
+            // ERASURE_DATABASE_ is the external authority contract. Recursive reads use the
+            // returned folder provenance, so child fields cannot become primary database fields.
             return secretKey.ToUpperInvariant() switch
             {
                 "ERASURE_DATABASE_HOST" => "Database:Erasure:Host",
@@ -510,23 +512,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             return $"RateLimiting:{string.Join(":", rateLimitingConfigParts)}";
         }
 
-        // 9. Licensing (/licensing or /api/licensing) -> Licensing:LuckyPenny:*
-        if (normalizedPath.Equals("licensing", StringComparison.OrdinalIgnoreCase)
-            || normalizedPath.Equals("api/licensing", StringComparison.OrdinalIgnoreCase))
-        {
-            var key = secretKey.ToUpperInvariant();
-            if (key.StartsWith("LICENSING_", StringComparison.Ordinal))
-                key = key["LICENSING_".Length..];
-
-            return key switch
-            {
-                "USE_COMMERCIAL_LUCKYPENNY" or "LUCKYPENNY_ENABLED" or "COMMERCIAL_ENABLED" => "Licensing:LuckyPenny:Enabled",
-                "LUCKYPENNY_LICENSE_KEY" or "LUCKYPENNY_KEY" or "LICENSE_KEY" => "Licensing:LuckyPenny:LicenseKey",
-                _ => $"Licensing:{ToPascalCase(key)}"
-            };
-        }
-
-        // 10. Legacy /api folder aliases for backwards compatibility
+        // 9. Flat /api folder aliases
         if (normalizedPath.Equals("api", StringComparison.OrdinalIgnoreCase))
         {
             var upper = secretKey.ToUpperInvariant();
@@ -603,19 +589,15 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             if (upper is "WEB_PUSH_ENABLED")
                 return "WebPush:Enabled";
 
-            if (upper is "USE_COMMERCIAL_LUCKYPENNY")
-                return "Licensing:LuckyPenny:Enabled";
-            if (upper is "LUCKYPENNY_LICENSE_KEY")
-                return "Licensing:LuckyPenny:LicenseKey";
         }
 
-        // 11. Special mappings for common patterns
+        // 10. Special mappings for common patterns
         if (secretKey.Equals("AI_TOOL_PROPOSALS_ENABLED", StringComparison.OrdinalIgnoreCase))
         {
             return "AiProvider:ToolProposalsEnabled";
         }
 
-        // 12. Default path to section conversion
+        // 11. Default path to section conversion
         var pathSegments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var section = pathSegments.Length == 0 ? string.Empty : string.Join(":", pathSegments.Select(ToPascalCase)) + ":";
 

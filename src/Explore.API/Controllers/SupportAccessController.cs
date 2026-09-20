@@ -4,11 +4,12 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Commands;
 using Explore.Application.Features.SupportAccess.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +24,12 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class SupportAccessController(
-    IMediator mediator,
+    IQueryHandler<GetCurrentSupportAccessSessionQuery, CurrentSupportAccessSessionDto> getCurrentHandler,
+    ICommandHandler<StartSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto> startHandler,
+    ICommandHandler<StopSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto> stopHandler,
+    ICommandHandler<ForceStopSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto> forceStopHandler,
+    IQueryHandler<ListSupportAccessSessionsQuery, PaginatedResult<SupportAccessSessionDto>> listSessionsHandler,
+    IQueryHandler<GetSupportAccessAuditEventsQuery, PaginatedResult<SupportAccessAuditEventDto>> getAuditEventsHandler,
     IResourceAssembler<SupportAccessSessionDto, SupportAccessSessionDto> sessionAssembler,
     IResourceAssembler<SupportAccessAuditEventDto, SupportAccessAuditEventDto> auditEventAssembler) : EventControllerBase
 {
@@ -41,7 +47,7 @@ public sealed class SupportAccessController(
     public async Task<ActionResult<CurrentSupportAccessSessionDto>> GetCurrent(
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetCurrentSupportAccessSessionQuery(), cancellationToken);
+        var result = await getCurrentHandler.QueryAsync(new GetCurrentSupportAccessSessionQuery(), cancellationToken);
         return Ok(result);
     }
 
@@ -60,7 +66,7 @@ public sealed class SupportAccessController(
         [FromBody] StartSupportAccessSessionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await startHandler.ExecuteAsync(
             new StartSupportAccessSessionCommand
             {
                 TargetTenantId = request.TargetTenantId,
@@ -100,7 +106,7 @@ public sealed class SupportAccessController(
         [FromBody] StopSupportAccessSessionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await stopHandler.ExecuteAsync(
             new StopSupportAccessSessionCommand
             {
                 SessionId = sessionId,
@@ -132,7 +138,7 @@ public sealed class SupportAccessController(
         [FromBody] ForceStopSupportAccessSessionRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(
+        var response = await forceStopHandler.ExecuteAsync(
             new ForceStopSupportAccessSessionCommand
             {
                 SessionId = sessionId,
@@ -161,7 +167,7 @@ public sealed class SupportAccessController(
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await listSessionsHandler.QueryAsync(
             new ListSupportAccessSessionsQuery
             {
                 TargetTenantId = targetTenantId,
@@ -191,7 +197,7 @@ public sealed class SupportAccessController(
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await getAuditEventsHandler.QueryAsync(
             new GetSupportAccessAuditEventsQuery
             {
                 TargetTenantId = targetTenantId,

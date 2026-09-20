@@ -4,6 +4,8 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.Features.Notifications.Requests.Commands;
@@ -12,7 +14,6 @@ using Explore.Application.Features.Organizations.Requests.Commands;
 using Explore.Application.Features.Organizations.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -53,16 +54,46 @@ public class OrganizationController : EventControllerBase
         "Organization not found",
         "Organization not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetOrganizationNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> _notificationPreferences;
+    private readonly ICommandHandler<UpdateOrganizationNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> _updateNotificationPreferences;
+    private readonly ICommandHandler<SetOrganizationNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> _setNotificationMute;
+    private readonly ICommandHandler<CreateOrganizationCommand, BaseCommandResponse<Guid>> _createOrganization;
+    private readonly ICommandHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>> _updateOrganization;
+    private readonly ICommandHandler<DeleteOrganizationCommand, BaseCommandResponse<Guid>> _deleteOrganization;
+    private readonly ICommandHandler<UpdateOrganizationApprovalStatusCommand> _updateApproval;
+    private readonly IQueryHandler<GetOrganizationDetailsRequest, OrganizationDto?> _organizationDetails;
+    private readonly IQueryHandler<GetOrganizationListRequest, PaginatedResult<OrganizationListDto>> _organizationList;
+    private readonly IQueryHandler<GetMyOrganizationsRequest, PaginatedResult<OrganizationListDto>> _myOrganizations;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<OrganizationDto, OrganizationListDto> _resourceAssembler;
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
 
     public OrganizationController(
-        IMediator mediator,
+        IQueryHandler<GetOrganizationNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> notificationPreferences,
+        ICommandHandler<UpdateOrganizationNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> updateNotificationPreferences,
+        ICommandHandler<SetOrganizationNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> setNotificationMute,
+        ICommandHandler<CreateOrganizationCommand, BaseCommandResponse<Guid>> createOrganization,
+        ICommandHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>> updateOrganization,
+        ICommandHandler<DeleteOrganizationCommand, BaseCommandResponse<Guid>> deleteOrganization,
+        ICommandHandler<UpdateOrganizationApprovalStatusCommand> updateApproval,
+        IQueryHandler<GetOrganizationDetailsRequest, OrganizationDto?> organizationDetails,
+        IQueryHandler<GetOrganizationListRequest, PaginatedResult<OrganizationListDto>> organizationList,
+        IQueryHandler<GetMyOrganizationsRequest, PaginatedResult<OrganizationListDto>> myOrganizations,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<OrganizationDto, OrganizationListDto> resourceAssembler,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler)
     {
-        _mediator = mediator;
+        _notificationPreferences = notificationPreferences;
+        _updateNotificationPreferences = updateNotificationPreferences;
+        _setNotificationMute = setNotificationMute;
+        _createOrganization = createOrganization;
+        _updateOrganization = updateOrganization;
+        _deleteOrganization = deleteOrganization;
+        _updateApproval = updateApproval;
+        _organizationDetails = organizationDetails;
+        _organizationList = organizationList;
+        _myOrganizations = myOrganizations;
+        _identityQuery = identityQuery;
         _resourceAssembler = resourceAssembler;
         _preferenceAssembler = preferenceAssembler;
     }
@@ -84,7 +115,7 @@ public class OrganizationController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetOrganizationListRequest
+        var result = await _organizationList.QueryAsync(new GetOrganizationListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -115,13 +146,13 @@ public class OrganizationController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var result = await _mediator.Send(new GetMyOrganizationsRequest
+        var result = await _myOrganizations.QueryAsync(new GetMyOrganizationsRequest
         {
             UserId = userId.Value.ToString("D"),
             PageNumber = query.PageNumber,
@@ -151,7 +182,7 @@ public class OrganizationController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<OrganizationDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var organization = await _mediator.Send(new GetOrganizationDetailsRequest { Id = id }, cancellationToken);
+        var organization = await _organizationDetails.QueryAsync(new GetOrganizationDetailsRequest { Id = id }, cancellationToken);
         if (organization == null)
         {
             return this.ToNotFoundProblem(OrganizationNotFoundProblem);
@@ -173,7 +204,7 @@ public class OrganizationController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var matrix = await _mediator.Send(new GetOrganizationNotificationPreferenceMatrixQuery
+        var matrix = await _notificationPreferences.QueryAsync(new GetOrganizationNotificationPreferenceMatrixQuery
         {
             OrganizationId = id
         }, cancellationToken);
@@ -197,7 +228,7 @@ public class OrganizationController : EventControllerBase
         [FromBody] UpdateNotificationPreferenceMatrixDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateOrganizationNotificationPreferenceMatrixCommand
+        var response = await _updateNotificationPreferences.ExecuteAsync(new UpdateOrganizationNotificationPreferenceMatrixCommand
         {
             OrganizationId = id,
             Cells = request.Cells
@@ -226,7 +257,7 @@ public class OrganizationController : EventControllerBase
         [FromBody] SetNotificationPreferenceMuteDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SetOrganizationNotificationPreferenceMuteCommand
+        var response = await _setNotificationMute.ExecuteAsync(new SetOrganizationNotificationPreferenceMuteCommand
         {
             OrganizationId = id,
             IsMuted = request.IsMuted
@@ -254,7 +285,7 @@ public class OrganizationController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateOrganizationDto organization, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
@@ -266,7 +297,7 @@ public class OrganizationController : EventControllerBase
             CreatorUserId = userId.Value
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createOrganization.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -322,7 +353,7 @@ public class OrganizationController : EventControllerBase
             UpdateOrganizationDto = updateDto
         };
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _updateOrganization.ExecuteAsync(command, cancellationToken);
 
         if (!result.IsSuccess)
         {
@@ -357,7 +388,7 @@ public class OrganizationController : EventControllerBase
             ApprovalStatusDto = approvalStatus
         };
 
-        await _mediator.Send(command, cancellationToken);
+        await _updateApproval.ExecuteAsync(command, cancellationToken);
         return NoContent();
     }
 
@@ -381,7 +412,7 @@ public class OrganizationController : EventControllerBase
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var result = await _mediator.Send(new DeleteOrganizationCommand
+        var result = await _deleteOrganization.ExecuteAsync(new DeleteOrganizationCommand
         {
             Id = id,
             UserId = userId

@@ -2,7 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Footer.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
@@ -11,9 +11,9 @@ public sealed class ReorderFooterLinkGroupsCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     FooterLinkMutationGuard mutationGuard)
-    : IRequestHandler<ReorderFooterLinkGroupsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReorderFooterLinkGroupsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ReorderFooterLinkGroupsCommand request, CancellationToken cancellationToken)
     {
         await mutationGuard.EnsureAllowedAsync(tenantContext.TenantId, cancellationToken);

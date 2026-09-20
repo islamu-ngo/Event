@@ -15,7 +15,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 
 [ApiController]
 [ApiVersion("0.1")]
@@ -33,7 +34,7 @@ using MediatR;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status504GatewayTimeout)]
 public sealed class SetupTargetEnrollmentsController(
     SetupLiveApplicationService setupLive,
-    IMediator mediator,
+    IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
     SetupLiveTelemetry telemetry) : EventControllerBase
 {
     [HttpPost(Name = RouteNames.CreateSetupTargetEnrollment)]
@@ -56,7 +57,7 @@ public sealed class SetupTargetEnrollmentsController(
         if (!TryParseOperationKey(idempotencyKey, out Guid operationKey))
             return InvalidRequest();
 
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveEnrollmentResult result = await setupLive.CreateAsync(
@@ -97,7 +98,7 @@ public sealed class SetupTargetEnrollmentsController(
     {
         using SetupLiveTelemetry.Operation telemetryOperation = telemetry.Start(
             "enrollment.read");
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveEnrollmentResult result = await setupLive.GetAsync(
@@ -129,7 +130,7 @@ public sealed class SetupTargetEnrollmentsController(
             "enrollment.revoke");
         if (!TryParseOperationKey(idempotencyKey, out Guid operationKey))
             return InvalidRequest();
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveEnrollmentResult result = await setupLive.RevokeAsync(
@@ -168,7 +169,7 @@ public sealed class SetupTargetEnrollmentsController(
             "enrollment.rotate");
         if (!TryParseOperationKey(idempotencyKey, out Guid operationKey))
             return InvalidRequest();
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveEnrollmentResult result = await setupLive.RotateAsync(
@@ -209,7 +210,7 @@ public sealed class SetupTargetEnrollmentsController(
     {
         using SetupLiveTelemetry.Operation telemetryOperation = telemetry.Start(
             "secret_binding.readiness");
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveReadinessResult result = await setupLive.ReadinessAsync(
@@ -268,7 +269,7 @@ public sealed class SetupTargetEnrollmentsController(
             Request.ContentLength);
         if (!TryParseOperationKey(idempotencyKey, out Guid operationKey))
             return InvalidRequest();
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveApplicationStatus validation = await setupLive.ValidateSecretWriteAsync(
@@ -341,7 +342,7 @@ public sealed class SetupTargetEnrollmentsController(
     {
         using SetupLiveTelemetry.Operation telemetryOperation = telemetry.Start(
             "secret_binding.operation.read");
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (userId is null)
             return UnresolvablePrincipal();
         SetupLiveSecretBindingResult result =

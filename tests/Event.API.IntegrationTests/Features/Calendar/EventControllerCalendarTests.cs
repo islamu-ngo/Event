@@ -5,10 +5,10 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Services.Calendar;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.Events.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -24,7 +24,10 @@ public sealed class EventControllerCalendarTests
     private const string CoordinateCanary = "50.84673,4.35247";
     private const string RoomCanary = "FAMILY-ROOM-CANARY";
 
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?> _calendarQuery =
+        Substitute.For<IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?>>();
+    private readonly IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?> _attendeeCalendarQuery =
+        Substitute.For<IQueryHandler<GetAttendeeEventCalendarExportRequest, AttendeeEventCalendarExportDto?>>();
     private readonly IPublicUrlBuilder _publicUrlBuilder = Substitute.For<IPublicUrlBuilder>();
     private readonly EventCalendarController _controller;
 
@@ -37,7 +40,8 @@ public sealed class EventControllerCalendarTests
         httpContext.Request.Path = "/api/event/22222222-3333-4444-5555-666666666666/calendar";
 
         _controller = new EventCalendarController(
-            _mediator,
+            _calendarQuery,
+            _attendeeCalendarQuery,
             new IcalNetEventCalendarFileBuilder(),
             _publicUrlBuilder)
         {
@@ -59,7 +63,7 @@ public sealed class EventControllerCalendarTests
             new DateTimeOffset(2026, 7, 19, 17, 0, 0, TimeSpan.Zero),
             Location: Explore.Application.Contracts.LocationPrivacy.EventLocationDisclosureContract.PrivateHomePublicLabel);
 
-        _mediator.Send(
+        _calendarQuery.QueryAsync(
                 Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId),
                 Arg.Any<CancellationToken>())
             .Returns(export);
@@ -131,7 +135,7 @@ public sealed class EventControllerCalendarTests
             new DateTimeOffset(2026, 7, 19, 16, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 7, 19, 17, 0, 0, TimeSpan.Zero),
             $"{PrivateHomeCanary}, {RoomCanary}, {AddressCanary}, {PostcodeCanary}, {CoordinateCanary}");
-        _mediator.Send(
+        _attendeeCalendarQuery.QueryAsync(
                 Arg.Is<GetAttendeeEventCalendarExportRequest>(request => request.EventId == eventId),
                 Arg.Any<CancellationToken>())
             .Returns(export);
@@ -167,7 +171,7 @@ public sealed class EventControllerCalendarTests
             new DateTimeOffset(2026, 5, 1, 20, 0, 0, TimeSpan.Zero),
             "Main Hall, Brussels");
 
-        _mediator.Send(Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId), Arg.Any<CancellationToken>())
+        _calendarQuery.QueryAsync(Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId), Arg.Any<CancellationToken>())
             .Returns(export);
         _publicUrlBuilder.GetEventUrl(eventId)
             .Returns("https://events.example.org/events/11111111-2222-3333-4444-555555555555");
@@ -194,7 +198,7 @@ public sealed class EventControllerCalendarTests
     public async Task GetCalendarWhenExportIsUnavailableReturnsNotFound()
     {
         var eventId = Guid.Parse("22222222-3333-4444-5555-666666666666");
-        _mediator.Send(Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId), Arg.Any<CancellationToken>())
+        _calendarQuery.QueryAsync(Arg.Is<GetEventCalendarExportRequest>(request => request.EventId == eventId), Arg.Any<CancellationToken>())
             .Returns((EventCalendarExportDto?)null);
 
         IActionResult result = await _controller.GetCalendar(eventId, CancellationToken.None);

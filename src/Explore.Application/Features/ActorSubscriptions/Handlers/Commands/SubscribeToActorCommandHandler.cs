@@ -5,11 +5,11 @@ using Explore.Application.Features.ActorSubscriptions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Handlers.Commands;
 
-public class SubscribeToActorCommandHandler : IRequestHandler<SubscribeToActorCommand, BaseCommandResponse<Guid>>
+public class SubscribeToActorCommandHandler : ICommandHandler<SubscribeToActorCommand, BaseCommandResponse<Guid>>
 {
     private readonly IActorSubscriptionRepository _actorSubscriptionRepository;
     private readonly IActorRepository _actorRepository;
@@ -31,7 +31,7 @@ public class SubscribeToActorCommandHandler : IRequestHandler<SubscribeToActorCo
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SubscribeToActorCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SubscribeToActorCommand request, CancellationToken cancellationToken)
     {
         var validator = new SubscribeToActorDtoValidator();
         var validationResult = await validator.ValidateAsync(request.Subscription, cancellationToken);

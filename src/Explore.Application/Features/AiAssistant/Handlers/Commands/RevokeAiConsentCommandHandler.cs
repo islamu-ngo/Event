@@ -1,12 +1,12 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
-public sealed class RevokeAiConsentCommandHandler : IRequestHandler<RevokeAiConsentCommand, BaseCommandResponse<Guid>>
+public sealed class RevokeAiConsentCommandHandler : ICommandHandler<RevokeAiConsentCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAiConsentGrantRepository _consentRepository;
     private readonly IAiContextHygieneService _hygieneService;
@@ -19,7 +19,7 @@ public sealed class RevokeAiConsentCommandHandler : IRequestHandler<RevokeAiCons
         _hygieneService = hygieneService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(RevokeAiConsentCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RevokeAiConsentCommand request, CancellationToken cancellationToken)
     {
         if (request.GrantId == Guid.Empty)
         {

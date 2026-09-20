@@ -10,7 +10,7 @@ using Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
 using Explore.Application.Features.TenantSettingsDocuments.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -23,7 +23,10 @@ namespace Explore.API.Controllers;
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
 public sealed class TenantSettingsDocumentsController(
-    IMediator mediator,
+    ICommandHandler<EnsureTenantBrandingSettingsDocumentCommand, TenantBrandingSettingsDocumentDto?> ensureBranding,
+    ICommandHandler<PatchTenantBrandingSettingsDocumentCommand, BaseCommandResponse<TenantBrandingSettingsDocumentDto>> patchBranding,
+    IQueryHandler<GetTenantDirectoryOperatorIdentityDocumentQuery, TenantDirectoryOperatorIdentityDocumentDto?> getDirectoryIdentity,
+    ICommandHandler<PatchTenantDirectoryOperatorIdentityDocumentCommand, BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>> patchDirectoryIdentity,
     ITenantContext tenantContext,
     ITenantBrandingSettingsDocumentLockService lockService,
     IResourceAssembler<TenantBrandingSettingsDocumentDto, TenantBrandingSettingsDocumentDto>
@@ -60,7 +63,7 @@ public sealed class TenantSettingsDocumentsController(
     public async Task<ActionResult<HalResource<TenantBrandingSettingsDocumentDto>>> GetBranding(
         CancellationToken cancellationToken = default)
     {
-        var document = await mediator.Send(new GetTenantBrandingSettingsDocumentQuery(), cancellationToken);
+        var document = await ensureBranding.ExecuteAsync(new EnsureTenantBrandingSettingsDocumentCommand(), cancellationToken);
 
         if (document is null)
         {
@@ -87,7 +90,7 @@ public sealed class TenantSettingsDocumentsController(
         CancellationToken cancellationToken = default)
     {
         var lockState = await lockService.GetLockStateAsync(cancellationToken);
-        var response = await mediator.Send(
+        var response = await patchBranding.ExecuteAsync(
             new PatchTenantBrandingSettingsDocumentCommand
             {
                 TenantId = tenantContext.TenantId,
@@ -106,7 +109,7 @@ public sealed class TenantSettingsDocumentsController(
             return this.ToCommandValidationProblem(response, PatchBrandingValidationProblem);
         }
 
-        var updated = await mediator.Send(new GetTenantBrandingSettingsDocumentQuery(), cancellationToken);
+        var updated = await ensureBranding.ExecuteAsync(new EnsureTenantBrandingSettingsDocumentCommand(), cancellationToken);
         if (updated is null)
         {
             return this.ToNotFoundProblem(BrandingDocumentNotFoundProblem);
@@ -132,7 +135,7 @@ public sealed class TenantSettingsDocumentsController(
     public async Task<ActionResult<HalResource<TenantDirectoryOperatorIdentityDocumentDto>>>
         GetDirectoryOperatorIdentity(CancellationToken cancellationToken = default)
     {
-        TenantDirectoryOperatorIdentityDocumentDto? document = await mediator.Send(
+        TenantDirectoryOperatorIdentityDocumentDto? document = await getDirectoryIdentity.QueryAsync(
             new GetTenantDirectoryOperatorIdentityDocumentQuery(tenantContext.TenantId),
             cancellationToken);
         if (document is null)
@@ -167,7 +170,7 @@ public sealed class TenantSettingsDocumentsController(
             CancellationToken cancellationToken = default)
     {
         BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto> response =
-            await mediator.Send(
+            await patchDirectoryIdentity.ExecuteAsync(
                 new PatchTenantDirectoryOperatorIdentityDocumentCommand
                 {
                     TenantId = tenantContext.TenantId,
@@ -186,7 +189,7 @@ public sealed class TenantSettingsDocumentsController(
                 PatchDirectoryIdentityValidationProblem);
         }
 
-        TenantDirectoryOperatorIdentityDocumentDto? updated = await mediator.Send(
+        TenantDirectoryOperatorIdentityDocumentDto? updated = await getDirectoryIdentity.QueryAsync(
             new GetTenantDirectoryOperatorIdentityDocumentQuery(tenantContext.TenantId),
             cancellationToken);
         if (updated is null)

@@ -1,25 +1,23 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagTypeTags;
 using Explore.Application.Features.TagTypeTags.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypeTags.Handlers.Queries;
 
-public class GetTagTypeTagsListRequestHandler : IRequestHandler<GetTagTypeTagsListRequest, List<TagTypeTagsListDto>>
+public class GetTagTypeTagsListRequestHandler : IQueryHandler<GetTagTypeTagsListRequest, List<TagTypeTagsListDto>>
 {
     private readonly ITagTypeTagsRepository _repository;
-    private readonly IMapper _mapper;
 
-    public GetTagTypeTagsListRequestHandler(ITagTypeTagsRepository repository, IMapper mapper)
+    public GetTagTypeTagsListRequestHandler(ITagTypeTagsRepository repository)
     {
         _repository = repository;
-        _mapper = mapper;
     }
 
-    public async Task<List<TagTypeTagsListDto>> Handle(GetTagTypeTagsListRequest request, CancellationToken cancellationToken)
+    public async Task<List<TagTypeTagsListDto>> QueryAsync(GetTagTypeTagsListRequest request, CancellationToken cancellationToken)
     {
         var tagTypeTags = await _repository.GetAll();
-        return _mapper.Map<List<TagTypeTagsListDto>>(tagTypeTags);
+        return tagTypeTags.Select(TagTypeTagsMapper.ToListItem).ToList();
     }
 }

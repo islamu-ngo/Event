@@ -50,7 +50,7 @@ public sealed class EventReportingIntakeCacheInvalidationTests
         IEventReportingOutputCacheInvalidator invalidator = Substitute.For<IEventReportingOutputCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [], [invalidator]);
 
-        await handler.Handle(Notification(GovernanceSettingKeys.EventReporting.IntakeEnabled, tenantId), CancellationToken.None);
+        await handler.HandleAsync(Notification(GovernanceSettingKeys.EventReporting.IntakeEnabled, tenantId), CancellationToken.None);
 
         Received.InOrder(() =>
         {
@@ -68,7 +68,7 @@ public sealed class EventReportingIntakeCacheInvalidationTests
         IEventReportingOutputCacheInvalidator invalidator = Substitute.For<IEventReportingOutputCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [], [invalidator]);
 
-        await handler.Handle(Notification(GovernanceSettingKeys.EventReporting.IntakeEnabled, tenantId: null), CancellationToken.None);
+        await handler.HandleAsync(Notification(GovernanceSettingKeys.EventReporting.IntakeEnabled, tenantId: null), CancellationToken.None);
 
         resolver.Received(1).InvalidateCache(SettingScope.Instance);
         resolver.DidNotReceive().InvalidateCache(SettingScope.Tenant, Arg.Any<Guid>());
@@ -82,7 +82,7 @@ public sealed class EventReportingIntakeCacheInvalidationTests
         IEventReportingOutputCacheInvalidator invalidator = Substitute.For<IEventReportingOutputCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [], [invalidator]);
 
-        await handler.Handle(Notification(GovernanceSettingKeys.Events.RequireApproval, Guid.CreateVersion7()), CancellationToken.None);
+        await handler.HandleAsync(Notification(GovernanceSettingKeys.Events.RequireApproval, Guid.CreateVersion7()), CancellationToken.None);
 
         await invalidator.DidNotReceiveWithAnyArgs().InvalidateAsync(default);
     }

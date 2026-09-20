@@ -4,6 +4,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
@@ -16,7 +17,6 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Registration;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,8 +57,8 @@ public sealed class AnonymousCancellationPostgreSqlSnapshotRaceTests(PostgreSqlC
         IServiceProvider cancellationServices = cancellationScope.ServiceProvider;
         barrier.Arm(cancellationServices.GetRequiredService<ExploreDbContext>().ContextId.InstanceId);
         Task<BaseCommandResponse<Guid>> cancellation = cancellationServices
-            .GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
-            .Handle(command, CancellationToken.None);
+            .GetRequiredService<ICommandHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(command, CancellationToken.None);
 
         try
         {
@@ -114,7 +114,7 @@ public sealed class AnonymousCancellationPostgreSqlSnapshotRaceTests(PostgreSqlC
         EventVisitorCapabilitySqliteFixture.GuestAllocationProof proof = await fixture.IssueGuestProofAsync(
             new(target.Id, catalog.Id, BookingPartyTypeEnum.Individual, [new(ticket.Id, 1, null)]));
         GuestRegistrationOrderStartDto created = await fixture
-            .ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+            .ExecuteCommandAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
         await Assert.That(created.IsSuccess).IsTrue();
         RegistrationOrder order = await fixture.Context.RegistrationOrders.Include(value => value.Lines)
             .SingleAsync(value => value.Id == created.Id);

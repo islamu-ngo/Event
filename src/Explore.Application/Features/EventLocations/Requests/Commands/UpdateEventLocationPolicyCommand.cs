@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventLocations.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Update)]
-public sealed record UpdateEventLocationPolicyCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateEventLocationPolicyCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid EventLocationId { get; init; }
@@ -20,7 +20,7 @@ public sealed record UpdateEventLocationPolicyCommand : IRequest<BaseCommandResp
 }
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Update)]
-public sealed record ConfirmEventLocationRemediationCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ConfirmEventLocationRemediationCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid EventLocationId { get; init; }

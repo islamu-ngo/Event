@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.LocationPrivacy;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventLocations.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventLocations.Handlers.Queries;
 
@@ -15,9 +15,9 @@ public sealed class GetPublicEventLocationsRequestHandler(
     IEventRepository events,
     IEventLocationRepository eventLocations,
     IEventLocationDisclosureService disclosureService)
-    : IRequestHandler<GetPublicEventLocationsRequest, IReadOnlyList<EventLocationPublicDto>?>
+    : IQueryHandler<GetPublicEventLocationsRequest, IReadOnlyList<EventLocationPublicDto>?>
 {
-    public async Task<IReadOnlyList<EventLocationPublicDto>?> Handle(
+    public async Task<IReadOnlyList<EventLocationPublicDto>?> QueryAsync(
         GetPublicEventLocationsRequest request,
         CancellationToken cancellationToken)
     {
@@ -79,9 +79,9 @@ public sealed class GetAttendeeEventLocationsRequestHandler(
     IEventRepository events,
     IEventLocationRepository eventLocations,
     IEventLocationDisclosureService disclosureService)
-    : IRequestHandler<GetAttendeeEventLocationsRequest, IReadOnlyList<EventLocationAttendeeDto>?>
+    : IQueryHandler<GetAttendeeEventLocationsRequest, IReadOnlyList<EventLocationAttendeeDto>?>
 {
-    public async Task<IReadOnlyList<EventLocationAttendeeDto>?> Handle(
+    public async Task<IReadOnlyList<EventLocationAttendeeDto>?> QueryAsync(
         GetAttendeeEventLocationsRequest request,
         CancellationToken cancellationToken)
     {
@@ -112,9 +112,9 @@ public sealed class GetManagementEventLocationRequestHandler(
     IEventRepository events,
     IEventLocationRepository eventLocations,
     IEventLocationDisclosureService disclosureService)
-    : IRequestHandler<GetManagementEventLocationRequest, EventLocationManagementDto?>
+    : IQueryHandler<GetManagementEventLocationRequest, EventLocationManagementDto?>
 {
-    public async Task<EventLocationManagementDto?> Handle(
+    public async Task<EventLocationManagementDto?> QueryAsync(
         GetManagementEventLocationRequest request,
         CancellationToken cancellationToken)
     {
@@ -160,9 +160,9 @@ public sealed class GetManagementEventLocationsRequestHandler(
     IEventRepository events,
     IEventLocationRepository eventLocations,
     IEventLocationDisclosureService disclosureService)
-    : IRequestHandler<GetManagementEventLocationsRequest, IReadOnlyList<EventLocationManagementDto>?>
+    : IQueryHandler<GetManagementEventLocationsRequest, IReadOnlyList<EventLocationManagementDto>?>
 {
-    public Task<IReadOnlyList<EventLocationManagementDto>?> Handle(
+    public Task<IReadOnlyList<EventLocationManagementDto>?> QueryAsync(
         GetManagementEventLocationsRequest request,
         CancellationToken cancellationToken) =>
         EventLocationManagementListProjection.ProjectAsync(
@@ -178,9 +178,9 @@ public sealed class GetEventLocationReviewQueueRequestHandler(
     IEventRepository events,
     IEventLocationRepository eventLocations,
     IEventLocationDisclosureService disclosureService)
-    : IRequestHandler<GetEventLocationReviewQueueRequest, IReadOnlyList<EventLocationManagementDto>?>
+    : IQueryHandler<GetEventLocationReviewQueueRequest, IReadOnlyList<EventLocationManagementDto>?>
 {
-    public Task<IReadOnlyList<EventLocationManagementDto>?> Handle(
+    public Task<IReadOnlyList<EventLocationManagementDto>?> QueryAsync(
         GetEventLocationReviewQueueRequest request,
         CancellationToken cancellationToken) =>
         EventLocationManagementListProjection.ProjectAsync(

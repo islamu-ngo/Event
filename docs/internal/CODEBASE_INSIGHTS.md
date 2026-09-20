@@ -392,9 +392,10 @@ service to ask who the caller is.
 - `principal.GetProviderIdentity()` — reconstructs the external provider account (subject, provider,
   provider id, email, verified flag) for first-login bootstrap and account sync. Returns `null` when no
   provider subject exists, which callers must treat as unauthenticated.
-- `mediator.ResolveCurrentUserIdAsync(User, ct)` — for principals whose provider subject is not itself a
-  platform user id (ATProto DIDs, Google subjects): short-circuits on `internal_user_id`, otherwise resolves
-  the linked local account through the Application query.
+- `identityQuery.ResolveCurrentUserIdAsync(User, ct)` — callers inject the closed
+  `IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>`. A reconstructed provider account takes
+  precedence over `internal_user_id` and GUID claims; an unlinked account returns `null`, without email
+  fallback. Only principals without a provider identity use the existing platform-ID chain.
 
 `EventControllerBase` now only projects those extensions (`CurrentUserId`, `RequiredUserId`) and parses
 `If-Match` concurrency stamps. It resolves nothing from the container, and `Explore.Infrastructure.Identity.UserContext`

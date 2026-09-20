@@ -1,29 +1,26 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
 using Explore.Application.Features.Categories.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Categories.Handlers.Queries;
 
-public class GetCategoryDetailsRequestHandler : IRequestHandler<GetCategoryDetailsRequest, CategoryDto>
+public class GetCategoryDetailsRequestHandler : IQueryHandler<GetCategoryDetailsRequest, CategoryDto?>
 {
     private readonly ICategoryRepository _categoryRepository;
-    private readonly IMapper _mapper;
 
     public GetCategoryDetailsRequestHandler(
-        ICategoryRepository categoryRepository,
-        IMapper mapper)
+        ICategoryRepository categoryRepository)
     {
         _categoryRepository = categoryRepository;
-        _mapper = mapper;
     }
 
-    public async Task<CategoryDto> Handle(GetCategoryDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<CategoryDto?> QueryAsync(GetCategoryDetailsRequest request, CancellationToken cancellationToken)
     {
         var category = await _categoryRepository.GetCategoryWithDetails(request.Id);
-        return _mapper.Map<CategoryDto>(category);
+        return category is null ? null : CustomPropertyMapper.ToDetail(category);
     }
 }

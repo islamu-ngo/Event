@@ -6,11 +6,11 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventAddOns;
 using Explore.Application.Features.EventAddOns.Requests.Commands;
 using Explore.Application.Features.EventAddOns.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,7 +21,11 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Route("api/events/{eventId:guid}/add-ons/management")]
 public sealed class EventAddOnManagementController(
-    IMediator mediator,
+    IQueryHandler<GetEventAddOnCatalogQuery, EventAddOnCatalogDto?> getCatalogHandler,
+    ICommandHandler<CreateEventAddOnCatalogDraftCommand, EventAddOnCatalogDto?> createDraftHandler,
+    ICommandHandler<AddEventAddOnCatalogItemCommand, EventAddOnCatalogDto?> addItemHandler,
+    ICommandHandler<PublishEventAddOnCatalogCommand, EventAddOnCatalogDto?> publishHandler,
+    ICommandHandler<RetireEventAddOnCatalogCommand, EventAddOnCatalogDto?> retireHandler,
     IResourceAssembler<EventAddOnCatalogDto, EventAddOnCatalogDto> assembler,
     TimeProvider timeProvider) : ControllerBase
 {
@@ -40,7 +44,7 @@ public sealed class EventAddOnManagementController(
         Guid eventId,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            getCatalogHandler.QueryAsync(
                 new GetEventAddOnCatalogQuery(eventId, ManagementView: true),
                 cancellationToken));
 
@@ -56,7 +60,7 @@ public sealed class EventAddOnManagementController(
         [FromBody] CreateEventAddOnCatalogDraftRequest request,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            createDraftHandler.ExecuteAsync(
                 new CreateEventAddOnCatalogDraftCommand(eventId, request.CurrencyCode),
                 cancellationToken));
 
@@ -72,7 +76,7 @@ public sealed class EventAddOnManagementController(
         [FromBody] ManageEventAddOnCatalogItemRequest request,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            addItemHandler.ExecuteAsync(
                 new AddEventAddOnCatalogItemCommand(
                     eventId,
                     request.Name,
@@ -94,7 +98,7 @@ public sealed class EventAddOnManagementController(
         Guid eventId,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            publishHandler.ExecuteAsync(
                 new PublishEventAddOnCatalogCommand(
                     eventId,
                     timeProvider.GetUtcNow().UtcDateTime),
@@ -111,7 +115,7 @@ public sealed class EventAddOnManagementController(
         Guid eventId,
         CancellationToken cancellationToken) =>
         ResourceAsync(
-            mediator.Send(
+            retireHandler.ExecuteAsync(
                 new RetireEventAddOnCatalogCommand(
                     eventId,
                     timeProvider.GetUtcNow().UtcDateTime),

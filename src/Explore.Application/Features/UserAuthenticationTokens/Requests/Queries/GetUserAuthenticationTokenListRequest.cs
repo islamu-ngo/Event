@@ -1,9 +1,9 @@
 using System.Collections.Generic;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.UserAuthenticationToken;
-using MediatR;
 
 namespace Explore.Application.Features.UserAuthenticationTokens.Requests.Queries;
 
-public sealed record GetUserAuthenticationTokenListRequest : IRequest<List<UserAuthenticationTokenListDto>>
+public sealed record GetUserAuthenticationTokenListRequest : IQuery<List<UserAuthenticationTokenListDto>>
 {
 }

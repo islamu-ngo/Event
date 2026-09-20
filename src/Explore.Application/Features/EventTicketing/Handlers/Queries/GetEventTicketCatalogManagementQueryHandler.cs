@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Features.EventTicketing.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Queries;
 
@@ -12,30 +12,30 @@ public sealed class GetEventTicketCatalogManagementQueryHandler(
     IEventRepository events,
     IEventTicketCatalogRepository catalogs,
     ITenantContext tenant,
-    Services.PaidEventPublicationPreflightService paidPreflight) : IRequestHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>
+    Services.PaidEventPublicationPreflightService paidPreflight) : IQueryHandler<GetEventTicketCatalogManagementQuery, EventTicketCatalogManagementDto?>
 {
-    public async Task<EventTicketCatalogManagementDto?> Handle(
-        GetEventTicketCatalogManagementQuery request,
+    public async Task<EventTicketCatalogManagementDto?> QueryAsync(
+        GetEventTicketCatalogManagementQuery query,
         CancellationToken cancellationToken)
     {
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(query.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
             return null;
         }
 
         EventTicketCatalogVersion? catalog =
-            await catalogs.GetManagementCatalogAsync(request.EventId, tenant.TenantId, cancellationToken)
-            ?? await catalogs.GetPublishedCatalogAsync(request.EventId, tenant.TenantId, cancellationToken);
+            await catalogs.GetManagementCatalogAsync(query.EventId, tenant.TenantId, cancellationToken)
+            ?? await catalogs.GetPublishedCatalogAsync(query.EventId, tenant.TenantId, cancellationToken);
 
         if (catalog is null)
         {
             return CreateBaseDto(eventTarget);
         }
 
-        Event? eventWithDetails = await events.GetEventWithDetails(request.EventId);
+        Event? eventWithDetails = await events.GetEventWithDetails(query.EventId);
         EventCapacityPool[] pools = eventWithDetails?.CapacityPools.Where(pool => !pool.IsDeleted).ToArray() ?? [];
-        PaidEventPublicationPreflightDto publicationPreflight = await paidPreflight.AssessAsync(request.EventId, eventWithDetails, catalog, cancellationToken);
+        PaidEventPublicationPreflightDto publicationPreflight = await paidPreflight.AssessAsync(query.EventId, eventWithDetails, catalog, cancellationToken);
         return Map(catalog, pools, eventTarget, publicationPreflight);
     }
 

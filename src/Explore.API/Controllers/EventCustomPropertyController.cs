@@ -11,7 +11,7 @@ using Explore.Application.Features.EventCustomProperties.Requests.Commands;
 using Explore.Application.Features.EventCustomProperties.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -29,6 +29,16 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public class EventCustomPropertyController : EventControllerBase
 {
+    private static readonly CommandFailurePolicy DefinitionFailurePolicy = CommandFailurePolicy.ValidatedBy(new(
+        "eventCustomPropertyDefinition",
+        "Event custom property definition validation failed",
+        "Event custom property definition creation failed."));
+
+    private static readonly CommandFailurePolicy ValueFailurePolicy = CommandFailurePolicy.ValidatedBy(new(
+        "eventCustomPropertyValue",
+        "Event custom property value validation failed",
+        "Event custom property value set failed."));
+
     private static readonly ApiValidationProblemDescriptor UpdateValidationProblem = new(
         "eventCustomPropertyDefinition",
         "Event custom property definition validation failed",
@@ -47,14 +57,41 @@ public class EventCustomPropertyController : EventControllerBase
         "Event custom property definition not found",
         "Event custom property definition not found.");
 
-    private readonly IMediator _mediator;
+    private static readonly CommandFailurePolicy UpdateFailurePolicy = CommandFailurePolicy.ValidatedBy(UpdateValidationProblem)
+        .NotFound(DefinitionNotFoundProblem, FailureCodes.NotFound);
+
+    private readonly IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> _list;
+    private readonly IQueryHandler<GetEventCustomPropertyDefinitionDetailsRequest, EventCustomPropertyDefinitionDto> _detail;
+    private readonly IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> _values;
+    private readonly ICommandHandler<CreateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> _create;
+    private readonly ICommandHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteEventCustomPropertyDefinitionCommand, bool> _delete;
+    private readonly ICommandHandler<PurgeEventCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>> _purge;
+    private readonly ICommandHandler<SetEventCustomPropertyValueCommand, BaseCommandResponse<Guid>> _setValue;
+    private readonly ICommandHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>> _setMultiValues;
     private readonly IResourceAssembler<EventCustomPropertyDefinitionDto, EventCustomPropertyDefinitionListDto> _resourceAssembler;
 
     public EventCustomPropertyController(
-        IMediator mediator,
+        IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> list,
+        IQueryHandler<GetEventCustomPropertyDefinitionDetailsRequest, EventCustomPropertyDefinitionDto> detail,
+        IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> values,
+        ICommandHandler<CreateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> create,
+        ICommandHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteEventCustomPropertyDefinitionCommand, bool> delete,
+        ICommandHandler<PurgeEventCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>> purge,
+        ICommandHandler<SetEventCustomPropertyValueCommand, BaseCommandResponse<Guid>> setValue,
+        ICommandHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>> setMultiValues,
         IResourceAssembler<EventCustomPropertyDefinitionDto, EventCustomPropertyDefinitionListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _list = list;
+        _detail = detail;
+        _values = values;
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _purge = purge;
+        _setValue = setValue;
+        _setMultiValues = setMultiValues;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -77,7 +114,7 @@ public class EventCustomPropertyController : EventControllerBase
         [FromQuery] EventCustomPropertyDefinitionListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEventCustomPropertyDefinitionListRequest
+        var result = await _list.QueryAsync(new GetEventCustomPropertyDefinitionListRequest
         {
             EventId = query.EventId,
             PageNumber = query.PageNumber,
@@ -107,7 +144,7 @@ public class EventCustomPropertyController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<EventCustomPropertyDefinitionDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var definition = await _mediator.Send(new GetEventCustomPropertyDefinitionDetailsRequest { Id = id }, cancellationToken);
+        var definition = await _detail.QueryAsync(new GetEventCustomPropertyDefinitionDetailsRequest { Id = id }, cancellationToken);
         if (definition == null)
         {
             return this.ToNotFoundProblem(DefinitionNotFoundProblem);
@@ -139,11 +176,11 @@ public class EventCustomPropertyController : EventControllerBase
             DefinitionDto = definition
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _create.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return this.ToQuotaProblemOrBadRequest(response);
+            return DefinitionFailurePolicy.Map(this, response);
         }
 
         return CreatedAtRoute(
@@ -187,13 +224,11 @@ public class EventCustomPropertyController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp
         };
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _update.ExecuteAsync(command, cancellationToken);
 
         if (!result.IsSuccess)
         {
-            return result.FailureCode == FailureCodes.NotFound
-                ? this.ToNotFoundProblem(DefinitionNotFoundProblem)
-                : this.ToQuotaProblemOrBadRequest(result);
+            return UpdateFailurePolicy.Map(this, result);
         }
 
         return Ok(result);
@@ -211,7 +246,7 @@ public class EventCustomPropertyController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventCustomPropertyDefinitionCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _delete.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }
@@ -233,7 +268,7 @@ public class EventCustomPropertyController : EventControllerBase
         [FromBody] PurgeCustomPropertyDefinitionDto purgeDto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new PurgeEventCustomPropertyDefinitionCommand
+        var result = await _purge.ExecuteAsync(new PurgeEventCustomPropertyDefinitionCommand
         {
             Id = id,
             Reason = purgeDto.Reason
@@ -262,7 +297,7 @@ public class EventCustomPropertyController : EventControllerBase
     public async Task<ActionResult<List<EventCustomPropertyValueDto>>> GetValues(
         [FromQuery] Guid eventId, CancellationToken cancellationToken = default)
     {
-        var values = await _mediator.Send(new GetEventCustomPropertyValuesRequest
+        var values = await _values.QueryAsync(new GetEventCustomPropertyValuesRequest
         {
             EventId = eventId
         }, cancellationToken);
@@ -292,11 +327,11 @@ public class EventCustomPropertyController : EventControllerBase
             ValueDto = valueDto
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _setValue.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return this.ToQuotaProblemOrBadRequest(response);
+            return ValueFailurePolicy.Map(this, response);
         }
 
         return Ok(response);
@@ -326,11 +361,11 @@ public class EventCustomPropertyController : EventControllerBase
             Values = multiValuesDto.Values
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _setMultiValues.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return this.ToQuotaProblemOrBadRequest(response);
+            return ValueFailurePolicy.Map(this, response);
         }
 
         return Ok(response);

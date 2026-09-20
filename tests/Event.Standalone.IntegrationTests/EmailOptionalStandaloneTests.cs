@@ -12,8 +12,9 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Models.Common;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
-using MediatR;
+using Explore.Application.Responses;
 using Explore.Blazor.Services;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -339,7 +340,7 @@ public sealed class EmailOptionalStandaloneTests
 
     private static async Task SaveSupportContactAsync(IServiceProvider services, string? contact)
     {
-        var saved = await services.GetRequiredService<ISender>().Send(new SaveInstanceOnboardingProfileCommand
+        var saved = await services.GetRequiredService<ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new SaveInstanceOnboardingProfileCommand
         {
             Profile = new SelfHostOnboardingProfileDto
             {
@@ -348,7 +349,7 @@ public sealed class EmailOptionalStandaloneTests
                 Locale = "en",
                 TimeZone = "UTC"
             }
-        });
+        }, CancellationToken.None);
         await Assert.That(saved.IsSuccess).IsTrue();
     }
 

@@ -34,6 +34,15 @@ public partial class FallbackAuthorizationService
         for (var i = 0; i < checks.Count; i++)
         {
             var check = checks[i];
+            if (check.ResourceKind == ResourceKinds.Organization
+                && check.Action is AuthorizationActions.Organizations.SubmitEvidence
+                    or AuthorizationActions.Organizations.ViewEvidence
+                    or AuthorizationActions.Organizations.ReviewEvidence)
+            {
+                results[i] = await AuthorizeAsync(check, cancellationToken);
+                continue;
+            }
+
             var attributes = TrustedAttributes(check);
             var allowed = EvaluateWithProfile(profile, eventAuthority, check.ResourceKind, check.ResourceId, check.Action, attributes, check.Facts);
             results[i] = allowed
@@ -463,6 +472,10 @@ public partial class FallbackAuthorizationService
         IDictionary<string, object>? resourceAttributes,
         IAuthorizationFacts? facts)
     {
+        if (facts is StorageUploadFinalizationFacts finalization)
+            return action == AuthorizationActions.StorageObjects.Create
+                && finalization.MatchesReservationOwner(resourceId, profile.UserId, profile.TenantId);
+
         if (action == AuthorizationActions.StorageObjects.Create)
             return CanCreateStorageUploadWithProfile(profile, resourceId, facts);
 

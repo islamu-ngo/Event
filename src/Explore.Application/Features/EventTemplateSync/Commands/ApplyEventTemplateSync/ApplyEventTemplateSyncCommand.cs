@@ -1,7 +1,7 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventTemplateSync.Commands.ApplyEventTemplateSync;
 
@@ -10,7 +10,7 @@ public sealed record ApplyEventTemplateSyncCommand(
     Guid EventId,
     TemplateSyncPlanDto Plan,
     int BaseProvenanceVersion
-) : IRequest<BaseCommandResponse<TemplateSyncOutcomeDto>>, ISecureRequest
+) : ICommand<BaseCommandResponse<TemplateSyncOutcomeDto>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId.ToString();
 }

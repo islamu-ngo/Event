@@ -22,6 +22,18 @@ A resource or collection may expose relations such as `self`, `edit`, `delete`, 
 
 Do not construct mutation URLs from naming conventions or enable controls from local roles/claims. A link may disappear after state, tenant, policy, concurrency, or provider changes. Refresh the representation after a mutation or authorization-relevant event.
 
+## Registration provider administration
+
+Registration provider management remains one `RegistrationProviderManagement` API/SDK
+group under `/api/tenants/{tenantId}/events/{eventId}/registration-providers`. It covers
+connections and approved origins; external schema imports, bindings and mappings;
+channels and launch descriptors; and health, queue and reconciliation.
+
+All of these endpoints require authentication, including reads, and use private,
+no-store responses. Follow the permission-checked HAL links for available actions.
+The server's capability split does not change endpoint URLs, operation names, API
+version `0.1`, or JSON/HAL media types; no client routing or SDK-group migration is required.
+
 ## Pagination
 
 List operations use 1-based pages:
@@ -63,3 +75,12 @@ Treat `type`/problem code and HTTP status as the stable machine-facing signal. P
 ## Privacy and caching
 
 Private account, commerce, refund, and erasure responses are `no-store`. Never persist provider IDs, admission bearer material, idempotency material, erasure receipts, raw provider errors, or PII from diagnostic responses. Health and metrics are operational surfaces, not data-export APIs.
+
+## Guest registration capabilities
+
+Guest order start/read/lifecycle, requirements, participants, promotions and account
+claim keep their existing URLs and `GuestRegistrationOrder` API/SDK group.
+Keep order and attempt capabilities in their dedicated headers, not URLs.
+Follow the returned HAL actions and retain the required idempotency/challenge
+proofs for writes. Account claim remains authenticated; an order capability alone
+does not establish account authority.

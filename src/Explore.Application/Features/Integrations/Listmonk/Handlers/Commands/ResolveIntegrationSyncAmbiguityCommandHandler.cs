@@ -7,7 +7,7 @@ using Explore.Application.Features.Settings.Handlers;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Integrations.Listmonk.Handlers.Commands;
 
@@ -17,9 +17,9 @@ public sealed class ResolveIntegrationSyncAmbiguityCommandHandler(
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
     TimeProvider timeProvider)
-    : IRequestHandler<ResolveIntegrationSyncAmbiguityCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ResolveIntegrationSyncAmbiguityCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ResolveIntegrationSyncAmbiguityCommand request,
         CancellationToken cancellationToken)
     {

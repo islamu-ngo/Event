@@ -1,14 +1,14 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
-public class UpdateInstanceSmtpSettingsCommandHandler : IRequestHandler<UpdateInstanceSmtpSettingsCommand, BaseCommandResponse<Guid>>
+public class UpdateInstanceSmtpSettingsCommandHandler : ICommandHandler<UpdateInstanceSmtpSettingsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly IInstanceSmtpSettingService _smtpSettingService;
@@ -24,7 +24,7 @@ public class UpdateInstanceSmtpSettingsCommandHandler : IRequestHandler<UpdateIn
         _smtpConfigResolver = smtpConfigResolver;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateInstanceSmtpSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateInstanceSmtpSettingsCommand request, CancellationToken cancellationToken)
     {
         var isInstanceAdmin = await _adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken);
         if (!isInstanceAdmin)

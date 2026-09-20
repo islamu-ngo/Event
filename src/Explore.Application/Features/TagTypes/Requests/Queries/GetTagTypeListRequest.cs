@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.TagType;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypes.Requests.Queries;
 
-public sealed record GetTagTypeListRequest : IRequest<List<TagTypeListDto>>
+public sealed record GetTagTypeListRequest : IQuery<List<TagTypeListDto>>
 {
 }

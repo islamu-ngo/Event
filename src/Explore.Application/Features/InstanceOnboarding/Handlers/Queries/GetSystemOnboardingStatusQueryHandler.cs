@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
 public sealed class GetSystemOnboardingStatusQueryHandler
-    : IRequestHandler<GetSystemOnboardingStatusQuery, SystemOnboardingStatusDto>
+    : IQueryHandler<GetSystemOnboardingStatusQuery, SystemOnboardingStatusDto>
 {
     private readonly IInstanceBootstrapStateRepository _instanceBootstrapStateRepository;
     private readonly IDeploymentModeProvider _deploymentModeProvider;
@@ -21,7 +21,7 @@ public sealed class GetSystemOnboardingStatusQueryHandler
         _deploymentModeProvider = deploymentModeProvider;
     }
 
-    public async Task<SystemOnboardingStatusDto> Handle(GetSystemOnboardingStatusQuery request, CancellationToken cancellationToken)
+    public async Task<SystemOnboardingStatusDto> QueryAsync(GetSystemOnboardingStatusQuery request, CancellationToken cancellationToken)
     {
         var bootstrap = await _instanceBootstrapStateRepository.GetCurrent(cancellationToken);
         var requiresOnboarding = bootstrap?.Status != InstanceBootstrapStatus.Completed;

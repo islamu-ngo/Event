@@ -1,14 +1,14 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Users.Handlers.Queries;
 
-public class ResolveUserTenantRedirectionRequestHandler : IRequestHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto>
+public class ResolveUserTenantRedirectionRequestHandler : IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto>
 {
     private readonly ITenantUserRepository _tenantUserRepository;
     private readonly IUserRepository _userRepository;
@@ -21,9 +21,9 @@ public class ResolveUserTenantRedirectionRequestHandler : IRequestHandler<Resolv
         _userRepository = userRepository;
     }
 
-    public async Task<UserTenantRedirectionDto> Handle(
+    public async Task<UserTenantRedirectionDto> QueryAsync(
         ResolveUserTenantRedirectionRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var memberships = await _tenantUserRepository.GetActiveTenantsForUserAsync(request.UserId, cancellationToken);
 

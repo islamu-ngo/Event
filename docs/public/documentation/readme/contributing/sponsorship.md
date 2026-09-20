@@ -6,6 +6,10 @@ description: "How to support ISLAMU Event through community donations, in-kind t
 
 ISLAMU Event is an independent, community-sovereign, and **100% free and open-source platform** licensed under the **GNU AGPL-3.0-or-later**. There are no enterprise paywalls, no proprietary features, and no tracking telemetry.
 
+Sponsorship does not select another software edition. Self-hosters, contributors
+and hosted deployments use the same supported build; it requires no Lucky Penny
+library license. Third-party tools and services retain their own terms.
+
 The platform is maintained by **Amir Akrari** with **ISLAMU (ASBL en formation)** established as the non-profit operational and legal steward in Belgium.
 
 {% hint style="info" %}

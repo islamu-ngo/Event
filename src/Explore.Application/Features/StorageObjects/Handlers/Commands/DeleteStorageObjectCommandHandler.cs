@@ -3,11 +3,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Models.Storage;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
-public class DeleteStorageObjectCommandHandler : IRequestHandler<DeleteStorageObjectCommand, bool>
+public class DeleteStorageObjectCommandHandler : ICommandHandler<DeleteStorageObjectCommand, bool>
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IFileStorageProviderResolver _providerResolver;
@@ -23,7 +23,7 @@ public class DeleteStorageObjectCommandHandler : IRequestHandler<DeleteStorageOb
         _metrics = metrics;
     }
 
-    public async Task<bool> Handle(DeleteStorageObjectCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteStorageObjectCommand request, CancellationToken cancellationToken)
     {
         var entity = await _storageObjectRepository.GetById(request.Id);
 

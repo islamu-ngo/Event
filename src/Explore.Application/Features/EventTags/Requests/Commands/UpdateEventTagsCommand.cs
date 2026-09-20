@@ -2,12 +2,12 @@ using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTags;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventTags.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Update)]
-public sealed record UpdateEventTagsCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateEventTagsCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventTagId { get; init; }
     public Guid ExpectedConcurrencyStamp { get; init; }

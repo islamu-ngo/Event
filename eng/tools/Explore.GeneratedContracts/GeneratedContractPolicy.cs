@@ -148,7 +148,12 @@ internal static class GeneratedContractPolicy
                 path);
         }
 
-        string[] names = File.ReadAllLines(path)
+        return ParseMutableStateTypes(File.ReadAllLines(path));
+    }
+
+    public static HashSet<string> ParseMutableStateTypes(IEnumerable<string> lines)
+    {
+        string[] names = lines
             .Select(line => line.Trim())
             .Where(line => line.Length != 0
                 && !line.StartsWith('#'))

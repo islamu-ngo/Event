@@ -7,7 +7,7 @@ using Explore.Application.Features.RegistrationForms.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation.Results;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.RegistrationForms.Handlers.Commands;
@@ -18,11 +18,11 @@ public sealed class AttachRegistrationRequirementCommandHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     HybridCache cache)
-    : IRequestHandler<AttachRegistrationRequirementCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<AttachRegistrationRequirementCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         AttachRegistrationRequirementCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ValidationResult validation = await new AttachRegistrationRequirementCommandValidator()
             .ValidateAsync(request, cancellationToken);
@@ -129,11 +129,11 @@ public sealed class DetachRegistrationRequirementCommandHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     HybridCache cache)
-    : IRequestHandler<DetachRegistrationRequirementCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DetachRegistrationRequirementCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         DetachRegistrationRequirementCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ValidationResult validation = await new DetachRegistrationRequirementCommandValidator()
             .ValidateAsync(request, cancellationToken);

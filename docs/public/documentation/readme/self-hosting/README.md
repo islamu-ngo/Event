@@ -49,7 +49,17 @@ For authentication, use this order unless your requirements say otherwise:
 See [Authentication Providers](../configuration-and-operations/authentication-providers.md)
 for the exact runtime matrix and safe switching procedure.
 
-Kubernetes, Helm, ActivityPub infrastructure, first-party PDS/AppView hosting, and initial `linux/arm64` packaging are not implemented deployment options.
+Kubernetes, Helm, ActivityPub infrastructure, and first-party PDS/AppView hosting are not implemented deployment options.
+
+## One supported build
+
+Self-hosters, contributors and hosted deployments use the same supported package
+graph. There is no commercial edition switch or Lucky Penny library license key.
+CI and the API/UI Dockerfiles enforce locked dependency restoration. Before
+upgrading existing build or deployment configuration, remove the
+[obsolete edition inputs](../configuration-and-operations/environment-variables.md#removed-edition-inputs).
+No replacement flag or database migration is needed; provider credentials and
+the selected hosting topology remain unchanged.
 
 ## First-Run Onboarding & Operator Identity
 

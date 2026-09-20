@@ -3,11 +3,11 @@ using Explore.API.Attributes;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,16 +21,22 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Public)]
 public class PublicExperienceController : ControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto> _settingsHandler;
+    private readonly IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> _shellHandler;
+    private readonly IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto> _homeDiscoveryHandler;
     private readonly ILinkPolicy<EventDiscoveryItemDto> _eventDiscoveryLinkPolicy;
     private readonly IHateoasLinkGenerator _linkGenerator;
 
     public PublicExperienceController(
-        IMediator mediator,
+        IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto> settingsHandler,
+        IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> shellHandler,
+        IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto> homeDiscoveryHandler,
         ILinkPolicy<EventDiscoveryItemDto> eventDiscoveryLinkPolicy,
         IHateoasLinkGenerator linkGenerator)
     {
-        _mediator = mediator;
+        _settingsHandler = settingsHandler;
+        _shellHandler = shellHandler;
+        _homeDiscoveryHandler = homeDiscoveryHandler;
         _eventDiscoveryLinkPolicy = eventDiscoveryLinkPolicy;
         _linkGenerator = linkGenerator;
     }
@@ -44,7 +50,7 @@ public class PublicExperienceController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<PublicExperienceSettingsDto>> GetSettings(CancellationToken cancellationToken = default)
     {
-        var settings = await _mediator.Send(new GetPublicExperienceSettingsQuery(), cancellationToken);
+        var settings = await _settingsHandler.QueryAsync(new GetPublicExperienceSettingsQuery(), cancellationToken);
         return settings.IsAvailable
             ? Ok(settings)
             : IdentityUnavailable(settings.UnavailableCode);
@@ -59,7 +65,7 @@ public class PublicExperienceController : ControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<PublicExperienceShellDto>> GetShell(CancellationToken cancellationToken = default)
     {
-        var shell = await _mediator.Send(new GetPublicExperienceShellQuery(), cancellationToken);
+        var shell = await _shellHandler.QueryAsync(new GetPublicExperienceShellQuery(), cancellationToken);
         return shell.IsAvailable
             ? Ok(shell)
             : IdentityUnavailable(shell.UnavailableCode);
@@ -78,7 +84,7 @@ public class PublicExperienceController : ControllerBase
         [FromQuery] string? mode = null,
         CancellationToken cancellationToken = default)
     {
-        var home = await _mediator.Send(new GetHomeDiscoveryQuery(areaId, mode), cancellationToken);
+        var home = await _homeDiscoveryHandler.QueryAsync(new GetHomeDiscoveryQuery(areaId, mode), cancellationToken);
         AddSourceLinks(home);
         return Ok(home);
     }

@@ -54,7 +54,7 @@ public sealed class EventLocationPolicyExactCacheInvalidationTests
             NeedsPrivacyReview = false
         };
 
-        var response = await handler.Handle(command, CancellationToken.None);
+        var response = await handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(cache.RemovedTags).IsEquivalentTo([CacheTags.EventLocation(placement.Id)]);
@@ -100,7 +100,7 @@ public sealed class EventLocationPolicyExactCacheInvalidationTests
             Fields = new UpdateEventLocationDisclosureFieldsDto { ShowCity = true }
         };
 
-        var response = await handler.Handle(command, cancellation.Token);
+        var response = await handler.ExecuteAsync(command, cancellation.Token);
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(cancellation.IsCancellationRequested).IsTrue();

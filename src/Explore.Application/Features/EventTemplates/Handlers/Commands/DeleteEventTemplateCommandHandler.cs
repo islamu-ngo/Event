@@ -2,12 +2,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Features.EventTemplates.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTemplates.Handlers.Commands;
 
-public class DeleteEventTemplateCommandHandler : IRequestHandler<DeleteEventTemplateCommand, bool>
+public class DeleteEventTemplateCommandHandler : ICommandHandler<DeleteEventTemplateCommand, bool>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly HybridCache _cache;
@@ -20,7 +20,7 @@ public class DeleteEventTemplateCommandHandler : IRequestHandler<DeleteEventTemp
         _cache = cache;
     }
 
-    public async Task<bool> Handle(DeleteEventTemplateCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventTemplateCommand request, CancellationToken cancellationToken)
     {
         var template = await _eventTemplateRepository.GetTemplateWithDetails(request.Id);
         if (template == null)

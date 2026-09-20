@@ -1,5 +1,4 @@
 using System.Reflection;
-using AutoMapper;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
@@ -8,7 +7,6 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Geocoding;
 using Explore.Application.Features.Locations.Handlers.Commands;
 using Explore.Application.Features.Locations.Requests.Commands;
-using Explore.Application.Profiles;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -76,7 +74,7 @@ public sealed class LocationAddressWriteContractTests
 
         try
         {
-            await handler.Handle(new CreateLocationCommand
+            await handler.ExecuteAsync(new CreateLocationCommand
             {
                 TenantId = tenantId,
                 LocationDto = ManualCreateDto()
@@ -115,7 +113,7 @@ public sealed class LocationAddressWriteContractTests
             ?? throw new InvalidOperationException("The location repository received a null entity."));
         var handler = CreateLocationHandler(locations, tenantContext);
 
-        var response = await handler.Handle(new CreateLocationCommand
+        var response = await handler.ExecuteAsync(new CreateLocationCommand
         {
             TenantId = Guid.CreateVersion7(),
             LocationDto = ManualCreateDto()
@@ -275,7 +273,7 @@ public sealed class LocationAddressWriteContractTests
         locations.GetById(location.Id, Arg.Any<CancellationToken>()).Returns(location);
         var handler = CreateUpdateLocationHandler(locations, location.TenantId);
 
-        var response = await handler.Handle(new UpdateLocationCommand
+        var response = await handler.ExecuteAsync(new UpdateLocationCommand
         {
             LocationId = location.Id,
             ExpectedConcurrencyStamp = location.ConcurrencyStamp,
@@ -476,18 +474,6 @@ public sealed class LocationAddressWriteContractTests
             location.SetManualAddress("Rue Existing 10", "1000");
         }
         return location;
-    }
-
-    private static IMapper CreateRealMapper()
-    {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-        var configuration = new MapperConfiguration(
-            expression => expression.AddProfile<LookupMappingProfile>(),
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-#else
-        var configuration = new MapperConfiguration(expression => expression.AddProfile<LookupMappingProfile>());
-#endif
-        return configuration.CreateMapper();
     }
 
     private static Tenant NewTenant(Guid tenantId) => new()

@@ -4,12 +4,12 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.Features.LocationRooms.Requests.Commands;
 using Explore.Application.Features.LocationRooms.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,18 +41,30 @@ public class LocationRoomController : EventControllerBase
         "Location room not found",
         "Location room not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateLocationRoomCommand, BaseCommandResponse<Guid>> _createRoom;
+    private readonly ICommandHandler<UpdateLocationRoomCommand, BaseCommandResponse<Guid>> _updateRoom;
+    private readonly ICommandHandler<DeleteLocationRoomCommand, BaseCommandResponse<Guid>> _deleteRoom;
+    private readonly IQueryHandler<GetLocationRoomDetailRequest, LocationRoomDto?> _roomDetails;
+    private readonly IQueryHandler<GetLocationRoomsByLocationRequest, List<LocationRoomListDto>> _rooms;
     private readonly ILogger<LocationRoomController> _logger;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<LocationRoomDto, LocationRoomListDto> _resourceAssembler;
 
     public LocationRoomController(
-        IMediator mediator,
+        ICommandHandler<CreateLocationRoomCommand, BaseCommandResponse<Guid>> createRoom,
+        ICommandHandler<UpdateLocationRoomCommand, BaseCommandResponse<Guid>> updateRoom,
+        ICommandHandler<DeleteLocationRoomCommand, BaseCommandResponse<Guid>> deleteRoom,
+        IQueryHandler<GetLocationRoomDetailRequest, LocationRoomDto?> roomDetails,
+        IQueryHandler<GetLocationRoomsByLocationRequest, List<LocationRoomListDto>> rooms,
         ILogger<LocationRoomController> logger,
         ITenantContext tenantContext,
         IResourceAssembler<LocationRoomDto, LocationRoomListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _createRoom = createRoom;
+        _updateRoom = updateRoom;
+        _deleteRoom = deleteRoom;
+        _roomDetails = roomDetails;
+        _rooms = rooms;
         _logger = logger;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
@@ -70,7 +82,7 @@ public class LocationRoomController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalCollectionResource<LocationRoomListDto>>> GetByLocation(Guid locationId, CancellationToken cancellationToken = default)
     {
-        var rooms = await _mediator.Send(new GetLocationRoomsByLocationRequest
+        var rooms = await _rooms.QueryAsync(new GetLocationRoomsByLocationRequest
         {
             LocationId = locationId,
             TenantId = _tenantContext.TenantId
@@ -98,7 +110,7 @@ public class LocationRoomController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalResource<LocationRoomDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var room = await _mediator.Send(new GetLocationRoomDetailRequest
+        var room = await _roomDetails.QueryAsync(new GetLocationRoomDetailRequest
         {
             Id = id,
             TenantId = _tenantContext.TenantId
@@ -127,7 +139,7 @@ public class LocationRoomController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateLocationRoomDto room, CancellationToken cancellationToken = default)
     {
         var command = new CreateLocationRoomCommand { LocationRoomDto = room };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createRoom.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -174,7 +186,7 @@ public class LocationRoomController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             UpdateLocationRoomDto = room
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateRoom.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -200,7 +212,7 @@ public class LocationRoomController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteLocationRoomCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteRoom.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

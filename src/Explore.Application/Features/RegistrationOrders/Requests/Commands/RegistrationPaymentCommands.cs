@@ -1,6 +1,6 @@
-using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.RegistrationOrders;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Commands;
 
@@ -18,21 +18,21 @@ public sealed record StartGuestRegistrationPaymentCommand(
     Guid OrderId,
     string? CapabilityToken,
     PaidOrderAcceptanceAcknowledgementDto? Acceptance)
-    : IRequest<RegistrationPaymentCommandResultDto>, IGuestRegistrationOrderAccessCommand;
+    : ICommand<RegistrationPaymentCommandResultDto>, IGuestRegistrationOrderAccessCommand;
 
 public sealed record RetryGuestRegistrationPaymentCommand(Guid EventId, Guid OrderId, string? CapabilityToken)
-    : IRequest<RegistrationPaymentCommandResultDto>, IGuestRegistrationOrderAccessCommand;
+    : ICommand<RegistrationPaymentCommandResultDto>, IGuestRegistrationOrderAccessCommand;
 
 [AuthorizeResource(ResourceKinds.RegistrationOrder, AuthorizationActions.RegistrationOrders.Continue)]
 public sealed record StartAuthenticatedRegistrationPaymentCommand(
     Guid EventId,
     Guid OrderId,
     PaidOrderAcceptanceAcknowledgementDto? Acceptance)
-    : IRequest<RegistrationPaymentCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
+    : ICommand<RegistrationPaymentCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
 
 [AuthorizeResource(ResourceKinds.RegistrationOrder, AuthorizationActions.RegistrationOrders.Continue)]
 public sealed record RetryAuthenticatedRegistrationPaymentCommand(Guid EventId, Guid OrderId)
-    : IRequest<RegistrationPaymentCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
+    : ICommand<RegistrationPaymentCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
 
 [AuthorizeResource(ResourceKinds.RegistrationOrder, AuthorizationActions.RegistrationOrders.RequestRefund)]
 public sealed record RequestAuthenticatedRegistrationRefundCommand(
@@ -40,14 +40,14 @@ public sealed record RequestAuthenticatedRegistrationRefundCommand(
     Guid OrderId,
     RegistrationRefundRequestDto Request,
     string IdempotencyKey)
-    : IRequest<RegistrationRefundCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
+    : ICommand<RegistrationRefundCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
 
 [AuthorizeResource(ResourceKinds.RegistrationOrder, AuthorizationActions.RegistrationOrders.RespondMaterialChange)]
 public sealed record RespondAuthenticatedRegistrationMaterialChangeCommand(
     Guid EventId,
     Guid OrderId,
     RegistrationMaterialChangeChoiceRequestDto Request)
-    : IRequest<RegistrationMaterialChangeChoiceCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
+    : ICommand<RegistrationMaterialChangeChoiceCommandResultDto>, IAuthenticatedRegistrationPaymentSecureRequest;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManagePaidEventCommerce)]
 public sealed record CreateStudioRegistrationRefundCommand(
@@ -55,7 +55,7 @@ public sealed record CreateStudioRegistrationRefundCommand(
     Guid OrderId,
     RegistrationRefundRequestDto Request,
     string IdempotencyKey)
-    : IRequest<RegistrationRefundCommandResultDto>, ISecureRequest
+    : ICommand<RegistrationRefundCommandResultDto>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString("D");
     IAuthorizationFacts? ISecureRequest.AuthorizationFacts => new EventScopedAuthorizationFacts(Guid.Empty, EventId);
@@ -66,7 +66,7 @@ public sealed record RetryStudioRegistrationRefundCommand(
     Guid EventId,
     Guid OrderId,
     Guid RefundAttemptId)
-    : IRequest<RegistrationRefundCommandResultDto>, ISecureRequest
+    : ICommand<RegistrationRefundCommandResultDto>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString("D");
     IAuthorizationFacts? ISecureRequest.AuthorizationFacts => new EventScopedAuthorizationFacts(Guid.Empty, EventId);

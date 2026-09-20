@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.Event;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventPublicActions.Requests.Queries;
 
-public sealed record GetEventPublicActionsRequest(Guid EventId) : IRequest<IReadOnlyList<EventPublicActionDto>>;
+public sealed record GetEventPublicActionsRequest(Guid EventId) : IQuery<IReadOnlyList<EventPublicActionDto>>;

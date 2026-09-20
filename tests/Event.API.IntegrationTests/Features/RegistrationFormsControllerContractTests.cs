@@ -6,6 +6,7 @@ using Explore.API.Controllers;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationAnalytics;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationAnalytics;
@@ -13,7 +14,6 @@ using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -40,11 +40,12 @@ public sealed class RegistrationFormsControllerContractTests
     [Test]
     public async Task Preflight_WhenBlocked_ReturnsStableValidationProblem()
     {
-        var mediator = Substitute.For<IMediator>();
         var preflight = new RegistrationFormPublishPreflightDto(false,
             [new RegistrationFormPublishPreflightIssueDto("registration_form_required_field_missing", "Add a required field.")]);
-        mediator.Send(Arg.Any<GetRegistrationFormPublishPreflightQuery>(), Arg.Any<CancellationToken>()).Returns(preflight);
-        RegistrationFormsController controller = CreateController(mediator);
+        var query = Substitute.For<IQueryHandler<GetRegistrationFormPublishPreflightQuery, RegistrationFormPublishPreflightDto?>>();
+        query.QueryAsync(Arg.Any<GetRegistrationFormPublishPreflightQuery>(), Arg.Any<CancellationToken>())
+            .Returns(preflight);
+        RegistrationFormsController controller = CreateController(preflightQuery: query);
 
         ActionResult<HalResource<RegistrationFormPublishPreflightDto>> result = await controller.Preflight(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), CancellationToken.None);
 
@@ -56,13 +57,14 @@ public sealed class RegistrationFormsControllerContractTests
     [Test]
     public async Task Preflight_WhenAllowed_ReturnsHalResource()
     {
-        var mediator = Substitute.For<IMediator>();
         var assembler = Substitute.For<IResourceAssembler<RegistrationFormPublishPreflightDto, RegistrationFormPublishPreflightDto>>();
         var preflight = new RegistrationFormPublishPreflightDto(true, []);
         var resource = new HalResource<RegistrationFormPublishPreflightDto>(preflight);
-        mediator.Send(Arg.Any<GetRegistrationFormPublishPreflightQuery>(), Arg.Any<CancellationToken>()).Returns(preflight);
+        var query = Substitute.For<IQueryHandler<GetRegistrationFormPublishPreflightQuery, RegistrationFormPublishPreflightDto?>>();
+        query.QueryAsync(Arg.Any<GetRegistrationFormPublishPreflightQuery>(), Arg.Any<CancellationToken>())
+            .Returns(preflight);
         assembler.ToResource(preflight, Arg.Any<HttpContext>()).Returns(resource);
-        RegistrationFormsController controller = CreateController(mediator, assembler);
+        RegistrationFormsController controller = CreateController(preflightQuery: query, preflightAssembler: assembler);
 
         ActionResult<HalResource<RegistrationFormPublishPreflightDto>> result = await controller.Preflight(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), CancellationToken.None);
 
@@ -83,12 +85,12 @@ public sealed class RegistrationFormsControllerContractTests
             "platform.registration", "attendee", "Attendee", Guid.CreateVersion7(), [version]);
         var workflow = new RegistrationWorkflowDto(
             Guid.CreateVersion7(), form.TenantId, form.EventId, "registration", Guid.CreateVersion7(), [], [form]);
-        var mediator = Substitute.For<IMediator>();
+        var query = Substitute.For<IQueryHandler<GetRegistrationWorkflowQuery, RegistrationWorkflowDto?>>();
         var assembler = Substitute.For<IResourceAssembler<RegistrationWorkflowDto, RegistrationWorkflowDto>>();
         var resource = new HalResource<RegistrationWorkflowDto>(workflow);
-        mediator.Send(Arg.Any<GetRegistrationWorkflowQuery>(), Arg.Any<CancellationToken>()).Returns(workflow);
+        query.QueryAsync(Arg.Any<GetRegistrationWorkflowQuery>(), Arg.Any<CancellationToken>()).Returns(workflow);
         assembler.ToResource(workflow, Arg.Any<HttpContext>()).Returns(resource);
-        RegistrationFormsController controller = CreateController(mediator, workflowAssembler: assembler);
+        RegistrationFormsController controller = CreateController(workflowQuery: query, workflowAssembler: assembler);
 
         ActionResult<HalResource<RegistrationWorkflowDto>> result = await controller.GetWorkflow(
             workflow.EventId, workflow.Purpose, CancellationToken.None);
@@ -104,15 +106,15 @@ public sealed class RegistrationFormsControllerContractTests
         Guid eventId = Guid.CreateVersion7();
         Guid formId = Guid.CreateVersion7();
         Guid versionId = Guid.CreateVersion7();
-        var mediator = Substitute.For<IMediator>();
+        var query = Substitute.For<IQueryHandler<GetRegistrationAnswerAnalyticsQuery, RegistrationAnswerAnalyticsDto?>>();
         var assembler = Substitute.For<IResourceAssembler<RegistrationAnswerAnalyticsDto, RegistrationAnswerAnalyticsDto>>();
         var analytics = new RegistrationAnswerAnalyticsDto(Guid.CreateVersion7(), eventId, formId, versionId, 3, []);
         var resource = new HalResource<RegistrationAnswerAnalyticsDto>(analytics);
-        mediator.Send(Arg.Is<GetRegistrationAnswerAnalyticsQuery>(query =>
-                query.EventId == eventId && query.FormId == formId && query.FormVersionId == versionId),
+        query.QueryAsync(Arg.Is<GetRegistrationAnswerAnalyticsQuery>(q =>
+                q.EventId == eventId && q.FormId == formId && q.FormVersionId == versionId),
             Arg.Any<CancellationToken>()).Returns(analytics);
         assembler.ToResource(analytics, Arg.Any<HttpContext>()).Returns(resource);
-        RegistrationFormsController controller = CreateController(mediator, analyticsAssembler: assembler);
+        RegistrationFormsController controller = CreateController(analyticsQuery: query, analyticsAssembler: assembler);
 
         ActionResult<HalResource<RegistrationAnswerAnalyticsDto>> result = await controller.GetAnswerAnalytics(eventId, formId, versionId, CancellationToken.None);
 
@@ -183,11 +185,11 @@ public sealed class RegistrationFormsControllerContractTests
     [Test]
     public async Task DeleteRequirement_AcceptsOnlyStrongQuotedNonEmptyGuid()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<DeleteRegistrationRequirementCommand>(), Arg.Any<CancellationToken>())
+        var deleteCommand = Substitute.For<ICommandHandler<DeleteRegistrationRequirementCommand, BaseCommandResponse<Guid>>>();
+        deleteCommand.ExecuteAsync(Arg.Any<DeleteRegistrationRequirementCommand>(), Arg.Any<CancellationToken>())
             .Returns(call => BaseCommandResponse.Success(
                 call.Arg<DeleteRegistrationRequirementCommand>().ExpectedConcurrencyStamp));
-        RegistrationFormsController controller = CreateController(mediator);
+        RegistrationFormsController controller = CreateController(deleteRequirementCommand: deleteCommand);
         Guid eventId = Guid.CreateVersion7();
         Guid workflowId = Guid.CreateVersion7();
         Guid requirementId = Guid.CreateVersion7();
@@ -208,12 +210,45 @@ public sealed class RegistrationFormsControllerContractTests
     }
 
     private static RegistrationFormsController CreateController(
-        IMediator mediator,
+        IQueryHandler<GetRegistrationWorkflowQuery, RegistrationWorkflowDto?>? workflowQuery = null,
+        IQueryHandler<GetRegistrationAnswerAnalyticsQuery, RegistrationAnswerAnalyticsDto?>? analyticsQuery = null,
+        IQueryHandler<GetRegistrationFormPublishPreflightQuery, RegistrationFormPublishPreflightDto?>? preflightQuery = null,
+        ICommandHandler<DeleteRegistrationRequirementCommand, BaseCommandResponse<Guid>>? deleteRequirementCommand = null,
         IResourceAssembler<RegistrationFormPublishPreflightDto, RegistrationFormPublishPreflightDto>? preflightAssembler = null,
         IResourceAssembler<RegistrationWorkflowDto, RegistrationWorkflowDto>? workflowAssembler = null,
         IResourceAssembler<RegistrationAnswerAnalyticsDto, RegistrationAnswerAnalyticsDto>? analyticsAssembler = null) =>
         new(
-            mediator,
+            workflowQuery ?? Substitute.For<IQueryHandler<GetRegistrationWorkflowQuery, RegistrationWorkflowDto?>>(),
+            analyticsQuery ?? Substitute.For<IQueryHandler<GetRegistrationAnswerAnalyticsQuery, RegistrationAnswerAnalyticsDto?>>(),
+            Substitute.For<IQueryHandler<GetRegistrationFormQuery, RegistrationFormDto?>>(),
+            Substitute.For<IQueryHandler<GetRegistrationFormVersionQuery, RegistrationFormVersionDto?>>(),
+            preflightQuery ?? Substitute.For<IQueryHandler<GetRegistrationFormPublishPreflightQuery, RegistrationFormPublishPreflightDto?>>(),
+            Substitute.For<IQueryHandler<ListRegistrationFormTemplatesQuery, IReadOnlyList<RegistrationFormTemplateDto>>>(),
+            Substitute.For<IQueryHandler<GetRegistrationFormTemplateQuery, RegistrationFormTemplateDto?>>(),
+            Substitute.For<ICommandHandler<CreateRegistrationWorkflowCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateRegistrationWorkflowCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateRegistrationRequirementCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateRegistrationRequirementCommand, BaseCommandResponse<Guid>>>(),
+            deleteRequirementCommand ?? Substitute.For<ICommandHandler<DeleteRegistrationRequirementCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateRegistrationFormCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateRegistrationFormVersionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<AddRegistrationFormSectionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateRegistrationFormSectionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<ReorderRegistrationFormSectionsCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteRegistrationFormSectionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<AddRegistrationFormFieldCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateRegistrationFormFieldCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<ReorderRegistrationFormFieldsCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteRegistrationFormFieldCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<AddRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<RetireRegistrationFormFieldOptionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<AddRegistrationFormRuleCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateRegistrationFormRuleCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteRegistrationFormRuleCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<PublishRegistrationFormVersionCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<CreateRegistrationFormTemplateCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<InstantiateRegistrationFormTemplateCommand, BaseCommandResponse<Guid>>>(),
             workflowAssembler ?? Substitute.For<IResourceAssembler<RegistrationWorkflowDto, RegistrationWorkflowDto>>(),
             Substitute.For<IResourceAssembler<RegistrationFormDto, RegistrationFormDto>>(),
             Substitute.For<IResourceAssembler<RegistrationFormVersionDto, RegistrationFormVersionDto>>(),

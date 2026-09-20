@@ -1,5 +1,5 @@
 using System.Text.Json;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -14,12 +14,12 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums.Analytics;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.PublicExperience.Handlers.Queries;
 
-public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>
+public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>
 {
     private readonly ITenantContext _tenantContext;
     private readonly ISystemSettingRepository _systemSettingRepository;
@@ -33,7 +33,6 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
     private readonly IHierarchicalSettingsResolver _hierarchicalSettingsResolver;
     private readonly ITypedSettingsDocumentResolver _typedSettingsDocumentResolver;
     private readonly IFooterLinkGroupRepository _footerLinkGroupRepository;
-    private readonly IMapper _mapper;
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness;
     private readonly IInstanceOperatorIdentityReadinessEvaluator _instanceOperatorReadiness;
     private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
@@ -51,7 +50,6 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         IHierarchicalSettingsResolver hierarchicalSettingsResolver,
         ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
         IFooterLinkGroupRepository footerLinkGroupRepository,
-        IMapper mapper,
         ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
         IInstanceOperatorIdentityReadinessEvaluator instanceOperatorReadiness,
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
@@ -68,13 +66,12 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         _hierarchicalSettingsResolver = hierarchicalSettingsResolver;
         _typedSettingsDocumentResolver = typedSettingsDocumentResolver;
         _footerLinkGroupRepository = footerLinkGroupRepository;
-        _mapper = mapper;
         _directoryOperatorReadiness = directoryOperatorReadiness;
         _instanceOperatorReadiness = instanceOperatorReadiness;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
     }
 
-    public async Task<PublicExperienceSettingsDto> Handle(GetPublicExperienceSettingsQuery request, CancellationToken cancellationToken)
+    public async Task<PublicExperienceSettingsDto> QueryAsync(GetPublicExperienceSettingsQuery query, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
         TenantDirectoryOperatorReadinessAssessment directoryAssessment =
@@ -142,7 +139,7 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
                 CopyrightText = footerSettingGroup.CopyrightText,
                 ShowCookieSettingsLink = footerSettingGroup.ShowCookieSettingsLink,
             },
-            LinkGroups = _mapper.Map<List<FooterLinkGroupDto>>(footerLinkGroups),
+            LinkGroups = footerLinkGroups.Select(FooterMapper.ToPublicGroup).ToList(),
         };
 
         // Resolve AI assistant availability (enabled + configured API key)

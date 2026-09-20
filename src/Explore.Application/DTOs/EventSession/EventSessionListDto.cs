@@ -12,7 +12,7 @@ public sealed record EventSessionListDto
 
     // Event relationship
     public Guid EventId { get; init; }
-    public required string EventTitle { get; init; }
+    public required string? EventTitle { get; init; }
     public int ParentEventStatusId { get; init; }
 
     // Day assignment

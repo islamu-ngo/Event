@@ -1,8 +1,8 @@
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Users.Requests.Queries;
 
-public sealed record ResolveCurrentUserIdByIdentityRequest : IRequest<Guid?>
+public sealed record ResolveCurrentUserIdByIdentityRequest : IQuery<Guid?>
 {
     public required string Provider { get; init; }
     public required string ProviderId { get; init; }

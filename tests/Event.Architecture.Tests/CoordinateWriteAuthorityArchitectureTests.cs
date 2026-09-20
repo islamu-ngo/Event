@@ -7,7 +7,6 @@ using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Federation.Atproto.Models;
-using MediatR;
 
 namespace Event.Architecture.Tests;
 
@@ -15,7 +14,6 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
 {
     private const string GeneratedClientNamespace = "Explore.Blazor.Client.Clients";
     private const string GeneratedCodeMarker = "[System.CodeDom.Compiler.GeneratedCode(";
-    private const string GeneratedTagClientsPath = "src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs";
 
     private static readonly Assembly ApplicationAssembly = typeof(CreateLocationDto).Assembly;
     private static readonly Lazy<GeneratedClientModel> GeneratedClient = new(CreateGeneratedClientModel);
@@ -234,8 +232,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
 
     private static GeneratedClientModel CreateGeneratedClientModel()
     {
-        string root = ResolveRepositoryRoot();
-        string tagSource = File.ReadAllText(Path.Combine(root, GeneratedTagClientsPath));
+        string tagSource = GeneratedContractInputs.Client;
         GeneratedClientContract[] contracts = ParseGeneratedClientContracts(tagSource);
 
         return new GeneratedClientModel(
@@ -510,7 +507,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
 
         string name = type.Name;
         string typeNamespace = type.Namespace ?? string.Empty;
-        if (typeof(IBaseRequest).IsAssignableFrom(type))
+        if (OperationContractDiscovery.IsRequest(type))
         {
             return typeNamespace.Contains(".Requests.Commands", StringComparison.Ordinal)
                 || name.EndsWith("Command", StringComparison.Ordinal)
@@ -527,7 +524,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
         string name = type.Name;
         string typeNamespace = type.Namespace ?? string.Empty;
 
-        return typeof(IBaseRequest).IsAssignableFrom(type)
+        return OperationContractDiscovery.IsRequest(type)
             || typeNamespace.StartsWith("Explore.Application", StringComparison.Ordinal)
                 && !typeNamespace.Contains(".Validators", StringComparison.Ordinal)
                 && !name.EndsWith("Validator", StringComparison.Ordinal)
@@ -547,7 +544,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
         || name.EndsWith($"{suffix}Dto", StringComparison.Ordinal);
 
     private static bool IsMachineGeneratedRequest(Type type) =>
-        typeof(IBaseRequest).IsAssignableFrom(type) && IsGenerated(type);
+        OperationContractDiscovery.IsRequest(type) && IsGenerated(type);
 
     private static bool IsGenerated(Type type) =>
         type.GetCustomAttribute<GeneratedCodeAttribute>() is not null
@@ -709,13 +706,13 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
     }
 
     [GeneratedCode("CoordinateWriteAuthorityArchitectureTests", "1.0")]
-    private sealed class GeneratedCodeCoordinateContractFixture : IRequest
+    private sealed class GeneratedCodeCoordinateContractFixture : Explore.Application.Contracts.Operations.ICommand
     {
         public double? Latitude { get; init; }
     }
 
     [CompilerGenerated]
-    private sealed class CompilerGeneratedCoordinateContractFixture : IRequest
+    private sealed class CompilerGeneratedCoordinateContractFixture : Explore.Application.Contracts.Operations.ICommand
     {
         public double? Longitude { get; init; }
     }

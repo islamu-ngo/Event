@@ -3,10 +3,10 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +19,7 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class TenantModerationReportingDashboardController(
-    IMediator mediator,
+    IQueryHandler<GetTenantModerationReportingDashboardRequest, TenantModerationReportingDashboardDto> getDashboardHandler,
     ITenantContext tenantContext,
     IResourceAssembler<TenantModerationReportingDashboardDto, TenantModerationReportingDashboardDto> resourceAssembler)
     : EventControllerBase
@@ -33,7 +33,7 @@ public sealed class TenantModerationReportingDashboardController(
     public async Task<ActionResult<HalResource<TenantModerationReportingDashboardDto>>> GetDashboard(
         CancellationToken cancellationToken = default)
     {
-        var dashboard = await mediator.Send(
+        var dashboard = await getDashboardHandler.QueryAsync(
             new GetTenantModerationReportingDashboardRequest(tenantContext.TenantId),
             cancellationToken);
 

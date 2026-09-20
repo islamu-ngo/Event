@@ -1,5 +1,6 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Authorization;
+using Explore.Application.Exceptions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventCustomProperty.Validators;
@@ -8,21 +9,21 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler<CreateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class CreateEventCustomPropertyDefinitionCommandHandler : ICommandHandler<CreateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEventRepository _eventRepository;
 
     public CreateEventCustomPropertyDefinitionCommandHandler(
         IEventCustomPropertyRepository eventCustomPropertyRepository,
@@ -30,21 +31,21 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IEventRepository eventRepository)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
+        _eventRepository = eventRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventCustomPropertyDefinitionDtoValidator();
         var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);
@@ -53,6 +54,12 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
             return BaseCommandResponse.Validation<Guid>(
                 validationResult.Errors.Select(e => e.ErrorMessage),
                 "Event custom property definition creation failed.");
+        }
+
+        var parent = await _eventRepository.GetById(request.DefinitionDto.EventId);
+        if (parent is null || parent.TenantId != _tenantContext.TenantId)
+        {
+            throw new AuthorizationException(ResourceKinds.Tenant, AuthorizationActions.Update);
         }
 
         var governance = _customPropertyGovernancePolicy.EvaluateDefinition(request.DefinitionDto.Namespace, request.DefinitionDto.Key);
@@ -110,13 +117,44 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
                     _tenantContext.TenantId));
         }
 
-        var definition = _mapper.Map<EventCustomPropertyDefinition>(request.DefinitionDto);
-        definition.TenantId = _tenantContext.TenantId;
-        definition.Namespace = governance.NormalizedNamespace;
-        definition.Key = governance.NormalizedKey;
-        definition.InstantiatedAt = DateTimeOffset.UtcNow;
-        definition.CreatedBy = _currentUserService.UserId;
-        definition.UpdatedBy = _currentUserService.UserId;
+        var dto = request.DefinitionDto;
+        var definition = new EventCustomPropertyDefinition
+        {
+            Id = Guid.CreateVersion7(),
+            EventId = dto.EventId,
+            Namespace = governance.NormalizedNamespace,
+            Key = governance.NormalizedKey,
+            DisplayName = dto.DisplayName,
+            Description = dto.Description,
+            PropertyType = dto.PropertyType,
+            IsRequired = dto.IsRequired,
+            IsMulti = dto.IsMulti,
+            IsActive = dto.IsActive,
+            SortOrder = dto.SortOrder,
+            ExposureLevel = dto.ExposureLevel,
+            IsSearchable = dto.IsSearchable,
+            IsFilterable = dto.IsFilterable,
+            IsExportable = dto.IsExportable,
+            IsModerationRelevant = dto.IsModerationRelevant,
+            IsAnalyticsRelevant = dto.IsAnalyticsRelevant,
+            IsSystemOwned = dto.IsSystemOwned,
+            DefaultTextValue = dto.DefaultTextValue,
+            DefaultNumberValue = dto.DefaultNumberValue,
+            DefaultBooleanValue = dto.DefaultBooleanValue,
+            DefaultDateTimeValue = dto.DefaultDateTimeValue,
+            MinLength = dto.MinLength,
+            MaxLength = dto.MaxLength,
+            RegexPattern = dto.RegexPattern,
+            MinNumber = dto.MinNumber,
+            MaxNumber = dto.MaxNumber,
+            MinDateTime = dto.MinDateTime,
+            MaxDateTime = dto.MaxDateTime,
+            AllowedUrlSchemes = dto.AllowedUrlSchemes,
+            TenantId = _tenantContext.TenantId,
+            InstantiatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = _currentUserService.UserId,
+            UpdatedBy = _currentUserService.UserId
+        };
 
         var options = CreateOptionEntities(request.DefinitionDto.Options, definition.Id);
         var defaultOption = options.SingleOrDefault(x => x.IsDefault);
@@ -125,9 +163,9 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
             ct => _eventCustomPropertyRepository.CreateWithOptions(definition, options, defaultOption?.Id, ct),
             cancellationToken);
 
-        await _cache.RemoveAsync(
-            GetListCacheKey(request.DefinitionDto.EventId, 1, PaginatedResult<object>.DefaultPageSize),
-            cancellationToken);
+        await _cache.RemoveByTagAsync(
+            EventCustomPropertyCache.ListsByEvent(definition.TenantId, definition.EventId),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Event custom property definition created successfully.");
     }
@@ -155,8 +193,4 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
             .ToList();
     }
 
-    private static string GetListCacheKey(Guid eventId, int pageNumber, int pageSize)
-    {
-        return $"event-custom-properties:list:{eventId}:{pageNumber}:{pageSize}";
-    }
 }

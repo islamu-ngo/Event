@@ -1,24 +1,22 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationReview;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationReviews.Queries.GetMyReviews;
 
-public class GetMyReviewsQueryHandler : IRequestHandler<GetMyReviewsQuery, List<OrganizationReviewDto>>
+public class GetMyReviewsQueryHandler : IQueryHandler<GetMyReviewsQuery, List<OrganizationReviewDto>>
 {
     private readonly IOrganizationReviewRepository _organizationReviewRepository;
-    private readonly IMapper _mapper;
 
-    public GetMyReviewsQueryHandler(IOrganizationReviewRepository organizationReviewRepository, IMapper mapper)
+    public GetMyReviewsQueryHandler(IOrganizationReviewRepository organizationReviewRepository)
     {
         _organizationReviewRepository = organizationReviewRepository;
-        _mapper = mapper;
     }
 
-    public async Task<List<OrganizationReviewDto>> Handle(GetMyReviewsQuery request, CancellationToken cancellationToken)
+    public async Task<List<OrganizationReviewDto>> QueryAsync(GetMyReviewsQuery request, CancellationToken cancellationToken)
     {
         var reviews = await _organizationReviewRepository.GetByUserId(request.UserId);
-        return _mapper.Map<List<OrganizationReviewDto>>(reviews);
+        return reviews.Select(OrganizationMapper.ToOrganizationReview).ToList();
     }
 }

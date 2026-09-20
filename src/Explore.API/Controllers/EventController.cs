@@ -12,14 +12,15 @@ using Explore.Application.DTOs.EventSession;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.EventPrograms.Requests.Queries;
 using Explore.Application.Features.Events.Moderation;
+using Explore.Application.Features.Events.OpenGraph;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -48,16 +49,31 @@ public class EventController : EventControllerBase
         "Event not found",
         "Event not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>> _getMyEvents;
+    private readonly IQueryHandler<GetEventDetailsRequest, EventDto?> _getEventDetails;
+    private readonly IQueryHandler<GetPublicEventDetailsRequest, EventDto?> _getPublicEventDetails;
+    private readonly IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?> _getOpenGraphImage;
+    private readonly IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> _getPublicEventDiscovery;
+    private readonly IQueryHandler<GetAtprotoEventSourceQuery, string?> _getAtprotoEventSource;
     private readonly IResourceAssembler<EventDto, EventListDto> _resourceAssembler;
     private readonly IResourceAssembler<EventDiscoveryItemDto> _eventDiscoveryResourceAssembler;
 
     public EventController(
-        IMediator mediator,
+        IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>> getMyEvents,
+        IQueryHandler<GetEventDetailsRequest, EventDto?> getEventDetails,
+        IQueryHandler<GetPublicEventDetailsRequest, EventDto?> getPublicEventDetails,
+        IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?> getOpenGraphImage,
+        IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> getPublicEventDiscovery,
+        IQueryHandler<GetAtprotoEventSourceQuery, string?> getAtprotoEventSource,
         IResourceAssembler<EventDto, EventListDto> resourceAssembler,
         IResourceAssembler<EventDiscoveryItemDto> eventDiscoveryResourceAssembler)
     {
-        _mediator = mediator;
+        _getMyEvents = getMyEvents;
+        _getEventDetails = getEventDetails;
+        _getPublicEventDetails = getPublicEventDetails;
+        _getOpenGraphImage = getOpenGraphImage;
+        _getPublicEventDiscovery = getPublicEventDiscovery;
+        _getAtprotoEventSource = getAtprotoEventSource;
         _resourceAssembler = resourceAssembler;
         _eventDiscoveryResourceAssembler = eventDiscoveryResourceAssembler;
     }
@@ -97,7 +113,7 @@ public class EventController : EventControllerBase
                 "The locationIds filter is not available on public event discovery.");
         }
 
-        var result = await _mediator.Send(new GetPublicEventDiscoveryRequest(new GetEventListRequest
+        var result = await _getPublicEventDiscovery.QueryAsync(new GetPublicEventDiscoveryRequest(new GetEventListRequest
         {
             PageNumber = filter.PageNumber,
             PageSize = filter.PageSize,
@@ -168,7 +184,7 @@ public class EventController : EventControllerBase
         Guid atprotoRecordId,
         CancellationToken cancellationToken = default)
     {
-        string? sourceUrl = await _mediator.Send(
+        string? sourceUrl = await _getAtprotoEventSource.QueryAsync(
             new GetAtprotoEventSourceQuery(atprotoRecordId),
             cancellationToken);
         return sourceUrl is null
@@ -199,7 +215,7 @@ public class EventController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var result = await _mediator.Send(new GetMyEventsRequest
+        var result = await _getMyEvents.QueryAsync(new GetMyEventsRequest
         {
             UserId = userId,
             PageNumber = query.PageNumber,
@@ -234,7 +250,7 @@ public class EventController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalResource<EventDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var @event = await _mediator.Send(new GetEventDetailsRequest { Id = id }, cancellationToken);
+        var @event = await _getEventDetails.QueryAsync(new GetEventDetailsRequest { Id = id }, cancellationToken);
         if (@event == null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
@@ -255,7 +271,7 @@ public class EventController : EventControllerBase
     [PrivateNoStore]
     public async Task<ActionResult<HalResource<EventDto>>> GetByPublicCode(string slugCode, CancellationToken cancellationToken = default)
     {
-        var @event = await _mediator.Send(new GetPublicEventDetailsRequest { SlugCode = slugCode }, cancellationToken);
+        var @event = await _getPublicEventDetails.QueryAsync(new GetPublicEventDetailsRequest { SlugCode = slugCode }, cancellationToken);
         if (@event == null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
@@ -280,7 +296,7 @@ public class EventController : EventControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public async Task<IActionResult> GetOpenGraphImage(string slugCode, CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _getOpenGraphImage.QueryAsync(
             new GetPublicEventOpenGraphImageRequest { SlugCode = slugCode },
             cancellationToken);
         if (result is null)

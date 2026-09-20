@@ -1,0 +1,35 @@
+Change-Id: CHG-01M2E9KBA5B4BV2VAMZW2T5GMV
+Title: "Protect Event Series disclosure and native writes"
+Type: fix
+Scope: events
+Summary: "Filter public Series and nested events, authorize unpublished updates against persisted ownership, and return concurrency conflicts correctly."
+Group: event-series
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/architecture/native-event-series.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/architecture/native-event-series.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Public Series reads and counts exclude unpublished, private, deleted,
+      foreign and otherwise ineligible nested events. Update authorization
+      resolves persisted Series ownership without an anonymous management read.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/features/event-series-management.md
+    Disposition: documented
+    Detail: >-
+      Upgrade normally without migration or new grants. Authorized administrators
+      can edit draft and private Series; conflicting patches return 409. Public
+      consumers must not rely on previously disclosed private Series or events.

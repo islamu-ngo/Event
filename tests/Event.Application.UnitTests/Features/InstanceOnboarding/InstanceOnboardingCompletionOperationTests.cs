@@ -40,7 +40,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         await Assert.That(scenario.CommittedWrites).Contains("bootstrap");
         await Assert.That(scenario.Users).Contains(scenario.UserId);
         await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -59,21 +59,26 @@ public sealed class InstanceOnboardingCompletionOperationTests
     }
 
     [Test]
-    public async Task CompletionRollback_WhenIdentityNotReady_AbortsWithoutCommittingAdministratorOrTenantRecords()
+    [Arguments("instance_operator_identity_incomplete", "instance_operator_identity_legal_name_missing")]
+    [Arguments("instance_operator_identity_missing", null)]
+    [Arguments("instance_operator_identity_integrity_error", null)]
+    public async Task CompletionRollback_WhenIdentityNotReady_AbortsWithoutCommittingAdministratorOrTenantRecords(
+        string failureCode, string? reasonCode)
     {
         var scenario = new OnboardingCompletionScenario();
         scenario.IdentityReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
             .Returns(new InstanceOperatorIdentityReadinessAssessment(
                 false,
-                "instance_operator_identity_incomplete",
-                ["instance_operator_identity_legal_name_missing"],
+                failureCode,
+                reasonCode is null ? [] : [reasonCode],
                 null,
                 null));
 
         BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
 
         await Assert.That(response.IsSuccess).IsFalse();
-        await Assert.That(response.Message).Contains("Instance operator identity is not ready");
+        await Assert.That(response.FailureCode).IsEqualTo(failureCode);
+        await Assert.That(response.Errors ?? []).IsEquivalentTo(reasonCode is null ? [] : new[] { reasonCode });
         await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.Users).IsEmpty();
@@ -96,7 +101,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(scenario.EventSequence[scenario.EventSequence.IndexOf("commit")..])
-            .IsEquivalentTo(["commit", "secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["commit", "secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -113,7 +118,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         await Assert.That(replay.Id).IsEqualTo(first.Id);
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -134,7 +139,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
     {
         var configured = new OnboardingCompletionScenario();
         BaseCommandResponse<Guid> configuredResponse = await new ClaimConfiguredInstanceAdministratorCommandHandler(
-            configured.Operation).Handle(configured.Command(), CancellationToken.None);
+            configured.Operation).ExecuteAsync(configured.Command(), CancellationToken.None);
 
         var interactive = new OnboardingCompletionScenario(interactive: true);
         var handler = new CompleteInstanceOnboardingCommandHandler(
@@ -142,7 +147,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
             interactive.UserRepository,
             interactive.DeploymentModeProvider,
             interactive.Operation);
-        BaseCommandResponse<Guid> interactiveResponse = await handler.Handle(
+        BaseCommandResponse<Guid> interactiveResponse = await handler.ExecuteAsync(
             interactive.InteractiveCommand(),
             CancellationToken.None);
 
@@ -383,7 +388,6 @@ internal sealed class OnboardingCompletionScenario
         });
 
         var setupSecret = new EffectSetupSecret(EventSequence);
-        var cache = new EffectAdminCache(EventSequence);
         DeploymentModeProvider = new EffectDeploymentModeProvider(EventSequence);
         var jwt = new EffectJwtNotifier(this, EventSequence);
         var audit = new EffectAuditLogger(EventSequence);
@@ -427,7 +431,6 @@ internal sealed class OnboardingCompletionScenario
             [_provider],
             setupSecret,
             audit,
-            cache,
             DeploymentModeProvider,
             jwt,
             branding,
@@ -471,7 +474,7 @@ internal sealed class OnboardingCompletionScenario
         ProviderAccountKey? account = null,
         CancellationToken cancellationToken = default) =>
         new ClaimConfiguredInstanceAdministratorCommandHandler(Operation)
-            .Handle(Command(userId, account), cancellationToken);
+            .ExecuteAsync(Command(userId, account), cancellationToken);
 
     public Task<BaseCommandResponse<Guid>> CompleteProvisionedLocalAsync()
     {
@@ -706,12 +709,6 @@ internal sealed class OnboardingCompletionScenario
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public bool ValidateSecret(string? secret) => true;
         public void Lock() => events.Add("secret-lock");
-    }
-
-    private sealed class EffectAdminCache(List<string> events) : IAdminCacheInvalidator
-    {
-        public void InvalidateUser(Guid userId) => events.Add("admin-cache");
-        public void InvalidateAll() => throw new NotSupportedException();
     }
 
     internal sealed class EffectDeploymentModeProvider(List<string> events) : IDeploymentModeProvider

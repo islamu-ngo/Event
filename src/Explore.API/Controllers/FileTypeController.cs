@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.FileType;
 using Explore.Application.Features.FileTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class FileTypeController(IMediator mediator) : ControllerBase
+public class FileTypeController(
+    IQueryHandler<GetFileTypeListRequest, List<FileTypeListDto>> listQuery,
+    IQueryHandler<GetFileTypeDetailsRequest, FileTypeDto?> detailQuery) : ControllerBase
 {
 
     // GET: api/filetype
@@ -29,7 +31,7 @@ public class FileTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<FileTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var fileTypes = await mediator.Send(new GetFileTypeListRequest(), cancellationToken);
+        var fileTypes = await listQuery.QueryAsync(new GetFileTypeListRequest(), cancellationToken);
         return Ok(fileTypes);
     }
 
@@ -43,7 +45,7 @@ public class FileTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<FileTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var fileType = await mediator.Send(new GetFileTypeDetailsRequest { Id = id }, cancellationToken);
+        var fileType = await detailQuery.QueryAsync(new GetFileTypeDetailsRequest { Id = id }, cancellationToken);
         return Ok(fileType);
     }
 }

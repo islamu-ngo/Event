@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Explore.API.Mcp;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Responses;
 using Explore.Domain.Ai;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
@@ -502,18 +502,18 @@ public sealed class McpProjectedToolTests
     }
 
     [Test]
-    public async Task InvokeAsync_ResolvesMediatorFromRequestScopeAndPropagatesCancellationToken()
+    public async Task InvokeAsync_ResolvesCommandHandlerFromRequestScopeAndPropagatesCancellationToken()
     {
         var conversationId = Guid.CreateVersion7();
         var tool = new AiMcpProjectedProposalTool(CreateEventDraftAiToolDefinition.Create());
-        var mediator = Substitute.For<IMediator>();
+        var handler = Substitute.For<ICommandHandler<ProposeAiToolActionCommand, BaseCommandResponse<Guid>>>();
         var expectedToken = new CancellationTokenSource().Token;
-        mediator.Send(Arg.Any<ProposeAiToolActionCommand>(), expectedToken)
+        handler.ExecuteAsync(Arg.Any<ProposeAiToolActionCommand>(), expectedToken)
             .Returns(BaseCommandResponse.Success(
                 Guid.CreateVersion7(),
                 "Confirm the proposed action before side effects."));
         await using var services = new ServiceCollection()
-            .AddSingleton(mediator)
+            .AddSingleton(handler)
             .BuildServiceProvider();
         var request = new RequestContext<CallToolRequestParams>(
             Substitute.For<McpServer>(),
@@ -537,7 +537,7 @@ public sealed class McpProjectedToolTests
         var result = await tool.InvokeAsync(request, expectedToken);
 
         await Assert.That(result.IsError).IsFalse();
-        await mediator.Received(1).Send(
+        await handler.Received(1).ExecuteAsync(
             Arg.Is<ProposeAiToolActionCommand>(command =>
                 command.ConversationId == conversationId &&
                 command.ToolName == "CreateEventDraft" &&

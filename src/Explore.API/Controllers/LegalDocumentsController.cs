@@ -4,9 +4,9 @@ using System.Globalization;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.LegalDocuments;
 using Explore.Application.Features.LegalDocuments.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +16,8 @@ using Microsoft.AspNetCore.OutputCaching;
 [Route("api/legal-documents")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public sealed class LegalDocumentsController(IMediator mediator) : ControllerBase
+public sealed class LegalDocumentsController(
+    IQueryHandler<GetPublicLegalDocumentQuery, PublicLegalDocumentQueryResult> query) : ControllerBase
 {
     [HttpGet("{kindCode}", Name = RouteNames.GetPublicLegalDocument)]
     [AllowAnonymous]
@@ -35,7 +36,7 @@ public sealed class LegalDocumentsController(IMediator mediator) : ControllerBas
         string languageTag = CultureInfo.CurrentUICulture.Name;
         if (string.IsNullOrWhiteSpace(languageTag))
             languageTag = "en";
-        PublicLegalDocumentQueryResult result = await mediator.Send(
+        PublicLegalDocumentQueryResult result = await query.QueryAsync(
             new GetPublicLegalDocumentQuery(
                 kindCode,
                 languageTag),

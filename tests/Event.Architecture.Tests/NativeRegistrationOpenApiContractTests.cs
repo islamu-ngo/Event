@@ -51,8 +51,7 @@ public sealed class NativeRegistrationOpenApiContractTests
         await Assert.That(fieldProperties.TryGetProperty("organizerVisibilityId", out _)).IsFalse();
         await Assert.That(fieldProperties.TryGetProperty("retentionPolicyId", out _)).IsFalse();
 
-        string generated = await File.ReadAllTextAsync(Path.Combine(
-            ResolveRepositoryRoot(), "src", "Explore.Blazor.Client", "Clients", "EventApiTagClients.g.cs"));
+        string generated = GeneratedContractInputs.Client;
         await Assert.That(generated).Contains(
             "partial class HalResourceOfNativeRegistrationRequirementProgressCollectionDto");
         await Assert.That(generated).Contains("ICollection<Requirements> Requirements");
@@ -63,8 +62,7 @@ public sealed class NativeRegistrationOpenApiContractTests
 
     private static async Task<JsonDocument> ReadOpenApiAsync()
     {
-        FileStream stream = File.OpenRead(Path.Combine(
-            ResolveRepositoryRoot(), "schemas", "openapi_islamu-event.json"));
+        Stream stream = GeneratedContractInputs.OpenSchema();
         await using (stream)
         {
             return await JsonDocument.ParseAsync(stream);

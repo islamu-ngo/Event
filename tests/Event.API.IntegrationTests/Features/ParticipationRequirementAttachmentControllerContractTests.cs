@@ -12,7 +12,10 @@ using Explore.Application.Features.RegistrationForms.Handlers.Queries;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.EventParticipation.Requests.Commands;
+using Explore.Application.Features.RegistrationForms.Requests.Commands;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -98,13 +101,13 @@ public sealed class ParticipationRequirementAttachmentControllerContractTests
         events.IsPubliclyEligibleAsync(tenantId, missingDescriptorEventId, Arg.Any<CancellationToken>())
             .Returns(true);
         var handler = new GetOptionalQuestionnaireQueryHandler(attachments, events, tenantContext);
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetOptionalQuestionnaireQuery>(), Arg.Any<CancellationToken>())
-            .Returns(call => handler.Handle(
-                call.Arg<GetOptionalQuestionnaireQuery>(),
-                call.Arg<CancellationToken>()));
         var assembler = Substitute.For<IResourceAssembler<OptionalQuestionnaireDto, OptionalQuestionnaireDto>>();
-        var controller = new EventParticipationController(mediator, assembler)
+        var controller = new EventParticipationController(
+            Substitute.For<ICommandHandler<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<AttachRegistrationRequirementCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DetachRegistrationRequirementCommand, BaseCommandResponse<Guid>>>(),
+            handler,
+            assembler)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

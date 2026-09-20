@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionLanguages.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EventSession, AuthorizationActions.Update)]
-public sealed record UpdateEventSessionLanguageCommand : IRequest<BaseCommandResponse<int>>, ISecureRequest
+public sealed record UpdateEventSessionLanguageCommand : ICommand<BaseCommandResponse<int>>, ISecureRequest
 {
     public int EventSessionLanguageId { get; init; }
 

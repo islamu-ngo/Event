@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.CustomPropertyProjection, AuthorizationActions.Update)]
-public sealed record DrainCustomPropertyProjectionDirtyScopesCommand : IRequest<BaseCommandResponse<DrainDirtyScopesResponseDto>>, ISecureRequest
+public sealed record DrainCustomPropertyProjectionDirtyScopesCommand : ICommand<BaseCommandResponse<DrainDirtyScopesResponseDto>>, ISecureRequest
 {
     public required DrainDirtyScopesRequestDto RequestDto { get; init; }
 

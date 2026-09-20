@@ -60,7 +60,7 @@ public sealed class SvixPortalAuditNoStoreTests
         var command = CreateCommand();
         var handler = CreateHandler(portalService, auditWriter, command.ConsumerId);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ExecuteAsync(
             command,
             CancellationToken.None));
     }
@@ -88,7 +88,7 @@ public sealed class SvixPortalAuditNoStoreTests
         var command = CreateCommand();
         var handler = CreateHandler(portalService, auditWriter, command.ConsumerId);
 
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(auditRequest).IsNotNull();
@@ -117,7 +117,7 @@ public sealed class SvixPortalAuditNoStoreTests
         var command = CreateCommand();
         var handler = CreateHandler(portalService, auditWriter, command.ConsumerId);
 
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await handler.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(auditRequest).IsNotNull();

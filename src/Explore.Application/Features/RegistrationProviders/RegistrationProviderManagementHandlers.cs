@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
@@ -15,7 +16,6 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using FluentValidation;
-using MediatR;
 using static Explore.Application.Features.RegistrationProviders.Commands.RegistrationProviderManagementHandlerHelpers;
 
 namespace Explore.Application.Features.RegistrationProviders.Commands;
@@ -24,9 +24,9 @@ public sealed class GetRegistrationProviderHealthQueryHandler(
     IRegistrationProviderRepository providerRepository,
     IRegistrationProviderRegistry providerRegistry,
     TimeProvider timeProvider)
-    : IRequestHandler<GetRegistrationProviderHealthQuery, IReadOnlyList<RegistrationProviderBindingHealthDto>>
+    : IQueryHandler<GetRegistrationProviderHealthQuery, IReadOnlyList<RegistrationProviderBindingHealthDto>>
 {
-    public async Task<IReadOnlyList<RegistrationProviderBindingHealthDto>> Handle(GetRegistrationProviderHealthQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RegistrationProviderBindingHealthDto>> QueryAsync(GetRegistrationProviderHealthQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         DateTime now = timeProvider.GetUtcNow().UtcDateTime;
@@ -64,9 +64,9 @@ public sealed class GetRegistrationProviderHealthQueryHandler(
 }
 
 public sealed class GetRegistrationProviderQueueQueryHandler(IRegistrationProviderRepository providerRepository)
-    : IRequestHandler<GetRegistrationProviderQueueQuery, IReadOnlyList<RegistrationProviderParkedQueueItemDto>>
+    : IQueryHandler<GetRegistrationProviderQueueQuery, IReadOnlyList<RegistrationProviderParkedQueueItemDto>>
 {
-    public async Task<IReadOnlyList<RegistrationProviderParkedQueueItemDto>> Handle(GetRegistrationProviderQueueQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RegistrationProviderParkedQueueItemDto>> QueryAsync(GetRegistrationProviderQueueQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         int limit = Math.Clamp(request.Limit, 1, 100);
@@ -102,9 +102,9 @@ public sealed class PollRegistrationProviderReconciliationCommandHandler(
     IRegistrationProviderRepository providerRepository,
     IRegistrationProviderRegistry providerRegistry,
     BusinessMetrics? metrics = null)
-    : IRequestHandler<PollRegistrationProviderReconciliationCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PollRegistrationProviderReconciliationCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(PollRegistrationProviderReconciliationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PollRegistrationProviderReconciliationCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         if (request.BindingId == Guid.Empty || request.SinceUtc == default || request.SinceUtc.Kind != DateTimeKind.Utc)
@@ -146,15 +146,15 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
     IIncomingWebhookMessageRepository messageRepository,
     IIncomingWebhookEffectOutboxRepository effectRepository,
     IRegistrationProviderCallbackReceiptProtector receiptProtector,
-    ISender sender,
+    IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> storageContent,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     BusinessMetrics? metrics = null)
-    : IRequestHandler<QueueManualRegistrationProviderImportCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<QueueManualRegistrationProviderImportCommand, BaseCommandResponse<Guid>>
 {
     public const string ManualImportEffectKind = "registration.provider_manual_import";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(QueueManualRegistrationProviderImportCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(QueueManualRegistrationProviderImportCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         if (request.BindingId == Guid.Empty || !Guid.TryParse(request.StorageReference, out Guid storageObjectId) ||
@@ -179,7 +179,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
             return Failure(request.BindingId, "registration_provider_manual_import_unsupported", "Manual import is not supported by this provider binding.");
         }
 
-        StorageObjectContentResult? content = await sender.Send(new GetStorageObjectContentRequest
+        StorageObjectContentResult? content = await storageContent.QueryAsync(new GetStorageObjectContentRequest
         {
             StorageObjectId = storageObjectId,
             TenantId = request.TenantId
@@ -358,9 +358,9 @@ public sealed class RetryRegistrationProviderParkedItemCommandHandler(
     IIncomingWebhookEffectReceiptRepository receiptRepository,
     TimeProvider timeProvider,
     BusinessMetrics? metrics = null)
-    : IRequestHandler<RetryRegistrationProviderParkedItemCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RetryRegistrationProviderParkedItemCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(RetryRegistrationProviderParkedItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RetryRegistrationProviderParkedItemCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         if (request.EffectOutboxId is not { } effectId || request.ExpectedProcessingGeneration is not { } generation)
@@ -401,9 +401,9 @@ public sealed class ResolveRegistrationProviderQueueItemCommandHandler(
     IIncomingWebhookEffectReceiptRepository receiptRepository,
     TimeProvider timeProvider,
     BusinessMetrics? metrics = null)
-    : IRequestHandler<ResolveRegistrationProviderQueueItemCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ResolveRegistrationProviderQueueItemCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ResolveRegistrationProviderQueueItemCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ResolveRegistrationProviderQueueItemCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         bool hasSubmission = request.SubmissionId is { } submissionId && submissionId != Guid.Empty;
@@ -447,9 +447,9 @@ public sealed class ResolveRegistrationProviderQueueItemCommandHandler(
 }
 
 public sealed class GetRegistrationProviderConnectionsQueryHandler(IRegistrationProviderRepository providerRepository)
-    : IRequestHandler<GetRegistrationProviderConnectionsQuery, IReadOnlyList<RegistrationProviderConnectionDto>>
+    : IQueryHandler<GetRegistrationProviderConnectionsQuery, IReadOnlyList<RegistrationProviderConnectionDto>>
 {
-    public async Task<IReadOnlyList<RegistrationProviderConnectionDto>> Handle(GetRegistrationProviderConnectionsQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RegistrationProviderConnectionDto>> QueryAsync(GetRegistrationProviderConnectionsQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         return [.. (await providerRepository.GetConnectionsAsync(request.TenantId, cancellationToken)).Select(connection => ToConnectionDto(connection, request.EventId))];
@@ -457,9 +457,9 @@ public sealed class GetRegistrationProviderConnectionsQueryHandler(IRegistration
 }
 
 public sealed class GetRegistrationProviderConnectionQueryHandler(IRegistrationProviderRepository providerRepository)
-    : IRequestHandler<GetRegistrationProviderConnectionQuery, RegistrationProviderConnectionDto?>
+    : IQueryHandler<GetRegistrationProviderConnectionQuery, RegistrationProviderConnectionDto?>
 {
-    public async Task<RegistrationProviderConnectionDto?> Handle(GetRegistrationProviderConnectionQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationProviderConnectionDto?> QueryAsync(GetRegistrationProviderConnectionQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
@@ -471,9 +471,9 @@ public sealed class UpsertRegistrationProviderConnectionCommandHandler(
     IRegistrationProviderRepository providerRepository,
     IRegistrationProviderRegistry providerRegistry,
     TimeProvider timeProvider)
-    : IRequestHandler<UpsertRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpsertRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpsertRegistrationProviderConnectionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpsertRegistrationProviderConnectionCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         if (!TryConnectionRequest(request.Request, providerRegistry, out RegistrationProviderKindEnum kind, out RegistrationProviderDeploymentKindEnum deployment))
@@ -509,9 +509,9 @@ public sealed class UpsertRegistrationProviderConnectionCommandHandler(
 }
 
 public sealed class ReplaceRegistrationProviderApprovedOriginsCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
-    : IRequestHandler<ReplaceRegistrationProviderApprovedOriginsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ReplaceRegistrationProviderApprovedOriginsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ReplaceRegistrationProviderApprovedOriginsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceRegistrationProviderApprovedOriginsCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
@@ -531,9 +531,9 @@ public sealed class ReplaceRegistrationProviderApprovedOriginsCommandHandler(IRe
 }
 
 public sealed class DeleteRegistrationProviderConnectionCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
-    : IRequestHandler<DeleteRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationProviderConnectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationProviderConnectionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationProviderConnectionCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.ConnectionId, cancellationToken);
@@ -547,9 +547,9 @@ public sealed class DeleteRegistrationProviderConnectionCommandHandler(IRegistra
 }
 
 public sealed class GetRegistrationProviderBindingsQueryHandler(IRegistrationProviderRepository providerRepository)
-    : IRequestHandler<GetRegistrationProviderBindingsQuery, IReadOnlyList<RegistrationProviderBindingDto>>
+    : IQueryHandler<GetRegistrationProviderBindingsQuery, IReadOnlyList<RegistrationProviderBindingDto>>
 {
-    public async Task<IReadOnlyList<RegistrationProviderBindingDto>> Handle(GetRegistrationProviderBindingsQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RegistrationProviderBindingDto>> QueryAsync(GetRegistrationProviderBindingsQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         return [.. (await providerRepository.GetBindingsForEventAsync(request.TenantId, request.EventId, cancellationToken)).Select(binding => ToBindingDto(binding, request.EventId))];
@@ -557,9 +557,9 @@ public sealed class GetRegistrationProviderBindingsQueryHandler(IRegistrationPro
 }
 
 public sealed class GetRegistrationProviderBindingQueryHandler(IRegistrationProviderRepository providerRepository)
-    : IRequestHandler<GetRegistrationProviderBindingQuery, RegistrationProviderBindingDto?>
+    : IQueryHandler<GetRegistrationProviderBindingQuery, RegistrationProviderBindingDto?>
 {
-    public async Task<RegistrationProviderBindingDto?> Handle(GetRegistrationProviderBindingQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationProviderBindingDto?> QueryAsync(GetRegistrationProviderBindingQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -574,9 +574,9 @@ public sealed class CreateRegistrationProviderBindingCommandHandler(
     ISecretBindingRepository secretBindingRepository,
     IRegistrationProviderRegistry providerRegistry,
     TimeProvider timeProvider)
-    : IRequestHandler<CreateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateRegistrationProviderBindingCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderConnection? connection = await providerRepository.GetConnectionAsync(request.TenantId, request.Request.ConnectionId, cancellationToken);
@@ -606,9 +606,9 @@ public sealed class UpdateRegistrationProviderBindingCommandHandler(
     IRegistrationProviderRepository providerRepository,
     ISecretBindingRepository secretBindingRepository,
     IRegistrationProviderRegistry providerRegistry)
-    : IRequestHandler<UpdateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateRegistrationProviderBindingCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -641,9 +641,9 @@ public sealed class UpdateRegistrationProviderBindingCommandHandler(
 }
 
 public sealed class DeleteRegistrationProviderBindingCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
-    : IRequestHandler<DeleteRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationProviderBindingCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -665,12 +665,12 @@ public sealed class DeleteRegistrationProviderBindingCommandHandler(IRegistratio
 
 public sealed class PublishEventRegistrationProviderBindingCommandHandler(
     IRegistrationProviderRepository providerRepository,
-    IMediator mediator,
+    ICommandHandler<PublishRegistrationProviderBindingCommand, BaseCommandResponse<Guid>> publishBindingHandler,
     IRegistrationProviderManagedPublishPreflight managedPublishPreflight,
     TimeProvider timeProvider)
-    : IRequestHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PublishEventRegistrationProviderBindingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(PublishEventRegistrationProviderBindingCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventRegistrationProviderBindingCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationProviderBinding? binding = await providerRepository.GetBindingAsync(request.TenantId, request.BindingId, cancellationToken);
@@ -686,7 +686,7 @@ public sealed class PublishEventRegistrationProviderBindingCommandHandler(
             string code = preflight.FailureCode ?? "registration_provider_preflight_failed";
             return BaseCommandResponse.Failure<Guid>(code, code, preflight.Errors, request.BindingId);
         }
-        return await mediator.Send(new PublishRegistrationProviderBindingCommand(
+        return await publishBindingHandler.ExecuteAsync(new PublishRegistrationProviderBindingCommand(
             request.TenantId,
             request.BindingId,
             ToSchemaDriftClass((RegistrationProviderDriftClassEnum)binding.DriftClassId),
@@ -694,16 +694,18 @@ public sealed class PublishEventRegistrationProviderBindingCommandHandler(
     }
 }
 
-public sealed class ReplaceEventDraftRegistrationProviderMappingsCommandHandler(IRegistrationProviderRepository providerRepository, IMediator mediator)
-    : IRequestHandler<ReplaceEventDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>
+public sealed class ReplaceEventDraftRegistrationProviderMappingsCommandHandler(
+    IRegistrationProviderRepository providerRepository,
+    ICommandHandler<ReplaceDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>> replaceMappingsHandler)
+    : ICommandHandler<ReplaceEventDraftRegistrationProviderMappingsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ReplaceEventDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceEventDraftRegistrationProviderMappingsCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         if (!await BindingBelongsToEventAsync(providerRepository, request.TenantId, request.EventId, request.BindingId, cancellationToken))
             return Failure(request.BindingId, "registration_provider_binding_not_found", "Registration provider binding was not found.");
 
-        return await mediator.Send(new ReplaceDraftRegistrationProviderMappingsCommand(
+        return await replaceMappingsHandler.ExecuteAsync(new ReplaceDraftRegistrationProviderMappingsCommand(
             request.TenantId,
             request.BindingId,
             [.. request.Request.FieldMappings.Select(mapping => new RegistrationProviderFieldMappingInput(mapping.PlatformFieldKey, mapping.ProviderFieldKey, mapping.IsRequired))],
@@ -717,9 +719,9 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
     SchemaDriftClassifier driftClassifier,
     FormSchemaArtifactPublicationService publicationService,
     TimeProvider timeProvider)
-    : IRequestHandler<ImportExternalRegistrationProviderFormVersionCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ImportExternalRegistrationProviderFormVersionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ImportExternalRegistrationProviderFormVersionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ImportExternalRegistrationProviderFormVersionCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         if (!ValidImportRequest(request.Request))
@@ -938,9 +940,9 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
 }
 
 public sealed class GetRegistrationChannelsQueryHandler(IRegistrationProviderRepository providerRepository)
-    : IRequestHandler<GetRegistrationChannelsQuery, IReadOnlyList<RegistrationChannelDto>>
+    : IQueryHandler<GetRegistrationChannelsQuery, IReadOnlyList<RegistrationChannelDto>>
 {
-    public async Task<IReadOnlyList<RegistrationChannelDto>> Handle(GetRegistrationChannelsQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RegistrationChannelDto>> QueryAsync(GetRegistrationChannelsQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationRequirement? requirement = await providerRepository.GetRequirementAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, cancellationToken);
@@ -949,9 +951,9 @@ public sealed class GetRegistrationChannelsQueryHandler(IRegistrationProviderRep
 }
 
 public sealed class UpsertRegistrationChannelCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
-    : IRequestHandler<UpsertRegistrationChannelCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpsertRegistrationChannelCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(UpsertRegistrationChannelCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpsertRegistrationChannelCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationRequirement? requirement = await providerRepository.GetRequirementAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, cancellationToken);
@@ -992,9 +994,9 @@ public sealed class UpsertRegistrationChannelCommandHandler(IRegistrationProvide
 }
 
 public sealed class DeleteRegistrationChannelCommandHandler(IRegistrationProviderRepository providerRepository, TimeProvider timeProvider)
-    : IRequestHandler<DeleteRegistrationChannelCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DeleteRegistrationChannelCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteRegistrationChannelCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteRegistrationChannelCommand request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationChannel? channel = await providerRepository.GetChannelAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, request.ChannelId, cancellationToken);
@@ -1006,9 +1008,9 @@ public sealed class DeleteRegistrationChannelCommandHandler(IRegistrationProvide
 }
 
 public sealed class GetRegistrationProviderLaunchDescriptorQueryHandler(IRegistrationProviderRepository providerRepository, IRegistrationProviderRegistry providerRegistry)
-    : IRequestHandler<GetRegistrationProviderLaunchDescriptorQuery, RegistrationProviderLaunchDescriptorDto>
+    : IQueryHandler<GetRegistrationProviderLaunchDescriptorQuery, RegistrationProviderLaunchDescriptorDto>
 {
-    public async Task<RegistrationProviderLaunchDescriptorDto> Handle(GetRegistrationProviderLaunchDescriptorQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationProviderLaunchDescriptorDto> QueryAsync(GetRegistrationProviderLaunchDescriptorQuery request, CancellationToken cancellationToken = default)
     {
         RequireEventScope(request.TenantId, request.EventId);
         RegistrationChannel? channel = await providerRepository.GetChannelAsync(request.TenantId, request.EventId, request.WorkflowId, request.RequirementId, request.ChannelId, cancellationToken);

@@ -5,10 +5,11 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,7 +19,9 @@ using Microsoft.AspNetCore.Mvc;
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
-public sealed class InstanceModerationReportingSettingsController(IMediator mediator) : EventControllerBase
+public sealed class InstanceModerationReportingSettingsController(
+    ICommandHandler<UpdateReportingProviderLocksCommand, BaseCommandResponse<Guid>> updateLocksHandler,
+    IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery) : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor UpdateLocksValidationProblem = new(
         "moderationReportingProviderLocks",
@@ -37,14 +40,14 @@ public sealed class InstanceModerationReportingSettingsController(IMediator medi
         [FromBody] UpdateReportingProviderLocksDto locks,
         CancellationToken cancellationToken = default)
     {
-        Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await mediator.Send(
+        var response = await updateLocksHandler.ExecuteAsync(
             new UpdateReportingProviderLocksCommand(userId.Value, locks),
             cancellationToken);
 

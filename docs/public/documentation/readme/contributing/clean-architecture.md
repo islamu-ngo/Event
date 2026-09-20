@@ -21,7 +21,7 @@ The core of the system. Owns aggregates, entities, value objects, domain invaria
 * **Strict Rule**: Zero dependencies on EF Core, ASP.NET Core, HTTP, or third-party libraries.
 
 ### 2. Application (`Explore.Application`)
-Orchestrates business use cases. Owns CQRS commands and queries, MediatR handlers, specifications, authorization requirements, and immutable request/result contracts.
+Orchestrates business use cases through explicit commands and queries. Owns application operations, specifications, authorization requirements, immutable request/result contracts and entity-to-response mapping.
 * **Strict Rule**: Validators are manually instantiated (no reflection/DI magic). Repositories return entities, never API DTOs.
 
 ### 3. Persistence & Infrastructure (`Explore.Persistence`, `Explore.Infrastructure`)
@@ -29,7 +29,7 @@ Orchestrates business use cases. Owns CQRS commands and queries, MediatR handler
 * **Infrastructure**: Implements external adapters: [Email SMTP](../communications-and-notifications/email-smtp.md), [Storage Providers](../integrations-and-ai/storage.md), [Stripe Payments](../events-and-ticketing/paid-events-and-payouts.md), and [AT Protocol Federation](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md).
 
 ### 4. API & BFF (`Explore.API`, `Explore.Blazor`)
-* **`Explore.API`**: Thin REST controllers that dispatch commands/queries to MediatR, map entities to DTOs, and assemble [Server-Issued HAL Links](../security-and-identity/authorization.md#the-golden-rule-of-client-ui-affordances).
+* **`Explore.API`**: Thin REST controllers that invoke application operations and assemble [Server-Issued HAL Links](../security-and-identity/authorization.md#the-golden-rule-of-client-ui-affordances).
 * **`Explore.Blazor`**: Blazor WebAssembly UI and Backend-for-Frontend (BFF) managing encrypted session cookies and proxying API calls.
 
 ---

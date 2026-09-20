@@ -1,7 +1,8 @@
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -44,8 +45,9 @@ public sealed class LocalIdentityLifecycleDeliveryWorker(
             try
             {
                 await using var repair = scopes.CreateAsyncScope();
-                var response = await repair.ServiceProvider.GetRequiredService<ISender>()
-                    .Send(new ReconcileLocalIdentityLifecycleMirrorCommand(pointer), cancellationToken);
+                var response = await repair.ServiceProvider
+                    .GetRequiredService<ICommandHandler<ReconcileLocalIdentityLifecycleMirrorCommand, BaseCommandResponse<Guid>>>()
+                    .ExecuteAsync(new ReconcileLocalIdentityLifecycleMirrorCommand(pointer), cancellationToken);
                 if (!response.IsSuccess)
                     logger.LogWarning(new EventId(4721, "LocalLifecycleMirrorDeferred"), "Local lifecycle mirror repair deferred.");
             }

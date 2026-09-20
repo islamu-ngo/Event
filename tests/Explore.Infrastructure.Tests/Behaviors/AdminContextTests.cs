@@ -8,7 +8,6 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Identity;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -627,7 +626,6 @@ public class AdminContextTests
         IGroupMemberRepository groupMemberRepository)
     {
         var userExternalLoginRepository = Substitute.For<IUserExternalLoginRepository>();
-        var cache = new MemoryCache(new MemoryCacheOptions());
         var logger = Substitute.For<ILogger<AdminContext>>();
 
         return new AdminContext(
@@ -637,7 +635,6 @@ public class AdminContextTests
             organizationMemberRepository,
             groupMemberRepository,
             userExternalLoginRepository,
-            cache,
             logger);
     }
 
@@ -784,7 +781,6 @@ public class AdminContextTests
         IUserExternalLoginRepository? userExternalLoginRepository = null)
     {
         var groupMemberRepository = Substitute.For<IGroupMemberRepository>();
-        var cache = new MemoryCache(new MemoryCacheOptions());
         var logger = Substitute.For<ILogger<AdminContext>>();
 
         return new AdminContext(
@@ -794,7 +790,6 @@ public class AdminContextTests
             organizationMemberRepository,
             groupMemberRepository,
             userExternalLoginRepository ?? Substitute.For<IUserExternalLoginRepository>(),
-            cache,
             logger);
     }
 

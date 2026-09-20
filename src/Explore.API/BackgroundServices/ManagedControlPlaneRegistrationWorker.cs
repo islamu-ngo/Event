@@ -1,6 +1,7 @@
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.Management;
 using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Application.Management;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.BackgroundServices;
@@ -24,8 +25,8 @@ public sealed class ManagedControlPlaneRegistrationWorker(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-                var result = await mediator.Send(
+                var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<TriggerManagedControlPlaneRegistrationCommand, TriggerManagedRegistrationResultDto>>();
+                var result = await handler.ExecuteAsync(
                     new TriggerManagedControlPlaneRegistrationCommand(),
                     stoppingToken);
                 if (result.Success)

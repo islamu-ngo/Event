@@ -7,12 +7,13 @@ using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Commands;
+using Explore.Application.Features.PaidEventPolicies.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -42,11 +43,12 @@ public sealed class PaidEventPolicySettingsApiTests
     {
         var tenantId = Guid.CreateVersion7();
         var body = CreateRevisionDto();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<ReviseTenantPaidEventPolicyCommand>(), Arg.Any<CancellationToken>())
+        var reviseCommandHandler = Substitute.For<ICommandHandler<ReviseTenantPaidEventPolicyCommand, BaseCommandResponse<Guid>>>();
+        reviseCommandHandler.ExecuteAsync(Arg.Any<ReviseTenantPaidEventPolicyCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(Guid.CreateVersion7()));
         var controller = new TenantPaidEventPolicySettingsController(
-            mediator,
+            Substitute.For<IQueryHandler<GetTenantPaidEventPolicyConfigurationQuery, TenantPaidEventPolicyConfigurationDto?>>(),
+            reviseCommandHandler,
             Substitute.For<IResourceAssembler<TenantPaidEventPolicyConfigurationDto, TenantPaidEventPolicyConfigurationDto>>())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
@@ -55,7 +57,7 @@ public sealed class PaidEventPolicySettingsApiTests
         var result = await controller.Update(tenantId, body, CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await reviseCommandHandler.Received(1).ExecuteAsync(
             Arg.Is<ReviseTenantPaidEventPolicyCommand>(command => command.TenantId == tenantId && command.Policy == body),
             Arg.Any<CancellationToken>());
     }

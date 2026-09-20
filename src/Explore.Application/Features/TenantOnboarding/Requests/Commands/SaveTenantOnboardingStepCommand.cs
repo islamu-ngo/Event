@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.TenantOnboarding.Requests.Commands;
 
-public sealed record SaveTenantOnboardingStepCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record SaveTenantOnboardingStepCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public Guid UserId { get; init; }
     public int CurrentStep { get; init; }

@@ -42,7 +42,7 @@ Implement the smallest complete backend change at the correct Clean Architecture
 ## Skill Routing
 
 - Any cross-layer backend change: [clean-architecture-rules](../skills/clean-architecture-rules/SKILL.md).
-- Command/query/handler/validator: [cqrs-mediatr-guidelines](../skills/cqrs-mediatr-guidelines/SKILL.md).
+- Command/query/handler/validator: [cqrs-guidelines](../skills/cqrs-guidelines/SKILL.md).
 - Repository, DbContext, configuration, filter, migration, seed: [dotnet-efcore-guidelines](../skills/dotnet-efcore-guidelines/SKILL.md).
 - Slow EF query backed by measurements: [optimize-ef-core-queries](../skills/optimize-ef-core-queries/SKILL.md).
 - Durable asynchronous side effect: [outbox-pattern](../skills/outbox-pattern/SKILL.md).

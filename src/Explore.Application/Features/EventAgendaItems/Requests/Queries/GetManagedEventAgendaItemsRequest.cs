@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventAgendaItem;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventAgendaItems.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ViewManagement)]
 public sealed record GetManagedEventAgendaItemsByEventRequest
-    : IRequest<List<EventAgendaItemListDto>>, ISecureRequest
+    : IQuery<List<EventAgendaItemListDto>>, ISecureRequest
 {
     public Guid EventId { get; init; }
 
@@ -15,7 +15,7 @@ public sealed record GetManagedEventAgendaItemsByEventRequest
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ViewManagement)]
 public sealed record GetManagedEventAgendaItemDetailRequest
-    : IRequest<EventAgendaItemDto?>, ISecureRequest
+    : IQuery<EventAgendaItemDto?>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid Id { get; init; }

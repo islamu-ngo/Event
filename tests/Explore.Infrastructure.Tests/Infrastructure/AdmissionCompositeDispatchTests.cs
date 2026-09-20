@@ -19,10 +19,11 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Services.Moderation;
 using Explore.Infrastructure.Services.Registration;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Persistence;
 using Explore.Persistence.Services;
 using Explore.Tests.Shared.Telemetry;
-using MediatR;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -247,7 +248,8 @@ public sealed class AdmissionCompositeDispatchTests
             Substitute.For<IAdmissionEventCancellationService>(),
             CreateMetrics(),
             TimeProvider.System,
-            Substitute.For<IMediator>(),
+            Substitute.For<ICommandHandler<ProcessManagedTenantProvisioningOperationCommand, bool>>(),
+            Substitute.For<ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>>(),
             NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             Substitute.For<IConfigurationManifestEffectDispatcher>(),
             Substitute.For<IConfigurationImportEffectDelivery>());

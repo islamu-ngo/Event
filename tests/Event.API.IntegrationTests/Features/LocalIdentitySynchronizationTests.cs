@@ -2,6 +2,7 @@
 using System.Data.Common;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.User;
@@ -11,7 +12,6 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Infrastructure.Services;
-using MediatR;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -125,7 +125,7 @@ public sealed class LocalIdentitySynchronizationTests
             ? ExternalKey(AuthenticationProviderKind.Keycloak)
             : LocalKey(unlinkedSubject);
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: incoming,
                 userId: attempt == ConfiguredAdoptionAttempt.ExternalUserId ? local.UserId : unlinkedSubject,
                 email: original.Email), CancellationToken);
@@ -154,7 +154,7 @@ public sealed class LocalIdentitySynchronizationTests
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         boundary.Enabled = true;
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: ExternalKey(AuthenticationProviderKind.Google), userId: Guid.Empty,
                 email: original.Email), CancellationToken);
 
@@ -322,7 +322,7 @@ public sealed class LocalIdentitySynchronizationTests
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         boundary.Enabled = true;
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: LocalKey(local.UserId), userId: local.UserId,
                 email: $"changed-{local.UserId:N}@example.test"), CancellationToken);
 
@@ -355,7 +355,7 @@ public sealed class LocalIdentitySynchronizationTests
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         boundary.Enabled = true;
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: incoming, userId: local.UserId,
                 email: $"changed-{local.UserId:N}@example.test"), CancellationToken);
 
@@ -386,7 +386,7 @@ public sealed class LocalIdentitySynchronizationTests
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         boundary.Enabled = true;
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: ExternalKey(AuthenticationProviderKind.Google), userId: Guid.Empty,
                 email: originalLocal.Email), CancellationToken);
 
@@ -413,7 +413,7 @@ public sealed class LocalIdentitySynchronizationTests
         await PrepareNativeAdministratorAsync(factory: factory, services: scope.ServiceProvider, accountKey: incoming);
         Counts before = await ReadCountsAsync(factory);
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: incoming, userId: target.UserId, email: original.Email), CancellationToken);
 
         await Assert.That(response.IsSuccess).IsTrue();
@@ -466,7 +466,7 @@ public sealed class LocalIdentitySynchronizationTests
         Counts before = await ReadCountsAsync(factory);
         boundary.Enabled = true;
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: incoming, userId: local.UserId, email: original.Email), CancellationToken);
 
         await Assert.That(boundary.TransactionsStarted).IsEqualTo(1);
@@ -499,7 +499,7 @@ public sealed class LocalIdentitySynchronizationTests
         await PrepareNativeAdministratorAsync(factory: factory, services: scope.ServiceProvider, accountKey: incoming);
         Counts before = await ReadCountsAsync(factory);
 
-        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+        BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             Command(accountKey: incoming, userId: Guid.Empty, email: email), CancellationToken);
 
         await Assert.That(response.IsSuccess).IsTrue();
@@ -590,7 +590,7 @@ public sealed class LocalIdentitySynchronizationTests
         LocalAdmissionWebApplicationFactory factory, SyncUserCommand command)
     {
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(command, CancellationToken);
+        return await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(command, CancellationToken);
     }
 
     private static Task<Graph> SeedLocalGraphAsync(LocalAdmissionWebApplicationFactory factory)

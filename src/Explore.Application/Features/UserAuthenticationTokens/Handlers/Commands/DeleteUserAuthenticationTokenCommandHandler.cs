@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.UserAuthenticationTokens.Requests.Commands;
-using MediatR;
 
 namespace Explore.Application.Features.UserAuthenticationTokens.Handlers.Commands;
 
-public class DeleteUserAuthenticationTokenCommandHandler : IRequestHandler<DeleteUserAuthenticationTokenCommand>
+public class DeleteUserAuthenticationTokenCommandHandler : ICommandHandler<DeleteUserAuthenticationTokenCommand>
 {
     private readonly IUserAuthenticationTokenRepository _userAuthenticationTokenRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -20,7 +20,7 @@ public class DeleteUserAuthenticationTokenCommandHandler : IRequestHandler<Delet
         _currentUserService = currentUserService;
     }
 
-    public async Task Handle(DeleteUserAuthenticationTokenCommand request, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(DeleteUserAuthenticationTokenCommand request, CancellationToken cancellationToken = default)
     {
         var currentUserId = _currentUserService.UserId
             ?? throw new AuthorizationException(ResourceKinds.User, AuthorizationActions.Users.Update);

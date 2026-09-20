@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public sealed class TestInstanceStorageProviderQueryHandler : IRequestHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto>
+public sealed class TestInstanceStorageProviderQueryHandler : IQueryHandler<TestInstanceStorageProviderQuery, InstanceStorageProviderStatusDto>
 {
     private readonly IInstanceStorageSettingService _storageSettingService;
 
@@ -14,7 +14,7 @@ public sealed class TestInstanceStorageProviderQueryHandler : IRequestHandler<Te
         _storageSettingService = storageSettingService;
     }
 
-    public async Task<InstanceStorageProviderStatusDto> Handle(TestInstanceStorageProviderQuery request, CancellationToken cancellationToken)
+    public async Task<InstanceStorageProviderStatusDto> QueryAsync(TestInstanceStorageProviderQuery request, CancellationToken cancellationToken)
     {
         return await _storageSettingService.TestProviderAsync(cancellationToken);
     }

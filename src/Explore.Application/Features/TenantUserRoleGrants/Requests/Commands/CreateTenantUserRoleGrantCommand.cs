@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.TenantUserRoleGrants.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.TenantUserRoleGrant, AuthorizationActions.Create)]
-public sealed record CreateTenantUserRoleGrantCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record CreateTenantUserRoleGrantCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public required CreateTenantUserRoleGrantDto TenantUserRoleGrantDto { get; init; }
 

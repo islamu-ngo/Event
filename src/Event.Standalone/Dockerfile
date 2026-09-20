@@ -3,6 +3,7 @@ ARG TARGETARCH
 WORKDIR /src
 
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
+COPY ["eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets", "eng/tools/Explore.GeneratedContracts/"]
 COPY ["dotnet-tools.json", "./"]
 COPY ["src/Event.Standalone/Event.Standalone.csproj", "src/Event.Standalone/packages.lock.json", "src/Event.Standalone/"]
 COPY ["src/Event.MigrationService/Event.MigrationService.csproj", "src/Event.MigrationService/packages.lock.json", "src/Event.MigrationService/"]

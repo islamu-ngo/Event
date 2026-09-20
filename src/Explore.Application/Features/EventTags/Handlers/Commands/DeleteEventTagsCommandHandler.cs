@@ -3,11 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTags.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventTags.Handlers.Commands;
 
-public class DeleteEventTagsCommandHandler : IRequestHandler<DeleteEventTagsCommand, bool>
+public class DeleteEventTagsCommandHandler : ICommandHandler<DeleteEventTagsCommand, bool>
 {
     private readonly IEventTagsRepository _eventTagsRepository;
 
@@ -16,7 +16,7 @@ public class DeleteEventTagsCommandHandler : IRequestHandler<DeleteEventTagsComm
         _eventTagsRepository = eventTagsRepository;
     }
 
-    public async Task<bool> Handle(DeleteEventTagsCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteEventTagsCommand request, CancellationToken cancellationToken)
     {
         var eventTags = await _eventTagsRepository.GetById(request.Id);
 

@@ -1,30 +1,27 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.Features.LocationRooms.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.LocationRooms.Handlers.Queries;
 
-public class GetLocationRoomDetailRequestHandler : IRequestHandler<GetLocationRoomDetailRequest, LocationRoomDto?>
+public class GetLocationRoomDetailRequestHandler : IQueryHandler<GetLocationRoomDetailRequest, LocationRoomDto?>
 {
     private readonly ILocationRoomRepository _locationRoomRepository;
-    private readonly IMapper _mapper;
 
     public GetLocationRoomDetailRequestHandler(
-        ILocationRoomRepository locationRoomRepository,
-        IMapper mapper)
+        ILocationRoomRepository locationRoomRepository)
     {
         _locationRoomRepository = locationRoomRepository;
-        _mapper = mapper;
     }
 
-    public async Task<LocationRoomDto?> Handle(GetLocationRoomDetailRequest request, CancellationToken cancellationToken)
+    public async Task<LocationRoomDto?> QueryAsync(GetLocationRoomDetailRequest request, CancellationToken cancellationToken)
     {
         var room = await _locationRoomRepository.GetById(request.Id);
         if (room == null)
             return null;
 
-        return _mapper.Map<LocationRoomDto>(room);
+        return LocationRoomMapper.ToDetail(room);
     }
 }

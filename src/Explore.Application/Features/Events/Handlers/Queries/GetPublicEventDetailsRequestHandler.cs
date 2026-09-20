@@ -1,16 +1,16 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public sealed class GetPublicEventDetailsRequestHandler(
     IEventDetailsProjectionService detailsProjectionService)
-    : IRequestHandler<GetPublicEventDetailsRequest, EventDto?>
+    : IQueryHandler<GetPublicEventDetailsRequest, EventDto?>
 {
-    public async Task<EventDto?> Handle(GetPublicEventDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventDto?> QueryAsync(GetPublicEventDetailsRequest request, CancellationToken cancellationToken)
     {
         var publicCode = ExtractPublicCode(request.SlugCode);
         if (publicCode is null)

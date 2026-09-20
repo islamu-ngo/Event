@@ -7,17 +7,17 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 
 namespace Explore.Application.Features.Users.Handlers.Commands;
 
-public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseCommandResponse<Guid>>
+public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>
 {
     private readonly IUserRepository _userRepository;
     private readonly IUserExternalLoginRepository _userExternalLoginRepository;
@@ -51,7 +51,7 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SyncUserCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SyncUserCommand request, CancellationToken cancellationToken = default)
     {
         var userDto = request.UserDto;
 

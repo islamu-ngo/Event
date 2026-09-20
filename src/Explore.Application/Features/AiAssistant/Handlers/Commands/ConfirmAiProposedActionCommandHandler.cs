@@ -1,9 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
+using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
@@ -11,7 +13,6 @@ using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AiAssistant.Handlers.Commands;
 
@@ -22,9 +23,11 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     IActorRepository actorRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IMediator mediator) : IRequestHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
+    ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> createEventCommand,
+    ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
+    ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload) : ICommandHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ConfirmAiProposedActionCommand request,
         CancellationToken cancellationToken)
     {
@@ -113,7 +116,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 mappingContext.FailureMessage ?? "AI proposed action actor context is invalid.");
         }
 
-        var executor = new CreateEventDraftAiToolExecutor(mediator);
+        var executor = new CreateEventDraftAiToolExecutor(createEventCommand);
         return await executor.ExecuteAsync(
             action.PayloadJson,
             mappingContext.Context,
@@ -173,7 +176,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 "AI event draft image bytes do not match the declared image metadata.");
         }
 
-        var uploadSession = await mediator.Send(new CreateStorageUploadSessionCommand
+        var uploadSession = await createUpload.ExecuteAsync(new CreateStorageUploadSessionCommand
         {
             TenantId = action.TenantId,
             UploadSessionDto = new CreateStorageUploadSessionDto
@@ -197,7 +200,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
         }
 
         await using var content = new MemoryStream(imageBytes, writable: false);
-        var finalizeResult = await mediator.Send(new FinalizeStorageUploadSessionCommand
+        var finalizeResult = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
         {
             UploadSessionId = uploadSession.Id.Id,
             Content = content,

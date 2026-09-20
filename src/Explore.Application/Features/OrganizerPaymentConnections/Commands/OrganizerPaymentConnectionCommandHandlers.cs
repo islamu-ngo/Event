@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.OrganizerPaymentConnections.Commands;
@@ -20,11 +20,11 @@ public sealed class RecordOrganizerPaymentConnectionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    TimeProvider timeProvider) : IRequestHandler<RecordOrganizerPaymentConnectionCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<RecordOrganizerPaymentConnectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(RecordOrganizerPaymentConnectionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RecordOrganizerPaymentConnectionCommand command, CancellationToken cancellationToken = default)
     {
-        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(request.TenantId, request.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
+        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(command.TenantId, command.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
         {
             return Failure(Guid.Empty, "organizer_payment_actor_denied", "The organizer actor is not controlled by the current user in this tenant.");
         }
@@ -34,7 +34,7 @@ public sealed class RecordOrganizerPaymentConnectionCommandHandler(
         string externalAccountId;
         try
         {
-            OrganizerPaymentProviderConnection candidate = OrganizerPaymentProviderConnection.Create(Guid.CreateVersion7(), request.TenantId, request.OrganizerActorId, request.ProviderCode, request.ConnectPlatformId, request.ExternalAccountId, timeProvider.GetUtcNow().UtcDateTime);
+            OrganizerPaymentProviderConnection candidate = OrganizerPaymentProviderConnection.Create(Guid.CreateVersion7(), command.TenantId, command.OrganizerActorId, command.ProviderCode, command.ConnectPlatformId, command.ExternalAccountId, timeProvider.GetUtcNow().UtcDateTime);
             providerCode = candidate.ProviderCode;
             connectPlatformId = candidate.ConnectPlatformId;
             externalAccountId = candidate.ExternalAccountId;
@@ -50,14 +50,14 @@ public sealed class RecordOrganizerPaymentConnectionCommandHandler(
         {
             OrganizerPaymentProviderConnection? externalOwner = await repository.GetHistoricalByExternalAccountAsync(providerCode, connectPlatformId, externalAccountId, token);
             if (externalOwner is not null
-                && (externalOwner.TenantId != request.TenantId
-                    || externalOwner.OrganizerActorId != request.OrganizerActorId
+                && (externalOwner.TenantId != command.TenantId
+                    || externalOwner.OrganizerActorId != command.OrganizerActorId
                     || externalOwner.StatusId is (int)OrganizerPaymentProviderConnectionStatusEnum.Disabled or (int)OrganizerPaymentProviderConnectionStatusEnum.Replaced))
             {
                 return Failure(Guid.Empty, "organizer_payment_external_account_bound", "External account is already bound to another organizer scope.");
             }
 
-            OrganizerPaymentProviderConnection? existing = await repository.GetActiveByScopeAsync(request.TenantId, request.OrganizerActorId, providerCode, connectPlatformId, token);
+            OrganizerPaymentProviderConnection? existing = await repository.GetActiveByScopeAsync(command.TenantId, command.OrganizerActorId, providerCode, connectPlatformId, token);
             if (existing is not null)
             {
                 return existing.ExternalAccountId == externalAccountId
@@ -65,7 +65,7 @@ public sealed class RecordOrganizerPaymentConnectionCommandHandler(
                     : Failure(existing.Id, "organizer_payment_connection_replace_required", "Active organizer payment connection must be replaced to change accounts.");
             }
 
-            OrganizerPaymentProviderConnection connection = OrganizerPaymentProviderConnection.Create(newId, request.TenantId, request.OrganizerActorId, providerCode, connectPlatformId, externalAccountId, createdAt);
+            OrganizerPaymentProviderConnection connection = OrganizerPaymentProviderConnection.Create(newId, command.TenantId, command.OrganizerActorId, providerCode, connectPlatformId, externalAccountId, createdAt);
             await repository.CreateAsync(connection, token);
             await repository.SaveChangesAsync(token);
             return Success(connection.Id, "Organizer payment connection recorded.");
@@ -87,29 +87,29 @@ public sealed class ReplaceOrganizerPaymentConnectionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    TimeProvider timeProvider) : IRequestHandler<ReplaceOrganizerPaymentConnectionCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<ReplaceOrganizerPaymentConnectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(ReplaceOrganizerPaymentConnectionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ReplaceOrganizerPaymentConnectionCommand command, CancellationToken cancellationToken = default)
     {
-        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(request.TenantId, request.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
+        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(command.TenantId, command.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
         {
-            return OrganizerPaymentConnectionResponses.Failure(request.CurrentConnectionId, "organizer_payment_actor_denied", "The organizer actor is not controlled by the current user in this tenant.");
+            return OrganizerPaymentConnectionResponses.Failure(command.CurrentConnectionId, "organizer_payment_actor_denied", "The organizer actor is not controlled by the current user in this tenant.");
         }
 
         Guid replacementId = Guid.CreateVersion7();
         DateTime replacedAt = timeProvider.GetUtcNow().UtcDateTime;
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            OrganizerPaymentProviderConnection? current = await repository.GetByTenantAndIdForUpdateAsync(request.TenantId, request.CurrentConnectionId, token);
-            if (current is null || current.OrganizerActorId != request.OrganizerActorId)
+            OrganizerPaymentProviderConnection? current = await repository.GetByTenantAndIdForUpdateAsync(command.TenantId, command.CurrentConnectionId, token);
+            if (current is null || current.OrganizerActorId != command.OrganizerActorId)
             {
-                return OrganizerPaymentConnectionResponses.Failure(request.CurrentConnectionId, "organizer_payment_connection_not_found", "Organizer payment connection was not found for this actor.");
+                return OrganizerPaymentConnectionResponses.Failure(command.CurrentConnectionId, "organizer_payment_connection_not_found", "Organizer payment connection was not found for this actor.");
             }
 
             string normalizedAccount;
             try
             {
-                OrganizerPaymentProviderConnection probe = OrganizerPaymentProviderConnection.Create(Guid.CreateVersion7(), current.TenantId, current.OrganizerActorId, current.ProviderCode, current.ConnectPlatformId, request.NewExternalAccountId, replacedAt);
+                OrganizerPaymentProviderConnection probe = OrganizerPaymentProviderConnection.Create(Guid.CreateVersion7(), current.TenantId, current.OrganizerActorId, current.ProviderCode, current.ConnectPlatformId, command.NewExternalAccountId, replacedAt);
                 normalizedAccount = probe.ExternalAccountId;
             }
             catch (ArgumentException exception)
@@ -156,26 +156,26 @@ public sealed class DisableOrganizerPaymentConnectionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    TimeProvider timeProvider) : IRequestHandler<DisableOrganizerPaymentConnectionCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<DisableOrganizerPaymentConnectionCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DisableOrganizerPaymentConnectionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DisableOrganizerPaymentConnectionCommand command, CancellationToken cancellationToken = default)
     {
-        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(request.TenantId, request.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
+        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(command.TenantId, command.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
         {
-            return OrganizerPaymentConnectionResponses.Failure(request.ConnectionId, "organizer_payment_actor_denied", "The organizer actor is not controlled by the current user in this tenant.");
+            return OrganizerPaymentConnectionResponses.Failure(command.ConnectionId, "organizer_payment_actor_denied", "The organizer actor is not controlled by the current user in this tenant.");
         }
 
         return await unitOfWork.ExecuteSerializableAsync(async token =>
         {
-            OrganizerPaymentProviderConnection? connection = await repository.GetByTenantAndIdForUpdateAsync(request.TenantId, request.ConnectionId, token);
-            if (connection is null || connection.OrganizerActorId != request.OrganizerActorId)
+            OrganizerPaymentProviderConnection? connection = await repository.GetByTenantAndIdForUpdateAsync(command.TenantId, command.ConnectionId, token);
+            if (connection is null || connection.OrganizerActorId != command.OrganizerActorId)
             {
-                return OrganizerPaymentConnectionResponses.Failure(request.ConnectionId, "organizer_payment_connection_not_found", "Organizer payment connection was not found for this actor.");
+                return OrganizerPaymentConnectionResponses.Failure(command.ConnectionId, "organizer_payment_connection_not_found", "Organizer payment connection was not found for this actor.");
             }
 
             try
             {
-                connection.Disable(request.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
+                connection.Disable(command.ReasonCode, timeProvider.GetUtcNow().UtcDateTime);
                 await repository.SaveChangesAsync(token);
                 return OrganizerPaymentConnectionResponses.Success(connection.Id, "Organizer payment connection disabled.");
             }
@@ -207,7 +207,7 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
     TimeProvider timeProvider,
-    ILogger<CreateOrganizerPaymentOnboardingLinkCommandHandler> logger) : IRequestHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>
+    ILogger<CreateOrganizerPaymentOnboardingLinkCommandHandler> logger) : ICommandHandler<CreateOrganizerPaymentOnboardingLinkCommand, BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>>
 {
     private static readonly TimeSpan ProviderHandoffRecoveryTimeout = TimeSpan.FromSeconds(5);
     private const string ProviderHandoffRecoveryFailedLogMessage = "Organizer payment provider account cancellation recovery manual settlement failed.";
@@ -216,9 +216,9 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
     private const string ProviderAccountCreationCanceledFailureCode = "organizer_payment_provider_account_creation_canceled";
     private const string ProviderAccountCreationExceptionFailureCode = "organizer_payment_provider_account_creation_exception";
 
-    public async Task<BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>> Handle(CreateOrganizerPaymentOnboardingLinkCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<OrganizerPaymentOnboardingLinkResult>> ExecuteAsync(CreateOrganizerPaymentOnboardingLinkCommand command, CancellationToken cancellationToken = default)
     {
-        Event? eventTarget = await eventRepository.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await eventRepository.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (eventTarget?.TenantId != tenantContext.TenantId || eventTarget.OrganizerActorId is null)
         {
             return Failure("organizer_payment_event_not_found", "The event organizer payment scope was not found.");
@@ -231,7 +231,7 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
             return Failure("organizer_payment_actor_denied", "The organizer actor is not controlled by the current user in this tenant.");
         }
 
-        if (!IsNavigationUrl(request.ReturnUrl) || !IsNavigationUrl(request.RefreshUrl))
+        if (!IsNavigationUrl(command.ReturnUrl) || !IsNavigationUrl(command.RefreshUrl))
         {
             return Failure("organizer_payment_onboarding_navigation_invalid", "Return and refresh URLs must be absolute HTTP navigation URLs.");
         }
@@ -252,7 +252,7 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
         OrganizerPaymentProviderConnection? existing = await repository.GetActiveByScopeAsync(tenantId, organizerActorId, providerCode, connectPlatformId, cancellationToken);
         if (existing is not null)
         {
-            OrganizerPaymentOnboardingLinkCreationResult existingLink = await CreateLinkAsync(providerCode, connectPlatformId, existing.ExternalAccountId, request, cancellationToken);
+            OrganizerPaymentOnboardingLinkCreationResult existingLink = await CreateLinkAsync(providerCode, connectPlatformId, existing.ExternalAccountId, command, cancellationToken);
             return existingLink.Success && existingLink.OnboardingUrl is not null && IsNavigationUrl(existingLink.OnboardingUrl)
                 ? Success(existingLink.OnboardingUrl, reusedExistingConnection: true)
                 : Failure(existingLink.FailureCode ?? "organizer_payment_onboarding_link_failed", "Provider onboarding link creation failed.");
@@ -288,7 +288,7 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
 
         if (admission.ReusedExistingConnection)
         {
-            OrganizerPaymentOnboardingLinkCreationResult existingLink = await CreateLinkAsync(providerCode, connectPlatformId, admission.ExternalAccountId!, request, cancellationToken);
+            OrganizerPaymentOnboardingLinkCreationResult existingLink = await CreateLinkAsync(providerCode, connectPlatformId, admission.ExternalAccountId!, command, cancellationToken);
             return existingLink.Success && existingLink.OnboardingUrl is not null && IsNavigationUrl(existingLink.OnboardingUrl)
                 ? Success(existingLink.OnboardingUrl, reusedExistingConnection: true)
                 : Failure(existingLink.FailureCode ?? "organizer_payment_onboarding_link_failed", "Provider onboarding link creation failed.");
@@ -382,7 +382,7 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
             return Failure(persistence.FailureCode!, persistence.Message!);
         }
 
-        OrganizerPaymentOnboardingLinkCreationResult link = await CreateLinkAsync(providerCode, connectPlatformId, persistence.ExternalAccountId!, request, cancellationToken);
+        OrganizerPaymentOnboardingLinkCreationResult link = await CreateLinkAsync(providerCode, connectPlatformId, persistence.ExternalAccountId!, command, cancellationToken);
         return link.Success && link.OnboardingUrl is not null && IsNavigationUrl(link.OnboardingUrl)
             ? Success(link.OnboardingUrl, persistence.ReusedExistingConnection)
             : Failure(link.FailureCode ?? "organizer_payment_onboarding_link_failed", "Provider onboarding link creation failed.");
@@ -436,15 +436,15 @@ public sealed class CreateOrganizerPaymentOnboardingLinkCommandHandler(
         string providerCode,
         string connectPlatformId,
         string externalAccountId,
-        CreateOrganizerPaymentOnboardingLinkCommand request,
+        CreateOrganizerPaymentOnboardingLinkCommand command,
         CancellationToken cancellationToken) =>
         await onboardingProvider.CreateOnboardingLinkAsync(
             new OrganizerPaymentOnboardingLinkRequest(
                 providerCode,
                 connectPlatformId,
                 externalAccountId,
-                request.ReturnUrl,
-                request.RefreshUrl,
+                command.ReturnUrl,
+                command.RefreshUrl,
                 OrganizerPaymentOnboardingType.AccountOnboarding),
             cancellationToken);
 

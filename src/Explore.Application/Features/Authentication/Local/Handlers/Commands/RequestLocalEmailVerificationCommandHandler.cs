@@ -1,10 +1,10 @@
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 
@@ -13,9 +13,9 @@ public sealed class RequestLocalEmailVerificationCommandHandler(
     ILocalCredentialAdministration credentials,
     ILocalIdentityAuthService authentication,
     IAccountAuthorityLifecycleEmailService email)
-    : IRequestHandler<RequestLocalEmailVerificationCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<RequestLocalEmailVerificationCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(RequestLocalEmailVerificationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(RequestLocalEmailVerificationCommand request, CancellationToken cancellationToken = default)
     {
         var validation = await new LocalEmailVerificationRequestDtoValidator().ValidateAsync(request.Request, cancellationToken);
         if (!validation.IsValid)

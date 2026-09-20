@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Explore.Application.Authorization;
 using Explore.Application.Features.EventSessions.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Event.Application.UnitTests.Contracts;
 
@@ -24,7 +24,7 @@ public sealed class PublicSetterRequestContractTests
         var applicationAssembly = typeof(AuthorizeResourceAttribute).Assembly;
         var actual = applicationAssembly.GetTypes()
             .Where(type => type is { IsClass: true, IsAbstract: false }
-                && typeof(IBaseRequest).IsAssignableFrom(type))
+                && IsRequest(type))
             .SelectMany(type => type
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(IsPublicMutableProperty)
@@ -67,4 +67,8 @@ public sealed class PublicSetterRequestContractTests
         && !property.SetMethod.ReturnParameter
             .GetRequiredCustomModifiers()
             .Contains(typeof(IsExternalInit));
+
+    private static bool IsRequest(Type type) =>
+        typeof(ICommand).IsAssignableFrom(type)
+        || type.GetInterfaces().Any(i => i.IsGenericType && (i.GetGenericTypeDefinition() == typeof(ICommand<>) || i.GetGenericTypeDefinition() == typeof(IQuery<>)));
 }

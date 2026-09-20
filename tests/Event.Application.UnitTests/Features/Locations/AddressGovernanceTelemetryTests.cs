@@ -1,10 +1,7 @@
 using Explore.Application.Authorization;
-using Explore.Application.Behaviors;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Locations.Requests.Commands;
-using Explore.Application.Responses;
-using MediatR;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -24,10 +21,8 @@ public sealed class AddressGovernanceTelemetryTests
             .Returns(AuthorizationDecision.Deny(
                 AuthorizationProviderMetadata.Runtime,
                 AuthorizationDecisionReasonCodes.Denied));
-        var logger = new CaptureLogger<AuthorizationBehavior<UpdateLocationCommand, BaseCommandResponse<Guid>>>();
-        var behavior = new AuthorizationBehavior<UpdateLocationCommand, BaseCommandResponse<Guid>>(
-            authorization,
-            logger);
+        var logger = new CaptureLogger<RequestAuthorization<UpdateLocationCommand>>();
+        var evaluator = new RequestAuthorization<UpdateLocationCommand>(authorization);
         var command = new UpdateLocationCommand
         {
             LocationId = locationId,
@@ -39,9 +34,9 @@ public sealed class AddressGovernanceTelemetryTests
             }
         };
 
-        await Assert.That(async () => await behavior.Handle(
+        await Assert.That(async () => await evaluator.AuthorizeAsync(
             command,
-            _ => Task.FromResult(BaseCommandResponse.Success(Guid.Empty)),
+            logger,
             CancellationToken.None)).Throws<Explore.Application.Exceptions.AuthorizationException>();
 
         CapturedLog warning = logger.Entries.Single(entry => entry.Level == LogLevel.Warning);

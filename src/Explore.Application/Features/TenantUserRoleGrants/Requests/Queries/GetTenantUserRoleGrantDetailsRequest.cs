@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.TenantUserRoleGrant;
-using MediatR;
 
 namespace Explore.Application.Features.TenantUserRoleGrants.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.TenantUserRoleGrant, AuthorizationActions.TenantUserRoleGrants.View)]
-public sealed record GetTenantUserRoleGrantDetailsRequest : IRequest<TenantUserRoleGrantDto?>, ISecureRequest
+public sealed record GetTenantUserRoleGrantDetailsRequest : IQuery<TenantUserRoleGrantDto?>, ISecureRequest
 {
     public Guid Id { get; init; }
 

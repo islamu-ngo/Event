@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventParticipation.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageRegistrations)]
-public sealed record ConfigureEventParticipationCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ConfigureEventParticipationCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid EventId { get; init; }
     public Guid ExpectedConcurrencyStamp { get; init; }

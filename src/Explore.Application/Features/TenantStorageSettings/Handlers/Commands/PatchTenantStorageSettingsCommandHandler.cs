@@ -7,12 +7,12 @@ using Explore.Application.DTOs.Tenant.Validators;
 using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TenantStorageSettings.Handlers.Commands;
 
 public sealed class PatchTenantStorageSettingsCommandHandler
-    : IRequestHandler<PatchTenantStorageSettingsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<PatchTenantStorageSettingsCommand, BaseCommandResponse<Guid>>
 {
     private const string LockedFailureCode = "StorageTenantOverridesLocked";
 
@@ -39,7 +39,7 @@ public sealed class PatchTenantStorageSettingsCommandHandler
         _s3ConfigResolver = s3ConfigResolver;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         PatchTenantStorageSettingsCommand request,
         CancellationToken cancellationToken)
     {

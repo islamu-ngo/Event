@@ -16,8 +16,10 @@ public sealed class RegistrationProviderFoundationArchitectureTests
     [Test]
     public async Task RegistrationProviderManagementActionsDeclareRequiredProblemMetadata()
     {
-        MethodInfo[] actions = typeof(RegistrationProviderManagementController)
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        MethodInfo[] actions = typeof(EventControllerBase).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && typeof(EventControllerBase).IsAssignableFrom(type) && type.GetCustomAttributes<RouteAttribute>().Any(route => route.Template == "api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers"))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            .ToArray();
 
         await Assert.That(actions).IsNotEmpty();
         foreach (MethodInfo action in actions)

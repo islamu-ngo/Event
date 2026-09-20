@@ -1,10 +1,10 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventOrganizerClaims.Handlers.Queries;
 
@@ -17,11 +17,10 @@ public sealed class GetClaimantOrganizerClaimsRequestHandler(
     IOrganizationMemberRepository organizationMemberRepository,
     IGroupMemberRepository groupMemberRepository,
     ITenantContext tenantContext,
-    ICurrentUserService currentUserService,
-    IMapper mapper)
-    : IRequestHandler<GetClaimantOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>>
+    ICurrentUserService currentUserService)
+    : IQueryHandler<GetClaimantOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>>
 {
-    public async Task<IReadOnlyList<EventOrganizerClaimDto>> Handle(
+    public async Task<IReadOnlyList<EventOrganizerClaimDto>> QueryAsync(
         GetClaimantOrganizerClaimsRequest request,
         CancellationToken cancellationToken)
     {
@@ -42,6 +41,6 @@ public sealed class GetClaimantOrganizerClaimsRequestHandler(
         }
 
         var claims = await claimRepository.ListByClaimantAsync(request.ClaimantActorId, cancellationToken);
-        return mapper.Map<List<EventOrganizerClaimDto>>(claims);
+        return claims.Select(EventMapper.ToDetail).ToList();
     }
 }

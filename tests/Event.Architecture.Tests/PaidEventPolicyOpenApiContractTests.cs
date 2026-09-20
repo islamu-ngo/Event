@@ -7,11 +7,7 @@ public sealed class PaidEventPolicyOpenApiContractTests
     [Test]
     public async Task TenantPaidPolicyHalSchema_ExposesTypedAuthorityFacts()
     {
-        string path = ContextSystemHelpers.RepoPath(
-            "schemas",
-            "openapi_islamu-event.json");
-        using JsonDocument document = JsonDocument.Parse(
-            await File.ReadAllTextAsync(path));
+        using JsonDocument document = JsonDocument.Parse(GeneratedContractInputs.Schema);
         JsonElement schemas = document.RootElement
             .GetProperty("components")
             .GetProperty("schemas");

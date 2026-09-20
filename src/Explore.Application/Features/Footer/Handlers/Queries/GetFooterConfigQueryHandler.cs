@@ -1,22 +1,21 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterConfigQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IFooterLinkGroupRepository footerLinkGroupRepository,
-    ITenantContext tenantContext,
-    IMapper mapper)
-    : IRequestHandler<GetFooterConfigQuery, FooterConfigDto>
+    ITenantContext tenantContext)
+    : IQueryHandler<GetFooterConfigQuery, FooterConfigDto>
 {
-    public async Task<FooterConfigDto> Handle(
+    public async Task<FooterConfigDto> QueryAsync(
         GetFooterConfigQuery request, CancellationToken cancellationToken)
     {
         var tenantId = tenantContext.TenantId;
@@ -45,7 +44,7 @@ public sealed class GetFooterConfigQueryHandler(
         return new FooterConfigDto
         {
             Settings = settings,
-            LinkGroups = mapper.Map<List<FooterLinkGroupDto>>(groups),
+            LinkGroups = groups.Select(FooterMapper.ToPublicGroup).ToList(),
         };
     }
 }

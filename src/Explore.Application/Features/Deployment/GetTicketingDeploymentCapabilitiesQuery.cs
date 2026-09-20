@@ -1,19 +1,19 @@
 using Explore.Application.Contracts.Deployment;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Deployment;
-using MediatR;
 
 namespace Explore.Application.Features.Deployment;
 
 public sealed record GetTicketingDeploymentCapabilitiesQuery :
-    IRequest<TicketingDeploymentCapabilityMatrixDto>;
+    IQuery<TicketingDeploymentCapabilityMatrixDto>;
 
 public sealed class GetTicketingDeploymentCapabilitiesQueryHandler(
     ITicketingDeploymentCapabilityCatalog catalog) :
-    IRequestHandler<
+    IQueryHandler<
         GetTicketingDeploymentCapabilitiesQuery,
         TicketingDeploymentCapabilityMatrixDto>
 {
-    public Task<TicketingDeploymentCapabilityMatrixDto> Handle(
+    public Task<TicketingDeploymentCapabilityMatrixDto> QueryAsync(
         GetTicketingDeploymentCapabilitiesQuery request,
         CancellationToken cancellationToken)
     {

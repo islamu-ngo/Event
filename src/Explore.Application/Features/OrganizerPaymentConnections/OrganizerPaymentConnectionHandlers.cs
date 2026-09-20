@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.OrganizerPaymentConnections.Commands;
@@ -6,7 +7,6 @@ using Explore.Application.DTOs.OrganizerPaymentConnections;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.OrganizerPaymentConnections;
 
@@ -20,16 +20,16 @@ public sealed class ListOrganizerPaymentConnectionsQueryHandler(
     IGroupMemberRepository groupMemberRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<ListOrganizerPaymentConnectionsQuery, IReadOnlyList<OrganizerPaymentConnectionDto>>
+    : IQueryHandler<ListOrganizerPaymentConnectionsQuery, IReadOnlyList<OrganizerPaymentConnectionDto>>
 {
-    public async Task<IReadOnlyList<OrganizerPaymentConnectionDto>> Handle(ListOrganizerPaymentConnectionsQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<OrganizerPaymentConnectionDto>> QueryAsync(ListOrganizerPaymentConnectionsQuery query, CancellationToken cancellationToken = default)
     {
-        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(request.TenantId, request.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
+        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(query.TenantId, query.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
         {
             return [];
         }
 
-        IReadOnlyList<OrganizerPaymentProviderConnection> connections = await repository.ListByTenantAndActorAsync(request.TenantId, request.OrganizerActorId, cancellationToken);
+        IReadOnlyList<OrganizerPaymentProviderConnection> connections = await repository.ListByTenantAndActorAsync(query.TenantId, query.OrganizerActorId, cancellationToken);
         return connections.Select(OrganizerPaymentConnectionMapper.ToDto).ToArray();
     }
 }
@@ -44,17 +44,17 @@ public sealed class GetOrganizerPaymentConnectionQueryHandler(
     IGroupMemberRepository groupMemberRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetOrganizerPaymentConnectionQuery, OrganizerPaymentConnectionDto?>
+    : IQueryHandler<GetOrganizerPaymentConnectionQuery, OrganizerPaymentConnectionDto?>
 {
-    public async Task<OrganizerPaymentConnectionDto?> Handle(GetOrganizerPaymentConnectionQuery request, CancellationToken cancellationToken)
+    public async Task<OrganizerPaymentConnectionDto?> QueryAsync(GetOrganizerPaymentConnectionQuery query, CancellationToken cancellationToken = default)
     {
-        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(request.TenantId, request.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
+        if (!await OrganizerPaymentActorAccess.AuthorizeAsync(query.TenantId, query.OrganizerActorId, tenantContext, currentUserService, actorRepository, tenantUserRepository, organizationTenantRepository, groupTenantRepository, organizationMemberRepository, groupMemberRepository, cancellationToken))
         {
             return null;
         }
 
-        OrganizerPaymentProviderConnection? connection = await repository.GetByTenantAndIdForUpdateAsync(request.TenantId, request.ConnectionId, cancellationToken);
-        return connection is not null && connection.OrganizerActorId == request.OrganizerActorId
+        OrganizerPaymentProviderConnection? connection = await repository.GetByTenantAndIdForUpdateAsync(query.TenantId, query.ConnectionId, cancellationToken);
+        return connection is not null && connection.OrganizerActorId == query.OrganizerActorId
             ? OrganizerPaymentConnectionMapper.ToDto(connection)
             : null;
     }
@@ -65,11 +65,11 @@ public sealed class GetEventOrganizerPaymentConnectionQueryHandler(
     IOrganizerPaymentProviderConnectionRepository repository,
     IOrganizerPaymentCommerceConfiguration commerceConfiguration,
     ITenantContext tenantContext)
-    : IRequestHandler<GetEventOrganizerPaymentConnectionQuery, EventOrganizerPaymentConnectionManagementDto?>
+    : IQueryHandler<GetEventOrganizerPaymentConnectionQuery, EventOrganizerPaymentConnectionManagementDto?>
 {
-    public async Task<EventOrganizerPaymentConnectionManagementDto?> Handle(GetEventOrganizerPaymentConnectionQuery request, CancellationToken cancellationToken)
+    public async Task<EventOrganizerPaymentConnectionManagementDto?> QueryAsync(GetEventOrganizerPaymentConnectionQuery query, CancellationToken cancellationToken = default)
     {
-        Event? eventTarget = await eventRepository.GetEventWithDetails(request.EventId);
+        Event? eventTarget = await eventRepository.GetEventWithDetails(query.EventId);
         if (eventTarget?.TenantId != tenantContext.TenantId || eventTarget.OrganizerActorId is null)
         {
             return null;

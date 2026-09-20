@@ -4,13 +4,11 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
-using Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 using Explore.Application.Features.ConfigurationManifest.LegalDocuments;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Application.Services;
 using Explore.Application.Settings;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -34,7 +32,6 @@ public static class ConfigurationManifestApplicationServicesRegistration
         }
 
         services.TryAddScoped<IPublicationPolicyMutationBoundary, PublicationPolicyMutationBoundary>();
-        services.TryAddTransient<IMediator>(provider => new Mediator(provider));
         services.TryAddScoped<SettingUpsertService>();
         services.TryAddScoped<
             IPaidEventPolicyMutationBoundary,
@@ -52,9 +49,7 @@ public static class ConfigurationManifestApplicationServicesRegistration
         services.TryAddScoped<
             IConfigurationManifestPreflight,
             ConfigurationManifestPreflight>();
-        services.TryAddScoped<ApplyConfigurationManifestCommandHandler>();
-        services.TryAddScoped<IConfigurationManifestApplier>(provider =>
-            provider.GetRequiredService<ApplyConfigurationManifestCommandHandler>());
+        services.TryAddScoped<IConfigurationManifestApplier, ConfigurationManifestApplier>();
         services.TryAddSingleton<LegalDocumentRenderingService>();
 
         if (effectDeliveryMode == ConfigurationManifestEffectDeliveryMode.DeferredToRuntime)
@@ -65,6 +60,7 @@ public static class ConfigurationManifestApplicationServicesRegistration
         }
         else
         {
+            services.TryAddScoped<ConfigurationManifestCurrentStateReader>();
             services.TryAddSingleton<ConfigurationImportArtifactParser>();
             services.TryAddSingleton<ConfigurationImportPreviewComposer>();
             services.TryAddScoped<ConfigurationImportSessionManager>();

@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Explore.Application.Notifications.Handlers;
 using Explore.Domain.Constants;
@@ -53,9 +54,15 @@ public sealed class SettingNotificationSecurityTests
             null,
             DateTime.UtcNow);
 
-        await handler.Handle(notification, CancellationToken.None);
+        IEnumerable<INotificationHandler<SettingChangedNotification>> consumers = [handler];
+        await consumers.HandleAsync(notification, CancellationToken.None);
 
         await Assert.That(capturedState?.ToString() ?? string.Empty).DoesNotContain(canary);
         await Assert.That(capturedState?.ToString() ?? string.Empty).Contains(actorUserId.ToString());
+        var fields = ((IEnumerable<KeyValuePair<string, object?>>)capturedState!).ToDictionary(pair => pair.Key, pair => pair.Value);
+        await Assert.That(fields["OldValue"]).IsEqualTo(SettingChangedNotification.RedactedValue);
+        await Assert.That(fields["NewValue"]).IsEqualTo(SettingChangedNotification.RedactedValue);
+        await Assert.That(fields["TenantId"]).IsEqualTo(actorUserId);
+        await Assert.That(fields["ActorUserId"]).IsNull();
     }
 }

@@ -4,16 +4,16 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Locations.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Commands;
 
 public sealed class ClassifyLocationAsPrivateHomeCommandHandler(
     ILocationRepository locations,
     ICurrentUserService currentUser)
-    : IRequestHandler<ClassifyLocationAsPrivateHomeCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ClassifyLocationAsPrivateHomeCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ClassifyLocationAsPrivateHomeCommand request,
         CancellationToken cancellationToken)
     {
@@ -55,9 +55,9 @@ public sealed class AcceptPrivateHomeOwnershipCommandHandler(
     ILocationRepository locations,
     ICurrentUserService currentUser,
     TimeProvider timeProvider)
-    : IRequestHandler<AcceptPrivateHomeOwnershipCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<AcceptPrivateHomeOwnershipCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         AcceptPrivateHomeOwnershipCommand request,
         CancellationToken cancellationToken)
     {

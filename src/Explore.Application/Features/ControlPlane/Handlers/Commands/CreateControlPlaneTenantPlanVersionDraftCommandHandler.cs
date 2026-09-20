@@ -4,14 +4,14 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
 public sealed class CreateControlPlaneTenantPlanVersionDraftCommandHandler(ITenantPlanRepository tenantPlanRepository)
-    : IRequestHandler<CreateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateControlPlaneTenantPlanVersionDraftCommand request,
         CancellationToken cancellationToken)
     {
@@ -37,12 +37,11 @@ public sealed class CreateControlPlaneTenantPlanVersionDraftCommandHandler(ITena
             : plan.Versions.Max(version => version.VersionNumber) + 1;
 
         TenantPlanVersion version = ControlPlaneTenantPlanDraftMapper.ToVersion(
-            plan,
+            plan.Id,
             request.Draft,
             nextVersionNumber,
             TenantPlanStatusEnum.Draft);
 
-        plan.Versions.Add(version);
         await tenantPlanRepository.CreateVersionAsync(version, cancellationToken);
 
         return BaseCommandResponse.Success(version.Id, "Tenant plan version draft created.");

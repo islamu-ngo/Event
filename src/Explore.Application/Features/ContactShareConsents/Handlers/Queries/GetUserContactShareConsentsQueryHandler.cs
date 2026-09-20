@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Features.ContactShareConsents.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.ContactShareConsents.Handlers.Queries;
 
-public class GetUserContactShareConsentsQueryHandler : IRequestHandler<GetUserContactShareConsentsQuery, List<UserContactShareConsentDto>>
+public class GetUserContactShareConsentsQueryHandler : IQueryHandler<GetUserContactShareConsentsQuery, List<UserContactShareConsentDto>>
 {
     private readonly IContactShareConsentService _consentService;
 
@@ -14,7 +14,7 @@ public class GetUserContactShareConsentsQueryHandler : IRequestHandler<GetUserCo
         _consentService = consentService;
     }
 
-    public async Task<List<UserContactShareConsentDto>> Handle(GetUserContactShareConsentsQuery request, CancellationToken cancellationToken)
+    public async Task<List<UserContactShareConsentDto>> QueryAsync(GetUserContactShareConsentsQuery request, CancellationToken cancellationToken = default)
     {
         return await _consentService.GetUserConsents(request.TenantId, request.UserId);
     }

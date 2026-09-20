@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.DTOs.EventTicketing.Validators;
@@ -9,7 +10,6 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTicketing.Handlers.Commands;
@@ -20,23 +20,23 @@ public sealed class CreateEventTicketTypeCommandHandler(
     TicketTypeEntitlementResolver entitlementResolver,
     ITenantContext tenant,
     IUnitOfWork unitOfWork,
-    HybridCache cache) : IRequestHandler<CreateEventTicketTypeCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<CreateEventTicketTypeCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        CreateEventTicketTypeCommand request,
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
+        CreateEventTicketTypeCommand command,
         CancellationToken cancellationToken)
     {
         var validation = await new ManageEventTicketTypeDtoValidator()
-            .ValidateAsync(request.TicketType, cancellationToken);
+            .ValidateAsync(command.TicketType, cancellationToken);
         if (!validation.IsValid)
         {
-            return Bad(request.EventId, validation.Errors.Select(error => error.ErrorMessage));
+            return Bad(command.EventId, validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
+        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(command.EventId, cancellationToken);
         if (!IsPlatformManaged(eventTarget, tenant.TenantId))
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
 
         try
@@ -45,7 +45,7 @@ public sealed class CreateEventTicketTypeCommandHandler(
             Guid? ticketTypeId = await unitOfWork.ExecuteInTransactionAsync<Guid?>(async token =>
             {
                 EventTicketCatalogVersion? catalog = await catalogs.GetDraftCatalogForUpdateAsync(
-                    request.EventId,
+                    command.EventId,
                     tenant.TenantId,
                     token);
                 if (catalog is null)
@@ -58,25 +58,25 @@ public sealed class CreateEventTicketTypeCommandHandler(
                     return stableTicketTypeId;
                 }
 
-                EventCapacityPool? pool = request.TicketType.CapacityPoolId.HasValue
+                EventCapacityPool? pool = command.TicketType.CapacityPoolId.HasValue
                     ? await catalogs.GetActiveCapacityPoolForUpdateAsync(
-                        request.TicketType.CapacityPoolId.Value,
-                        request.EventId,
+                        command.TicketType.CapacityPoolId.Value,
+                        command.EventId,
                         tenant.TenantId,
                         token)
                     : null;
-                if (request.TicketType.CapacityPoolId.HasValue && pool is null)
+                if (command.TicketType.CapacityPoolId.HasValue && pool is null)
                 {
                     return null;
                 }
 
                 pool?.RegisterTicketAssignment();
 
-                EventTicketType ticketType = CreateTicketType(stableTicketTypeId, catalog, request.TicketType);
+                EventTicketType ticketType = CreateTicketType(stableTicketTypeId, catalog, command.TicketType);
                 IReadOnlyList<TicketTypeEntitlement> entitlements = await entitlementResolver.ResolveAsync(
                     ticketType.Id,
-                    request.TicketType.Entitlements,
-                    request.EventId,
+                    command.TicketType.Entitlements,
+                    command.EventId,
                     token);
 
                 catalog.AddTicketType(ticketType, pool);
@@ -91,23 +91,23 @@ public sealed class CreateEventTicketTypeCommandHandler(
 
             if (ticketTypeId is null)
             {
-                return Missing(request.EventId);
+                return Missing(command.EventId);
             }
 
-            await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
             return Ok(ticketTypeId.Value, "Ticket type created.");
         }
         catch (TicketingNotFoundException)
         {
-            return Missing(request.EventId);
+            return Missing(command.EventId);
         }
         catch (ConcurrencyConflictException exception)
         {
-            return Conflict(request.EventId, exception.Message);
+            return Conflict(command.EventId, exception.Message);
         }
         catch (ArgumentException exception)
         {
-            return Bad(request.EventId, exception.Message);
+            return Bad(command.EventId, exception.Message);
         }
     }
 

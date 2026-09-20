@@ -5,7 +5,7 @@ using Explore.Application.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationSubmissions.Commands;
 
@@ -16,7 +16,7 @@ public sealed record RecordRegistrationRequirementFulfillmentCommand(
     Guid? RegistrationSubmissionId,
     RegistrationAnswerSubjectTypeEnum SubjectType,
     Guid SubjectId,
-    bool IsSkipped) : IRequest<bool>;
+    bool IsSkipped) : ICommand<bool>;
 
 public sealed class RecordRegistrationRequirementFulfillmentCommandValidator
     : AbstractValidator<RecordRegistrationRequirementFulfillmentCommand>
@@ -39,9 +39,9 @@ public sealed class RecordRegistrationRequirementFulfillmentCommandHandler(
     IRegistrationSubmissionRepository submissions,
     IRegistrationFinalizationRepository finalization,
     TimeProvider timeProvider)
-    : IRequestHandler<RecordRegistrationRequirementFulfillmentCommand, bool>
+    : ICommandHandler<RecordRegistrationRequirementFulfillmentCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         RecordRegistrationRequirementFulfillmentCommand request,
         CancellationToken cancellationToken)
     {
@@ -76,7 +76,7 @@ public sealed class RecordRegistrationRequirementFulfillmentCommandHandler(
 public sealed record DrainRegistrationFinalizationEffectsCommand(
     string LeaseOwner,
     int BatchSize = 100,
-    int LeaseSeconds = 60) : IRequest<int>;
+    int LeaseSeconds = 60) : ICommand<int>;
 
 public sealed class DrainRegistrationFinalizationEffectsCommandValidator
     : AbstractValidator<DrainRegistrationFinalizationEffectsCommand>
@@ -95,9 +95,9 @@ public sealed class DrainRegistrationFinalizationEffectsCommandHandler(
     ITenantContextAccessor tenantContextAccessor,
     TimeProvider timeProvider,
     IAdmissionIssuanceService? admissionIssuance = null)
-    : IRequestHandler<DrainRegistrationFinalizationEffectsCommand, int>
+    : ICommandHandler<DrainRegistrationFinalizationEffectsCommand, int>
 {
-    public async Task<int> Handle(
+    public async Task<int> ExecuteAsync(
         DrainRegistrationFinalizationEffectsCommand request,
         CancellationToken cancellationToken)
     {

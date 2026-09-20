@@ -41,6 +41,6 @@ Self-hosting transfers operational responsibility to the operator. You must asse
 ## Related Guides & Next Steps
 
 * **[5-Minute Quickstart](5-minute-quickstart.md)** — Spin up an evaluation instance locally using Docker.
-* **[Architecture & Request Flows](architecture-and-request-flows.md)** — Trace HTTP requests from Blazor BFF through MediatR to PostgreSQL.
+* **[Architecture & Request Flows](architecture-and-request-flows.md)** — Trace HTTP requests from the browser-facing service through authorized operations to storage.
 * **[Deployment Tiers & Sizing](../self-hosting/deployment-tiers.md)** — Review hardware requirements and deployment topologies.
 * **[Clean-Room IP & Licensing](../contributing/clean-room-ip-and-licensing.md)** — Understand our open-source IP stewardship and governance.

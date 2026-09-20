@@ -213,7 +213,7 @@ public sealed class LegalDocumentPersistenceTests
             new UnexpectedTenantIdentityEvaluator(),
             new FixedInstanceIdentityEvaluator(identity));
 
-        PublicLegalDocumentQueryResult result = await handler.Handle(
+        PublicLegalDocumentQueryResult result = await handler.QueryAsync(
             new GetPublicLegalDocumentQuery("terms-of-service", "en"),
             CancellationToken.None);
 

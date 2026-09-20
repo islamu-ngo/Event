@@ -26,7 +26,7 @@ public sealed class GetControlPlaneDomainsQueryHandlerTests
             .Build();
         var handler = new GetControlPlaneDomainsQueryHandler(governanceService, configuration);
 
-        var result = await handler.Handle(new GetControlPlaneDomainsQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetControlPlaneDomainsQuery(), CancellationToken.None);
 
         await Assert.That(result.PublicPlatformHost).IsEqualTo("events.example.org");
         await Assert.That(result.WildcardTenantHost).IsEqualTo("*.events.example.org");
@@ -49,7 +49,7 @@ public sealed class GetControlPlaneDomainsQueryHandlerTests
         var configuration = new ConfigurationBuilder().Build();
         var handler = new GetControlPlaneDomainsQueryHandler(governanceService, configuration);
 
-        var result = await handler.Handle(new GetControlPlaneDomainsQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetControlPlaneDomainsQuery(), CancellationToken.None);
 
         await Assert.That(result.DnsRecords.Single(record => record.Purpose == "Public platform").Status)
             .IsEqualTo("missing_configuration");
@@ -75,7 +75,7 @@ public sealed class GetControlPlaneDomainsQueryHandlerTests
             .Build();
         var handler = new GetControlPlaneDomainsQueryHandler(governanceService, configuration);
 
-        var result = await handler.Handle(new GetControlPlaneDomainsQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetControlPlaneDomainsQuery(), CancellationToken.None);
 
         await Assert.That(result.AdminHost).IsEqualTo("admin.events.example.org");
         await Assert.That(result.DnsRecords.Single(record => record.Purpose == "Control plane").Name)

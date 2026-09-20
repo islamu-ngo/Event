@@ -7,6 +7,7 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
@@ -21,7 +22,6 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -128,25 +128,25 @@ public class UserExternalLoginIntegrationTests
                 new Uri("https://pds.example.test"),
                 "oauth-key",
                 new byte[] { 1 })));
-        var sender = Substitute.For<ISender>();
-        sender.Send(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
+        var claimAdministratorHandler = Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>();
+        claimAdministratorHandler.ExecuteAsync(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>("claim_rejected", "Claim rejected."));
         var logins = Substitute.For<IUserExternalLoginRepository>();
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
             gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             logins,
             out _);
 
-        AtprotoSessionBootstrapResult result = await handler.Handle(
+        AtprotoSessionBootstrapResult result = await handler.ExecuteAsync(
             CreateBootstrapCommand(expectedDid),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("pds_identity_mismatch");
-        await sender.DidNotReceiveWithAnyArgs().Send(default(ClaimConfiguredInstanceAdministratorCommand)!, default);
+        await claimAdministratorHandler.DidNotReceiveWithAnyArgs().ExecuteAsync(default(ClaimConfiguredInstanceAdministratorCommand)!, default);
         await logins.DidNotReceiveWithAnyArgs().GetByProviderAndKey(default!);
         await gateway.DidNotReceiveWithAnyArgs().PreparePersistenceAsync(default!, default, default, default);
         await gateway.DidNotReceiveWithAnyArgs().PersistPreparedAsync(default!, default);
@@ -241,8 +241,8 @@ public class UserExternalLoginIntegrationTests
                 return login;
             });
 
-        var sender = Substitute.For<ISender>();
-        sender.Send(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
+        var claimAdministratorHandler = Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>();
+        claimAdministratorHandler.ExecuteAsync(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 Record("claim");
@@ -270,14 +270,14 @@ public class UserExternalLoginIntegrationTests
         BootstrapAtprotoSessionCommandHandler first = CreateAtprotoHandler(
             gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             logins,
             out _,
             bootstrapRepository);
         BootstrapAtprotoSessionCommandHandler second = CreateAtprotoHandler(
             gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             logins,
             out _,
             bootstrapRepository);
@@ -286,7 +286,7 @@ public class UserExternalLoginIntegrationTests
             string name, BootstrapAtprotoSessionCommandHandler handler)
         {
             currentAttempt.Value = name;
-            return await handler.Handle(CreateBootstrapCommand(did), CancellationToken.None);
+            return await handler.ExecuteAsync(CreateBootstrapCommand(did), CancellationToken.None);
         }
 
         AtprotoSessionBootstrapResult[] results = await Task.WhenAll(
@@ -294,8 +294,8 @@ public class UserExternalLoginIntegrationTests
             RunAttemptAsync("second", second));
 
         await Assert.That(results.All(result => result.Success)).IsTrue();
-        await Assert.That(loginReads).IsEqualTo(8);
-        await sender.Received(2).Send(
+        await Assert.That(loginReads).IsEqualTo(10);
+        await claimAdministratorHandler.Received(2).ExecuteAsync(
             Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(),
             Arg.Any<CancellationToken>());
         List<string> snapshot;
@@ -345,7 +345,7 @@ public class UserExternalLoginIntegrationTests
                 new byte[] { 1 })));
         var logins = Substitute.For<IUserExternalLoginRepository>();
         logins.GetByProviderAndKey(Arg.Any<ProviderAccountKey>()).Returns(login);
-        var sender = Substitute.For<ISender>();
+        var claimAdministratorHandler = Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>();
         gateway.PreparePersistenceAsync(
                 Arg.Any<AtprotoVerifiedOAuthSession>(),
                 Arg.Any<Guid>(),
@@ -363,7 +363,7 @@ public class UserExternalLoginIntegrationTests
                 null));
         int claimAttempts = 0;
         ClaimConfiguredInstanceAdministratorCommand? lastClaim = null;
-        sender.Send(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
+        claimAdministratorHandler.ExecuteAsync(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 lastClaim = call.Arg<ClaimConfiguredInstanceAdministratorCommand>();
@@ -387,14 +387,14 @@ public class UserExternalLoginIntegrationTests
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
             gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             logins,
             out _,
             bootstrapRepository);
 
         _ = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.Handle(CreateBootstrapCommand(did), CancellationToken.None));
-        AtprotoSessionBootstrapResult retry = await handler.Handle(
+            handler.ExecuteAsync(CreateBootstrapCommand(did), CancellationToken.None));
+        AtprotoSessionBootstrapResult retry = await handler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
@@ -447,23 +447,23 @@ public class UserExternalLoginIntegrationTests
         };
         var logins = Substitute.For<IUserExternalLoginRepository>();
         logins.GetByProviderAndKey(Arg.Any<ProviderAccountKey>()).Returns(login);
-        var sender = Substitute.For<ISender>();
+        var claimAdministratorHandler = Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>();
         var tokenIssuer = Substitute.For<IAtprotoSessionTokenIssuer>();
         tokenIssuer.IssueAsync(userId, Arg.Any<Guid>(), did, Arg.Any<CancellationToken>())
             .Returns(new AtprotoIssuedSessionToken("platform-token", DateTimeOffset.UtcNow.AddMinutes(5)));
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
             gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             logins,
             out _);
 
-        AtprotoSessionBootstrapResult result = await handler.Handle(
+        AtprotoSessionBootstrapResult result = await handler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsTrue();
-        await sender.DidNotReceiveWithAnyArgs().Send(
+        await claimAdministratorHandler.DidNotReceiveWithAnyArgs().ExecuteAsync(
             default(ClaimConfiguredInstanceAdministratorCommand)!,
             default);
     }
@@ -511,13 +511,13 @@ public class UserExternalLoginIntegrationTests
         BootstrapAtprotoSessionCommandHandler handler = CreateAtprotoHandler(
             gateway,
             Substitute.For<IAtprotoSessionTokenIssuer>(),
-            Substitute.For<ISender>(),
+            Substitute.For<ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>>>(),
             logins,
             out _,
             authenticationProviderDispatcher: dispatcher,
             authProviderConfiguration: configuration);
 
-        AtprotoSessionBootstrapResult result = await handler.Handle(
+        AtprotoSessionBootstrapResult result = await handler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
@@ -538,7 +538,7 @@ public class UserExternalLoginIntegrationTests
     private static BootstrapAtprotoSessionCommandHandler CreateAtprotoHandler(
         IAtprotoOAuthSecurityGateway gateway,
         IAtprotoSessionTokenIssuer tokenIssuer,
-        ISender sender,
+        ICommandHandler<ClaimConfiguredInstanceAdministratorCommand, BaseCommandResponse<Guid>> claimAdministratorHandler,
         IUserExternalLoginRepository logins,
         out IUnitOfWork unitOfWork,
         IInstanceBootstrapStateRepository? bootstrapRepository = null,
@@ -628,7 +628,7 @@ public class UserExternalLoginIntegrationTests
         return new BootstrapAtprotoSessionCommandHandler(
             gateway,
             tokenIssuer,
-            sender,
+            claimAdministratorHandler,
             logins,
             bootstrapRepository ?? Substitute.For<IInstanceBootstrapStateRepository>(),
             authenticationProviderDispatcher
@@ -640,9 +640,8 @@ public class UserExternalLoginIntegrationTests
                 logins),
             onboarding,
             unitOfWork,
-            Substitute.For<ISettingMutationLock>(),
+            new ImmediateSettingMutationLock(),
             Substitute.For<IVisitorAccessCapabilityResolver>(),
-            Substitute.For<IAdminCacheInvalidator>(),
             tenantContext,
             configuration,
             TimeProvider.System);
@@ -714,6 +713,19 @@ public class UserExternalLoginIntegrationTests
 
         public Task<T> ExecuteReadCommittedAsync<T>(
             Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+    }
+
+    private sealed class ImmediateSettingMutationLock : ISettingMutationLock
+    {
+        public Task<T> ExecuteAsync<T>(
+            string canonicalSettingKey,
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken = default) => operation(cancellationToken);
+
+        public Task<T> ExecuteManyAsync<T>(
+            IEnumerable<string> canonicalSettingKeys,
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken = default) => operation(cancellationToken);
     }
 
     private sealed class TestClaimPayload

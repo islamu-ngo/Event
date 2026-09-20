@@ -1,0 +1,35 @@
+Change-Id: CHG-01M2DPRFSDMZ304RCWMSXCQSYA
+Title: "Return controlled duplicate session-language failures"
+Type: fix
+Scope: events
+Summary: "Use protected native session-language operations and return a controlled validation result when an assignment already exists, including racing creates."
+Group: session-languages
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Native ports retain persisted parent-session and tenant authorization.
+      Duplicate classification recognizes only the existing assignment index;
+      unrelated primary-key and foreign-key errors remain observable.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: >-
+      Repeated or racing creates for an existing session-language assignment
+      return controlled validation failures while the database keeps one
+      durable assignment. No schema migration or configuration change is needed.

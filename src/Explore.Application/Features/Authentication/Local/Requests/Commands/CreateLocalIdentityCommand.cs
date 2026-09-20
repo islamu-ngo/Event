@@ -1,10 +1,10 @@
 
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Requests.Commands;
 
-public sealed record CreateLocalIdentityCommand : IRequest<LocalCredentialIssueCommandResponse>
+public sealed record CreateLocalIdentityCommand : ICommand<LocalCredentialIssueCommandResponse>
 {
     public CreateLocalIdentityCommand(Guid operationId, string email, string firstName, string lastName)
     {

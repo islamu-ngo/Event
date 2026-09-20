@@ -51,6 +51,17 @@ Manifest file ingestion represents an administrative trust boundary:
 
 ---
 
+## Tenant Configuration Packages
+
+Tenant administrators can export a tenant configuration package in either
+Overrides or Portable view, then upload it for preview and import into an
+authorized tenant. Keep its generated authority and sovereign-field omission
+metadata intact: the importer validates those declarations. The omission list
+describes excluded fields; it contains no credentials and grants no additional
+authority.
+
+---
+
 ## Related Guides & Next Steps
 
 * **[White-Labeling & Branding](../administration-and-branding/white-labeling.md)** — Customize colors, logos, and typography via manifests.

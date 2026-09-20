@@ -3,7 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.ScheduleItemKind;
 using Explore.Application.Features.ScheduleItemKinds.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -14,7 +14,8 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class ScheduleItemKindController(IMediator mediator) : ControllerBase
+public class ScheduleItemKindController(
+    IQueryHandler<GetScheduleItemKindListRequest, List<ScheduleItemKindListDto>> scheduleItemKinds) : ControllerBase
 {
 
     // GET: api/scheduleitemkind
@@ -26,7 +27,7 @@ public class ScheduleItemKindController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<ScheduleItemKindListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var kinds = await mediator.Send(new GetScheduleItemKindListRequest(), cancellationToken);
+        var kinds = await scheduleItemKinds.QueryAsync(new GetScheduleItemKindListRequest(), cancellationToken);
         return Ok(kinds);
     }
 }

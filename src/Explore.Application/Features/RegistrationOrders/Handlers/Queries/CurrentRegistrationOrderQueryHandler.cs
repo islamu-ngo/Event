@@ -6,7 +6,7 @@ using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.RegistrationOrders.Handlers;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
 
@@ -15,9 +15,9 @@ public sealed class GetCurrentRegistrationOrderQueryHandler(
     IRegistrationOrderLifecycleService lifecycle,
     ITenantContext tenant,
     ICurrentUserService currentUser)
-    : IRequestHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>
+    : IQueryHandler<GetCurrentRegistrationOrderQuery, RegistrationOrderDto?>
 {
-    public async Task<RegistrationOrderDto?> Handle(GetCurrentRegistrationOrderQuery request, CancellationToken cancellationToken)
+    public async Task<RegistrationOrderDto?> QueryAsync(GetCurrentRegistrationOrderQuery request, CancellationToken cancellationToken)
     {
         return await RegistrationOrderAccessGuard.GetCurrentAccountOrderAsync(
             inventory,
@@ -34,10 +34,10 @@ public sealed class GetAuthenticatedNativeRegistrationRequirementProgressQueryHa
     IRegistrationInventoryRepository inventory,
     ITenantContext tenant,
     ICurrentUserService currentUser,
-    ISender sender)
-    : IRequestHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
+    IQueryHandler<GetNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?> progressHandler)
+    : IQueryHandler<GetAuthenticatedNativeRegistrationRequirementProgressQuery, NativeRegistrationRequirementProgressCollectionDto?>
 {
-    public async Task<NativeRegistrationRequirementProgressCollectionDto?> Handle(
+    public async Task<NativeRegistrationRequirementProgressCollectionDto?> QueryAsync(
         GetAuthenticatedNativeRegistrationRequirementProgressQuery request,
         CancellationToken cancellationToken)
     {
@@ -52,7 +52,7 @@ public sealed class GetAuthenticatedNativeRegistrationRequirementProgressQueryHa
             return null;
         }
 
-        return await sender.Send(new GetNativeRegistrationRequirementProgressQuery(
+        return await progressHandler.QueryAsync(new GetNativeRegistrationRequirementProgressQuery(
             tenant.TenantId, request.EventId, request.OrderId), cancellationToken);
     }
 }

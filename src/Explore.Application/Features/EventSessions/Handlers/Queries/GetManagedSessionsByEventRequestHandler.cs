@@ -1,30 +1,27 @@
-using AutoMapper;
+using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 
-public class GetManagedSessionsByEventRequestHandler : IRequestHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>>
+public class GetManagedSessionsByEventRequestHandler : IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
-    private readonly IMapper _mapper;
 
     public GetManagedSessionsByEventRequestHandler(
-        IEventSessionRepository eventSessionRepository,
-        IMapper mapper)
+        IEventSessionRepository eventSessionRepository)
     {
         _eventSessionRepository = eventSessionRepository;
-        _mapper = mapper;
     }
 
-    public async Task<List<EventSessionListDto>> Handle(
+    public async Task<List<EventSessionListDto>> QueryAsync(
         GetManagedSessionsByEventRequest request,
         CancellationToken cancellationToken)
     {
         var eventSessions = await _eventSessionRepository.GetSessionsByEvent(request.EventId);
-        var dtos = _mapper.Map<List<EventSessionListDto>>(eventSessions);
+        var dtos = eventSessions.Select(EventSessionMapper.ToListItem).ToList();
         for (var index = 0; index < dtos.Count; index++)
         {
             var session = eventSessions[index];

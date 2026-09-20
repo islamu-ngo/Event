@@ -7,12 +7,13 @@ using Explore.API.Hateoas;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.LocationPrivacy;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventLocations.Requests.Commands;
 using Explore.Application.Features.EventLocations.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -171,8 +172,8 @@ public sealed class EventLocationHateoasTests
             tenantId,
             Guid.CreateVersion7(),
             includeAuthorizationMetadata);
-        IMediator mediator = Substitute.For<IMediator>();
-        mediator.Send(
+        var getManagementLocationHandler = Substitute.For<IQueryHandler<GetManagementEventLocationRequest, EventLocationManagementDto?>>();
+        getManagementLocationHandler.QueryAsync(
                 Arg.Any<GetManagementEventLocationRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(dto);
@@ -190,7 +191,13 @@ public sealed class EventLocationHateoasTests
         }
 
         var services = new ServiceCollection();
-        services.AddSingleton(mediator);
+        services.AddSingleton(getManagementLocationHandler);
+        services.AddSingleton(Substitute.For<IQueryHandler<GetPublicEventLocationsRequest, IReadOnlyList<EventLocationPublicDto>?>>());
+        services.AddSingleton(Substitute.For<IQueryHandler<GetAttendeeEventLocationsRequest, IReadOnlyList<EventLocationAttendeeDto>?>>());
+        services.AddSingleton(Substitute.For<IQueryHandler<GetManagementEventLocationsRequest, IReadOnlyList<EventLocationManagementDto>?>>());
+        services.AddSingleton(Substitute.For<IQueryHandler<GetEventLocationReviewQueueRequest, IReadOnlyList<EventLocationManagementDto>?>>());
+        services.AddSingleton(Substitute.For<ICommandHandler<UpdateEventLocationPolicyCommand, BaseCommandResponse<Guid>>>());
+        services.AddSingleton(Substitute.For<ICommandHandler<ConfirmEventLocationRemediationCommand, BaseCommandResponse<Guid>>>());
         services.AddSingleton<IHateoasAuthorizationEvaluator>(evaluator);
         services.AddSingleton(linkGenerator);
         services.AddSingleton<IHttpContextAccessor>(new HttpContextAccessor { HttpContext = httpContext });

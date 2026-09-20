@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventReporting;
@@ -13,7 +14,6 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
@@ -38,11 +38,11 @@ public sealed class SubmitEventReportCommandHandler(
     IEventReportEvidenceProtector evidenceProtector,
     BusinessMetrics metrics,
     IOptions<EventReportSubmissionOptions> optionsAccessor,
-    ISettingMutationLock mutationLock) : IRequestHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>
+    ISettingMutationLock mutationLock) : ICommandHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SubmitEventReportCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SubmitEventReportCommand request, CancellationToken cancellationToken)
     {
         var tenantId = tenantContext.TenantId;
         if (tenantId == Guid.Empty)

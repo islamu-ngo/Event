@@ -1,11 +1,11 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessions.Requests.Queries;
 
-public sealed record GetEventSessionListRequest : IRequest<PaginatedResult<EventSessionListDto>>
+public sealed record GetEventSessionListRequest : IQuery<PaginatedResult<EventSessionListDto>>
 {
     public int PageNumber { get; init; } = 1;
 

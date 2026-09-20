@@ -1,6 +1,6 @@
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.EventTicketing.Handlers.Commands;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using TUnit.Assertions;
 using TUnit.Core;
@@ -24,7 +24,9 @@ public sealed class EventTicketingHandlerServiceProviderTests
                 "Explore.Application.Features.EventTicketing.Handlers.",
                 StringComparison.Ordinal) == true && !type.IsAbstract)
             .SelectMany(type => type.ImplementedInterfaces)
-            .Where(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IRequestHandler<,>))
+            .Where(type => type.IsGenericType && (
+                type.GetGenericTypeDefinition() == typeof(ICommandHandler<,>) ||
+                type.GetGenericTypeDefinition() == typeof(IQueryHandler<,>)))
             .Distinct()
             .ToArray();
 

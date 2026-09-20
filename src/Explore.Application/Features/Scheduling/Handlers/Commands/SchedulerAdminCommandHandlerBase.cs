@@ -14,7 +14,7 @@ public abstract class SchedulerAdminCommandHandlerBase(
 {
     protected ISchedulerOperations SchedulerOperations { get; } = schedulerOperations;
 
-    protected async Task<BaseCommandResponse<string>> ExecuteAsync(
+    protected async Task<BaseCommandResponse<string>> ExecuteOperationAsync(
         string operationId,
         Func<CancellationToken, Task<SchedulerOperationResult>> operation,
         string successMessage,

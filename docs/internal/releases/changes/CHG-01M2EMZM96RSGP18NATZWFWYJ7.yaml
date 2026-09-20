@@ -1,0 +1,36 @@
+Change-Id: CHG-01M2EMZM96RSGP18NATZWFWYJ7
+Title: "Isolate session custom properties and persist their native writes"
+Type: fix
+Scope: events
+Summary: "Partition cached session definitions by trusted tenant, reject foreign-session creation, and commit values, projections and purge audits consistently through native operations."
+Group: session-custom-properties
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/architecture/native-session-custom-properties.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/architecture/native-session-custom-properties.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Shared list cache entries use trusted tenant partitions. Foreign session
+      creation is refused before writing; persisted update authorization and
+      administrator purge authority remain enforced.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/features/session-custom-property-management.md
+    Disposition: documented
+    Detail: >-
+      Replace all older API instances. No schema migration or manual cache flush
+      is required. Definition and value validation now honor documented
+      ProblemDetails responses, and successful writes refresh all affected pages.
+      Reload before retrying a request that fails after database commit.

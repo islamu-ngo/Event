@@ -3,11 +3,11 @@ namespace Explore.Application.Features.TenantSettingsDocuments.Requests.Queries;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.TenantSettingsDocuments;
 using Explore.Domain.Settings.Documents;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 [AuthorizeResource(ResourceKinds.TenantSetting, AuthorizationActions.TenantSettings.View)]
 public sealed record GetTenantDirectoryOperatorIdentityDocumentQuery(Guid TenantId)
-    : IRequest<TenantDirectoryOperatorIdentityDocumentDto?>, ISecureRequest
+    : IQuery<TenantDirectoryOperatorIdentityDocumentDto?>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => TenantId == Guid.Empty
         ? null

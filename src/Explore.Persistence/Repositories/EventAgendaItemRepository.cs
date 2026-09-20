@@ -16,12 +16,12 @@ public class EventAgendaItemRepository : GenericRepository<EventAgendaItem, Guid
 
     public async Task<List<EventAgendaItem>> GetByEventAsync(Guid eventId, CancellationToken cancellationToken)
     {
-        return await _dbContext.EventAgendaItems
+        var items = await _dbContext.EventAgendaItems
             .AsNoTracking()
             .Where(a => a.EventId == eventId)
-            .OrderBy(a => a.SortOrder)
-            .ThenBy(a => a.StartTime)
             .ToListAsync(cancellationToken);
+
+        return items.OrderBy(item => item.SortOrder).ThenBy(item => item.StartTime).ToList();
     }
 
     public async Task<EventAgendaItem?> GetPublicByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -34,13 +34,13 @@ public class EventAgendaItemRepository : GenericRepository<EventAgendaItem, Guid
 
     public async Task<List<EventAgendaItem>> GetPublicByEventAsync(Guid eventId, CancellationToken cancellationToken)
     {
-        return await _dbContext.EventAgendaItems
+        var items = await _dbContext.EventAgendaItems
             .AsNoTracking()
             .WherePubliclyEligible(_dbContext)
             .Where(item => item.EventId == eventId)
-            .OrderBy(item => item.SortOrder)
-            .ThenBy(item => item.StartTime)
             .ToListAsync(cancellationToken);
+
+        return items.OrderBy(item => item.SortOrder).ThenBy(item => item.StartTime).ToList();
     }
 
     public async Task MoveToEventAsync(

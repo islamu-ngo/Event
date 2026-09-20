@@ -16,7 +16,7 @@ using Explore.Application.Onboarding;
 using Explore.Application.Responses;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Hateoas;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -41,18 +41,21 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
         "Instance operator identity validation failed",
         "Instance operator identity update failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto> _identityQuery;
+    private readonly ICommandHandler<SaveInstanceOperatorIdentityCommand, BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>> _saveIdentity;
     private readonly ISetupSecretProvider _setupSecretProvider;
     private readonly IAdminContext _adminContext;
     private readonly IResourceAssembler<InstanceOperatorIdentityDocumentDto, InstanceOperatorIdentityDocumentDto> _assembler;
 
     public InstanceOperatorIdentityController(
-        IMediator mediator,
+        IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto> identityQuery,
+        ICommandHandler<SaveInstanceOperatorIdentityCommand, BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>> saveIdentity,
         ISetupSecretProvider setupSecretProvider,
         IAdminContext adminContext,
         IResourceAssembler<InstanceOperatorIdentityDocumentDto, InstanceOperatorIdentityDocumentDto> assembler)
     {
-        _mediator = mediator;
+        _identityQuery = identityQuery;
+        _saveIdentity = saveIdentity;
         _setupSecretProvider = setupSecretProvider;
         _adminContext = adminContext;
         _assembler = assembler;
@@ -79,7 +82,7 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
             return HandleAuthResult(authResult)!;
         }
 
-        var dto = await _mediator.Send(new GetInstanceOperatorIdentityQuery(), cancellationToken);
+        var dto = await _identityQuery.QueryAsync(new GetInstanceOperatorIdentityQuery(), cancellationToken);
         var resource = await _assembler.ToResource(dto, HttpContext);
         return Ok(resource);
     }
@@ -110,7 +113,7 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
         }
 
         var command = new SaveInstanceOperatorIdentityCommand { Request = request };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _saveIdentity.ExecuteAsync(command, cancellationToken);
 
         if (response.IsSuccess)
         {

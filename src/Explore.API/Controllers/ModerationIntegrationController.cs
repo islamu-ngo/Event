@@ -6,6 +6,7 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.API.Services;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Application.Hateoas;
@@ -13,7 +14,6 @@ using Explore.Application.Responses;
 using Explore.Application.Serialization;
 using Explore.Application.Telemetry;
 using Explore.Infrastructure.Configuration;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -27,7 +27,7 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType)]
 public sealed class ModerationIntegrationController(
-    IMediator mediator,
+    ICommandHandler<RecordOspreySignalCallbackCommand, BaseCommandResponse<Guid>> recordOspreyCallbackHandler,
     IIncomingWebhookIntakeService incomingWebhookIntakeService,
     IOptionsMonitor<CoopProviderOptions> coopOptions,
     BusinessMetrics metrics,
@@ -49,7 +49,7 @@ public sealed class ModerationIntegrationController(
         [FromBody] OspreySignalCallbackRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await mediator.Send(new RecordOspreySignalCallbackCommand
+        var response = await recordOspreyCallbackHandler.ExecuteAsync(new RecordOspreySignalCallbackCommand
         {
             Request = request
         }, cancellationToken);

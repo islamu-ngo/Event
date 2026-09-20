@@ -7,10 +7,10 @@ using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Federation;
 using Explore.Domain.Services.Lifecycle;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Events.Handlers.Commands;
@@ -21,12 +21,12 @@ public sealed class ArchiveEventCommandHandler(
     HybridCache cache,
     IUserContext userContext,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
-    TimeProvider timeProvider) : IRequestHandler<ArchiveEventCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider) : ICommandHandler<ArchiveEventCommand, BaseCommandResponse<Guid>>
 {
     private const string ConcurrencyConflictCode = "event_archive_concurrency_conflict";
     private const string TransitionNotAllowedCode = "event_archive_transition_not_allowed";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(ArchiveEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(ArchiveEventCommand request, CancellationToken cancellationToken)
     {
         var validator = new ArchiveEventRequestDtoValidator();
         var validationResult = await validator.ValidateAsync(request.Request, cancellationToken);

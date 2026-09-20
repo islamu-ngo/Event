@@ -23,7 +23,7 @@ public sealed class GetAdminAuthorityRequestHandlerTests
         adminContext.GetAdminGroupIdsAsync(userId, Arg.Any<CancellationToken>()).Returns([groupId]);
         var handler = new GetAdminAuthorityRequestHandler(adminContext);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetAdminAuthorityRequest { UserId = userId },
             CancellationToken.None);
 
@@ -46,7 +46,7 @@ public sealed class GetAdminAuthorityRequestHandlerTests
         adminContext.GetAdminGroupIdsAsync(userId, Arg.Any<CancellationToken>()).Returns([groupId]);
         var handler = new GetAdminAuthorityRequestHandler(adminContext);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetAdminAuthorityRequest { UserId = userId },
             CancellationToken.None);
 

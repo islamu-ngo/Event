@@ -1,28 +1,26 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.GroupMember;
 using Explore.Application.Features.GroupMembers.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupMembers.Handlers.Queries;
 
-public class GetGroupMemberDetailsRequestHandler : IRequestHandler<GetGroupMemberDetailsRequest, GroupMemberDto?>
+public class GetGroupMemberDetailsRequestHandler : IQueryHandler<GetGroupMemberDetailsRequest, GroupMemberDto?>
 {
     private readonly IGroupMemberRepository _groupMemberRepository;
-    private readonly IMapper _mapper;
 
-    public GetGroupMemberDetailsRequestHandler(IGroupMemberRepository groupMemberRepository, IMapper mapper)
+    public GetGroupMemberDetailsRequestHandler(IGroupMemberRepository groupMemberRepository)
     {
         _groupMemberRepository = groupMemberRepository;
-        _mapper = mapper;
     }
 
-    public async Task<GroupMemberDto?> Handle(GetGroupMemberDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<GroupMemberDto?> QueryAsync(GetGroupMemberDetailsRequest request, CancellationToken cancellationToken)
     {
         var member = await _groupMemberRepository.GetGroupMemberWithDetails(request.Id);
         if (member is null) return null;
-        return _mapper.Map<GroupMemberDto>(member);
+        return OrganizationMapper.ToGroupMember(member);
     }
 }

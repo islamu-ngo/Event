@@ -10,7 +10,7 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -50,15 +50,15 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
         CurrentUserService = new CurrentUserService(httpContext);
         AdminContext = new AdminContext(httpContext, new PlatformUserRoleRepository(context), new TenantUserRoleGrantRepository(context),
             new OrganizationMemberRepository(context), new GroupMemberRepository(context),
-            new UserExternalLoginRepository(context), _cache, NullLogger<AdminContext>.Instance);
+            new UserExternalLoginRepository(context), NullLogger<AdminContext>.Instance);
         Notifications = new CommittedNotificationObserver(context);
         _provider = new ServiceCollection()
             .AddSingleton<INotificationHandler<SettingChangedNotification>>(Notifications)
             .BuildServiceProvider();
-        Mediator = new Mediator(_provider);
+        NotificationHandlers = _provider.GetServices<INotificationHandler<SettingChangedNotification>>();
         PublicationPolicyBoundary = new PublicationPolicyMutationBoundary(MutationLock,
             new CoordinatedSettingMutationRepository(context));
-        UpsertService = new SettingUpsertService(SystemSettings, Mediator, PublicationPolicyBoundary, EmailDeliverySettingsWriter);
+        UpsertService = new SettingUpsertService(SystemSettings, NotificationHandlers, PublicationPolicyBoundary, EmailDeliverySettingsWriter);
         Governance = new InstanceGovernanceSettingService(Settings, UpsertService,
             new ModuleCapabilityService(new TenantCapabilityRepository(context), new ModuleDefinitionRepository(context)),
             NullLogger<InstanceGovernanceSettingService>.Instance, EmailDeliverySettingsWriter);
@@ -75,7 +75,7 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
     internal HierarchicalSettingsResolver Settings { get; }
     internal AdminContext AdminContext { get; }
     internal CurrentUserService CurrentUserService { get; }
-    internal IMediator Mediator { get; }
+    internal IEnumerable<INotificationHandler<SettingChangedNotification>> NotificationHandlers { get; }
     internal PublicationPolicyMutationBoundary PublicationPolicyBoundary { get; }
     internal SettingUpsertService UpsertService { get; }
     internal InstanceGovernanceSettingService Governance { get; }
@@ -120,7 +120,7 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
 
         internal Func<SettingChangedNotification, CancellationToken, Task>? OnPublishing { get; set; }
 
-        public async Task Handle(SettingChangedNotification notification, CancellationToken cancellationToken)
+        public async Task HandleAsync(SettingChangedNotification notification, CancellationToken cancellationToken)
         {
             if (context.Database.CurrentTransaction is not null)
                 throw new InvalidOperationException("Settings notifications must be published after commit.");

@@ -7,12 +7,12 @@ namespace Event.Architecture.Tests
     using System.Text.Json;
     using Explore.API.Controllers;
     using Explore.Application.Authorization;
+    using Explore.Application.Contracts.Operations;
     using Explore.Application.DTOs.CustomPropertyProjection.Validators;
     using Explore.Application.DTOs.RegistrationOrders;
     using Explore.Application.DTOs.RegistrationSubmissions;
     using Explore.Application.Responses;
     using Explore.Domain.Interfaces;
-    using MediatR;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.AspNetCore.Mvc.ModelBinding;
     using Microsoft.AspNetCore.Mvc.Routing;
@@ -81,8 +81,8 @@ namespace Event.Architecture.Tests
             await Assert.That(Classify(typeof(NativeRegistrationFormDefinitionDto))).IsEqualTo(ContractClassification.Record);
             await Assert.That(IsRecord(genericRecordRequest)).IsTrue();
             await Assert.That(genericRecordRequest.GetInterfaces().Any(contract =>
-                contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IRequest<>))).IsTrue();
-            await Assert.That(typeof(IRequest).IsAssignableFrom(nonGenericRecordRequest)).IsTrue();
+                contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IQuery<>))).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(nonGenericRecordRequest)).IsTrue();
             await Assert.That(IsRecord(abstractRecordRequest)).IsTrue();
             await Assert.That(IsRecord(inheritedRecordRequest)).IsTrue();
             await Assert.That(inheritedRecordRequest.BaseType!.GetGenericTypeDefinition()).IsEqualTo(abstractRecordRequest);
@@ -92,13 +92,13 @@ namespace Event.Architecture.Tests
             await Assert.That(compiledRequests.Contains(abstractRecordRequest)).IsFalse();
             await Assert.That(IsApplicationContractOwned(generated)).IsTrue();
             await Assert.That(Classify(generated)).IsEqualTo(ContractClassification.Generated);
-            await Assert.That(typeof(IBaseRequest).IsAssignableFrom(generatedRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(generatedRequest)).IsTrue();
             await Assert.That(IsGenerated(generatedRequest)).IsTrue();
             await Assert.That(IsCompiledApplicationRequest(generatedRequest)).IsFalse();
-            await Assert.That(typeof(IBaseRequest).IsAssignableFrom(compilerGeneratedRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(compilerGeneratedRequest)).IsTrue();
             await Assert.That(IsGenerated(compilerGeneratedRequest)).IsTrue();
             await Assert.That(IsCompiledApplicationRequest(compilerGeneratedRequest)).IsFalse();
-            await Assert.That(typeof(IBaseRequest).IsAssignableFrom(fixtureRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(fixtureRequest)).IsTrue();
             await Assert.That(IsTestFixture(fixtureRequest)).IsTrue();
             await Assert.That(IsCompiledApplicationRequest(fixtureRequest)).IsFalse();
             await Assert.That(IsApplicationContractOwned(typeof(RebuildProjectionRequestDtoValidator))).IsTrue();
@@ -354,7 +354,7 @@ namespace Event.Architecture.Tests
         private static bool IsCompiledApplicationRequest(Type type) =>
             type.Assembly == ApplicationAssembly
             && type is { IsClass: true, IsAbstract: false }
-            && typeof(IBaseRequest).IsAssignableFrom(type)
+            && OperationContractDiscovery.IsRequest(type)
             && !IsGenerated(type)
             && !IsTestFixture(type);
 
@@ -419,7 +419,7 @@ namespace Event.Architecture.Tests
                 return ContractClassification.TestFixture;
             if (IsRecord(type))
                 return ContractClassification.Record;
-            if (type is { IsClass: true, IsAbstract: false } && typeof(IBaseRequest).IsAssignableFrom(type))
+            if (type is { IsClass: true, IsAbstract: false } && OperationContractDiscovery.IsRequest(type))
                 return ContractClassification.ConcreteMediatRClassRequest;
             if (type is { IsClass: true, IsAbstract: false } && IsApplicationContractOwned(type))
                 return ContractClassification.HandwrittenApplicationClassDto;
@@ -764,7 +764,7 @@ namespace Event.Architecture.Tests
 
         private sealed class SyntheticBindingContract;
 
-        private sealed class SyntheticTestFixtureRequest : IRequest;
+        private sealed class SyntheticTestFixtureRequest : Explore.Application.Contracts.Operations.ICommand;
     }
 }
 
@@ -774,10 +774,10 @@ namespace Explore.Application.DTOs.RecordContractCharacterization
     internal sealed class GeneratedContract;
 
     [System.CodeDom.Compiler.GeneratedCode("RecordContractArchitectureTests", "1.0")]
-    internal sealed class GeneratedRequest : MediatR.IRequest;
+    internal sealed class GeneratedRequest : Explore.Application.Contracts.Operations.ICommand;
 
     [System.Runtime.CompilerServices.CompilerGenerated]
-    internal sealed class CompilerGeneratedRequest : MediatR.IRequest;
+    internal sealed class CompilerGeneratedRequest : Explore.Application.Contracts.Operations.ICommand;
 
     internal sealed class MutableContractEditState;
 

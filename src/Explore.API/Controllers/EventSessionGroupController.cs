@@ -9,8 +9,8 @@ using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -55,20 +55,47 @@ public class EventSessionGroupController : EventControllerBase
         "Program validation failed",
         "Event session unassignment failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> _getByEventHandler;
+    private readonly IQueryHandler<GetEventSessionGroupDetailRequest, EventSessionGroupDto?> _getByIdHandler;
+    private readonly IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> _getManagedByEventHandler;
+    private readonly IQueryHandler<GetManagedEventSessionGroupDetailRequest, EventSessionGroupDto?> _getManagedByIdHandler;
+    private readonly IQueryHandler<GetEventSessionGroupSessionsRequest, List<EventSessionListDto>> _getSessionsHandler;
+    private readonly ICommandHandler<CreateEventSessionGroupCommand, BaseCommandResponse<Guid>> _createHandler;
+    private readonly ICommandHandler<UpdateEventSessionGroupCommand, BaseCommandResponse<Guid>> _updateHandler;
+    private readonly ICommandHandler<DeleteEventSessionGroupCommand, BaseCommandResponse<Guid>> _deleteHandler;
+    private readonly ICommandHandler<AssignSessionToGroupCommand, BaseCommandResponse<Guid>> _assignSessionHandler;
+    private readonly ICommandHandler<UnassignSessionFromGroupCommand, BaseCommandResponse<Guid>> _unassignSessionHandler;
     private readonly ILogger<EventSessionGroupController> _logger;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<EventSessionGroupDto, EventSessionGroupListDto> _resourceAssembler;
     private readonly IResourceAssembler<EventSessionDto, EventSessionListDto> _sessionResourceAssembler;
 
     public EventSessionGroupController(
-        IMediator mediator,
+        IQueryHandler<GetEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> getByEventHandler,
+        IQueryHandler<GetEventSessionGroupDetailRequest, EventSessionGroupDto?> getByIdHandler,
+        IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> getManagedByEventHandler,
+        IQueryHandler<GetManagedEventSessionGroupDetailRequest, EventSessionGroupDto?> getManagedByIdHandler,
+        IQueryHandler<GetEventSessionGroupSessionsRequest, List<EventSessionListDto>> getSessionsHandler,
+        ICommandHandler<CreateEventSessionGroupCommand, BaseCommandResponse<Guid>> createHandler,
+        ICommandHandler<UpdateEventSessionGroupCommand, BaseCommandResponse<Guid>> updateHandler,
+        ICommandHandler<DeleteEventSessionGroupCommand, BaseCommandResponse<Guid>> deleteHandler,
+        ICommandHandler<AssignSessionToGroupCommand, BaseCommandResponse<Guid>> assignSessionHandler,
+        ICommandHandler<UnassignSessionFromGroupCommand, BaseCommandResponse<Guid>> unassignSessionHandler,
         ILogger<EventSessionGroupController> logger,
         ITenantContext tenantContext,
         IResourceAssembler<EventSessionGroupDto, EventSessionGroupListDto> resourceAssembler,
         IResourceAssembler<EventSessionDto, EventSessionListDto> sessionResourceAssembler)
     {
-        _mediator = mediator;
+        _getByEventHandler = getByEventHandler;
+        _getByIdHandler = getByIdHandler;
+        _getManagedByEventHandler = getManagedByEventHandler;
+        _getManagedByIdHandler = getManagedByIdHandler;
+        _getSessionsHandler = getSessionsHandler;
+        _createHandler = createHandler;
+        _updateHandler = updateHandler;
+        _deleteHandler = deleteHandler;
+        _assignSessionHandler = assignSessionHandler;
+        _unassignSessionHandler = unassignSessionHandler;
         _logger = logger;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
@@ -88,7 +115,7 @@ public class EventSessionGroupController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var groups = await _mediator.Send(new GetEventSessionGroupsByEventRequest { EventId = eventId }, cancellationToken);
+        var groups = await _getByEventHandler.QueryAsync(new GetEventSessionGroupsByEventRequest { EventId = eventId }, cancellationToken);
 
         var halResource = await _resourceAssembler.ToCollectionResource(
             groups,
@@ -113,7 +140,7 @@ public class EventSessionGroupController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var group = await _mediator.Send(new GetEventSessionGroupDetailRequest { Id = id }, cancellationToken);
+        var group = await _getByIdHandler.QueryAsync(new GetEventSessionGroupDetailRequest { Id = id }, cancellationToken);
         if (group is null)
         {
             return this.ToNotFoundProblem(EventSessionGroupNotFoundProblem);
@@ -136,7 +163,7 @@ public class EventSessionGroupController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var groups = await _mediator.Send(
+        var groups = await _getManagedByEventHandler.QueryAsync(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventId },
             cancellationToken);
 
@@ -164,7 +191,7 @@ public class EventSessionGroupController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var group = await _mediator.Send(new GetManagedEventSessionGroupDetailRequest
+        var group = await _getManagedByIdHandler.QueryAsync(new GetManagedEventSessionGroupDetailRequest
         {
             EventId = eventId,
             Id = id
@@ -191,7 +218,7 @@ public class EventSessionGroupController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var sessions = await _mediator.Send(
+        var sessions = await _getSessionsHandler.QueryAsync(
             new GetEventSessionGroupSessionsRequest { EventSessionGroupId = id },
             cancellationToken);
 
@@ -220,7 +247,7 @@ public class EventSessionGroupController : EventControllerBase
         [FromBody] CreateEventSessionGroupRequestDto group,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _createHandler.ExecuteAsync(
             new CreateEventSessionGroupCommand
             {
                 EventSessionGroup = group,
@@ -267,7 +294,7 @@ public class EventSessionGroupController : EventControllerBase
                 "If-Match header is required and must contain the current event session group concurrency stamp.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _updateHandler.ExecuteAsync(
             new UpdateEventSessionGroupCommand
             {
                 EventSessionGroupId = id,
@@ -302,7 +329,7 @@ public class EventSessionGroupController : EventControllerBase
         [FromQuery] Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _deleteHandler.ExecuteAsync(
             new DeleteEventSessionGroupCommand
             {
                 Id = id,
@@ -341,7 +368,7 @@ public class EventSessionGroupController : EventControllerBase
             return this.ToValidationProblem(AssignmentValidationProblem, "Event session group ID mismatch.");
         }
 
-        var response = await _mediator.Send(
+        var response = await _assignSessionHandler.ExecuteAsync(
             new AssignSessionToGroupCommand
             {
                 Assignment = assignment,
@@ -375,7 +402,7 @@ public class EventSessionGroupController : EventControllerBase
         [FromQuery] Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _unassignSessionHandler.ExecuteAsync(
             new UnassignSessionFromGroupCommand
             {
                 EventSessionGroupId = id,

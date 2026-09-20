@@ -1,13 +1,13 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
-using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Requests.Queries;
 
-public sealed record GetRegistrationOrderQuery(Guid OrderId) : IRequest<RegistrationOrderDto?>;
+public sealed record GetRegistrationOrderQuery(Guid OrderId) : IQuery<RegistrationOrderDto?>;
 
 [AuthorizeResource(ResourceKinds.Event, AuthorizationActions.Events.ManageRegistrations)]
-public sealed record GetEventRegistrationOrdersQuery(Guid EventId) : IRequest<IReadOnlyList<RegistrationOrderDto>>, ISecureRequest
+public sealed record GetEventRegistrationOrdersQuery(Guid EventId) : IQuery<IReadOnlyList<RegistrationOrderDto>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => EventId == Guid.Empty ? null : EventId.ToString();
 

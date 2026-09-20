@@ -7,9 +7,13 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Attributes;
 using Explore.API.Filters;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Validation;
+using Explore.Domain;
+using Explore.Domain.Enums;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -85,7 +89,8 @@ public sealed class ConfigurationManifestExportControllerTests
         MethodInfo action = controller.GetMethod("Export", BindingFlags.Public | BindingFlags.Instance)!;
 
         await Assert.That(dependencies).HasSingleItem();
-        await Assert.That(dependencies.Single()).IsEqualTo(typeof(MediatR.IMediator));
+        await Assert.That(dependencies.Single()).IsEqualTo(
+            typeof(IQueryHandler<ExportConfigurationManifestQuery, ConfigurationManifestExportResult>));
         await Assert.That(action.GetParameters().Any(parameter => parameter.ParameterType == typeof(Guid)))
             .IsFalse()
             .Because("the deployment has one server-fixed instance and callers cannot select another");
@@ -200,14 +205,26 @@ public sealed class ConfigurationManifestExportControllerTests
     [Test]
     public async Task TenantBoundOverflowReturnsStablePayloadTooLargeProblem()
     {
-        var handler = Substitute.For<IRequestHandler<
-            ExportConfigurationManifestQuery,
-            ConfigurationManifestExportResult>>();
-        handler.Handle(
-                Arg.Any<ExportConfigurationManifestQuery>(),
+        var tenants = Substitute.For<ITenantRepository>();
+        tenants.GetAllActiveForConfigurationManifestExportAsync(
+                Arg.Any<int>(),
                 Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromException<ConfigurationManifestExportResult>(
-                new ConfigurationManifestExportTooLargeException()));
+            .Returns(Enumerable.Range(0, ConfigurationManifestValidator.MaximumTenantCount + 1)
+                .Select(index => new Tenant
+                {
+                    Id = Guid.CreateVersion7(),
+                    Slug = $"overflow-{index}",
+                    FullName = $"Overflow {index}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = new TenantStatus
+                    {
+                        Id = (int)TenantStatusEnum.Active,
+                        MasterCode = "active",
+                        FullName = "Active",
+                        IsActiveState = true
+                    }
+                })
+                .ToArray());
         await using var baseFactory = new AuthenticatedWebApplicationFactory
         {
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
@@ -215,10 +232,8 @@ public sealed class ConfigurationManifestExportControllerTests
         await using var factory = baseFactory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IRequestHandler<
-                    ExportConfigurationManifestQuery,
-                    ConfigurationManifestExportResult>>();
-                services.AddScoped(_ => handler);
+                services.RemoveAll<ITenantRepository>();
+                services.AddScoped(_ => tenants);
             }));
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(

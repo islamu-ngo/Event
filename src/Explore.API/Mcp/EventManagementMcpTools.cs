@@ -6,6 +6,7 @@ using System.Text.Json.Serialization.Metadata;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventCustomProperty;
@@ -36,8 +37,8 @@ using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDif
 using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
@@ -52,12 +53,35 @@ namespace Explore.API.Mcp;
 
 [McpServerToolType]
 public sealed class EventManagementMcpTools(
-    IMediator mediator,
     IUserContext userContext,
     ITenantContext tenantContext,
     IResourceAssembler<EventDto, EventListDto> eventResourceAssembler,
     IHttpContextAccessor httpContextAccessor,
-    EventMcpLocationDisclosureGuard locationDisclosureGuard)
+    EventMcpLocationDisclosureGuard locationDisclosureGuard,
+    IQueryHandler<GetEventTemplateListRequest, PaginatedResult<EventTemplateListDto>> eventTemplateListHandler,
+    IQueryHandler<GetEventSessionTemplateListRequest, PaginatedResult<EventSessionTemplateListDto>> eventSessionTemplateListHandler,
+    IQueryHandler<GetEventTemplateSyncHistoryQuery, PaginatedResult<EventTemplateSyncHistoryItemDto>> eventTemplateSyncHistoryHandler,
+    IQueryHandler<GetEventSessionTemplateSyncHistoryQuery, PaginatedResult<EventSessionTemplateSyncHistoryItemDto>> eventSessionTemplateSyncHistoryHandler,
+    IQueryHandler<GetEventTemplateDiffQuery, BaseCommandResponse<EventTemplateDiffDto>> eventTemplateDiffHandler,
+    IQueryHandler<GetEventSessionTemplateDiffQuery, BaseCommandResponse<EventSessionTemplateDiffDto>> eventSessionTemplateDiffHandler,
+    IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays,
+    IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
+    IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
+    IQueryHandler<GetManagedEventSessionGroupsByEventRequest, List<EventSessionGroupListDto>> managedEventSessionGroups,
+    IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> customPropertyDefinitions,
+    IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues,
+    IQueryHandler<GetEventRegistrationOrdersQuery, IReadOnlyList<RegistrationOrderDto>> eventRegistrationOrdersHandler,
+    IQueryHandler<GetEventTeamListRequest, List<EventTeamMemberDto>> eventTeamListHandler,
+    IQueryHandler<GetCurrentUserEventPermissionsRequest, CurrentUserEventPermissionsDto> currentUserEventPermissionsHandler,
+    IQueryHandler<GetAssignableEventRolePresetsRequest, List<EventRolePresetDto>> assignableEventRolePresetsHandler,
+    IQueryHandler<GetSessionsByEventRequest, List<EventSessionListDto>> publicSessionsByEvent,
+    IQueryHandler<GetManagedSessionsByEventRequest, List<EventSessionListDto>> managedSessionsByEvent,
+    IQueryHandler<GetEventListRequest, PaginatedResult<EventListDto>> eventListHandler,
+    IQueryHandler<GetMyEventsRequest, PaginatedResult<EventListDto>> myEventsHandler,
+    IQueryHandler<GetEventCreationContextRequest, EventCreationContextDto> eventCreationContextHandler,
+    IQueryHandler<GetEventManagementDetailsRequest, EventDto?> eventManagementDetailsHandler,
+    IQueryHandler<GetEventPublishReadinessRequest, EventPublishReadinessDto?> eventPublishReadinessHandler,
+    IQueryHandler<GetEventDetailsRequest, EventDto?> eventDetailsHandler)
 {
 
     [McpServerTool(
@@ -93,7 +117,7 @@ public sealed class EventManagementMcpTools(
                 : Math.Clamp(pageSize, 1, MaxPublicEventPageSize);
             var pageSizeWasClamped = normalizedPageSize != pageSize;
 
-            var result = await mediator.Send(
+            var result = await eventListHandler.QueryAsync(
                 new GetEventListRequest
                 {
                     PageNumber = normalizedPageNumber,
@@ -235,7 +259,7 @@ public sealed class EventManagementMcpTools(
             var publicEvent = await GetPublicEventOrNullAsync(eventId, cancellationToken);
             var summary = publicEvent is null
                 ? null
-                : await mediator.Send(new GetEventProgramSummaryRequest(eventId), cancellationToken);
+                : await publicProgramSummary.QueryAsync(new GetEventProgramSummaryRequest(eventId), cancellationToken);
             EventMcpProgramResultDescriptor descriptor;
             if (summary is null)
             {
@@ -309,7 +333,7 @@ public sealed class EventManagementMcpTools(
             var publicEvent = await GetPublicEventOrNullAsync(eventId, cancellationToken);
             var sessions = publicEvent is null
                 ? null
-                : await mediator.Send(new GetSessionsByEventRequest { EventId = eventId }, cancellationToken);
+                : await publicSessionsByEvent.QueryAsync(new GetSessionsByEventRequest { EventId = eventId }, cancellationToken);
             EventMcpSessionListResultDescriptor descriptor;
             if (sessions is null)
             {
@@ -385,7 +409,7 @@ public sealed class EventManagementMcpTools(
                 : Math.Clamp(pageSize, 1, MaxMyEventsPageSize);
             var pageSizeWasClamped = normalizedPageSize != pageSize;
 
-            var result = await mediator.Send(
+            var result = await myEventsHandler.QueryAsync(
                 new GetMyEventsRequest
                 {
                     UserId = userId.ToString(),
@@ -467,7 +491,7 @@ public sealed class EventManagementMcpTools(
 
         try
         {
-            var context = await mediator.Send(new GetEventCreationContextRequest(), cancellationToken);
+            var context = await eventCreationContextHandler.QueryAsync(new GetEventCreationContextRequest(), cancellationToken);
             var descriptor = MapCreationContext(context);
 
             McpAdapterTelemetry.MarkSuccess(activity);
@@ -776,7 +800,7 @@ public sealed class EventManagementMcpTools(
         Guid eventId,
         CancellationToken cancellationToken)
     {
-        var eventDto = await mediator.Send(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
+        var eventDto = await eventManagementDetailsHandler.QueryAsync(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
         if (eventDto is null)
         {
             return EventMcpPublishReadinessResultDescriptor.NotFound(eventId);
@@ -788,7 +812,7 @@ public sealed class EventManagementMcpTools(
             return EventMcpPublishReadinessResultDescriptor.Unavailable(eventDto.Id);
         }
 
-        var readiness = await mediator.Send(
+        var readiness = await eventPublishReadinessHandler.QueryAsync(
             new GetEventPublishReadinessRequest { Id = eventDto.Id },
             cancellationToken);
         if (readiness is null)
@@ -885,14 +909,14 @@ public sealed class EventManagementMcpTools(
         }
 
         var eventDto = gate.Event!;
-        var sessions = await mediator.Send(new GetManagedSessionsByEventRequest { EventId = eventDto.Id }, cancellationToken);
-        var sessionGroups = await mediator.Send(
+        var sessions = await managedSessionsByEvent.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventDto.Id }, cancellationToken);
+        var sessionGroups = await managedEventSessionGroups.QueryAsync(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventDto.Id },
             cancellationToken);
-        var days = await mediator.Send(
+        var days = await managedEventDays.QueryAsync(
             new GetManagedEventDaysByEventRequest { EventId = eventDto.Id },
             cancellationToken);
-        var agendaItems = await mediator.Send(
+        var agendaItems = await managedAgendaItems.QueryAsync(
             new GetManagedEventAgendaItemsByEventRequest { EventId = eventDto.Id },
             cancellationToken);
 
@@ -927,7 +951,7 @@ public sealed class EventManagementMcpTools(
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxCustomPropertyDefinitions);
 
-        var definitions = await mediator.Send(
+        var definitions = await customPropertyDefinitions.QueryAsync(
             new GetEventCustomPropertyDefinitionListRequest
             {
                 EventId = eventDto.Id,
@@ -935,7 +959,7 @@ public sealed class EventManagementMcpTools(
                 PageSize = normalizedPageSize
             },
             cancellationToken);
-        var values = await mediator.Send(new GetEventCustomPropertyValuesRequest { EventId = eventDto.Id }, cancellationToken);
+        var values = await customPropertyValues.QueryAsync(new GetEventCustomPropertyValuesRequest { EventId = eventDto.Id }, cancellationToken);
 
         var truncatedFields = new List<string>();
         var returnedValues = values
@@ -991,7 +1015,7 @@ public sealed class EventManagementMcpTools(
 
         var eventDto = gate.Event!;
         var userId = userContext.GetRequiredUserId();
-        var teamMembers = await mediator.Send(
+        var teamMembers = await eventTeamListHandler.QueryAsync(
             new GetEventTeamListRequest
             {
                 TenantId = tenantContext.TenantId,
@@ -999,7 +1023,7 @@ public sealed class EventManagementMcpTools(
                 IncludeInactive = includeInactive
             },
             cancellationToken);
-        var permissions = await mediator.Send(
+        var permissions = await currentUserEventPermissionsHandler.QueryAsync(
             new GetCurrentUserEventPermissionsRequest
             {
                 TenantId = tenantContext.TenantId,
@@ -1007,7 +1031,7 @@ public sealed class EventManagementMcpTools(
                 UserId = userId
             },
             cancellationToken);
-        var assignablePresets = await mediator.Send(
+        var assignablePresets = await assignableEventRolePresetsHandler.QueryAsync(
             new GetAssignableEventRolePresetsRequest
             {
                 TenantId = tenantContext.TenantId,
@@ -1079,7 +1103,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxManagedRegistrations);
-        IReadOnlyList<RegistrationOrderDto> orders = await mediator.Send(
+        IReadOnlyList<RegistrationOrderDto> orders = await eventRegistrationOrdersHandler.QueryAsync(
             new GetEventRegistrationOrdersQuery(eventDto.Id),
             cancellationToken);
         int totalOrderCount = orders.Count;
@@ -1137,7 +1161,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxTemplateCatalogItems);
-        var templates = await mediator.Send(
+        var templates = await eventTemplateListHandler.QueryAsync(
             new GetEventTemplateListRequest
             {
                 EventTypeId = eventTypeId ?? eventDto.EventTypeId,
@@ -1151,7 +1175,7 @@ public sealed class EventManagementMcpTools(
         {
             var (normalizedSessionPageNumber, normalizedSessionPageSize, sessionPageSizeWasClamped) =
                 NormalizeManagementPage(sessionTemplatePageNumber, sessionTemplatePageSize, MaxTemplateCatalogItems);
-            var sessionTemplatePage = await mediator.Send(
+            var sessionTemplatePage = await eventSessionTemplateListHandler.QueryAsync(
                 new GetEventSessionTemplateListRequest
                 {
                     EventTemplateId = eventTemplateId.Value,
@@ -1217,7 +1241,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedHistoryPageNumber, normalizedHistoryPageSize, historyPageSizeWasClamped) =
             NormalizeManagementPage(historyPageNumber, historyPageSize, MaxSyncHistoryItems);
-        var history = await mediator.Send(
+        var history = await eventTemplateSyncHistoryHandler.QueryAsync(
             new GetEventTemplateSyncHistoryQuery(eventDto.Id, normalizedHistoryPageNumber, normalizedHistoryPageSize),
             cancellationToken);
         var diffRead = await ReadEventTemplateDiffAsync(eventDto.Id, targetTemplateVersion, cancellationToken);
@@ -1260,7 +1284,7 @@ public sealed class EventManagementMcpTools(
             return EventMcpSessionTemplateSyncContextResultDescriptor.Unavailable(eventId, sessionId);
         }
 
-        var sessions = await mediator.Send(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
+        var sessions = await managedSessionsByEvent.QueryAsync(new GetManagedSessionsByEventRequest { EventId = eventId }, cancellationToken);
         if (sessions.All(session => session.Id != sessionId))
         {
             return EventMcpSessionTemplateSyncContextResultDescriptor.NotFound(eventId, sessionId);
@@ -1269,7 +1293,7 @@ public sealed class EventManagementMcpTools(
         var eventDto = gate.Event!;
         var (normalizedHistoryPageNumber, normalizedHistoryPageSize, historyPageSizeWasClamped) =
             NormalizeManagementPage(historyPageNumber, historyPageSize, MaxSyncHistoryItems);
-        var history = await mediator.Send(
+        var history = await eventSessionTemplateSyncHistoryHandler.QueryAsync(
             new GetEventSessionTemplateSyncHistoryQuery(sessionId, normalizedHistoryPageNumber, normalizedHistoryPageSize),
             cancellationToken);
         var diffRead = await ReadEventSessionTemplateDiffAsync(sessionId, targetTemplateVersion, cancellationToken);
@@ -1300,7 +1324,7 @@ public sealed class EventManagementMcpTools(
         string requiredLinkRelation,
         CancellationToken cancellationToken)
     {
-        var eventDto = await mediator.Send(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
+        var eventDto = await eventManagementDetailsHandler.QueryAsync(new GetEventManagementDetailsRequest { Id = eventId }, cancellationToken);
         if (eventDto is null)
         {
             return EventMcpManagementReadGate.NotFound();
@@ -1329,7 +1353,7 @@ public sealed class EventManagementMcpTools(
 
         try
         {
-            var response = await mediator.Send(
+            var response = await eventTemplateDiffHandler.QueryAsync(
                 new GetEventTemplateDiffQuery(eventId, targetTemplateVersion.Value),
                 cancellationToken);
             return response.IsSuccess && response.Id is not null
@@ -1359,7 +1383,7 @@ public sealed class EventManagementMcpTools(
 
         try
         {
-            var response = await mediator.Send(
+            var response = await eventSessionTemplateDiffHandler.QueryAsync(
                 new GetEventSessionTemplateDiffQuery(sessionId, targetTemplateVersion.Value),
                 cancellationToken);
             return response.IsSuccess && response.Id is not null
@@ -1382,7 +1406,7 @@ public sealed class EventManagementMcpTools(
 
     private async Task<EventDto?> GetPublicEventOrNullAsync(Guid eventId, CancellationToken cancellationToken)
     {
-        var eventDto = await mediator.Send(new GetEventDetailsRequest { Id = eventId }, cancellationToken);
+        var eventDto = await eventDetailsHandler.QueryAsync(new GetEventDetailsRequest { Id = eventId }, cancellationToken);
         return IsPublishedPublicEvent(eventDto) ? eventDto : null;
     }
 
@@ -1457,4 +1481,3 @@ public sealed class EventManagementMcpTools(
             => new(true, null, diff);
     }
 }
-

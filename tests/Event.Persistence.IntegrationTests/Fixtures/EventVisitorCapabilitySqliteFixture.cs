@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -17,7 +18,6 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Secrets.Extensions;
-using MediatR;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
@@ -174,8 +174,16 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     }
 
     internal Task<TResponse> ExecuteAsync<TCommand, TResponse>(TCommand command)
-        where TCommand : IRequest<TResponse> =>
-        Services.GetRequiredService<IRequestHandler<TCommand, TResponse>>().Handle(command, CancellationToken.None);
+        where TCommand : ICommand<TResponse> =>
+        ExecuteCommandAsync<TCommand, TResponse>(command);
+
+    internal Task<TResponse> ExecuteCommandAsync<TCommand, TResponse>(TCommand command)
+        where TCommand : ICommand<TResponse> =>
+        Services.GetRequiredService<ICommandHandler<TCommand, TResponse>>().ExecuteAsync(command, CancellationToken.None);
+
+    internal Task<TResponse> ExecuteQueryAsync<TQuery, TResponse>(TQuery query)
+        where TQuery : IQuery<TResponse> =>
+        Services.GetRequiredService<IQueryHandler<TQuery, TResponse>>().QueryAsync(query, CancellationToken.None);
 
     internal async Task<Explore.Domain.Event> SeedEventAsync(bool accountRequired = false, bool published = false)
     {
@@ -241,8 +249,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     internal static async Task<StartGuestRegistrationOrderCommand> ValidateGuestProofAsync(
         IServiceProvider services, GuestAllocationProof proof)
     {
-        var authority = await services.GetRequiredService<IRequestHandler<ConsumeAnonymousRegistrationChallengeCommand,
-            AnonymousRegistrationChallengeAuthority?>>().Handle(new(proof.Request.EventId,
+        var authority = await services.GetRequiredService<ICommandHandler<ConsumeAnonymousRegistrationChallengeCommand,
+            AnonymousRegistrationChallengeAuthority?>>().ExecuteAsync(new(proof.Request.EventId,
                 proof.Binding.CanonicalRequestDigest, proof.Binding.IdempotencyKey,
                 proof.Challenge.ProtectedChallenge, proof.Nonce, proof.Request), CancellationToken.None);
         return proof.Request with

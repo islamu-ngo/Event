@@ -1,15 +1,15 @@
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Features.ExternalApiKeys.Requests.Queries;
 using Explore.Application.Lookups;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.ExternalApiKeys.Handlers.Queries;
 
-public class GetExternalApiKeyDetailsRequestHandler : IRequestHandler<GetExternalApiKeyDetailsRequest, ExternalApiKeyListDto?>
+public class GetExternalApiKeyDetailsRequestHandler : IQueryHandler<GetExternalApiKeyDetailsRequest, ExternalApiKeyListDto?>
 {
     private readonly IExternalApiKeyRepository _externalApiKeyRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
@@ -31,7 +31,7 @@ public class GetExternalApiKeyDetailsRequestHandler : IRequestHandler<GetExterna
         _userContext = userContext;
     }
 
-    public async Task<ExternalApiKeyListDto?> Handle(GetExternalApiKeyDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<ExternalApiKeyListDto?> QueryAsync(GetExternalApiKeyDetailsRequest request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
         var externalApiKey = await _externalApiKeyRepository.GetByIdIgnoringTenantFilter(request.Id, cancellationToken);

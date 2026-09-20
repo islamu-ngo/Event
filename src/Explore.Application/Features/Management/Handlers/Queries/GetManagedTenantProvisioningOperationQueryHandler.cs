@@ -1,19 +1,19 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.Management.Requests.Queries;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Management.Handlers.Queries;
 
 public sealed class GetManagedTenantProvisioningOperationQueryHandler(
     IManagedTenantProvisioningOperationRepository operationRepository)
-    : IRequestHandler<GetManagedTenantProvisioningOperationQuery,
+    : IQueryHandler<GetManagedTenantProvisioningOperationQuery,
         ManagementTenantProvisioningOperationDto?>
 {
-    public async Task<ManagementTenantProvisioningOperationDto?> Handle(
+    public async Task<ManagementTenantProvisioningOperationDto?> QueryAsync(
         GetManagedTenantProvisioningOperationQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ManagedTenantProvisioningOperation? operation =
             await operationRepository.GetByManagedInstanceAndIdAsNoTrackingAsync(

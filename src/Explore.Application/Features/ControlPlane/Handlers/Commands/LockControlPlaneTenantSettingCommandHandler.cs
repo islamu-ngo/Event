@@ -7,7 +7,7 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
@@ -17,13 +17,13 @@ public sealed class LockControlPlaneTenantSettingCommandHandler(
     ISettingMutationLock mutationLock,
     ICurrentUserService currentUserService,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
     IUnitOfWork unitOfWork,
     IVisitorAccessSettingsWriter visitorSettings)
-    : IRequestHandler<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<LockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         LockControlPlaneTenantSettingCommand request,
         CancellationToken cancellationToken)
     {
@@ -73,7 +73,7 @@ public sealed class LockControlPlaneTenantSettingCommandHandler(
         if (outcome.Notification is not null)
         {
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-            await mediator.Publish(outcome.Notification, CancellationToken.None);
+            await notificationHandlers.HandleAsync(outcome.Notification, CancellationToken.None);
         }
 
         return outcome.Response;

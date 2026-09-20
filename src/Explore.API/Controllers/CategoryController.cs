@@ -9,7 +9,7 @@ using Explore.Application.Features.Categories.Requests.Commands;
 using Explore.Application.Features.Categories.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -41,18 +41,30 @@ public class CategoryController : EventControllerBase
         "Category not found",
         "Category not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateCategoryCommand, BaseCommandResponse<Guid>> _createCategory;
+    private readonly ICommandHandler<UpdateCategoryCommand, BaseCommandResponse<Guid>> _updateCategory;
+    private readonly ICommandHandler<DeleteCategoryCommand, bool> _deleteCategory;
+    private readonly IQueryHandler<GetCategoryDetailsRequest, CategoryDto?> _categoryDetails;
+    private readonly IQueryHandler<GetCategoryListRequest, PaginatedResult<CategoryListDto>> _categoryList;
     private readonly ILogger<CategoryController> _logger;
     private readonly IResourceAssembler<CategoryDto, CategoryListDto> _resourceAssembler;
     private readonly ITenantContext _tenantContext;
 
     public CategoryController(
-        IMediator mediator,
+        ICommandHandler<CreateCategoryCommand, BaseCommandResponse<Guid>> createCategory,
+        ICommandHandler<UpdateCategoryCommand, BaseCommandResponse<Guid>> updateCategory,
+        ICommandHandler<DeleteCategoryCommand, bool> deleteCategory,
+        IQueryHandler<GetCategoryDetailsRequest, CategoryDto?> categoryDetails,
+        IQueryHandler<GetCategoryListRequest, PaginatedResult<CategoryListDto>> categoryList,
         ILogger<CategoryController> logger,
         IResourceAssembler<CategoryDto, CategoryListDto> resourceAssembler,
         ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _createCategory = createCategory;
+        _updateCategory = updateCategory;
+        _deleteCategory = deleteCategory;
+        _categoryDetails = categoryDetails;
+        _categoryList = categoryList;
         _logger = logger;
         _resourceAssembler = resourceAssembler;
         _tenantContext = tenantContext;
@@ -76,7 +88,7 @@ public class CategoryController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetCategoryListRequest
+        var result = await _categoryList.QueryAsync(new GetCategoryListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -105,7 +117,7 @@ public class CategoryController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<CategoryDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var category = await _mediator.Send(new GetCategoryDetailsRequest { Id = id }, cancellationToken);
+        var category = await _categoryDetails.QueryAsync(new GetCategoryDetailsRequest { Id = id }, cancellationToken);
         if (category == null)
         {
             return this.ToNotFoundProblem(CategoryNotFoundProblem);
@@ -131,7 +143,7 @@ public class CategoryController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateCategoryDto category, CancellationToken cancellationToken = default)
     {
         var command = new CreateCategoryCommand { CategoryDto = category, TenantId = _tenantContext.TenantId };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createCategory.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -178,7 +190,7 @@ public class CategoryController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             UpdateCategoryDto = category
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateCategory.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -204,7 +216,7 @@ public class CategoryController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteCategoryCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteCategory.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

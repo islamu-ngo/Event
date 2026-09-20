@@ -10,6 +10,20 @@ This guide provides fast diagnostic procedures and step-by-step recovery recipes
 
 ---
 
+## Setup Readiness
+
+The setup overview refreshes one server journey snapshot. Save the site profile
+before refreshing readiness so its canonical host is evaluated from persisted
+settings. A deployment-managed provider is not ready merely because deployment
+selected it: pending, failed and restart-required states require the displayed
+repair action. Setup never silently selects a replacement provider.
+
+If the snapshot is unavailable, contradictory or changed while being read, repair
+the selected source and refresh; do not proceed using an older screen's actions.
+Custom setup clients must replace `/api/system/onboarding-preflight` with
+`/api/instanceonboarding/journey`, using active setup or administrator authority.
+Completion and sign-in recovery rules are unchanged.
+
 ## Quick Diagnostic Flow
 
 When diagnosing an unexpected failure, follow this four-step sequence:

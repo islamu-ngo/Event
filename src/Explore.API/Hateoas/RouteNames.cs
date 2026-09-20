@@ -1190,7 +1190,7 @@ public static class RouteNames
     #region System Routes
 
     public const string GetSystemOnboardingStatus = nameof(GetSystemOnboardingStatus);
-    public const string GetSystemOnboardingPreflight = nameof(GetSystemOnboardingPreflight);
+    public const string GetInstanceOnboardingJourney = nameof(GetInstanceOnboardingJourney);
 
     #endregion
 

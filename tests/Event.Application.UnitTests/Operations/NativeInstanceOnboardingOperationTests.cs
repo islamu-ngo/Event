@@ -1,4 +1,5 @@
 using Explore.Application;
+using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Analytics;
@@ -17,6 +18,58 @@ namespace Event.Application.UnitTests.Operations;
 
 public sealed class NativeInstanceOnboardingOperationTests
 {
+    [Test]
+    [Arguments(true, "ready", true, "Ready")]
+    [Arguments(true, "pending", false, "DeploymentRestartRequired")]
+    [Arguments(true, "failed", false, "Failed")]
+    [Arguments(false, "not-applicable", false, "ActionRequired")]
+    public async Task Journey_PreservesSelectedProviderAndExplicitReadiness(bool managed, string state, bool configured, string expected)
+    {
+        var journey = ProjectJourney(new AuthorizationProviderConfigurationDto
+        {
+            Provider = "cerbos", AuthorizationProviderManagedByDeployment = managed,
+            AuthorizationProviderBootstrapStatus = state, AuthorizationProviderConfigured = configured,
+            CerbosEndpointVerified = configured, CerbosPoliciesSynchronized = configured
+        });
+        await Assert.That(journey.State).IsEqualTo("Available");
+        await Assert.That(journey.Authorization.State).IsEqualTo(expected);
+        await Assert.That(journey.Authorization.Provider).IsEqualTo("cerbos");
+        await Assert.That(journey.Authorization.ActionRelation).IsEqualTo("manage-authorization");
+        await Assert.That(journey.Authorization.RestartRequired).IsEqualTo(expected == "DeploymentRestartRequired");
+    }
+
+    [Test]
+    public async Task Journey_MissingOrContradictorySourcesFailClosed()
+    {
+        var unavailable = ProjectJourney(null);
+        await Assert.That(unavailable.State).IsEqualTo("Failed");
+        await Assert.That(unavailable.Authorization.State).IsEqualTo("Unavailable");
+        await Assert.That(unavailable.Generation).IsNull();
+        var contradiction = ProjectJourney(new AuthorizationProviderConfigurationDto
+        {
+            Provider = "cerbos", AuthorizationProviderManagedByDeployment = true,
+            AuthorizationProviderBootstrapStatus = "failed", AuthorizationProviderConfigured = true
+        });
+        await Assert.That(contradiction.State).IsEqualTo("Failed");
+        await Assert.That(contradiction.ReasonCode).IsEqualTo("source_contradiction");
+    }
+
+    [Test]
+    public async Task Journey_GenerationIsStableUntilAuthoritativeProfileChanges()
+    {
+        var provider = new AuthorizationProviderConfigurationDto { Provider = "local", AuthorizationProviderConfigured = true };
+        var first = ProjectJourney(provider);
+        await Assert.That(first.Generation).IsNotNull();
+        await Assert.That(ProjectJourney(provider).Generation).IsEqualTo(first.Generation);
+        await Assert.That(ProjectJourney(provider, "changed").Generation).IsNotEqualTo(first.Generation);
+    }
+
+    private static InstanceOnboardingJourneyDto ProjectJourney(AuthorizationProviderConfigurationDto? provider, string name = "site") =>
+        GetInstanceOnboardingJourneyQueryHandler.Project(
+            new InstanceOnboardingStatusDto { State = "InteractivePending", Provider = "Local", Generation = 1, SelectedDeploymentMode = "SingleTenant" },
+            new AuthProviderConfigurationDto(), provider,
+            new SelfHostOnboardingProfileDto { SiteName = name }, new OnboardingPreflightDto());
+
     private static readonly Type[] Requests =
     [
         // Commands (29)
@@ -50,7 +103,8 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(UpdateAiAssistantGovernanceSettingsCommand),
         typeof(UpdateRenderPolicySettingsCommand),
 
-        // Queries (18)
+        // Queries (19)
+        typeof(GetInstanceOnboardingJourneyQuery),
         typeof(GetInstanceOperatorIdentityQuery),
         typeof(DownloadAuthorizationPolicyPackageQuery),
         typeof(GetActiveTenantCountQuery),
@@ -110,6 +164,7 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Arguments(typeof(GetAuthorizationProviderConfigurationQuery), typeof(IQuery<AuthorizationProviderConfigurationDto>))]
     [Arguments(typeof(GetInstanceGovernanceSettingsQuery), typeof(IQuery<InstanceGovernanceSettings>))]
     [Arguments(typeof(GetInstanceOnboardingStatusQuery), typeof(IQuery<InstanceOnboardingStatusDto>))]
+    [Arguments(typeof(GetInstanceOnboardingJourneyQuery), typeof(IQuery<InstanceOnboardingJourneyDto>))]
     [Arguments(typeof(GetInstanceSmtpSettingsQuery), typeof(IQuery<InstanceSmtpSettingsDto>))]
     [Arguments(typeof(GetInstanceStorageSettingsQuery), typeof(IQuery<InstanceStorageSettingsDto>))]
     [Arguments(typeof(GetOnboardingPreflightQuery), typeof(IQuery<OnboardingPreflightDto>))]
@@ -131,7 +186,7 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Test]
     public async Task Requests_HaveOneNativeShapeAndNoLegacyDispatchEscapeHatch()
     {
-        await Assert.That(Requests.Length).IsEqualTo(47);
+        await Assert.That(Requests.Length).IsEqualTo(48);
 
         foreach (var request in Requests)
         {
@@ -151,7 +206,7 @@ public sealed class NativeInstanceOnboardingOperationTests
         var ports = services.Where(descriptor => !descriptor.IsKeyedService &&
             OperationServicesRegistration.IsHandlerContract(descriptor.ServiceType) &&
             Requests.Contains(descriptor.ServiceType.GenericTypeArguments[0])).ToArray();
-        await Assert.That(ports.Length).IsEqualTo(47);
+        await Assert.That(ports.Length).IsEqualTo(48);
         services.ValidateNativeOperationRegistrations();
         await Assert.That(ports.All(port => port.Lifetime == ServiceLifetime.Scoped)).IsTrue();
         await Assert.That(ports.All(port => port.ImplementationFactory is not null)).IsTrue();

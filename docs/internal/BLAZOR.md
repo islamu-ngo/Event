@@ -197,7 +197,11 @@ When debugging onboarding, check both BFF setup-secret endpoints and API setup-s
 
 ## Onboarding UI Contract
 
-`/setup` is the dedicated pre-authentication operator gateway and renders through `SetupLayout`, separate from authenticated application/admin navigation. After provider authentication, the setup experience becomes one task overview composed from existing server onboarding-status, provider-status/sync, and preflight services.
+`/setup` is the dedicated pre-authentication operator gateway and renders through `SetupLayout`, separate from authenticated application/admin navigation. The instance wizard refreshes through one generated journey request, including bootstrap state, profile, provider readiness, identity and preflight. It no longer merges independently timed status, branding, provider and preflight requests. Overlapping refreshes share one task and disposal cancels the request.
+
+The `save-profile` HAL relation exposes the existing profile PATCH operation. A successful save is awaited before one journey refresh; failed saves do not present newly evaluated readiness. Provider navigation skips deployment-managed authorization only when configured and explicitly ready. Failed journey reads discard old actions rather than substitute defaults.
+
+This projection change does not change the authorization page render mode or repair the reported loss of interactivity. Browser reproduction remains a separate evidence gate; no render/navigation root cause has been established.
 
 Contributor rules:
 

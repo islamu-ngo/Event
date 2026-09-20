@@ -239,6 +239,7 @@ public static class HateoasAssemblerRegistration
         services.AddHalResourceWithAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationLinkPolicy, ControlPlaneTenantEffectiveConfigurationCollectionLinkPolicy, ControlPlaneTenantEffectiveConfigurationResourceAssembler>();
 
         services.AddHalResource<InstanceOnboardingStatusDto, InstanceOnboardingStatusLinkPolicy, InstanceOnboardingStatusCollectionLinkPolicy>();
+        services.AddHalResource<InstanceOnboardingJourneyDto, InstanceOnboardingJourneyLinkPolicy, InstanceOnboardingJourneyCollectionLinkPolicy>();
         services.AddHalResource<TenantOnboardingStatusDto, TenantOnboardingStatusLinkPolicy, TenantOnboardingStatusCollectionLinkPolicy>();
         services.AddHalResource<InstanceOperatorIdentityDocumentDto, InstanceOperatorIdentityLinkPolicy, InstanceOperatorIdentityCollectionLinkPolicy>();
 

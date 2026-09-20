@@ -562,11 +562,13 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
-    [Arguments(true, false, "pending", true)]
+    [Arguments(true, false, "pending", false)]
+    [Arguments(true, true, "pending", false)]
+    [Arguments(true, true, "failed", false)]
     [Arguments(true, false, "failed", false)]
     [Arguments(false, true, null, true)]
     [Arguments(false, false, null, false)]
-    public async Task ShouldSkipAuthorizationProviderStepAsync_UsesDeploymentOwnershipOrReadiness(
+    public async Task ShouldSkipAuthorizationProviderStepAsync_RequiresExplicitReadiness(
         bool managedByDeployment,
         bool configured,
         string? bootstrapStatus,

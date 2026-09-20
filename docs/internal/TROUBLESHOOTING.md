@@ -3,6 +3,21 @@ ABOUTME: Prioritizes repeat incidents and non-obvious checks over generic .NET a
 
 # Troubleshooting
 
+## Onboarding Journey Readiness
+
+Use the private `GET /api/instanceonboarding/journey` resource with active setup
+or administrator authority. `source_unavailable`, `source_contradiction`, and
+`snapshot_changed` mean the snapshot cannot safely offer mutations; follow its
+`refresh` relation after repairing the selected source. Do not infer readiness
+from deployment ownership or select a different provider to hide failure.
+Save the profile through its HAL action before refreshing canonical-host checks.
+The old System preflight route is removed, not redirected.
+
+A failed browser environment is not evidence of a render/circuit defect. Capture
+actual browser, network and circuit evidence before changing render modes or
+navigation. Completion-time identity, publication and handoff behavior is unchanged
+by the journey projection.
+
 ## Legal Identity And Readiness
 
 | Symptom | Likely authority | Repair |

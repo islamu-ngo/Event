@@ -82805,6 +82805,17 @@ namespace Explore.Blazor.Client.Clients
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
+        /// Get Instance Onboarding Journey
+        /// </summary>
+        /// <remarks>
+        /// Returns one fail-closed setup snapshot with provider readiness, persisted profile, generation, checks and authorized HAL actions.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<HalResourceOfInstanceOnboardingJourneyDto> GetInstanceOnboardingJourneyAsync(string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
         /// Save Instance Onboarding Profile
         /// </summary>
         /// <remarks>
@@ -83033,6 +83044,102 @@ namespace Explore.Blazor.Client.Clients
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Get Instance Onboarding Journey
+        /// </summary>
+        /// <remarks>
+        /// Returns one fail-closed setup snapshot with provider readiness, persisted profile, generation, checks and authorized HAL actions.
+        /// </remarks>
+        /// <returns>OK</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<HalResourceOfInstanceOnboardingJourneyDto> GetInstanceOnboardingJourneyAsync(string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Api_Version != null)
+                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/instanceonboarding/journey"
+                    urlBuilder_.Append("api/instanceonboarding/journey");
+                    urlBuilder_.Append('?');
+                    if (api_version != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<HalResourceOfInstanceOnboardingJourneyDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -127711,17 +127818,6 @@ namespace Explore.Blazor.Client.Clients
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<SystemOnboardingStatusDto> GetSystemOnboardingStatusAsync(string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Get System Onboarding Preflight
-        /// </summary>
-        /// <remarks>
-        /// Returns non-sensitive blocking checks and operational warnings for first-run launch readiness.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<OnboardingPreflightDto> GetSystemOnboardingPreflightAsync(string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
-
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -127816,92 +127912,6 @@ namespace Explore.Blazor.Client.Clients
                         if (status_ == 200)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<SystemOnboardingStatusDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Get System Onboarding Preflight
-        /// </summary>
-        /// <remarks>
-        /// Returns non-sensitive blocking checks and operational warnings for first-run launch readiness.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<OnboardingPreflightDto> GetSystemOnboardingPreflightAsync(string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
-        {
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-
-                    if (x_Api_Version != null)
-                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
-                    request_.Method = new System.Net.Http.HttpMethod("GET");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("text/plain; v=0.1"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-
-                    // Operation Path: "api/system/onboarding-preflight"
-                    urlBuilder_.Append("api/system/onboarding-preflight");
-                    urlBuilder_.Append('?');
-                    if (api_version != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<OnboardingPreflightDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -173386,6 +173396,60 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class HalResourceOfInstanceOnboardingJourneyDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
+        public string? State { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCode")]
+        public string? ReasonCode { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("generation")]
+        public string? Generation { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("bootstrap")]
+        public InstanceOnboardingStatusDto? Bootstrap { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("authentication")]
+        public OnboardingProviderReadinessDto? Authentication { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("authorization")]
+        public OnboardingProviderReadinessDto? Authorization { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("profile")]
+        public SelfHostOnboardingProfileDto? Profile { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("preflight")]
+        public OnboardingPreflightDto? Preflight { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorIdentity")]
+        public InstanceOperatorIdentityDocumentDto? OperatorIdentity { get; set; } = default!;
+
+        /// <summary>
+        /// HAL hypermedia links
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_links")]
+        public System.Collections.Generic.IDictionary<string, HalLink>? _links { get; set; } = default!;
+
+        /// <summary>
+        /// Embedded related resources
+        /// </summary>
+        [System.Text.Json.Serialization.JsonPropertyName("_embedded")]
+        public object? _embedded { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class HalResourceOfInstanceOnboardingStatusDto
     {
 
@@ -180413,6 +180477,53 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class InstanceOnboardingJourneyDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
+        public string? State { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCode")]
+        public string? ReasonCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("generation")]
+        public string? Generation { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("bootstrap")]
+        public InstanceOnboardingStatusDto? Bootstrap { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("authentication")]
+        public OnboardingProviderReadinessDto? Authentication { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("authorization")]
+        public OnboardingProviderReadinessDto? Authorization { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("profile")]
+        public SelfHostOnboardingProfileDto? Profile { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("preflight")]
+        public OnboardingPreflightDto? Preflight { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorIdentity")]
+        public InstanceOperatorIdentityDocumentDto? OperatorIdentity { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class InstanceOnboardingStatusDto
     {
 
@@ -180491,6 +180602,76 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.ICollection<string> ReasonCodes { get; init; } = new System.Collections.Generic.List<string>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class InstanceOperatorIdentityDocumentDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicDisclosure")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public PublicDisclosure2 PublicDisclosure { get; init; } = new PublicDisclosure2();
+
+        [System.Text.Json.Serialization.JsonPropertyName("paidCommerce")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public PaidCommerce2 PaidCommerce { get; init; } = new PaidCommerce2();
+
+        [System.Text.Json.Serialization.JsonPropertyName("revision")]
+        public System.Guid? Revision { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorId")]
+        public System.Guid? OperatorId { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicName")]
+        public string? PublicName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("legalName")]
+        public string? LegalName { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorKindCode")]
+        public string? OperatorKindCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("jurisdictionCountryCode")]
+        public string? JurisdictionCountryCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("registrationIdentifier")]
+        public string? RegistrationIdentifier { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("publicContactEmail")]
+        public string? PublicContactEmail { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("websiteUrl")]
+        public string? WebsiteUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("legalNoticeUrl")]
+        public string? LegalNoticeUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("termsUrl")]
+        public string? TermsUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("privacyUrl")]
+        public string? PrivacyUrl { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("isOfficialInstance")]
+        public bool? IsOfficialInstance { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("officialOrigin")]
+        public string? OfficialOrigin { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -185246,6 +185427,21 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("detail")]
         public string? Detail { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("remediationAuthority")]
+        public string? RemediationAuthority { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("requirementCategory")]
+        public string? RequirementCategory { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("restartRequired")]
+        public bool? RestartRequired { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCode")]
+        public string? ReasonCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("actionRelation")]
+        public string? ActionRelation { get; init; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -185277,6 +185473,44 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("warningChecks")]
         public System.Collections.Generic.ICollection<OnboardingPreflightCheckDto>? WarningChecks { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class OnboardingProviderReadinessDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("provider")]
+        public string? Provider { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("state")]
+        public string? State { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("remediationAuthority")]
+        public string? RemediationAuthority { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCode")]
+        public string? ReasonCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("restartRequired")]
+        public bool? RestartRequired { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("actionRelation")]
+        public string? ActionRelation { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -210710,6 +210944,66 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("createdAt")]
         public System.DateTimeOffset? CreatedAt { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class PublicDisclosure2
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
+        public bool IsReady { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
+        public string? FailureCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> ReasonCodes { get; init; } = new System.Collections.Generic.List<string>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class PaidCommerce2
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
+        public bool IsReady { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
+        public string? FailureCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> ReasonCodes { get; init; } = new System.Collections.Generic.List<string>();
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

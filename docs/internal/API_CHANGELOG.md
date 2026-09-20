@@ -5,6 +5,14 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-20
 
+- **Breaking: canonical onboarding journey.** Setup clients use private HAL
+  `GET /api/instanceonboarding/journey` for one snapshot of bootstrap, provider
+  readiness, persisted profile and categorized preflight checks. Failed or changing
+  sources return bounded failure state and refresh authority, not fallback defaults.
+  The duplicate System onboarding-preflight route and generated client method are
+  removed without aliases. Existing profile PATCH precedes readiness refresh.
+  Completion semantics, schema and dependencies are unchanged.
+
 - **Private default-directory administration.** Existing control-plane tenant
   detail and activation routes now accept the fixed default tenant in SingleTenant
   mode with unchanged instance-administrator authorization. Arbitrary targets are

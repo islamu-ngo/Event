@@ -42,6 +42,49 @@ public class InstanceOnboardingControllerTests
     private const string CerbosBootstrapEndpoint = "http://cerbos-bootstrap.test:3593";
 
     [Test]
+    public async Task Journey_ProvidesOneSnapshotAndProfileSaveChangesItsGeneration()
+    {
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", SetupSecret);
+        using var beforeResponse = await client.GetAsync($"{BaseUrl}/journey");
+        await Assert.That(beforeResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var before = JsonDocument.Parse(await beforeResponse.Content.ReadAsStringAsync());
+        var snapshot = before.RootElement;
+        await Assert.That(snapshot.GetProperty("state").GetString()).IsEqualTo("Available");
+        await Assert.That(snapshot.GetProperty("generation").GetString()).IsNotNullOrEmpty();
+        await Assert.That(snapshot.GetProperty("bootstrap").GetProperty("selectedDeploymentMode").GetString())
+            .IsEqualTo(snapshot.GetProperty("preflight").GetProperty("deploymentMode").GetString());
+        await Assert.That(snapshot.GetProperty("_links").TryGetProperty("refresh", out _)).IsTrue();
+        await Assert.That(snapshot.GetProperty("_links").TryGetProperty("save-profile", out _)).IsTrue();
+        var checks = snapshot.GetProperty("preflight").GetProperty("blockingChecks").EnumerateArray().ToArray();
+        await Assert.That(checks.All(check => check.TryGetProperty("requirementCategory", out _)
+            && check.TryGetProperty("remediationAuthority", out _)
+            && check.TryGetProperty("restartRequired", out _)
+            && check.TryGetProperty("reasonCode", out _))).IsTrue();
+        using var save = CreateInstanceAdminRequest(HttpMethod.Patch, $"{BaseUrl}/profile", Guid.CreateVersion7(),
+            new SelfHostOnboardingProfileDto { SiteName = "Journey profile", CanonicalUrl = "https://journey.example.org" }, true);
+        using var saved = await client.SendAsync(save);
+        await Assert.That(saved.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var afterResponse = await client.GetAsync($"{BaseUrl}/journey");
+        using var after = JsonDocument.Parse(await afterResponse.Content.ReadAsStringAsync());
+        await Assert.That(after.RootElement.GetProperty("profile").GetProperty("siteName").GetString()).IsEqualTo("Journey profile");
+        await Assert.That(after.RootElement.GetProperty("generation").GetString())
+            .IsNotEqualTo(snapshot.GetProperty("generation").GetString());
+        await Assert.That(after.RootElement.GetProperty("preflight").GetProperty("blockingChecks").EnumerateArray()
+            .Single(check => check.GetProperty("code").GetString() == "canonical_host").GetProperty("status").GetString()).IsEqualTo("Pass");
+    }
+
+    [Test]
+    public async Task Journey_MissingSetupAuthority_DoesNotExposeProfile()
+    {
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync($"{BaseUrl}/journey");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
     public async Task GetStatus_Anonymous_ShouldReturnOk()
     {
         using var factory = CreateFactoryWithSetupSecret();
@@ -475,13 +518,15 @@ public class InstanceOnboardingControllerTests
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
-        using var preflightResponse = await client.GetAsync("/api/system/onboarding-preflight");
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", SetupSecret);
+        using var preflightResponse = await client.GetAsync($"{BaseUrl}/journey");
         await Assert.That(preflightResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var preflight = await preflightResponse.Content.ReadFromJsonAsync<OnboardingPreflightDto>(TestJsonOptions.Default);
+        using var journey = JsonDocument.Parse(await preflightResponse.Content.ReadAsStringAsync());
+        var preflight = journey.RootElement.GetProperty("preflight").Deserialize<OnboardingPreflightDto>(TestJsonOptions.Default);
         await Assert.That(preflight).IsNotNull();
         await Assert.That(preflight!.IsReadyToLaunch).IsFalse();
-        await Assert.That(preflight.BlockingChecks.Single(check => check.Status == OnboardingPreflightCheckStatus.Fail).Code)
-            .IsEqualTo("canonical_host");
+        await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "canonical_host").Status)
+            .IsEqualTo(OnboardingPreflightCheckStatus.Fail);
         await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "auth_config").Status)
             .IsEqualTo(OnboardingPreflightCheckStatus.Pass);
 

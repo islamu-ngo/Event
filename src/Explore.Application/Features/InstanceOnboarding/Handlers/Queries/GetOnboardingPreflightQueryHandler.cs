@@ -359,6 +359,11 @@ public sealed class GetOnboardingPreflightQueryHandler(
             Name = name,
             Severity = OnboardingPreflightCheckSeverity.Blocking,
             Status = status,
+            ReasonCode = status == OnboardingPreflightCheckStatus.Pass ? "check_passed" : "check_failed",
+            RequirementCategory = "RequiredNow",
+            RemediationAuthority = code is "database_reachable" or "deployment_mode" or "setup_secret" ? "Deployment" : "SetupOperator",
+            RestartRequired = status == OnboardingPreflightCheckStatus.Fail && code == "setup_secret",
+            ActionRelation = code switch { "canonical_host" => "save-profile", "auth_config" => "manage-authentication", _ => "refresh" },
             Message = message,
             Detail = detail
         });
@@ -372,6 +377,15 @@ public sealed class GetOnboardingPreflightQueryHandler(
             Name = name,
             Severity = OnboardingPreflightCheckSeverity.Warning,
             Status = OnboardingPreflightCheckStatus.Warning,
+            ReasonCode = "operator_review_required",
+            RequirementCategory = code switch
+            {
+                "smtp" or "object_storage" or "dns_custom_domain_cname" => "Optional",
+                "public_exposure" or "dns_public_platform" => "RequiredToPublish",
+                _ => "Recommended"
+            },
+            RemediationAuthority = "Deployment",
+            ActionRelation = "refresh",
             Message = message,
             Detail = detail
         });

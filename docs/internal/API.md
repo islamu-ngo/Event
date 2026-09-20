@@ -60,6 +60,31 @@ check. No client timestamp or new concurrency authority is introduced.
 
 For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Generated OpenAPI output remains the endpoint and DTO reference; Scalar is a development/testing UI over that contract.
 
+### Canonical Instance Onboarding Journey
+
+`GET /api/instanceonboarding/journey` requires active setup authority or instance
+administrator authority and returns a private, no-store HAL snapshot. The native
+`GetInstanceOnboardingJourneyQuery` composes bootstrap status, selected deployment,
+existing provider configuration contracts, persisted profile, operator identity,
+and existing preflight checks. Two sequential projections must agree; changing,
+unavailable or contradictory sources return `Failed` with a bounded reason and
+`refresh`, without mutation affordances. This is a read projection, not a database
+transaction or a new workflow engine.
+
+Provider states are `Ready`, `ActionRequired`, `DeploymentRestartRequired`,
+`Unavailable`, and `Failed`. Deployment ownership alone never implies readiness.
+Checks carry requirement category, remediation authority, restart requirement,
+reason code and action relation; only actual HAL links authorize UI actions.
+Generation is an opaque content fingerprint, not completion authority. Completion
+still performs its existing checks; expected-generation fencing belongs to the
+subsequent completion change.
+
+The duplicate `GET /api/system/onboarding-preflight` and its generated method are
+removed with no alias. Clients refresh the journey, and save profile through the
+existing setup-only PATCH operation before refreshing readiness. Persisted profile
+projection includes the stored canonical host; it does not invent a URL scheme or
+persist the non-persisted purpose/time-zone fields.
+
 ### Generated C# Client Shape
 
 The OpenAPI document defines wire shape; repository generation policy defines the checked-in C# shape. Pinned NSwag first emits POCO syntax, then `eng/tools/Explore.GeneratedContracts` converts structurally eligible response/value schemas into nominal records without changing JSON names, requiredness, nullability, HAL relations, operation methods, or wire payloads. Protocol inputs, nested request graphs, HAL resources, inherited schemas, clients, exceptions, file wrappers, and explicitly mutable UI/service contracts remain classes. Generated record properties are init-only except `[JsonExtensionData] AdditionalProperties`, which stays settable for System.Text.Json AOT compatibility.

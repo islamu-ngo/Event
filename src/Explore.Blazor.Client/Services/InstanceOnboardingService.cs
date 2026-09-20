@@ -10,6 +10,8 @@ public interface IInstanceOnboardingService
     Task<InstanceOnboardingStartupStatus> GetStartupStatusAsync(CancellationToken cancellationToken = default);
     Task<SystemOnboardingStatusDto?> GetSystemOnboardingStatusAsync();
     Task<OnboardingPreflightDto?> GetOnboardingPreflightAsync();
+    Task<HalResourceOfInstanceOnboardingJourneyDto?> GetJourneyAsync(CancellationToken cancellationToken = default);
+    Task<BaseCommandResponseOfGuid> SaveProfileAsync(SelfHostOnboardingProfileDto profile, CancellationToken cancellationToken = default);
     Task<InstanceOnboardingStatusDto?> GetStatusAsync();
     Task<SetupSecretValidationResultDto> ValidateSecretAsync(string secret);
     Task<BaseCommandResponseOfGuid> CompleteAsync(CompleteInstanceOnboardingRequest completion);
@@ -103,8 +105,14 @@ public sealed class InstanceOnboardingService(
         return InstanceOnboardingStartupStatusAdapter.FromGenerated(resource.ToDto());
     }
 
-    public Task<OnboardingPreflightDto?> GetOnboardingPreflightAsync() =>
-        GetOptionalAsync(ct => systemClient.GetSystemOnboardingPreflightAsync(cancellationToken: ct), "onboarding preflight");
+    public async Task<OnboardingPreflightDto?> GetOnboardingPreflightAsync() =>
+        (await GetJourneyAsync())?.Preflight;
+
+    public Task<HalResourceOfInstanceOnboardingJourneyDto?> GetJourneyAsync(CancellationToken cancellationToken = default) =>
+        GetOptionalAsync(ct => onboardingClient.GetInstanceOnboardingJourneyAsync(cancellationToken: ct), "onboarding journey", cancellationToken);
+
+    public Task<BaseCommandResponseOfGuid> SaveProfileAsync(SelfHostOnboardingProfileDto profile, CancellationToken cancellationToken = default) =>
+        SendCommandAsync(_ => onboardingClient.SaveInstanceOnboardingProfileAsync(profile, cancellationToken: cancellationToken));
 
     public async Task<InstanceOnboardingStatusDto?> GetStatusAsync()
     {
@@ -455,13 +463,9 @@ public sealed class InstanceOnboardingService(
         {
             var status = await authorizationClient.GetInstanceAuthorizationProviderConfigurationStatusAsync(
                 cancellationToken: CancellationToken.None);
-            var deploymentFailed = string.Equals(
-                status.AuthorizationProviderBootstrapStatus,
-                "failed",
-                StringComparison.OrdinalIgnoreCase);
-
-            return status.Configured == true ||
-                   (status.AuthorizationProviderManagedByDeployment == true && !deploymentFailed);
+            return status.Configured == true &&
+                (status.AuthorizationProviderManagedByDeployment != true || string.Equals(
+                    status.AuthorizationProviderBootstrapStatus, "ready", StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception ex)
         {

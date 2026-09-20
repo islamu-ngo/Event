@@ -60379,6 +60379,69 @@
         "x-endpoint-class": "Public"
       }
     },
+    "/api/instanceonboarding/journey": {
+      "get": {
+        "tags": [
+          "InstanceOnboarding"
+        ],
+        "summary": "Get Instance Onboarding Journey",
+        "description": "Returns one fail-closed setup snapshot with provider readiness, persisted profile, generation, checks and authorized HAL actions.",
+        "operationId": "GetInstanceOnboardingJourney",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfInstanceOnboardingJourneyDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfInstanceOnboardingJourneyDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
     "/api/instanceonboarding/profile": {
       "patch": {
         "tags": [
@@ -92976,55 +93039,6 @@
         },
         "x-endpoint-class": "Public",
         "x-output-cache-policy": "SystemConfig"
-      }
-    },
-    "/api/system/onboarding-preflight": {
-      "get": {
-        "tags": [
-          "System"
-        ],
-        "summary": "Get System Onboarding Preflight",
-        "description": "Returns non-sensitive blocking checks and operational warnings for first-run launch readiness.",
-        "operationId": "GetSystemOnboardingPreflight",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/OnboardingPreflightDto"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/OnboardingPreflightDto"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/OnboardingPreflightDto"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Public"
       }
     },
     "/api/tag": {
@@ -140282,6 +140296,55 @@
           }
         }
       },
+      "HalResourceOfInstanceOnboardingJourneyDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "generation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bootstrap": {
+            "$ref": "#/components/schemas/InstanceOnboardingStatusDto"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/OnboardingProviderReadinessDto"
+          },
+          "authorization": {
+            "$ref": "#/components/schemas/OnboardingProviderReadinessDto"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/SelfHostOnboardingProfileDto"
+          },
+          "preflight": {
+            "$ref": "#/components/schemas/OnboardingPreflightDto"
+          },
+          "operatorIdentity": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentityDocumentDto"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfInstanceOnboardingStatusDto": {
         "type": "object",
         "properties": {
@@ -151828,6 +151891,41 @@
           }
         }
       },
+      "InstanceOnboardingJourneyDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "generation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bootstrap": {
+            "$ref": "#/components/schemas/InstanceOnboardingStatusDto"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/OnboardingProviderReadinessDto"
+          },
+          "authorization": {
+            "$ref": "#/components/schemas/OnboardingProviderReadinessDto"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/SelfHostOnboardingProfileDto"
+          },
+          "preflight": {
+            "$ref": "#/components/schemas/OnboardingPreflightDto"
+          },
+          "operatorIdentity": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentityDocumentDto"
+          }
+        }
+      },
       "InstanceOnboardingStatusDto": {
         "type": "object",
         "properties": {
@@ -151919,6 +152017,148 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "InstanceOperatorIdentityDocumentDto": {
+        "required": [
+          "publicDisclosure",
+          "paidCommerce"
+        ],
+        "type": "object",
+        "properties": {
+          "publicDisclosure": {
+            "required": [
+              "isReady",
+              "failureCode",
+              "reasonCodes"
+            ],
+            "type": "object",
+            "properties": {
+              "isReady": {
+                "type": "boolean"
+              },
+              "failureCode": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "reasonCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "paidCommerce": {
+            "required": [
+              "isReady",
+              "failureCode",
+              "reasonCodes"
+            ],
+            "type": "object",
+            "properties": {
+              "isReady": {
+                "type": "boolean"
+              },
+              "failureCode": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "reasonCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "revision": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "operatorId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "publicName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "legalName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operatorKindCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jurisdictionCountryCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registrationIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publicContactEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "websiteUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "legalNoticeUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "termsUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "privacyUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isOfficialInstance": {
+            "type": "boolean"
+          },
+          "officialOrigin": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -158990,6 +159230,24 @@
               "null",
               "string"
             ]
+          },
+          "remediationAuthority": {
+            "type": "string"
+          },
+          "requirementCategory": {
+            "type": "string"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "actionRelation": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -159013,6 +159271,35 @@
             "items": {
               "$ref": "#/components/schemas/OnboardingPreflightCheckDto"
             }
+          }
+        }
+      },
+      "OnboardingProviderReadinessDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": "string"
+          },
+          "remediationAuthority": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "actionRelation": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

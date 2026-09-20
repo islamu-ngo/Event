@@ -15,7 +15,6 @@
 @attribute [AllowAnonymous]
 @rendermode InteractiveServer
 @inject IInstanceOnboardingService InstanceOnboardingService
-@inject IInstanceOperatorIdentityAdminService OperatorIdentityService
 @inject IUserService UserService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -193,6 +192,13 @@
                                       Placeholder="@T("profile.purpose_placeholder", "A short note for future administrators about this site.")" />
                         <ValidationMessage For="@(() => _siteProfile.Purpose)" />
                     </div>
+                    @if (_journey?._links?.ContainsKey("save-profile") == true)
+                    {
+                        <MudButton ButtonType="ButtonType.Button" data-testid="save-onboarding-profile"
+                                   Disabled="@(_isSavingProfile || _isRefreshing)" OnClick="SaveProfileAsync">
+                            Save profile and refresh readiness
+                        </MudButton>
+                    }
                 </section>
 
                 <section id="instance-operator-identity" class="instance-onboarding__section" aria-labelledby="instance-operator-identity-heading">
@@ -372,6 +378,8 @@
     private Task? _refreshTask;
     private string? _deploymentMode;
     private OnboardingPreflightDto? _preflight;
+    private HalResourceOfInstanceOnboardingJourneyDto? _journey;
+    private bool _isSavingProfile;
     private InstanceOnboardingStatusDto? _status;
     private bool? _authProviderConfigured;
     private bool? _authorizationProviderConfigured;
@@ -677,28 +685,39 @@
 
         try
         {
-            var status = await InstanceOnboardingService.GetStatusAsync();
-            if (_disposed)
+            var journey = await InstanceOnboardingService.GetJourneyAsync(_lifetimeCancellation.Token);
+            if (_disposed) return;
+
+            _journey = journey?.State == "Available" ? journey : null;
+            var status = _journey?.Bootstrap;
+            if (status is not null)
             {
-                return;
+                status = status with
+                {
+                    AdditionalProperties = new Dictionary<string, object>(status.AdditionalProperties)
+                    {
+                        ["_links"] = System.Text.Json.JsonSerializer.SerializeToElement(_journey!._links)
+                    }
+                };
             }
-
-            var systemStatusTask = InstanceOnboardingService.GetSystemOnboardingStatusAsync();
-            var brandingTask = InstanceOnboardingService.GetBrandingSettingsAsync();
-            var authenticationTask = InstanceOnboardingService.GetAuthProviderConfiguredStateAsync();
-            var authorizationTask = InstanceOnboardingService.GetAuthorizationProviderConfiguredStateAsync();
-            var preflightTask = InstanceOnboardingService.GetOnboardingPreflightAsync();
-            var operatorIdentityTask = OperatorIdentityService.GetAsync(_lifetimeCancellation.Token);
-
-            await Task.WhenAll(systemStatusTask, brandingTask, authenticationTask, authorizationTask, preflightTask, operatorIdentityTask);
-            if (_disposed)
+            var identity = _journey?.OperatorIdentity;
+            _operatorIdentity = identity is null ? InstanceOperatorIdentityAdminModel.Failed() : new()
             {
-                return;
-            }
-
-            var systemStatus = await systemStatusTask;
-            var branding = await brandingTask;
-            _operatorIdentity = await operatorIdentityTask ?? new();
+                CanEdit = _journey?._links?.ContainsKey("update-operator-identity") == true,
+                Revision = identity.Revision, OperatorId = identity.OperatorId,
+                PublicName = identity.PublicName, LegalName = identity.LegalName,
+                OperatorKindCode = identity.OperatorKindCode, JurisdictionCountryCode = identity.JurisdictionCountryCode,
+                RegistrationIdentifier = identity.RegistrationIdentifier, PublicContactEmail = identity.PublicContactEmail,
+                WebsiteUrl = identity.WebsiteUrl, LegalNoticeUrl = identity.LegalNoticeUrl,
+                TermsUrl = identity.TermsUrl, PrivacyUrl = identity.PrivacyUrl,
+                IsOfficialInstance = identity.IsOfficialInstance == true, OfficialOrigin = identity.OfficialOrigin,
+                PaidCommerceIsReady = identity.PaidCommerce?.IsReady == true,
+                PublicDisclosure = identity.PublicDisclosure is { } disclosure ? new()
+                {
+                    IsReady = disclosure.IsReady, FailureCode = disclosure.FailureCode, ReasonCodes = disclosure.ReasonCodes
+                } : null,
+                FailureCode = identity.PaidCommerce?.FailureCode, ReasonCodes = identity.PaidCommerce?.ReasonCodes ?? []
+            };
 
             bool wasLocal = IsLocalSetup;
             _status = status;
@@ -710,20 +729,23 @@
             }
             if (IsLocalSetup)
                 _localOperationId = status?.PendingOperationId ?? _localOperationId;
-            _deploymentMode = NormalizeDeploymentMode(systemStatus?.DeploymentMode);
-            _authProviderConfigured = await authenticationTask;
-            _authorizationProviderConfigured = await authorizationTask;
-            _preflight = await preflightTask;
+            _deploymentMode = NormalizeDeploymentMode(status?.SelectedDeploymentMode);
+            _authProviderConfigured = _journey is null ? null : _journey.Authentication?.State == "Ready";
+            _authorizationProviderConfigured = _journey is null ? null : _journey.Authorization?.State == "Ready";
+            _preflight = _journey?.Preflight;
             _acknowledgePublicExposure = false;
 
-            if (!string.IsNullOrWhiteSpace(branding?.DefaultBrandDisplayName))
+            if (_journey?.Profile is { } profile)
             {
-                _siteProfile.SiteName = branding.DefaultBrandDisplayName;
+                _siteProfile.SiteName = profile.SiteName;
+                _siteProfile.SupportEmail = profile.SupportEmail;
+                _siteProfile.Locale = profile.Locale;
+                if (Uri.TryCreate(profile.CanonicalUrl, UriKind.Absolute, out _))
+                    _siteProfile.CanonicalUrl = profile.CanonicalUrl;
             }
-            _siteProfile.SupportEmail = branding?.SupportEmail;
 
             if (status is null
-                || systemStatus is null
+                || _journey is null
                 || _deploymentMode is null
                 || _preflight is null
                 || !_authProviderConfigured.HasValue
@@ -755,6 +777,26 @@
                 _isRefreshing = false;
             }
         }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (_disposed || _isSavingProfile || _journey?._links?.ContainsKey("save-profile") != true
+            || !_profileEditContext.Validate()) return;
+        _isSavingProfile = true;
+        try
+        {
+            var response = await InstanceOnboardingService.SaveProfileAsync(CreateCompletionProfile(), _lifetimeCancellation.Token);
+            if (_disposed) return;
+            if (response.Success != true)
+            {
+                await SetLoadErrorAsync("The site profile could not be saved. Readiness has not been refreshed.");
+                return;
+            }
+            await RefreshAsync();
+        }
+        catch (OperationCanceledException) when (_lifetimeCancellation.IsCancellationRequested) { }
+        finally { _isSavingProfile = false; }
     }
 
     private async Task CompleteOnboardingAsync()

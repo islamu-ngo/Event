@@ -1,0 +1,39 @@
+Change-Id: CHG-01M2ZX7228505Q2Y37MD92QJT3
+Title: Show one recoverable source of setup truth
+Type: fix
+Scope: onboarding
+Summary: >-
+  Setup refreshes one HAL journey snapshot, preserves explicit provider readiness,
+  and saves the profile before refreshing preflight instead of mixing independent reads.
+Group: progressive-instance-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      The duplicate System preflight endpoint and generated method are removed
+      without aliases. Setup clients consume the canonical onboarding journey.
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: >-
+      The journey includes generation, provider readiness, persisted profile,
+      identity and preflight categories, remediation authority and action relations.
+      Missing or contradictory sources produce a failed snapshot with refresh only.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Journey reads require active setup or instance administrator authority.
+      HAL remains action authority; setup purpose boundaries and server-held
+      credentials remain unchanged. No provider fallback is introduced.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: >-
+      Deployment-managed authorization must be explicitly ready before its step
+      is skipped. Profile saves precede readiness refresh. No database migration,
+      dependency or completion-semantics change is required. The separate reported
+      authorization-screen interaction defect remains unconfirmed.

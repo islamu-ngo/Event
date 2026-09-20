@@ -16,6 +16,8 @@ public class InstanceOnboardingTests : IDisposable
     private readonly IBffAuthApi _bffAuthApi;
     private readonly IInstanceOperatorIdentityAdminService _operatorIdentityAdminService;
     private string _currentDeploymentMode = "SingleTenant";
+    private HalResourceOfInstanceOnboardingJourneyDto? _journey;
+    private bool _identityReady = true;
 
     public InstanceOnboardingTests()
     {
@@ -49,8 +51,10 @@ public class InstanceOnboardingTests : IDisposable
         _instanceOnboardingService.CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>())
             .Returns(_ =>
             {
-                _instanceOnboardingService.GetStatusAsync().Returns(
-                    CreateStatus(isCompleted: true, _currentDeploymentMode));
+                _journey!.Bootstrap = CreateStatus(isCompleted: true, _currentDeploymentMode);
+                _instanceOnboardingService.GetStatusAsync().Returns(_journey.Bootstrap);
+                _journey._links = JsonSerializer.Deserialize<Dictionary<string, HalLink>>(
+                    ((JsonElement)_journey.Bootstrap.AdditionalProperties["_links"]).GetRawText());
                 return new BaseCommandResponseOfGuid
                 {
                     Success = true,
@@ -61,6 +65,49 @@ public class InstanceOnboardingTests : IDisposable
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    public async Task Refresh_UsesOnlyTheJourneySnapshotAndRefreshesSavedProfile()
+    {
+        var journey = new HalResourceOfInstanceOnboardingJourneyDto
+        {
+            State = "Available", Generation = "first",
+            Bootstrap = CreateStatus(false, "MultiTenant"),
+            Profile = new SelfHostOnboardingProfileDto { SiteName = "Journey site" },
+            Authentication = new OnboardingProviderReadinessDto { State = "Ready" },
+            Authorization = new OnboardingProviderReadinessDto { State = "Ready" },
+            Preflight = CreatePreflight("MultiTenant"),
+            _links = new Dictionary<string, HalLink> { ["save-profile"] = new() { Href = "/api/instanceonboarding/profile", Method = "PATCH" } }
+        };
+        var requested = new List<string>();
+        _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            requested.Add("journey");
+            return Task.FromResult<HalResourceOfInstanceOnboardingJourneyDto?>(journey);
+        });
+        _instanceOnboardingService.SaveProfileAsync(Arg.Any<SelfHostOnboardingProfileDto>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            requested.Add("save-profile");
+            var saved = call.Arg<SelfHostOnboardingProfileDto>();
+            journey.Profile = new SelfHostOnboardingProfileDto { SiteName = saved.SiteName, CanonicalUrl = saved.CanonicalUrl };
+            journey.Generation = "after-save";
+            return Task.FromResult(new BaseCommandResponseOfGuid { Success = true });
+        });
+        SetupBffJsModule(true);
+        var cut = _ctx.RenderMudComponent<InstanceOnboarding>();
+        await cut.InvokeAsync(() => Task.CompletedTask);
+        await Assert.That(cut.FindAll("input").Any(input => input.GetAttribute("value") == "Journey site")).IsTrue();
+        await cut.InvokeAsync(() => cut.Instance.RefreshAsync());
+        await cut.Find("button[data-testid='save-onboarding-profile']").ClickAsync(new MouseEventArgs());
+        await Assert.That(requested).IsEquivalentTo(new[] { "journey", "journey", "save-profile", "journey" });
+        await _instanceOnboardingService.DidNotReceive().GetStatusAsync();
+        await _instanceOnboardingService.DidNotReceive().GetSystemOnboardingStatusAsync();
+        await _instanceOnboardingService.DidNotReceive().GetBrandingSettingsAsync();
+        await _instanceOnboardingService.DidNotReceive().GetOnboardingPreflightAsync();
+        await _instanceOnboardingService.DidNotReceive().GetAuthProviderConfiguredStateAsync();
+        await _instanceOnboardingService.DidNotReceive().GetAuthorizationProviderConfiguredStateAsync();
+        await _operatorIdentityAdminService.DidNotReceive().GetAsync(Arg.Any<CancellationToken>());
+    }
 
     [Test]
     public async Task Workspace_HasOneH1AndContinuesWithoutStandaloneOverview()
@@ -361,7 +408,7 @@ public class InstanceOnboardingTests : IDisposable
     }
 
     [Test]
-    public async Task InitialLoad_CallsEachAuthoritativeEndpointExactlyOnce()
+    public async Task InitialLoad_UsesOneJourneyRequest()
     {
         RenderForDeploymentMode("SingleTenant");
 
@@ -369,20 +416,11 @@ public class InstanceOnboardingTests : IDisposable
     }
 
     [Test]
-    public async Task ExplicitRefresh_AddsOneAuthoritativeEndpointCallSet()
+    public async Task ExplicitRefresh_UsesOneAdditionalJourneyRequest()
     {
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        cut.Find("button[aria-label='Refresh setup status']").Click();
-        cut.WaitForAssertion(() =>
-        {
-            _instanceOnboardingService.Received(2).GetStatusAsync();
-            _instanceOnboardingService.Received(2).GetSystemOnboardingStatusAsync();
-            _instanceOnboardingService.Received(2).GetBrandingSettingsAsync();
-            _instanceOnboardingService.Received(2).GetAuthProviderConfiguredStateAsync();
-            _instanceOnboardingService.Received(2).GetAuthorizationProviderConfiguredStateAsync();
-            _instanceOnboardingService.Received(2).GetOnboardingPreflightAsync();
-        });
+        await cut.Find("button[aria-label='Refresh setup status']").ClickAsync(new MouseEventArgs());
 
         await AssertAuthoritativeCallCountAsync(2);
     }
@@ -391,22 +429,18 @@ public class InstanceOnboardingTests : IDisposable
     public async Task OverlappingRefreshes_ShareOneInFlightAuthoritativeCallSet()
     {
         var cut = RenderForDeploymentMode("SingleTenant");
-        var statusGate = new TaskCompletionSource<InstanceOnboardingStatusDto?>(
+        var statusGate = new TaskCompletionSource<HalResourceOfInstanceOnboardingJourneyDto?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        _instanceOnboardingService.GetStatusAsync().Returns(_ => statusGate.Task);
+        _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(_ => statusGate.Task);
 
         var firstRefresh = cut.Instance.RefreshAsync();
         var overlappingRefresh = cut.Instance.RefreshAsync();
 
         Require(ReferenceEquals(firstRefresh, overlappingRefresh), "Overlapping refreshes should share one task.");
-        await _instanceOnboardingService.Received(2).GetStatusAsync();
+        await _instanceOnboardingService.Received(2).GetJourneyAsync(Arg.Any<CancellationToken>());
 
-        statusGate.SetResult(new InstanceOnboardingStatusDto
-        {
-            IsCompleted = false,
-            IsAuthenticated = true
-        });
-        await Task.WhenAll(firstRefresh, overlappingRefresh);
+        statusGate.SetResult(_journey);
+        await Task.WhenAll(firstRefresh, overlappingRefresh).WaitAsync(TimeSpan.FromSeconds(5));
 
         await AssertAuthoritativeCallCountAsync(2);
     }
@@ -414,14 +448,7 @@ public class InstanceOnboardingTests : IDisposable
     [Test]
     public async Task OperatorIdentityIncomplete_DisablesLaunchButton()
     {
-        _operatorIdentityAdminService.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new InstanceOperatorIdentityAdminModel
-            {
-                Exists = true,
-                CanEdit = true,
-                PaidCommerceIsReady = false,
-                ReasonCodes = new List<string> { "instance_operator_identity_missing" }
-            }));
+        _identityReady = false;
 
         var cut = RenderForDeploymentMode("SingleTenant");
 
@@ -460,25 +487,25 @@ public class InstanceOnboardingTests : IDisposable
         int syncFailureStatus = 400)
     {
         _currentDeploymentMode = deploymentMode;
-        _instanceOnboardingService.GetStatusAsync().Returns(statusAvailable
-            ? Task.FromResult<InstanceOnboardingStatusDto?>(CreateStatus(isCompleted: false, deploymentMode))
-            : Task.FromResult<InstanceOnboardingStatusDto?>(null));
-        _instanceOnboardingService.GetSystemOnboardingStatusAsync().Returns(systemStatusAvailable
-            ? Task.FromResult<SystemOnboardingStatusDto?>(new SystemOnboardingStatusDto
-            {
-                RequiresOnboarding = true,
-                DeploymentMode = deploymentMode
-            })
-            : Task.FromResult<SystemOnboardingStatusDto?>(null));
-        _instanceOnboardingService.GetBrandingSettingsAsync().Returns(new BrandingSettingsDto
+        var status = CreateStatus(false, deploymentMode);
+        _journey = statusAvailable && systemStatusAvailable && preflightAvailable
+            && authenticationConfigured.HasValue && authorizationConfigured.HasValue ? new()
         {
-            DefaultBrandDisplayName = "ISLAMU Explore"
-        });
-        _instanceOnboardingService.GetAuthProviderConfiguredStateAsync().Returns(authenticationConfigured);
-        _instanceOnboardingService.GetAuthorizationProviderConfiguredStateAsync().Returns(authorizationConfigured);
-        _instanceOnboardingService.GetOnboardingPreflightAsync().Returns(preflightAvailable
-            ? Task.FromResult<OnboardingPreflightDto?>(preflight ?? CreatePreflight(deploymentMode))
-            : Task.FromResult<OnboardingPreflightDto?>(null));
+            State = "Available", Generation = "fixture", Bootstrap = status,
+            Profile = new() { SiteName = "ISLAMU Explore" },
+            Authentication = new() { State = authenticationConfigured == true ? "Ready" : "ActionRequired" },
+            Authorization = new() { State = authorizationConfigured == true ? "Ready" : "ActionRequired" },
+            Preflight = preflight ?? CreatePreflight(deploymentMode),
+            OperatorIdentity = new()
+            {
+                PublicName = "ISLAMU Explore", LegalName = "ISLAMU Explore", OperatorKindCode = "individual",
+                PaidCommerce = new() { IsReady = _identityReady, ReasonCodes = [] },
+                PublicDisclosure = new() { IsReady = true, ReasonCodes = [] }
+            },
+            _links = JsonSerializer.Deserialize<Dictionary<string, HalLink>>(((JsonElement)status.AdditionalProperties["_links"]).GetRawText())
+        } : null;
+        if (_journey is not null) _journey._links!["update-operator-identity"] = new() { Href = "/api/instance-operator-identity", Method = "PUT" };
+        _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult(_journey));
 
         SetupBffJsModule(syncOk, syncFailureStatus);
 
@@ -568,12 +595,13 @@ public class InstanceOnboardingTests : IDisposable
 
     private async Task AssertAuthoritativeCallCountAsync(int count)
     {
-        await _instanceOnboardingService.Received(count).GetStatusAsync();
-        await _instanceOnboardingService.Received(count).GetSystemOnboardingStatusAsync();
-        await _instanceOnboardingService.Received(count).GetBrandingSettingsAsync();
-        await _instanceOnboardingService.Received(count).GetAuthProviderConfiguredStateAsync();
-        await _instanceOnboardingService.Received(count).GetAuthorizationProviderConfiguredStateAsync();
-        await _instanceOnboardingService.Received(count).GetOnboardingPreflightAsync();
+        await _instanceOnboardingService.Received(count).GetJourneyAsync(Arg.Any<CancellationToken>());
+        await _instanceOnboardingService.DidNotReceive().GetStatusAsync();
+        await _instanceOnboardingService.DidNotReceive().GetSystemOnboardingStatusAsync();
+        await _instanceOnboardingService.DidNotReceive().GetBrandingSettingsAsync();
+        await _instanceOnboardingService.DidNotReceive().GetAuthProviderConfiguredStateAsync();
+        await _instanceOnboardingService.DidNotReceive().GetAuthorizationProviderConfiguredStateAsync();
+        await _instanceOnboardingService.DidNotReceive().GetOnboardingPreflightAsync();
     }
 
     private static IElement FindButton(IRenderedComponent<InstanceOnboarding> cut, string text) =>

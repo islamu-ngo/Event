@@ -1,0 +1,46 @@
+# ABOUTME: Public change fragment for provider credential HTTP response nonretention.
+# ABOUTME: Records the governed nonbreaking security fix without changing provider contracts.
+Change-Id: CHG-01M2ZT0ESS2N24Y2T4TKG6J3C2
+Title: "Prevent provider credential operations from using HTTP replay"
+Type: fix
+Scope: access
+Summary: "Provider credential operations now use private, non-cacheable responses and re-evaluate current authority and provider outcome on retry."
+Group: provider-credential-http-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: >-
+      Existing routes, request and response DTOs, operation IDs, authorization,
+      handlers, HAL affordances, and generated contracts are unchanged.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Seven existing credential-bearing provider-management POST operations are
+      private/no-store and bypass generic idempotency response storage, so retries
+      re-evaluate current authority and the current provider outcome.
+  Migration:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: >-
+      No persisted schema, migration, or database-secret removal is included.
+  Configuration:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: not-applicable
+    Detail: >-
+      No provider configuration, fallback behavior, lifecycle-service identity,
+      or Infisical isolation changes.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: >-
+      OpenAPI and generated contracts are unchanged.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: >-
+      Operators retry through existing authorized operations and reconciliation;
+      prior successful responses are not replayed.

@@ -5,6 +5,7 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Authorization;
@@ -125,6 +126,8 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         return HandleCommandResponse(response);
     }
 
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
     [HttpPost("auth-provider/keycloak/doctor", Name = RouteNames.RunInstanceKeycloakRealmDoctor)]
     [EndpointSummary("Run Keycloak Realm Doctor")]
     [EndpointDescription("Runs read-only Keycloak realm diagnostics. Temporary admin credentials are used only for this request and are not stored.")]
@@ -141,6 +144,8 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         return Ok(result);
     }
 
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
     [HttpPost("auth-provider/keycloak/sync-preview", Name = RouteNames.PreviewInstanceKeycloakRealmSync)]
     [EndpointSummary("Preview Keycloak Realm Sync")]
     [EndpointDescription("Generates a read-only additive Keycloak realm sync plan. Temporary admin credentials are used only for this request and are not stored.")]
@@ -157,6 +162,8 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         return Ok(result);
     }
 
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
     [HttpPost("auth-provider/keycloak/sync-apply", Name = RouteNames.ApplyInstanceKeycloakRealmSync)]
     [EndpointSummary("Apply Keycloak Realm Sync")]
     [EndpointDescription("Applies backup-confirmed additive Keycloak realm repairs. Temporary admin credentials are used only for this request and are not stored.")]
@@ -173,6 +180,8 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         return Ok(result);
     }
 
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
     [HttpPost("auth-provider/keycloak/client-secret/rotate", Name = RouteNames.RotateInstanceKeycloakClientSecret)]
     [EndpointSummary("Rotate Keycloak Client Secret")]
     [EndpointDescription("Rotates an application-managed Keycloak client secret. Deployment-managed secrets return operator instructions and are not changed by the application.")]

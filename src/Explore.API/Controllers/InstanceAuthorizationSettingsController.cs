@@ -5,6 +5,7 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Authorization;
@@ -121,6 +122,8 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
         return HandleCommandResponse(response);
     }
 
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
     [HttpPost("authz-provider/sync", Name = RouteNames.SyncInstanceAuthorizationPolicyPackage)]
     [EndpointSummary("Sync Authorization Policy Package")]
     [EndpointDescription("Publishes the authorization policy package. Requires instance administrator.")]

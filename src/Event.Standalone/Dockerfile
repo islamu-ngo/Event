@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460
 WORKDIR /src
 
 COPY ["global.json", "Directory.Build.props", "Directory.Packages.props", "./"]
+COPY ["eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets", "eng/tools/Explore.GeneratedContracts/"]
 COPY ["dotnet-tools.json", "./"]
 COPY ["src/Event.Standalone/Event.Standalone.csproj", "src/Event.Standalone/packages.lock.json", "src/Event.Standalone/"]
 COPY ["src/Event.MigrationService/Event.MigrationService.csproj", "src/Event.MigrationService/packages.lock.json", "src/Event.MigrationService/"]

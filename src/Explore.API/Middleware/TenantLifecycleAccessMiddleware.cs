@@ -20,7 +20,11 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)
                 && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
         if (!tenantSurface || ApiTenantResolutionMiddleware.IsTenantExemptPath(context.Request.Path)
-            || IsExistingAuthenticationOrSignedCallback(context.GetEndpoint()))
+            || IsExistingAuthenticationOrSignedCallback(context.GetEndpoint())
+            || HttpMethods.IsGet(context.Request.Method)
+                && context.Request.Path.Equals(new PathString("/api/instance/settings/branding"), StringComparison.OrdinalIgnoreCase)
+                && context.User.Identities.Any(identity => identity.IsAuthenticated
+                    && identity.AuthenticationType == Explore.Application.Constants.ApiAuthenticationSchemeNames.SetupSecret))
         {
             await next(context);
             return;

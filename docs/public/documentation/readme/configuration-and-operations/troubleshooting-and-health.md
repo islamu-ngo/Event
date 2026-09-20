@@ -173,6 +173,23 @@ When `AUTHORIZATION_PROVIDER=cerbos` is selected, ISLAMU Event enforces **fail-c
 
 ### Recipe 6: Lost Setup Secret Recovery
 
+During first-run setup, the protected BFF session can read branding and save the
+installation profile before a directory is public. Signing in with Local,
+Keycloak, or ATProto does not itself grant administrator rights; normal branding
+changes still require an administrator.
+
+If profile save loses setup authority after sign-in, refresh setup status and
+return to `/setup` to renew the session while setup is incomplete. Keep browser
+cookies enabled and use the normal form so write requests retain antiforgery
+protection. Do not add authorization, provider, tenant, or setup-secret headers,
+or copy secrets/tokens into browser storage.
+
+A completed installation permanently rejects setup authority. The BFF rechecks
+persisted authority before renewing or synchronizing it and clears setup state
+when the API reports `410` / `setup_already_completed`. Use normal sign-in instead;
+retained cookies and restarts cannot reopen setup. Share only bounded reason codes
+with support, never secrets or raw provider responses.
+
 #### Why this happens
 If you left `SETUP_SECRET=` blank in `.env`, the container generated an ephemeral single-use secret inside the volume upon first boot.
 

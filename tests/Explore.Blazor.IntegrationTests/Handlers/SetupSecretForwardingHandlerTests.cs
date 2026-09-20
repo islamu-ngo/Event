@@ -442,7 +442,15 @@ public class SetupSecretForwardingHandlerTests
     [Arguments("PATCH", "/api/instance/settings/authz-provider/")]
     [Arguments("PATCH", "/api/instance/settings/authz-provider/child")]
     [Arguments("PATCH", "/api/instance/settings/authz-provider-extra")]
-    [Arguments("GET", "/api/instance/settings/branding")]
+    [Arguments("PATCH", "/api/instance/settings/branding")]
+    [Arguments("GET", "/api/instance/settings/branding/")]
+    [Arguments("GET", "/api/instance/settings/branding/child")]
+    [Arguments("GET", "/api/instance/settings/branding-extra")]
+    [Arguments("GET", "/api/InstanceOnboarding/profile")]
+    [Arguments("POST", "/api/InstanceOnboarding/profile")]
+    [Arguments("PATCH", "/api/InstanceOnboarding/profile/")]
+    [Arguments("PATCH", "/api/InstanceOnboarding/profile/child")]
+    [Arguments("PATCH", "/api/InstanceOnboarding/profile-extra")]
     [Arguments("GET", "/api/instance/settings/auth-provider/status")]
     [Arguments("GET", "/api/instance/settings/authz-provider/status")]
     [Arguments("GET", "/api/instance/settings-extra/branding")]
@@ -498,6 +506,56 @@ public class SetupSecretForwardingHandlerTests
 
         await Assert.That(innerHandler.CapturedRequest).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsFalse();
+    }
+
+    [Test]
+    [Arguments("GET", "/api/instance/settings/branding")]
+    [Arguments("PATCH", "/api/InstanceOnboarding/profile")]
+    public async Task ProfilePreparationForwardsOnlyProtectedAuthority(string method, string path)
+    {
+        string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var protector = new SetupSecretCookieProtector(new EphemeralDataProtectionProvider());
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = $"setup-secret={protector.Protect(secret)}";
+        var capture = new CapturingHandler();
+        using var handler = CreateHandler(context, new SetupSecretSessionService(), capture, protector);
+        using var invoker = new HttpMessageInvoker(handler, disposeHandler: false);
+        using var request = new HttpRequestMessage(new HttpMethod(method), $"https://api.example.test{path}?source=setup");
+        request.Headers.Add("X-Setup-Secret", Guid.NewGuid().ToString());
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+        await Assert.That(capture.CapturedRequest!.Headers.TryGetValues("X-Setup-Secret", out var values)
+            && values.Single() == secret).IsTrue();
+    }
+
+    [Test]
+    [Arguments("forged")]
+    [Arguments("expired")]
+    [Arguments("other-session")]
+    public async Task ProfilePreparationRejectsUntrustedOrExpiredAuthority(string source)
+    {
+        string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var dataProtection = new EphemeralDataProtectionProvider();
+        var protector = new SetupSecretCookieProtector(dataProtection);
+        var context = new DefaultHttpContext();
+        var sessions = new SetupSecretSessionService();
+        context.Request.Headers.Cookie = source switch
+        {
+            "expired" => $"setup-secret={dataProtection.CreateProtector("Explore.Blazor.SetupSecretCookie.v1").ToTimeLimitedDataProtector().Protect(secret, DateTimeOffset.UtcNow.AddMinutes(-1))}",
+            "forged" => $"setup-secret={secret}",
+            _ => $"setup-secret-session={Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))}"
+        };
+        // A different browser's valid server-side entry must not be selected.
+        _ = sessions.CreateAnonymousSession(secret);
+        foreach (var (method, path) in new[] { (HttpMethod.Get, "/api/instance/settings/branding"), (HttpMethod.Patch, "/api/InstanceOnboarding/profile") })
+        {
+            var capture = new CapturingHandler();
+            using var handler = CreateHandler(context, sessions, capture, protector);
+            using var invoker = new HttpMessageInvoker(handler, disposeHandler: false);
+            using var request = new HttpRequestMessage(method, $"https://api.example.test{path}");
+            request.Headers.Add("X-Setup-Secret", secret);
+            using var response = await invoker.SendAsync(request, CancellationToken.None);
+            await Assert.That(capture.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsFalse();
+        }
     }
 
     private static string SetupKey(string userId)

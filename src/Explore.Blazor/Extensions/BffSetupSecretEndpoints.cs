@@ -65,9 +65,7 @@ public static class BffSetupSecretEndpoints
             return;
         }
 
-        var validation = IsTrustedPersistedSource(resolution.Source)
-            ? new SetupSecretValidationResult(true, StatusCodes.Status200OK, string.Empty)
-            : await ValidateSetupSecretAsync(ctx, secret, ctx.RequestAborted);
+        var validation = await ValidateSetupSecretAsync(ctx, secret, ctx.RequestAborted);
         if (!validation.IsValid)
         {
             if (IsPermanentValidationFailure(validation.StatusCode))
@@ -149,13 +147,11 @@ public static class BffSetupSecretEndpoints
         }
 
         var secret = request.Secret;
-        var requiresValidation = true;
         if (string.IsNullOrWhiteSpace(secret))
         {
             var secretResolver = ctx.RequestServices.GetRequiredService<ISetupSecretResolver>();
             var resolution = secretResolver.Resolve(ctx);
             secret = resolution.Found ? resolution.Secret?.Trim() : null;
-            requiresValidation = !IsTrustedPersistedSource(resolution.Source);
         }
 
         if (string.IsNullOrWhiteSpace(secret))
@@ -164,19 +160,16 @@ public static class BffSetupSecretEndpoints
             return;
         }
 
-        if (requiresValidation)
+        var validation = await ValidateSetupSecretAsync(ctx, secret, ctx.RequestAborted);
+        if (!validation.IsValid)
         {
-            var validation = await ValidateSetupSecretAsync(ctx, secret, ctx.RequestAborted);
-            if (!validation.IsValid)
+            if (IsPermanentValidationFailure(validation.StatusCode))
             {
-                if (IsPermanentValidationFailure(validation.StatusCode))
-                {
-                    ClearSetupSecret(ctx, sessionService, ShouldUseSecureSetupCookie(ctx), userId);
-                }
-
-                await WriteProblemAsync(ctx, validation.StatusCode, "Setup Secret Validation Failed", validation.Error);
-                return;
+                ClearSetupSecret(ctx, sessionService, ShouldUseSecureSetupCookie(ctx), userId);
             }
+
+            await WriteProblemAsync(ctx, validation.StatusCode, "Setup Secret Validation Failed", validation.Error);
+            return;
         }
 
         PersistSetupSecret(ctx, sessionService, secret, ShouldUseSecureSetupCookie(ctx), userId);
@@ -205,11 +198,6 @@ public static class BffSetupSecretEndpoints
     {
         return ctx.User.TryGetSetupSessionIdentity(out var identity) ? identity.PartitionKey : null;
     }
-
-    private static bool IsTrustedPersistedSource(SetupSecretSource source) =>
-        source is SetupSecretSource.ServerSideSetupSession
-            or SetupSecretSource.AnonymousSetupSession
-            or SetupSecretSource.ProtectedSetupCookie;
 
     private static bool ShouldUseSecureSetupCookie(HttpContext ctx) => ctx.Request.IsHttps;
 

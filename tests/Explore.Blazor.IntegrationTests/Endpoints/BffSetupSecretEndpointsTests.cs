@@ -166,7 +166,7 @@ public sealed class BffSetupSecretEndpointsTests
     }
 
     [Test]
-    public async Task SetupSecret_Get_WhenPersistedSecretIsTrusted_RefreshesCookiesWithoutRevalidation()
+    public async Task SetupSecret_Get_WhenPersistedSecretIsTrusted_RevalidatesBeforeRefreshingCookies()
     {
         using var handler = new ValidateSecretHandler(HttpStatusCode.OK, """{"valid":true}""");
         await using var app = await CreateAppAsync(
@@ -179,11 +179,11 @@ public sealed class BffSetupSecretEndpointsTests
         var cookies = response.Headers.GetValues("Set-Cookie").ToArray();
         await Assert.That(cookies.Single(value => value.StartsWith("setup-secret=", StringComparison.Ordinal))).Contains("max-age=1800");
         await Assert.That(cookies.Single(value => value.StartsWith("setup-secret-session=", StringComparison.Ordinal))).Contains("max-age=1800");
-        await Assert.That(handler.CallCount).IsEqualTo(0);
+        await Assert.That(handler.CallCount).IsEqualTo(1);
     }
 
     [Test]
-    public async Task SetupSecret_Sync_WhenPersistedSecretIsTrusted_BindsSessionWithoutRevalidation()
+    public async Task SetupSecret_Sync_WhenPersistedSecretIsTrusted_RevalidatesBeforeBindingSession()
     {
         using var handler = new ValidateSecretHandler(HttpStatusCode.OK, """{"valid":true}""");
         await using var app = await CreateAppAsync(
@@ -194,7 +194,33 @@ public sealed class BffSetupSecretEndpointsTests
         using var response = await app.Client.PostAsJsonAsync("/bff/setup-secret/sync", new { secret = "" });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(handler.CallCount).IsEqualTo(0);
+        await Assert.That(handler.CallCount).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments("GET", "/bff/setup-secret")]
+    [Arguments("POST", "/bff/setup-secret/sync")]
+    [Arguments("POST", "/bff/setup-secret")]
+    public async Task CompletedSetupCannotRenewOrRebindPersistedAuthority(string method, string path)
+    {
+        string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        using var handler = new ValidateSecretHandler(HttpStatusCode.Gone, "{}");
+        await using var app = await CreateAppAsync(handler,
+            setupSecretResolver: new StaticSetupSecretResolver(secret), authenticatedUserId: Guid.NewGuid().ToString());
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        if (method == "POST") request.Content = JsonContent.Create(new { secret = path.EndsWith("/sync", StringComparison.Ordinal) ? "" : secret });
+        using var response = await app.Client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(method == "GET" ? HttpStatusCode.OK : HttpStatusCode.Gone);
+        var cookies = response.Headers.GetValues("Set-Cookie").ToArray();
+        await Assert.That(cookies.Any(cookie => cookie.StartsWith("setup-secret=;", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(cookies.Any(cookie => cookie.StartsWith("setup-secret-session=;", StringComparison.Ordinal))).IsTrue();
+        using var body = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        if (method == "GET")
+        {
+            await Assert.That(body.RootElement.GetProperty("hasPersistedSecret").GetBoolean()).IsFalse();
+            await Assert.That(body.RootElement.GetProperty("isValid").GetBoolean()).IsFalse();
+        }
+        await Assert.That(body.RootElement.ToString().Contains(secret, StringComparison.Ordinal)).IsFalse();
     }
 
     [Test]

@@ -50,6 +50,14 @@ public class SetupSecretForwardingHandler : DelegatingHandler
             return true;
         }
 
+        if (HttpMethods.IsGet(method)
+                && path.Equals("/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPatch(method)
+                && path.Equals("/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         const string onboardingBasePath = "/api/InstanceOnboarding/";
 
         if (!path.StartsWith(onboardingBasePath, StringComparison.OrdinalIgnoreCase))

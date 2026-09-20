@@ -449,6 +449,30 @@ In YARP transforms:
 
 This prevents stale outgoing proxy headers and browser-controlled privileged headers from leaking across requests. Treat the setup secret as bootstrap-only sensitive material; the BFF protects the setup cookie with a 30-minute time-limited ASP.NET Core Data Protection payload, applies the same rolling inactivity limit to server-side setup sessions, and forwards only resolver output to downstream API calls.
 
+### Initial Sign-In Setup Authority
+
+Both the server-side generated-client handler and the shared browser proxy/bridge
+policy forward trusted setup authority to exactly `GET /api/instance/settings/branding`
+and `PATCH /api/InstanceOnboarding/profile`. The API authenticates these operations
+through the purpose-bound setup scheme. Only a validated setup principal bypasses
+the tenant lifecycle gate for the exact branding GET, so initial preparation does
+not require a public tenant. The controller still requires instance-administrator
+or validated setup authority. Branding PATCH and all other settings routes gain no
+new setup permissions.
+
+Provider sign-in (Local, Keycloak, or ATProto) is not an administrator grant.
+Setup authority does not become a platform identity or unlock UI-shell settings
+scopes. The browser cannot supply authorization, provider assertions, tenant, or
+setup-secret headers; existing BFF sanitization and write antiforgery remain in
+force. Generated clients remain the component boundary.
+
+Persisted BFF setup cookies/sessions are revalidated before status renewal or
+sign-in synchronization. Durable API completion rejects setup authentication with
+`410` / `setup_already_completed`; the BFF clears its setup cookies/session rather
+than renewing or rebinding them. Neither a retained cookie nor restarting a BFF
+reopens setup. Troubleshooting must use bounded, value-free codes, never secret or
+provider response content.
+
 ## Embedded Control Plane Boundary
 
 The control-plane UI is an admin-host shell inside the existing browser BFF, not a separate application or management API:

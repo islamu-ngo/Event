@@ -15,6 +15,12 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
   HAL, provider reconciliation, OpenAPI, and generated contracts are unchanged.
   This HTTP-only fix does not remove database secrets or provider fallbacks, clear
   UI data, harden logs, change lifecycle-service identity, or isolate Infisical.
+- **Breaking: capability-specific instance identity readiness.** Identity GET and
+  PUT responses replace top-level readiness fields with `publicDisclosure` and
+  `paidCommerce` assessments. Valid incomplete administrative drafts can be saved
+  after setup. Public disclosure permits missing commercial terms; commerce still
+  requires them and current immutable acceptance evidence. Update generated clients;
+  no database migration, route alias, or configuration change is required.
 
 ## 2026-09-13
 

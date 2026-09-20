@@ -54,7 +54,7 @@ public sealed class PaidCheckoutActivationService(
         CancellationToken cancellationToken)
     {
         InstanceOperatorIdentityReadinessAssessment instanceIdentity =
-            await instanceOperatorIdentityReadiness.EvaluateAsync(cancellationToken);
+            await instanceOperatorIdentityReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, cancellationToken);
         if (!instanceIdentity.IsReady)
         {
             return PaidCheckoutActivationResult.Failure(

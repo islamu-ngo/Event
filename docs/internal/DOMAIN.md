@@ -85,15 +85,19 @@ Legal identity is split by responsibility:
 
 - `TenantDirectoryOperatorIdentity` is the normalized tenant-owned directory
   authority stored in the canonical typed settings document;
-- `InstanceOperatorIdentity` is immutable startup configuration for the
-  general platform operator;
+- `InstanceOperatorIdentity` is the normalized general platform operator identity
+  assessed from the persisted `instance.operator_identity` document;
 - organizer merchant identity comes from the event organizer actor and current
   provider recipient lineage;
 - `PaidCheckoutGovernanceOptions` owns payment operations, not identity.
 
 `TenantDirectoryOperatorReadinessEvaluator` evaluates the exact document for
 `Activation`, `PublicDisclosure`, or `PaidCommerce` and returns stable blocker
-codes without identity payloads. `PaidOrderAcceptanceSnapshot` stores immutable
+codes without identity payloads. Instance identity evaluation explicitly selects
+`PublicDisclosure` or `PaidCommerce`: disclosure permits absent commercial terms,
+while commerce requires them. Both reject malformed supplied values; registration
+identifiers remain optional. Draft saves validate syntax independently of either
+capability, including after bootstrap completion. `PaidOrderAcceptanceSnapshot` stores immutable
 structured evidence: acceptance-template identity/text, organizer actor,
 tenant directory document/revision and normalized facts, instance operator,
 provider recipient, policies, schedule, lines, and money. Historical snapshots

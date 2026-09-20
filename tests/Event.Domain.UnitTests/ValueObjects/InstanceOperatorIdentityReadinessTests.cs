@@ -10,7 +10,7 @@ public sealed class InstanceOperatorIdentityReadinessTests
     {
         InstanceOperatorIdentitySettings settings = Complete();
 
-        InstanceOperatorIdentityReadiness readiness = InstanceOperatorIdentityReadiness.Evaluate(settings);
+        InstanceOperatorIdentityReadiness readiness = InstanceOperatorIdentityReadiness.Evaluate(settings, InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(readiness.IsReady).IsTrue();
         await Assert.That(readiness.FailureCode).IsNull();
@@ -34,7 +34,7 @@ public sealed class InstanceOperatorIdentityReadinessTests
     public async Task Evaluate_EmptySettings_ReturnsIncompleteWithAllRequiredReasonCodes()
     {
         InstanceOperatorIdentityReadiness readiness =
-            InstanceOperatorIdentityReadiness.Evaluate(new InstanceOperatorIdentitySettings());
+            InstanceOperatorIdentityReadiness.Evaluate(new InstanceOperatorIdentitySettings(), InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(readiness.IsReady).IsFalse();
         await Assert.That(readiness.FailureCode)
@@ -74,7 +74,7 @@ public sealed class InstanceOperatorIdentityReadinessTests
             OfficialOrigin = "https://example.test/origin"
         };
 
-        InstanceOperatorIdentityReadiness readiness = InstanceOperatorIdentityReadiness.Evaluate(settings);
+        InstanceOperatorIdentityReadiness readiness = InstanceOperatorIdentityReadiness.Evaluate(settings, InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(readiness.IsReady).IsFalse();
         await Assert.That(readiness.FailureCode)
@@ -123,6 +123,74 @@ public sealed class InstanceOperatorIdentityReadinessTests
         await Assert.That(draft.Normalized.PublicName).IsEqualTo("Independent Operator");
         await Assert.That(draft.Normalized.OfficialOrigin).IsEqualTo("https://event.example.org");
         await Assert.That(draft.Normalized.WebsiteUrl).IsEqualTo("https://example.test/");
+    }
+
+    [Test]
+    public async Task PublicDisclosure_WithoutCommercialTerms_IsReady()
+    {
+        var readiness = InstanceOperatorIdentityReadiness.Evaluate(
+            Complete() with { TermsUrl = null }, InstanceOperatorIdentityCapability.PublicDisclosure);
+
+        await Assert.That(readiness.IsReady).IsTrue();
+        await Assert.That(readiness.ReasonCodes).IsEmpty();
+        await Assert.That(readiness.Normalized!.TermsUrl).IsNull();
+    }
+
+    [Test]
+    public async Task PaidCommerce_WithoutCommercialTerms_IsNotReady()
+    {
+        var readiness = InstanceOperatorIdentityReadiness.Evaluate(
+            Complete() with { TermsUrl = null }, InstanceOperatorIdentityCapability.PaidCommerce);
+
+        await Assert.That(readiness.IsReady).IsFalse();
+        await Assert.That(readiness.Normalized).IsNull();
+        await Assert.That(readiness.ReasonCodes).IsEquivalentTo(["instance_operator_identity_terms_url_missing"]);
+    }
+
+    [Test]
+    public async Task ValidateDraft_WellFormedIncompleteIdentity_IsValidButCannotDiscloseOrSell()
+    {
+        var settings = new InstanceOperatorIdentitySettings { PublicName = "  Independent Operator  " };
+        var draft = InstanceOperatorIdentityReadiness.ValidateDraft(settings);
+
+        await Assert.That(draft.IsValid).IsTrue();
+        await Assert.That(draft.Normalized.PublicName).IsEqualTo("Independent Operator");
+        foreach (var capability in Enum.GetValues<InstanceOperatorIdentityCapability>())
+        {
+            var readiness = InstanceOperatorIdentityReadiness.Evaluate(draft.Normalized, capability);
+            await Assert.That(readiness.IsReady).IsFalse();
+            await Assert.That(readiness.Normalized).IsNull();
+            await Assert.That(readiness.ReasonCodes).Contains("instance_operator_identity_legal_name_missing");
+        }
+    }
+
+    [Test]
+    public async Task Evaluate_WithoutRegistrationIdentifier_IsReadyForBothCapabilities()
+    {
+        foreach (var capability in Enum.GetValues<InstanceOperatorIdentityCapability>())
+        {
+            var readiness = InstanceOperatorIdentityReadiness.Evaluate(
+                Complete() with { RegistrationIdentifier = null }, capability);
+            await Assert.That(readiness.IsReady).IsTrue();
+            await Assert.That(readiness.ReasonCodes).IsEmpty();
+        }
+    }
+
+    [Test]
+    public async Task PublicDisclosure_MalformedOptionalTerms_FailsClosed()
+    {
+        var readiness = InstanceOperatorIdentityReadiness.Evaluate(
+            Complete() with { TermsUrl = "http://example.test/terms" }, InstanceOperatorIdentityCapability.PublicDisclosure);
+
+        await Assert.That(readiness.IsReady).IsFalse();
+        await Assert.That(readiness.ReasonCodes).IsEquivalentTo(["instance_operator_identity_terms_url_invalid"]);
+    }
+
+    [Test]
+    public async Task Evaluate_UnsupportedCapability_IsRejected()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Task.FromResult(
+            InstanceOperatorIdentityReadiness.Evaluate(Complete(), (InstanceOperatorIdentityCapability)99)));
     }
 
     private static InstanceOperatorIdentitySettings Complete() => new()

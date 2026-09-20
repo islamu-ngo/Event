@@ -105,7 +105,7 @@ public class BlazorTestContext : BunitContext
             {
                 Exists = true,
                 CanEdit = true,
-                IsReady = true,
+                PaidCommerceIsReady = true,
                 PublicName = "ISLAMU Explore",
                 LegalName = "ISLAMU Explore Legal",
                 OperatorKindCode = "NONPROFIT",

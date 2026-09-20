@@ -66,7 +66,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         string failureCode, string? reasonCode)
     {
         var scenario = new OnboardingCompletionScenario();
-        scenario.IdentityReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+        scenario.IdentityReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, Arg.Any<CancellationToken>())
             .Returns(new InstanceOperatorIdentityReadinessAssessment(
                 false,
                 failureCode,
@@ -393,7 +393,7 @@ internal sealed class OnboardingCompletionScenario
         var audit = new EffectAuditLogger(EventSequence);
 
         IdentityReadiness = Substitute.For<IInstanceOperatorIdentityReadinessEvaluator>();
-        IdentityReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+        IdentityReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, Arg.Any<CancellationToken>())
             .Returns(new InstanceOperatorIdentityReadinessAssessment(
                 true,
                 null,

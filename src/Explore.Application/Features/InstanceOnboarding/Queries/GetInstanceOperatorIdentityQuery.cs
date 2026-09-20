@@ -26,10 +26,9 @@ public sealed class GetInstanceOperatorIdentityQueryHandler(
 
         return new InstanceOperatorIdentityDocumentDto
         {
-            IsReady = doc.Readiness.IsReady,
-            FailureCode = doc.Readiness.FailureCode,
-            ReasonCodes = doc.Readiness.ReasonCodes,
-            Revision = doc.Readiness.DocumentRevision,
+            PublicDisclosure = new(doc.PublicDisclosure.IsReady, doc.PublicDisclosure.FailureCode, doc.PublicDisclosure.ReasonCodes),
+            PaidCommerce = new(doc.PaidCommerce.IsReady, doc.PaidCommerce.FailureCode, doc.PaidCommerce.ReasonCodes),
+            Revision = doc.Settings?.Revision,
             OperatorId = doc.Settings?.OperatorId,
             PublicName = doc.Settings?.PublicName,
             LegalName = doc.Settings?.LegalName,

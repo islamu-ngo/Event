@@ -44,6 +44,19 @@ public sealed class InstanceOperatorIdentityOptionsTests
     }
 
     [Test]
+    public async Task ValidatorStillRequiresCommercialTermsForConfiguredCommerceIdentity()
+    {
+        var options = Complete();
+        options.TermsUrl = string.Empty;
+        options.RegistrationIdentifier = null;
+
+        var result = new InstanceOperatorIdentityOptionsValidator().Validate(null, options);
+
+        await Assert.That(result.Failed).IsTrue();
+        await Assert.That(result.Failures!).IsEquivalentTo(["instance_operator_identity_terms_url_missing"]);
+    }
+
+    [Test]
     public async Task ApplicationRegistrationBindsIdentityOptions()
     {
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();

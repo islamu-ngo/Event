@@ -67,9 +67,10 @@ public sealed class InstanceOperatorIdentityAdminService(
             if (response.Success == true && response.Id is not null)
             {
                 model.Revision = response.Id.Revision;
-                model.IsReady = response.Id.IsReady == true;
-                model.FailureCode = response.Id.FailureCode;
-                model.ReasonCodes = response.Id.ReasonCodes ?? new List<string>();
+                model.PaidCommerceIsReady = response.Id.PaidCommerce?.IsReady == true;
+                model.FailureCode = response.Id.PaidCommerce?.FailureCode;
+                model.ReasonCodes = response.Id.PaidCommerce?.ReasonCodes ?? new List<string>();
+                model.PublicDisclosure = response.Id.PublicDisclosure;
                 if (response.Id.OperatorId.HasValue)
                 {
                     model.OperatorId = response.Id.OperatorId.Value;
@@ -136,9 +137,17 @@ public sealed class InstanceOperatorIdentityAdminService(
             PrivacyUrl = document.PrivacyUrl,
             IsOfficialInstance = document.IsOfficialInstance == true,
             OfficialOrigin = document.OfficialOrigin,
-            IsReady = document.IsReady == true,
-            FailureCode = document.FailureCode,
-            ReasonCodes = document.ReasonCodes ?? new List<string>(),
+            PaidCommerceIsReady = document.PaidCommerce?.IsReady == true,
+            FailureCode = document.PaidCommerce?.FailureCode,
+            ReasonCodes = document.PaidCommerce?.ReasonCodes ?? new List<string>(),
+            PublicDisclosure = document.PublicDisclosure is { } disclosure
+                ? new InstanceOperatorIdentityCapabilityReadinessDto
+                {
+                    IsReady = disclosure.IsReady,
+                    FailureCode = disclosure.FailureCode,
+                    ReasonCodes = disclosure.ReasonCodes
+                }
+                : null,
             MessageCode = InstanceOperatorIdentityAdminMessageCode.None
         };
     }
@@ -188,7 +197,8 @@ public sealed class InstanceOperatorIdentityAdminModel
     public string? PrivacyUrl { get; set; }
     public bool IsOfficialInstance { get; set; }
     public string? OfficialOrigin { get; set; }
-    public bool IsReady { get; set; }
+    public bool PaidCommerceIsReady { get; set; }
+    public InstanceOperatorIdentityCapabilityReadinessDto? PublicDisclosure { get; set; }
     public string? FailureCode { get; set; }
     public ICollection<string> ReasonCodes { get; set; } = new List<string>();
     public InstanceOperatorIdentityAdminMessageCode MessageCode { get; set; }
@@ -225,7 +235,8 @@ public sealed class InstanceOperatorIdentityAdminModel
         PrivacyUrl = source.PrivacyUrl;
         IsOfficialInstance = source.IsOfficialInstance;
         OfficialOrigin = source.OfficialOrigin;
-        IsReady = source.IsReady;
+        PaidCommerceIsReady = source.PaidCommerceIsReady;
+        PublicDisclosure = source.PublicDisclosure;
         FailureCode = source.FailureCode;
         ReasonCodes = source.ReasonCodes;
         MessageCode = source.MessageCode;

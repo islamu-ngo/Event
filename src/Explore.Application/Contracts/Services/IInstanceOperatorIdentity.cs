@@ -13,6 +13,6 @@ public interface IInstanceOperatorIdentity
     string PublicContactEmail { get; }
     string WebsiteUrl { get; }
     string LegalNoticeUrl { get; }
-    string TermsUrl { get; }
+    string? TermsUrl { get; }
     string PrivacyUrl { get; }
 }

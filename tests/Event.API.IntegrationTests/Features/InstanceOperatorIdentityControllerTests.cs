@@ -177,7 +177,8 @@ public class InstanceOperatorIdentityControllerTests
         var body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>();
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.IsSuccess).IsTrue();
-        await Assert.That(body.Id!.IsReady).IsFalse();
+        await Assert.That(body.Id!.PublicDisclosure.IsReady).IsFalse();
+        await Assert.That(body.Id.PaidCommerce.IsReady).IsFalse();
         await Assert.That(body.Id.Revision).IsNotEqualTo(Guid.Empty);
     }
 

@@ -43,7 +43,7 @@ public sealed class InstanceOperatorIdentityEditorTests
         using var context = new BlazorTestContext();
         var service = Substitute.For<IInstanceOperatorIdentityAdminService>();
         var model = CreateModel(canEdit: true);
-        model.IsReady = false;
+        model.PaidCommerceIsReady = false;
         model.ReasonCodes = new List<string> { "instance_operator_identity_website_url_missing" };
 
         service.SaveAsync(Arg.Any<InstanceOperatorIdentityAdminModel>(), Arg.Any<CancellationToken>())
@@ -51,7 +51,7 @@ public sealed class InstanceOperatorIdentityEditorTests
             {
                 var input = callInfo.Arg<InstanceOperatorIdentityAdminModel>();
                 input.Revision = Guid.Parse("11111111-1111-1111-1111-111111111111");
-                input.IsReady = false;
+                input.PaidCommerceIsReady = false;
                 input.ReasonCodes = new List<string> { "instance_operator_identity_website_url_missing" };
                 return Task.FromResult(InstanceOperatorIdentitySaveResult.Successful(input));
             });
@@ -183,7 +183,7 @@ public sealed class InstanceOperatorIdentityEditorTests
         TermsUrl = "https://event.example/terms",
         PrivacyUrl = "https://event.example/privacy",
         IsOfficialInstance = true,
-        IsReady = true,
+        PaidCommerceIsReady = true,
         ReasonCodes = new List<string>()
     };
 

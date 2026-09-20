@@ -51,10 +51,9 @@ public sealed class SaveInstanceOperatorIdentityCommandHandler(
             var dto = new InstanceOperatorIdentitySavedDocumentDto
             {
                 Revision = result.Id!.Revision,
-                IsReady = result.Id.Readiness.IsReady,
-                FailureCode = result.Id.Readiness.FailureCode,
-                ReasonCodes = result.Id.Readiness.ReasonCodes,
-                OperatorId = result.Id.Readiness.Identity?.OperatorId
+                PublicDisclosure = new(result.Id.PublicDisclosure.IsReady, result.Id.PublicDisclosure.FailureCode, result.Id.PublicDisclosure.ReasonCodes),
+                PaidCommerce = new(result.Id.PaidCommerce.IsReady, result.Id.PaidCommerce.FailureCode, result.Id.PaidCommerce.ReasonCodes),
+                OperatorId = result.Id.OperatorId
             };
             return BaseCommandResponse.Success(dto, result.Message);
         }

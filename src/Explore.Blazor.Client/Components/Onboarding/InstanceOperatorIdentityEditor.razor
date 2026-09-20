@@ -208,7 +208,7 @@
                      Class="mb-2">
                 @T("operator.readinessStatus", "Readiness status")
             </MudText>
-            @if (Model.IsReady)
+            @if (Model.PaidCommerceIsReady)
             {
                 <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" data-testid="operator-readiness-ready">
                     @T("operator.readyMessage", "Instance operator identity is verified and ready for public disclosures and paid commerce.")

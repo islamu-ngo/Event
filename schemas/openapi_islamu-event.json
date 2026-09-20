@@ -61849,7 +61849,7 @@
           "InstanceOperatorIdentity"
         ],
         "summary": "Get Instance Operator Identity",
-        "description": "Returns current instance operator identity and readiness assessment.",
+        "description": "Returns the current instance operator identity with separate public-disclosure and paid-commerce readiness assessments.",
         "operationId": "GetInstanceOperatorIdentity",
         "parameters": [
           {
@@ -61944,7 +61944,7 @@
           "InstanceOperatorIdentity"
         ],
         "summary": "Update Instance Operator Identity",
-        "description": "Saves candidate instance operator identity settings.",
+        "description": "Saves a syntactically valid instance operator identity draft and returns separate public-disclosure and paid-commerce readiness assessments.",
         "operationId": "SaveInstanceOperatorIdentity",
         "parameters": [
           {
@@ -140368,21 +140368,60 @@
         }
       },
       "HalResourceOfInstanceOperatorIdentityDocumentDto": {
+        "required": [
+          "publicDisclosure",
+          "paidCommerce"
+        ],
         "type": "object",
         "properties": {
-          "isReady": {
-            "type": "boolean"
+          "publicDisclosure": {
+            "required": [
+              "isReady",
+              "failureCode",
+              "reasonCodes"
+            ],
+            "type": "object",
+            "properties": {
+              "isReady": {
+                "type": "boolean"
+              },
+              "failureCode": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "reasonCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
           },
-          "failureCode": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "reasonCodes": {
-            "type": "array",
-            "items": {
-              "type": "string"
+          "paidCommerce": {
+            "required": [
+              "isReady",
+              "failureCode",
+              "reasonCodes"
+            ],
+            "type": "object",
+            "properties": {
+              "isReady": {
+                "type": "boolean"
+              },
+              "failureCode": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "reasonCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           },
           "revision": {
@@ -151860,13 +151899,14 @@
           }
         }
       },
-      "InstanceOperatorIdentitySavedDocumentDto": {
+      "InstanceOperatorIdentityCapabilityReadinessDto": {
+        "required": [
+          "isReady",
+          "failureCode",
+          "reasonCodes"
+        ],
         "type": "object",
         "properties": {
-          "revision": {
-            "type": "string",
-            "format": "uuid"
-          },
           "isReady": {
             "type": "boolean"
           },
@@ -151881,6 +151921,25 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "InstanceOperatorIdentitySavedDocumentDto": {
+        "required": [
+          "publicDisclosure",
+          "paidCommerce"
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publicDisclosure": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentityCapabilityReadinessDto"
+          },
+          "paidCommerce": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentityCapabilityReadinessDto"
           },
           "operatorId": {
             "type": [

@@ -491,7 +491,7 @@
         || _authProviderConfigured != true
         || _authorizationProviderConfigured != true
         || _preflight?.IsReadyToLaunch != true
-        || !_operatorIdentity.IsReady
+        || !_operatorIdentity.PaidCommerceIsReady
         || !AllAcknowledgementsChecked
         || _status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true;
 
@@ -796,7 +796,7 @@
             return;
         }
 
-        if (!_operatorIdentity.IsReady)
+        if (!_operatorIdentity.PaidCommerceIsReady)
         {
             await SetCompletionErrorAsync(T("errors.operator_identity_incomplete", "Complete all required instance operator identity fields before launching."));
             return;

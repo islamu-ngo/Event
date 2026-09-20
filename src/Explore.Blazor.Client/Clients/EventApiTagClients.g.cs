@@ -84589,7 +84589,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get Instance Operator Identity
         /// </summary>
         /// <remarks>
-        /// Returns current instance operator identity and readiness assessment.
+        /// Returns the current instance operator identity with separate public-disclosure and paid-commerce readiness assessments.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -84600,7 +84600,7 @@ namespace Explore.Blazor.Client.Clients
         /// Update Instance Operator Identity
         /// </summary>
         /// <remarks>
-        /// Saves candidate instance operator identity settings.
+        /// Saves a syntactically valid instance operator identity draft and returns separate public-disclosure and paid-commerce readiness assessments.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -84645,7 +84645,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get Instance Operator Identity
         /// </summary>
         /// <remarks>
-        /// Returns current instance operator identity and readiness assessment.
+        /// Returns the current instance operator identity with separate public-disclosure and paid-commerce readiness assessments.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -84761,7 +84761,7 @@ namespace Explore.Blazor.Client.Clients
         /// Update Instance Operator Identity
         /// </summary>
         /// <remarks>
-        /// Saves candidate instance operator identity settings.
+        /// Saves a syntactically valid instance operator identity draft and returns separate public-disclosure and paid-commerce readiness assessments.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -173462,14 +173462,13 @@ namespace Explore.Blazor.Client.Clients
     public partial class HalResourceOfInstanceOperatorIdentityDocumentDto
     {
 
-        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
-        public bool? IsReady { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("publicDisclosure")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public PublicDisclosure PublicDisclosure { get; set; } = new PublicDisclosure();
 
-        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
-        public string? FailureCode { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
-        public System.Collections.Generic.ICollection<string>? ReasonCodes { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("paidCommerce")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public PaidCommerce PaidCommerce { get; set; } = new PaidCommerce();
 
         [System.Text.Json.Serialization.JsonPropertyName("revision")]
         public System.Guid? Revision { get; set; } = default!;
@@ -180480,20 +180479,49 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class InstanceOperatorIdentityCapabilityReadinessDto
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
+        public bool IsReady { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
+        public string? FailureCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> ReasonCodes { get; init; } = new System.Collections.Generic.List<string>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class InstanceOperatorIdentitySavedDocumentDto
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("revision")]
         public System.Guid? Revision { get; init; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
-        public bool? IsReady { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("publicDisclosure")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public InstanceOperatorIdentityCapabilityReadinessDto PublicDisclosure { get; init; } = new InstanceOperatorIdentityCapabilityReadinessDto();
 
-        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
-        public string? FailureCode { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
-        public System.Collections.Generic.ICollection<string>? ReasonCodes { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("paidCommerce")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public InstanceOperatorIdentityCapabilityReadinessDto PaidCommerce { get; init; } = new InstanceOperatorIdentityCapabilityReadinessDto();
 
         [System.Text.Json.Serialization.JsonPropertyName("operatorId")]
         public System.Guid? OperatorId { get; init; } = default!;
@@ -208576,6 +208604,66 @@ namespace Explore.Blazor.Client.Clients
 
         [System.Text.Json.Serialization.JsonPropertyName("currencyCode")]
         public string? CurrencyCode { get; init; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class PublicDisclosure
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
+        public bool IsReady { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
+        public string? FailureCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> ReasonCodes { get; init; } = new System.Collections.Generic.List<string>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+        // Generated record values are intentionally omitted from diagnostic text.
+        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
+        {
+            return false;
+        }
+}
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial record class PaidCommerce
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("isReady")]
+        public bool IsReady { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("failureCode")]
+        public string? FailureCode { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("reasonCodes")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> ReasonCodes { get; init; } = new System.Collections.Generic.List<string>();
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

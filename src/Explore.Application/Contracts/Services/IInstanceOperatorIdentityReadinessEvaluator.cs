@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -15,7 +16,7 @@ public static class InstanceOperatorIdentityFailureCodes
 /// <summary>
 /// Per-operation readiness assessment of the persisted instance operator identity.
 /// </summary>
-/// <param name="IsReady">True when the persisted identity satisfies the full readiness contract.</param>
+/// <param name="IsReady">True when the persisted identity satisfies the requested capability.</param>
 /// <param name="FailureCode">
 /// One of <see cref="InstanceOperatorIdentityFailureCodes.Missing"/>,
 /// <see cref="InstanceOperatorIdentityFailureCodes.IntegrityError"/>, or the domain
@@ -39,5 +40,6 @@ public sealed record InstanceOperatorIdentityReadinessAssessment(
 public interface IInstanceOperatorIdentityReadinessEvaluator
 {
     Task<InstanceOperatorIdentityReadinessAssessment> EvaluateAsync(
+        InstanceOperatorIdentityCapability capability,
         CancellationToken cancellationToken = default);
 }

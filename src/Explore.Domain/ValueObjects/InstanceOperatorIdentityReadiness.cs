@@ -44,18 +44,25 @@ public sealed record InstanceOperatorIdentityReadiness(
     private const string InstanceReasonPrefix = "instance_operator_identity_";
 
     /// <summary>
-    /// Evaluates the persisted identity document against the full paid-commerce readiness
-    /// contract: every required legal-entity field, a UUIDv7 operator id, a normalized
+    /// Evaluates the persisted identity document for the requested capability:
+    /// required legal-entity fields, a UUIDv7 operator id, a normalized
     /// HTTPS origin, and an HTTPS website URL.
     /// </summary>
-    public static InstanceOperatorIdentityReadiness Evaluate(InstanceOperatorIdentitySettings settings)
+    public static InstanceOperatorIdentityReadiness Evaluate(
+        InstanceOperatorIdentitySettings settings,
+        InstanceOperatorIdentityCapability capability)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        TenantDirectoryOperatorIdentityCapability legalCapability = capability switch
+        {
+            InstanceOperatorIdentityCapability.PublicDisclosure => TenantDirectoryOperatorIdentityCapability.PublicDisclosure,
+            InstanceOperatorIdentityCapability.PaidCommerce => TenantDirectoryOperatorIdentityCapability.PaidCommerce,
+            _ => throw new ArgumentOutOfRangeException(nameof(capability), capability, "Unsupported identity capability.")
+        };
         var reasons = ImmutableArray.CreateBuilder<string>();
         TenantDirectoryOperatorIdentityReadiness legal = TenantDirectoryOperatorIdentity.Evaluate(
-            ToLegalSettings(settings),
-            TenantDirectoryOperatorIdentityCapability.PaidCommerce);
+            ToLegalSettings(settings), legalCapability);
         reasons.AddRange(legal.ReasonCodes.Select(MapReasonCode));
 
         if (settings.OperatorId is not { } operatorId || operatorId == Guid.Empty || operatorId.Version != 7)

@@ -115,7 +115,7 @@ public sealed class GetPublicLegalDocumentQueryHandler(
         InstanceIdentityValuesAsync(CancellationToken cancellationToken)
     {
         InstanceOperatorIdentityReadinessAssessment assessment =
-            await instanceIdentityReadiness.EvaluateAsync(cancellationToken);
+            await instanceIdentityReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PublicDisclosure, cancellationToken);
         return assessment.IsReady && assessment.Identity is not null
             ? InstanceIdentityValues(assessment.Identity)
             : null;

@@ -108,7 +108,7 @@ public sealed class InstanceOperatorIdentitySectionTests
         TermsUrl = "https://event.example/terms",
         PrivacyUrl = "https://event.example/privacy",
         IsOfficialInstance = true,
-        IsReady = true,
+        PaidCommerceIsReady = true,
         ReasonCodes = new List<string>()
     };
 }

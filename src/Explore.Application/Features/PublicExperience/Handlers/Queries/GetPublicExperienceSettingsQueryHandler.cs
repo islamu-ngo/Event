@@ -150,7 +150,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             new SettingContext(TenantId: tenantId), cancellationToken);
 
         InstanceOperatorIdentityReadinessAssessment instanceAssessment =
-            await _instanceOperatorReadiness.EvaluateAsync(cancellationToken);
+            await _instanceOperatorReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PublicDisclosure, cancellationToken);
 
         return new PublicExperienceSettingsDto
         {
@@ -252,7 +252,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             PublicContactEmail = identity.PublicContactEmail,
             WebsiteUrl = identity.WebsiteUrl,
             LegalNoticeUrl = identity.LegalNoticeUrl,
-            TermsUrl = identity.TermsUrl,
+            TermsUrl = identity.TermsUrl ?? string.Empty,
             PrivacyUrl = identity.PrivacyUrl
         };
 

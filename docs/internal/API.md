@@ -5,6 +5,15 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Structured Legal-Identity Contracts
 
+`GET/PUT /api/instance-operator-identity` return separate `publicDisclosure` and
+`paidCommerce` assessments, each containing `isReady`, `failureCode`, and bounded
+`reasonCodes`. The former top-level readiness fields are removed. Authorized
+administrators may save syntactically valid incomplete drafts after setup as well
+as during setup; saving never grants a protected capability. Disclosure does not
+require commercial terms, but paid commerce does. Missing or corrupt documents
+fail both assessments closed. Routes, setup/admin authority, and revision conflicts
+are unchanged.
+
 Authenticated tenant administration exposes:
 
 | Route | Operation | Contract |

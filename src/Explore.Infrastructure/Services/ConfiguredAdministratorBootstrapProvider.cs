@@ -122,7 +122,7 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
         ValidateSubject(subject);
         ProviderAccountKey accountKey = BuildAccountKey(providerKind, subject);
         DeploymentMode deploymentMode = ResolveDeploymentMode();
-        var (identity, _) = InstanceOperatorIdentity.TryCreate(operatorIdentityOptions.Value);
+        var (identity, _) = InstanceOperatorIdentity.TryCreate(operatorIdentityOptions.Value, InstanceOperatorIdentityCapability.PaidCommerce);
         CompleteInstanceOnboardingRequest settings = BuildSettings(deploymentMode, identity);
         if (identity is not null && !new CompleteInstanceOnboardingRequestValidator().Validate(settings).IsValid)
         {

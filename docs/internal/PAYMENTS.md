@@ -133,10 +133,13 @@ operator:
 
 `PaidCommerce` readiness is an intersection, not a fallback chain. Paid event
 publication and Checkout activation require a complete tenant directory
-operator identity, a complete instance operator identity, active payment
+operator identity, instance identity explicitly assessed for `PaidCommerce`, active payment
 operations, current policies, and an eligible organizer payment connection.
 Missing or corrupt tenant identity blocks the operation with stable reason
-codes; branding is never consulted as a substitute.
+codes; branding is never consulted as a substitute. A valid administrative draft
+or successful `PublicDisclosure` assessment does not authorize commerce. Commercial
+terms remain mandatory, and recipient, revision, money, idempotency, acknowledgement,
+and immutable-acceptance checks are unchanged.
 
 Before provider handoff, `PaidOrderAcceptanceService` returns a structured
 `PaidOrderAcceptanceDisclosureDto` containing:
@@ -171,7 +174,7 @@ sequenceDiagram
     participant Provider as Organizer Payment Provider
 
     App->>Tenant: Evaluate PaidCommerce readiness
-    App->>Instance: Read immutable startup identity
+    App->>Instance: Evaluate persisted identity for PaidCommerce
     App->>Provider: Resolve organizer recipient lineage
     App-->>UI: Structured multi-party disclosure + revision
     Buyer->>UI: Acknowledge revision

@@ -18,7 +18,8 @@ namespace Explore.Application.Services;
 /// </summary>
 public sealed record InstanceOperatorIdentityDocument(
     InstanceOperatorIdentitySettings? Settings,
-    InstanceOperatorIdentityReadinessAssessment Readiness);
+    InstanceOperatorIdentityReadinessAssessment PublicDisclosure,
+    InstanceOperatorIdentityReadinessAssessment PaidCommerce);
 
 /// <summary>
 /// Result of a successful operator identity save: the fresh document revision and the
@@ -26,7 +27,9 @@ public sealed record InstanceOperatorIdentityDocument(
 /// </summary>
 public sealed record InstanceOperatorIdentitySavedDocument(
     Guid Revision,
-    InstanceOperatorIdentityReadinessAssessment Readiness);
+    Guid OperatorId,
+    InstanceOperatorIdentityReadinessAssessment PublicDisclosure,
+    InstanceOperatorIdentityReadinessAssessment PaidCommerce);
 
 /// <summary>
 /// Transactional management service for the persisted instance operator identity
@@ -36,7 +39,6 @@ public sealed record InstanceOperatorIdentitySavedDocument(
 /// </summary>
 public sealed class InstanceOperatorIdentityService(
     ISystemSettingRepository systemSettingRepository,
-    IInstanceBootstrapStateRepository bootstrapStateRepository,
     IUnitOfWork unitOfWork)
     : IInstanceOperatorIdentityReadinessEvaluator
 {
@@ -44,8 +46,17 @@ public sealed class InstanceOperatorIdentityService(
 
     /// <inheritdoc />
     public async Task<InstanceOperatorIdentityReadinessAssessment> EvaluateAsync(
+        InstanceOperatorIdentityCapability capability,
         CancellationToken cancellationToken = default)
-        => (await GetCurrentAsync(cancellationToken)).Readiness;
+    {
+        InstanceOperatorIdentityDocument document = await GetCurrentAsync(cancellationToken);
+        return capability switch
+        {
+            InstanceOperatorIdentityCapability.PublicDisclosure => document.PublicDisclosure,
+            InstanceOperatorIdentityCapability.PaidCommerce => document.PaidCommerce,
+            _ => throw new ArgumentOutOfRangeException(nameof(capability), capability, "Unsupported identity capability.")
+        };
+    }
 
     /// <summary>
     /// Returns the stored document (or null when missing or corrupt) with its readiness
@@ -60,19 +71,21 @@ public sealed class InstanceOperatorIdentityService(
 
         if (setting is null)
         {
-            return new(null, Missing());
+            return new(null, Missing(), Missing());
         }
 
         InstanceOperatorIdentitySettings? payload = TryDeserialize(setting.Value);
         return payload is null
-            ? new(null, Corrupt())
-            : new(payload, Assess(payload, payload.Revision));
+            ? new(null, Corrupt(), Corrupt())
+            : new(payload,
+                Assess(payload, InstanceOperatorIdentityCapability.PublicDisclosure),
+                Assess(payload, InstanceOperatorIdentityCapability.PaidCommerce));
     }
 
     /// <summary>
-    /// Saves a candidate document. While onboarding is pending, incomplete drafts are
-    /// persisted; once the bootstrap is completed only fully valid replacements are
-    /// accepted. <see cref="InstanceOperatorIdentitySettings.OperatorId"/>,
+    /// Saves a syntactically valid candidate, including incomplete administrative drafts.
+    /// Protected operations independently require capability readiness.
+    /// <see cref="InstanceOperatorIdentitySettings.OperatorId"/>,
     /// <see cref="InstanceOperatorIdentitySettings.IsOfficialInstance"/>, and the
     /// document revision are server-controlled and never taken from the candidate.
     /// Stale <paramref name="expectedRevision"/> values throw
@@ -85,10 +98,6 @@ public sealed class InstanceOperatorIdentityService(
         => unitOfWork.ExecuteSerializableAsync(
             async ct =>
             {
-                bool bootstrapCompleted =
-                    (await bootstrapStateRepository.GetCurrent(ct))?.Status
-                        == InstanceBootstrapStatus.Completed;
-
                 SystemSetting? setting = await systemSettingRepository.GetByKey(
                     InstanceOperatorIdentitySettingKeys.OperatorIdentity,
                     ct);
@@ -116,18 +125,6 @@ public sealed class InstanceOperatorIdentityService(
                     return BaseCommandResponse.Validation<InstanceOperatorIdentitySavedDocument>(
                         draft.ReasonCodes,
                         "The instance operator identity candidate contains invalid values.");
-                }
-
-                if (bootstrapCompleted)
-                {
-                    InstanceOperatorIdentityReadiness strict =
-                        InstanceOperatorIdentityReadiness.Evaluate(draft.Normalized);
-                    if (!strict.IsReady)
-                    {
-                        return BaseCommandResponse.Validation<InstanceOperatorIdentitySavedDocument>(
-                            strict.ReasonCodes,
-                            "A completed instance requires a fully valid operator identity.");
-                    }
                 }
 
                 InstanceOperatorIdentitySettings saved = draft.Normalized with
@@ -158,7 +155,11 @@ public sealed class InstanceOperatorIdentityService(
                 await systemSettingRepository.UpsertInCurrentTransactionAsync(setting, ct);
 
                 return BaseCommandResponse.Success(
-                    new InstanceOperatorIdentitySavedDocument(saved.Revision!.Value, Assess(saved, saved.Revision)),
+                    new InstanceOperatorIdentitySavedDocument(
+                        saved.Revision!.Value,
+                        saved.OperatorId!.Value,
+                        Assess(saved, InstanceOperatorIdentityCapability.PublicDisclosure),
+                        Assess(saved, InstanceOperatorIdentityCapability.PaidCommerce)),
                     "Instance operator identity saved.");
             },
             cancellationToken);
@@ -179,24 +180,13 @@ public sealed class InstanceOperatorIdentityService(
 
     private static InstanceOperatorIdentityReadinessAssessment Assess(
         InstanceOperatorIdentitySettings payload,
-        Guid? revision)
+        InstanceOperatorIdentityCapability capability)
     {
-        InstanceOperatorIdentityReadiness readiness = InstanceOperatorIdentityReadiness.Evaluate(payload);
-        if (!readiness.IsReady)
-        {
-            return new(
-                false,
-                InstanceOperatorIdentityReasonCodes.IncompleteFailureCode,
-                readiness.ReasonCodes,
-                null,
-                revision);
-        }
-
         (InstanceOperatorIdentity? identity, ImmutableArray<string> failures) =
-            InstanceOperatorIdentity.TryCreate(ToOptions(readiness.Normalized!));
+            InstanceOperatorIdentity.TryCreate(ToOptions(payload), capability);
         return failures.IsEmpty
-            ? new(true, null, [], identity, revision)
-            : new(false, InstanceOperatorIdentityReasonCodes.IncompleteFailureCode, failures, null, revision);
+            ? new(true, null, [], identity, payload.Revision)
+            : new(false, InstanceOperatorIdentityReasonCodes.IncompleteFailureCode, failures, null, payload.Revision);
     }
 
     private static InstanceOperatorIdentityOptions ToOptions(InstanceOperatorIdentitySettings settings) => new()

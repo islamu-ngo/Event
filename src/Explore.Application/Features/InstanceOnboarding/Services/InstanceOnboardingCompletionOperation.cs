@@ -164,7 +164,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         if (input.IsConfigured && operatorIdentityOptions?.Value is { } options)
         {
-            var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options);
+            var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
             if (configuredIdentity is not null)
             {
                 SystemSetting? existingIdentitySetting = await systemSettingRepository.GetByKey(
@@ -203,7 +203,7 @@ public sealed class InstanceOnboardingCompletionOperation(
         }
 
         InstanceOperatorIdentityReadinessAssessment identityReadiness =
-            await instanceOperatorIdentityReadiness.EvaluateAsync(cancellationToken);
+            await instanceOperatorIdentityReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, cancellationToken);
         if (!identityReadiness.IsReady)
         {
             return new(

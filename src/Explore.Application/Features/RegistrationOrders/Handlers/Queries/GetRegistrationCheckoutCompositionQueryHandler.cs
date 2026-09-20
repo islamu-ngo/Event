@@ -47,7 +47,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandler(
         if (ticketTypes.Any(ticketType => ticketType.TicketPricingModeId != (int)TicketPricingModeEnum.Free))
         {
             InstanceOperatorIdentityReadinessAssessment instanceReadiness =
-                await instanceOperatorReadiness.EvaluateAsync(cancellationToken);
+                await instanceOperatorReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, cancellationToken);
             if (!instanceReadiness.IsReady)
             {
                 return null;

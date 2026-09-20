@@ -206,6 +206,7 @@ public sealed class LegalDocumentsControllerTests
         IInstanceOperatorIdentityReadinessEvaluator
     {
         public Task<InstanceOperatorIdentityReadinessAssessment> EvaluateAsync(
+            InstanceOperatorIdentityCapability capability,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new InstanceOperatorIdentityReadinessAssessment(
                 true,

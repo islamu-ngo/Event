@@ -419,7 +419,7 @@ public class InstanceOnboardingTests : IDisposable
             {
                 Exists = true,
                 CanEdit = true,
-                IsReady = false,
+                PaidCommerceIsReady = false,
                 ReasonCodes = new List<string> { "instance_operator_identity_missing" }
             }));
 

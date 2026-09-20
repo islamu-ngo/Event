@@ -2,13 +2,14 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Security.Claims;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
-using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Persistence;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.DTOs.CustomPropertyDefinition;
-using Explore.Application.DTOs.Registration;
-using Explore.Application.Features.RegistrationAnswerFiles.Queries;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Application.Hateoas;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
@@ -238,19 +239,40 @@ public sealed class AdminRoleEndpointParityTests
 
     private static WebApplicationFactory<Program> CreateFactory()
     {
-        var fileHandler = Substitute.For<IQueryHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>>();
-        fileHandler.QueryAsync(Arg.Any<GetRegistrationAnswerFileQuery>(), Arg.Any<CancellationToken>()).Returns(new RegistrationAnswerFileDto(
-            Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
-            "answer.pdf", "application/pdf", ".pdf", 128, "quarantined", "clean",
-            DateTime.UnixEpoch, null, null, null));
+        var tenantId = PlatformDefaults.DefaultTenantId;
+        var form = RegistrationForm.Create(tenantId, Guid.CreateVersion7(), "native", "parity", "Parity", DateTime.UnixEpoch);
+        var version = RegistrationFormVersion.Create(form, 1, "en", null, null, DateTime.UnixEpoch);
+        var section = RegistrationFormSection.Create(Guid.CreateVersion7(), version, 1, "Files", DateTime.UnixEpoch);
+        var field = RegistrationFormField.Create(Guid.CreateVersion7(), section, 1, "native", "document", "Document",
+            RegistrationFieldTypeEnum.File, (int)RegistrationRetentionPolicyEnum.LegalHold,
+            RegistrationOrganizerVisibilityEnum.AuthorizedOrganizers, false, false, DateTime.UnixEpoch);
+        var file = RegistrationAnswerFile.Create(tenantId, Guid.CreateVersion7(), field, new StorageObject
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = new TenantBuilder().WithId(tenantId).Build(),
+            FileType = new FileType { MasterCode = "pdf", FullName = "PDF" },
+            Uri = "answer.pdf",
+            Provider = "test",
+            FullName = "answer.pdf",
+            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+            Purpose = StorageObjectPurposes.Document,
+            SafeDisplayName = "answer.pdf",
+            ContentType = "application/pdf",
+            Extension = ".pdf",
+            Size = 128,
+            LifecycleState = StorageObjectLifecycleStates.Active
+        }, DateTime.UnixEpoch);
+        var repository = Substitute.For<IRegistrationAnswerFileRepository>();
+        repository.GetAsync(tenantId, Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(file);
 
         return new AuthenticatedWebApplicationFactory
         {
             AuthorizationProviderOverride = new StubAuthorizationProvider()
         }.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<IQueryHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>>();
-            services.AddSingleton(fileHandler);
+            services.RemoveAll<IRegistrationAnswerFileRepository>();
+            services.AddSingleton(repository);
         }));
     }
 }

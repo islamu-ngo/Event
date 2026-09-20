@@ -9,9 +9,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
-using Explore.Application.Contracts.Operations;
-using Explore.Application.DTOs.Actor;
-using Explore.Application.Features.Actors.Requests.Queries;
+using Explore.Application.Contracts.Persistence;
 using Explore.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -155,7 +153,7 @@ public class MiddlewareOrderTests
     [Test]
     public async Task ExceptionHandler_CatchesControllerExceptions_ReturnsProblemDetails()
     {
-        // When a controller action throws (via MediatR), the exception handler should
+        // When the protected query's repository throws, the exception handler should
         // catch it and return ProblemDetails — not a raw 500 or empty body
         using var client = CreateClientThatThrows(new BadRequestException("Test validation error"));
 
@@ -190,16 +188,16 @@ public class MiddlewareOrderTests
 
     private HttpClient CreateClientThatThrows(Exception exception)
     {
-        var throwingHandler = Substitute.For<IQueryHandler<GetActorDetailsRequest, ActorDto?>>();
-        throwingHandler.QueryAsync(Arg.Any<GetActorDetailsRequest>(), Arg.Any<CancellationToken>())
-            .Returns<ActorDto?>(_ => throw exception);
+        var actorRepository = Substitute.For<IActorRepository>();
+        actorRepository.GetPublicActorProfileAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns<Actor?>(_ => throw exception);
 
         var app = _fixture.Factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                services.RemoveAll<IQueryHandler<GetActorDetailsRequest, ActorDto?>>();
-                services.AddSingleton(throwingHandler);
+                services.RemoveAll<IActorRepository>();
+                services.AddSingleton(actorRepository);
             });
         });
 

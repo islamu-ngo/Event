@@ -7,7 +7,8 @@ using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Features.RegistrationForms.Handlers.Commands;
+using Explore.Application.Operations.Decorators;
+using Explore.Application.Responses;
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -37,7 +38,8 @@ public sealed class ParticipationRequirementAttachmentRuntimeTests(
         RuntimeServiceGraph graph = await fixture.GetServiceGraphAsync();
 
         await Assert.That(graph.DatabaseProvider).IsEqualTo("Npgsql.EntityFrameworkCore.PostgreSQL");
-        await Assert.That(graph.AttachHandler).IsEqualTo(typeof(AttachRegistrationRequirementCommandHandler));
+        await Assert.That(graph.AttachHandler).IsEqualTo(typeof(
+            AuthorizationCommandHandlerDecorator<AttachRegistrationRequirementCommand, BaseCommandResponse<Guid>>));
         await Assert.That(graph.Repository).IsEqualTo(typeof(ParticipationRequirementAttachmentRepository));
         await Assert.That(graph.UnitOfWork).IsEqualTo(typeof(EfCoreUnitOfWork));
         await Assert.That(graph.AuthorizationProvider).IsEqualTo(typeof(FallbackAuthorizationService));

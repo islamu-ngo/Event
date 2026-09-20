@@ -23,7 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel]
-public sealed class ProvisioningTenantAccessHttpTests
+public sealed partial class ProvisioningTenantAccessHttpTests
 {
     private static CancellationToken Token => TestContext.Current!.Execution.CancellationToken;
     private static Guid TenantId => PlatformDefaults.DefaultTenantId;

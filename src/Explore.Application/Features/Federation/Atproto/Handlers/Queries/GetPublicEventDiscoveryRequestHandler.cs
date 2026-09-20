@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -19,7 +20,8 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
     IAtprotoEventProjectionRepository projectionRepository,
     AtprotoEventGovernanceResolver governanceResolver,
     Explore.Application.Contracts.Infrastructure.ITenantContext tenantContext,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ITenantLifecycleAccessService lifecycle)
     : IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>
 {
     public async Task<PaginatedResult<EventDiscoveryItemDto>> QueryAsync(
@@ -29,6 +31,10 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
         var validator = new GetPublicEventDiscoveryRequestValidator();
         await validator.ValidateAndThrowAsync(request, cancellationToken);
         GetPublicEventDiscoveryRequestValidator.TryGetWindow(request, out int window);
+
+        if (!await lifecycle.IsPublicAsync(tenantContext.TenantId, cancellationToken))
+            return PaginatedResult<EventDiscoveryItemDto>.Create(
+                [], 0, request.Criteria.PageNumber, request.Criteria.PageSize);
 
         AtprotoEventGovernance governance = await governanceResolver.ResolveAsync(
             tenantContext.TenantId,

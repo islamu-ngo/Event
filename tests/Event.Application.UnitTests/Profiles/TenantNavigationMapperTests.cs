@@ -1,5 +1,8 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Services;
+using Explore.Domain.Enums;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.Tenants.Handlers.Commands.CreateTenantNavLink;
@@ -22,7 +25,7 @@ public sealed class TenantNavigationMapperTests
     [Arguments("mdi-home")]
     public async Task QueryDisclosesDetachedNavigationScalars(string? icon)
     {
-        var tenant = new Tenant { Id = TenantId, FullName = "Internal tenant", Slug = "internal", TenantStatus = null! };
+        var tenant = new Tenant { Id = TenantId, FullName = "Internal tenant", Slug = "internal", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
         var link = new TenantNavigationLink
         {
             Id = LinkId,
@@ -40,7 +43,10 @@ public sealed class TenantNavigationMapperTests
         var rows = new List<TenantNavigationLink> { link };
         var repository = Substitute.For<ITenantNavigationLinkRepository>();
         repository.GetByTenantIdOrderedAsync(TenantId, default).Returns(rows);
-        var handler = new GetTenantNavLinksQueryHandler(repository, Context());
+        var tenants = Substitute.For<ITenantRepository>();
+        tenants.GetByIdAsNoTrackingAsync(TenantId, default).Returns(tenant);
+        var lifecycle = new TenantLifecycleAccessService(tenants, Substitute.For<IAdminContext>());
+        var handler = new GetTenantNavLinksQueryHandler(repository, Context(), lifecycle);
 
         var result = await handler.QueryAsync(new(), default);
         link.Label = "Changed after projection";

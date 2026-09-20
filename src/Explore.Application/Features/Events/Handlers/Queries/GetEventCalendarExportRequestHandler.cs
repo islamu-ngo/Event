@@ -12,7 +12,8 @@ namespace Explore.Application.Features.Events.Handlers.Queries;
 public sealed class GetEventCalendarExportRequestHandler(
     IEventRepository eventRepository,
     IEventSessionRepository eventSessionRepository,
-    IEventLocationDisclosureService eventLocationDisclosureService)
+    IEventLocationDisclosureService eventLocationDisclosureService,
+    ITenantLifecycleAccessService lifecycle)
     : IQueryHandler<GetEventCalendarExportRequest, EventCalendarExportDto?>
 {
     public async Task<EventCalendarExportDto?> QueryAsync(
@@ -20,7 +21,8 @@ public sealed class GetEventCalendarExportRequestHandler(
         CancellationToken cancellationToken)
     {
         Event? entity = await eventRepository.GetEventWithDetails(request.EventId);
-        if (entity is null || !IsPublicCalendarEligible(entity))
+        if (entity is null || !IsPublicCalendarEligible(entity) ||
+            !await lifecycle.IsPublicAsync(entity.TenantId, cancellationToken))
         {
             return null;
         }

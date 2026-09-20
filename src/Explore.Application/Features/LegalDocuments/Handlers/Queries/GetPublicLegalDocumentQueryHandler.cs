@@ -15,7 +15,8 @@ public sealed class GetPublicLegalDocumentQueryHandler(
     LegalDocumentRenderingService renderingService,
     ITenantContext tenantContext,
     ITenantDirectoryOperatorReadinessEvaluator tenantIdentityReadiness,
-    IInstanceOperatorIdentityReadinessEvaluator instanceIdentityReadiness)
+    IInstanceOperatorIdentityReadinessEvaluator instanceIdentityReadiness,
+    ITenantLifecycleAccessService lifecycle)
     : IQueryHandler<
         GetPublicLegalDocumentQuery,
         PublicLegalDocumentQueryResult>
@@ -36,6 +37,9 @@ public sealed class GetPublicLegalDocumentQueryHandler(
         Guid? tenantId = descriptor.Scope == LegalDocumentScope.Tenant
             ? tenantContext.TenantId
             : null;
+        if (tenantId.HasValue && !await lifecycle.IsPublicAsync(tenantId.Value, cancellationToken))
+            return PublicLegalDocumentQueryResult.NotFound();
+
         LegalDocument? document = await repository.GetPublishedAsync(
             descriptor.Scope,
             tenantId,

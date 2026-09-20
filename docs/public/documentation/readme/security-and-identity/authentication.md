@@ -215,6 +215,18 @@ Lifecycle-email failure logs report the action and HTTP status without account
 identifiers, credentials or provider response bodies. Use authorized operation
 results and delegation records when investigating a particular account.
 
+#### Provider credential retries
+
+The existing credential-bearing Keycloak and Cerbos management POST operations
+return private, non-cacheable responses and do not use generic idempotency replay.
+If a request outcome is uncertain, retry through the existing authorized operation:
+each retry checks current setup or instance-administrator authority and the current
+provider outcome. An earlier successful response is not reused. The internal
+setup authentication-configuration read that can contain provider secrets is also
+private and non-cacheable. Existing provider reconciliation remains the recovery
+path for interrupted provider work; no route, request format, or client contract
+changes with this HTTP boundary.
+
 * Production operators must ensure:
   * Proper TLS termination and reverse-proxy header forwarding (`X-Forwarded-Proto: https`).
   * Explicit registration of valid redirect URIs in the Keycloak Admin Console (see [Troubleshooting Redirect Errors](../configuration-and-operations/troubleshooting-and-health.md#recipe-1-keycloak-invalid-parameter-redirect_uri-or-infinite-login-loop)).

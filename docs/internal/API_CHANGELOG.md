@@ -3,6 +3,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-20
+
+- **Security: provider credential HTTP nonretention.** The seven existing
+  credential-bearing provider-management POST operations are now
+  `private, no-store` and bypass generic idempotency response storage. A retry
+  re-evaluates current setup or instance-administrator authority and the current
+  provider outcome rather than replaying a historical successful response. The
+  secret-bearing internal authentication-configuration GET is also
+  `private, no-store`. Routes, DTOs, operation IDs, authorization, handlers,
+  HAL, provider reconciliation, OpenAPI, and generated contracts are unchanged.
+  This HTTP-only fix does not remove database secrets or provider fallbacks, clear
+  UI data, harden logs, change lifecycle-service identity, or isolate Infisical.
+
 ## 2026-09-13
 
 - **Session status not-found contract repair.** Unknown integer IDs at

@@ -123,6 +123,18 @@ When `AUTHORIZATION_PROVIDER=cerbos` is set:
 - Requires Cerbos policies and schemas to be uploaded via `cerbosctl` (see [Coolify with Cerbos & Traefik](../self-hosting/coolify-cerbos-traefik.md)).
 - **Fail-Closed Guarantee**: If Cerbos becomes unreachable or returns an error, ISLAMU Event denies access immediately. It will **never** silently fall back to local RBAC, preventing accidental security elevation during infrastructure outages.
 
+### Provider credential operation retries
+
+Existing credential-bearing Keycloak and Cerbos management POST operations return
+private, non-cacheable responses and bypass generic idempotency replay. Retrying
+an uncertain operation checks the caller's current setup or instance-administrator
+authority and the provider's current outcome; it does not return an earlier
+successful response. Use the existing server-authorized provider reconciliation
+flow when it is available, and continue to rely on HAL links rather than inferring
+that a retry is authorized. This HTTP response boundary does not change provider
+selection, authorization decisions, routes, request or response formats, or
+server-issued HAL affordances.
+
 ---
 
 ## The Golden Rule of Client UI Affordances

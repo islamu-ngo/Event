@@ -111,6 +111,21 @@ provider-neutral:
 - `Explore.API` isolates Local/Keycloak bearer validation and AT Protocol bootstrap/session schemes before applying resource-level authorization.
 - `ISLAMU Event Domain` remains authoritative for tenant memberships, legal entities, and event access control.
 
+### Provider credential HTTP response boundary
+
+The seven existing credential-bearing provider-management POST operations are
+`private, no-store` and exclude generic idempotency response storage. A repeated
+request reaches the existing operation and re-evaluates current setup or instance
+administrator authority and the current provider outcome; a historical successful
+response is never replayed as provider authority. The existing secret-bearing
+internal authentication-configuration GET is also `private, no-store`.
+
+This changes neither routes, request or response DTOs, operation IDs,
+authorization filters, handlers, HAL affordances, provider reconciliation, nor
+generated contracts. It is limited to HTTP response retention and replay:
+database-secret removal, provider-fallback removal, UI clearing, log hardening,
+lifecycle-service identity, and Infisical isolation remain outside this change.
+
 When AT Protocol is primary, a verified DID may JIT-create a passwordless
 `User`, personal `Actor`, and global `UserExternalLogin`. This creates no role.
 Interactive administrator authority remains setup-secret-bound and configured

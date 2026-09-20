@@ -138,6 +138,11 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
 
                 var secretPath = ValidateSecretPath(secret.SecretPath, path);
                 var configKey = ConvertToConfigurationKey(secret.SecretKey, secretPath);
+                if (configKey is null)
+                {
+                    continue;
+                }
+
                 newData[configKey] = secretValue;
 
                 // Flat deployment aliases belong to the requested folder, not recursive children.
@@ -325,7 +330,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     /// <summary>
     /// Converts an Infisical secret key to .NET configuration format.
     /// </summary>
-    private static string ConvertToConfigurationKey(string secretKey, string path)
+    private static string? ConvertToConfigurationKey(string secretKey, string path)
     {
         var normalizedPath = path.Trim('/');
 
@@ -477,42 +482,56 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             };
         }
 
-        // 7. Web Push (/api/webpush or /api/web-push) -> WebPush:*
-        if (normalizedPath.Equals("api/webpush", StringComparison.OrdinalIgnoreCase)
-            || normalizedPath.Equals("api/web-push", StringComparison.OrdinalIgnoreCase))
+        // 7. Keycloak SMTP (/keycloak/smtp) -> Keycloak bootstrap environment names
+        if (normalizedPath.Equals("keycloak/smtp", StringComparison.OrdinalIgnoreCase))
         {
-            var key = secretKey.ToUpperInvariant();
-            if (key.StartsWith("WEBPUSH_", StringComparison.Ordinal))
-                key = key["WEBPUSH_".Length..];
-            else if (key.StartsWith("WEB_PUSH_", StringComparison.Ordinal))
-                key = key["WEB_PUSH_".Length..];
-
-            return key switch
+            return secretKey.ToUpperInvariant() switch
             {
-                "ENABLED" => "WebPush:Enabled",
-                "VAPID_PUBLIC_KEY" or "PUBLIC_KEY" => "WebPush:VapidPublicKey",
-                "VAPID_PRIVATE_KEY" or "PRIVATE_KEY" => "WebPush:VapidPrivateKey",
-                "VAPID_SUBJECT" or "SUBJECT" => "WebPush:VapidSubject",
-                _ => $"WebPush:{ToPascalCase(key)}"
+                "KEYCLOAK_SMTP_HOST" => "KEYCLOAK_SMTP_HOST",
+                "KEYCLOAK_SMTP_PORT" => "KEYCLOAK_SMTP_PORT",
+                "KEYCLOAK_SMTP_FROM" => "KEYCLOAK_SMTP_FROM",
+                "KEYCLOAK_SMTP_FROM_DISPLAY_NAME" => "KEYCLOAK_SMTP_FROM_DISPLAY_NAME",
+                "KEYCLOAK_SMTP_AUTH" => "KEYCLOAK_SMTP_AUTH",
+                "KEYCLOAK_SMTP_SSL" => "KEYCLOAK_SMTP_SSL",
+                "KEYCLOAK_SMTP_STARTTLS" => "KEYCLOAK_SMTP_STARTTLS",
+                "KEYCLOAK_SMTP_REPLY_TO" => "KEYCLOAK_SMTP_REPLY_TO",
+                "KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME" => "KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME",
+                "KEYCLOAK_SMTP_ENVELOPE_FROM" => "KEYCLOAK_SMTP_ENVELOPE_FROM",
+                "KEYCLOAK_SMTP_USER" => "KEYCLOAK_SMTP_USER",
+                "KEYCLOAK_SMTP_PASSWORD" => "KEYCLOAK_SMTP_PASSWORD",
+                _ => null
             };
         }
 
-        // 8. Rate Limiting (/api/ratelimiting or /api/rate-limiting) -> RateLimiting:*
+        // 8. Web Push (/api/webpush or /api/web-push) -> WebPush:*
+        if (normalizedPath.Equals("api/webpush", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Equals("api/web-push", StringComparison.OrdinalIgnoreCase))
+        {
+            return secretKey.ToUpperInvariant() switch
+            {
+                "WEB_PUSH_ENABLED" => "WebPush:Enabled",
+                "VAPID_PUBLIC_KEY" => "WebPush:VapidPublicKey",
+                "VAPID_PRIVATE_KEY" => "WebPush:VapidPrivateKey",
+                "VAPID_SUBJECT" => "WebPush:VapidSubject",
+                _ => null
+            };
+        }
+
+        // 9. Rate Limiting (/api/ratelimiting or /api/rate-limiting) -> RateLimiting:*
         if (normalizedPath.Equals("api/ratelimiting", StringComparison.OrdinalIgnoreCase)
             || normalizedPath.Equals("api/rate-limiting", StringComparison.OrdinalIgnoreCase))
         {
-            var key = secretKey;
-            if (key.StartsWith("RATELIMITING__", StringComparison.OrdinalIgnoreCase))
-                key = key["RATELIMITING__".Length..];
-            else if (key.StartsWith("RATE_LIMITING__", StringComparison.OrdinalIgnoreCase))
-                key = key["RATE_LIMITING__".Length..];
+            if (secretKey.Contains("__", StringComparison.Ordinal))
+            {
+                return null;
+            }
 
-            var rateLimitingParts = key.Split("__", StringSplitOptions.RemoveEmptyEntries);
+            var rateLimitingParts = secretKey.Split('_', StringSplitOptions.RemoveEmptyEntries);
             var rateLimitingConfigParts = rateLimitingParts.Select(NormalizeRateLimitingPart);
             return $"RateLimiting:{string.Join(":", rateLimitingConfigParts)}";
         }
 
-        // 9. Flat /api folder aliases
+        // 10. Flat /api folder aliases
         if (normalizedPath.Equals("api", StringComparison.OrdinalIgnoreCase))
         {
             var upper = secretKey.ToUpperInvariant();
@@ -591,13 +610,13 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
 
         }
 
-        // 10. Special mappings for common patterns
+        // 11. Special mappings for common patterns
         if (secretKey.Equals("AI_TOOL_PROPOSALS_ENABLED", StringComparison.OrdinalIgnoreCase))
         {
             return "AiProvider:ToolProposalsEnabled";
         }
 
-        // 11. Default path to section conversion
+        // 12. Default path to section conversion
         var pathSegments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var section = pathSegments.Length == 0 ? string.Empty : string.Join(":", pathSegments.Select(ToPascalCase)) + ":";
 

@@ -106,8 +106,12 @@ public sealed class ConfigurationAuthorityRegressionTests
             ? [
                 new("PUBLIC_NAME", "Community Operator", "/api/operator-identity"),
                 new("MODE", "configured", "/api/bootstrap"),
-                new("PUBLIC_KEY", "public-key", "/api/webpush"),
-                new("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "7", "/api/ratelimiting"),
+                new("VAPID_PUBLIC_KEY", "public-key", "/api/webpush"),
+                new("PUBLIC_KEY", "ignored-public-key", "/api/webpush"),
+                new("ANONYMOUSREGISTRATION_IPPERMITLIMIT", "7", "/api/ratelimiting"),
+                new("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "11", "/api/ratelimiting"),
+                new("RATELIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "12", "/api/ratelimiting"),
+                new("RATE_LIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "13", "/api/rate-limiting"),
             ]
             : []);
         using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), false);
@@ -118,7 +122,46 @@ public sealed class ConfigurationAuthorityRegressionTests
         await Assert.That(configuration["Instance:OperatorIdentity:PublicName"]).IsEqualTo("Community Operator");
         await Assert.That(configuration["INSTANCE_BOOTSTRAP_MODE"]).IsEqualTo("configured");
         await Assert.That(configuration["WebPush:VapidPublicKey"]).IsEqualTo("public-key");
+        await Assert.That(configuration["WebPush:PublicKey"]).IsNull();
         await Assert.That(configuration.GetValue<int>("RateLimiting:AnonymousRegistration:IpPermitLimit")).IsEqualTo(7);
+    }
+
+    [Test]
+    public async Task Infisical_KeycloakSmtpFolderSecretsPublishKeycloakBootstrapNames()
+    {
+        string password = Guid.CreateVersion7().ToString("N");
+        await using var server = await SecretServer.StartAsync(path => path == "/keycloak"
+            ? [
+                new("KEYCLOAK_SMTP_HOST", "smtp.example.test", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_PORT", "587", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_FROM", "noreply@example.test", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_FROM_DISPLAY_NAME", "ISLAMU Event", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_AUTH", "true", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_SSL", "false", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_STARTTLS", "true", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_REPLY_TO", "support@example.test", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME", "ISLAMU Support", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_ENVELOPE_FROM", "bounce@example.test", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_USER", "smtp-user", "/keycloak/smtp"),
+                new("KEYCLOAK_SMTP_PASSWORD", password, "/keycloak/smtp"),
+            ]
+            : []);
+        using var source = new InfisicalConfigurationProvider(new()
+        {
+            Url = server.Url,
+            ProjectId = "project-id",
+            ClientId = "client-id",
+            ClientSecret = Guid.CreateVersion7().ToString("N"),
+            Environment = "testing",
+            Paths = ["/keycloak"],
+        });
+
+        source.Load();
+        source.TryGet("KEYCLOAK_SMTP_HOST", out string? host);
+        source.TryGet("KEYCLOAK_SMTP_PASSWORD", out string? configuredPassword);
+
+        await Assert.That(host).IsEqualTo("smtp.example.test");
+        await Assert.That(configuredPassword).IsEqualTo(password);
     }
 
     [Test]

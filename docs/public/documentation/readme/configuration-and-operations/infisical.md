@@ -104,6 +104,7 @@ Create the following folders at the root of the selected environment. Folder nam
 ├── integrations
 │   └── listmonk            (optional: subscriber sync)
 ├── keycloak                (optional: OIDC identity)
+│   └── smtp                (optional: Keycloak account-email delivery)
 ├── mcp                     (optional: Model Context Protocol)
 ├── smtp                    (optional: transactional mail)
 ├── storage                 (optional: S3 / local uploads)
@@ -156,14 +157,14 @@ Optional configuration when connecting this instance to a central managed SaaS c
 
 ### `/api/webpush`
 
-Optional browser Web Push notification credentials (VAPID). When all three VAPID values are present, Web Push is automatically enabled (aliases `/api/web-push` or `/api/webpush`).
+Optional browser Web Push notification credentials (VAPID). When all three VAPID values are present, Web Push is automatically enabled (aliases `/api/web-push` or `/api/webpush`). Use only the following key names.
 
-| Key | Alternative / Legacy | Purpose |
-|---|---|---|
-| `ENABLED` | `WEB_PUSH_ENABLED` | `true` or `false`; explicitly enables or disables Web Push. |
-| `SUBJECT` | `VAPID_SUBJECT` | Web Push contact subject (`mailto:` or origin URL). |
-| `PUBLIC_KEY` | `VAPID_PUBLIC_KEY` | Web Push public key (served to browsers). |
-| `PRIVATE_KEY` | `VAPID_PRIVATE_KEY` | Web Push private key (server-only; sensitive secret). |
+| Key | Purpose |
+|---|---|
+| `WEB_PUSH_ENABLED` | `true` or `false`; explicitly enables or disables Web Push. |
+| `VAPID_SUBJECT` | Web Push contact subject (`mailto:` or origin URL). |
+| `VAPID_PUBLIC_KEY` | Web Push public key (served to browsers). |
+| `VAPID_PRIVATE_KEY` | Web Push private key (server-only; sensitive secret). |
 
 ### `/api/ratelimiting`
 
@@ -171,11 +172,11 @@ Optional rate-limiting overrides for DDoS and anti-abuse protection (aliases `/a
 
 | Key | Purpose |
 |---|---|
-| `ANONYMOUSREGISTRATION__IPPERMITLIMIT` | Per-IP permit limit for anonymous registration (default: `10`). |
-| `ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT` | Per-subnet permit limit (default: `40`). |
-| `ANONYMOUSREGISTRATION__WINDOWSECONDS` | Rate limit window in seconds (default: `60`). |
-| `ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | Concurrency limit (default: `8`). |
-| `ANONYMOUSREGISTRATION__QUEUELIMIT` | Queue limit (default: `0`). |
+| `ANONYMOUSREGISTRATION_IPPERMITLIMIT` | Per-IP permit limit for anonymous registration (default: `10`). |
+| `ANONYMOUSREGISTRATION_SUBNETPERMITLIMIT` | Per-subnet permit limit (default: `40`). |
+| `ANONYMOUSREGISTRATION_WINDOWSECONDS` | Rate limit window in seconds (default: `60`). |
+| `ANONYMOUSREGISTRATION_CONCURRENCYLIMIT` | Concurrency limit (default: `8`). |
+| `ANONYMOUSREGISTRATION_QUEUELIMIT` | Queue limit (default: `0`). |
 
 The build no longer consumes Lucky Penny licensing or edition-selection secrets.
 Remove obsolete entries from the selected authority using the
@@ -211,6 +212,14 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_BLAZOR_REDIRECT_URIS` | Optional comma-separated allowed redirect URIs. |
 | `KEYCLOAK_BLAZOR_WEB_ORIGINS` | Optional allowed CORS web origins. |
 | `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` | Optional allowed post-logout redirect URIs. |
+`KEYCLOAK_DB_DATABASE`, `KEYCLOAK_DB_USERNAME`, and `KEYCLOAK_DB_PASSWORD` are backend provisioning inputs, not BFF-readable `/keycloak` entries. Inject them only into their owning container/provisioning environment; database keys in frontend folders fail closed.
+
+### `/keycloak/smtp`
+
+Optional Keycloak realm SMTP settings for account emails. These are separate from ISLAMU Event's `/smtp` delivery. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak settings.
+
+| Key | Purpose |
+|---|---|
 | `KEYCLOAK_SMTP_HOST` | Optional realm SMTP host for Keycloak verification emails. |
 | `KEYCLOAK_SMTP_PORT` | Optional realm SMTP port. |
 | `KEYCLOAK_SMTP_FROM` | Optional realm sender address. |
@@ -223,10 +232,6 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_SMTP_REPLY_TO` | Optional reply-to address. |
 | `KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME` | Optional reply-to display name. |
 | `KEYCLOAK_SMTP_ENVELOPE_FROM` | Optional envelope-from address. |
-
-`KEYCLOAK_DB_DATABASE`, `KEYCLOAK_DB_USERNAME`, and `KEYCLOAK_DB_PASSWORD` are backend provisioning inputs, not BFF-readable `/keycloak` entries. Inject them only into their owning container/provisioning environment; database keys in frontend folders fail closed.
-
-Keycloak's own account emails are configured here and are separate from ISLAMU Event's `/smtp` delivery. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak settings.
 
 ### `/database`
 

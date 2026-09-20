@@ -259,31 +259,72 @@ public sealed class InfisicalConfigurationProviderTests
     }
 
     [Test]
-    public async Task ConvertToConfigurationKey_WhenWebPushFolderSecretsProvided_MapsToWebPush()
+    public async Task ConvertToConfigurationKey_WhenKeycloakSmtpFolderSecretsProvided_PreservesKeycloakBootstrapNames()
     {
-        var enabled = await ConvertToConfigurationKey("ENABLED", "/api/webpush");
-        var pub = await ConvertToConfigurationKey("PUBLIC_KEY", "/api/web-push");
-        var priv = await ConvertToConfigurationKey("PRIVATE_KEY", "/api/webpush");
-        var subject = await ConvertToConfigurationKey("SUBJECT", "/api/web-push");
+        string[] keys =
+        [
+            "KEYCLOAK_SMTP_HOST",
+            "KEYCLOAK_SMTP_PORT",
+            "KEYCLOAK_SMTP_FROM",
+            "KEYCLOAK_SMTP_FROM_DISPLAY_NAME",
+            "KEYCLOAK_SMTP_AUTH",
+            "KEYCLOAK_SMTP_SSL",
+            "KEYCLOAK_SMTP_STARTTLS",
+            "KEYCLOAK_SMTP_REPLY_TO",
+            "KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME",
+            "KEYCLOAK_SMTP_ENVELOPE_FROM",
+            "KEYCLOAK_SMTP_USER",
+            "KEYCLOAK_SMTP_PASSWORD",
+        ];
+
+        foreach (var key in keys)
+        {
+            var configurationKey = await ConvertToConfigurationKey(key, "/keycloak/smtp");
+
+            await Assert.That(configurationKey).IsEqualTo(key);
+        }
+    }
+
+    [Test]
+    public async Task ConvertToConfigurationKey_WhenWebPushFolderLegacySecretsProvided_MapsToWebPush()
+    {
+        var enabled = await ConvertToConfigurationKey("WEB_PUSH_ENABLED", "/api/webpush");
+        var pub = await ConvertToConfigurationKey("VAPID_PUBLIC_KEY", "/api/web-push");
+        var priv = await ConvertToConfigurationKey("VAPID_PRIVATE_KEY", "/api/webpush");
+        var subject = await ConvertToConfigurationKey("VAPID_SUBJECT", "/api/web-push");
         var legacyInApi = await ConvertToConfigurationKey("VAPID_PUBLIC_KEY", "/api");
+        var unsupportedEnabled = await ConvertToConfigurationKey("ENABLED", "/api/webpush");
+        var unsupportedPublicKey = await ConvertToConfigurationKey("PUBLIC_KEY", "/api/web-push");
+        var unsupportedPrivateKey = await ConvertToConfigurationKey("PRIVATE_KEY", "/api/webpush");
+        var unsupportedSubject = await ConvertToConfigurationKey("SUBJECT", "/api/web-push");
 
         await Assert.That(enabled).IsEqualTo("WebPush:Enabled");
         await Assert.That(pub).IsEqualTo("WebPush:VapidPublicKey");
         await Assert.That(priv).IsEqualTo("WebPush:VapidPrivateKey");
         await Assert.That(subject).IsEqualTo("WebPush:VapidSubject");
         await Assert.That(legacyInApi).IsEqualTo("WebPush:VapidPublicKey");
+        await Assert.That(unsupportedEnabled).IsNull();
+        await Assert.That(unsupportedPublicKey).IsNull();
+        await Assert.That(unsupportedPrivateKey).IsNull();
+        await Assert.That(unsupportedSubject).IsNull();
     }
 
     [Test]
     public async Task ConvertToConfigurationKey_WhenRateLimitingFolderSecretsProvided_MapsToRateLimiting()
     {
-        var ipLimit = await ConvertToConfigurationKey("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "/api/ratelimiting");
-        var window = await ConvertToConfigurationKey("ANONYMOUSREGISTRATION__WINDOWSECONDS", "/api/rate-limiting");
+        var ipLimit = await ConvertToConfigurationKey("ANONYMOUSREGISTRATION_IPPERMITLIMIT", "/api/ratelimiting");
+        var window = await ConvertToConfigurationKey("ANONYMOUSREGISTRATION_WINDOWSECONDS", "/api/rate-limiting");
         var legacyInApi = await ConvertToConfigurationKey("RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT", "/api");
+        var unsupportedDoubleSeparator = await ConvertToConfigurationKey("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "/api/ratelimiting");
+        var unsupportedRateLimitingPrefix = await ConvertToConfigurationKey("RATELIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "/api/ratelimiting");
+        var unsupportedRateLimitingAliasPrefix = await ConvertToConfigurationKey("RATE_LIMITING__ANONYMOUSREGISTRATION_IPPERMITLIMIT", "/api/rate-limiting");
 
         await Assert.That(ipLimit).IsEqualTo("RateLimiting:AnonymousRegistration:IpPermitLimit");
         await Assert.That(window).IsEqualTo("RateLimiting:AnonymousRegistration:WindowSeconds");
         await Assert.That(legacyInApi).IsEqualTo("RateLimiting:AnonymousRegistration:IpPermitLimit");
+        await Assert.That(unsupportedDoubleSeparator).IsNull();
+        await Assert.That(unsupportedRateLimitingPrefix).IsNull();
+        await Assert.That(unsupportedRateLimitingAliasPrefix).IsNull();
     }
 
     [Test]
@@ -298,14 +339,14 @@ public sealed class InfisicalConfigurationProviderTests
         await Assert.That(cleanKey).DoesNotStartWith("Licensing:LuckyPenny:");
     }
 
-    private static async Task<string> ConvertToConfigurationKey(string secretKey, string path)
+    private static async Task<string?> ConvertToConfigurationKey(string secretKey, string path)
     {
         var method = typeof(InfisicalConfigurationProvider).GetMethod(
             "ConvertToConfigurationKey",
             BindingFlags.NonPublic | BindingFlags.Static);
 
         await Assert.That(method).IsNotNull();
-        return ((string?)method!.Invoke(null, [secretKey, path]))!;
+        return (string?)method!.Invoke(null, [secretKey, path]);
     }
 
     private static Dictionary<string, string?> CaptureBootstrapEnvironment() =>

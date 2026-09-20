@@ -190,7 +190,7 @@
                     {
                         if (instanceStatus.IsCurrentUserInstanceAdmin)
                         {
-                            Navigation.NavigateTo("/settings/instance");
+                            Navigation.NavigateTo("/settings/instance?section=getting-started");
                             return;
                         }
 
@@ -216,7 +216,7 @@
                 Navigation.NavigateTo("/setup");
                 return;
             case StartupRouteDecision.InstanceAdmin:
-                Navigation.NavigateTo("/settings/instance");
+                Navigation.NavigateTo("/settings/instance?section=getting-started");
                 return;
             case StartupRouteDecision.KeycloakChallenge:
                 NavigateToProviderChallenge("Keycloak");

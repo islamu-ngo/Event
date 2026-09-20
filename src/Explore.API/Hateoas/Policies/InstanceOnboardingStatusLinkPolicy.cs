@@ -82,6 +82,10 @@ public sealed class InstanceOnboardingStatusLinkPolicy(
             AuthorizationSettingKey,
             "Manage authorization provider");
 
+        yield return new LinkDefinition(
+            "manage-operator-identity", RouteNames.GetInstanceOperatorIdentity,
+            Method: HttpMethods.Get, Title: "Manage operator identity", RequiresAuth: true);
+
         if (string.Equals(dto.SelectedDeploymentMode, "MultiTenant", StringComparison.OrdinalIgnoreCase))
         {
             yield return InstanceSettingLink(

@@ -62,7 +62,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
     [Arguments("instance_operator_identity_incomplete", "instance_operator_identity_legal_name_missing")]
     [Arguments("instance_operator_identity_missing", null)]
     [Arguments("instance_operator_identity_integrity_error", null)]
-    public async Task CompletionRollback_WhenIdentityNotReady_AbortsWithoutCommittingAdministratorOrTenantRecords(
+    public async Task CompletionWithoutLegalIdentity_CreatesPrivateAdministration(
         string failureCode, string? reasonCode)
     {
         var scenario = new OnboardingCompletionScenario();
@@ -76,13 +76,73 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
 
-        await Assert.That(response.IsSuccess).IsFalse();
-        await Assert.That(response.FailureCode).IsEqualTo(failureCode);
-        await Assert.That(response.Errors ?? []).IsEquivalentTo(reasonCode is null ? [] : new[] { reasonCode });
-        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
-        await Assert.That(scenario.CommittedWrites).IsEmpty();
-        await Assert.That(scenario.Users).IsEmpty();
-        await Assert.That(scenario.PostCommitEffects).IsEmpty();
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Completed);
+        await Assert.That(scenario.CreatedTenant?.TenantStatusId).IsEqualTo((int)TenantStatusEnum.Provisioning);
+        await Assert.That(scenario.Users).Contains(scenario.UserId);
+    }
+
+    [Test]
+    public async Task InteractiveCompletion_RequiresNoDirectoryLegalIdentity()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        var command = scenario.InteractiveCommand();
+        command = command with { Settings = command.Settings with { DirectoryOperatorIdentity = null } };
+        var handler = new CompleteInstanceOnboardingCommandHandler(
+            scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+
+        var response = await handler.ExecuteAsync(command, CancellationToken.None);
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.CreatedTenant?.TenantStatusId).IsEqualTo((int)TenantStatusEnum.Provisioning);
+    }
+
+    [Test]
+    public async Task ConfiguredCompletion_WithoutIdentity_CreatesCanonicalDrafts()
+    {
+        var scenario = new OnboardingCompletionScenario();
+        scenario.Configuration = scenario.Configuration with { DirectoryOperatorIdentity = null };
+
+        var response = await scenario.ClaimAsync();
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.CreatedTenant?.TenantStatusId).IsEqualTo((int)TenantStatusEnum.Provisioning);
+        var draft = TenantDirectoryOperatorIdentityDocumentDefaults.Create(PlatformDefaults.DefaultTenantId);
+        await Assert.That(scenario.CreatedTenant?.DirectoryOperatorIdentity.PayloadJson).IsEqualTo(draft.PayloadJson);
+    }
+
+    [Test]
+    public async Task ConfiguredMultiTenantCompletion_CreatesNoDefaultTenant()
+    {
+        var scenario = new OnboardingCompletionScenario();
+        scenario.Configuration = scenario.Configuration with { DeploymentMode = DeploymentMode.MultiTenant, DirectoryOperatorIdentity = null };
+
+        var response = await scenario.ClaimAsync();
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.CreatedTenant).IsNull();
+        await Assert.That(scenario.CommittedWrites).DoesNotContain("tenant-role");
+    }
+
+    [Test]
+    public async Task ExistingActiveDefault_IsPreservedWithoutReplacingItsDocuments()
+    {
+        var scenario = new OnboardingCompletionScenario
+        {
+            ExistingTenant = new Tenant
+            {
+                Id = PlatformDefaults.DefaultTenantId, FullName = "Existing", Slug = "existing",
+                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            }
+        };
+
+        var response = await scenario.ClaimAsync();
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.ExistingTenant.TenantStatusId).IsEqualTo((int)TenantStatusEnum.Active);
+        await Assert.That(scenario.CreatedTenant).IsNull();
+        await Assert.That(scenario.CommittedWrites).DoesNotContain("tenant-identity");
+        await Assert.That(scenario.CommittedWrites).DoesNotContain("tenant-branding");
     }
 
     [Test]
@@ -261,6 +321,16 @@ internal sealed class OnboardingCompletionScenario
         var tenants = Substitute.For<ITenantRepository>();
         var tenantCreation = Substitute.For<ITenantCreationService>();
         var tenantSettings = Substitute.For<ITenantSettingsDocumentRepository>();
+        tenantSettings.Create(Arg.Any<TenantSettingsDocument>()).Returns(call =>
+        {
+            RecordWrite("tenant-identity");
+            return call.Arg<TenantSettingsDocument>();
+        });
+        tenantSettings.Update(Arg.Any<TenantSettingsDocument>()).Returns(_ =>
+        {
+            RecordWrite("tenant-identity");
+            return Task.CompletedTask;
+        });
         var systemSettings = Substitute.For<ISystemSettingRepository>();
         var branding = Substitute.For<ITenantBrandingSettingsDocumentProvisioningService>();
 
@@ -335,12 +405,13 @@ internal sealed class OnboardingCompletionScenario
             return role;
         });
 
-        tenants.GetById(PlatformDefaults.DefaultTenantId).Returns(_ => (Tenant?)null);
+        tenants.GetById(PlatformDefaults.DefaultTenantId).Returns(_ => ExistingTenant);
         tenantCreation.CreateInCurrentTransactionAsync(Arg.Any<TenantCreationRequest>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 RecordWrite("tenant");
                 TenantCreationRequest request = call.Arg<TenantCreationRequest>();
+                CreatedTenant = request;
                 var tenant = new Tenant
                 {
                     Id = request.TenantId,
@@ -426,19 +497,19 @@ internal sealed class OnboardingCompletionScenario
             externalLogins,
             tenants,
             tenantCreation,
-            tenantSettings,
             systemSettings,
             [_provider],
             setupSecret,
             audit,
             DeploymentModeProvider,
             jwt,
-            branding,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance,
-            _unitOfWork,
-            IdentityReadiness);
+            _unitOfWork);
     }
 
+    public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();
+    public Tenant? ExistingTenant { get; set; }
+    public TenantCreationRequest? CreatedTenant { get; private set; }
     public Guid UserId { get; }
     public ProviderAccountKey Account { get; }
     public InstanceBootstrapState Bootstrap { get; set; }
@@ -599,7 +670,7 @@ internal sealed class OnboardingCompletionScenario
                 BindingAccount,
                 Generation,
                 Fingerprint,
-                Settings(),
+                owner.Configuration,
                 new ConfiguredAdministratorProfile("configured@example.test", "Configured", "Admin")));
         }
     }

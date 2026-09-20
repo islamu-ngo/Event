@@ -70,13 +70,13 @@ public class StartupGateTests : IDisposable
     #region Completed routing
 
     [Test]
-    public async Task StartupGate_WhenDecisionIsInstanceAdmin_RedirectsToControlPlaneOverview()
+    public async Task StartupGate_WhenDecisionIsInstanceAdmin_RedirectsToGettingStarted()
     {
         _startupRouting.GetRootDecisionAsync().Returns(StartupRouteDecision.InstanceAdmin);
 
         _ctx.RenderMudComponent<StartupGate>();
 
-        await Assert.That(LastNavigationUri()).EndsWith(ControlPlaneRoutes.Overview);
+        await Assert.That(LastNavigationUri()).EndsWith("/settings/instance?section=getting-started");
     }
 
     [Test]

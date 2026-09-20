@@ -108,7 +108,11 @@
                                 Settings Menu
                             </MudButton>
                         </div>
-                        @if (_currentSection == "governance")
+                        @if (_currentSection == "getting-started")
+                        {
+                            <InstanceGettingStartedSection />
+                        }
+                        else if (_currentSection == "governance")
                         {
                             <InstanceGovernanceSection Delegation="_delegation"
                                                        EventPolicy="_eventPolicy"
@@ -407,6 +411,15 @@
 
         if (!_canEdit)
         {
+            _isLoading = false;
+            return;
+        }
+
+        _deploymentMode = status?.SelectedDeploymentMode ?? _deploymentMode;
+        ApplySectionFromQuery();
+        if (_currentSection == "getting-started")
+        {
+            _identityReady = true;
             _isLoading = false;
             return;
         }
@@ -873,6 +886,7 @@
         {
             List<NavItem> navItems =
             [
+                new("getting-started",  Icons.Material.Filled.Checklist,       "Getting started"),
                 new("governance",       Icons.Material.Filled.Settings,        "General"),
                 new("operator-identity",Icons.Material.Filled.Badge,           "Operator Identity"),
             ];
@@ -919,6 +933,7 @@
 
         List<NavItem> multiTenantNavItems =
         [
+            new("getting-started",  Icons.Material.Filled.Checklist,       "Getting started"),
             new("governance",       Icons.Material.Filled.Gavel,           "Governance"),
             new("operator-identity",Icons.Material.Filled.Badge,           "Operator Identity"),
             new("tenants",          Icons.Material.Filled.DomainAdd,       "Tenants"),
@@ -1004,6 +1019,11 @@
 
     private void SelectSection(string section)
     {
+        if (_currentSection == "getting-started" && section != _currentSection)
+        {
+            Navigation.NavigateTo($"/settings/instance?section={Uri.EscapeDataString(section)}", forceLoad: true);
+            return;
+        }
         _currentSection = section;
         _showMobileMenu = false;
     }

@@ -340,7 +340,10 @@ public class InstanceOnboardingControllerTests
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
-        var completePayload = CreateValidOnboardingRequest();
+        var completePayload = CreateValidOnboardingRequest() with
+        {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client)
+        };
 
         using var completeRequest = CreateInstanceAdminRequest(HttpMethod.Post, $"{BaseUrl}/complete", userId, completePayload, includeSetupSecret: true);
         var completeResponse = await client.SendAsync(completeRequest);
@@ -375,7 +378,7 @@ public class InstanceOnboardingControllerTests
             HttpMethod.Post,
             $"{BaseUrl}/complete",
             userId,
-            CreateValidOnboardingRequest(),
+            CreateValidOnboardingRequest() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client) },
             includeSetupSecret: true);
         using var response = await client.SendAsync(request);
 
@@ -430,7 +433,7 @@ public class InstanceOnboardingControllerTests
         using var request = CreateCustomAuthRequest(
             HttpMethod.Post,
             $"{BaseUrl}/complete",
-            CreateValidOnboardingRequest(),
+            CreateValidOnboardingRequest() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client) },
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Unlinked Bootstrap User"),
             new("sub", providerId),
@@ -470,7 +473,7 @@ public class InstanceOnboardingControllerTests
         using var request = CreateCustomAuthRequest(
             HttpMethod.Post,
             $"{BaseUrl}/complete",
-            CreateValidOnboardingRequest(),
+            CreateValidOnboardingRequest() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client) },
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Sid Only User"),
             new("internal_user_id", internalUserId.ToString()),
@@ -604,7 +607,10 @@ public class InstanceOnboardingControllerTests
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
-        var clientPayload = CreateValidOnboardingRequest();
+        var clientPayload = CreateValidOnboardingRequest() with
+        {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client)
+        };
         clientPayload.DeploymentMode = DeploymentMode.MultiTenant;
 
         using var completeRequest = CreateInstanceAdminRequest(HttpMethod.Post, $"{BaseUrl}/complete", userId, clientPayload, includeSetupSecret: true);
@@ -632,6 +638,7 @@ public class InstanceOnboardingControllerTests
 
         var clientPayload = new CompleteInstanceOnboardingRequest
         {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client),
             DeploymentMode = DeploymentMode.SingleTenant,
             SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Integration Test Instance" }
         };
@@ -1352,6 +1359,16 @@ public class InstanceOnboardingControllerTests
     private static string EncodeClaims(params TestAuthHandler.TestClaimDto[] claims)
     {
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(claims)));
+    }
+
+    private static async Task<string?> ReadGenerationAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/journey");
+        request.Headers.Add("X-Setup-Secret", SetupSecret);
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var journey = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return journey.RootElement.GetProperty("generation").GetString();
     }
 
     private static CompleteInstanceOnboardingRequest CreateValidOnboardingRequest()

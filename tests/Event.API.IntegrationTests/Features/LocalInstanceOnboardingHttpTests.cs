@@ -26,6 +26,51 @@ public sealed class LocalInstanceOnboardingHttpTests
     private static CancellationToken CancellationToken => TestContext.Current!.Execution.CancellationToken;
 
     [Test]
+    public async Task StaleJourneyGeneration_RejectsBeforeCredentialCreation()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
+        using HttpClient client = CreateClient(factory);
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
+        var request = Request();
+        request = request with { Settings = request.Settings with { ExpectedJourneyGeneration = "stale" } };
+
+        using var response = await client.PostAsJsonAsync(CompletePath, request, CancellationToken);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        await Assert.That(problem.RootElement.GetProperty("_links").GetProperty("refresh").GetProperty("href").GetString())
+            .IsEqualTo("/api/instanceonboarding/journey");
+        await using var database = factory.CreateDatabase();
+        await Assert.That(await database.LocalIdentityUsers.AnyAsync(CancellationToken)).IsFalse();
+        await Assert.That(await database.PlatformUserRoles.AnyAsync(CancellationToken)).IsFalse();
+    }
+
+    [Test]
+    public async Task LostCompletionResponse_IsRecoveredFromStatusWithoutReplayingCredentials()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
+        await using var before = factory.CreateDatabase();
+        int existingStatus = (await before.Tenants.AsNoTracking().SingleAsync(CancellationToken)).TenantStatusId;
+        using HttpClient client = CreateClient(factory);
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
+        var request = await WithCurrentJourneyAsync(client, Request());
+        request = request with { Settings = request.Settings with { DirectoryOperatorIdentity = null } };
+        using (var ignoredResponse = await client.PostAsJsonAsync(CompletePath, request, CancellationToken)) { }
+        client.DefaultRequestHeaders.Remove("X-Setup-Secret");
+
+        using var status = await StatusAsync(client);
+
+        await Assert.That(status.RootElement.GetProperty("isCompleted").GetBoolean()).IsTrue();
+        await Assert.That(status.RootElement.GetProperty("provider").GetString()).IsEqualTo("Local");
+        await Assert.That(status.RootElement.GetProperty("setupSecretState").GetString()).IsEqualTo("Locked");
+        await Assert.That(status.RootElement.GetProperty("_links").TryGetProperty("complete-local", out _)).IsFalse();
+        await using var database = factory.CreateDatabase();
+        await Assert.That(await database.LocalIdentityUsers.CountAsync(CancellationToken)).IsEqualTo(1);
+        await Assert.That((await database.Tenants.SingleAsync(CancellationToken)).TenantStatusId)
+            .IsEqualTo(existingStatus);
+    }
+
+    [Test]
     [Arguments(IdentityDatabaseTopology.Colocated, false)]
     [Arguments(IdentityDatabaseTopology.External, false)]
     [Arguments(IdentityDatabaseTopology.Colocated, true)]
@@ -37,6 +82,7 @@ public sealed class LocalInstanceOnboardingHttpTests
         var request = Request() with { Email = supplyEmail ? $"local-{Guid.CreateVersion7():N}@example.test" : null };
         client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
         client.DefaultRequestHeaders.Add("Idempotency-Key", request.OperationId.ToString("D"));
+        request = await WithCurrentJourneyAsync(client, request);
         using HttpResponseMessage response = await client.PostAsJsonAsync(CompletePath, request, CancellationToken);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using JsonDocument body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(CancellationToken));
@@ -130,7 +176,7 @@ public sealed class LocalInstanceOnboardingHttpTests
         await Assert.That(bearerOnly.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         client.DefaultRequestHeaders.Authorization = null;
         client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
-        using HttpResponseMessage response = await client.PostAsJsonAsync(CompletePath, Request(), CancellationToken);
+        using HttpResponseMessage response = await client.PostAsJsonAsync(CompletePath, await WithCurrentJourneyAsync(client, Request()), CancellationToken);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await using ExploreDbContext database = factory.CreateDatabase();
         await Assert.That(await database.LocalIdentityUsers.AnyAsync(CancellationToken)).IsFalse();
@@ -159,7 +205,7 @@ public sealed class LocalInstanceOnboardingHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true, enableRateLimiting: true);
         using HttpClient client = CreateClient(factory);
         client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
-        var request = Request() with { OperationId = Guid.Empty };
+        var request = await WithCurrentJourneyAsync(client, Request()) with { OperationId = Guid.Empty };
         for (int attempt = 0; attempt < 5; attempt++)
         {
             using HttpResponseMessage response = await client.PostAsJsonAsync(CompletePath, request, CancellationToken);
@@ -188,6 +234,7 @@ public sealed class LocalInstanceOnboardingHttpTests
             firstBrowser.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
             using JsonDocument initial = await StatusAsync(firstBrowser);
             await Assert.That(initial.RootElement.TryGetProperty("pendingOperationId", out _)).IsFalse();
+            original = await WithCurrentJourneyAsync(firstBrowser, original);
             fault.Armed = true;
             using HttpResponseMessage interrupted = await firstBrowser.PostAsJsonAsync(CompletePath, original, CancellationToken);
             await Assert.That(interrupted.IsSuccessStatusCode).IsFalse();
@@ -202,6 +249,7 @@ public sealed class LocalInstanceOnboardingHttpTests
         using JsonDocument status = await StatusAsync(browser);
         Guid recovered = status.RootElement.GetProperty("pendingOperationId").GetGuid();
         await Assert.That(recovered).IsEqualTo(original.OperationId);
+        original = await WithCurrentJourneyAsync(browser, original);
         using HttpResponseMessage wrongOperation = await browser.PostAsJsonAsync(CompletePath,
             original with { OperationId = Guid.CreateVersion7() }, CancellationToken);
         await Assert.That(wrongOperation.IsSuccessStatusCode).IsFalse();
@@ -246,22 +294,41 @@ public sealed class LocalInstanceOnboardingHttpTests
     public async Task MissingDirectoryOperatorCannotBeInferredFromCredentialEmail()
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
+        await using var before = factory.CreateDatabase();
+        var existingDocuments = await before.TenantSettingsDocuments.AsNoTracking()
+            .Select(document => document.PayloadJson).ToArrayAsync(CancellationToken);
         using HttpClient client = CreateClient(factory);
         client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
-        var valid = Request();
+        var valid = await WithCurrentJourneyAsync(client, Request());
         var request = valid with
         {
             Email = $"private-{Guid.CreateVersion7():N}@example.test",
             Settings = valid.Settings with { DirectoryOperatorIdentity = null }
         };
         using HttpResponseMessage response = await client.PostAsJsonAsync(CompletePath, request, CancellationToken);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string body = await response.Content.ReadAsStringAsync(CancellationToken);
         await Assert.That(body.Contains(request.TemporaryPassword, StringComparison.Ordinal)
             || body.Contains(request.Email, StringComparison.Ordinal)
             || body.Contains(request.Username, StringComparison.Ordinal)).IsFalse();
         await using ExploreDbContext database = factory.CreateDatabase();
-        await Assert.That(await database.LocalIdentityUsers.AnyAsync(CancellationToken)).IsFalse();
+        await Assert.That(await database.LocalIdentityUsers.CountAsync(CancellationToken)).IsEqualTo(1);
+        var documents = await database.TenantSettingsDocuments.AsNoTracking()
+            .Select(document => document.PayloadJson).ToArrayAsync(CancellationToken);
+        await Assert.That(documents).IsEquivalentTo(existingDocuments);
+        await Assert.That(documents.Any(payload => payload.Contains(request.Email, StringComparison.Ordinal))).IsFalse();
+    }
+
+    private static async Task<CompleteLocalInstanceOnboardingRequestDto> WithCurrentJourneyAsync(
+        HttpClient client, CompleteLocalInstanceOnboardingRequestDto request)
+    {
+        using var response = await client.GetAsync("/api/instanceonboarding/journey", CancellationToken);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var journey = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return request with { Settings = request.Settings with
+        {
+            ExpectedJourneyGeneration = journey.RootElement.GetProperty("generation").GetString()
+        } };
     }
 
     private static CompleteLocalInstanceOnboardingRequestDto Request() => new()

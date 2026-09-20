@@ -60,7 +60,11 @@ Interactive Local setup uses the authenticated setup-secret principal and the
 `complete-local` HAL action, not public account registration.
 `CompleteLocalInstanceOnboardingCommandHandler` rechecks active setup authority,
 the current Local provider and launch preflight before provisioning. The wizard
-collects a username, temporary password and optional credential email.
+collects a site name, username, temporary password and optional credential email.
+Both browser completion paths submit the current journey generation; conflicts
+require a refresh rather than blind credential replay. Completed Local status
+retains its provider so a refreshed browser can offer sign-in without resubmitting
+credentials. Password replacement remains owned by the existing Local login flow.
 Subsequent Local account creation/reset belongs to a current instance
 administrator, not a tenant administrator or setup-secret holder. Issued
 credentials are handed over privately and replaced before normal session
@@ -83,7 +87,14 @@ intent still require their own guarded administration.
 
 ## 2. Operator Identity Governance & Readiness Gate
 
-Runtime operator identity is stored in the database under system setting `instance.operator_identity` and configured via the first-run onboarding wizard (`/setup`) or authenticated administrator settings (`/admin/instance` via `GET/PUT /api/instance-operator-identity`).
+Runtime operator identity is stored under `instance.operator_identity` and managed
+at `/settings/instance?section=operator-identity` through
+`GET/PUT /api/instance-operator-identity`. It is not an installation prerequisite.
+Completion creates missing canonical identity drafts without inventing legal facts.
+A new SingleTenant default directory remains Provisioning; existing directories
+and their documents are preserved. MultiTenant creates no default directory.
+Administrators reach `/settings/instance?section=getting-started` after sign-in;
+publication remains a later explicit, authorized transition.
 
 - **Decoupled Startup:** API and Standalone hosts boot cleanly without operator identity environment variables, allowing the web onboarding wizard and health probes to respond.
 - **Optional Headless Bootstrap Seed:** For headless `ConfiguredAdministrator` deployments, `INSTANCE__OPERATORIDENTITY__*` in `.env` can optionally provide first-run identity which is validated and persisted to the database during bootstrap completion.

@@ -977,13 +977,17 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
-    public async Task GetStartupStatusAsync_MapsCompletedInteractive_AndSurfacesServerAuthority()
+    [Arguments(null)]
+    [Arguments("Local")]
+    [Arguments("Keycloak")]
+    [Arguments("Atproto")]
+    public async Task GetStartupStatusAsync_MapsCompletedInteractive_AndSurfacesServerAuthority(string? provider)
     {
         SetupBffClient(CreateJsonResponse(CreateStatusResource(
             isCompleted: true,
             state: "Completed",
             mode: "Interactive",
-            provider: null,
+            provider: provider,
             generation: 7,
             isAuthenticated: true,
             isCurrentUserInstanceAdmin: true,
@@ -996,6 +1000,7 @@ public class InstanceOnboardingServiceTests
         await Assert.That(status.IsCurrentUserInstanceAdmin).IsTrue();
         await Assert.That(status.SelectedDeploymentMode).IsEqualTo("MultiTenant");
         await Assert.That(status.Generation).IsEqualTo(7L);
+        await Assert.That(status.Provider).IsEqualTo(provider);
     }
 
     [Test]

@@ -59,7 +59,7 @@
                     NavigateToProviderChallenge("atproto");
                     return;
                 case StartupRouteDecision.InstanceAdmin:
-                    Navigation.NavigateTo(ControlPlaneRoutes.Overview);
+                    Navigation.NavigateTo("/settings/instance?section=getting-started");
                     return;
                 case StartupRouteDecision.PublicLanding:
                     Navigation.NavigateTo("/home");

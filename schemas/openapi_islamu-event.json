@@ -111022,6 +111022,12 @@
           "deploymentMode": {
             "$ref": "#/components/schemas/DeploymentMode"
           },
+          "expectedJourneyGeneration": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "siteProfile": {
             "$ref": "#/components/schemas/SelfHostOnboardingProfileDto"
           },

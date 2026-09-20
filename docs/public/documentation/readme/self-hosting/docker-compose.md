@@ -22,6 +22,17 @@ configuration inputs, not your database schema or selected deployment topology.
 
 ---
 
+## Finishing Private Setup
+
+Complete site and administrator setup before legal identity configuration. After
+Local password replacement and fresh sign-in, or the selected external provider's
+sign-in, open `/settings/instance?section=getting-started`. A new SingleTenant
+directory stays private until explicit activation; MultiTenant creates none.
+Existing directory state and documents are preserved. If completion returns a
+state conflict, refresh setup status before resubmitting. If status says Completed,
+continue through sign-in rather than replaying credentials or reopening setup.
+Public disclosures and paid commerce retain their own readiness checks.
+
 ## 1. Architecture & Service Topology
 
 The repository `docker-compose.yml` declares these base services. Host ports below

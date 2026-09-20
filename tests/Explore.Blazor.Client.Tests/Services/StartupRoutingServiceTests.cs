@@ -105,17 +105,19 @@ public sealed class StartupRoutingServiceTests
     }
 
     [Test]
-    public async Task GetRootDecisionAsync_ReturnsPublicHome_ForInstanceAdminInSingleTenant()
+    public async Task GetRootDecisionAsync_ReturnsInstanceAdmin_WithoutPublicShellForInstanceAdminInSingleTenant()
     {
         var instanceOnboarding = CreateInstanceOnboardingService(Completed(
             selectedDeploymentMode: "SingleTenant",
             isAuthenticated: true,
             isCurrentUserInstanceAdmin: true));
-        var service = new StartupRoutingService(instanceOnboarding, CreatePublicExperienceService());
+        var publicExperience = CreatePublicExperienceService();
+        publicExperience.GetCachedShellAsync().Returns<Task<PublicExperienceShellDto?>>(_ => throw new InvalidOperationException("Private administration must not load a public shell."));
+        var service = new StartupRoutingService(instanceOnboarding, publicExperience);
 
         var decision = await service.GetRootDecisionAsync();
 
-        await Assert.That(decision).IsEqualTo(StartupRouteDecision.PublicHome);
+        await Assert.That(decision).IsEqualTo(StartupRouteDecision.InstanceAdmin);
     }
 
     [Test]

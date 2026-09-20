@@ -125,7 +125,16 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
             Authentication = auth, Authorization = authz, Profile = profile,
             Preflight = projectedPreflight, OperatorIdentity = identity
         };
-        return snapshot with { Generation = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(snapshot))) };
+        var durableSnapshot = snapshot with
+        {
+            Bootstrap = bootstrap with
+            {
+                IsAuthenticated = false,
+                IsCurrentUserInstanceAdmin = false,
+                PendingOperationId = null
+            }
+        };
+        return snapshot with { Generation = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(durableSnapshot))) };
     }
 
     private static OnboardingProviderReadinessDto Readiness(string provider, string state, bool deploymentManaged, string relation) => new()

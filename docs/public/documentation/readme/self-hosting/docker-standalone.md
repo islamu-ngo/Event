@@ -8,8 +8,14 @@ The standalone image (`Event.Standalone`) is the simplest and lowest-overhead op
 
 You can complete Local administrator setup and use the core without SMTP,
 Mailpit or a credential email address. Public operator contact and legal identity
-are still required. Email delivery starts disabled and is an optional,
-administrator-controlled capability.
+are not required to finish setup; configure them before dependent disclosure,
+directory activation or paid commerce. Email delivery starts disabled and is an
+optional, administrator-controlled capability.
+
+After setup and Local password replacement, sign in afresh and open
+`/settings/instance?section=getting-started`. A new SingleTenant directory stays
+Provisioning and private until explicitly activated. Setup status recovers a lost
+completion response without replaying credentials; completed setup stays locked.
 
 ---
 

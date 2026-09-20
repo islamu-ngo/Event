@@ -1,0 +1,45 @@
+@using Explore.Blazor.Client.Services
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Helpers
+@inject IInstanceOnboardingService Onboarding
+
+<section class="instance-getting-started" aria-labelledby="instance-getting-started-heading">
+    <MudText Typo="Typo.h5" HtmlTag="h2" id="instance-getting-started-heading">Administration ready</MudText>
+    <MudText>Setup is finished. Your directory remains private until you explicitly activate it.</MudText>
+    @if (_status is null)
+    {
+        <p role="status">Administration status is unavailable. Refresh to recover the server's current actions.</p>
+    }
+    else
+    {
+        <nav class="instance-getting-started__actions" aria-label="Getting started actions">
+            @if (_status.HasHalLink("manage-authentication") || _status.HasHalLink("manage-authorization"))
+            {
+                <MudLink Href="/settings/instance?section=auth-providers">Manage providers</MudLink>
+            }
+            @if (_status.HasHalLink("manage-operator-identity"))
+            {
+                <MudLink Href="/settings/instance?section=operator-identity">Configure operator identity</MudLink>
+            }
+            @if (_status.HasHalLink("manage-tenants"))
+            {
+                <MudLink Href="/admin/tenants">Manage directories</MudLink>
+            }
+        </nav>
+    }
+    <MudButton ButtonType="ButtonType.Button" OnClick="RefreshAsync" Disabled="_loading">Refresh status</MudButton>
+</section>
+
+@code {
+    private InstanceOnboardingStatusDto? _status;
+    private bool _loading;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+        try { _status = await Onboarding.GetStatusAsync(); }
+        finally { _loading = false; }
+    }
+}

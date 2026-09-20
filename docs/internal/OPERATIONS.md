@@ -20,8 +20,18 @@ node-local revision. A concurrent stale identity edit must reload its revision;
 do not retry it by overwriting current data.
 
 No schema migration, new configuration, dependency, or payment-history change is
-required. Setup completion and the browser getting-started journey are separate
-work; this change does not switch completion to Provisioning automatically.
+required. Setup completion now creates a missing SingleTenant default directory
+as Provisioning, without changing an existing tenant's status or documents.
+MultiTenant completion creates no directory. After sign-in, administrators open
+`/settings/instance?section=getting-started` without loading the public shell.
+
+Completion submits the generation returned by the current private journey. HTTP
+409 means refresh that journey before another attempt. If a response is lost,
+read durable status first: Completed is final and never permits credential replay
+or reopening setup. Local completion does not sign the operator in. Sign in with
+the temporary password, complete the existing private replacement flow, then sign
+in afresh. The login flow, not the onboarding status projection, decides whether
+password replacement is required.
 
 ## Anonymous Registration Retention
 

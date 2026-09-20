@@ -227,6 +227,9 @@ public class InstanceOnboardingController : EventControllerBase
             return this.ToValidationProblem(CompleteValidationProblem, PreflightBlockedMessage);
         }
 
+        if (await CheckCompletionJourneyAsync(settings.ExpectedJourneyGeneration, cancellationToken) is { } conflict)
+            return conflict;
+
         providerSubject ??= currentUserId.Value.ToString("D");
         var authProvider = User.GetAuthProvider();
         var email = User.GetEmail();
@@ -275,8 +278,31 @@ public class InstanceOnboardingController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> CompleteLocal(
         [FromBody] CompleteLocalInstanceOnboardingRequestDto request, CancellationToken cancellationToken = default)
     {
+        if (await CheckCompletionJourneyAsync(request.Settings?.ExpectedJourneyGeneration, cancellationToken) is { } conflict)
+            return conflict;
+
         var response = await _completeLocalOnboardingCommand.ExecuteAsync(new CompleteLocalInstanceOnboardingCommand(request, User), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, CompleteValidationProblem);
+    }
+
+    private async Task<ObjectResult?> CheckCompletionJourneyAsync(string? expectedGeneration, CancellationToken cancellationToken)
+    {
+        var journey = await _journeyQuery.QueryAsync(new() { SetupPrincipal = User }, cancellationToken);
+        if (journey.State == "Available" && !string.IsNullOrWhiteSpace(expectedGeneration)
+            && string.Equals(expectedGeneration, journey.Generation, StringComparison.Ordinal))
+            return null;
+
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = "Setup state changed",
+            Detail = "Refresh authoritative setup status before submitting a new completion request."
+        };
+        problem.Extensions["_links"] = new Dictionary<string, object>
+        {
+            ["refresh"] = new { href = "/api/instanceonboarding/journey", method = "GET" }
+        };
+        return new ObjectResult(problem) { StatusCode = StatusCodes.Status409Conflict };
     }
 
     [AllowAnonymous]

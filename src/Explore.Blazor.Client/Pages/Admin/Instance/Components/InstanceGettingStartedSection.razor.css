@@ -1,0 +1,12 @@
+.instance-getting-started {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.instance-getting-started__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    align-items: flex-start;
+}

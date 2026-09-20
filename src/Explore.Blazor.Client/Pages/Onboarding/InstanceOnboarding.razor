@@ -91,23 +91,23 @@
                 </MudText>
                 <div role="status">
                     <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
-                        @T("success.message", "The platform is live. Continue with the destination that matches this deployment mode.")
+                        @T("success.administration_ready", "Administration is ready. Setup does not publish a directory.")
                     </MudAlert>
                 </div>
                 <div class="instance-onboarding__actions">
                     @if (_localCompleted)
                     {
                         <MudAlert Severity="Severity.Info">Sign in with the temporary password, replace it privately, then sign in again. Setup has not created a signed-in session.</MudAlert>
-                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/login?provider=local">Sign in to replace password</MudButton>
+                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/login?provider=local&amp;returnUrl=%2Fsettings%2Finstance%3Fsection%3Dgetting-started">Sign in to continue</MudButton>
                     }
                     else if (IsSingleTenantMode)
                     {
                         <MudButton Elevation="0"
                                    Color="Color.Primary"
                                    Variant="Variant.Filled"
-                                   Href="/events"
-                                   StartIcon="@Icons.Material.Filled.Event">
-                            @T("success.single_primary", "Browse events")
+                                   Href="/settings/instance?section=getting-started"
+                                   StartIcon="@Icons.Material.Filled.Settings">
+                            @T("success.getting_started", "Open administration")
                         </MudButton>
                         <MudButton Elevation="0"
                                    Color="Color.Secondary"
@@ -122,9 +122,9 @@
                         <MudButton Elevation="0"
                                    Color="Color.Primary"
                                    Variant="Variant.Filled"
-                                   Href="@ControlPlaneRoutes.Overview"
+                                   Href="/settings/instance?section=getting-started"
                                    StartIcon="@Icons.Material.Filled.Dashboard">
-                            @T("success.multi_primary", "Open control plane")
+                            @T("success.getting_started", "Open administration")
                         </MudButton>
                         @if (CanManageTenants)
                         {
@@ -200,33 +200,6 @@
                         </MudButton>
                     }
                 </section>
-
-                <section id="instance-operator-identity" class="instance-onboarding__section" aria-labelledby="instance-operator-identity-heading">
-                    <InstanceOperatorIdentityEditor @ref="_operatorIdentityEditor"
-                                                    Model="_operatorIdentity"
-                                                    IsSingleTenantMode="IsSingleTenantMode"
-                                                    ShowCopyToDirectoryIdentity="IsSingleTenantMode"
-                                                    AllowIncompleteDraft="true"
-                                                    Disabled="_submitState.IsSubmitting"
-                                                    OnCopyToDirectoryIdentity="HandleCopyToDirectoryIdentity" />
-                </section>
-
-                @if (IsSingleTenantMode)
-                {
-                    <fieldset class="instance-onboarding__section">
-                        <legend>Directory operator identity</legend>
-                        <MudText Typo="Typo.body2">These public accountability details are separate from the administrator's optional credential email.</MudText>
-                        <AppTextField T="string" Id="operator-public-name" Label="Public name" Required="true" @bind-Value="_directoryOperator.PublicName" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-legal-name" Label="Legal name" Required="true" @bind-Value="_directoryOperator.LegalName" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-kind-code" Label="Operator kind code" Required="true" @bind-Value="_directoryOperator.OperatorKindCode" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-jurisdiction-country-code" Label="Jurisdiction country code" Required="true" MaxLength="2" @bind-Value="_directoryOperator.JurisdictionCountryCode" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-registration-identifier" Label="Registration identifier (optional)" @bind-Value="_directoryOperator.RegistrationIdentifier" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-public-contact-email" Label="Public contact email" InputType="InputType.Email" Required="true" @bind-Value="_directoryOperator.PublicContactEmail" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-legal-notice-url" Label="Legal notice URL" InputType="InputType.Url" Required="true" @bind-Value="_directoryOperator.LegalNoticeUrl" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-terms-url" Label="Terms URL (optional)" InputType="InputType.Url" @bind-Value="_directoryOperator.TermsUrl" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-privacy-url" Label="Privacy URL" InputType="InputType.Url" Required="true" @bind-Value="_directoryOperator.PrivacyUrl" Disabled="_submitState.IsSubmitting" />
-                    </fieldset>
-                }
 
                 @if (IsLocalSetup)
                 {
@@ -364,7 +337,6 @@
     private readonly SelfHostOnboardingProfileDto _siteProfile = new();
     private readonly TenantDirectoryOperatorIdentityInputDto _directoryOperator = new();
     private InstanceOperatorIdentityAdminModel _operatorIdentity = new();
-    private InstanceOperatorIdentityEditor? _operatorIdentityEditor;
     private string _localUsername = string.Empty;
     private string _localPassword = string.Empty;
     private string? _localEmail;
@@ -486,8 +458,8 @@
         : "/onboarding/authz-provider";
     private string? CurrentError => _completionError ?? _setupSecretError ?? _loadError;
     private string CompleteButtonLabel => _submitState.IsSubmitting
-        ? T("actions.launching", "Launching...")
-        : T("actions.launch", "Launch instance");
+        ? T("actions.finishing", "Finishing setup...")
+        : T("actions.finish", "Finish setup");
     private bool HasSeriousWarning => _preflight?.WarningChecks?.Any(check =>
         string.Equals(check.Severity, "Critical", StringComparison.OrdinalIgnoreCase)
         || string.Equals(check.Severity, "High", StringComparison.OrdinalIgnoreCase)) == true;
@@ -499,7 +471,6 @@
         || _authProviderConfigured != true
         || _authorizationProviderConfigured != true
         || _preflight?.IsReadyToLaunch != true
-        || !_operatorIdentity.PaidCommerceIsReady
         || !AllAcknowledgementsChecked
         || _status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true;
 
@@ -722,6 +693,7 @@
             bool wasLocal = IsLocalSetup;
             _status = status;
             _isCompleted = status?.IsCompleted == true;
+            _localCompleted = _isCompleted && status?.Provider == "Local" && status.IsAuthenticated != true;
             if (wasLocal && !IsLocalSetup)
             {
                 _localPassword = string.Empty;
@@ -838,12 +810,6 @@
             return;
         }
 
-        if (!_operatorIdentity.PaidCommerceIsReady)
-        {
-            await SetCompletionErrorAsync(T("errors.operator_identity_incomplete", "Complete all required instance operator identity fields before launching."));
-            return;
-        }
-
         if (IsLocalSetup)
         {
             await CompleteLocalSetupAsync();
@@ -863,11 +829,11 @@
 
             var completion = new CompleteInstanceOnboardingRequest
             {
+                ExpectedJourneyGeneration = _journey?.Generation,
                 DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
                 AdministrationAccessMode = "Embedded",
                 SiteProfile = CreateCompletionProfile(),
-                InstanceName = _siteProfile.SiteName?.Trim(),
-                DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null
+                InstanceName = _siteProfile.SiteName?.Trim()
             };
 
             var preRefreshed = await InstanceOnboardingService.RefreshAuthSessionAsync();
@@ -982,9 +948,9 @@
                 Email = NormalizeOptional(_localEmail), FirstName = NormalizeOptional(_localFirstName), LastName = NormalizeOptional(_localLastName),
                 Settings = new CompleteInstanceOnboardingRequest
                 {
+                    ExpectedJourneyGeneration = _journey?.Generation,
                     DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
                     SiteProfile = CreateCompletionProfile(),
-                    DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null,
                     AdministrationAccessMode = "Embedded", InstanceName = _siteProfile.SiteName?.Trim()
                 }
             }, _lifetimeCancellation.Token);

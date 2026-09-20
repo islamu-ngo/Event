@@ -67,6 +67,16 @@ public class InstanceOnboardingTests : IDisposable
     public void Dispose() => _ctx.Dispose();
 
     [Test]
+    public async Task PrivateCompletion_DoesNotRequireLegalIdentity()
+    {
+        _identityReady = false;
+        var cut = RenderForDeploymentMode("SingleTenant");
+
+        await Assert.That(cut.FindAll("#operator-legal-name").Count).IsEqualTo(0);
+        await Assert.That(cut.Find("button[type='submit']").HasAttribute("disabled")).IsFalse();
+    }
+
+    [Test]
     public async Task Refresh_UsesOnlyTheJourneySnapshotAndRefreshesSavedProfile()
     {
         var journey = new HalResourceOfInstanceOnboardingJourneyDto
@@ -176,7 +186,7 @@ public class InstanceOnboardingTests : IDisposable
         Require(cut.FindAll("a").Any(link => link.GetAttribute("href") == "/onboarding/auth-provider"),
             "Configured authentication must retain access to realm management.");
         RequireNotContains(cut.Markup, "Configure authentication");
-        Require(!FindButton(cut, "Launch instance").HasAttribute("disabled"),
+        Require(!cut.Find("button[type='submit']").HasAttribute("disabled"),
             "A completed authentication task must not block launch.");
 
         await Task.CompletedTask;
@@ -187,14 +197,9 @@ public class InstanceOnboardingTests : IDisposable
     {
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        FindButton(cut, "Launch instance").Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            RequireContains(cut.Markup, "Manage authentication");
-            Require(FindLink(cut, "/settings/instance?section=auth-providers") is not null,
-                    "Completed setup must retain the HAL-authorized Keycloak management route.");
-        });
+        await cut.Find("form").SubmitAsync();
+        Require(FindLink(cut, "/settings/instance?section=auth-providers") is not null,
+            "Completed setup must retain the HAL-authorized provider management route.");
 
         await Task.CompletedTask;
     }
@@ -229,25 +234,20 @@ public class InstanceOnboardingTests : IDisposable
             "SingleTenant",
             CreatePreflight("SingleTenant", blockingStatus: "Fail"));
 
-        Require(FindButton(cut, "Launch instance").HasAttribute("disabled"), "Expected blocker to disable completion.");
+        Require(cut.Find("button[type='submit']").HasAttribute("disabled"), "Expected blocker to disable completion.");
         await _instanceOnboardingService.DidNotReceive()
             .CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>());
     }
 
     [Test]
-    public async Task OrdinaryWarning_IsNonBlockingAndSingleTenantUsesEventHandoff()
+    public async Task OrdinaryWarning_IsNonBlockingAndSingleTenantUsesPrivateHandoff()
     {
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        Require(!FindButton(cut, "Launch instance").HasAttribute("disabled"), "Ordinary warning must remain non-blocking.");
-        FindButton(cut, "Launch instance").Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            RequireContains(cut.Markup, "Instance setup is complete");
-            Require(FindLink(cut, "/events") is not null, "Expected events handoff.");
-            Require(FindLink(cut, "/settings/instance") is not null, "Expected settings handoff.");
-        });
+        Require(!cut.Find("button[type='submit']").HasAttribute("disabled"), "Ordinary warning must remain non-blocking.");
+        await cut.Find("form").SubmitAsync();
+        Require(FindLink(cut, "/settings/instance?section=getting-started") is not null, "Expected private handoff.");
+        Require(FindLink(cut, "/events") is null, "Completion must not require public access.");
 
         await _instanceOnboardingService.Received(1)
             .CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>());
@@ -263,12 +263,10 @@ public class InstanceOnboardingTests : IDisposable
         var cut = RenderForDeploymentMode("SingleTenant", preflight);
 
         RequireContains(cut.Markup, "Required acknowledgement");
-        Require(FindButton(cut, "Launch instance").HasAttribute("disabled"), "Serious warning must require acknowledgement.");
-
-        cut.Find("input[type='checkbox']").Change(true);
-        cut.WaitForAssertion(() =>
-            Require(!FindButton(cut, "Launch instance").HasAttribute("disabled"), "Acknowledgement should enable completion."));
-        FindButton(cut, "Launch instance").Click();
+        Require(cut.Find("button[type='submit']").HasAttribute("disabled"), "Serious warning must require acknowledgement.");
+        await cut.Find("input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true });
+        Require(!cut.Find("button[type='submit']").HasAttribute("disabled"), "Acknowledgement should enable completion.");
+        await cut.Find("form").SubmitAsync();
 
         await _instanceOnboardingService.Received(1)
             .CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>());
@@ -280,21 +278,16 @@ public class InstanceOnboardingTests : IDisposable
         var requestDefaults = new CompleteInstanceOnboardingRequest();
         var cut = RenderForDeploymentMode("MultiTenant");
 
-        FindButton(cut, "Launch instance").Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            RequireContains(cut.Markup, "Open control plane");
-            RequireContains(cut.Markup, "Manage first tenant (optional)");
-            Require(FindLink(cut, ControlPlaneRoutes.Overview) is not null, "Expected control-plane handoff.");
-            Require(FindLink(cut, ControlPlaneRoutes.Tenants) is not null, "Expected optional tenant handoff.");
-        });
+        await cut.Find("form").SubmitAsync();
+        Require(FindLink(cut, "/settings/instance?section=getting-started") is not null, "Expected private handoff.");
+        Require(FindLink(cut, ControlPlaneRoutes.Tenants) is not null, "Expected optional tenant handoff.");
 
         await _instanceOnboardingService.Received(1).CompleteAsync(
             Arg.Is<CompleteInstanceOnboardingRequest>(request =>
                 request != null
                 && request.SiteProfile != null
                 && request.SiteProfile.SiteName == "ISLAMU Explore"
+                && request.ExpectedJourneyGeneration == "fixture"
                 && request.AdministrationAccessMode == "Embedded"
                 && request.AdminHost == requestDefaults.AdminHost));
     }
@@ -305,8 +298,8 @@ public class InstanceOnboardingTests : IDisposable
         var cut = RenderForDeploymentMode("MultiTenant");
 
         RequireContains(cut.Markup, "Post-launch");
-        Require(!FindButton(cut, "Launch instance").HasAttribute("disabled"), "Optional tenant task must not block launch.");
-        FindButton(cut, "Launch instance").Click();
+        Require(!cut.Find("button[type='submit']").HasAttribute("disabled"), "Optional tenant task must not block completion.");
+        await cut.Find("form").SubmitAsync();
 
         await _instanceOnboardingService.Received(1)
             .CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>());
@@ -317,7 +310,7 @@ public class InstanceOnboardingTests : IDisposable
     {
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        FindButton(cut, "Launch instance").Click();
+        await cut.Find("form").SubmitAsync();
 
         await _instanceOnboardingService.Received(2).RefreshAuthSessionAsync();
         await _instanceOnboardingService.Received(1)
@@ -338,13 +331,9 @@ public class InstanceOnboardingTests : IDisposable
             });
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        FindButton(cut, "Launch instance").Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            RequireContains(cut.Find("[role='alert']").TextContent, "Invalid onboarding request.");
-            RequireContains(cut.Find("[role='alert']").TextContent, "A required launch check failed.");
-        });
+        await cut.Find("form").SubmitAsync();
+        RequireContains(cut.Find("[role='alert']").TextContent, "Invalid onboarding request.");
+        RequireContains(cut.Find("[role='alert']").TextContent, "A required launch check failed.");
 
         await Task.CompletedTask;
     }
@@ -384,7 +373,7 @@ public class InstanceOnboardingTests : IDisposable
         RequireContains(cut.Markup, "Launch readiness is unavailable");
         Require(!cut.FindAll("a").Any(link => link.GetAttribute("href") == "/onboarding/auth-provider"),
             "Missing authoritative state must not expose provider actions.");
-        Require(FindButton(cut, "Launch instance").HasAttribute("disabled"), "Missing state must disable completion.");
+        Require(cut.Find("button[type='submit']").HasAttribute("disabled"), "Missing state must disable completion.");
         await _instanceOnboardingService.DidNotReceive()
             .CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>());
     }
@@ -401,7 +390,7 @@ public class InstanceOnboardingTests : IDisposable
         RequireContains(cut.Markup, "Status unavailable");
         Require(!cut.FindAll("a").Any(link => link.GetAttribute("href") == "/onboarding/auth-provider"),
             "Unavailable provider status must not expose a setup action.");
-        Require(FindButton(cut, "Launch instance").HasAttribute("disabled"),
+        Require(cut.Find("button[type='submit']").HasAttribute("disabled"),
             "Unavailable provider status must disable completion.");
         await _instanceOnboardingService.DidNotReceive()
             .CompleteAsync(Arg.Any<CompleteInstanceOnboardingRequest>());
@@ -446,33 +435,25 @@ public class InstanceOnboardingTests : IDisposable
     }
 
     [Test]
-    public async Task OperatorIdentityIncomplete_DisablesLaunchButton()
+    public async Task OperatorIdentityIncomplete_DoesNotBlockPrivateCompletion()
     {
         _identityReady = false;
 
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        Require(FindButton(cut, "Launch instance").HasAttribute("disabled"),
-            "Incomplete operator identity must disable instance launch.");
-        RequireContains(cut.Markup, "Instance operator identity");
+        Require(!cut.Find("button[type='submit']").HasAttribute("disabled"),
+            "An incomplete legal identity must not block private administration.");
         await Task.CompletedTask;
     }
 
     [Test]
-    public async Task SingleTenant_CopyToDirectoryIdentity_PopulatesDirectoryOperatorForm()
+    public async Task SingleTenant_CompletionDoesNotCopyLegalFactsIntoDirectoryIdentity()
     {
         var cut = RenderForDeploymentMode("SingleTenant");
 
-        var copyButton = cut.Find("[data-testid='copy-to-directory-identity']");
-        await Assert.That(copyButton).IsNotNull();
-
-        copyButton.Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            var publicNameInput = cut.Find("#operator-public-name");
-            Require(publicNameInput.GetAttribute("value") == "ISLAMU Explore", "Expected public name to be copied.");
-        });
+        await Assert.That(cut.FindAll("[data-testid='copy-to-directory-identity']").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("#operator-public-name").Count).IsEqualTo(0);
+        await Assert.That(cut.FindAll("#operator-legal-name").Count).IsEqualTo(0);
     }
 
     private IRenderedComponent<InstanceOnboarding> RenderForDeploymentMode(

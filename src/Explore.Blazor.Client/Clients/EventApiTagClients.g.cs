@@ -151699,6 +151699,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<DeploymentMode>))]
         public DeploymentMode? DeploymentMode { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("expectedJourneyGeneration")]
+        public string? ExpectedJourneyGeneration { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("siteProfile")]
         public SelfHostOnboardingProfileDto? SiteProfile { get; set; } = default!;
 

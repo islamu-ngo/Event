@@ -5,6 +5,17 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-20
 
+- **Breaking: setup finishes before publication.** Completion requests must submit
+  the current journey `generation` as `expectedJourneyGeneration` (nested under
+  `settings` for Local completion). Stale or unavailable state returns HTTP 409
+  with a HAL refresh link before mutation. Legal identity is no longer an
+  installation prerequisite. A new SingleTenant default is Provisioning with
+  canonical draft documents; existing tenants/documents are preserved and
+  MultiTenant creates no directory. Completed status retains the provider for
+  credential-free recovery. Setup stays locked; administrators land at
+  `/settings/instance?section=getting-started`. Disclosure, activation and paid
+  commerce keep their separate readiness and authorization checks.
+
 - **Breaking: canonical onboarding journey.** Setup clients use private HAL
   `GET /api/instanceonboarding/journey` for one snapshot of bootstrap, provider
   readiness, persisted profile and categorized preflight checks. Failed or changing

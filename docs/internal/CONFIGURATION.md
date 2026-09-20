@@ -111,8 +111,12 @@ lineage to force an older constraint to accept newer state.
 ## Legal-Identity Configuration Boundaries
 
 General instance accountability is stored in the database under system setting
-`instance.operator_identity` and managed via `/setup` or `/admin/instance`
-(`GET/PUT /api/instance-operator-identity`). The `.env` representation uses
+`instance.operator_identity` and managed after setup at
+`/settings/instance?section=operator-identity`
+(`GET/PUT /api/instance-operator-identity`). Setup authority can still use the
+identity API, but legal identity is not required to finish installation. Completion
+creates a canonical draft only when no instance identity document exists; existing
+identity and directory documents are not replaced. The `.env` representation uses
 `INSTANCE__OPERATORIDENTITY__*` as an optional bootstrap seed for headless
 `ConfiguredAdministrator` mode, including the UUIDv7 operator ID, public and
 legal names, official-instance flag/origin, operator kind, jurisdiction,

@@ -50,7 +50,7 @@ public sealed class LocalAdministratorBootstrapOperation(
 
         settings.DeploymentMode = await deploymentModeProvider.GetConfiguredOnboardingModeAsync(cancellationToken);
         var validation = await new CompleteInstanceOnboardingRequestValidator().ValidateAsync(settings, cancellationToken);
-        if (!validation.IsValid || (settings.DeploymentMode == DeploymentMode.SingleTenant && settings.DirectoryOperatorIdentity is null))
+        if (!validation.IsValid)
             return Failure("local_bootstrap_settings_invalid");
         LocalCredentialCreateRequest intent;
         try

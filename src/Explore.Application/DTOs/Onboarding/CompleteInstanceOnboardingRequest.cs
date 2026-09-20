@@ -12,6 +12,7 @@ public sealed record CompleteInstanceOnboardingRequest
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DeploymentMode DeploymentMode { get; set; } = DeploymentMode.SingleTenant;
+    public string? ExpectedJourneyGeneration { get; init; }
     public SelfHostOnboardingProfileDto SiteProfile { get; init; } = new();
     public TenantDirectoryOperatorIdentityInputDto? DirectoryOperatorIdentity { get; init; }
     public string AdministrationAccessMode { get; init; } = EmbeddedAdministrationAccess;

@@ -170,7 +170,7 @@ There are two related but separate transport paths:
    - `SupportAccessForwardingHandler`,
    - `BffCookieForwardingHandler` for self/BFF calls that must preserve cookie/XSRF context.
 
-All server-side handlers use `UseCookies = false` where applicable to avoid pooled `CookieContainer` leakage between requests.
+All server-side handlers use `UseCookies = false` where applicable to avoid pooled `CookieContainer` leakage between requests. The setup-secret handler includes the exact `GET /api/instanceonboarding/journey` read so protected setup authority reaches the site-profile/readiness snapshot. This does not authorize other methods or descendant routes; forged and expired setup cookies remain rejected.
 
 ## Dedicated Admin Host Classification
 

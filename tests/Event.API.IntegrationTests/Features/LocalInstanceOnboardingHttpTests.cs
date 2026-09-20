@@ -1,4 +1,11 @@
+extern alias bff;
 
+using BffServices = bff::Explore.Blazor.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -24,6 +31,52 @@ public sealed class LocalInstanceOnboardingHttpTests
 {
     private const string CompletePath = "/api/instanceonboarding/complete-local";
     private static CancellationToken CancellationToken => TestContext.Current!.Execution.CancellationToken;
+
+    [Test]
+    [Arguments("active", HttpStatusCode.OK)]
+    [Arguments("forged", HttpStatusCode.Forbidden)]
+    [Arguments("expired", HttpStatusCode.Forbidden)]
+    public async Task JourneyReadUsesOnlyActiveBffSetupAuthority(string authority, HttpStatusCode expectedStatus)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
+        var protection = new EphemeralDataProtectionProvider();
+        var protector = new BffServices.SetupSecretCookieProtector(protection);
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = "setup-secret=" + (authority switch
+        {
+            "active" => protector.Protect(factory.SetupSecret),
+            "expired" => protection.CreateProtector("Explore.Blazor.SetupSecretCookie.v1")
+                .ToTimeLimitedDataProtector().Protect(factory.SetupSecret, DateTimeOffset.UtcNow.AddMinutes(-1)),
+            _ => Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
+        });
+        var accessor = new HttpContextAccessor { HttpContext = context };
+        var resolver = new BffServices.SetupSecretResolver(accessor,
+            new BffServices.SetupSecretSessionService(), protector,
+            Options.Create(new BffServices.SetupSecretResolverOptions()),
+            factory.Services.GetRequiredService<IHostEnvironment>());
+        using var handler = new BffServices.SetupSecretForwardingHandler(resolver)
+        {
+            InnerHandler = factory.Server.CreateHandler()
+        };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://localhost") };
+        // Even a valid raw header cannot substitute for protected BFF authority.
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
+        using var response = await client.GetAsync("/api/instanceonboarding/journey", CancellationToken);
+        accessor.HttpContext = null;
+
+        await Assert.That(response.StatusCode).IsEqualTo(expectedStatus);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        if (expectedStatus == HttpStatusCode.OK)
+        {
+            await Assert.That(body.RootElement.GetProperty("bootstrap").GetProperty("isSetupModeActive").GetBoolean()).IsTrue();
+            await Assert.That(body.RootElement.GetProperty("_links").GetProperty("save-profile").GetProperty("href").GetString())
+                .IsEqualTo("/api/instanceonboarding/profile");
+        }
+        else
+        {
+            await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("forbidden");
+        }
+    }
 
     [Test]
     public async Task StaleJourneyGeneration_RejectsBeforeCredentialCreation()

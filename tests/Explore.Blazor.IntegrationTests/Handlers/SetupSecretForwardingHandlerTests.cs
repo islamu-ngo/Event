@@ -42,6 +42,7 @@ public class SetupSecretForwardingHandlerTests
 
     [Test]
     [Arguments("GET", "status")]
+    [Arguments("GET", "journey")]
     [Arguments("POST", "complete-local")]
     public async Task LocalSetupUsesProtectedCookieInsteadOfCallerHeader(string method, string endpoint)
     {
@@ -56,6 +57,27 @@ public class SetupSecretForwardingHandlerTests
         request.Headers.Add("X-Setup-Secret", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         using HttpResponseMessage response = await invoker.SendAsync(request, CancellationToken.None);
         await Assert.That(string.Equals(capture.CapturedRequest!.Headers.GetValues("X-Setup-Secret").Single(), secret, StringComparison.Ordinal)).IsTrue();
+    }
+
+    [Test]
+    [Arguments("POST", "/api/instanceonboarding/journey")]
+    [Arguments("GET", "/api/instanceonboarding/journey/details")]
+    [Arguments("GET", "/api/instanceonboarding/journey-report")]
+    public async Task JourneyAuthorityDoesNotFlowToOtherMethodsOrDescendants(string method, string path)
+    {
+        string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var context = new DefaultHttpContext();
+        var protector = new SetupSecretCookieProtector(new EphemeralDataProtectionProvider());
+        context.Request.Headers.Cookie = $"setup-secret={protector.Protect(secret)}";
+        var capture = new CapturingHandler();
+        using var handler = CreateHandler(context, new SetupSecretSessionService(), capture, protector);
+        using var invoker = new HttpMessageInvoker(handler, disposeHandler: false);
+        using var request = new HttpRequestMessage(new HttpMethod(method), $"https://api.example.test{path}");
+        request.Headers.Add("X-Setup-Secret", secret);
+
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+
+        await Assert.That(capture.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsFalse();
     }
 
     [Test]

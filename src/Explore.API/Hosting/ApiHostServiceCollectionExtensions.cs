@@ -119,9 +119,11 @@ public static class ApiHostServiceCollectionExtensions
                 [$"{SecretProviderOptions.SectionName}:Provider"] = nameof(SecretProviderType.Environment)
             });
         }
-        builder.Configuration.AddSecretAuthorityConfiguration(builder.Environment.EnvironmentName);
+        var secretProviderConfiguration = builder.Configuration.AddSecretAuthorityConfiguration(
+            builder.Environment.EnvironmentName);
         builder.Services.AddSecretManagement(
             builder.Configuration,
+            secretProviderConfiguration,
             enableAuditing: true,
             enableRefreshService: !isOpenApiGeneration);
         builder.Services.AddHttpContextAccessor();

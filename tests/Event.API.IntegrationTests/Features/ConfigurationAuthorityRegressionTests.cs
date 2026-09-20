@@ -54,10 +54,10 @@ public sealed class ConfigurationAuthorityRegressionTests
         {
             ["SECRET_PROVIDER"] = "Environment",
         });
-        builder.AddSecretAuthorityConfiguration("Testing");
-        using var services = RuntimeOptions(builder.Build());
+        IConfiguration providerConfiguration = builder.AddSecretAuthorityConfiguration("Testing");
+        await using var host = RuntimeHost(builder.Build(), providerConfiguration);
 
-        await Assert.That(services.GetRequiredService<IOptions<SecretProviderOptions>>().Value.Provider)
+        await Assert.That(host.Services.GetRequiredService<IOptions<SecretProviderOptions>>().Value.Provider)
             .IsEqualTo(SecretProviderType.Environment);
     }
 
@@ -70,9 +70,13 @@ public sealed class ConfigurationAuthorityRegressionTests
         string credential = Guid.CreateVersion7().ToString("N");
         using var environment = BootstrapEnvironment(server.Url, credential, structured);
         var builder = Bootstrap("Infisical");
-        builder.AddSecretAuthorityConfiguration("Testing");
-        using var services = RuntimeOptions(builder.Build());
-        SecretProviderOptions options = services.GetRequiredService<IOptions<SecretProviderOptions>>().Value;
+        builder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["SecretProvider:Infisical:Paths:12"] = "/stale",
+        });
+        IConfiguration providerConfiguration = builder.AddSecretAuthorityConfiguration("Testing");
+        await using var host = RuntimeHost(builder.Build(), providerConfiguration);
+        SecretProviderOptions options = host.Services.GetRequiredService<IOptions<SecretProviderOptions>>().Value;
 
         await Assert.That(options.Provider).IsEqualTo(SecretProviderType.Infisical);
         await Assert.That(options.Infisical.Url).IsEqualTo(server.Url);
@@ -80,8 +84,19 @@ public sealed class ConfigurationAuthorityRegressionTests
         await Assert.That(options.Infisical.ClientId).IsEqualTo("client-id");
         await Assert.That(options.Infisical.ClientSecret).IsEqualTo(credential);
         await Assert.That(options.Infisical.Environment).IsEqualTo("testing");
-        await Assert.That(options.Infisical.Paths.Contains("/database/erasure")).IsTrue();
-        await Assert.That(options.Infisical.Paths.Contains("/")).IsFalse();
+        string[] expectedPaths =
+        [
+            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api", "/blazor",
+            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/integrations/listmonk",
+        ];
+        await Assert.That(options.Infisical.Paths.SequenceEqual(expectedPaths)).IsTrue();
+
+        server.Paths.Clear();
+        await host.StartAsync().WaitAsync(TimeSpan.FromSeconds(15));
+        var provider = host.Services.GetRequiredService<ISecretProvider>();
+        await Assert.That((await provider.GetHealthAsync()).IsHealthy).IsTrue();
+        await Assert.That(server.Paths.SequenceEqual(expectedPaths)).IsTrue();
+        await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(15));
     }
 
     [Test]
@@ -161,12 +176,14 @@ public sealed class ConfigurationAuthorityRegressionTests
             ["SecretProvider:Provider"] = provider,
         });
 
-    private static ServiceProvider RuntimeOptions(IConfiguration configuration)
+    private static WebApplication RuntimeHost(IConfiguration configuration, IConfiguration providerConfiguration)
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSecretProvider(configuration);
-        return services.BuildServiceProvider();
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddSecretManagement(configuration, providerConfiguration,
+            enableAuditing: true, enableRefreshService: false, enableSecretResolution: false);
+        return builder.Build();
     }
 
     private static BffSource FrontendSource(string url, string path)

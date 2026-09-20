@@ -9,9 +9,9 @@ using Explore.Secrets.Database;
 public static class ConfigurationExtensions
 {
     /// <summary>
-    /// Adds Infisical secrets and maps them to canonical .NET configuration keys.
+    /// Maps the selected secret authority to canonical keys and returns isolated runtime provider configuration.
     /// </summary>
-    public static void AddSecretAuthorityConfiguration(
+    public static IConfiguration AddSecretAuthorityConfiguration(
         this IConfigurationBuilder configBuilder,
         string environmentName)
     {
@@ -34,6 +34,12 @@ public static class ConfigurationExtensions
         foreach (var pair in authority.GetSection(SecretProviderOptions.SectionName).AsEnumerable())
             runtimeProvider[pair.Key] = pair.Value;
         configBuilder.AddInMemoryCollection(runtimeProvider);
+
+        // Null overlays hide values, not collection children. Bind the provider from a
+        // separate root so suppressed paths cannot become null members at runtime.
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(runtimeProvider.Where(pair => pair.Value is not null))
+            .Build();
     }
 
     /// <summary>

@@ -128,6 +128,20 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     }
 
     [Test]
+    public async Task StandaloneBootsCleanlyWithoutConfiguredOperatorIdentity()
+    {
+        var timeline = new StartupTimeline();
+        await using var factory = new StartupFactory(timeline, ConfiguredValues(), includeOperatorIdentity: false);
+
+        using HttpClient client = factory.CreateClient();
+        using var requestTimeout = new CancellationTokenSource(SignalTimeout);
+        using HttpResponseMessage response = await client.GetAsync("/alive", requestTimeout.Token);
+        await timeline.WaitForAsync("http", SignalTimeout);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+    }
+
+    [Test]
     public async Task PreparationFailureBlocksSetupCookieTokenAndHttpAuthorityWithoutRetry()
     {
         var timeline = new StartupTimeline();
@@ -205,26 +219,30 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     }
 
     private static Dictionary<string, string?> BaseValues(
-        IReadOnlyDictionary<string, string?> bootstrapValues)
+        IReadOnlyDictionary<string, string?> bootstrapValues,
+        bool includeOperatorIdentity = true)
     {
         var values = new Dictionary<string, string?>(bootstrapValues, StringComparer.Ordinal)
         {
             ["Deployment:Mode"] = "SingleTenant",
-            ["Keycloak:Authority"] = "https://authority.example.test",
-            ["Instance:OperatorIdentity:OperatorId"] = "0198e2a4-5340-7f89-8abc-b8bdf43e0ea8",
-            ["Instance:OperatorIdentity:PublicName"] = "Startup Test Operator",
-            ["Instance:OperatorIdentity:LegalName"] = "Startup Test Operator ASBL",
-            ["Instance:OperatorIdentity:IsOfficialInstance"] = "false",
-            ["Instance:OperatorIdentity:OfficialOrigin"] = "https://standalone.example.test",
-            ["Instance:OperatorIdentity:OperatorKindCode"] = "registered_organization",
-            ["Instance:OperatorIdentity:JurisdictionCountryCode"] = "BE",
-            ["Instance:OperatorIdentity:RegistrationIdentifier"] = "BE 0123.456.789",
-            ["Instance:OperatorIdentity:PublicContactEmail"] = "contact@standalone.example.test",
-            ["Instance:OperatorIdentity:WebsiteUrl"] = "https://standalone.example.test",
-            ["Instance:OperatorIdentity:LegalNoticeUrl"] = "https://standalone.example.test/legal",
-            ["Instance:OperatorIdentity:TermsUrl"] = "https://standalone.example.test/terms",
-            ["Instance:OperatorIdentity:PrivacyUrl"] = "https://standalone.example.test/privacy"
+            ["Keycloak:Authority"] = "https://authority.example.test"
         };
+        if (includeOperatorIdentity)
+        {
+            values["Instance:OperatorIdentity:OperatorId"] = "0198e2a4-5340-7f89-8abc-b8bdf43e0ea8";
+            values["Instance:OperatorIdentity:PublicName"] = "Startup Test Operator";
+            values["Instance:OperatorIdentity:LegalName"] = "Startup Test Operator ASBL";
+            values["Instance:OperatorIdentity:IsOfficialInstance"] = "false";
+            values["Instance:OperatorIdentity:OfficialOrigin"] = "https://standalone.example.test";
+            values["Instance:OperatorIdentity:OperatorKindCode"] = "registered_organization";
+            values["Instance:OperatorIdentity:JurisdictionCountryCode"] = "BE";
+            values["Instance:OperatorIdentity:RegistrationIdentifier"] = "BE 0123.456.789";
+            values["Instance:OperatorIdentity:PublicContactEmail"] = "contact@standalone.example.test";
+            values["Instance:OperatorIdentity:WebsiteUrl"] = "https://standalone.example.test";
+            values["Instance:OperatorIdentity:LegalNoticeUrl"] = "https://standalone.example.test/legal";
+            values["Instance:OperatorIdentity:TermsUrl"] = "https://standalone.example.test/terms";
+            values["Instance:OperatorIdentity:PrivacyUrl"] = "https://standalone.example.test/privacy";
+        }
         return values;
     }
 
@@ -259,6 +277,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
     {
         private readonly StartupTimeline _timeline;
         private readonly IReadOnlyDictionary<string, string?> _bootstrapValues;
+        private readonly bool _includeOperatorIdentity;
         private readonly EnvironmentVariableScope _environment = new(new Dictionary<string, string?>
         {
             ["SECRET_PROVIDER"] = "Environment",
@@ -273,10 +292,12 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
 
         public StartupFactory(
             StartupTimeline timeline,
-            IReadOnlyDictionary<string, string?> bootstrapValues)
+            IReadOnlyDictionary<string, string?> bootstrapValues,
+            bool includeOperatorIdentity = true)
         {
             _timeline = timeline;
             _bootstrapValues = bootstrapValues;
+            _includeOperatorIdentity = includeOperatorIdentity;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -292,7 +313,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             builder.UseSetting("Database:Runtime:Username", "event_test");
             builder.UseSetting("Database:Runtime:Password", "runtime-password");
             builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(BaseValues(_bootstrapValues)));
+                configuration.AddInMemoryCollection(BaseValues(_bootstrapValues, _includeOperatorIdentity)));
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<QuartzSchemaInitializer>();

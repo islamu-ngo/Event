@@ -53,9 +53,24 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 ? policy : PublicOnboardingPolicy.Unknown;
 
         string deploymentProvider = Configured("Authentication:Provider", "AUTHENTICATION_PROVIDER");
-        AuthenticationProviderKind primary = !string.IsNullOrWhiteSpace(deploymentProvider)
-            ? deploymentProvider.ParseAuthenticationProviderKind()
-            : RequireSupportedPrimaryProvider(JsonSerializer.Deserialize<int>(Stored(GovernanceSettingKeys.Authentication.PrimaryProviderId)));
+        AuthenticationProviderKind primary;
+        if (!string.IsNullOrWhiteSpace(deploymentProvider))
+        {
+            primary = deploymentProvider.ParseAuthenticationProviderKind();
+        }
+        else
+        {
+            string stored = Stored(GovernanceSettingKeys.Authentication.PrimaryProviderId);
+            if (string.IsNullOrWhiteSpace(stored) || stored is "null" or "\"\"")
+            {
+                primary = AuthenticationProviderKind.Local;
+            }
+            else
+            {
+                int id = JsonSerializer.Deserialize<int>(stored);
+                primary = id > 0 ? RequireSupportedPrimaryProvider(id) : AuthenticationProviderKind.Local;
+            }
+        }
         bool atprotoEnabled = primary == AuthenticationProviderKind.Atproto
             || DeserializeBoolean(Stored(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled), false);
         bool googleEnabled = primary != AuthenticationProviderKind.Atproto
@@ -412,7 +427,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 (int)deploymentProvider.ParseAuthenticationProviderKind());
         }
 
-        if (string.IsNullOrWhiteSpace(storedSetting?.Value))
+        if (string.IsNullOrWhiteSpace(storedSetting?.Value) || storedSetting.Value is "null" or "\"\"")
         {
             return AuthenticationProviderKind.Local;
         }
@@ -420,7 +435,9 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         try
         {
             int providerId = JsonSerializer.Deserialize<int>(storedSetting.Value);
-            return RequireSupportedPrimaryProvider(providerId);
+            return providerId > 0
+                ? RequireSupportedPrimaryProvider(providerId)
+                : AuthenticationProviderKind.Local;
         }
         catch (JsonException exception)
         {

@@ -112,7 +112,8 @@ public sealed class LegalDocumentsControllerTests
                 new FixedTenantContext(Guid.CreateVersion7()));
             services.AddSingleton<ITenantDirectoryOperatorReadinessEvaluator>(
                 new UnexpectedTenantIdentityEvaluator());
-            services.AddSingleton<IInstanceOperatorIdentity>(InstanceIdentity());
+            services.AddSingleton<IInstanceOperatorIdentityReadinessEvaluator>(
+                new FixedInstanceIdentityEvaluator(InstanceIdentity()));
             services.AddTransient<
                 IQueryHandler<
                     GetPublicLegalDocumentQuery,
@@ -199,5 +200,18 @@ public sealed class LegalDocumentsControllerTests
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException(
                 "Instance legal requests must not resolve tenant identity.");
+    }
+
+    private sealed class FixedInstanceIdentityEvaluator(InstanceOperatorIdentity identity) :
+        IInstanceOperatorIdentityReadinessEvaluator
+    {
+        public Task<InstanceOperatorIdentityReadinessAssessment> EvaluateAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new InstanceOperatorIdentityReadinessAssessment(
+                true,
+                null,
+                [],
+                identity,
+                Guid.CreateVersion7()));
     }
 }

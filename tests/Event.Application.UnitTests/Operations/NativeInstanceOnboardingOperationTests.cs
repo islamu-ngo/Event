@@ -4,9 +4,12 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Analytics;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Commands;
+using Explore.Application.Features.InstanceOnboarding.Queries;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Models;
+using Explore.Application.Operations;
 using Explore.Application.Responses;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,7 +19,8 @@ public sealed class NativeInstanceOnboardingOperationTests
 {
     private static readonly Type[] Requests =
     [
-        // Commands (28)
+        // Commands (29)
+        typeof(SaveInstanceOperatorIdentityCommand),
         typeof(ApplyKeycloakRealmSyncCommand),
         typeof(BootstrapKeycloakRealmCommand),
         typeof(ClaimConfiguredInstanceAdministratorCommand),
@@ -46,7 +50,8 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(UpdateAiAssistantGovernanceSettingsCommand),
         typeof(UpdateRenderPolicySettingsCommand),
 
-        // Queries (17)
+        // Queries (18)
+        typeof(GetInstanceOperatorIdentityQuery),
         typeof(DownloadAuthorizationPolicyPackageQuery),
         typeof(GetActiveTenantCountQuery),
         typeof(GetAnalyticsGovernanceSettingsQuery),
@@ -67,6 +72,8 @@ public sealed class NativeInstanceOnboardingOperationTests
     ];
 
     [Test]
+    [Arguments(typeof(SaveInstanceOperatorIdentityCommand), typeof(ICommand<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>))]
+    [Arguments(typeof(GetInstanceOperatorIdentityQuery), typeof(IQuery<InstanceOperatorIdentityDocumentDto>))]
     [Arguments(typeof(ApplyKeycloakRealmSyncCommand), typeof(ICommand<KeycloakRealmSyncPlanDto>))]
     [Arguments(typeof(BootstrapKeycloakRealmCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(ClaimConfiguredInstanceAdministratorCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
@@ -124,7 +131,7 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Test]
     public async Task Requests_HaveOneNativeShapeAndNoLegacyDispatchEscapeHatch()
     {
-        await Assert.That(Requests.Length).IsEqualTo(45);
+        await Assert.That(Requests.Length).IsEqualTo(47);
 
         foreach (var request in Requests)
         {
@@ -144,7 +151,8 @@ public sealed class NativeInstanceOnboardingOperationTests
         var ports = services.Where(descriptor => !descriptor.IsKeyedService &&
             OperationServicesRegistration.IsHandlerContract(descriptor.ServiceType) &&
             Requests.Contains(descriptor.ServiceType.GenericTypeArguments[0])).ToArray();
-        await Assert.That(ports.Length).IsEqualTo(45);
+        await Assert.That(ports.Length).IsEqualTo(47);
+        services.ValidateNativeOperationRegistrations();
         await Assert.That(ports.All(port => port.Lifetime == ServiceLifetime.Scoped)).IsTrue();
         await Assert.That(ports.All(port => port.ImplementationFactory is not null)).IsTrue();
     }

@@ -15,7 +15,8 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandler(
     IEventTicketCatalogRepository catalogs,
     IPlatformFeePolicyRepository feePolicies,
     ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
-    IOrganizerEarningsCalculator earningsCalculator)
+    IOrganizerEarningsCalculator earningsCalculator,
+    IInstanceOperatorIdentityReadinessEvaluator instanceOperatorReadiness)
     : IQueryHandler<GetRegistrationCheckoutCompositionQuery, RegistrationCheckoutCompositionDto?>
 {
     public async Task<RegistrationCheckoutCompositionDto?> QueryAsync(
@@ -45,6 +46,13 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandler(
         TenantDirectoryOperatorPublicDto? directoryOperator = null;
         if (ticketTypes.Any(ticketType => ticketType.TicketPricingModeId != (int)TicketPricingModeEnum.Free))
         {
+            InstanceOperatorIdentityReadinessAssessment instanceReadiness =
+                await instanceOperatorReadiness.EvaluateAsync(cancellationToken);
+            if (!instanceReadiness.IsReady)
+            {
+                return null;
+            }
+
             TenantDirectoryOperatorReadinessAssessment readiness =
                 await directoryOperatorReadiness.EvaluateAsync(
                     @event.TenantId,

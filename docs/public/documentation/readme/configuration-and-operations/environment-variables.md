@@ -100,6 +100,12 @@ passwordless authority.
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | External topology | None | Schema-owner/migrator credential username. |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | External topology (Secret) | None | Schema-owner/migrator credential password. |
 
+> [!WARNING]
+> **Do not blindly mirror `IDENTITY_DATABASE_TOPOLOGY` and `ERASURE_DATABASE_TOPOLOGY`.**
+> Although both settings configure database topologies, they serve fundamentally different architectural purposes with opposing default recommendations:
+> - **`IDENTITY_DATABASE_TOPOLOGY` (Recommended: `colocated`):** In standard single-instance setups, keep this `colocated` so user credentials share the primary application database with zero extra operational overhead. Only switch to `external` if your organization requires a central, shared identity database across multiple distinct applications or SaaS solutions (such as sharing one user database across all ISLAMU solutions).
+> - **`ERASURE_DATABASE_TOPOLOGY` (Recommended: `EmbeddedSqlite`):** The privacy erasure authority must remain *outside* the primary application database to ensure GDPR anti-resurrection guarantees survive primary database backup restoration. See [Section 7: Privacy Erasure Authority](#7-privacy-erasure-authority-gdpr--anti-resurrection).
+
 Keycloak variables are required only when `AUTHENTICATION_PROVIDER=keycloak`:
 
 The supported primary/AT Protocol combinations are `local/false`,
@@ -194,8 +200,8 @@ providers retain their own verification and recovery delivery configuration.
 
 | Variable | Status | Default | Description |
 |---|---|---|---|
-| `ERASURE_TOPOLOGY` | **Baseline** | `EmbeddedSqlite` | Storage topology: `EmbeddedSqlite` (dedicated local file), `CoLocated`, or `ExternalDatabase`. |
-| `ERASURE_EMBEDDED_PATH` | **Baseline** | `/app/data/privacy_erasure_authority.db` | File path when `ERASURE_TOPOLOGY=EmbeddedSqlite`. |
+| `ERASURE_DATABASE_TOPOLOGY` | **Baseline** | `EmbeddedSqlite` | Storage topology: `EmbeddedSqlite` (dedicated local file), `CoLocated`, or `ExternalDatabase`. |
+| `ERASURE_EMBEDDED_PATH` | **Baseline** | `/app/data/privacy_erasure_authority.db` | File path when `ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite`. |
 | `ERASURE_WRITER_REPLICA_COUNT` | Advanced | `1` | Maximum write concurrency for the embedded authority database. |
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | Advanced | `30` | SQLite busy timeout before serializable retry. |
 | `ERASURE_DATABASE_HOST` | Advanced | None | Hostname if using `ExternalDatabase` topology. |
@@ -210,8 +216,11 @@ providers retain their own verification and recovery delivery configuration.
 
 The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/erasure` folder, so a flat `.env` and an Infisical project never disagree on the key name. See [Infisical Setup](infisical.md#databaseerasure).
 
-> [!NOTE]
-> **We recommend:** Keep `EmbeddedSqlite`. It runs with zero operational overhead and guarantees strict GDPR anti-resurrection isolation without requiring a second database server.
+> [!WARNING]
+> **Why `EmbeddedSqlite` is recommended (and distinct from Identity topology):**
+> Do not blindly set `ERASURE_DATABASE_TOPOLOGY` to match `IDENTITY_DATABASE_TOPOLOGY`. They solve completely different architectural problems:
+> - **Erasure Authority (`EmbeddedSqlite` recommended):** The erasure ledger is lightweight and intentionally decoupled from the primary application database. If your primary database ever needs to be restored from an earlier backup, an independent embedded or external erasure authority retains the history of user deletion requests that occurred *after* that backup, immediately re-enforcing those deletions and preventing illegal GDPR data resurrection.
+> - **Identity Database (`colocated` recommended):** By contrast, `IDENTITY_DATABASE_TOPOLOGY` defaults to `colocated` within the primary database for standard deployments, and is only separated into an `external` database when an enterprise or SaaS operator needs a single, unified credential database shared across multiple distinct applications (such as across all ISLAMU products).
 
 ---
 
@@ -389,7 +398,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `KEYCLOAK_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | deployment |
 | `LOCAL_STORAGE_ROOT_PATH` | storage | public | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
-| `ERASURE_TOPOLOGY` | platform | public | None | optional | process |
+| `ERASURE_DATABASE_TOPOLOGY` | platform | public | None | optional | process |
 | `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
 | `SETUP_SECRET` | platform | secret | None (secret) | required | process |
 | `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
@@ -685,7 +694,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `ERASURE_DATABASE_TLS_MODE` | database | public | None | optional | process |
 | `ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | None | optional | process |
 | `DATABASE_SERVER_VERSION` | integration | public | None | optional | deployment |
-| `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_WRITER_REPLICA_COUNT` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_BUSY_TIMEOUT_SECONDS` | integration | public | None | optional | deployment |

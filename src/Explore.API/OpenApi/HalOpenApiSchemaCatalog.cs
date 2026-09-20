@@ -301,6 +301,7 @@ internal static class HalOpenApiSchemaCatalog
         ["HalResourceOfPublicExperienceEventSectionDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceEventSectionDto),
         ["HalResourceOfPublicExperienceCtaDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceCtaDto),
         ["HalResourceOfInstanceSmtpSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.InstanceSmtpSettingsDto),
+        ["HalResourceOfInstanceOperatorIdentityDocumentDto"] = typeof(Explore.Application.DTOs.Onboarding.InstanceOperatorIdentityDocumentDto),
         ["HalResourceOfEmailDeliveryDisablePreviewDto"] = typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisablePreviewDto),
         ["HalResourceOfLocalIdentitySummary"] = typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
         ["HalResourceOfLocalCredentialOperationStatus"] = typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),

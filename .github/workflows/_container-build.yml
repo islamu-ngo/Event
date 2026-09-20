@@ -20,6 +20,10 @@ on:
         required: false
         type: string
         default: "Release"
+      platforms:
+        required: false
+        type: string
+        default: "linux/amd64,linux/arm64"
       registry:
         required: false
         type: string
@@ -58,6 +62,9 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc5e6b4a696749961609132104084f7069c9 # v3.6.0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
@@ -90,6 +97,7 @@ jobs:
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

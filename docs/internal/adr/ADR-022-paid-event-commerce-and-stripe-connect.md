@@ -91,7 +91,7 @@ Stripe Billing, subscriptions, Tax, Invoicing, Payment Links, Terminal, Issuing,
 
 ## Related
 
-- `islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md`
+- `islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md`
 - `dev/active/registration-data-collection/registration-data-collection-plan.md` D21-D25
 - ADR-002: Transactional Outbox Pattern
 - ADR-017: Event Participation Authority Model

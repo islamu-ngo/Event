@@ -35,8 +35,8 @@ public sealed class ConfigurationAuthorityRegressionTests
     }
 
     [Test]
-    [Arguments("ERASURE_TOPOLOGY", "ExternalDatabase", PrivacyErasureAuthorityTopology.ExternalDatabase)]
-    [Arguments("PRIVACY_ERASURE_AUTHORITY_TOPOLOGY", "CoLocated", PrivacyErasureAuthorityTopology.CoLocated)]
+    [Arguments("ERASURE_DATABASE_TOPOLOGY", "ExternalDatabase", PrivacyErasureAuthorityTopology.ExternalDatabase)]
+    [Arguments("ERASURE_DATABASE_TOPOLOGY", "CoLocated", PrivacyErasureAuthorityTopology.CoLocated)]
     public async Task Api_PreservesExplicitSupportedTopology(string key, string value, PrivacyErasureAuthorityTopology expected)
     {
         using var environment = new EnvironmentScope(new() { [key] = value });
@@ -86,8 +86,8 @@ public sealed class ConfigurationAuthorityRegressionTests
         await Assert.That(options.Infisical.Environment).IsEqualTo("testing");
         string[] expectedPaths =
         [
-            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api", "/blazor",
-            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/integrations/listmonk",
+            "/keycloak", "/database", "/database/erasure", "/database/identity", "/api",
+            "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/integrations/listmonk",
         ];
         await Assert.That(options.Infisical.Paths.SequenceEqual(expectedPaths)).IsTrue();
 
@@ -97,6 +97,28 @@ public sealed class ConfigurationAuthorityRegressionTests
         await Assert.That((await provider.GetHealthAsync()).IsHealthy).IsTrue();
         await Assert.That(server.Paths.SequenceEqual(expectedPaths)).IsTrue();
         await host.StopAsync().WaitAsync(TimeSpan.FromSeconds(15));
+    }
+
+    [Test]
+    public async Task Api_InfisicalModularSettingsReachTheirRuntimeConsumers()
+    {
+        await using var server = await SecretServer.StartAsync(path => path == "/api"
+            ? [
+                new("PUBLIC_NAME", "Community Operator", "/api/operator-identity"),
+                new("MODE", "configured", "/api/bootstrap"),
+                new("PUBLIC_KEY", "public-key", "/api/webpush"),
+                new("ANONYMOUSREGISTRATION__IPPERMITLIMIT", "7", "/api/ratelimiting"),
+            ]
+            : []);
+        using var environment = BootstrapEnvironment(server.Url, Guid.CreateVersion7().ToString("N"), false);
+        var builder = Bootstrap("Infisical");
+        builder.AddSecretAuthorityConfiguration("Testing");
+        var configuration = builder.Build();
+
+        await Assert.That(configuration["Instance:OperatorIdentity:PublicName"]).IsEqualTo("Community Operator");
+        await Assert.That(configuration["INSTANCE_BOOTSTRAP_MODE"]).IsEqualTo("configured");
+        await Assert.That(configuration["WebPush:VapidPublicKey"]).IsEqualTo("public-key");
+        await Assert.That(configuration.GetValue<int>("RateLimiting:AnonymousRegistration:IpPermitLimit")).IsEqualTo(7);
     }
 
     [Test]

@@ -11,4 +11,5 @@ contact_links:
 
   - name: "🔧 Improvements"
     url: https://github.com/islamu-ngo/Event/discussions/categories/improvements
-    about: Suggest improvements to existing features. Small fixes should target `main`; larger changes should target `develop`.
+    about: Suggest improvements to existing features. All feature and fix PRs should branch from and target `develop`.
+

@@ -56,4 +56,4 @@ Until these conditions hold, describe effectiveness as **unmeasured**, not safe 
 - [Public anonymous participation guidance](../../docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md)
 - [Challenge implementation](../../src/Explore.Infrastructure/Services/Registration/AnonymousRegistrationChallengeService.cs)
 - [Retention policy](../../src/Explore.Domain/Services/Registration/AnonymousRegistrationRetentionPolicy.cs)
-- [Single I-VSD report](../../islamic-value-sensitive-design/i-vsd-email-optional-self-hosting.md)
+- [Single I-VSD report](../../islamic-value-sensitive-design/consultations/i-vsd-email-optional-self-hosting.md)

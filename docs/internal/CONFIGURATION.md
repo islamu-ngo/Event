@@ -110,14 +110,18 @@ lineage to force an older constraint to accept newer state.
 
 ## Legal-Identity Configuration Boundaries
 
-General instance accountability is startup-bound at
-`Instance:OperatorIdentity`. The `.env` representation uses
-`INSTANCE__OPERATORIDENTITY__*` and includes the UUIDv7 operator ID, public and
+General instance accountability is stored in the database under system setting
+`instance.operator_identity` and managed via `/setup` or `/admin/instance`
+(`GET/PUT /api/instance-operator-identity`). The `.env` representation uses
+`INSTANCE__OPERATORIDENTITY__*` as an optional bootstrap seed for headless
+`ConfiguredAdministrator` mode, including the UUIDv7 operator ID, public and
 legal names, official-instance flag/origin, operator kind, jurisdiction,
 optional registration identifier, public contact email, website, legal notice,
-terms, and privacy URLs. API and Standalone hosts validate this section at
-runtime startup and fail closed when it is incomplete or malformed. OpenAPI
-generation uses its explicit build-time mode and does not weaken runtime hosts.
+terms, and privacy URLs. API and Standalone hosts decouple process startup from
+operator identity readiness, enabling setup and diagnostics to serve requests;
+dependent disclosure and paid commerce operations fail closed when identity is
+incomplete. OpenAPI generation uses its explicit build-time mode and does not
+weaken runtime hosts.
 
 Tenant directory identity is not an environment setting. Each tenant owns one
 canonical `tenant.directory-operator-identity` typed settings document created
@@ -671,7 +675,7 @@ retained authority rows there because the primary database is its sole sink.
 | `Database:Erasure:Runtime:Username`, `Password` | none | API-only function-execution credential for `ExternalDatabase`; its username must differ from the migrator username. |
 | `Database:Erasure:Migrator:Username`, `Password` | none | MigrationService-only schema/grant credential for `ExternalDatabase`; role collapse with runtime fails startup/provisioning. |
 
-Compose and Infisical map `ERASURE_TOPOLOGY` (or `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY`),
+Compose and Infisical map `ERASURE_DATABASE_TOPOLOGY`,
 `ERASURE_EMBEDDED_PATH`, `ERASURE_WRITER_REPLICA_COUNT`, and
 `ERASURE_BUSY_TIMEOUT_SECONDS` to the embedded .NET keys.
 For the external topology they map `ERASURE_DATABASE_HOST` (or Infisical `/database/erasure/ERASURE_DATABASE_HOST`),

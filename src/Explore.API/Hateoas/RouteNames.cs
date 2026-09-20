@@ -1208,6 +1208,8 @@ public static class RouteNames
     public const string VerifyInstanceOnboardingAuthorizationProviderEndpoint = nameof(VerifyInstanceOnboardingAuthorizationProviderEndpoint);
     public const string SyncInstanceOnboardingAuthorizationPolicyPackage = nameof(SyncInstanceOnboardingAuthorizationPolicyPackage);
     public const string DownloadInstanceOnboardingAuthorizationPolicyPackage = nameof(DownloadInstanceOnboardingAuthorizationPolicyPackage);
+    public const string GetInstanceOperatorIdentity = nameof(GetInstanceOperatorIdentity);
+    public const string SaveInstanceOperatorIdentity = nameof(SaveInstanceOperatorIdentity);
 
     #endregion
 

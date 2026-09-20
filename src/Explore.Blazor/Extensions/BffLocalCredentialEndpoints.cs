@@ -140,7 +140,8 @@ public static class BffLocalCredentialEndpoints
             return LocalCredentialAdmission.Denied;
         }
 
-        var configured = context.RequestServices.GetRequiredService<IConfiguration>()["Authentication:Provider"]
+        var config = context.RequestServices.GetRequiredService<IConfiguration>();
+        var configured = (config["Authentication:Provider"] ?? config["AUTHENTICATION_PROVIDER"])
             ?.Trim().ToLowerInvariant();
         if (!string.IsNullOrEmpty(configured))
         {

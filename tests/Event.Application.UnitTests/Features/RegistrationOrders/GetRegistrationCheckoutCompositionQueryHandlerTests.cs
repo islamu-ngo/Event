@@ -79,12 +79,35 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
                 TenantDirectoryOperatorIdentityCapability.PaidCommerce,
                 Arg.Any<CancellationToken>())
             .Returns(TenantDirectoryOperatorReadinessAssessment.Ready(identity, Guid.CreateVersion7(), Guid.CreateVersion7()));
+        var instanceReadiness = Substitute.For<IInstanceOperatorIdentityReadinessEvaluator>();
+        instanceReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+            .Returns(new InstanceOperatorIdentityReadinessAssessment(
+                true,
+                null,
+                System.Collections.Immutable.ImmutableArray<string>.Empty,
+                InstanceOperatorIdentity.Create(new InstanceOperatorIdentityOptions
+                {
+                    OperatorId = Guid.CreateVersion7(),
+                    PublicName = "Instance Operator",
+                    LegalName = "Instance Operator SA",
+                    OperatorKindCode = TenantDirectoryOperatorKinds.RegisteredOrganization,
+                    JurisdictionCountryCode = "BE",
+                    RegistrationIdentifier = "BE0123456789",
+                    PublicContactEmail = "contact@instance.test",
+                    WebsiteUrl = "https://instance.test",
+                    LegalNoticeUrl = "https://instance.test/legal",
+                    TermsUrl = "https://instance.test/terms",
+                    PrivacyUrl = "https://instance.test/privacy",
+                    OfficialOrigin = "https://event.islamu.org"
+                }),
+                Guid.CreateVersion7()));
         var handler = new GetRegistrationCheckoutCompositionQueryHandler(
             events,
             catalogs,
             feePolicies,
             directoryReadiness,
-            new OrganizerEarningsCalculator());
+            new OrganizerEarningsCalculator(),
+            instanceReadiness);
 
         var result = await handler.QueryAsync(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
         var options = result!.TicketTypes.Single().SlidingScaleOptions;
@@ -100,4 +123,70 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
         await Assert.That(json).DoesNotContain("\"paidEventDirectoryDisclaimer\"");
     }
 
+    [Test]
+    public async Task Handle_WhenInstanceOperatorIdentityNotReady_ReturnsNullForPaidEvent()
+    {
+        var tenantId = Guid.CreateVersion7();
+        var eventId = Guid.CreateVersion7();
+        var events = Substitute.For<IEventRepository>();
+        var catalogs = Substitute.For<IEventTicketCatalogRepository>();
+        var feePolicies = Substitute.For<IPlatformFeePolicyRepository>();
+        var directoryReadiness = Substitute.For<ITenantDirectoryOperatorReadinessEvaluator>();
+        var instanceReadiness = Substitute.For<IInstanceOperatorIdentityReadinessEvaluator>();
+
+        var eventTarget = new DomainEvent(EventStatusEnum.Published)
+        {
+            Id = eventId,
+            TenantId = tenantId,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            Title = "Community event",
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!,
+            ParticipationConfiguration = EventParticipationConfiguration.Create(
+                eventId,
+                tenantId,
+                (int)ParticipationHandlingModeEnum.PlatformManaged,
+                (int)AdvanceRegistrationObligationEnum.Required,
+                (int)IdentityAccessModeEnum.CapabilityTokenAllowed,
+                GuestRecoveryPolicyEnum.CapabilityLinkOnly,
+                DateTime.UtcNow)
+        };
+        var catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "EUR", 1);
+        var ticket = EventTicketType.Create(
+            Guid.CreateVersion7(), tenantId, catalog.Id, "Community rate", "EUR",
+            TicketPricingModeEnum.Fixed, Money.Create(500, "EUR"), null, null,
+            ParticipantDataCollectionModeEnum.None, null, null, null, false, false,
+            5, null, null, null);
+        catalog.AddTicketType(ticket, null);
+        catalog.AddEntitlement(ticket, TicketTypeEntitlement.CreateForEvent(ticket.Id, tenantId, eventId, 1));
+        catalog.UpdateCommercialDisclosures("Merchant", "Refund", "Support");
+        catalog.Publish();
+
+        events.GetById(eventId).Returns(eventTarget);
+        events.IsPubliclyEligibleAsync(tenantId, eventId, Arg.Any<CancellationToken>()).Returns(true);
+        catalogs.GetPublishedCatalogAsync(eventId, tenantId, Arg.Any<CancellationToken>()).Returns(catalog);
+
+        instanceReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+            .Returns(new InstanceOperatorIdentityReadinessAssessment(
+                false,
+                InstanceOperatorIdentityFailureCodes.Missing,
+                System.Collections.Immutable.ImmutableArray<string>.Empty,
+                null,
+                null));
+
+        var handler = new GetRegistrationCheckoutCompositionQueryHandler(
+            events,
+            catalogs,
+            feePolicies,
+            directoryReadiness,
+            new OrganizerEarningsCalculator(),
+            instanceReadiness);
+
+        var result = await handler.QueryAsync(new GetRegistrationCheckoutCompositionQuery(eventId), CancellationToken.None);
+
+        await Assert.That(result).IsNull();
+    }
 }

@@ -1,0 +1,280 @@
+@using Explore.Blazor.Client.Components.Common
+@using Explore.Blazor.Client.Services
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@inject IInstanceOperatorIdentityAdminService IdentityService
+@inject IAccessibilityFocusService Focus
+@inject ITranslationService Translation
+
+<section class="instance-operator-identity-editor"
+         aria-labelledby="instance-operator-identity-heading"
+         data-testid="instance-operator-identity-editor">
+    <div class="instance-operator-identity__header mb-4">
+        <MudText Id="instance-operator-identity-heading"
+                 Typo="Typo.h5"
+                 HtmlTag="h2">
+            @T("operator.heading", "Instance operator identity")
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            @T("operator.description", "Identify the legal entity operating this instance. These verified facts back public disclosures, imprint notices, and paid commerce.")
+        </MudText>
+    </div>
+
+    @if (_validationErrors.Count > 0)
+    {
+        <div class="instance-operator-identity__validation mb-4"
+             role="alert"
+             aria-live="assertive"
+             data-testid="operator-validation-summary">
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                <strong>@T("operator.validationSummary", "Please correct the highlighted fields.")</strong>
+                <ul class="mt-2">
+                    @foreach (string error in _validationErrors.Values)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </MudAlert>
+        </div>
+    }
+
+    @if (!Model.Exists)
+    {
+        <MudAlert Severity="Severity.Warning" role="alert" Class="mb-4">@MessageFor(Model.MessageCode)</MudAlert>
+    }
+    else
+    {
+        @if (!Model.CanEdit)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4" data-testid="operator-read-only-alert">
+                @T("operator.readOnly", "This identity is read-only because the API did not emit the exact edit action.")
+            </MudAlert>
+        }
+
+        <fieldset class="instance-operator-identity__group mb-4">
+            <legend class="mud-typography mud-typography-subtitle2 mb-2 font-weight-bold">@T("operator.legalIdentity", "Legal identity")</legend>
+            <div class="d-flex flex-column gap-3">
+                <AppTextField T="string"
+                              Label="@T("operator.publicName", "Public name")"
+                              Id="instance-operator-public-name"
+                              @bind-Value="Model.PublicName"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.PublicName))"
+                              ErrorText="@ErrorFor(nameof(Model.PublicName))"
+                              aria-invalid="@AriaInvalid(nameof(Model.PublicName))"
+                              Required="true"
+                              FullWidth="true"
+                              HelperText="@T("operator.publicNameHelp", "Name shown to visitors as the platform instance operator.")" />
+                <AppTextField T="string"
+                              Label="@T("operator.legalName", "Legal name")"
+                              Id="instance-operator-legal-name"
+                              @bind-Value="Model.LegalName"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.LegalName))"
+                              ErrorText="@ErrorFor(nameof(Model.LegalName))"
+                              aria-invalid="@AriaInvalid(nameof(Model.LegalName))"
+                              Required="true"
+                              FullWidth="true" />
+                <div class="d-flex gap-3 flex-column flex-sm-row">
+                    <AppTextField T="string"
+                                  Label="@T("operator.kindCode", "Operator kind code")"
+                                  Id="instance-operator-kind-code"
+                                  @bind-Value="Model.OperatorKindCode"
+                                  Disabled="@Disabled"
+                                  ReadOnly="@IsReadOnly"
+                                  Error="@HasError(nameof(Model.OperatorKindCode))"
+                                  ErrorText="@ErrorFor(nameof(Model.OperatorKindCode))"
+                                  aria-invalid="@AriaInvalid(nameof(Model.OperatorKindCode))"
+                                  Required="true"
+                                  FullWidth="true"
+                                  dir="ltr" />
+                    <AppTextField T="string"
+                                  Label="@T("operator.jurisdictionCountryCode", "Jurisdiction country code")"
+                                  Id="instance-operator-jurisdiction-country-code"
+                                  @bind-Value="Model.JurisdictionCountryCode"
+                                  Disabled="@Disabled"
+                                  ReadOnly="@IsReadOnly"
+                                  Error="@HasError(nameof(Model.JurisdictionCountryCode))"
+                                  ErrorText="@ErrorFor(nameof(Model.JurisdictionCountryCode))"
+                                  aria-invalid="@AriaInvalid(nameof(Model.JurisdictionCountryCode))"
+                                  Required="true"
+                                  FullWidth="true"
+                                  MaxLength="2"
+                                  dir="ltr" />
+                </div>
+                <AppTextField T="string"
+                              Label="@T("operator.registrationIdentifier", "Registration identifier")"
+                              Id="instance-operator-registration-identifier"
+                              @bind-Value="Model.RegistrationIdentifier"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              FullWidth="true"
+                              dir="ltr" />
+            </div>
+        </fieldset>
+
+        <fieldset class="instance-operator-identity__group mb-4">
+            <legend class="mud-typography mud-typography-subtitle2 mb-2 font-weight-bold">@T("operator.contactAndPresence", "Contact and official presence")</legend>
+            <div class="d-flex flex-column gap-3">
+                <AppTextField T="string"
+                              Label="@T("operator.publicContactEmail", "Public contact email")"
+                              Id="instance-operator-public-contact-email"
+                              @bind-Value="Model.PublicContactEmail"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.PublicContactEmail))"
+                              ErrorText="@ErrorFor(nameof(Model.PublicContactEmail))"
+                              aria-invalid="@AriaInvalid(nameof(Model.PublicContactEmail))"
+                              Required="true"
+                              FullWidth="true"
+                              InputType="InputType.Email"
+                              dir="ltr" />
+                <AppTextField T="string"
+                              Label="@T("operator.websiteUrl", "Website URL")"
+                              Id="instance-operator-website-url"
+                              @bind-Value="Model.WebsiteUrl"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.WebsiteUrl))"
+                              ErrorText="@ErrorFor(nameof(Model.WebsiteUrl))"
+                              aria-invalid="@AriaInvalid(nameof(Model.WebsiteUrl))"
+                              Required="true"
+                              FullWidth="true"
+                              InputType="InputType.Url"
+                              dir="ltr" />
+                <AppTextField T="string"
+                              Label="@T("operator.officialOrigin", "Official origin")"
+                              Id="instance-operator-official-origin"
+                              @bind-Value="Model.OfficialOrigin"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.OfficialOrigin))"
+                              ErrorText="@ErrorFor(nameof(Model.OfficialOrigin))"
+                              aria-invalid="@AriaInvalid(nameof(Model.OfficialOrigin))"
+                              Required="true"
+                              FullWidth="true"
+                              InputType="InputType.Url"
+                              dir="ltr" />
+            </div>
+        </fieldset>
+
+        <fieldset class="instance-operator-identity__group mb-4">
+            <legend class="mud-typography mud-typography-subtitle2 mb-2 font-weight-bold">@T("operator.legalDisclosureLinks", "Legal and disclosure links")</legend>
+            <div class="d-flex flex-column gap-3">
+                <AppTextField T="string"
+                              Label="@T("operator.legalNoticeUrl", "Legal notice URL")"
+                              Id="instance-operator-legal-notice-url"
+                              @bind-Value="Model.LegalNoticeUrl"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.LegalNoticeUrl))"
+                              ErrorText="@ErrorFor(nameof(Model.LegalNoticeUrl))"
+                              aria-invalid="@AriaInvalid(nameof(Model.LegalNoticeUrl))"
+                              Required="true"
+                              FullWidth="true"
+                              InputType="InputType.Url"
+                              dir="ltr" />
+                <AppTextField T="string"
+                              Label="@T("operator.termsUrl", "Terms URL")"
+                              Id="instance-operator-terms-url"
+                              @bind-Value="Model.TermsUrl"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              FullWidth="true"
+                              InputType="InputType.Url"
+                              dir="ltr" />
+                <AppTextField T="string"
+                              Label="@T("operator.privacyUrl", "Privacy URL")"
+                              Id="instance-operator-privacy-url"
+                              @bind-Value="Model.PrivacyUrl"
+                              Disabled="@Disabled"
+                              ReadOnly="@IsReadOnly"
+                              Error="@HasError(nameof(Model.PrivacyUrl))"
+                              ErrorText="@ErrorFor(nameof(Model.PrivacyUrl))"
+                              aria-invalid="@AriaInvalid(nameof(Model.PrivacyUrl))"
+                              Required="true"
+                              FullWidth="true"
+                              InputType="InputType.Url"
+                              dir="ltr" />
+            </div>
+        </fieldset>
+
+        <section class="instance-operator-identity__readiness mb-4"
+                 aria-labelledby="instance-operator-identity-readiness-heading">
+            <MudText Id="instance-operator-identity-readiness-heading"
+                     Typo="Typo.subtitle1"
+                     HtmlTag="h3"
+                     Class="mb-2">
+                @T("operator.readinessStatus", "Readiness status")
+            </MudText>
+            @if (Model.IsReady)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" data-testid="operator-readiness-ready">
+                    @T("operator.readyMessage", "Instance operator identity is verified and ready for public disclosures and paid commerce.")
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" data-testid="operator-readiness-incomplete">
+                    @T("operator.incompleteMessage", "Operator identity is incomplete. Required legal and official fields must be completed before launching or activating paid commerce.")
+                    @if (Model.ReasonCodes.Count > 0)
+                    {
+                        <ul class="mt-2">
+                            @foreach (var reason in Model.ReasonCodes)
+                            {
+                                <li><code>@reason</code></li>
+                            }
+                        </ul>
+                    }
+                </MudAlert>
+            }
+        </section>
+
+        <div class="instance-operator-identity__actions mt-4 d-flex gap-2">
+            @if (IsSingleTenantMode && ShowCopyToDirectoryIdentity)
+            {
+                <AppButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           Disabled="@(Disabled || _saving)"
+                           OnClick="CopyToDirectoryIdentityAsync"
+                           StartIcon="@Icons.Material.Filled.ContentCopy"
+                           data-testid="copy-to-directory-identity">
+                    @T("operator.copyToDirectory", "Copy to Directory Identity")
+                </AppButton>
+            }
+
+            @if (Model.CanEdit && ShowSaveButton)
+            {
+                <AppButton OnClick="SaveDraftAsync"
+                           Disabled="@(Disabled || _saving)"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           data-testid="save-operator-identity">
+                    @(_saving ? T("operator.savingAction", "Saving...") : (AllowIncompleteDraft ? T("operator.saveDraft", "Save draft") : T("operator.save", "Save")))
+                </AppButton>
+            }
+        </div>
+    }
+
+    @if (_authoritativeConflict is not null)
+    {
+        <section id="operator-conflict-alert"
+                 class="instance-operator-identity__conflict mt-4"
+                 role="alert"
+                 aria-live="assertive"
+                 tabindex="-1"
+                 data-testid="operator-concurrency-conflict">
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                <strong>@_errorMessage</strong>
+                <p class="mt-1">@T("operator.conflictAuthoritative", "Current authoritative values (your pending edits are preserved):")</p>
+                <dl class="mt-1">
+                    <dt>@T("operator.publicName", "Public name")</dt><dd><bdi dir="auto">@_authoritativeConflict.PublicName</bdi></dd>
+                    <dt>@T("operator.legalName", "Legal name")</dt><dd><bdi dir="auto">@_authoritativeConflict.LegalName</bdi></dd>
+                    <dt>@T("operator.revision", "Revision")</dt><dd dir="ltr" lang="en">@_authoritativeConflict.Revision</dd>
+                </dl>
+            </MudAlert>
+        </section>
+    }
+    <div role="status" aria-live="polite" aria-atomic="true" class="sr-only">@_statusMessage</div>
+    <div role="alert" class="sr-only">@(_authoritativeConflict is null ? _errorMessage : null)</div>
+</section>

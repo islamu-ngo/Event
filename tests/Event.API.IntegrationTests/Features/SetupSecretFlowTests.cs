@@ -1,24 +1,28 @@
-using System.Net;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Json;
+using System.Net;
+
 using Event.Api.IntegrationTests.Fixtures;
-using Explore.Application.Contracts.Infrastructure;
+using Explore.API.Authentication;
 using Explore.Application.Authentication;
+using Explore.Application.Constants;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantSettings;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
-using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Persistence;
+using Explore.Domain;
 using Explore.Persistence.Database;
+using Explore.Persistence;
 using Explore.Secrets.Database;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -102,6 +106,7 @@ public class SetupSecretFlowTests
         await EnsureUserExistsAsync(factory, userId);
 
         // Complete onboarding to end setup mode
+        await SaveReadyOperatorIdentityAsync(client);
         var completePayload = CreateValidSettings();
         using var completeRequest = CreateInstanceAdminRequest(
             HttpMethod.Post, $"{BaseUrl}/complete", userId, completePayload, includeSetupSecret: true);
@@ -134,6 +139,7 @@ public class SetupSecretFlowTests
 
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
+        await SaveReadyOperatorIdentityAsync(client);
 
         var completePayload = CreateValidSettings();
         using var completeRequest = CreateInstanceAdminRequest(
@@ -207,6 +213,7 @@ public class SetupSecretFlowTests
 
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
+        await SaveReadyOperatorIdentityAsync(client);
 
         using var completeRequest = CreateInstanceAdminRequest(
             HttpMethod.Post, $"{BaseUrl}/complete", userId, CreateValidSettings(), includeSetupSecret: true);
@@ -222,6 +229,29 @@ public class SetupSecretFlowTests
     }
 
     #region Helpers
+
+    private static async Task SaveReadyOperatorIdentityAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/instance-operator-identity");
+        request.Headers.Add("X-Setup-Secret", SetupSecret);
+        request.Content = JsonContent.Create(new SaveInstanceOperatorIdentityRequestDto
+        {
+            PublicName = "Test Operator",
+            LegalName = "Test Operator",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            PublicContactEmail = "operator@integration.test",
+            WebsiteUrl = "https://integration.test",
+            OfficialOrigin = "https://integration.test",
+            LegalNoticeUrl = "https://integration.test/legal",
+            TermsUrl = "https://integration.test/terms",
+            PrivacyUrl = "https://integration.test/privacy"
+        });
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var saved = await response.Content.ReadFromJsonAsync<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>();
+        await Assert.That(saved!.Id!.IsReady).IsTrue();
+    }
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret()
     {
@@ -391,6 +421,23 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
                 context.TenantContext = provider.GetService<ITenantContext>();
                 context.CurrentUserService = provider.GetService<ICurrentUserService>();
                 return context;
+            });
+
+            // Preserve production setup-secret routing while retaining TestScheme for test users.
+            services.PostConfigure<PolicySchemeOptions>(ApiAuthenticationSchemeNames.MultiAuth, options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                    SetupSecretAuthenticationHandler.SupportsRequest(context.Request)
+                    && context.Request.Headers.ContainsKey(SetupSecretAuthenticationHandler.HeaderName)
+                        ? ApiAuthenticationSchemeNames.SetupSecret
+                        : TestAuthHandler.SchemeName;
+            });
+            services.PostConfigure<AuthenticationOptions>(options =>
+            {
+                options.DefaultScheme = ApiAuthenticationSchemeNames.MultiAuth;
+                options.DefaultAuthenticateScheme = ApiAuthenticationSchemeNames.MultiAuth;
+                options.DefaultChallengeScheme = ApiAuthenticationSchemeNames.MultiAuth;
+                options.DefaultForbidScheme = ApiAuthenticationSchemeNames.MultiAuth;
             });
         });
     }

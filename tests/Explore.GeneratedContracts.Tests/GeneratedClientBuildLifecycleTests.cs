@@ -106,7 +106,9 @@ public sealed class GeneratedClientBuildLifecycleTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("dotnet")
+            StartInfo = new ProcessStartInfo(Path.GetFullPath(Path.Combine(
+                System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(),
+                "..", "..", "..", OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet")))
             {
                 WorkingDirectory = root,
                 RedirectStandardOutput = true,

@@ -872,7 +872,7 @@ public static class SecretDefinitionRegistry
                 Key = Keys.Management.ControlPlaneRegistrationCredentials,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/api",
+                DefaultInfisicalPath = "/api/controlplane",
                 DefaultInfisicalKey = "CONTROL_PLANE_REGISTRATION_CREDENTIALS",
                 DefaultEnvironmentVariableName = "CONTROL_PLANE_REGISTRATION_CREDENTIALS",
                 IsBootstrapSecret = false,

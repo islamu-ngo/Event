@@ -49,7 +49,7 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         _oidcOptionsFactory = oidcOptionsFactory;
         _logger = logger;
         _deploymentPrimaryProvider = ResolveDeploymentPrimaryProvider(
-            configuration["Authentication:Provider"]);
+            configuration["Authentication:Provider"] ?? configuration["AUTHENTICATION_PROVIDER"]);
         _activePrimaryProvider = _deploymentPrimaryProvider ?? "local";
     }
 

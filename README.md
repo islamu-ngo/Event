@@ -8,9 +8,9 @@
 
 Self-hostable, open-source event discovery and management software for communities, organizations, and platform operators.
 
-ISLAMU Event powers ISLAMU’s Islamic events instance, but the software itself is purpose-agnostic, white-label, and designed to be rebranded for any event ecosystem.
+ISLAMU Event will power ISLAMU’s upcoming community events instance, but the software itself is purpose-agnostic, white-label, and designed to be rebranded for any event ecosystem.
 
-> Pre-1.0 notice: ISLAMU Event is still before v1. Breaking changes may happen between releases. We avoid data-loss-class breaks where possible, but configuration changes may be required.
+> 🚧 **Active Pre-Release Development:** ISLAMU Event has **no official release yet**. We are actively fixing startup bugs and preparing for our very first release soon! Pre-built container images and release tags are not yet published.
 
 ![GitHub Workflow Status][github-workflow-status-shield]
 [![GitHub License][github-license-shield]][github-license-link]
@@ -22,7 +22,7 @@ ISLAMU Event powers ISLAMU’s Islamic events instance, but the software itself 
 [![Documentation][docs-shield]][official-docs-link]
 [![Donate via Stripe][stripe-shield]][stripe-donation-link]
 
-[**ISLAMU Live Instance**][islamu-platform] · [**Official Docs (GitBook)**](https://islamu.gitbook.io/islamu-event) · [**5-Minute Quickstart**](https://islamu.gitbook.io/islamu-event/documentation/readme/getting-started/5-minute-quickstart) · [**Self-Hosting**](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting) · [**Roadmap**][roadmap-link] · [**Developer Guide**](#-documentation-for-developers--contributors) · [**Sponsor**](#-sponsors)
+[**Official Docs (GitBook)**](https://islamu.gitbook.io/islamu-event) · [**Roadmap**][roadmap-link] · [**5-Minute Quickstart**](https://islamu.gitbook.io/islamu-event/documentation/readme/getting-started/5-minute-quickstart) · [**Self-Hosting**](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting) · [**Developer Guide**](#-documentation-for-developers--contributors) · [**Sponsor**](#-sponsors)
 
 </div>
 
@@ -94,7 +94,7 @@ ISLAMU Event is architected for sovereign self-hosting across diverse hardware r
 | **[PaaS Deployment (Coolify)](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** | Self-hosted PaaS deployment behind Traefik with an external Cerbos PDP container. | 📖 **[Coolify with Cerbos & Traefik](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** |
 | **[Developer Orchestration](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** | Local development and cloud-native adaptation via .NET Aspire AppHost. | 📖 **[.NET Aspire & Cloud](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** |
 
-For hardware sizing benchmarks, real-world Hetzner CPX32 reference metrics, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
+For hardware sizing recommendations, reference architecture blueprints, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
 
 ---
 
@@ -120,16 +120,6 @@ Security and privacy fail closed at every layer:
 - **🗝️ Secrets Management:** Centralized secret delivery via Environment or Infisical — see [Secrets Management](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/secrets).
 
 ---
-
-## Used in production
-
-ISLAMU Event is used by:
-
-<img src="assets/images/adopters/ISLAMU/islamu-logo-text-only-v2.png" alt="ISLAMU" width="200" />
-
----
-
-Using ISLAMU Event and want to add your project/organization to this list? [Open a pull request!](https://github.com/islamu-ngo/Event/edit/develop/README.md)
 
 ## Roadmap
 
@@ -240,7 +230,7 @@ For developers contributing code, architecture reviewers, and AI agents, use the
 
 ---
 
-## 🏗️ Technology Stack (v0.1.0)
+## 🏗️ Technology Stack
 
 | Layer | Technology |
 |---|---|
@@ -420,7 +410,7 @@ ISLAMU Event operates on a transparent three-pillar model designed for universal
 2. **Enterprise Internal-Use License (Anti-SaaS):** For enterprises whose internal compliance policies ban AGPL copyleft on private internal infrastructure. This license waives Section 13 network copyleft for private on-premises/VPC deployments and internal corporate events, while **strictly forbidding external SaaS or commercial cloud hosting**. Paid for commercial corporations (funding security audits and maintainers); gratis ($0) for verified non-profits and educational institutions.
 3. **Official Partner Program:** For certified agencies, hosters, and integrators. Partners operate on the exact same 100% AGPLv3 codebase (no proprietary code privilege). Commercial value is generated through quality certification, trust branding, and official directory listings.
 
-For the full ethical and strategic design analysis, see the [I-VSD Strategy Review](islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md).
+For the full ethical and strategic design analysis, see the [I-VSD Strategy Review](islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
 
 ### Standalone Core And Optional Services
 

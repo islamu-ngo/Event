@@ -36,15 +36,14 @@ Keep the gate proportional: a short advisory may need one decisive question; a d
 
 ## Default Output Location
 
-When producing reports, write them under this output folder relative to the current workspace, project root, repository root, or user-approved destination:
+When producing reports, write them under the appropriate tier folder relative to `islamic-value-sensitive-design/`:
+- `islamic-value-sensitive-design/governance/` for constitutional policies, commercial models, licensing, and strategic governance.
+- `islamic-value-sensitive-design/consultations/` for substantive feature and domain consultations, audits, and compliance reviews.
+- `islamic-value-sensitive-design/workstreams/` for active implementation-planning assessments and moral diff reviews.
 
-```text
-islamic-value-sensitive-design/
-```
+Create subdirectories if needed. Every generated report file must use the `i-vsd-*.md` naming pattern. Derive the canonical subject-and-report-kind path from [report-contract.md](report-contract.md); the filenames in `Action Map` identify report kinds and legacy one-subject examples. For multiple actions, also create or update `i-vsd-review-index.md` or index them in `islamic-value-sensitive-design/README.md`.
 
-Create the directory if needed. Every generated report file must use the `i-vsd-*.md` naming pattern. Derive the canonical subject-and-report-kind path from [report-contract.md](report-contract.md); the filenames in `Action Map` identify report kinds and legacy one-subject examples. For multiple actions, also create or update `i-vsd-review-index.md`.
-
-If the user specifies another output path, ask for confirmation before using it. The default remains `islamic-value-sensitive-design/`, and filenames must still use the `i-vsd-*.md` prefix pattern.
+If the user specifies another output path, ask for confirmation before using it. The default remains partitioned under `islamic-value-sensitive-design/`, and filenames must still use the `i-vsd-*.md` prefix pattern.
 
 ## Existing Report Rule
 

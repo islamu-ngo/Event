@@ -94,7 +94,7 @@ Ship public adopter upgrade/changelog help with internal runbook/checklist/polic
 
 ## I-VSD and Provenance
 
-Revalidate `islamic-value-sensitive-design/i-vsd-release-governance.md` for the exact new triad; map actual IDs for public-record truth, human embargo timing, identity privacy and offline verification. Its current findings use headings; do not invent IDs or approval.
+Revalidate `islamic-value-sensitive-design/governance/i-vsd-release-governance.md` for the exact new triad; map actual IDs for public-record truth, human embargo timing, identity privacy and offline verification. Its current findings use headings; do not invent IDs or approval.
 
 Interface facts accessed 2026-09-10: [GitBook monorepos](https://gitbook.com/docs/docs-as-code/git-sync/monorepos), [content configuration](https://gitbook.com/docs/docs-as-code/git-sync/content-configuration), [troubleshooting](https://gitbook.com/docs/docs-as-code/git-sync/troubleshooting), [GitHub concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), and [workflow triggering](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow). These explain interface constraints, not this installation's settings. The mirror and inventory are independent repository-native decisions; no third-party implementation source, snippets/assets/prose or dependencies imported. Changed publication authority requires I-VSD revalidation; do not infer approval.
 

@@ -18,11 +18,12 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 | **Authorization** | Local database-backed RBAC | External Cerbos PDP (Fail-closed) | High-Availability Cerbos Cluster |
 | **Storage** | Local volume mount | S3-Compatible (MinIO / R2 / S3) | Distributed S3 with Multi-Region CDN |
 | **Minimum Hardware** | 1 vCPU, 2 GB RAM | 4 vCPUs, 8 GB RAM | 8+ vCPUs, 16+ GB RAM (per node) |
+| **Supported Architectures** | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64` | `linux/amd64`, `linux/arm64` |
 
 > [!TIP]
-> **⚙️ Real-World Reference Setup (ISLAMU's Production Topology):**
-> Our primary production deployment is orchestrated using a **Coolify Cloud** subscription connected to a **Hetzner CPX32** cloud server (see our [Coolify Deployment Guide](coolify-cerbos-traefik.md)):
-> - **Server Hardware & Compute:**
+> **⚙️ Reference Architecture Blueprint (Target Topology):**
+> Our recommended multi-service split deployment blueprint is designed for a **Hetzner CPX32** (x86_64) or **CAX31/CAX41** (ARM64 Ampere Altra) cloud server managed via **Coolify** (see our [Coolify Deployment Guide](coolify-cerbos-traefik.md)). Because all ISLAMU Event images ship with native multi-architecture support, operators can choose ARM64 cloud instances (e.g., Hetzner CAX, AWS Graviton) for improved price-to-performance without emulation overhead:
+> - **Server Hardware & Compute (Reference Blueprint):**
 >   - **CPU:** 4 vCPUs
 >   - **RAM:** 8 GB
 >   - **Disk (Local):** 160 GB
@@ -30,7 +31,7 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 >   - **Management:** Server connected to [Coolify Cloud](https://coolify.io)
 > - **Object Storage:** Hetzner Object Storage resource (S3-compatible)
 >   - **Location:** City: Falkenstein | Country: Germany | Network zone: `eu-central`
-> - **Deployed Services (via Coolify):**
+> - **Target Services (via Coolify):**
 >   - `islamu-event-api` Docker image (ASP.NET Core REST API & Background Workers)
 >   - `islamu-event-ui` Docker image (Blazor WebAssembly BFF)
 >   - `postgres` for ISLAMU Event (Primary application database)
@@ -40,7 +41,6 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 >   - `cockroachdb` (Dedicated database backend for Phase Two Keycloak)
 >   - `infisical` (Secrets management engine for dynamic runtime configuration)
 >   - SQLite Privacy Erasure Authority store (GDPR anti-resurrection fence)
-> - **Workload Handled:** Comfortably supports multi-tenant organizations, concurrent ticket launches and check-ins, and continuous background outbox email delivery with sub-45ms API responses.
 >
 > 💡 **Latency & Datacenter Placement Note:**
 > It is best to choose a server location close to where you are or where your main public is located to have the lowest latency. Co-locating your compute server and object storage near your primary audience minimizes round-trip latency, accelerates media uploads/downloads, and ensures the fastest responsiveness.

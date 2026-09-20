@@ -219,7 +219,7 @@ public sealed class ConfigurationExtensionsTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["PRIVACY_ERASURE_AUTHORITY_TOPOLOGY"] = "ExternalDatabase",
+            ["ERASURE_DATABASE_TOPOLOGY"] = "ExternalDatabase",
             ["PRIVACY_ERASURE_AUTHORITY_HOST"] = "authority",
             ["PRIVACY_ERASURE_AUTHORITY_PORT"] = "6543",
             ["PRIVACY_ERASURE_AUTHORITY_DATABASE"] = "privacy",
@@ -248,7 +248,7 @@ public sealed class ConfigurationExtensionsTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["ERASURE_TOPOLOGY"] = "ExternalDatabase",
+            ["ERASURE_DATABASE_TOPOLOGY"] = "ExternalDatabase",
             ["ERASURE_DATABASE_HOST"] = "erasure-authority",
             ["ERASURE_DATABASE_PORT"] = "5432",
             ["ERASURE_DATABASE_NAME"] = "erasure_db",
@@ -287,7 +287,7 @@ public sealed class ConfigurationExtensionsTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["PRIVACY_ERASURE_AUTHORITY_TOPOLOGY"] = "ExternalDatabase",
+            ["ERASURE_DATABASE_TOPOLOGY"] = "ExternalDatabase",
             ["PRIVACY_ERASURE_AUTHORITY_HOST"] = "mapped-host",
             ["PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME"] = "mapped-user",
             ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",

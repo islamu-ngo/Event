@@ -52,7 +52,7 @@ Missing or useful context:
 - <Only action-relevant gaps, e.g. terms/privacy/retention, moderation policy, pricing/refunds, support/incident logs, stakeholder review, issue tracker/roadmap, scholarly review.>
 
 Planned output:
-- `islamic-value-sensitive-design/i-vsd-<action>.md`
+- `islamic-value-sensitive-design/<tier>/i-vsd-<action>.md`
 
 Tell me "agreed" and I will check whether the mapped report already exists, then update it or create it with `Missing Evidence` boundaries. Or point me to additional paths/exports/integrations first.
 ```
@@ -71,7 +71,7 @@ Available context:
 - <Only relevant project-context MCPs/CLIs/paths, or omit this line if none are relevant.>
 
 Planned outputs:
-- `islamic-value-sensitive-design/i-vsd-<action>.md`
+- `islamic-value-sensitive-design/<tier>/i-vsd-<action>.md`
 - <additional mapped files, including `i-vsd-review-index.md` for multi-report work>
 
 Tell me "agreed" and I will check whether these mapped reports already exist, then run the deep review and update or create the Markdown files. Or point me to additional context first.

@@ -215,4 +215,16 @@ public class SecretBindingTests
         await Assert.That(SecretDefinitionRegistry.GetRequired(SecretDefinitionRegistry.Keys.Postgresql.Username).IsBootstrapSecret).IsTrue();
         await Assert.That(SecretDefinitionRegistry.GetRequired(SecretDefinitionRegistry.Keys.Postgresql.Password).IsBootstrapSecret).IsTrue();
     }
+
+    [Test]
+    public async Task Registry_ControlPlaneRegistrationCredentials_UsesDedicatedSubfolder()
+    {
+        var definition = SecretDefinitionRegistry.GetRequired(SecretDefinitionRegistry.Keys.Management.ControlPlaneRegistrationCredentials);
+
+        await Assert.That(definition.DefaultInfisicalPath).IsEqualTo("/api/controlplane");
+        await Assert.That(definition.DefaultInfisicalKey).IsEqualTo("CONTROL_PLANE_REGISTRATION_CREDENTIALS");
+        await Assert.That(definition.DefaultEnvironmentVariableName).IsEqualTo("CONTROL_PLANE_REGISTRATION_CREDENTIALS");
+        await Assert.That(definition.IsBootstrapSecret).IsFalse();
+        await Assert.That(definition.AllowedScopes).IsEquivalentTo([SecretScope.Instance]);
+    }
 }

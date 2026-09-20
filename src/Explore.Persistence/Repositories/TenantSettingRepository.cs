@@ -65,6 +65,7 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
+        InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -149,6 +150,7 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
+        InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -172,6 +174,7 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
+        InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -202,6 +205,7 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
+        InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -244,6 +248,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         {
             VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+            InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
         }
         if (overrides.Any(overrideValue => PublicationPolicySettingKeys.All.Contains(
                 overrideValue.SettingKey,
@@ -310,6 +315,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         {
             VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+            InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
         }
         if (occurredAtUtc.Kind != DateTimeKind.Utc)
         {

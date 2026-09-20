@@ -3,6 +3,7 @@ using Explore.Blazor.Client.Contracts.Services.Federation;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Contracts.Services.Reporting;
 using Explore.Blazor.Client.Contracts.Services.Shell;
+using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Docking;
 using Explore.Blazor.Client.Services.Shell;
 using MudBlazor;
@@ -97,6 +98,30 @@ public class BlazorTestContext : BunitContext
         Services.AddScoped<CurrentUserState>();
         Services.AddSingleton(Substitute.For<ITagService>());
         Services.AddSingleton(Substitute.For<ICategoryService>());
+
+        var defaultOperatorIdentityService = Substitute.For<IInstanceOperatorIdentityAdminService>();
+        defaultOperatorIdentityService.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InstanceOperatorIdentityAdminModel
+            {
+                Exists = true,
+                CanEdit = true,
+                IsReady = true,
+                PublicName = "ISLAMU Explore",
+                LegalName = "ISLAMU Explore Legal",
+                OperatorKindCode = "NONPROFIT",
+                JurisdictionCountryCode = "BE",
+                RegistrationIdentifier = "BE0123456789",
+                PublicContactEmail = "operator@example.org",
+                WebsiteUrl = "https://event.example.org",
+                OfficialOrigin = "https://event.example.org",
+                LegalNoticeUrl = "https://event.example.org/legal",
+                TermsUrl = "https://event.example.org/terms",
+                PrivacyUrl = "https://event.example.org/privacy",
+                Revision = Guid.Parse("11111111-1111-1111-1111-111111111111")
+            }));
+        defaultOperatorIdentityService.SaveAsync(Arg.Any<InstanceOperatorIdentityAdminModel>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(InstanceOperatorIdentitySaveResult.Successful(callInfo.Arg<InstanceOperatorIdentityAdminModel>())));
+        Services.AddSingleton(defaultOperatorIdentityService);
     }
 
     protected override void Dispose(bool disposing)

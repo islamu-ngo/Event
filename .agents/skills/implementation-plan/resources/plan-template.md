@@ -25,7 +25,7 @@ Record:
 - matched intents, relevant skills, and relevant rules;
 - primary layers touched;
 - S/M/L/XL complexity with evidence-based rationale;
-- **I-VSD Document:** `[islamic-value-sensitive-design/i-vsd-<task-name>.md](../../../islamic-value-sensitive-design/i-vsd-<task-name>.md)`;
+- **I-VSD Document:** `[islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md](../../../islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md)`;
 - **I-VSD Status / Disposition:** `current` plus `plan-aligned`, or the blocking state;
 - **CTO Review:** `Not reviewed`, `Changes required`, `Approved`, or the linked review artifact;
 - **User Approval:** `Awaiting approval` or `Approved`;
@@ -246,7 +246,7 @@ Every implementation plan MUST classify its procedural changelog approach across
 
 ## 9. Islamic Value-Sensitive Design (I-VSD) & Moral Boundaries
 
-Link the mapped `[I-VSD report](../../../islamic-value-sensitive-design/i-vsd-<task-name>.md)` and record its reviewed-input revision, status, and disposition. Map every material report ID:
+Link the mapped `[I-VSD report](../../../islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md)` and record its reviewed-input revision, status, and disposition. Map every material report ID:
 
 | I-VSD ID | Finding / mitigation status | Scenario and task mapping | Disposition |
 |---|---|---|---|

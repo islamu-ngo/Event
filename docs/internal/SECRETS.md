@@ -20,7 +20,7 @@ The subject, DID, issuer pairing and generation are selectors, not authenticatio
 proof. External identities still require a real sign-in with the exact provider
 claim. Configured Local bootstrap additionally resolves
 `authentication.local.bootstrap_password` from
-`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api`); it is instance-only,
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api/bootstrap` or `/api`); it is instance-only,
 bootstrap-classified and has no live-rotation path or source default.
 
 That secret creates only the initial temporary credential during incomplete
@@ -87,12 +87,17 @@ phase; never reuse the Photon configuration surface.
 
 Copy `.env.example` to the ignored repository-root `.env`. Select exactly one
 `SECRET_PROVIDER`: `Environment`, `Infisical`, or `UserSecrets`. Environment mode
-reads the documented process variables. Infisical mode uses only `INFISICAL_*`
-secret-zero bootstrap credentials. User Secrets mode reads the shared store owned
-by `src/Explore.Secrets/Explore.Secrets.csproj`; populate it with the same documented
-environment-style keys (for example `MAIL_SMTP_PASSWORD`) through your IDE or the
-`dotnet user-secrets --project src/Explore.Secrets` CLI. It is rejected unless the
-host environment is Development or Testing.
+reads the documented process variables. Infisical mode uses `INFISICAL_*` process
+environment variables or, in Development and Testing environments, can read bootstrap
+Universal Auth credentials (`Infisical:Url`, `Infisical:ProjectId`, `Infisical:ClientId`,
+`Infisical:ClientSecret`, `Infisical:Environment`) directly from the shared User Secrets store
+owned by `src/Explore.Secrets/Explore.Secrets.csproj`. In Development/Testing, if `SECRET_PROVIDER`
+is omitted from process variables or `.env`, it also falls back to `SECRET_PROVIDER` configured in
+User Secrets. User Secrets mode reads all application secrets directly from the shared store
+through your IDE or the `dotnet user-secrets --project src/Explore.Secrets` CLI.
+Both User Secrets mode and Infisical bootstrap via User Secrets are rejected unless the
+host environment is Development or Testing. In Production, Infisical bootstrap credentials
+must strictly come from process environment variables.
 
 AppHost loads the repository `.env`, so Aspire profiles honor
 `SECRET_PROVIDER=UserSecrets` directly. Direct project launches do not load that
@@ -273,12 +278,13 @@ file with filesystem permissions. Its nonsecret deployment fields are
 
 There is one Infisical bootstrap schema: `SecretProvider:Provider=Infisical`
 selects the authority and `SecretProvider:Infisical:*` (projected from the documented
-`INFISICAL_*` deployment inputs) supplies secret-zero Universal Auth credentials.
+`INFISICAL_*` deployment inputs, or in Development/Testing loaded from User Secrets) supplies secret-zero Universal Auth credentials.
 API composition projects the validated provider selection and the actual authenticated
 source's URL, project, client, credential, environment and requested paths into
 runtime `SecretProviderOptions`. Runtime binding does not silently append a root
 path or select a provider supplied by vault contents. Bootstrap credentials still
-come from the process environment, not arbitrary merged configuration.
+come from the process environment in Production, not arbitrary merged configuration.
+Development/Testing additionally supports bootstrap configuration and shared User Secrets.
 
 ### Configuration boundary upgrade
 
@@ -286,8 +292,7 @@ API composition validates obsolete `PrivacyErasure:Durability:Mode` inputs befor
 projecting either bootstrap configuration or the selected Environment, Infisical
 or development User Secrets authority. Its double-underscore form is also rejected.
 Operators must explicitly retain the intended supported topology through
-`ERASURE_TOPOLOGY`, `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY` or
-`PrivacyErasure:Authority:Topology`; deleting an obsolete selector without choosing
+`ERASURE_DATABASE_TOPOLOGY` or `PrivacyErasure:Authority:Topology`; deleting an obsolete selector without choosing
 the intended authority is not a migration. Follow the existing privacy-erasure
 backup/restore/reset policy before intentionally changing topology. This repair
 performs no automatic authority migration or database schema change.
@@ -429,7 +434,8 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/database/DATABASE_RUNTIME_PASSWORD` | Runtime database password |
 | `/database/DATABASE_MIGRATOR_USERNAME` | Migrator database username |
 | `/database/DATABASE_MIGRATOR_PASSWORD` | Migrator database password |
-| `/database/ERASURE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |
+| `/database/ERASURE_DATABASE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |
+| `/database/IDENTITY_DATABASE_TOPOLOGY` | Identity database topology: `colocated` or `external` |
 | `/database/erasure/ERASURE_DATABASE_PROVIDER` | External authority provider (fixed to `PostgreSql`) |
 | `/database/erasure/ERASURE_DATABASE_HOST` | External authority PostgreSQL host |
 | `/database/erasure/ERASURE_DATABASE_PORT` | External authority PostgreSQL port (default: `5432`) |
@@ -549,7 +555,7 @@ Reporting provider secrets are server-side tenant settings. API keys and webhook
 
 Current migrated surface: Cerbos authorization settings expose endpoint and Admin API credential ownership metadata. `AUTHORIZATION_PROVIDER` is non-secret deployment intent, while `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are server-side deployment secrets resolved from environment configuration or Infisical. The browser normally sees only configured flags and ownership metadata. During an explicit setup sync, an operator may instead submit a complete one-time pair; it exists only in the Blazor server circuit and request pipeline, overrides deployment credentials for that call, is cleared after the call, and is never written to `SystemSetting`, returned by an API, or logged. `CERBOS_ADMIN_PASSWORD_HASH` is the Cerbos server verifier and cannot authenticate an Admin API client; keep the matching plaintext password only in deployment secrets or enter it for one sync. Reporting provider secret keys are registered as sensitive hierarchical settings for the moderation routing foundation. Listmonk API username/key values are registered server-side secret bindings; admin updates are write-only and browser DTOs expose configured flags only. Stripe `payments.stripe.platform_secret_key` and `payments.stripe.webhook_secret` are instance/server-only definitions for self-hoster-owned platform credentials. Promotion lookup resolves the qualified instance-only `promotions.code_lookup_hmac_key` binding for every digest operation. SMTP, S3, OAuth, localization/TMS, and AI keys still have area-specific storage/UI paths and must not be documented as fully migrated until their resolvers use the shared ownership metadata consistently.
 
-Web Push VAPID keys are deployment configuration. Infisical `/api/VAPID_PRIVATE_KEY` maps to `WebPush:VapidPrivateKey`; it is a server-only secret and must never appear in browser configuration, API responses, HAL links, logs, traces, health data, screenshots, or support artifacts. `VAPID_PUBLIC_KEY` is intentionally public and is returned by `GET /vapid-public-key` as plain text and by `GET /api/notification/web-push/config`. Browser subscription endpoints and `p256dh`/`auth` material are stored tenant-scoped and are never echoed by subscription status DTOs.
+Web Push VAPID keys are deployment configuration. Infisical `/api/webpush` (or legacy `/api`) `PRIVATE_KEY` / `VAPID_PRIVATE_KEY` maps to `WebPush:VapidPrivateKey`; it is a server-only secret and must never appear in browser configuration, API responses, HAL links, logs, traces, health data, screenshots, or support artifacts. `VAPID_PUBLIC_KEY` is intentionally public and is returned by `GET /vapid-public-key` as plain text and by `GET /api/notification/web-push/config`. Browser subscription endpoints and `p256dh`/`auth` material are stored tenant-scoped and are never echoed by subscription status DTOs.
 
 ## ISecretProvider Interface
 

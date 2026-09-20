@@ -8,7 +8,7 @@ description: >-
 
 ## Is ISLAMU Event production-ready?
 
-It is pre-1.0 software with API version `0.1`. Evaluate it against your requirements, pin exact versions, keep release evidence, back up before upgrades, and test restores. Breaking contract changes are allowed before v1 and are recorded in the API changelog.
+ISLAMU Event is in active pre-release development with no official release yet. We are actively polishing the core platform for our upcoming initial release. Breaking changes occur freely during this development phase.
 
 ## What is the smallest supported deployment?
 
@@ -92,4 +92,4 @@ Development/Testing can expose `/swagger`, Scalar, and `/openapi/islamu-event.js
 
 ## What should I collect before asking for help?
 
-Collect the exact pinned version/tag, deployment mode, database/provider topology, redacted configuration status, health endpoints, relevant correlation or trace IDs, recent migration/upgrade step, and bounded logs with secrets and PII removed. Never paste raw credentials, provider payloads, admission tokens, erasure receipts, or connection strings into a support request.
+Collect the commit SHA / version, deployment mode, database/provider topology, redacted configuration status, health endpoints, relevant correlation or trace IDs, and bounded logs with secrets and PII removed. Never paste raw credentials, provider payloads, admission tokens, erasure receipts, or connection strings into a support request.

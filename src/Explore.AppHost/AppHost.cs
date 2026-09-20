@@ -19,9 +19,13 @@ var dotenvPath = Path.Combine(repositoryRoot, ".env");
 if (File.Exists(dotenvPath))
     Env.NoClobber().Load(dotenvPath);
 var builder = DistributedApplication.CreateBuilder(args);
+if (SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.EnvironmentName))
+{
+    builder.Configuration.AddUserSecrets(typeof(SecretAuthorityConfiguration).Assembly, optional: true, reloadOnChange: false);
+}
 var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE_MODE"]);
 SecretProviderType configuredSecretProvider =
-    SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration);
+    SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
 IConfiguration authorityBootstrap = runMode == AspireRunMode.FullLocal
     && configuredSecretProvider == SecretProviderType.Infisical
     ? new ConfigurationBuilder()
@@ -61,11 +65,8 @@ var privacyErasureTopology = ParsePrivacyErasureTopology(
         "PrivacyErasure:Authority:Topology",
         ConfiguredValue(
             builder.Configuration,
-            "ERASURE_TOPOLOGY",
-            ConfiguredValue(
-                builder.Configuration,
-                "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY",
-                nameof(PrivacyErasureAuthorityTopology.EmbeddedSqlite)))));
+            "ERASURE_DATABASE_TOPOLOGY",
+            nameof(PrivacyErasureAuthorityTopology.EmbeddedSqlite))));
 var usesEmbeddedPrivacyErasureAuthority =
     privacyErasureTopology == PrivacyErasureAuthorityTopology.EmbeddedSqlite;
 var usesExternalPrivacyErasureAuthority =
@@ -413,16 +414,6 @@ if (hostingTopology == HostingTopology.Split)
     exploreBlazor = exploreBlazor
         .WithReference(migrations)
         .WaitForCompletion(migrations);
-
-    if (database is not null)
-    {
-        exploreBlazor = WithLocalPrimaryDatabase(exploreBlazor, database, PrimaryDatabaseRole.Runtime)
-            .WaitFor(database);
-    }
-    else
-    {
-        exploreBlazor = WithExternalPrimaryDatabase(builder, exploreBlazor, PrimaryDatabaseRole.Runtime);
-    }
 
     if (cache is not null)
     {
@@ -1600,7 +1591,7 @@ static PrivacyErasureAuthorityTopology ParsePrivacyErasureTopology(string value)
     }
 
     throw new InvalidOperationException(
-        "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY must be EmbeddedSqlite, CoLocated, or ExternalDatabase.");
+        "ERASURE_DATABASE_TOPOLOGY must be EmbeddedSqlite, CoLocated, or ExternalDatabase.");
 }
 
 static HostingTopology ParseHostingTopology(string? rawValue)
@@ -1689,6 +1680,7 @@ static InfisicalBootstrapSettings ReadInfisicalBootstrap(IConfiguration configur
             _ => $"INFISICAL_{key.ToUpperInvariant()}",
         };
         return configuration[$"SecretProvider:Infisical:{key}"]
+            ?? configuration[$"Infisical:{key}"]
             ?? configuration[environmentKey]
             ?? fallback
             ?? string.Empty;

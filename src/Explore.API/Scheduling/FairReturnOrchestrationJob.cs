@@ -16,9 +16,9 @@ public sealed class FairReturnOrchestrationJob(
         IJobExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        string? rawEffectId =
-            context.MergedJobDataMap.GetString(
-                EffectIdKey);
+        string? rawEffectId = context.MergedJobDataMap.TryGetValue(EffectIdKey, out var raw) && raw is string str
+            ? str
+            : null;
         Guid? effectId = string.IsNullOrWhiteSpace(
             rawEffectId)
             ? null

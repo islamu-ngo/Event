@@ -6,6 +6,10 @@ description: Evaluate ISLAMU Event locally in under five minutes using Docker.
 
 # 5-Minute Quickstart
 
+{% hint style="warning" %}
+**Pre-Release Notice:** ISLAMU Event is in active pre-release development with no official release yet. Pre-built container images (`ghcr.io/islamu-ngo/event-standalone:latest`) will be published with our upcoming initial release. To run or evaluate the platform currently, build from source using [.NET Aspire](../self-hosting/dotnet-aspire-and-cloud.md) or the [Docker Standalone source build](../self-hosting/docker-standalone.md).
+{% endhint %}
+
 The fastest way to evaluate ISLAMU Event on your local machine or testing server is using Docker. You do not need to install the .NET SDK or any compilers.
 
 ---

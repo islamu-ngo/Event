@@ -11,7 +11,7 @@ Best input is an `implementation-plan` workstream:
 - `dev/active/[task-name]/[task-name]-plan.md`
 - `dev/active/[task-name]/[task-name]-context.md`
 - `dev/active/[task-name]/[task-name]-tasks.md`
-- `islamic-value-sensitive-design/i-vsd-[task-name].md`
+- `islamic-value-sensitive-design/workstreams/i-vsd-[task-name].md`
 
 Also useful:
 

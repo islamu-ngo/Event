@@ -33,7 +33,7 @@ updates:
           - "*"
 
   - package-ecosystem: docker
-    directory: "/Explore.API"
+    directory: "/src/Explore.API"
     schedule:
       interval: weekly
       day: monday
@@ -49,7 +49,7 @@ updates:
           - "*"
 
   - package-ecosystem: docker
-    directory: "/Explore.Blazor"
+    directory: "/src/Explore.Blazor"
     schedule:
       interval: weekly
       day: monday

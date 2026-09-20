@@ -697,6 +697,7 @@ public class AccessTokenForwardingHandler : DelegatingHandler
             || pathAndQuery.Contains("/api/InstanceOnboarding/authz-provider-configuration/internal", StringComparison.OrdinalIgnoreCase)
             || pathAndQuery.Contains("/api/InstanceOnboarding/authz-provider-configuration", StringComparison.OrdinalIgnoreCase)
             || pathAndQuery.Contains("/api/InstanceOnboarding/auth-provider-configured", StringComparison.OrdinalIgnoreCase)
+            || pathAndQuery.Contains("/api/instance-operator-identity", StringComparison.OrdinalIgnoreCase)
             || pathAndQuery.Contains("/api/translation", StringComparison.OrdinalIgnoreCase);
     }
 

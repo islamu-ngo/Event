@@ -211,7 +211,7 @@ public sealed class LegalDocumentPersistenceTests
             new LegalDocumentRenderingService(),
             new FixedTenantContext(Guid.CreateVersion7()),
             new UnexpectedTenantIdentityEvaluator(),
-            identity);
+            new FixedInstanceIdentityEvaluator(identity));
 
         PublicLegalDocumentQueryResult result = await handler.QueryAsync(
             new GetPublicLegalDocumentQuery("terms-of-service", "en"),
@@ -382,5 +382,18 @@ public sealed class LegalDocumentPersistenceTests
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException(
                 "Instance legal composition must not resolve tenant identity.");
+    }
+
+    private sealed class FixedInstanceIdentityEvaluator(InstanceOperatorIdentity identity) :
+        IInstanceOperatorIdentityReadinessEvaluator
+    {
+        public Task<InstanceOperatorIdentityReadinessAssessment> EvaluateAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new InstanceOperatorIdentityReadinessAssessment(
+                true,
+                null,
+                [],
+                identity,
+                Guid.CreateVersion7()));
     }
 }

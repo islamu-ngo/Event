@@ -13,8 +13,8 @@ ISLAMU Event provides a robust, multi-tenant, and **provider-neutral payment arc
 
 ## Paid Checkout Activation Safety
 
-New paid Checkout is disabled by default and fails closed until startup-bound
-`Instance:OperatorIdentity` is complete and `Payments:CheckoutGovernance`
+New paid Checkout is disabled by default and fails closed until persisted
+`instance.operator_identity` is complete and `Payments:CheckoutGovernance`
 defines complaint, refund, dispute, reconciliation, activation, statement, and
 charge-type operations. The browser first reads exact server-authored facts and
 explicitly acknowledges their SHA-256 revision. The resulting
@@ -127,7 +127,7 @@ operator:
 | Role | Authority source | Paid responsibility represented by the system |
 |---|---|---|
 | Tenant directory operator | `tenant.directory-operator-identity` typed settings document | Public accountability for the tenant directory and its legal/contact links |
-| Instance operator | Startup-bound `Instance:OperatorIdentity` | General platform identity and operator legal/contact links |
+| Instance operator | Persisted `instance.operator_identity` (`IInstanceOperatorIdentityReadinessEvaluator`) | General platform identity and operator legal/contact links |
 | Organizer merchant | Event organizer actor plus connected provider account | Recipient/merchant lineage for the direct charge |
 | Payment operations | `Payments:CheckoutGovernance` | Complaint, refund, dispute, reconciliation, activation, statement, and charge-type operations |
 
@@ -494,8 +494,8 @@ Create an incoming webhook verifier and handler in `src/Explore.Infrastructure/P
 
 | Secret Key | Registry Binding Key | Scope | Description |
 |---|---|---|---|
-| `PAYMENTS_STRIPE_PLATFORM_API_KEY` | `payments.stripe.platform_api_key` | Instance (Server-only) | Platform secret API key (`sk_test_...` or `sk_live_...`). |
-| `PAYMENTS_STRIPE_WEBHOOK_SECRET` | `payments.stripe.webhook_secret` | Instance (Server-only) | Signing secret for verifying raw webhook signatures (`whsec_...`). |
+| `STRIPE_PLATFORM_SECRET_KEY` | `payments.stripe.platform_secret_key` | Instance (Server-only) | Platform secret API key (`sk_test_...` or `sk_live_...`). |
+| `STRIPE_WEBHOOK_SECRET` | `payments.stripe.webhook_secret` | Instance (Server-only) | Signing secret for verifying raw webhook signatures (`whsec_...`). |
 
 ---
 
@@ -596,4 +596,4 @@ merchant's accounting, tax, invoice, credit-note, banking, or escrow system.
 - [SECRETS.md](SECRETS.md) - Multi-provider secret management
 - [SECURITY-MODEL.md](SECURITY-MODEL.md) - Platform security invariants and privilege boundaries
 - [WEBHOOKS.md](WEBHOOKS.md) - Webhook delivery, callback verifications, and operational runbooks
-- [I-VSD Paid Event Payments Consultation](../../islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md)
+- [I-VSD Paid Event Payments Consultation](../../islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md)

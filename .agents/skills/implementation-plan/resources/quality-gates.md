@@ -5,7 +5,7 @@
 
 ## Intake Gate (I-VSD & Grill-Me)
 
-- `islamic-value-sensitive-design/i-vsd-<task-name>.md` exists, contains `Last Updated: YYYY-MM-DD`, and is linked from the task-owned plan, context, and tasks files.
+- `islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md` exists, contains `Last Updated: YYYY-MM-DD`, and is linked from the task-owned plan, context, and tasks files.
 - The I-VSD report follows `planning` mode, names its workstream, is `current`, and has a `plan-aligned` disposition after the completed triad was revalidated.
 - The I-VSD report traces applicable principles, stakeholders, provider-controlled decisions, evidence, stable finding/mitigation IDs, uncertainty, refresh triggers, and escalation boundaries.
 - Every material `IVSD-*` ID maps in plan Section 9 to a named scenario/task, explicit non-applicability, or named escalation gate; the same report path and status appears in plan, context, and tasks.

@@ -392,8 +392,8 @@ Ask Stripe to review the planned Connect configuration, country rollout, manual-
 - `src/Explore.Domain/ValueObjects/CurrencyMetadata.cs` — supplies ISO currencies and exponent-aware minor units, including EUR, USD, MAD, SAR, and AED.
 - `src/Explore.Domain/PlatformFeePolicy.cs` — default-off, instance-scoped platform fee policy.
 - `src/Explore.Domain/PlatformContributionSetting.cs` — separate, default-off platform contribution setting.
-- `islamic-value-sensitive-design/i-vsd-compliance-check.md` — identifies refund, cancellation, financial, legal, and scholarly gaps.
-- `islamic-value-sensitive-design/i-vsd-flexible-event-end-times.md` — confirms that public event endings may be open-ended or contextual and therefore cannot double as payout milestones.
+- `islamic-value-sensitive-design/consultations/i-vsd-compliance-check.md` — identifies refund, cancellation, financial, legal, and scholarly gaps.
+- `islamic-value-sensitive-design/consultations/i-vsd-flexible-event-end-times.md` — confirms that public event endings may be open-ended or contextual and therefore cannot double as payout milestones.
 
 ### External Functional Evidence
 

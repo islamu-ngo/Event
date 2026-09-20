@@ -8,6 +8,7 @@
 @using Explore.Blazor.Client.Contracts.Services.Webhooks
 @using Explore.Blazor.Client.Contracts.ControlPlane
 @using Explore.Blazor.Client.Services.ControlPlane
+@using Explore.Blazor.Client.Components
 @using Explore.Blazor.Client.Pages.User.Components
 @implements IDisposable
 
@@ -130,6 +131,10 @@
                         else if (_currentSection == "domain")
                         {
                         <InstanceDomainSection Model="_domain" IsMultiTenantMode="!IsSingleTenantMode" SaveDomainAsync="SaveDomainAsync" />
+                        }
+                        else if (_currentSection == "operator-identity")
+                        {
+                            <InstanceOperatorIdentitySection IsSingleTenantMode="IsSingleTenantMode" />
                         }
                         else if (_currentSection == "branding" && !IsSingleTenantMode)
                         {
@@ -869,6 +874,7 @@
             List<NavItem> navItems =
             [
                 new("governance",       Icons.Material.Filled.Settings,        "General"),
+                new("operator-identity",Icons.Material.Filled.Badge,           "Operator Identity"),
             ];
 
             if (_canManageTenant)
@@ -914,6 +920,7 @@
         List<NavItem> multiTenantNavItems =
         [
             new("governance",       Icons.Material.Filled.Gavel,           "Governance"),
+            new("operator-identity",Icons.Material.Filled.Badge,           "Operator Identity"),
             new("tenants",          Icons.Material.Filled.DomainAdd,       "Tenants"),
             new("domain",           Icons.Material.Filled.Language,        "Domain"),
             new("branding",         Icons.Material.Filled.Palette,         "Branding"),

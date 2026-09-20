@@ -7,8 +7,8 @@ description: Deploy and operate an external Cerbos Policy Decision Point (PDP) b
 This runbook guides operators through deploying and operating an external **Cerbos Policy Decision Point (PDP)** as a standalone application on **Coolify** behind Traefik, providing fine-grained authorization for ISLAMU Event.
 
 > [!TIP]
-> **⚙️ ISLAMU's Production Deployment on Coolify Cloud:**
-> In our own production environment, we connect our Hetzner CPX32 server to a **Coolify Cloud** subscription and deploy the following services directly through Coolify:
+> **⚙️ Reference Deployment Blueprint on Coolify Cloud:**
+> For multi-service hosting, our reference architecture blueprint connects a Hetzner CPX32 server to a **Coolify Cloud** subscription with the following services deployed through Coolify:
 > - **`islamu-event-api`**: Core ASP.NET Core REST API & Background Workers Docker image
 > - **`islamu-event-ui`**: Blazor WebAssembly BFF Docker image
 > - **`postgres` (ISLAMU Event)**: Primary application relational database
@@ -19,7 +19,7 @@ This runbook guides operators through deploying and operating an external **Cerb
 > - **Infisical**: Secrets management engine providing dynamic runtime configuration
 > - **Hetzner Object Storage**: S3-compatible media storage located in Falkenstein, Germany (`eu-central`)
 >
-> For server sizing benchmarks, see the **[Deployment Tiers & Sizing Guide](deployment-tiers.md)**.
+> For server sizing recommendations, see the **[Deployment Tiers & Sizing Guide](deployment-tiers.md)**.
 
 ---
 

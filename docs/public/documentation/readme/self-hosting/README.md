@@ -6,14 +6,14 @@ description: >-
 
 # Self-Hosting
 
-Select a topology by operational needs, then follow its dedicated runbook. The project is pre-1.0: pin versions and image digests, review release/API changes, and test backup restoration before upgrades.
+Select a topology by operational needs, then follow its dedicated runbook. The project is in active pre-release development with no official release yet: pre-built images and versioned tags will become available upon initial release.
 
 ## Deployment paths
 
 | Path                                                       | Best fit                                                | Primary constraint                                                     |
 | ---------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
 | [Deployment Tiers & Sizing](deployment-tiers.md)           | Hardware capacity and infrastructure sizing             | Choose based on monthly attendee volume                                |
-| [Docker Standalone](docker-standalone.md)                  | Smallest deployment and lowest operating load           | One replica, durable SQLite/local volume, initial `linux/amd64` target |
+| [Docker Standalone](docker-standalone.md)                  | Smallest deployment and lowest operating load           | One replica, durable SQLite/local volume, multi-platform (`linux/amd64`, `linux/arm64`) |
 | [Docker Compose](docker-compose.md)                        | Split services and a server database                    | One-shot migration service must complete before API/UI                 |
 | [Coolify with Cerbos & Traefik](coolify-cerbos-traefik.md) | Existing Coolify/Traefik operators using Cerbos         | Cerbos runbook only, not a whole-platform one-click template           |
 | [.NET Aspire & Cloud](dotnet-aspire-and-cloud.md)          | Development orchestration or adopter-owned cloud design | No turnkey Azure/AWS template or universal responsibility model        |
@@ -49,7 +49,7 @@ For authentication, use this order unless your requirements say otherwise:
 See [Authentication Providers](../configuration-and-operations/authentication-providers.md)
 for the exact runtime matrix and safe switching procedure.
 
-Kubernetes, Helm, ActivityPub infrastructure, first-party PDS/AppView hosting, and initial `linux/arm64` packaging are not implemented deployment options.
+Kubernetes, Helm, ActivityPub infrastructure, and first-party PDS/AppView hosting are not implemented deployment options.
 
 ## One supported build
 
@@ -60,6 +60,15 @@ upgrading existing build or deployment configuration, remove the
 [obsolete edition inputs](../configuration-and-operations/environment-variables.md#removed-edition-inputs).
 No replacement flag or database migration is needed; provider credentials and
 the selected hosting topology remain unchanged.
+
+## First-Run Onboarding & Operator Identity
+
+All self-hosted topologies feature a guided first-run web wizard at `/setup`:
+
+1. **Decoupled Startup:** The server process boots cleanly without requiring operator legal identity environment variables up front. Optional `INSTANCE__OPERATORIDENTITY__*` variables can be provided to pre-seed initial defaults, but they are not required to start the container.
+2. **Setup Wizard Configuration (`/setup`):** Operators use the temporary setup secret to select the deployment mode (`SingleTenant` or `MultiTenant`), configure initial administrator credentials, and complete the operator's legal identity (legal name, jurisdiction, contact email, and legal disclosure URLs).
+3. **Fail-Closed Consumer Protections:** Completed instances with missing or incomplete operator identity will start, but will fail closed for consumer-facing legal operations: public legal notices return HTTP 503 (`Unavailable`), and paid ticket checkout activation is blocked until identity requirements are satisfied.
+4. **Post-Launch Maintenance (`/settings/instance`):** Once onboarding completes, the setup wizard locks permanently. Authorized administrators maintain and update operator legal details under **Settings → Instance → Operator Identity** (`/settings/instance?section=operator-identity`).
 
 ## Shared production gate
 

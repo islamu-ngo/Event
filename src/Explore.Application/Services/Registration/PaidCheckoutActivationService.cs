@@ -42,7 +42,8 @@ public sealed class PaidCheckoutActivationService(
     IPaidEventPolicyRepository policies,
     IEventRepository events,
     ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
-    IPaidCheckoutGovernance governance) : IPaidCheckoutActivationService
+    IPaidCheckoutGovernance governance,
+    IInstanceOperatorIdentityReadinessEvaluator instanceOperatorIdentityReadiness) : IPaidCheckoutActivationService
 {
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness =
         directoryOperatorReadiness;
@@ -52,6 +53,15 @@ public sealed class PaidCheckoutActivationService(
         Guid eventId,
         CancellationToken cancellationToken)
     {
+        InstanceOperatorIdentityReadinessAssessment instanceIdentity =
+            await instanceOperatorIdentityReadiness.EvaluateAsync(cancellationToken);
+        if (!instanceIdentity.IsReady)
+        {
+            return PaidCheckoutActivationResult.Failure(
+                "instance_operator_identity_unavailable",
+                "Instance operator identity is unavailable for paid commerce.");
+        }
+
         TenantDirectoryOperatorReadinessAssessment directoryIdentity =
             await _directoryOperatorReadiness.EvaluateAsync(
                 tenantId,

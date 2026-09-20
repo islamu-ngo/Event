@@ -87,8 +87,7 @@ public static class ServiceRegistrationExtensions
         services.Configure<SetupSecretResolverOptions>(options =>
         {
             options.DevelopmentSecret = configuration["Setup:Secret"]?.Trim()
-                ?? configuration["Explore:Setup:Secret"]?.Trim()
-                ?? configuration["SETUP_SECRET"]?.Trim();
+                ?? configuration["Explore:Setup:Secret"]?.Trim();
         });
         services.AddSingleton<ISetupSecretCookieProtector, SetupSecretCookieProtector>();
         services.AddSingleton<LocalCredentialChallengeCookie>();

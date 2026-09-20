@@ -1,15 +1,16 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Http.Json;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
-using Infisical.Sdk;
-using Infisical.Sdk.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Secrets.Providers;
 
 /// <summary>
-/// Secret provider that retrieves secrets from Infisical using Universal Auth.
+/// Secret provider that retrieves secrets from Infisical using Universal Auth via direct REST API calls.
+/// Uses HttpClient with IPv4 forcing instead of Infisical.Sdk (whose Rust FFI hangs against self-hosted instances).
 /// Caches secrets locally and supports periodic refresh.
 /// </summary>
 public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
@@ -18,7 +19,7 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     private readonly InfisicalOptions _options;
     private readonly ConcurrentDictionary<string, SecretValue> _secretCache = new(StringComparer.OrdinalIgnoreCase);
 
-    private InfisicalClient? _client;
+    private string? _accessToken;
     private bool _initialized;
     private DateTime? _lastSuccessfulRefresh;
     private int _consecutiveFailures;
@@ -55,21 +56,12 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
 
             _logger.LogInformation("secret_provider_initializing");
 
-            var settings = new InfisicalSdkSettingsBuilder()
-                .WithHostUri(_options.Url!)
-                .Build();
-
-            _client = new InfisicalClient(settings);
-
-            // Authenticate using Universal Auth
-            await _client.Auth().UniversalAuth().LoginAsync(
-                _options.ClientId!,
-                _options.ClientSecret!);
+            await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
 
             _logger.LogDebug("Infisical authentication successful");
 
             // Load initial secrets
-            await LoadSecretsAsync(cancellationToken);
+            await LoadSecretsAsync(cancellationToken).ConfigureAwait(false);
 
             _initialized = true;
             _lastSuccessfulRefresh = DateTime.UtcNow;
@@ -77,7 +69,17 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
 
             _logger.LogInformation("secret_provider_initialized");
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (SecretProviderException)
+        {
+            _consecutiveFailures++;
+            _logger.LogError("secret_provider_initialization_failed");
+            throw;
+        }
+        catch (Exception)
         {
             _consecutiveFailures++;
             _logger.LogError("secret_provider_initialization_failed");
@@ -195,15 +197,69 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     }
 
     /// <summary>
-    /// Loads secrets from all configured paths into the cache.
+    /// Authenticates with Infisical using Universal Auth via direct REST API.
+    /// </summary>
+    private async Task AuthenticateAsync(CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrEmpty(_accessToken))
+        {
+            return;
+        }
+
+        using var handler = InfisicalConfigurationProvider.CreateIpv4Handler();
+        using var http = new HttpClient(handler, disposeHandler: false)
+        {
+            Timeout = TimeSpan.FromSeconds(15),
+        };
+
+        var effectiveUrl = (_options.Url ?? string.Empty).TrimEnd('/');
+        var loginResp = await http.PostAsJsonAsync(
+            $"{effectiveUrl}/api/v1/auth/universal-auth/login",
+            new { clientId = _options.ClientId, clientSecret = _options.ClientSecret },
+            cancellationToken).ConfigureAwait(false);
+
+        if (!loginResp.IsSuccessStatusCode)
+        {
+            throw SecretProviderException.Permanent(
+                "secret_provider_initialization_failed",
+                SecretProviderType.Infisical,
+                "UniversalAuth");
+        }
+
+        var loginJson = await loginResp.Content
+            .ReadFromJsonAsync<InfisicalConfigurationProvider.InfisicalLoginResponse>(cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        _accessToken = loginJson?.AccessToken;
+        if (string.IsNullOrEmpty(_accessToken))
+        {
+            throw SecretProviderException.Permanent(
+                "secret_provider_initialization_failed",
+                SecretProviderType.Infisical,
+                "UniversalAuth");
+        }
+    }
+
+    /// <summary>
+    /// Loads secrets from all configured paths into the cache via direct REST API.
     /// </summary>
     private async Task LoadSecretsAsync(CancellationToken cancellationToken)
     {
-        if (_client is null)
+        if (string.IsNullOrEmpty(_accessToken))
         {
-            throw new InvalidOperationException("Infisical client not initialized");
+            await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        using var handler = InfisicalConfigurationProvider.CreateIpv4Handler();
+        using var http = new HttpClient(handler, disposeHandler: false)
+        {
+            Timeout = TimeSpan.FromSeconds(15),
+        };
+
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+
+        var effectiveUrl = (_options.Url ?? string.Empty).TrimEnd('/');
         var newSecrets = new Dictionary<string, SecretValue>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var path in _options.Paths)
@@ -212,40 +268,59 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
 
             try
             {
-                var options = new ListSecretsOptions
+                var listUrl =
+                    $"{effectiveUrl}/api/v3/secrets/raw"
+                    + $"?workspaceId={Uri.EscapeDataString(_options.ProjectId!)}"
+                    + $"&environment={Uri.EscapeDataString(_options.Environment)}"
+                    + $"&secretPath={Uri.EscapeDataString(path)}"
+                    + "&expandSecretReferences=true&recursive=true";
+
+                var listResp = await http.GetAsync(listUrl, cancellationToken).ConfigureAwait(false);
+
+                if (!listResp.IsSuccessStatusCode)
                 {
-                    ProjectId = _options.ProjectId!,
-                    EnvironmentSlug = _options.Environment,
-                    SecretPath = path,
-                    Recursive = true,
-                    ExpandSecretReferences = true,
-                    ViewSecretValue = true
-                };
+                    _logger.LogError("secret_provider_path_unavailable status={StatusCode} path={Path}", listResp.StatusCode, path);
+                    throw SecretProviderException.Transient(
+                        "secret_provider_path_unavailable",
+                        SecretProviderType.Infisical,
+                        "ListSecrets");
+                }
 
-                var secrets = await _client.Secrets().ListAsync(options);
+                var listJson = await listResp.Content
+                    .ReadFromJsonAsync<InfisicalConfigurationProvider.InfisicalListSecretsResponse>(cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
 
-                if (secrets is null)
+                if (listJson?.Secrets is null || listJson.Secrets.Count == 0)
                 {
                     _logger.LogWarning("secret_provider_path_empty");
                     continue;
                 }
 
-                foreach (var secret in secrets)
+                foreach (var secret in listJson.Secrets)
                 {
+                    if (string.IsNullOrEmpty(secret.SecretKey)) continue;
+
                     var canonicalKey = ConvertToCanonicalKey(secret.SecretKey, path);
                     var secretValue = new SecretValue(
-                        secret.SecretValue,
-                        Version: secret.Version.ToString());
+                        secret.SecretValue ?? string.Empty,
+                        Version: secret.Version?.ToString());
 
                     newSecrets[canonicalKey] = secretValue;
 
                     _logger.LogTrace("secret_provider_item_loaded");
                 }
             }
-            catch (Exception)
+            catch (OperationCanceledException)
             {
-                _logger.LogError("secret_provider_path_unavailable");
                 throw;
+            }
+            catch (Exception ex) when (ex is not SecretProviderException)
+            {
+                _logger.LogError(ex, "secret_provider_path_unavailable");
+                throw SecretProviderException.Transient(
+                    "secret_provider_path_unavailable",
+                    SecretProviderType.Infisical,
+                    "ListSecrets");
             }
         }
 
@@ -308,6 +383,9 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     {
         var errors = new List<string>();
 
+        if (string.IsNullOrWhiteSpace(_options.Url))
+            errors.Add("Infisical Url is required");
+
         if (string.IsNullOrWhiteSpace(_options.ProjectId))
             errors.Add("Infisical ProjectId is required");
 
@@ -336,22 +414,12 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _initLock.Dispose();
         _refreshLock.Dispose();
-
-        // InfisicalClient may implement IDisposable
-        if (_client is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
-        else if (_client is IAsyncDisposable asyncDisposable)
-        {
-            await asyncDisposable.DisposeAsync();
-        }
-
-        _client = null;
         _initialized = false;
+        _accessToken = null;
+        return ValueTask.CompletedTask;
     }
 }

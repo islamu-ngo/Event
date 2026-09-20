@@ -629,7 +629,7 @@ scenarios:
       - "docs/BLAZOR.md"
       - "README.md"
       - "dev/zarchive/secrets-refactor-control-plane/**"
-      - "islamic-value-sensitive-design/i-vsd-secrets-refactor-control-plane.md"
+      - "islamic-value-sensitive-design/workstreams/i-vsd-secrets-refactor-control-plane.md"
     expected_verification_commands:
       - "dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWorkflow.csproj -- validate-intents .agents/contract/intents.yaml"
       - "dotnet build --configuration Release --verbosity quiet"

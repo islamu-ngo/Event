@@ -143,4 +143,4 @@ Only separate future authority/research work is graduated to backlog; no S01-S26
 - [Internal self-hosting](../SELF_HOSTING.md)
 - [Public Standalone guide](../../public/documentation/readme/self-hosting/docker-standalone.md)
 - [Public Compose guide](../../public/documentation/readme/self-hosting/docker-compose.md)
-- [Single I-VSD report](../../../islamic-value-sensitive-design/i-vsd-email-optional-self-hosting.md)
+- [Single I-VSD report](../../../islamic-value-sensitive-design/consultations/i-vsd-email-optional-self-hosting.md)

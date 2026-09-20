@@ -34,7 +34,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
     private readonly ITypedSettingsDocumentResolver _typedSettingsDocumentResolver;
     private readonly IFooterLinkGroupRepository _footerLinkGroupRepository;
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness;
-    private readonly IInstanceOperatorIdentity _instanceOperatorIdentity;
+    private readonly IInstanceOperatorIdentityReadinessEvaluator _instanceOperatorReadiness;
     private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
 
     public GetPublicExperienceSettingsQueryHandler(
@@ -51,7 +51,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
         IFooterLinkGroupRepository footerLinkGroupRepository,
         ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
-        IInstanceOperatorIdentity instanceOperatorIdentity,
+        IInstanceOperatorIdentityReadinessEvaluator instanceOperatorReadiness,
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
     {
         _tenantContext = tenantContext;
@@ -67,7 +67,7 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         _typedSettingsDocumentResolver = typedSettingsDocumentResolver;
         _footerLinkGroupRepository = footerLinkGroupRepository;
         _directoryOperatorReadiness = directoryOperatorReadiness;
-        _instanceOperatorIdentity = instanceOperatorIdentity;
+        _instanceOperatorReadiness = instanceOperatorReadiness;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
     }
 
@@ -149,6 +149,9 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         var appearanceSettingGroup = await _hierarchicalSettingsResolver.ResolveGroupAsync<AppearanceSettingGroup>(
             new SettingContext(TenantId: tenantId), cancellationToken);
 
+        InstanceOperatorIdentityReadinessAssessment instanceAssessment =
+            await _instanceOperatorReadiness.EvaluateAsync(cancellationToken);
+
         return new PublicExperienceSettingsDto
         {
             TenantId = tenantId,
@@ -156,7 +159,9 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
             VisitorAccess = VisitorAccessCapabilityDto.From(
                 await _visitorAccessCapabilityResolver.ResolveAsync(tenantId, cancellationToken)),
             DirectoryOperator = MapDirectoryOperator(directoryAssessment.Identity, documentRevision),
-            InstanceOperator = MapInstanceOperator(_instanceOperatorIdentity),
+            InstanceOperator = instanceAssessment.IsReady && instanceAssessment.Identity is not null
+                ? MapInstanceOperator(instanceAssessment.Identity)
+                : null,
             Mode = Explore.Application.Models.PublicExperienceMode.DiscoveryCentric,
             DeploymentMode = deploymentMode,
             PreferredHomePage = effectiveTenantSettings.PreferredHomePage,

@@ -41,7 +41,9 @@ public sealed class GeneratedContractGraphTests
             Task secondReady = second.ReceiveAsync(timeout.Token);
             using var process = new Process
             {
-                StartInfo = new ProcessStartInfo("dotnet")
+                StartInfo = new ProcessStartInfo(Path.GetFullPath(Path.Combine(
+                    System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(),
+                    "..", "..", "..", OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet")))
                 {
                     WorkingDirectory = root,
                     RedirectStandardOutput = true,

@@ -36,6 +36,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         ArgumentNullException.ThrowIfNull(setting);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+        InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (PublicationPolicySettingKeys.All.Contains(setting.SettingKey, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -81,6 +82,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         ArgumentNullException.ThrowIfNull(setting);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+        InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (PublicationPolicySettingKeys.All.Contains(setting.SettingKey, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");

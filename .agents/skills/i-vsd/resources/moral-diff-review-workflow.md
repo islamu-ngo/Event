@@ -99,7 +99,7 @@ Soft violations are warnings that degrade the ethical baseline but may not block
 
 ## Report Output
 
-Create or update `islamic-value-sensitive-design/i-vsd-moral-diff-review.md`. Use the standard report contract from [action-routing.md](action-routing.md), plus this action-specific YAML block near the top of `## Findings`:
+Create or update `islamic-value-sensitive-design/workstreams/i-vsd-moral-diff-review.md`. Use the standard report contract from [action-routing.md](action-routing.md), plus this action-specific YAML block near the top of `## Findings`:
 
 ```yaml
 pass: true

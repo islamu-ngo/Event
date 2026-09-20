@@ -187,6 +187,13 @@ A handoff is written directly into the task-owned context and contains only:
 
 Generic dev-directory README and handoff templates are intentionally absent because directory-context systems may inject them into every nested read.
 
+### Rolling Context Compaction Invariant (< 200–300 lines / < 15KB)
+
+To prevent token budget exhaustion upon session resume, `*-context.md` must remain strictly **ephemeral working memory** (< 200–300 lines / < 15KB), not a permanent historical diary. In multi-phase or multi-cohort tasks, agents must never accumulate raw commit digests, compiler logs, or per-cohort status dumps in `context.md`. As milestones or cohorts complete:
+1. Summarize completed work into a concise 1-line checkpoint under `## Quick Resume`.
+2. Archive durable lessons, quirks, or ADRs to `dev/_journal/` or `docs/internal/adr/`.
+3. Prune old ephemeral session logs from `context.md`. The Git commit log (`git log`) is the sole durable source of truth for commits, never markdown text dumps.
+
 ## Multi-Harness Rule Architecture
 
 This repository supports multiple AI agent harnesses. Each harness has its own native rule-discovery mechanism that scans specific filesystem paths on every prompt or tool execution. To ensure automatic path-scoped rule injection across all harnesses, architectural rules are maintained as identical twin copies:

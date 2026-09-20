@@ -16,6 +16,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
+using Explore.Domain.ValueObjects;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -51,6 +52,33 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         _ = await Assert.ThrowsAsync<InjectedOnboardingWriteException>(() => scenario.ClaimAsync());
 
+        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
+        await Assert.That(scenario.CommittedWrites).IsEmpty();
+        await Assert.That(scenario.Users).IsEmpty();
+        await Assert.That(scenario.PostCommitEffects).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("instance_operator_identity_incomplete", "instance_operator_identity_legal_name_missing")]
+    [Arguments("instance_operator_identity_missing", null)]
+    [Arguments("instance_operator_identity_integrity_error", null)]
+    public async Task CompletionRollback_WhenIdentityNotReady_AbortsWithoutCommittingAdministratorOrTenantRecords(
+        string failureCode, string? reasonCode)
+    {
+        var scenario = new OnboardingCompletionScenario();
+        scenario.IdentityReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+            .Returns(new InstanceOperatorIdentityReadinessAssessment(
+                false,
+                failureCode,
+                reasonCode is null ? [] : [reasonCode],
+                null,
+                null));
+
+        BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
+
+        await Assert.That(response.IsSuccess).IsFalse();
+        await Assert.That(response.FailureCode).IsEqualTo(failureCode);
+        await Assert.That(response.Errors ?? []).IsEquivalentTo(reasonCode is null ? [] : new[] { reasonCode });
         await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.Users).IsEmpty();
@@ -364,6 +392,29 @@ internal sealed class OnboardingCompletionScenario
         var jwt = new EffectJwtNotifier(this, EventSequence);
         var audit = new EffectAuditLogger(EventSequence);
 
+        IdentityReadiness = Substitute.For<IInstanceOperatorIdentityReadinessEvaluator>();
+        IdentityReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+            .Returns(new InstanceOperatorIdentityReadinessAssessment(
+                true,
+                null,
+                System.Collections.Immutable.ImmutableArray<string>.Empty,
+                InstanceOperatorIdentity.Create(new InstanceOperatorIdentityOptions
+                {
+                    OperatorId = Guid.CreateVersion7(),
+                    PublicName = "Scenario Operator",
+                    LegalName = "Scenario Operator SA",
+                    OperatorKindCode = TenantDirectoryOperatorKinds.RegisteredOrganization,
+                    JurisdictionCountryCode = "BE",
+                    RegistrationIdentifier = "BE0123456789",
+                    PublicContactEmail = "contact@scenario.test",
+                    WebsiteUrl = "https://scenario.test",
+                    LegalNoticeUrl = "https://scenario.test/legal",
+                    TermsUrl = "https://scenario.test/terms",
+                    PrivacyUrl = "https://scenario.test/privacy",
+                    OfficialOrigin = "https://event.islamu.org"
+                }),
+                Guid.CreateVersion7()));
+
         Operation = new InstanceOnboardingCompletionOperation(
             BootstrapRepository,
             platformRoles,
@@ -384,7 +435,8 @@ internal sealed class OnboardingCompletionScenario
             jwt,
             branding,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance,
-            _unitOfWork);
+            _unitOfWork,
+            IdentityReadiness);
     }
 
     public Guid UserId { get; }
@@ -392,6 +444,7 @@ internal sealed class OnboardingCompletionScenario
     public InstanceBootstrapState Bootstrap { get; set; }
     public IInstanceBootstrapStateRepository BootstrapRepository { get; }
     public IUserRepository UserRepository { get; }
+    public IInstanceOperatorIdentityReadinessEvaluator IdentityReadiness { get; }
     public EffectDeploymentModeProvider DeploymentModeProvider { get; }
     public InstanceOnboardingCompletionOperation Operation { get; }
     public List<string> EventSequence { get; } = [];

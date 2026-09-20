@@ -317,8 +317,8 @@ public enum DeactivationMode
 
 - Repository Documentation: [`docs/PAYMENTS.md`](file:///home/amir/ISLAMU/Github/Event/docs/PAYMENTS.md), [`docs/DOMAIN.md`](file:///home/amir/ISLAMU/Github/Event/docs/DOMAIN.md), [`docs/AUTHORIZATION.md`](file:///home/amir/ISLAMU/Github/Event/docs/AUTHORIZATION.md).
 - Predecessor Consultations:
-  - [`islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md`](file:///home/amir/ISLAMU/Github/Event/islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md)
-  - [`islamic-value-sensitive-design/i-vsd-event-ticketing-lifecycle.md`](file:///home/amir/ISLAMU/Github/Event/islamic-value-sensitive-design/i-vsd-event-ticketing-lifecycle.md)
+  - [`islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md`](file:///home/amir/ISLAMU/Github/Event/islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md)
+  - [`islamic-value-sensitive-design/consultations/i-vsd-event-ticketing-lifecycle.md`](file:///home/amir/ISLAMU/Github/Event/islamic-value-sensitive-design/consultations/i-vsd-event-ticketing-lifecycle.md)
 - Codebase Foundations:
   - `src/Explore.Domain/Services/Registration/PaidEventPolicyRules.cs`
   - `src/Explore.Domain/PaidEventPolicyVersion.cs`

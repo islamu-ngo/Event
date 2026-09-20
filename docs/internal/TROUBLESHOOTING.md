@@ -7,7 +7,7 @@ ABOUTME: Prioritizes repeat incidents and non-obvious checks over generic .NET a
 
 | Symptom | Likely authority | Repair |
 |---|---|---|
-| API or Standalone stops with `Instance:OperatorIdentity` validation failure | Missing or malformed `INSTANCE__OPERATORIDENTITY__*` startup values | Correct the exact `.env` values and restart; do not move them into appsettings, branding, or Checkout governance |
+| Public legal notice returns `503` or paid checkout fails closed with `instance_operator_identity_unavailable` | Incomplete or missing instance operator identity in database | Open `/setup` (during first-run) or `/admin/instance` (platform administrator), complete required fields, and save; headless setups can provide `INSTANCE__OPERATORIDENTITY__*` in `.env` |
 | Tenant activation/reactivation is blocked | Tenant document is incomplete for `Activation` | Open Tenant Settings -> Legal Identity, complete the grouped legal/contact/link fields, and save using the current revision |
 | Anonymous settings/shell returns `503` and `tenant_identity_unavailable` | Exact tenant document is missing, corrupt, or incomplete for `PublicDisclosure` | Repair the tenant identity document; do not add a public cache or branding fallback |
 | Paid publication or Checkout activation is blocked | `PaidCommerce` intersection is incomplete | Repair the reported tenant identity, instance identity, organizer payment connection, policy, or payment-operation authority |

@@ -43,7 +43,7 @@ Group recommendations into quick fixes, design/policy changes, architecture chan
 
 ## Output Modes
 
-All output modes below MUST be persisted to a Markdown file under `islamic-value-sensitive-design/` using the `i-vsd-*.md` naming pattern. Never deliver I-VSD findings, consultations, advisories, or recommendations only as inline conversation text. The conversation response should summarize what was written and point to the file path, not replace it. If no explicit action name maps to the request, derive a descriptive filename (e.g., `i-vsd-account-deletion-consultation.md`) and write the full output to that file.
+All output modes below MUST be persisted to a Markdown file under `islamic-value-sensitive-design/consultations/` (or `governance/` for constitutional/strategic policies) using the `i-vsd-*.md` naming pattern. Never deliver I-VSD findings, consultations, advisories, or recommendations only as inline conversation text. The conversation response should summarize what was written and point to the file path, not replace it. If no explicit action name maps to the request, derive a descriptive filename (e.g., `i-vsd-account-deletion-consultation.md`) and write the full output to that file.
 
 - Short advisory memo: direct answer, basis, risks, caveat. Written to `i-vsd-short-advisory.md` or a topic-specific filename.
 - Executive report: summary, risks, prioritized recommendations. Written to `i-vsd-executive-review.md`.

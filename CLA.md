@@ -23,7 +23,7 @@ ISLAMU Event is distributed publicly under `AGPL-3.0-or-later`. The CLA grants t
 ## Related Documents
 
 - **Full CLA text & Governance:** [`legal/CLA.md`](legal/CLA.md)
-- **I-VSD Licensing & Strategy Review:** [`islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md`](islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md)
+- **I-VSD Licensing & Strategy Review:** [`islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md`](islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md)
 - **Contribution guidelines:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **Legal governance decision:** [`docs/internal/legal/CONTRIBUTION_GOVERNANCE.md`](docs/internal/legal/CONTRIBUTION_GOVERNANCE.md)
 - **IP governance:** [`docs/internal/legal/IP_GOVERNANCE.md`](docs/internal/legal/IP_GOVERNANCE.md)

@@ -81,24 +81,23 @@ intent still require their own guarded administration.
 
 ---
 
-## 2. Required Operator Identity Gate
+## 2. Operator Identity Governance & Readiness Gate
 
-Runtime API and Standalone hosts require a complete `INSTANCE__OPERATORIDENTITY__*` section before startup:
+Runtime operator identity is stored in the database under system setting `instance.operator_identity` and configured via the first-run onboarding wizard (`/setup`) or authenticated administrator settings (`/admin/instance` via `GET/PUT /api/instance-operator-identity`).
 
-* `INSTANCE__OPERATORIDENTITY__OPERATORID`: Canonical UUIDv7 identifier.
-* `INSTANCE__OPERATORIDENTITY__PUBLICNAME`: User-facing organization name.
-* `INSTANCE__OPERATORIDENTITY__LEGALNAME`: Legally registered entity name.
-* `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL`: Public operator contact.
-* `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE`: Jurisdiction country code.
-* `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN`: Required HTTPS origin, including for unofficial instances.
+- **Decoupled Startup:** API and Standalone hosts boot cleanly without operator identity environment variables, allowing the web onboarding wizard and health probes to respond.
+- **Optional Headless Bootstrap Seed:** For headless `ConfiguredAdministrator` deployments, `INSTANCE__OPERATORIDENTITY__*` in `.env` can optionally provide first-run identity which is validated and persisted to the database during bootstrap completion.
+- **Fail-Closed Consumer Gating:** When operator identity is incomplete, public legal notices return HTTP 503 Service Unavailable, and new paid ticket sales/checkout fail closed (`instance_operator_identity_unavailable`) before payment reservation or provider handoff. First-run setup and administrative repair remain accessible.
 
-These are part of the grouped identity contract, not an exhaustive field list.
-Use the operator-identity section in the environment reference for operator kind,
-official-instance status and required legal links. `OperatorKindCode` uses the
-closed `TenantDirectoryOperatorKinds` vocabulary, such as
-`unincorporated_association`; `community` is not accepted. Invalid or incomplete identity
-makes `Explore.API` and `Event.Standalone` fail startup validation. Zero-email
-operation does not waive this gate.
+Required fields include:
+* `OperatorId`: Canonical UUIDv7 identifier (server-managed).
+* `PublicName`: User-facing organization name.
+* `LegalName`: Legally registered entity name.
+* `PublicContactEmail`: Public operator contact.
+* `JurisdictionCountryCode`: Jurisdiction country code.
+* `OfficialOrigin`: Required HTTPS origin, including for unofficial instances.
+* `OperatorKindCode`: Closed `TenantDirectoryOperatorKinds` vocabulary (`registered_organization`, `sole_trader`, `individual`, `public_body`, `unincorporated_association`).
+* `WebsiteUrl`, `LegalNoticeUrl`, `TermsUrl`, `PrivacyUrl`: Required HTTPS URLs.
 
 ---
 
@@ -223,6 +222,15 @@ erasure facts. Persistence wiring alone proves neither crash safety nor a
 successful restore, and retaining Data Protection keys alone does not guarantee
 that every session survives. Follow [BACKUP_RESTORE_UPGRADE.md](BACKUP_RESTORE_UPGRADE.md)
 and verify recovery in an isolated environment.
+
+### Multi-Platform Container Runtime Invariants
+
+1. **OCI Manifest List Single-Tag Contract**: All deployable application containers (`Explore.API`, `Explore.Blazor`, `Event.MigrationService`, `Event.Standalone`) are distributed as multi-platform OCI image indexes (`linux/amd64` and `linux/arm64`). Operators pull a single image tag (e.g. `ghcr.io/islamu-ngo/event-standalone:latest`); the local container engine transparently resolves the matching native architecture layer.
+2. **Execution Environment Parity**:
+   * **Linux Bare-Metal/Cloud**: Native execution on 64-bit x86 and ARM64 instances (AWS Graviton, Hetzner CAX/ARM, Ampere Altra, Raspberry Pi 4/5).
+   * **macOS**: Native execution inside container virtualization (Docker Desktop, OrbStack, Colima). Apple Silicon M-series nodes execute `linux/arm64` natively without Rosetta 2 emulation penalty.
+   * **Windows**: Supported via Docker Desktop (WSL2 Linux VM backend). Native Windows Server container mode (`Windows Server Core` / `NanoServer`) is deliberately unsupported; bare Windows Server deployments must run via system services or IIS.
+3. **Pure IL & Dynamic PGO Invariant**: Images distribute platform-agnostic Intermediate Language (IL) assemblies rather than Ahead-of-Time (AOT) or ReadyToRun (R2R) pre-compiled binaries. This retains full Tiered Compilation Dynamic Profile-Guided Optimization (Dynamic PGO) at runtime, allowing the JIT compiler to devirtualize and inline CQS command/query handler decorator chains according to host-specific traffic patterns.
 
 ---
 

@@ -69,7 +69,7 @@ The optional promise that funds are controlled until an event also has materiall
 ## Related
 
 - `dev/report/event-platform-boundary-and-external-business-integrations.md`
-- `islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md`
+- `islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md`
 - `dev/active/registration-data-collection/registration-data-collection-plan.md` D29-D30
 - ADR-022: Paid Event Commerce And Stripe Connect
 - ADR-023: Admission Credential, Check-In, Transfer, And Recovery

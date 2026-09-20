@@ -12,12 +12,13 @@ using Explore.Application.Models;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Services;
 
 public sealed class ConfiguredAdministratorBootstrapProvider(
     IConfiguration configuration,
-    IInstanceOperatorIdentity instanceOperatorIdentity,
+    IOptions<InstanceOperatorIdentityOptions> operatorIdentityOptions,
     IInstanceBootstrapStateRepository bootstrapRepository)
     : IConfiguredAdministratorBootstrapProvider
 {
@@ -121,8 +122,9 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
         ValidateSubject(subject);
         ProviderAccountKey accountKey = BuildAccountKey(providerKind, subject);
         DeploymentMode deploymentMode = ResolveDeploymentMode();
-        CompleteInstanceOnboardingRequest settings = BuildSettings(deploymentMode);
-        if (!new CompleteInstanceOnboardingRequestValidator().Validate(settings).IsValid)
+        var (identity, _) = InstanceOperatorIdentity.TryCreate(operatorIdentityOptions.Value);
+        CompleteInstanceOnboardingRequest settings = BuildSettings(deploymentMode, identity);
+        if (identity is not null && !new CompleteInstanceOnboardingRequestValidator().Validate(settings).IsValid)
         {
             throw Failure("instance_bootstrap_onboarding_settings_invalid");
         }
@@ -171,37 +173,40 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
             new ConfiguredAdministratorProfile(email, firstName, lastName));
     }
 
-    private CompleteInstanceOnboardingRequest BuildSettings(DeploymentMode deploymentMode)
+    private static CompleteInstanceOnboardingRequest BuildSettings(
+        DeploymentMode deploymentMode,
+        InstanceOperatorIdentity? identity)
     {
-        TenantDirectoryOperatorIdentityInputDto? directoryIdentity = deploymentMode == DeploymentMode.SingleTenant
-            ? new TenantDirectoryOperatorIdentityInputDto
-            {
-                PublicName = instanceOperatorIdentity.PublicName,
-                LegalName = instanceOperatorIdentity.LegalName,
-                OperatorKindCode = instanceOperatorIdentity.OperatorKindCode,
-                JurisdictionCountryCode = instanceOperatorIdentity.JurisdictionCountryCode,
-                RegistrationIdentifier = instanceOperatorIdentity.RegistrationIdentifier,
-                PublicContactEmail = instanceOperatorIdentity.PublicContactEmail,
-                LegalNoticeUrl = instanceOperatorIdentity.LegalNoticeUrl,
-                TermsUrl = instanceOperatorIdentity.TermsUrl,
-                PrivacyUrl = instanceOperatorIdentity.PrivacyUrl
-            }
-            : null;
+        TenantDirectoryOperatorIdentityInputDto? directoryIdentity =
+            identity is not null && deploymentMode == DeploymentMode.SingleTenant
+                ? new TenantDirectoryOperatorIdentityInputDto
+                {
+                    PublicName = identity.PublicName,
+                    LegalName = identity.LegalName,
+                    OperatorKindCode = identity.OperatorKindCode,
+                    JurisdictionCountryCode = identity.JurisdictionCountryCode,
+                    RegistrationIdentifier = identity.RegistrationIdentifier,
+                    PublicContactEmail = identity.PublicContactEmail,
+                    LegalNoticeUrl = identity.LegalNoticeUrl,
+                    TermsUrl = identity.TermsUrl,
+                    PrivacyUrl = identity.PrivacyUrl
+                }
+                : null;
 
         return new CompleteInstanceOnboardingRequest
         {
             DeploymentMode = deploymentMode,
             SiteProfile = new SelfHostOnboardingProfileDto
             {
-                SiteName = instanceOperatorIdentity.PublicName,
-                SupportEmail = instanceOperatorIdentity.PublicContactEmail,
-                CanonicalUrl = instanceOperatorIdentity.OfficialOrigin,
+                SiteName = identity?.PublicName ?? "ISLAMU Event",
+                SupportEmail = identity?.PublicContactEmail,
+                CanonicalUrl = identity?.OfficialOrigin,
                 Locale = "en",
                 TimeZone = "UTC"
             },
             DirectoryOperatorIdentity = directoryIdentity,
             AdministrationAccessMode = CompleteInstanceOnboardingRequest.EmbeddedAdministrationAccess,
-            InstanceName = instanceOperatorIdentity.PublicName
+            InstanceName = identity?.PublicName
         };
     }
 

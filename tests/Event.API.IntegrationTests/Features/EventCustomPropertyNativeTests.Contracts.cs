@@ -69,7 +69,9 @@ public sealed partial class EventCustomPropertyNativeTests
         var update = scope.ServiceProvider.GetRequiredService<ICommandHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>>();
         var result = await update.ExecuteAsync(new()
         {
-            DefinitionId = data.DefinitionId, TenantId = data.ForeignTenantId, ExpectedConcurrencyStamp = data.Stamp,
+            DefinitionId = data.DefinitionId,
+            TenantId = data.ForeignTenantId,
+            ExpectedConcurrencyStamp = data.Stamp,
             DefinitionDto = new() { Metadata = new() { DisplayName = "Trusted update" } }
         }, default);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -78,8 +80,10 @@ public sealed partial class EventCustomPropertyNativeTests
         await Assert.That(own.TenantId).IsEqualTo(PlatformDefaults.DefaultTenantId);
         await Assert.That(async () => await update.ExecuteAsync(new()
         {
-            DefinitionId = data.ForeignDefinitionId, TenantId = PlatformDefaults.DefaultTenantId,
-            ExpectedConcurrencyStamp = data.Stamp, DefinitionDto = new() { Metadata = new() { DisplayName = "Foreign attempt" } }
+            DefinitionId = data.ForeignDefinitionId,
+            TenantId = PlatformDefaults.DefaultTenantId,
+            ExpectedConcurrencyStamp = data.Stamp,
+            DefinitionDto = new() { Metadata = new() { DisplayName = "Foreign attempt" } }
         }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await DetailAsync(factory, PlatformDefaults.DefaultTenantId, data.ForeignDefinitionId)).Throws<NotFoundException>();
         await Assert.That((await DetailAsync(factory, data.ForeignTenantId, data.ForeignDefinitionId)).DisplayName).IsEqualTo("foreign-internal");
@@ -96,8 +100,12 @@ public sealed partial class EventCustomPropertyNativeTests
         await Assert.That(async () => await services.GetRequiredService<ICommandHandler<CreateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new() { DefinitionDto = CreateDto(data.EventId) }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await services.GetRequiredService<ICommandHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>>()
-            .ExecuteAsync(new() { DefinitionId = data.DefinitionId, ExpectedConcurrencyStamp = data.Stamp,
-                DefinitionDto = new() { Metadata = new() { DisplayName = "Denied" } } }, default)).Throws<AuthorizationException>();
+            .ExecuteAsync(new()
+            {
+                DefinitionId = data.DefinitionId,
+                ExpectedConcurrencyStamp = data.Stamp,
+                DefinitionDto = new() { Metadata = new() { DisplayName = "Denied" } }
+            }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await services.GetRequiredService<ICommandHandler<DeleteEventCustomPropertyDefinitionCommand, bool>>()
             .ExecuteAsync(new() { Id = data.DefinitionId }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await services.GetRequiredService<ICommandHandler<PurgeEventCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>>()
@@ -237,6 +245,8 @@ public sealed partial class EventCustomPropertyNativeTests
 
     private static SetEventCustomPropertyValueDto ValueDto(SeedData data, string value) => new()
     {
-        EventCustomPropertyDefinitionId = data.DefinitionId, EventId = data.EventId, TextValue = value
+        EventCustomPropertyDefinitionId = data.DefinitionId,
+        EventId = data.EventId,
+        TextValue = value
     };
 }

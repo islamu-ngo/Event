@@ -29,15 +29,25 @@ public sealed class AdminAuthorityScopeFreshnessTests
                 var group = new Group { Id = Guid.CreateVersion7(), FullName = "Authority test group" };
                 var participation = new GroupTenant
                 {
-                    Id = Guid.CreateVersion7(), GroupId = group.Id, Group = group,
-                    TenantId = subject.TenantId, Tenant = null!,
-                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+                    Id = Guid.CreateVersion7(),
+                    GroupId = group.Id,
+                    Group = group,
+                    TenantId = subject.TenantId,
+                    Tenant = null!,
+                    ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                    ApprovalStatus = null!
                 };
                 db.GroupMembers.Add(new GroupMember
                 {
-                    Id = Guid.CreateVersion7(), GroupTenantId = participation.Id, GroupTenant = participation,
-                    UserId = subject.UserId, User = null!, TenantId = subject.TenantId, Tenant = null!,
-                    RoleId = (int)RoleEnum.GroupAdmin, Role = null!
+                    Id = Guid.CreateVersion7(),
+                    GroupTenantId = participation.Id,
+                    GroupTenant = participation,
+                    UserId = subject.UserId,
+                    User = null!,
+                    TenantId = subject.TenantId,
+                    Tenant = null!,
+                    RoleId = (int)RoleEnum.GroupAdmin,
+                    Role = null!
                 });
                 await db.SaveChangesAsync();
                 scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext
@@ -58,8 +68,11 @@ public sealed class AdminAuthorityScopeFreshnessTests
                 {
                     external.PlatformUserRoles.Add(new PlatformUserRole
                     {
-                        Id = Guid.CreateVersion7(), UserId = subject.UserId, User = null!,
-                        RoleId = (int)RoleEnum.Admin, Role = null!
+                        Id = Guid.CreateVersion7(),
+                        UserId = subject.UserId,
+                        User = null!,
+                        RoleId = (int)RoleEnum.Admin,
+                        Role = null!
                     });
                     await external.SaveChangesAsync();
                     await external.OrganizationMembers

@@ -132,7 +132,8 @@ public sealed partial class NativeEventAspectsHttpTests
         }
         await Assert.That(async () => await update.ExecuteAsync(new()
         {
-            EventId = data.PrivateId, AspectDto = new() { Participation = new() { RequiresLaptop = false } }
+            EventId = data.PrivateId,
+            AspectDto = new() { Participation = new() { RequiresLaptop = false } }
         }, default)).Throws<AuthorizationException>();
         var facts = (EventAuthorizationFacts)observed!.Facts!;
         await Assert.That(facts.EventId).IsEqualTo(data.PrivateId);

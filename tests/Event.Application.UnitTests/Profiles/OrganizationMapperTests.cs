@@ -132,15 +132,28 @@ public sealed class OrganizationMapperTests
     {
         var group = new Group
         {
-            Id = Id, FullName = "Community group", Description = "Public description", ConcurrencyStamp = Stamp,
-            CreatedAt = CreatedAt, CreatedBy = TenantId, UpdatedBy = TenantId, IsDeleted = true, DeletedBy = TenantId,
+            Id = Id,
+            FullName = "Community group",
+            Description = "Public description",
+            ConcurrencyStamp = Stamp,
+            CreatedAt = CreatedAt,
+            CreatedBy = TenantId,
+            UpdatedBy = TenantId,
+            IsDeleted = true,
+            DeletedBy = TenantId,
             Actor = CreateActor()
         };
         group.Actor.Group = group;
         group.TenantParticipations.Add(new GroupTenant
         {
-            TenantId = TenantId, Tenant = null!, GroupId = Id, Group = group, ApprovalStatusId = 7, ApprovalStatus = null!,
-            DisplayNameOverride = "Private tenant display", ProfilePictureId = Stamp
+            TenantId = TenantId,
+            Tenant = null!,
+            GroupId = Id,
+            Group = group,
+            ApprovalStatusId = 7,
+            ApprovalStatus = null!,
+            DisplayNameOverride = "Private tenant display",
+            ProfilePictureId = Stamp
         });
         return group;
     }
@@ -149,9 +162,15 @@ public sealed class OrganizationMapperTests
     {
         var actor = new Actor
         {
-            Id = ActorId, ActorType = null!, Pii = new ActorPii { DisplayName = "Public actor", ProfilePictureUri = "https://images.example.test/public.png" },
-            BackgroundColor = "blue", BackgroundEffect = "glow", BannerColor = "green", CreatedBy = TenantId,
-            Description = "Do not disclose actor description", ModerationReasonCode = "private reason"
+            Id = ActorId,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Public actor", ProfilePictureUri = "https://images.example.test/public.png" },
+            BackgroundColor = "blue",
+            BackgroundEffect = "glow",
+            BannerColor = "green",
+            CreatedBy = TenantId,
+            Description = "Do not disclose actor description",
+            ModerationReasonCode = "private reason"
         };
         actor.Pii.Actor = actor;
         actor.AtprotoIdentities =
@@ -167,11 +186,19 @@ public sealed class OrganizationMapperTests
     {
         var member = new GroupMember
         {
-            Id = Id, GroupTenantId = Stamp, GroupTenant = CreateGroup().TenantParticipations.Single(),
-            UserId = ActorId, User = CreateUser(), RoleId = 7,
+            Id = Id,
+            GroupTenantId = Stamp,
+            GroupTenant = CreateGroup().TenantParticipations.Single(),
+            UserId = ActorId,
+            User = CreateUser(),
+            RoleId = 7,
             Role = new Role { Id = 7, MasterCode = "PRIVATE_ROLE_CODE", FullName = "Moderator" },
-            GroupPositionId = 4, GroupPosition = new GroupPosition { Id = 4, FullName = "Coordinator", MasterCode = "PRIVATE_POSITION_CODE" },
-            TenantId = TenantId, Tenant = null!, CreatedBy = TenantId, IsDeleted = true
+            GroupPositionId = 4,
+            GroupPosition = new GroupPosition { Id = 4, FullName = "Coordinator", MasterCode = "PRIVATE_POSITION_CODE" },
+            TenantId = TenantId,
+            Tenant = null!,
+            CreatedBy = TenantId,
+            IsDeleted = true
         };
         var store = new OrganizationMappingHandlerTests.GroupMemberStore([member]);
         var detail = new Explore.Application.Features.GroupMembers.Handlers.Queries.GetGroupMemberDetailsRequestHandler(store);
@@ -271,15 +298,28 @@ public sealed class OrganizationMapperTests
     {
         var organization = new Organization
         {
-            Id = Id, ConcurrencyStamp = Stamp, CreatedAt = CreatedAt, CreatedBy = TenantId, IsDeleted = true,
-            WebsiteUrl = "https://community.example.test", Actor = CreateActor(),
+            Id = Id,
+            ConcurrencyStamp = Stamp,
+            CreatedAt = CreatedAt,
+            CreatedBy = TenantId,
+            IsDeleted = true,
+            WebsiteUrl = "https://community.example.test",
+            Actor = CreateActor(),
             Pii = new OrganizationPii { FullName = "Community organization", Email = "office@example.test", Country = "BE", City = "Brussels", Postcode = "1000", Address = "Square 1" }
         };
         organization.Actor.Organization = organization;
         organization.TenantParticipations.Add(new OrganizationTenant
         {
-            Id = Stamp, OrganizationId = Id, Organization = organization, TenantId = TenantId, Tenant = null!, ApprovalStatusId = 7, ApprovalStatus = null!,
-            ContactEmailOverride = "private-tenant@example.test", DisplayNameOverride = "Private tenant display", ProfilePictureId = Stamp
+            Id = Stamp,
+            OrganizationId = Id,
+            Organization = organization,
+            TenantId = TenantId,
+            Tenant = null!,
+            ApprovalStatusId = 7,
+            ApprovalStatus = null!,
+            ContactEmailOverride = "private-tenant@example.test",
+            DisplayNameOverride = "Private tenant display",
+            ProfilePictureId = Stamp
         });
         return organization;
     }
@@ -289,10 +329,19 @@ public sealed class OrganizationMapperTests
     {
         var member = new OrganizationMember
         {
-            Id = ActorId, OrganizationTenantId = Stamp, OrganizationTenant = CreateOrganization().TenantParticipations.Single(),
-            UserId = ActorId, User = CreateUser(), RoleId = 7, Role = new Role { FullName = "Administrator", MasterCode = "PRIVATE_ROLE_CODE" },
-            OrganizationPositionId = 4, OrganizationPosition = new OrganizationPosition { FullName = "Coordinator", MasterCode = "PRIVATE_POSITION_CODE" },
-            TenantId = TenantId, Tenant = null!, CreatedBy = Stamp, IsDeleted = true
+            Id = ActorId,
+            OrganizationTenantId = Stamp,
+            OrganizationTenant = CreateOrganization().TenantParticipations.Single(),
+            UserId = ActorId,
+            User = CreateUser(),
+            RoleId = 7,
+            Role = new Role { FullName = "Administrator", MasterCode = "PRIVATE_ROLE_CODE" },
+            OrganizationPositionId = 4,
+            OrganizationPosition = new OrganizationPosition { FullName = "Coordinator", MasterCode = "PRIVATE_POSITION_CODE" },
+            TenantId = TenantId,
+            Tenant = null!,
+            CreatedBy = Stamp,
+            IsDeleted = true
         };
         var store = new OrganizationMappingHandlerTests.OrganizationMemberStore([member]);
         var detail = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMemberDetailsRequestHandler(store);
@@ -348,8 +397,10 @@ public sealed class OrganizationMapperTests
 
     internal static User CreateUser() => new()
     {
-        Id = ActorId, Pii = new UserPii { Email = "member@example.test", FirstName = "Member", LastName = "Name" },
-        LastActiveTenantId = TenantId, CreatedBy = TenantId
+        Id = ActorId,
+        Pii = new UserPii { Email = "member@example.test", FirstName = "Member", LastName = "Name" },
+        LastActiveTenantId = TenantId,
+        CreatedBy = TenantId
     };
 
     internal static async Task AssertFields<T>(T dto, params string[] fields)

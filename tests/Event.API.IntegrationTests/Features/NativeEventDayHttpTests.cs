@@ -120,7 +120,7 @@ public sealed partial class NativeEventDayHttpTests
         }
         // Prove the outsider can write at the destination before attacking another owner's source.
         using (var destinationCreate = await outsider.PostAsJsonAsync("/api/eventday", new
-            { eventId = factory.UnownedEventId, localDate = "2027-02-15" }))
+        { eventId = factory.UnownedEventId, localDate = "2027-02-15" }))
             await Assert.That(destinationCreate.StatusCode).IsEqualTo(HttpStatusCode.Created);
         using (var denied = await PatchAsync(outsider, id, new { @event = new { eventId = factory.UnownedEventId } }, $"\"{stamp}\""))
             await ProblemAsync(denied, HttpStatusCode.Forbidden);

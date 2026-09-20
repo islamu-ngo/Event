@@ -36,11 +36,19 @@ public sealed class NativeAudienceAgeHttpTests
             ?? throw new InvalidOperationException("Expected an audience-age array.");
         await Assert.That(list.Single(item => item.Id == 8008)).IsEqualTo(new AudienceAgeListDto
         {
-            Id = 8008, MasterCode = "TEST_ADULT", FullName = "Test Adults", MinAge = 18, Description = "Adult group"
+            Id = 8008,
+            MasterCode = "TEST_ADULT",
+            FullName = "Test Adults",
+            MinAge = 18,
+            Description = "Adult group"
         });
         await Assert.That(list.Single(item => item.Id == 8002)).IsEqualTo(new AudienceAgeListDto
         {
-            Id = 8002, MasterCode = "TEST_YOUTH", FullName = "Test Youth", MinAge = 12, MaxAge = 17
+            Id = 8002,
+            MasterCode = "TEST_YOUTH",
+            FullName = "Test Youth",
+            MinAge = 12,
+            MaxAge = 17
         });
 
         using var detailResponse = await client.GetAsync("/api/AudienceAge/8002");
@@ -48,7 +56,11 @@ public sealed class NativeAudienceAgeHttpTests
         var detail = await detailResponse.Content.ReadFromJsonAsync<AudienceAgeDto>();
         await Assert.That(detail).IsEqualTo(new AudienceAgeDto
         {
-            Id = 8002, MasterCode = "TEST_YOUTH", FullName = "Test Youth", MinAge = 12, MaxAge = 17
+            Id = 8002,
+            MasterCode = "TEST_YOUTH",
+            FullName = "Test Youth",
+            MinAge = 12,
+            MaxAge = 17
         });
         using var payload = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
         await Assert.That(payload.RootElement.EnumerateObject().Select(property => property.Name).Order().ToArray())

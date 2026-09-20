@@ -27,7 +27,12 @@ public sealed class FooterMapperTests
         var (group, links) = Graph(TenantId);
         object[] expectedLinks = links.Select(link => (object)new
         {
-            link.Id, link.Label, link.Url, link.OpenInNewTab, link.IsActive, link.Order
+            link.Id,
+            link.Label,
+            link.Url,
+            link.OpenInNewTab,
+            link.IsActive,
+            link.Order
         }).ToArray();
         object expected = shape switch
         {
@@ -116,22 +121,38 @@ public sealed class FooterMapperTests
     {
         var group = new TenantFooterLinkGroup
         {
-            Id = GroupId, TenantId = tenantId, Title = "Community", Order = 3,
-            IsActive = true, CreatedAt = DateTime.UnixEpoch, CreatedBy = TenantId
+            Id = GroupId,
+            TenantId = tenantId,
+            Title = "Community",
+            Order = 3,
+            IsActive = true,
+            CreatedAt = DateTime.UnixEpoch,
+            CreatedBy = TenantId
         };
         // Hydrate the EF-managed relationship for this in-memory projection fixture only.
         var links = (List<TenantFooterLink>)typeof(TenantFooterLinkGroup)
             .GetField("_links", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(group)!;
         links.Add(new TenantFooterLink
         {
-            Id = Guid.Parse("01990000-0000-7000-8000-000000000022"), FooterLinkGroupId = GroupId,
-            Label = "Events", Url = "/events", Order = 9, OpenInNewTab = true, IsActive = false,
-            CreatedAt = DateTime.UnixEpoch, CreatedBy = TenantId
+            Id = Guid.Parse("01990000-0000-7000-8000-000000000022"),
+            FooterLinkGroupId = GroupId,
+            Label = "Events",
+            Url = "/events",
+            Order = 9,
+            OpenInNewTab = true,
+            IsActive = false,
+            CreatedAt = DateTime.UnixEpoch,
+            CreatedBy = TenantId
         });
         links.Add(new TenantFooterLink
         {
-            Id = Guid.Parse("01990000-0000-7000-8000-000000000023"), FooterLinkGroupId = GroupId,
-            Label = "Home", Url = "/", Order = 1, OpenInNewTab = false, IsActive = true
+            Id = Guid.Parse("01990000-0000-7000-8000-000000000023"),
+            FooterLinkGroupId = GroupId,
+            Label = "Home",
+            Url = "/",
+            Order = 1,
+            OpenInNewTab = false,
+            IsActive = true
         });
         return (group, links);
     }

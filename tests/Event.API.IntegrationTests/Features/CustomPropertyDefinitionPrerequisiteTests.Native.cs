@@ -73,7 +73,8 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         var update = scope.ServiceProvider.GetRequiredService<ICommandHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>>();
         var result = await update.ExecuteAsync(new UpdateCustomPropertyDefinitionCommand
         {
-            DefinitionId = data.OwnDefinitionId, TenantId = data.ForeignTenantId,
+            DefinitionId = data.OwnDefinitionId,
+            TenantId = data.ForeignTenantId,
             ExpectedConcurrencyStamp = before.ConcurrencyStamp,
             DefinitionDto = new() { Metadata = new() { DisplayName = "Trusted tenant update" } }
         }, default);
@@ -83,7 +84,8 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         await Assert.That(after.DisplayName).IsEqualTo("Trusted tenant update");
         await Assert.That(async () => await update.ExecuteAsync(new UpdateCustomPropertyDefinitionCommand
         {
-            DefinitionId = data.ForeignDefinitionId, TenantId = PlatformDefaults.DefaultTenantId,
+            DefinitionId = data.ForeignDefinitionId,
+            TenantId = PlatformDefaults.DefaultTenantId,
             ExpectedConcurrencyStamp = Guid.CreateVersion7(),
             DefinitionDto = new() { Metadata = new() { DisplayName = "Cross-tenant attempt" } }
         }, default)).Throws<AuthorizationException>();
@@ -110,7 +112,8 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         await Assert.That(async () => await scope.ServiceProvider.GetRequiredService<ICommandHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new()
             {
-                DefinitionId = data.OwnDefinitionId, ExpectedConcurrencyStamp = detail.ConcurrencyStamp,
+                DefinitionId = data.OwnDefinitionId,
+                ExpectedConcurrencyStamp = detail.ConcurrencyStamp,
                 DefinitionDto = new() { Metadata = new() { DisplayName = "Denied update" } }
             }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await scope.ServiceProvider.GetRequiredService<ICommandHandler<DeleteCustomPropertyDefinitionCommand, bool>>()

@@ -53,7 +53,9 @@ public sealed class NativeEventSeriesFactory : AuthenticatedWebApplicationFactor
     {
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _databasePath
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _databasePath
         });
         options.UseSnakeCaseNamingConvention();
         if (DatabaseInterceptor is not null)

@@ -102,8 +102,14 @@ public sealed class LocationMapperTests
     {
         var source = new Location
         {
-            Id = LocationId, TenantId = TenantId, FullName = "Home venue", Country = "BE", City = "Brussels",
-            Timezone = "Europe/Brussels", CreatedAt = new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc), CreatedBy = OwnerId
+            Id = LocationId,
+            TenantId = TenantId,
+            FullName = "Home venue",
+            Country = "BE",
+            City = "Brussels",
+            Timezone = "Europe/Brussels",
+            CreatedAt = new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc),
+            CreatedBy = OwnerId
         };
         source.ClassifyAsPrivateHome(OwnerId);
         if (state == "manual")
@@ -112,8 +118,13 @@ public sealed class LocationMapperTests
             source.SetProviderAddress("Rue Test 10", "1000", GeoCoordinate.Create(state == "zero" ? 0 : 50.85, state == "zero" ? 0 : 4.35));
         source.Rooms.Add(new LocationRoom
         {
-            Id = Guid.Parse("01900000-0000-7000-8000-000000000085"), LocationId = LocationId, Location = source,
-            Name = "Private room", Description = "Private room details", TenantId = TenantId, Tenant = null!
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000085"),
+            LocationId = LocationId,
+            Location = source,
+            Name = "Private room",
+            Description = "Private room details",
+            TenantId = TenantId,
+            Tenant = null!
         });
         if (state == "erased")
             source.EraseOwnedPii(new DateTime(2026, 8, 2, 12, 0, 0, DateTimeKind.Utc), LocationPrivacyErasureReasonEnum.OwnerErasureRequest);

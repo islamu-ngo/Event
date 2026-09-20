@@ -93,8 +93,13 @@ public sealed partial class NativeEventProgramHttpTests
                 }
                 var location = new Location
                 {
-                    Id = Guid.CreateVersion7(), TenantId = owner.TenantId, Tenant = null!,
-                    FullName = "Approved venue", City = "Hidden city", Country = "Hidden country", Timezone = "Europe/Brussels"
+                    Id = Guid.CreateVersion7(),
+                    TenantId = owner.TenantId,
+                    Tenant = null!,
+                    FullName = "Approved venue",
+                    City = "Hidden city",
+                    Country = "Hidden country",
+                    Timezone = "Europe/Brussels"
                 };
                 location.ClassifyAs(LocationKindEnum.CommercialVenue);
                 location.SetManualAddress("Hidden street", "Hidden postcode");
@@ -134,8 +139,12 @@ public sealed partial class NativeEventProgramHttpTests
                 context.EventSessionGroupSessions.Add(Assignment(published, draftGroupSession, hiddenGroup, true, 1));
                 var agenda = new EventAgendaItem
                 {
-                    Id = Guid.CreateVersion7(), EventId = published.Id, Event = published,
-                    TenantId = owner.TenantId, Tenant = null!, Title = "Outside-window agenda"
+                    Id = Guid.CreateVersion7(),
+                    EventId = published.Id,
+                    Event = published,
+                    TenantId = owner.TenantId,
+                    Tenant = null!,
+                    Title = "Outside-window agenda"
                 };
                 agenda.Reschedule(UtcInstantRange.Create(new DateTimeOffset(2026, 7, 22, 9, 0, 0, TimeSpan.Zero),
                     new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero)), "Europe/Brussels", new EventScheduleProjectionCalculator());
@@ -178,8 +187,12 @@ public sealed partial class NativeEventProgramHttpTests
         {
             var session = new EventSession(status)
             {
-                Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-                TenantId = parent.TenantId, Tenant = null!, Title = title
+                Id = Guid.CreateVersion7(),
+                EventId = parent.Id,
+                Event = parent,
+                TenantId = parent.TenantId,
+                Tenant = null!,
+                Title = title
             };
             session.Reschedule(UtcInstantRange.Create(new DateTimeOffset(2026, 7, 20, 23, 30, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 7, 21, 0, 30, 0, TimeSpan.Zero)), "Europe/Brussels", new EventScheduleProjectionCalculator());
@@ -188,15 +201,29 @@ public sealed partial class NativeEventProgramHttpTests
 
         private static EventSessionGroup Group(Explore.Domain.Event parent, string name, bool published, int order) => new()
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId, Tenant = null!,
-            Name = name, IsPublished = published, SortOrder = order
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            Name = name,
+            IsPublished = published,
+            SortOrder = order
         };
 
         private static EventSessionGroupSession Assignment(Explore.Domain.Event parent, EventSession session, EventSessionGroup group, bool primary, int order) => new()
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId, Tenant = null!,
-            EventSessionId = session.Id, EventSession = session, EventSessionGroupId = group.Id, EventSessionGroup = group,
-            IsPrimary = primary, SortOrder = order
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            EventSessionId = session.Id,
+            EventSession = session,
+            EventSessionGroupId = group.Id,
+            EventSessionGroup = group,
+            IsPrimary = primary,
+            SortOrder = order
         };
 
         public HttpClient Client(Guid userId)

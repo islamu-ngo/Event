@@ -203,13 +203,19 @@ public sealed class NativeOrganizationMemberHttpTests
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         var tenant = new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-org-members", FullName = "Native organization",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-org-members",
+            FullName = "Native organization",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var foreignTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = "foreign-org-members", FullName = "Foreign organization",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = Guid.CreateVersion7(),
+            Slug = "foreign-org-members",
+            FullName = "Foreign organization",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         db.Tenants.AddRange(tenant, foreignTenant);
         var admin = NewUser("admin");
@@ -218,23 +224,33 @@ public sealed class NativeOrganizationMemberHttpTests
         db.Users.AddRange(admin, invitee, outsider);
         var organization = new Organization
         {
-            Id = Guid.CreateVersion7(), Pii = new() { FullName = "Native organization" }
+            Id = Guid.CreateVersion7(),
+            Pii = new() { FullName = "Native organization" }
         };
         var foreignOrganization = new Organization
         {
-            Id = Guid.CreateVersion7(), Pii = new() { FullName = "Foreign organization" }
+            Id = Guid.CreateVersion7(),
+            Pii = new() { FullName = "Foreign organization" }
         };
         var participation = new OrganizationTenant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            OrganizationId = organization.Id, Organization = organization,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!
         };
         var foreignParticipation = new OrganizationTenant
         {
-            Id = Guid.CreateVersion7(), TenantId = foreignTenant.Id, Tenant = foreignTenant,
-            OrganizationId = foreignOrganization.Id, Organization = foreignOrganization,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = foreignTenant.Id,
+            Tenant = foreignTenant,
+            OrganizationId = foreignOrganization.Id,
+            Organization = foreignOrganization,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!
         };
         db.OrganizationTenants.AddRange(participation, foreignParticipation);
         var adminMember = NewMember(participation, admin, RoleEnum.OrgAdmin);
@@ -252,9 +268,15 @@ public sealed class NativeOrganizationMemberHttpTests
 
     private static OrganizationMember NewMember(OrganizationTenant participation, User user, RoleEnum role) => new()
     {
-        Id = Guid.CreateVersion7(), OrganizationTenantId = participation.Id, OrganizationTenant = participation,
-        TenantId = participation.TenantId, Tenant = participation.Tenant,
-        UserId = user.Id, User = user, RoleId = (int)role, Role = null!
+        Id = Guid.CreateVersion7(),
+        OrganizationTenantId = participation.Id,
+        OrganizationTenant = participation,
+        TenantId = participation.TenantId,
+        Tenant = participation.Tenant,
+        UserId = user.Id,
+        User = user,
+        RoleId = (int)role,
+        Role = null!
     };
 
     private static async Task<OrganizationMember> ReadMemberAsync(AuthenticatedWebApplicationFactory factory, Guid id)

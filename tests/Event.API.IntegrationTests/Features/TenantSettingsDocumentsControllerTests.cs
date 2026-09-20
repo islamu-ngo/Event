@@ -317,7 +317,9 @@ public sealed class TenantSettingsDocumentsControllerTests
         var command = scope.ServiceProvider.GetRequiredService<ICommandHandler<PatchTenantBrandingSettingsDocumentCommand, BaseCommandResponse<TenantBrandingSettingsDocumentDto>>>();
         var response = await command.ExecuteAsync(new()
         {
-            TenantId = PlatformDefaults.DefaultTenantId, Patch = BrandPatch(branding.ConcurrencyStamp), IsLockedByInstance = false
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Patch = BrandPatch(branding.ConcurrencyStamp),
+            IsLockedByInstance = false
         }, default);
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.Errors).IsNotNull();
@@ -405,7 +407,8 @@ public sealed class TenantSettingsDocumentsControllerTests
         var patch = scope.ServiceProvider.GetRequiredService<ICommandHandler<PatchTenantDirectoryOperatorIdentityDocumentCommand, BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>>>();
         await Assert.That(async () => await patch.ExecuteAsync(new()
         {
-            TenantId = seed.OtherTenantId, Patch = IdentityPatch(foreign.ConcurrencyStamp)
+            TenantId = seed.OtherTenantId,
+            Patch = IdentityPatch(foreign.ConcurrencyStamp)
         }, default)).Throws<AuthorizationException>();
         await Assert.That((await query.QueryAsync(new(seed.OtherTenantId), default))!.ConcurrencyStamp).IsEqualTo(foreign.ConcurrencyStamp);
     }
@@ -421,7 +424,8 @@ public sealed class TenantSettingsDocumentsControllerTests
         var patch = scope.ServiceProvider.GetRequiredService<ICommandHandler<PatchTenantDirectoryOperatorIdentityDocumentCommand, BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>>>();
         var mismatch = await patch.ExecuteAsync(new()
         {
-            TenantId = PlatformDefaults.DefaultTenantId, Patch = IdentityPatch(Guid.CreateVersion7())
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Patch = IdentityPatch(Guid.CreateVersion7())
         }, default);
         await Assert.That(mismatch.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
         var query = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetTenantDirectoryOperatorIdentityDocumentQuery, TenantDirectoryOperatorIdentityDocumentDto?>>();
@@ -498,10 +502,14 @@ public sealed class TenantSettingsDocumentsControllerTests
     private static TenantSettingsDocument ReadyIdentity(Guid tenantId, string legalName = "Community Events ASBL") =>
         TenantDirectoryOperatorIdentityDocumentDefaults.Create(tenantId, new TenantDirectoryOperatorIdentitySettings
         {
-            PublicName = "Community Events", LegalName = legalName,
-            OperatorKindCode = "registered_organization", JurisdictionCountryCode = "BE",
-            RegistrationIdentifier = "BE 0123.456.789", PublicContactEmail = "contact@example.test",
-            LegalNoticeUrl = "https://example.test/legal", PrivacyUrl = "https://example.test/privacy"
+            PublicName = "Community Events",
+            LegalName = legalName,
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE 0123.456.789",
+            PublicContactEmail = "contact@example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            PrivacyUrl = "https://example.test/privacy"
         });
 
     private static async Task<SeedData> SeedAsync(DocumentFactory factory, bool identity = true)
@@ -516,14 +524,23 @@ public sealed class TenantSettingsDocumentsControllerTests
         membership.Tenant.TenantStatusId = (int)TenantStatusEnum.Active;
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, Tenant = membership.Tenant,
-            TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-            Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            Tenant = membership.Tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var role = await db.Roles.SingleAsync(item => item.MasterCode == "platform.admin");
         db.PlatformUserRoles.Add(new PlatformUserRole
         {
-            Id = Guid.CreateVersion7(), UserId = instance.UserId, User = null!, RoleId = role.Id, Role = role
+            Id = Guid.CreateVersion7(),
+            UserId = instance.UserId,
+            User = null!,
+            RoleId = role.Id,
+            Role = role
         });
         if (identity) db.TenantSettingsDocuments.Add(ReadyIdentity(admin.TenantId));
         db.TenantSettingsDocuments.Add(ReadyIdentity(other.TenantId, "Foreign Operator ASBL"));
@@ -563,7 +580,9 @@ public sealed class TenantSettingsDocumentsControllerTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _path
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _path
             });
             options.UseSnakeCaseNamingConvention().AddInterceptors(CommitBoundary, SaveBoundary);
         }

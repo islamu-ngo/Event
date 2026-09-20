@@ -57,7 +57,9 @@ public sealed partial class NativeStorageObjectHttpTests
 
         var review = new ReviewOrganizationTenantEvidenceDto
         {
-            Decision = decision, ExpectedConcurrencyStamp = pending.ConcurrencyStamp, Notes = "  verified document  "
+            Decision = decision,
+            ExpectedConcurrencyStamp = pending.ConcurrencyStamp,
+            Notes = "  verified document  "
         };
         using (var denied = await owner.PostAsJsonAsync(detailPath + "/review", review))
             await AssertEvidenceProblemAsync(denied, HttpStatusCode.Forbidden);
@@ -130,7 +132,8 @@ public sealed partial class NativeStorageObjectHttpTests
             await AssertEvidenceProblemAsync(missing, HttpStatusCode.NotFound);
         using (var wrong = await reviewer.PostAsJsonAsync($"{EvidenceRoot(other.OrganizationId)}/{id}/review", new ReviewOrganizationTenantEvidenceDto
         {
-            Decision = OrganizationTenantEvidenceReviewDecisionDto.Approve, ExpectedConcurrencyStamp = detail.ConcurrencyStamp
+            Decision = OrganizationTenantEvidenceReviewDecisionDto.Approve,
+            ExpectedConcurrencyStamp = detail.ConcurrencyStamp
         }))
             await AssertEvidenceProblemAsync(wrong, HttpStatusCode.BadRequest);
         await AssertEvidenceCountAsync(reviewer, EvidenceRoot(Guid.CreateVersion7()), 0);
@@ -141,29 +144,50 @@ public sealed partial class NativeStorageObjectHttpTests
             var actor = await db.Actors.SingleAsync(item => item.UserId == factory.OwnerId);
             var foreignUser = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                UserId = factory.OwnerId, User = null!, ActorId = actor.Id, Actor = actor,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                UserId = factory.OwnerId,
+                User = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow
             };
             db.TenantUsers.Add(foreignUser);
             var participation = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                OrganizationId = scenario.OrganizationId, Organization = null!,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                OrganizationId = scenario.OrganizationId,
+                Organization = null!,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                ApprovalStatus = null!
             };
             db.OrganizationTenants.Add(participation);
             db.OrganizationMembers.Add(new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                OrganizationTenantId = participation.Id, OrganizationTenant = participation,
-                UserId = foreignUser.UserId, User = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                OrganizationTenantId = participation.Id,
+                OrganizationTenant = participation,
+                UserId = foreignUser.UserId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!
             });
             db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                TenantUserId = foreignUser.Id, TenantUser = foreignUser,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                TenantUserId = foreignUser.Id,
+                TenantUser = foreignUser,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
             });
             await db.SaveChangesAsync();
             var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
@@ -181,12 +205,14 @@ public sealed partial class NativeStorageObjectHttpTests
                 var submit = scope.ServiceProvider.GetRequiredService<ICommandHandler<SubmitOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>>>();
                 await Assert.That((await submit.ExecuteAsync(new()
                 {
-                    OrganizationId = scenario.OrganizationId, Evidence = new() { DocumentStorageObjectId = documentId }
+                    OrganizationId = scenario.OrganizationId,
+                    Evidence = new() { DocumentStorageObjectId = documentId }
                 }, default)).IsSuccess).IsFalse();
                 var review = scope.ServiceProvider.GetRequiredService<ICommandHandler<ReviewOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>>>();
                 await Assert.That((await review.ExecuteAsync(new()
                 {
-                    OrganizationId = scenario.OrganizationId, EvidenceId = id,
+                    OrganizationId = scenario.OrganizationId,
+                    EvidenceId = id,
                     Review = new() { Decision = OrganizationTenantEvidenceReviewDecisionDto.Approve, ExpectedConcurrencyStamp = detail.ConcurrencyStamp }
                 }, default)).IsSuccess).IsFalse();
             }
@@ -281,7 +307,8 @@ public sealed partial class NativeStorageObjectHttpTests
         }
         using var denied = await reviewer.PostAsJsonAsync($"{root}/{id}/review", new ReviewOrganizationTenantEvidenceDto
         {
-            Decision = OrganizationTenantEvidenceReviewDecisionDto.Approve, ExpectedConcurrencyStamp = pending.ConcurrencyStamp
+            Decision = OrganizationTenantEvidenceReviewDecisionDto.Approve,
+            ExpectedConcurrencyStamp = pending.ConcurrencyStamp
         });
         await AssertEvidenceProblemAsync(denied, HttpStatusCode.BadRequest);
         var retained = await ReadEvidenceAsync(reviewer, $"{root}/{id}", true);
@@ -335,7 +362,9 @@ public sealed partial class NativeStorageObjectHttpTests
 
     private static CreateOrganizationTenantEvidenceUploadSessionDto EvidenceUpload() => new()
     {
-        FileName = "evidence.pdf", ContentType = "application/pdf", ExpectedSizeBytes = 5
+        FileName = "evidence.pdf",
+        ContentType = "application/pdf",
+        ExpectedSizeBytes = 5
     };
 
     private static async Task<TenantScenarioSeed.TenantOrganizationScenarioResult> SeedEvidenceAsync(StorageFactory factory)
@@ -349,9 +378,14 @@ public sealed partial class NativeStorageObjectHttpTests
         var membership = await db.TenantUsers.SingleAsync(item => item.UserId == factory.OwnerId);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = scenario.TenantId, Tenant = null!,
-            TenantUserId = membership.Id, TenantUser = membership,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = scenario.TenantId,
+            Tenant = null!,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         await db.SaveChangesAsync();
         return scenario;
@@ -366,15 +400,25 @@ public sealed partial class NativeStorageObjectHttpTests
         var participation = await db.OrganizationTenants.SingleAsync(item => item.OrganizationId == scenario.OrganizationId);
         var document = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = scenario.TenantId, Tenant = null!,
-            FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-            Provider = StorageProviders.Local, Uri = string.Empty,
+            Id = Guid.CreateVersion7(),
+            TenantId = scenario.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Provider = StorageProviders.Local,
+            Uri = string.Empty,
             ObjectKey = $"tenants/{scenario.TenantId:N}/private-evidence.pdf",
-            FullName = "evidence.pdf", SafeDisplayName = "evidence.pdf", Extension = "pdf",
-            ContentType = "application/pdf", Size = 5, CreatedBy = scenario.UserId,
-            Visibility = StorageObjectVisibilities.PrivateOwner, Purpose = StorageObjectPurposes.Document,
+            FullName = "evidence.pdf",
+            SafeDisplayName = "evidence.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 5,
+            CreatedBy = scenario.UserId,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            Purpose = StorageObjectPurposes.Document,
             LifecycleState = StorageObjectLifecycleStates.Active,
-            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant, OwningResourceId = participation.Id
+            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant,
+            OwningResourceId = participation.Id
         };
         db.StorageObjects.Add(document);
         await db.SaveChangesAsync();

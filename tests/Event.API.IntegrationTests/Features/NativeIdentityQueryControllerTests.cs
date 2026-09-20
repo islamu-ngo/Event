@@ -69,8 +69,10 @@ public sealed class NativeIdentityQueryControllerTests
         await Assert.That(ReferenceEquals(query, other)).IsFalse();
         var request = new ResolveCurrentUserIdByIdentityRequest
         {
-            Provider = "google", ProviderId = $"oidc:27:{Issuer}:{Subject:D}",
-            Email = "conflicting@example.invalid", EmailVerified = true
+            Provider = "google",
+            ProviderId = $"oidc:27:{Issuer}:{Subject:D}",
+            Email = "conflicting@example.invalid",
+            EmailVerified = true
         };
         await Assert.That(await query.QueryAsync(request, CancellationToken.None)).IsEqualTo(LinkedUser);
         await Assert.That(await other.QueryAsync(request with { Provider = "keycloak" }, CancellationToken.None)).IsNull();
@@ -111,7 +113,9 @@ public sealed class NativeIdentityQueryControllerTests
         db.UserExternalLogins.Add(new UserExternalLogin
         {
             Id = Guid.Parse("018e4e5c-7f00-7000-8000-000000000083"),
-            User = user, UserId = LinkedUser, AuthenticationProvider = null!,
+            User = user,
+            UserId = LinkedUser,
+            AuthenticationProvider = null!,
             AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
             ProviderKey = $"oidc:27:{Issuer}:{Subject:D}"
         });

@@ -85,6 +85,13 @@ public sealed class EventDayMapperTests
 
     private static Explore.Domain.Event Parent() => new()
     {
-        Id = EventId, TenantId = TenantId, Title = "Festival", Actor = null!, Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!
+        Id = EventId,
+        TenantId = TenantId,
+        Title = "Festival",
+        Actor = null!,
+        Tenant = null!,
+        VisibilityType = null!,
+        EventStatus = null!,
+        EventFormat = null!
     };
 }

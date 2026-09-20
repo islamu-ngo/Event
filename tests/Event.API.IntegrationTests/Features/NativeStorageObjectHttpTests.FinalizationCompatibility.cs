@@ -72,55 +72,58 @@ public sealed partial class NativeStorageObjectHttpTests
         long expectedUsedBytes = 0;
         int finalizedCount = 0;
         foreach (string purpose in StorageObjectPurposes.All)
-        foreach (bool hasOwnerPair in new[] { false, true })
-        {
-            bool image = SafeRasterContentPolicy.IsImagePurpose(purpose);
-            byte[] bytes = image ? CompatibilityPng : "%PDF-"u8.ToArray();
-            var upload = new CreateStorageUploadSessionDto
+            foreach (bool hasOwnerPair in new[] { false, true })
             {
-                ContentType = image ? "image/png" : "application/pdf", Extension = image ? "png" : "pdf",
-                OriginalFileName = image ? "image.png" : "document.pdf", ExpectedSizeBytes = bytes.Length,
-                Purpose = purpose, Visibility = image ? StorageObjectVisibilities.PublicImage : StorageObjectVisibilities.PrivateOwner,
-                OwningResourceKind = hasOwnerPair ? "event" : null,
-                OwningResourceId = hasOwnerPair ? Guid.CreateVersion7() : null,
-                IdempotencyKey = $"compatibility-{purpose}-{hasOwnerPair}"
-            };
-            var reserved = await ReserveAsync(client, upload);
-            sessionIds.Add(reserved.Id.ToString("D"));
-            using var finalized = await PutAsync(client, reserved.Id, bytes);
-            if (finalized.StatusCode != HttpStatusCode.OK)
-            {
-                failures.Add((purpose, upload.OwningResourceKind, finalized.StatusCode));
-                continue;
+                bool image = SafeRasterContentPolicy.IsImagePurpose(purpose);
+                byte[] bytes = image ? CompatibilityPng : "%PDF-"u8.ToArray();
+                var upload = new CreateStorageUploadSessionDto
+                {
+                    ContentType = image ? "image/png" : "application/pdf",
+                    Extension = image ? "png" : "pdf",
+                    OriginalFileName = image ? "image.png" : "document.pdf",
+                    ExpectedSizeBytes = bytes.Length,
+                    Purpose = purpose,
+                    Visibility = image ? StorageObjectVisibilities.PublicImage : StorageObjectVisibilities.PrivateOwner,
+                    OwningResourceKind = hasOwnerPair ? "event" : null,
+                    OwningResourceId = hasOwnerPair ? Guid.CreateVersion7() : null,
+                    IdempotencyKey = $"compatibility-{purpose}-{hasOwnerPair}"
+                };
+                var reserved = await ReserveAsync(client, upload);
+                sessionIds.Add(reserved.Id.ToString("D"));
+                using var finalized = await PutAsync(client, reserved.Id, bytes);
+                if (finalized.StatusCode != HttpStatusCode.OK)
+                {
+                    failures.Add((purpose, upload.OwningResourceKind, finalized.StatusCode));
+                    continue;
+                }
+                var result = (await finalized.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!;
+                expectedUsedBytes += bytes.Length;
+                finalizedCount++;
+                await Assert.That(result.Status).IsEqualTo(StorageUploadSessionStates.Finalized);
+                await Assert.That(result.UsedBytes).IsEqualTo(expectedUsedBytes);
+                await Assert.That(result.TotalReservedBytes).IsEqualTo(0);
+                await Assert.That(result.Purpose).IsEqualTo(purpose);
+                await Assert.That(result.Visibility).IsEqualTo(upload.Visibility);
+                using var replay = await PutAsync(client, reserved.Id, bytes);
+                await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.OK);
+                await Assert.That((await replay.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!.StorageObjectId)
+                    .IsEqualTo(result.StorageObjectId);
+                await Assert.That(factory.WriteCount).IsEqualTo(finalizedCount);
+                using var scope = selected.Services.CreateScope();
+                var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                accessor.HttpContext = FinalizationPrincipal(factory.OwnerId);
+                try
+                {
+                    using var content = new MemoryStream(bytes);
+                    var resolved = await scope.ServiceProvider.GetRequiredService<AuthorizationResourceContextResolver>().ResolveAsync(
+                        new FinalizeStorageUploadSessionCommand { UploadSessionId = reserved.Id, Content = content, TenantId = factory.OtherTenantId },
+                        ResourceKinds.StorageObject, AuthorizationActions.Create, reserved.Id.ToString("D"), null, default);
+                    await Assert.That(resolved.Facts).IsEqualTo(new StorageObjectCollectionAuthorizationFacts(PlatformDefaults.DefaultTenantId));
+                    var check = new AuthorizationRequest(ResourceKinds.StorageObject, reserved.Id.ToString("D"), AuthorizationActions.Create, Facts: resolved.Facts);
+                    await Assert.That((await scope.ServiceProvider.GetRequiredService<FallbackAuthorizationService>().AuthorizeAsync(check)).IsAllowed).IsFalse();
+                }
+                finally { accessor.HttpContext = null; }
             }
-            var result = (await finalized.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!;
-            expectedUsedBytes += bytes.Length;
-            finalizedCount++;
-            await Assert.That(result.Status).IsEqualTo(StorageUploadSessionStates.Finalized);
-            await Assert.That(result.UsedBytes).IsEqualTo(expectedUsedBytes);
-            await Assert.That(result.TotalReservedBytes).IsEqualTo(0);
-            await Assert.That(result.Purpose).IsEqualTo(purpose);
-            await Assert.That(result.Visibility).IsEqualTo(upload.Visibility);
-            using var replay = await PutAsync(client, reserved.Id, bytes);
-            await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            await Assert.That((await replay.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!.StorageObjectId)
-                .IsEqualTo(result.StorageObjectId);
-            await Assert.That(factory.WriteCount).IsEqualTo(finalizedCount);
-            using var scope = selected.Services.CreateScope();
-            var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
-            accessor.HttpContext = FinalizationPrincipal(factory.OwnerId);
-            try
-            {
-                using var content = new MemoryStream(bytes);
-                var resolved = await scope.ServiceProvider.GetRequiredService<AuthorizationResourceContextResolver>().ResolveAsync(
-                    new FinalizeStorageUploadSessionCommand { UploadSessionId = reserved.Id, Content = content, TenantId = factory.OtherTenantId },
-                    ResourceKinds.StorageObject, AuthorizationActions.Create, reserved.Id.ToString("D"), null, default);
-                await Assert.That(resolved.Facts).IsEqualTo(new StorageObjectCollectionAuthorizationFacts(PlatformDefaults.DefaultTenantId));
-                var check = new AuthorizationRequest(ResourceKinds.StorageObject, reserved.Id.ToString("D"), AuthorizationActions.Create, Facts: resolved.Facts);
-                await Assert.That((await scope.ServiceProvider.GetRequiredService<FallbackAuthorizationService>().AuthorizeAsync(check)).IsAllowed).IsFalse();
-            }
-            finally { accessor.HttpContext = null; }
-        }
         await Assert.That(failures).IsEmpty();
         await Assert.That(transport.Endpoints.Count > 0).IsEqualTo(byo);
         await Assert.That(finalizedCount).IsEqualTo(12);
@@ -135,8 +138,13 @@ public sealed partial class NativeStorageObjectHttpTests
             request.Principal.Attr["tenantMemberships"].StructValue.Fields.ContainsKey(PlatformDefaults.DefaultTenantId.ToString("D")) == (principalKind == "tenant-admin"))).IsTrue();
         var document = new CreateStorageUploadSessionDto
         {
-            ContentType = "application/pdf", Extension = "pdf", OriginalFileName = "document.pdf", ExpectedSizeBytes = 5,
-            Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.PrivateOwner, IdempotencyKey = "ownership-boundary"
+            ContentType = "application/pdf",
+            Extension = "pdf",
+            OriginalFileName = "document.pdf",
+            ExpectedSizeBytes = 5,
+            Purpose = StorageObjectPurposes.Document,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            IdempotencyKey = "ownership-boundary"
         };
         foreach (var incomplete in new[]
         {
@@ -196,20 +204,36 @@ public sealed partial class NativeStorageObjectHttpTests
                 byte[] bytes = image ? CompatibilityPng : "%PDF-"u8.ToArray();
                 var upload = new CreateStorageUploadSessionDto
                 {
-                    ContentType = image ? "image/png" : "application/pdf", Extension = image ? "png" : "pdf",
-                    OriginalFileName = image ? "image.png" : "document.pdf", ExpectedSizeBytes = bytes.Length,
-                    Purpose = purpose, Visibility = image ? StorageObjectVisibilities.PublicImage : StorageObjectVisibilities.PrivateOwner,
-                    OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant, OwningResourceId = participationId,
+                    ContentType = image ? "image/png" : "application/pdf",
+                    Extension = image ? "png" : "pdf",
+                    OriginalFileName = image ? "image.png" : "document.pdf",
+                    ExpectedSizeBytes = bytes.Length,
+                    Purpose = purpose,
+                    Visibility = image ? StorageObjectVisibilities.PublicImage : StorageObjectVisibilities.PrivateOwner,
+                    OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant,
+                    OwningResourceId = participationId,
                     IdempotencyKey = $"canonical-{purpose}"
                 };
                 await Assert.That((await new CreateStorageUploadSessionDtoValidator().ValidateAsync(upload)).IsValid).IsTrue();
                 var session = new StorageUploadSession
                 {
-                    Id = Guid.CreateVersion7(), TenantId = owner.TenantId, UserId = owner.UserId, Provider = StorageProviders.Local,
-                    ContentType = upload.ContentType, Extension = upload.Extension, SafeDisplayName = upload.OriginalFileName!,
-                    Purpose = purpose, Visibility = upload.Visibility, OwningResourceKind = upload.OwningResourceKind, OwningResourceId = participationId,
-                    ExpectedSizeBytes = bytes.Length, ReservedBytes = bytes.Length, PolicyMaxUploadBytes = 1048576,
-                    Status = StorageUploadSessionStates.Reserved, ExpiresAt = DateTime.UtcNow.AddHours(1), IdempotencyKey = upload.IdempotencyKey
+                    Id = Guid.CreateVersion7(),
+                    TenantId = owner.TenantId,
+                    UserId = owner.UserId,
+                    Provider = StorageProviders.Local,
+                    ContentType = upload.ContentType,
+                    Extension = upload.Extension,
+                    SafeDisplayName = upload.OriginalFileName!,
+                    Purpose = purpose,
+                    Visibility = upload.Visibility,
+                    OwningResourceKind = upload.OwningResourceKind,
+                    OwningResourceId = participationId,
+                    ExpectedSizeBytes = bytes.Length,
+                    ReservedBytes = bytes.Length,
+                    PolicyMaxUploadBytes = 1048576,
+                    Status = StorageUploadSessionStates.Reserved,
+                    ExpiresAt = DateTime.UtcNow.AddHours(1),
+                    IdempotencyKey = upload.IdempotencyKey
                 };
                 db.StorageUploadSessions.Add(session);
                 counter.Reserve(bytes.Length, 1048576);
@@ -329,9 +353,14 @@ public sealed partial class NativeStorageObjectHttpTests
             var member = await db.TenantUsers.SingleAsync(item => item.UserId == userId);
             db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                TenantUserId = member.Id, TenantUser = member,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
             });
         }
         await db.SaveChangesAsync();

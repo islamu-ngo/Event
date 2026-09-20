@@ -115,8 +115,13 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             case 0:
                 var session = new EventSession
                 {
-                    Id = Guid.CreateVersion7(), EventId = program.Id, Event = program,
-                    TenantId = tenant.Id, Tenant = tenant, Title = "Room session", IsDeleted = deleted
+                    Id = Guid.CreateVersion7(),
+                    EventId = program.Id,
+                    Event = program,
+                    TenantId = tenant.Id,
+                    Tenant = tenant,
+                    Title = "Room session",
+                    IsDeleted = deleted
                 };
                 session.AssignEventLocation(placement);
                 session.RoomId = data.RoomId;
@@ -125,8 +130,13 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             case 1:
                 var group = new EventSessionGroup
                 {
-                    Id = Guid.CreateVersion7(), EventId = program.Id, Event = program,
-                    TenantId = tenant.Id, Tenant = tenant, Name = "Room group", IsDeleted = deleted
+                    Id = Guid.CreateVersion7(),
+                    EventId = program.Id,
+                    Event = program,
+                    TenantId = tenant.Id,
+                    Tenant = tenant,
+                    Name = "Room group",
+                    IsDeleted = deleted
                 };
                 group.AssignEventLocation(placement);
                 group.RoomId = data.RoomId;
@@ -135,8 +145,13 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             case 2:
                 var item = new EventAgendaItem
                 {
-                    Id = Guid.CreateVersion7(), EventId = program.Id, Event = program,
-                    TenantId = tenant.Id, Tenant = tenant, Title = "Room agenda", IsDeleted = deleted
+                    Id = Guid.CreateVersion7(),
+                    EventId = program.Id,
+                    Event = program,
+                    TenantId = tenant.Id,
+                    Tenant = tenant,
+                    Title = "Room agenda",
+                    IsDeleted = deleted
                 };
                 item.Reschedule(UtcInstantRange.Create(
                     new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero),
@@ -209,13 +224,18 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             var tenant = foreignTenant
                 ? new Tenant
                 {
-                    FullName = "Foreign destination", Slug = $"foreign-room-{Guid.CreateVersion7():N}",
-                    TenantStatusId = 2, TenantStatus = null!
+                    FullName = "Foreign destination",
+                    Slug = $"foreign-room-{Guid.CreateVersion7():N}",
+                    TenantStatusId = 2,
+                    TenantStatus = null!
                 }
                 : await setup.Tenants.SingleAsync(item => item.Id == data.TenantId);
             target = new Location
             {
-                FullName = "Unusable destination", Country = "BE", City = "Brussels", Tenant = tenant
+                FullName = "Unusable destination",
+                Country = "BE",
+                City = "Brussels",
+                Tenant = tenant
             };
             setup.Locations.Add(target);
             await setup.SaveChangesAsync();
@@ -251,8 +271,12 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
             await using var attachmentTransaction = await attaching.Database.BeginTransactionAsync();
             var group = new EventSessionGroup
             {
-                Id = Guid.CreateVersion7(), EventId = program.Id, Event = program,
-                TenantId = tenant.Id, Tenant = tenant, Name = "Concurrent room reference"
+                Id = Guid.CreateVersion7(),
+                EventId = program.Id,
+                Event = program,
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                Name = "Concurrent room reference"
             };
             group.AssignEventLocation(placement);
             group.RoomId = data.RoomId;
@@ -297,15 +321,27 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = user.Id, User = user, Pii = new() { DisplayName = "Room reference" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = user.Id,
+            User = user,
+            Pii = new() { DisplayName = "Room reference" }
         };
         var program = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Room references", ActorId = actor.Id, Actor = actor,
-            TenantId = tenant.Id, Tenant = tenant, EventStatus = null!,
+            Id = Guid.CreateVersion7(),
+            Title = "Room references",
+            ActorId = actor.Id,
+            Actor = actor,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            EventStatus = null!,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = 1, VisibilityType = null!, EventFormatId = 1, EventFormat = null!
+            VisibilityTypeId = 1,
+            VisibilityType = null!,
+            EventFormatId = 1,
+            EventFormat = null!
         };
         context.Events.Add(program);
         await context.SaveChangesAsync();
@@ -322,28 +358,43 @@ public sealed class LocationRoomRelocationTests(PostgreSqlContainerFixture fixtu
         await using var context = fixture.CreateDbContext();
         var tenant = new Tenant
         {
-            FullName = "Room relocation", Slug = $"room-relocation-{Guid.CreateVersion7():N}",
-            TenantStatusId = 2, TenantStatus = null!
+            FullName = "Room relocation",
+            Slug = $"room-relocation-{Guid.CreateVersion7():N}",
+            TenantStatusId = 2,
+            TenantStatus = null!
         };
         var source = new Location
         {
-            FullName = "Source", Country = "BE", City = "Brussels", Tenant = tenant
+            FullName = "Source",
+            Country = "BE",
+            City = "Brussels",
+            Tenant = tenant
         };
         var target = new Location
         {
-            FullName = "Target", Country = "BE", City = "Brussels", Tenant = tenant
+            FullName = "Target",
+            Country = "BE",
+            City = "Brussels",
+            Tenant = tenant
         };
         context.Locations.AddRange(source, target);
         await context.SaveChangesAsync();
         var room = new LocationRoom
         {
-            Name = "Shared name", LocationId = source.Id, Location = source,
-            TenantId = tenant.Id, Tenant = tenant, Capacity = 20
+            Name = "Shared name",
+            LocationId = source.Id,
+            Location = source,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            Capacity = 20
         };
         var occupiedName = new LocationRoom
         {
-            Name = "Shared name", LocationId = target.Id, Location = target,
-            TenantId = tenant.Id, Tenant = tenant
+            Name = "Shared name",
+            LocationId = target.Id,
+            Location = target,
+            TenantId = tenant.Id,
+            Tenant = tenant
         };
         context.LocationRooms.AddRange(room, occupiedName);
         await context.SaveChangesAsync();

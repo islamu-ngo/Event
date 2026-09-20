@@ -41,7 +41,9 @@ internal sealed class NativeCustomPropertyGovernanceFactory : AuthenticatedWebAp
     {
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _path
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _path
         });
         options.UseSnakeCaseNamingConvention();
         options.AddInterceptors(Reads);

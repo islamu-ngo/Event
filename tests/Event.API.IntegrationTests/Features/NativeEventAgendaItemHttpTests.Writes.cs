@@ -125,7 +125,11 @@ public sealed partial class NativeEventAgendaItemHttpTests
 
     private static object Input(Guid parent) => new
     {
-        eventId = parent, title = "Opening", description = "Keep until cleared",
-        startTime = Start, endTime = Start.AddHours(1), sortOrder = 4
+        eventId = parent,
+        title = "Opening",
+        description = "Keep until cleared",
+        startTime = Start,
+        endTime = Start.AddHours(1),
+        sortOrder = 4
     };
 }

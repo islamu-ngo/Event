@@ -159,8 +159,12 @@ public sealed partial class NativeEventPublicActionsHttpTests
         using var attacker = Client(factory, data.OutsiderId);
         using var forged = await attacker.PostAsJsonAsync(Route(data.PublicId), new
         {
-            kindId = 1, url = "https://example.test/forged", userId = data.OwnerId,
-            tenantId = data.ForeignTenantId, eventId = data.OtherId, authorizationFacts = new { userId = data.OwnerId }
+            kindId = 1,
+            url = "https://example.test/forged",
+            userId = data.OwnerId,
+            tenantId = data.ForeignTenantId,
+            eventId = data.OtherId,
+            authorizationFacts = new { userId = data.OwnerId }
         });
         await Assert.That(forged.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         using var unknownMembers = JsonDocument.Parse(await forged.Content.ReadAsStringAsync());

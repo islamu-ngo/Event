@@ -33,8 +33,12 @@ public sealed class AgendaProjectionTests
         var tie = Session(parent, "Tie session", 21, 7, 0, 5);
         var unscheduled = new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = parent.TenantId, Tenant = null!, EventId = parent.Id,
-            Event = parent, Title = "Unscheduled"
+            Id = Guid.CreateVersion7(),
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            EventId = parent.Id,
+            Event = parent,
+            Title = "Unscheduled"
         };
         var incomplete = Session(parent, "Missing end", 21, 8, 0, 0);
         incomplete.EndTime = null;
@@ -111,22 +115,39 @@ public sealed class AgendaProjectionTests
 
     private static Explore.Domain.Event Parent() => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, Actor = null!, Title = "Projection event",
-        VisibilityType = null!, EventStatus = null!, EventFormat = null!
+        Id = Guid.CreateVersion7(),
+        TenantId = Guid.CreateVersion7(),
+        Tenant = null!,
+        Actor = null!,
+        Title = "Projection event",
+        VisibilityType = null!,
+        EventStatus = null!,
+        EventFormat = null!
     };
 
     private static EventDay Day(Explore.Domain.Event parent, int day, int order) => new()
     {
-        Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId,
-        Tenant = null!, LocalDate = new DateOnly(2026, 7, day), IsPublished = true, SortOrder = order
+        Id = Guid.CreateVersion7(),
+        EventId = parent.Id,
+        Event = parent,
+        TenantId = parent.TenantId,
+        Tenant = null!,
+        LocalDate = new DateOnly(2026, 7, day),
+        IsPublished = true,
+        SortOrder = order
     };
 
     private static EventSession Session(Explore.Domain.Event parent, string title, int day, int hour, int minute, int order)
     {
         var session = new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId,
-            Tenant = null!, Title = title, SortOrder = order
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            Title = title,
+            SortOrder = order
         };
         var start = new DateTimeOffset(2026, 7, day, hour, minute, 0, TimeSpan.Zero);
         session.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "Europe/Brussels", new EventScheduleProjectionCalculator());
@@ -137,8 +158,13 @@ public sealed class AgendaProjectionTests
     {
         var item = new EventAgendaItem
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId,
-            Tenant = null!, Title = title, SortOrder = order
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            Title = title,
+            SortOrder = order
         };
         var start = new DateTimeOffset(2026, 7, day, hour, minute, 0, TimeSpan.Zero);
         item.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "Europe/Brussels", new EventScheduleProjectionCalculator());

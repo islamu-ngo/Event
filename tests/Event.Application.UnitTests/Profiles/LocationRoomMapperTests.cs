@@ -65,7 +65,12 @@ public sealed class LocationRoomMapperTests
     {
         var result = LocationRoomMapper.Create(new CreateLocationRoomDto
         {
-            LocationId = LocationId, Name = "Main hall", Slug = "main-hall", Description = "Room notes", Capacity = 120, SortOrder = 7
+            LocationId = LocationId,
+            Name = "Main hall",
+            Slug = "main-hall",
+            Description = "Room notes",
+            Capacity = 120,
+            SortOrder = 7
         }, TenantId);
         await Assert.That(result.TenantId).IsEqualTo(TenantId);
         await Assert.That(result.LocationId).IsEqualTo(LocationId);
@@ -113,9 +118,21 @@ public sealed class LocationRoomMapperTests
         parent.SetManualAddress("private-parent-address", "1000");
         var source = new LocationRoom
         {
-            Id = RoomId, LocationId = LocationId, Location = parent, TenantId = TenantId, Tenant = null!, Name = "Main hall",
-            Slug = "main-hall", Description = "Room notes", Capacity = 120, SortOrder = 7, ConcurrencyStamp = Stamp,
-            CreatedBy = Stamp, UpdatedBy = Stamp, DeletedBy = Stamp, IsDeleted = true,
+            Id = RoomId,
+            LocationId = LocationId,
+            Location = parent,
+            TenantId = TenantId,
+            Tenant = null!,
+            Name = "Main hall",
+            Slug = "main-hall",
+            Description = "Room notes",
+            Capacity = 120,
+            SortOrder = 7,
+            ConcurrencyStamp = Stamp,
+            CreatedBy = Stamp,
+            UpdatedBy = Stamp,
+            DeletedBy = Stamp,
+            IsDeleted = true,
             CreatedAt = new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc),
             UpdatedAt = new DateTime(2026, 8, 2, 12, 0, 0, DateTimeKind.Utc),
             DeletedAt = new DateTime(2026, 8, 3, 12, 0, 0, DateTimeKind.Utc)

@@ -42,8 +42,11 @@ public sealed class EventAspectMapperTests
             EventId = EventId,
             AspectDto = new CreateUpdateIslamicAspectDto
             {
-                MadhabId = 3, PrimaryLanguageId = 5, ReferencePrayer = PrayerTime.Fajr,
-                PrayerTimeOffset = -15, GenderMode = GenderSegregationMode.Family,
+                MadhabId = 3,
+                PrimaryLanguageId = 5,
+                ReferencePrayer = PrayerTime.Fajr,
+                PrayerTimeOffset = -15,
+                GenderMode = GenderSegregationMode.Family,
                 IncludesQuranRecitation = true
             }
         }, CancellationToken.None);
@@ -90,10 +93,15 @@ public sealed class EventAspectMapperTests
             EventId = EventId,
             AspectDto = new CreateUpdateTechAspectDto
             {
-                GithubRepoUrl = "https://code.example.test/project", HackathonTrack = "Tools",
-                SkillLevel = SkillLevel.Intermediate, TechStackTags = "CSharp",
-                RequiresLaptop = true, IsCodingCompetition = true,
-                MaxTeamSize = 4, PrizePool = 125.5m, PrizeCurrencyCode = "EUR"
+                GithubRepoUrl = "https://code.example.test/project",
+                HackathonTrack = "Tools",
+                SkillLevel = SkillLevel.Intermediate,
+                TechStackTags = "CSharp",
+                RequiresLaptop = true,
+                IsCodingCompetition = true,
+                MaxTeamSize = 4,
+                PrizePool = 125.5m,
+                PrizeCurrencyCode = "EUR"
             }
         }, CancellationToken.None);
 
@@ -117,7 +125,12 @@ public sealed class EventAspectMapperTests
 
     private static Explore.Domain.Event Parent() => new()
     {
-        Id = EventId, Title = "Workshop", Actor = null!, Tenant = null!,
-        EventStatus = null!, VisibilityType = null!, EventFormat = null!
+        Id = EventId,
+        Title = "Workshop",
+        Actor = null!,
+        Tenant = null!,
+        EventStatus = null!,
+        VisibilityType = null!,
+        EventFormat = null!
     };
 }

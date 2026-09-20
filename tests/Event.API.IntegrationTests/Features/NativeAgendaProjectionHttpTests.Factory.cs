@@ -72,15 +72,24 @@ public sealed partial class NativeAgendaProjectionHttpTests
                 }
                 var location = new Location
                 {
-                    Id = Guid.CreateVersion7(), TenantId = owner.TenantId, Tenant = null!, FullName = "Approved projection venue",
-                    City = "Private city canary", Country = "Private country canary", Timezone = "Europe/Brussels"
+                    Id = Guid.CreateVersion7(),
+                    TenantId = owner.TenantId,
+                    Tenant = null!,
+                    FullName = "Approved projection venue",
+                    City = "Private city canary",
+                    Country = "Private country canary",
+                    Timezone = "Europe/Brussels"
                 };
                 location.ClassifyAs(LocationKindEnum.CommercialVenue);
                 location.SetManualAddress("Private street canary", "Private postcode canary");
                 var room = new LocationRoom
                 {
-                    Id = Guid.CreateVersion7(), TenantId = owner.TenantId, Tenant = null!, LocationId = location.Id,
-                    Location = location, Name = "Private room canary"
+                    Id = Guid.CreateVersion7(),
+                    TenantId = owner.TenantId,
+                    Tenant = null!,
+                    LocationId = location.Id,
+                    Location = location,
+                    Name = "Private room canary"
                 };
                 context.Locations.Add(location);
                 context.LocationRooms.Add(room);
@@ -117,8 +126,12 @@ public sealed partial class NativeAgendaProjectionHttpTests
                 deletedSession.IsDeleted = true;
                 var unscheduled = new EventSession(EventSessionStatusEnum.Published)
                 {
-                    Id = Guid.CreateVersion7(), EventId = published.Id, Event = published, TenantId = owner.TenantId,
-                    Tenant = null!, Title = "Unscheduled canary"
+                    Id = Guid.CreateVersion7(),
+                    EventId = published.Id,
+                    Event = published,
+                    TenantId = owner.TenantId,
+                    Tenant = null!,
+                    Title = "Unscheduled canary"
                 };
                 context.EventSessions.AddRange(early, tie, hiddenSession, draftSession, deletedSession, unscheduled);
                 var tieItem = Item(published, "Tie agenda", 21, 7, -5);
@@ -171,8 +184,13 @@ public sealed partial class NativeAgendaProjectionHttpTests
         {
             var session = new EventSession(status)
             {
-                Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId,
-                Tenant = null!, Title = title, SortOrder = order
+                Id = Guid.CreateVersion7(),
+                EventId = parent.Id,
+                Event = parent,
+                TenantId = parent.TenantId,
+                Tenant = null!,
+                Title = title,
+                SortOrder = order
             };
             var start = new DateTimeOffset(2026, 7, day, hour, minute, 0, TimeSpan.Zero);
             session.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "Europe/Brussels", new EventScheduleProjectionCalculator());
@@ -183,8 +201,13 @@ public sealed partial class NativeAgendaProjectionHttpTests
         {
             var item = new EventAgendaItem
             {
-                Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId,
-                Tenant = null!, Title = title, SortOrder = order
+                Id = Guid.CreateVersion7(),
+                EventId = parent.Id,
+                Event = parent,
+                TenantId = parent.TenantId,
+                Tenant = null!,
+                Title = title,
+                SortOrder = order
             };
             var start = new DateTimeOffset(2026, 7, day, hour, 0, 0, TimeSpan.Zero);
             item.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "Europe/Brussels", new EventScheduleProjectionCalculator());
@@ -193,8 +216,14 @@ public sealed partial class NativeAgendaProjectionHttpTests
 
         private static EventDay Day(Explore.Domain.Event parent, int day, int order) => new()
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent, TenantId = parent.TenantId,
-            Tenant = null!, LocalDate = new DateOnly(2026, 7, day), IsPublished = true, SortOrder = order
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            LocalDate = new DateOnly(2026, 7, day),
+            IsPublished = true,
+            SortOrder = order
         };
 
         public HttpClient OwnerClient()

@@ -64,23 +64,34 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
             factory.ForeignGroupId = AddGroup(context, factory.GroupAdminOnlyId, factory.OtherTenantId, null);
             var foreignOrganization = new Organization
             {
-                Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(),
+                Id = Guid.CreateVersion7(),
+                ConcurrencyStamp = Guid.CreateVersion7(),
                 Pii = new OrganizationPii { FullName = "Foreign notification owner" }
             };
             foreignOrganization.Pii.OrganizationId = foreignOrganization.Id;
             factory.ForeignOrganizationId = foreignOrganization.Id;
             var foreignParticipation = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                OrganizationId = foreignOrganization.Id, Organization = foreignOrganization,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                OrganizationId = foreignOrganization.Id,
+                Organization = foreignOrganization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
                 ConcurrencyStamp = Guid.CreateVersion7()
             };
             context.OrganizationMembers.Add(new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                OrganizationTenantId = foreignParticipation.Id, OrganizationTenant = foreignParticipation,
-                UserId = factory.UserId, User = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                OrganizationTenantId = foreignParticipation.Id,
+                OrganizationTenant = foreignParticipation,
+                UserId = factory.UserId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!
             });
             await context.SaveChangesAsync();
             return factory;
@@ -97,16 +108,27 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
         var group = new Group { Id = Guid.CreateVersion7(), FullName = "Notification group", ConcurrencyStamp = Guid.CreateVersion7() };
         var participation = new GroupTenant
         {
-            Id = Guid.CreateVersion7(), GroupId = group.Id, Group = group,
-            TenantId = tenantId, Tenant = null!, ParentOrganizationTenantId = parentId,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
+            Id = Guid.CreateVersion7(),
+            GroupId = group.Id,
+            Group = group,
+            TenantId = tenantId,
+            Tenant = null!,
+            ParentOrganizationTenantId = parentId,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         db.GroupMembers.Add(new GroupMember
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            GroupTenantId = participation.Id, GroupTenant = participation,
-            UserId = userId, User = null!, RoleId = (int)RoleEnum.GroupAdmin, Role = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            GroupTenantId = participation.Id,
+            GroupTenant = participation,
+            UserId = userId,
+            User = null!,
+            RoleId = (int)RoleEnum.GroupAdmin,
+            Role = null!
         });
         return group.Id;
     }
@@ -125,11 +147,17 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var notification = new Notification
         {
-            Id = Guid.CreateVersion7(), UserId = userId, User = null!,
-            TenantId = tenantId ?? PlatformDefaults.DefaultTenantId, Tenant = null!,
-            NotificationTypeId = (int)NotificationTypeEnum.EventCreated, NotificationType = null!,
-            NotificationScopeId = scopeId, NotificationScope = null!,
-            Title = "Notification test", DeduplicationKey = Guid.CreateVersion7().ToString(),
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            TenantId = tenantId ?? PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            NotificationTypeId = (int)NotificationTypeEnum.EventCreated,
+            NotificationType = null!,
+            NotificationScopeId = scopeId,
+            NotificationScope = null!,
+            Title = "Notification test",
+            DeduplicationKey = Guid.CreateVersion7().ToString(),
             CreatedAt = DateTime.UtcNow
         };
         db.Notifications.Add(notification);
@@ -141,7 +169,9 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
     {
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _database
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _database
         });
         options.UseSnakeCaseNamingConvention();
         if (TransactionGate is not null)
@@ -187,7 +217,8 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
                     {
                         Resource = new Cerbos.Api.V1.Response.CheckResourcesResponse.Types.ResultEntry.Types.Resource
                         {
-                            Id = entry.Resource.Id, Kind = entry.Resource.Kind
+                            Id = entry.Resource.Id,
+                            Kind = entry.Resource.Kind
                         }
                     };
                     // Bounded provider-boundary model of the bundled organization/group policies:

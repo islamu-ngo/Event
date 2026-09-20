@@ -264,12 +264,22 @@ public sealed class NativeUiShellHttpTests
         var platformRole = await db.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
         db.PlatformUserRoles.Add(new PlatformUserRole
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = platformRole.Id, Role = platformRole
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            RoleId = platformRole.Id,
+            Role = platformRole
         });
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, TenantUserId = membership.Id,
-            TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var permission = await db.Permissions.SingleAsync(item => item.MasterCode == PermissionCodes.EventCreate);
         if (!await db.RolePermissions.AnyAsync(item => item.RoleId == (int)RoleEnum.GroupAdmin && item.PermissionId == permission.Id))
@@ -277,21 +287,32 @@ public sealed class NativeUiShellHttpTests
         var group = AddGroup(db, tenant, user, "Local organizers");
         var foreignTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = "foreign-shell", FullName = "Foreign tenant",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            Slug = "foreign-shell",
+            FullName = "Foreign tenant",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         db.Tenants.Add(foreignTenant);
         var foreignMembership = new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = foreignTenant.Id, Tenant = foreignTenant,
-            UserId = other.UserId, User = await db.Users.SingleAsync(item => item.Id == other.UserId),
+            Id = Guid.CreateVersion7(),
+            TenantId = foreignTenant.Id,
+            Tenant = foreignTenant,
+            UserId = other.UserId,
+            User = await db.Users.SingleAsync(item => item.Id == other.UserId),
             StatusId = (int)TenantUserStatusEnum.Active
         };
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = foreignTenant.Id, Tenant = foreignTenant,
-            TenantUserId = foreignMembership.Id, TenantUser = foreignMembership,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = foreignTenant.Id,
+            Tenant = foreignTenant,
+            TenantUserId = foreignMembership.Id,
+            TenantUser = foreignMembership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         AddGroup(db, foreignTenant, user, "Foreign organizers");
         AddSetting(db, tenant, GovernanceSettingKeys.Events.UserSubmissionEnabled, false);
@@ -307,13 +328,27 @@ public sealed class NativeUiShellHttpTests
         var group = new Group { Id = Guid.CreateVersion7(), FullName = name };
         var participation = new GroupTenant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, GroupId = group.Id, Group = group,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsVisible = true, IsOrganizerEligible = true
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            GroupId = group.Id,
+            Group = group,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+            ApprovalStatus = null!,
+            IsVisible = true,
+            IsOrganizerEligible = true
         };
         db.GroupMembers.Add(new GroupMember
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, GroupTenantId = participation.Id,
-            GroupTenant = participation, UserId = user.Id, User = user, RoleId = (int)RoleEnum.GroupAdmin, Role = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            GroupTenantId = participation.Id,
+            GroupTenant = participation,
+            UserId = user.Id,
+            User = user,
+            RoleId = (int)RoleEnum.GroupAdmin,
+            Role = null!
         });
         var actor = new ActorBuilder().WithActorType(ActorTypeEnum.Group).WithDisplayName(name).Build();
         actor.GroupId = group.Id;
@@ -325,7 +360,11 @@ public sealed class NativeUiShellHttpTests
     private static void AddSetting<T>(ExploreDbContext db, Tenant tenant, string key, T value) =>
         db.Set<TenantSetting>().Add(new TenantSetting
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, SettingKey = key, Value = JsonSerializer.Serialize(value)
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            SettingKey = key,
+            Value = JsonSerializer.Serialize(value)
         });
 
     private static HttpRequestMessage Request(Guid userId, string path = "/api/ui-shell/context", params (string Type, string Value)[] claims)

@@ -36,18 +36,25 @@ public sealed class NativeDidCustodyTypeHttpTests
             ?? throw new InvalidOperationException("Expected an custody-type array.");
         await Assert.That(list.Single(item => item.Id == 8008)).IsEqualTo(new DidCustodyTypeListDto
         {
-            Id = 8008, MasterCode = "TEST_SELF", FullName = "Test Self Custody", Description = "Self-custodied identity"
+            Id = 8008,
+            MasterCode = "TEST_SELF",
+            FullName = "Test Self Custody",
+            Description = "Self-custodied identity"
         });
         await Assert.That(list.Single(item => item.Id == 8002)).IsEqualTo(new DidCustodyTypeListDto
         {
-            Id = 8002, MasterCode = "TEST_MANAGED", FullName = "Test Managed Custody"
+            Id = 8002,
+            MasterCode = "TEST_MANAGED",
+            FullName = "Test Managed Custody"
         });
 
         using var detailResponse = await client.GetAsync("/api/DidCustodyType/8002");
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(await detailResponse.Content.ReadFromJsonAsync<DidCustodyTypeDto>()).IsEqualTo(new DidCustodyTypeDto
         {
-            Id = 8002, MasterCode = "TEST_MANAGED", FullName = "Test Managed Custody"
+            Id = 8002,
+            MasterCode = "TEST_MANAGED",
+            FullName = "Test Managed Custody"
         });
         using var payload = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
         await Assert.That(payload.RootElement.EnumerateObject().Select(property => property.Name).ToArray())

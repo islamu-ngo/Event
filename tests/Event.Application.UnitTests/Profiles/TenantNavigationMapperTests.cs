@@ -25,9 +25,16 @@ public sealed class TenantNavigationMapperTests
         var tenant = new Tenant { Id = TenantId, FullName = "Internal tenant", Slug = "internal", TenantStatus = null! };
         var link = new TenantNavigationLink
         {
-            Id = LinkId, TenantId = TenantId, Tenant = tenant, Label = "Events",
-            Url = "/events", Icon = icon, Order = 8, OpenInNewTab = true,
-            CreatedAt = DateTime.UnixEpoch, CreatedBy = TenantId
+            Id = LinkId,
+            TenantId = TenantId,
+            Tenant = tenant,
+            Label = "Events",
+            Url = "/events",
+            Icon = icon,
+            Order = 8,
+            OpenInNewTab = true,
+            CreatedAt = DateTime.UnixEpoch,
+            CreatedBy = TenantId
         };
         tenant.NavigationLinks.Add(link);
         var rows = new List<TenantNavigationLink> { link };

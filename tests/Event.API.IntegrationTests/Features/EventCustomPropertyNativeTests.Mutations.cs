@@ -272,9 +272,13 @@ public sealed partial class EventCustomPropertyNativeTests
             var db = seedScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             if (blocker == "audit") db.AuditLogs.Add(new AuditLog
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                EntityType = nameof(EventCustomPropertyDefinition), EntityId = data.DefinitionId.ToString(),
-                Action = "RetainedReference", Timestamp = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                EntityType = nameof(EventCustomPropertyDefinition),
+                EntityId = data.DefinitionId.ToString(),
+                Action = "RetainedReference",
+                Timestamp = DateTime.UtcNow
             });
             else (await db.EventCustomPropertyDefinitions.SingleAsync(row => row.Id == data.DefinitionId)).SourceTemplateDefinitionId = Guid.CreateVersion7();
             await db.SaveChangesAsync();

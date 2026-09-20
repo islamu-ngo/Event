@@ -99,44 +99,44 @@ public sealed class TenantAuthorityMembershipParityTests
         await using var database = new AuthorityDatabase();
         await database.InitializeAsync(state);
         foreach (var machineOwner in new[] { false, true })
-        foreach (var batch in new[] { false, true })
-        {
-            using var cache = new MemoryCache(new MemoryCacheOptions());
-            var machine = Substitute.For<IMachinePrincipalAccessor>();
-            machine.IsMachineCaller.Returns(machineOwner);
-            machine.Current.Returns(machineOwner
-                ? new ApiKeyPrincipalContext("membership-key", database.TenantId,
-                    ExternalApiKeyOwnerType.User, database.UserId, [ExternalApiKeyScopes.AdminTenant])
-                : null);
-            var remote = new CategoryPolicyBoundary();
-            var provider = database.CreateProvider(providerName, cache, machine, remote);
-            var own = DeleteCategory(database.TenantId);
-            var foreign = DeleteCategory(database.ForeignTenantId);
-            var checks = new[] { own, foreign, DeleteCategory(database.TenantId) };
-            if (batch)
+            foreach (var batch in new[] { false, true })
             {
-                var decisions = await provider.AuthorizeBatchAsync(checks);
-                await Assert.That(decisions.Count).IsEqualTo(3);
-                await Assert.That(decisions[0].IsAllowed).IsEqualTo(expectedAuthority);
-                await Assert.That(decisions[1].IsAllowed).IsFalse();
-                await Assert.That(decisions[2].IsAllowed).IsEqualTo(expectedAuthority);
+                using var cache = new MemoryCache(new MemoryCacheOptions());
+                var machine = Substitute.For<IMachinePrincipalAccessor>();
+                machine.IsMachineCaller.Returns(machineOwner);
+                machine.Current.Returns(machineOwner
+                    ? new ApiKeyPrincipalContext("membership-key", database.TenantId,
+                        ExternalApiKeyOwnerType.User, database.UserId, [ExternalApiKeyScopes.AdminTenant])
+                    : null);
+                var remote = new CategoryPolicyBoundary();
+                var provider = database.CreateProvider(providerName, cache, machine, remote);
+                var own = DeleteCategory(database.TenantId);
+                var foreign = DeleteCategory(database.ForeignTenantId);
+                var checks = new[] { own, foreign, DeleteCategory(database.TenantId) };
+                if (batch)
+                {
+                    var decisions = await provider.AuthorizeBatchAsync(checks);
+                    await Assert.That(decisions.Count).IsEqualTo(3);
+                    await Assert.That(decisions[0].IsAllowed).IsEqualTo(expectedAuthority);
+                    await Assert.That(decisions[1].IsAllowed).IsFalse();
+                    await Assert.That(decisions[2].IsAllowed).IsEqualTo(expectedAuthority);
+                }
+                else
+                {
+                    await Assert.That((await provider.AuthorizeAsync(own)).IsAllowed).IsEqualTo(expectedAuthority);
+                    await Assert.That((await provider.AuthorizeAsync(foreign)).IsAllowed).IsFalse();
+                }
+                await Assert.That(remote.Requests.Count > 0).IsEqualTo(providerName == "cerbos");
+                foreach (var request in remote.Requests)
+                {
+                    var ids = request.Principal.Attr["tenantMemberships"].StructValue.Fields.Keys;
+                    await Assert.That(ids.Contains(database.TenantId.ToString())).IsEqualTo(expectedAuthority);
+                    await Assert.That(ids).Contains(database.SecondTenantId.ToString());
+                    await Assert.That(ids).DoesNotContain(database.ForeignTenantId.ToString());
+                    await Assert.That(request.Principal.Id).IsEqualTo(machineOwner
+                        ? "api_key:membership-key" : database.UserId.ToString());
+                }
             }
-            else
-            {
-                await Assert.That((await provider.AuthorizeAsync(own)).IsAllowed).IsEqualTo(expectedAuthority);
-                await Assert.That((await provider.AuthorizeAsync(foreign)).IsAllowed).IsFalse();
-            }
-            await Assert.That(remote.Requests.Count > 0).IsEqualTo(providerName == "cerbos");
-            foreach (var request in remote.Requests)
-            {
-                var ids = request.Principal.Attr["tenantMemberships"].StructValue.Fields.Keys;
-                await Assert.That(ids.Contains(database.TenantId.ToString())).IsEqualTo(expectedAuthority);
-                await Assert.That(ids).Contains(database.SecondTenantId.ToString());
-                await Assert.That(ids).DoesNotContain(database.ForeignTenantId.ToString());
-                await Assert.That(request.Principal.Id).IsEqualTo(machineOwner
-                    ? "api_key:membership-key" : database.UserId.ToString());
-            }
-        }
     }
 
     [Test]
@@ -145,23 +145,23 @@ public sealed class TenantAuthorityMembershipParityTests
         await using var database = new AuthorityDatabase();
         await database.InitializeAsync(MembershipState.Active);
         foreach (var batch in new[] { false, true })
-        foreach (var scenario in new[] { "read-only-scope", "foreign-owner", "wrong-key-tenant" })
-        {
-            using var cache = new MemoryCache(new MemoryCacheOptions());
-            var machine = Substitute.For<IMachinePrincipalAccessor>();
-            machine.IsMachineCaller.Returns(true);
-            machine.Current.Returns(new ApiKeyPrincipalContext("membership-key",
-                scenario == "wrong-key-tenant" ? database.SecondTenantId : database.TenantId,
-                ExternalApiKeyOwnerType.User,
-                scenario == "foreign-owner" ? database.ForeignUserId : database.UserId,
-                scenario == "read-only-scope" ? [ExternalApiKeyScopes.LookupsRead] : [ExternalApiKeyScopes.AdminTenant]));
-            var provider = database.CreateProvider("local", cache, machine, new CategoryPolicyBoundary());
-            var check = DeleteCategory(database.TenantId);
-            if (batch)
-                await Assert.That((await provider.AuthorizeBatchAsync([check, check, check])).All(d => !d.IsAllowed)).IsTrue();
-            else
-                await Assert.That((await provider.AuthorizeAsync(check)).IsAllowed).IsFalse();
-        }
+            foreach (var scenario in new[] { "read-only-scope", "foreign-owner", "wrong-key-tenant" })
+            {
+                using var cache = new MemoryCache(new MemoryCacheOptions());
+                var machine = Substitute.For<IMachinePrincipalAccessor>();
+                machine.IsMachineCaller.Returns(true);
+                machine.Current.Returns(new ApiKeyPrincipalContext("membership-key",
+                    scenario == "wrong-key-tenant" ? database.SecondTenantId : database.TenantId,
+                    ExternalApiKeyOwnerType.User,
+                    scenario == "foreign-owner" ? database.ForeignUserId : database.UserId,
+                    scenario == "read-only-scope" ? [ExternalApiKeyScopes.LookupsRead] : [ExternalApiKeyScopes.AdminTenant]));
+                var provider = database.CreateProvider("local", cache, machine, new CategoryPolicyBoundary());
+                var check = DeleteCategory(database.TenantId);
+                if (batch)
+                    await Assert.That((await provider.AuthorizeBatchAsync([check, check, check])).All(d => !d.IsAllowed)).IsTrue();
+                else
+                    await Assert.That((await provider.AuthorizeAsync(check)).IsAllowed).IsFalse();
+            }
     }
 
     private static AuthorizationRequest DeleteCategory(Guid tenantId) => TestAuthorizationRequest.Create(
@@ -239,10 +239,16 @@ public sealed class TenantAuthorityMembershipParityTests
             foreach (var status in Enum.GetValues<TenantStatusEnum>())
                 Context.TenantStatuses.Add(new TenantStatus { Id = (int)status, MasterCode = status.ToString(), FullName = status.ToString(), IsActiveState = status == TenantStatusEnum.Active });
             foreach (var userId in new[] { UserId, ForeignUserId })
-                Context.Users.Add(new User { Id = userId, Pii = new UserPii
+                Context.Users.Add(new User
                 {
-                    Email = $"{userId}@example.test", FirstName = "Authority", LastName = "Member"
-                } });
+                    Id = userId,
+                    Pii = new UserPii
+                    {
+                        Email = $"{userId}@example.test",
+                        FirstName = "Authority",
+                        LastName = "Member"
+                    }
+                });
             AddMembership(TenantId, UserId, state, tenantStatus);
             AddMembership(SecondTenantId, UserId, MembershipState.Active, TenantStatusEnum.Active);
             AddMembership(ForeignTenantId, ForeignUserId, MembershipState.Active, TenantStatusEnum.Active);
@@ -256,7 +262,11 @@ public sealed class TenantAuthorityMembershipParityTests
             var tenant = new Tenant { Id = tenantId, FullName = "Authority tenant", Slug = tenantId.ToString(), TenantStatusId = (int)tenantStatus, TenantStatus = null! };
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant, UserId = userId, User = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = tenant,
+                UserId = userId,
+                User = null!,
                 StatusId = (int)(state switch
                 {
                     MembershipState.Suspended => TenantUserStatusEnum.Suspended,
@@ -270,9 +280,14 @@ public sealed class TenantAuthorityMembershipParityTests
             foreach (var role in new[] { RoleEnum.TenantAdmin, RoleEnum.TenantMember })
                 Context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant,
-                    TenantUserId = membership.Id, TenantUser = membership,
-                    RoleId = (int)role, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = tenant,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    RoleId = (int)role,
+                    Role = null!,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
                     RevokedAt = state == MembershipState.Revoked ? new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) : null
                 });
         }

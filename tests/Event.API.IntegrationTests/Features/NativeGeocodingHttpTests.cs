@@ -31,8 +31,13 @@ public sealed class NativeGeocodingHttpTests
     {
         var selection = new ProtectedAddressSelection
         {
-            DisplayName = "Synthetic venue", Address = "Synthetic street", Postcode = "1000",
-            City = "Brussels", Country = "BE", Latitude = 50.85, Longitude = 4.35,
+            DisplayName = "Synthetic venue",
+            Address = "Synthetic street",
+            Postcode = "1000",
+            City = "Brussels",
+            Country = "BE",
+            Latitude = 50.85,
+            Longitude = 4.35,
             Attribution = "Synthetic attribution",
             Provenance = new() { Provider = "Photon", ProviderRecordId = "synthetic:record-1" }
         };
@@ -78,8 +83,11 @@ public sealed class NativeGeocodingHttpTests
         using var response = await client.PostAsJsonAsync("/api/geocoding/address-suggestions",
             new AddressSuggestionsRequestDto
             {
-                SearchText = "synthetic venue", Limit = 3, OrganizationId = organizationId,
-                LocationId = data.Location.Id, ExpectedConcurrencyStamp = data.Location.ConcurrencyStamp
+                SearchText = "synthetic venue",
+                Limit = 3,
+                OrganizationId = organizationId,
+                LocationId = data.Location.Id,
+                ExpectedConcurrencyStamp = data.Location.ConcurrencyStamp
             });
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsEqualTo((bool?)true);
@@ -98,7 +106,9 @@ public sealed class NativeGeocodingHttpTests
         var protector = scope.ServiceProvider.GetRequiredService<IAddressSelectionProtector>();
         var context = new AddressSelectionContext
         {
-            TenantId = PlatformDefaults.DefaultTenantId, ActorId = data.UserId, OrganizationId = organizationId,
+            TenantId = PlatformDefaults.DefaultTenantId,
+            ActorId = data.UserId,
+            OrganizationId = organizationId,
             Purpose = AddressSelectionPurpose.UpdateLocation,
             Target = new() { LocationId = data.Location.Id, ExpectedConcurrencyStamp = data.Location.ConcurrencyStamp },
             ConfigurationFingerprint = protector.ConfigurationFingerprint
@@ -174,7 +184,8 @@ public sealed class NativeGeocodingHttpTests
             new() { SearchText = "denied", Limit = 3 }), default)).Throws<AuthorizationException>();
         await Assert.That(async () => await promotion.ExecuteAsync(new()
         {
-            LocationId = data.Location.Id, ExpectedConcurrencyStamp = data.Location.ConcurrencyStamp
+            LocationId = data.Location.Id,
+            ExpectedConcurrencyStamp = data.Location.ConcurrencyStamp
         }, default)).Throws<AuthorizationException>();
         var unchanged = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>().Locations
             .AsNoTracking().SingleAsync(location => location.Id == data.Location.Id);
@@ -196,18 +207,25 @@ public sealed class NativeGeocodingHttpTests
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         var tenant = new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-geocoding", FullName = "Native geocoding",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-geocoding",
+            FullName = "Native geocoding",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var foreignTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = "foreign-geocoding", FullName = "Foreign geocoding",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = Guid.CreateVersion7(),
+            Slug = "foreign-geocoding",
+            FullName = "Foreign geocoding",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var userId = Guid.CreateVersion7();
         db.Users.Add(new User
         {
-            Id = userId, Pii = new() { Email = "geocoding@example.test", FirstName = "Geocoding", LastName = "User" }
+            Id = userId,
+            Pii = new() { Email = "geocoding@example.test", FirstName = "Geocoding", LastName = "User" }
         });
         var location = NewLocation(tenant, "Synthetic location");
         var foreign = NewLocation(foreignTenant, "Foreign location");
@@ -220,8 +238,12 @@ public sealed class NativeGeocodingHttpTests
     {
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), FullName = name, Country = "BE", City = "Brussels",
-            TenantId = tenant.Id, Tenant = tenant
+            Id = Guid.CreateVersion7(),
+            FullName = name,
+            Country = "BE",
+            City = "Brussels",
+            TenantId = tenant.Id,
+            Tenant = tenant
         };
         location.SetManualAddress("Synthetic street", "1000");
         return location;

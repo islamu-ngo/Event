@@ -30,8 +30,12 @@ public sealed class GenericRepositorySoftDeleteTests
             var group = new Group { FullName = "Soft deletion" };
             var participation = new GroupTenant
             {
-                Group = group, GroupId = group.Id, TenantId = tenantId, Tenant = null!,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!
+                Group = group,
+                GroupId = group.Id,
+                TenantId = tenantId,
+                Tenant = null!,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                ApprovalStatus = null!
             };
             context.GroupTenants.Add(participation);
             await context.SaveChangesAsync();
@@ -100,8 +104,12 @@ public sealed class GenericRepositorySoftDeleteTests
         context.TenantContext = new TenantContext(tenantId);
         var link = new TagTypeTags
         {
-            TagId = Guid.CreateVersion7(), Tag = null!, TagTypeId = 1, TagType = null!,
-            TenantId = tenantId, Tenant = null!
+            TagId = Guid.CreateVersion7(),
+            Tag = null!,
+            TagTypeId = 1,
+            TagType = null!,
+            TenantId = tenantId,
+            Tenant = null!
         };
         context.TagTypeTags.Add(link);
         await context.SaveChangesAsync();

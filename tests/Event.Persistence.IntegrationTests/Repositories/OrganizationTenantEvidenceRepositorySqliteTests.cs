@@ -18,7 +18,8 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = ":memory:", ForeignKeys = true
+            DataSource = ":memory:",
+            ForeignKeys = true
         }.ToString());
         await connection.OpenAsync();
         Guid tenantId = Guid.CreateVersion7();
@@ -63,7 +64,8 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = ":memory:", ForeignKeys = true
+            DataSource = ":memory:",
+            ForeignKeys = true
         }.ToString());
         await connection.OpenAsync();
         Guid tenantId = Guid.CreateVersion7();
@@ -107,7 +109,8 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = ":memory:", ForeignKeys = true
+            DataSource = ":memory:",
+            ForeignKeys = true
         }.ToString());
         await connection.OpenAsync();
         Guid tenantId = Guid.CreateVersion7();
@@ -142,8 +145,11 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
     {
         var tenant = new Tenant
         {
-            Id = tenantId, FullName = "Evidence tenant", Slug = $"evidence-{tenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = tenantId,
+            FullName = "Evidence tenant",
+            Slug = $"evidence-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         Guid organizationId = Guid.CreateVersion7();
         var organization = new Organization
@@ -153,20 +159,34 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
         };
         var participation = new OrganizationTenant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant,
-            OrganizationId = organizationId, Organization = organization,
-            ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = tenant,
+            OrganizationId = organizationId,
+            Organization = organization,
+            ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+            ApprovalStatus = null!
         };
         var document = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant,
-            FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-            FullName = "Retained document", SafeDisplayName = "evidence.pdf", Uri = string.Empty,
-            ObjectKey = $"tenants/{tenantId:N}/evidence.pdf", Provider = StorageProviders.Local,
-            Extension = "pdf", ContentType = "application/pdf", Size = 5,
-            LifecycleState = StorageObjectLifecycleStates.Active, Visibility = StorageObjectVisibilities.PrivateOwner,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = tenant,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            FullName = "Retained document",
+            SafeDisplayName = "evidence.pdf",
+            Uri = string.Empty,
+            ObjectKey = $"tenants/{tenantId:N}/evidence.pdf",
+            Provider = StorageProviders.Local,
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 5,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
             Purpose = StorageObjectPurposes.Document,
-            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant, OwningResourceId = participation.Id
+            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant,
+            OwningResourceId = participation.Id
         };
         context.AddRange(participation, document);
         await context.SaveChangesAsync();

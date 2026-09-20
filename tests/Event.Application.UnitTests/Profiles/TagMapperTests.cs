@@ -67,6 +67,10 @@ public sealed class TagMapperTests
 
     private static Tag Source() => new()
     {
-        Id = TagId, TenantId = TenantId, Tenant = null!, MasterCode = "COMMUNITY", FullName = "Community"
+        Id = TagId,
+        TenantId = TenantId,
+        Tenant = null!,
+        MasterCode = "COMMUNITY",
+        FullName = "Community"
     };
 }

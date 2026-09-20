@@ -308,8 +308,15 @@ public sealed partial class NativeEventSessionLanguageHttpTests
                 tenant.SetTenant(foreign.TenantId);
                 context.Events.Add(foreignEvent);
                 context.EventSessions.Add(foreignSession);
-                var assignment = new EventSessionLanguage { TenantId = foreign.TenantId, EventSessionId = foreignSession.Id,
-                    LanguageId = 1, EventSession = foreignSession, Language = null!, Tenant = null! };
+                var assignment = new EventSessionLanguage
+                {
+                    TenantId = foreign.TenantId,
+                    EventSessionId = foreignSession.Id,
+                    LanguageId = 1,
+                    EventSession = foreignSession,
+                    Language = null!,
+                    Tenant = null!
+                };
                 context.EventSessionLanguages.Add(assignment);
                 await context.SaveChangesAsync();
                 factory.PublicEventId = publicEvent.Id;
@@ -326,17 +333,30 @@ public sealed partial class NativeEventSessionLanguageHttpTests
         }
         private static EventSessionLanguage Assignment(int id, EventSession session, int languageId) => new()
         {
-            Id = id, TenantId = session.TenantId, EventSessionId = session.Id, EventSession = session,
-            LanguageId = languageId, Language = null!, Tenant = null!
+            Id = id,
+            TenantId = session.TenantId,
+            EventSessionId = session.Id,
+            EventSession = session,
+            LanguageId = languageId,
+            Language = null!,
+            Tenant = null!
         };
         private static Explore.Domain.Event Parent(TenantScenarioSeed.TenantScenarioResult owner, VisibilityTypeEnum visibility) =>
             new EventBuilder().WithActorId(owner.ActorId).WithTenantId(owner.TenantId)
                 .WithStatus(EventStatusEnum.Published).WithVisibility(visibility).Build();
         private static EventSession Session(Explore.Domain.Event parent, EventSessionStatusEnum status)
         {
-            var session = new EventSession(status) { Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-                TenantId = parent.TenantId, Tenant = null!, Title = "Language session", EventSessionKindId = (int)EventSessionKindEnum.Talk,
-                RegistrationModeId = (int)RegistrationModeEnum.Open };
+            var session = new EventSession(status)
+            {
+                Id = Guid.CreateVersion7(),
+                EventId = parent.Id,
+                Event = parent,
+                TenantId = parent.TenantId,
+                Tenant = null!,
+                Title = "Language session",
+                EventSessionKindId = (int)EventSessionKindEnum.Talk,
+                RegistrationModeId = (int)RegistrationModeEnum.Open
+            };
             var start = new DateTimeOffset(2027, 1, 1, 10, 0, 0, TimeSpan.Zero);
             session.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "UTC", new EventScheduleProjectionCalculator());
             session.AssignEventLocation(EventLocation.CreateToBeAnnounced(parent.TenantId, parent.Id, Guid.CreateVersion7(), DateTime.UtcNow));

@@ -194,14 +194,19 @@ public sealed class OperationAuthorizationTests
     private sealed record TenantContext(Guid TenantId) : ITenantContext;
     private static OrganizationMember Member() => new()
     {
-        Id = MemberId, TenantId = Guid.Parse("01900000-0000-7000-8000-000000000002"),
+        Id = MemberId,
+        TenantId = Guid.Parse("01900000-0000-7000-8000-000000000002"),
         UserId = Guid.Parse("01900000-0000-7000-8000-000000000003"),
         OrganizationTenant = new OrganizationTenant
         {
             OrganizationId = Guid.Parse("01900000-0000-7000-8000-000000000004"),
-            Tenant = null!, Organization = null!, ApprovalStatus = null!
+            Tenant = null!,
+            Organization = null!,
+            ApprovalStatus = null!
         },
-        User = null!, Role = null!, Tenant = null!
+        User = null!,
+        Role = null!,
+        Tenant = null!
     };
     private sealed class MemberStore(OrganizationMember member) : IOrganizationMemberRepository
     {

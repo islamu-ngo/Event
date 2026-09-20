@@ -121,9 +121,14 @@ public sealed partial class SessionCustomPropertyNativeTests
         var membership = await db.TenantUsers.Include(row => row.Tenant).SingleAsync(row => row.UserId == admin.UserId);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, Tenant = membership.Tenant,
-            TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-            Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            Tenant = membership.Tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var role = await db.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
         db.PlatformUserRoles.Add(new PlatformUserRole { Id = Guid.CreateVersion7(), UserId = admin.UserId, User = null!, RoleId = role.Id, Role = role });
@@ -149,15 +154,29 @@ public sealed partial class SessionCustomPropertyNativeTests
 
     private static EventSessionCustomPropertyDefinition Definition(Guid tenantId, Guid sessionId, string key, int order) => new()
     {
-        Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(), TenantId = tenantId, EventSessionId = sessionId,
-        Namespace = "tenant.community", Key = key, DisplayName = key, PropertyType = PropertyType.Text,
-        ExposureLevel = ExposureLevel.Internal, IsActive = true, SortOrder = order
+        Id = Guid.CreateVersion7(),
+        ConcurrencyStamp = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        EventSessionId = sessionId,
+        Namespace = "tenant.community",
+        Key = key,
+        DisplayName = key,
+        PropertyType = PropertyType.Text,
+        ExposureLevel = ExposureLevel.Internal,
+        IsActive = true,
+        SortOrder = order
     };
 
     private static CreateEventSessionCustomPropertyDefinitionDto CreateDto(Guid sessionId) => new()
     {
-        EventSessionId = sessionId, Namespace = "tenant.community", Key = "created", DisplayName = "Created",
-        PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.Internal, SortOrder = 5, IsActive = true
+        EventSessionId = sessionId,
+        Namespace = "tenant.community",
+        Key = "created",
+        DisplayName = "Created",
+        PropertyType = PropertyType.Text,
+        ExposureLevel = ExposureLevel.Internal,
+        SortOrder = 5,
+        IsActive = true
     };
 
     private static IServiceScope Scope(SessionFactory factory, Guid tenantId, Guid? userId = null)
@@ -177,7 +196,9 @@ public sealed partial class SessionCustomPropertyNativeTests
         using var scope = Scope(factory, tenantId);
         return await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionCustomPropertyDefinitionListRequest, PaginatedResult<EventSessionCustomPropertyDefinitionListDto>>>().QueryAsync(new GetEventSessionCustomPropertyDefinitionListRequest
         {
-            EventSessionId = sessionId, PageNumber = page, PageSize = size
+            EventSessionId = sessionId,
+            PageNumber = page,
+            PageSize = size
         }, default);
     }
 
@@ -207,7 +228,9 @@ public sealed partial class SessionCustomPropertyNativeTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _path
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _path
             });
             options.UseSnakeCaseNamingConvention().AddInterceptors(Reads, Commits);
         }

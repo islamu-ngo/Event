@@ -126,16 +126,28 @@ public sealed class UserMapperTests
     {
         var user = new User
         {
-            Id = UserId, Pii = new UserPii { Email = "private@example.invalid", FirstName = "First", LastName = "Last" },
-            EmailVerified = false, ConcurrencyStamp = Stamp, LastActiveTenantId = ActorId,
-            CreatedBy = ActorId, UpdatedBy = ActorId, DeletedBy = ActorId, IsDeleted = true,
+            Id = UserId,
+            Pii = new UserPii { Email = "private@example.invalid", FirstName = "First", LastName = "Last" },
+            EmailVerified = false,
+            ConcurrencyStamp = Stamp,
+            LastActiveTenantId = ActorId,
+            CreatedBy = ActorId,
+            UpdatedBy = ActorId,
+            DeletedBy = ActorId,
+            IsDeleted = true,
             CreatedAt = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc)
         };
         var actor = new Actor
         {
-            Id = ActorId, ActorType = null!, UserId = UserId, User = user,
+            Id = ActorId,
+            ActorType = null!,
+            UserId = UserId,
+            User = user,
             Pii = new ActorPii { DisplayName = "Public name", ProfilePictureUri = "https://images.example.invalid/profile.png" },
-            BackgroundColor = "", BackgroundEffect = "stars", BannerColor = "blue", ModerationReasonCode = "private-reason"
+            BackgroundColor = "",
+            BackgroundEffect = "stars",
+            BannerColor = "blue",
+            ModerationReasonCode = "private-reason"
         };
         actor.AtprotoIdentities.Add(new AtprotoIdentity(AtprotoDid.Parse("did:plc:abcdefghijklmnopqrstuvwx"))
         { Actor = actor, Handle = "first.example.invalid", PdsHost = "https://private.example.invalid" });
@@ -147,11 +159,22 @@ public sealed class UserMapperTests
 
     internal static UserAuthenticationToken CreateToken() => new()
     {
-        Id = Stamp, Provider = "atproto", PdsHost = "https://pds.example.invalid",
-        ExpiresAt = new DateTime(2026, 9, 12, 10, 0, 0, DateTimeKind.Utc), UserId = UserId, User = CreateUser(),
-        TenantId = ActorId, Tenant = null!, SubjectDid = "did:plc:abcdefghijklmnopqrstuvwx",
-        SessionCiphertext = new byte[32], EncryptionKeyId = "test-key-reference", OAuthClientKeyId = "test-client-key-reference",
-        EnvelopeVersion = 9, ConcurrencyStamp = UserId, CreatedBy = ActorId, UpdatedBy = ActorId
+        Id = Stamp,
+        Provider = "atproto",
+        PdsHost = "https://pds.example.invalid",
+        ExpiresAt = new DateTime(2026, 9, 12, 10, 0, 0, DateTimeKind.Utc),
+        UserId = UserId,
+        User = CreateUser(),
+        TenantId = ActorId,
+        Tenant = null!,
+        SubjectDid = "did:plc:abcdefghijklmnopqrstuvwx",
+        SessionCiphertext = new byte[32],
+        EncryptionKeyId = "test-key-reference",
+        OAuthClientKeyId = "test-client-key-reference",
+        EnvelopeVersion = 9,
+        ConcurrencyStamp = UserId,
+        CreatedBy = ActorId,
+        UpdatedBy = ActorId
     };
 
     private static UserDto Detail(User source) => UserMapper.ToDetail(source);

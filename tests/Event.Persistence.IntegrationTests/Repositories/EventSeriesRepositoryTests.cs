@@ -137,8 +137,13 @@ public sealed class EventSeriesRepositoryTests
         context.TenantContext = new TestTenantContext(tenantId);
         context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            UserId = actor.UserId!.Value, User = null!, ActorId = actor.Id, Actor = actor,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            UserId = actor.UserId!.Value,
+            User = null!,
+            ActorId = actor.Id,
+            Actor = actor,
             StatusId = (int)TenantUserStatusEnum.Active
         });
         context.AddRange(actor, series, @event, participationConfiguration, publishedCatalog, draftCatalog);

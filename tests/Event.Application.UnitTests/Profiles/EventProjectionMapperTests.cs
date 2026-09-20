@@ -178,9 +178,16 @@ public sealed class EventProjectionMapperTests
 
     private static Explore.Domain.Event Entity() => new()
     {
-        Id = EventId, TenantId = TenantId, Title = "Festival", ConcurrencyStamp = ActorId,
-        CreatedAt = DateTime.SpecifyKind(Now, DateTimeKind.Unspecified), Actor = null!, Tenant = null!,
-        VisibilityType = null!, EventStatus = null!, EventFormat = null!
+        Id = EventId,
+        TenantId = TenantId,
+        Title = "Festival",
+        ConcurrencyStamp = ActorId,
+        CreatedAt = DateTime.SpecifyKind(Now, DateTimeKind.Unspecified),
+        Actor = null!,
+        Tenant = null!,
+        VisibilityType = null!,
+        EventStatus = null!,
+        EventFormat = null!
     };
 
     private static EventPublicAction Action(Explore.Domain.Event parent, Guid id, int order, EventPublicActionHealthStateEnum health)

@@ -55,7 +55,8 @@ public sealed class NativeGroupMemberMutationTests
         await Assert.That(administrator.RoleId).IsEqualTo((int)RoleEnum.GroupMember);
         var removeSuccessor = new DeleteGroupMemberCommand
         {
-            MemberId = successor.Id, RequesterUserId = successor.UserId.ToString()
+            MemberId = successor.Id,
+            RequesterUserId = successor.UserId.ToString()
         };
         await Assert.That((await delete.ExecuteAsync(removeSuccessor, default)).IsSuccess).IsFalse();
         await Assert.That(successor.IsDeleted).IsFalse();
@@ -93,8 +94,10 @@ public sealed class NativeGroupMemberMutationTests
             RequesterUserId = administrator.UserId.ToString(),
             AddGroupMemberDto = new()
             {
-                GroupId = state.Participation.GroupId, Email = user.Email,
-                Role = RoleEnum.GroupMember, GroupPositionId = 4
+                GroupId = state.Participation.GroupId,
+                Email = user.Email,
+                Role = RoleEnum.GroupMember,
+                GroupPositionId = 4
             }
         };
 
@@ -130,17 +133,27 @@ public sealed class NativeGroupMemberMutationTests
         public bool Participates { get; set; } = true;
         public GroupTenant Participation { get; } = new()
         {
-            Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!,
-            GroupId = Guid.CreateVersion7(), Group = null!, ApprovalStatus = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            Tenant = null!,
+            GroupId = Guid.CreateVersion7(),
+            Group = null!,
+            ApprovalStatus = null!
         };
 
         public GroupMember AddMember(RoleEnum role)
         {
             var member = new GroupMember
             {
-                Id = Guid.CreateVersion7(), UserId = Guid.CreateVersion7(), User = null!,
-                GroupTenantId = Participation.Id, GroupTenant = Participation,
-                TenantId = Participation.TenantId, Tenant = null!, RoleId = (int)role, Role = null!
+                Id = Guid.CreateVersion7(),
+                UserId = Guid.CreateVersion7(),
+                User = null!,
+                GroupTenantId = Participation.Id,
+                GroupTenant = Participation,
+                TenantId = Participation.TenantId,
+                Tenant = null!,
+                RoleId = (int)role,
+                Role = null!
             };
             Members.Add(member);
             return member;

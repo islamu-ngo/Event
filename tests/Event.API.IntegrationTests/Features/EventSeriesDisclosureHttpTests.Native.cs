@@ -90,7 +90,8 @@ public sealed partial class EventSeriesDisclosureHttpTests
         var original = (await repository.GetForUpdateAsync(data.DraftId, PlatformDefaults.DefaultTenantId, default))!;
         var command = new UpdateEventSeriesCommand
         {
-            EventSeriesId = data.DraftId, ExpectedConcurrencyStamp = original.ConcurrencyStamp,
+            EventSeriesId = data.DraftId,
+            ExpectedConcurrencyStamp = original.ConcurrencyStamp,
             EventSeriesDto = new() { Title = new() { Value = "Provider-authorized draft" } }
         };
         var port = scope.ServiceProvider.GetRequiredService<ICommandHandler<UpdateEventSeriesCommand, BaseCommandResponse<Guid>>>();

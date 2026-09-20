@@ -157,9 +157,15 @@ public sealed class EventSessionMappingHandlerTests
         {
             EventSessionDto = new CreateEventSessionDto
             {
-                EventId = EventId, StartTime = Start, EndTime = kind == SessionEndTimeType.Fixed ? Start.AddHours(1) : null,
-                EndTimeType = kind, Title = "New session", Description = "Description", Slug = "new-session",
-                SortOrder = 5, MaxAudienceAttendees = 40
+                EventId = EventId,
+                StartTime = Start,
+                EndTime = kind == SessionEndTimeType.Fixed ? Start.AddHours(1) : null,
+                EndTimeType = kind,
+                Title = "New session",
+                Description = "Description",
+                Slug = "new-session",
+                SortOrder = 5,
+                MaxAudienceAttendees = 40
             }
         }, CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -203,8 +209,13 @@ public sealed class EventSessionMappingHandlerTests
         {
             EventSessionGroup = new CreateEventSessionGroupRequestDto
             {
-                EventId = EventId, Name = "Track", Slug = "track", Description = "Notes", Color = "blue",
-                SortOrder = 2, IsPublished = true
+                EventId = EventId,
+                Name = "Track",
+                Slug = "track",
+                Description = "Notes",
+                Color = "blue",
+                SortOrder = 2,
+                IsPublished = true
             }
         }, CancellationToken.None);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -246,7 +257,11 @@ public sealed class EventSessionMappingHandlerTests
         {
             AgendaItemDto = new CreateEventSessionAgendaItemDto
             {
-                EventSessionId = SessionId, Title = "Agenda", Description = "Notes", StartTime = Start, EndTime = Start.AddMinutes(20)
+                EventSessionId = SessionId,
+                Title = "Agenda",
+                Description = "Notes",
+                StartTime = Start,
+                EndTime = Start.AddMinutes(20)
             }
         }, CancellationToken.None);
         await Assert.That(result.IsSuccess).IsEqualTo(!crossTenant);
@@ -305,11 +320,20 @@ public sealed class EventSessionMappingHandlerTests
 
     private static EventSession Session() => new()
     {
-        Id = SessionId, EventId = EventId, TenantId = TenantId, Tenant = null!,
+        Id = SessionId,
+        EventId = EventId,
+        TenantId = TenantId,
+        Tenant = null!,
         Event = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = EventId, Title = "Parent", TenantId = TenantId, Tenant = null!, Actor = null!,
-            EventStatus = null!, EventFormat = null!, VisibilityType = null!
+            Id = EventId,
+            Title = "Parent",
+            TenantId = TenantId,
+            Tenant = null!,
+            Actor = null!,
+            EventStatus = null!,
+            EventFormat = null!,
+            VisibilityType = null!
         }
     };
 

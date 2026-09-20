@@ -17,16 +17,29 @@ public sealed class NativeLocationRoomMutationTests
         var tenantId = Guid.CreateVersion7();
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), FullName = "Current venue", Country = "BE", City = "Brussels", TenantId = tenantId
+            Id = Guid.CreateVersion7(),
+            FullName = "Current venue",
+            Country = "BE",
+            City = "Brussels",
+            TenantId = tenantId
         };
         var target = new Location
         {
-            Id = Guid.CreateVersion7(), FullName = "Target venue", Country = "BE", City = "Brussels", TenantId = tenantId
+            Id = Guid.CreateVersion7(),
+            FullName = "Target venue",
+            Country = "BE",
+            City = "Brussels",
+            TenantId = tenantId
         };
         var room = new LocationRoom
         {
-            Id = Guid.CreateVersion7(), LocationId = location.Id, Location = location,
-            TenantId = tenantId, Tenant = null!, Name = "Room", ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            LocationId = location.Id,
+            Location = location,
+            TenantId = tenantId,
+            Tenant = null!,
+            Name = "Room",
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var locations = Substitute.For<ILocationRepository>();
         locations.Exists(Arg.Any<Guid>()).Returns(call => call.Arg<Guid>() == location.Id || call.Arg<Guid>() == target.Id);
@@ -65,10 +78,12 @@ public sealed class NativeLocationRoomMutationTests
             ICommandHandler<UpdateLocationRoomCommand, BaseCommandResponse<Guid>>>();
         var move = new UpdateLocationRoomCommand
         {
-            LocationRoomId = room.Id, ExpectedConcurrencyStamp = room.ConcurrencyStamp,
+            LocationRoomId = room.Id,
+            ExpectedConcurrencyStamp = room.ConcurrencyStamp,
             UpdateLocationRoomDto = new()
             {
-                Location = new() { LocationId = target.Id }, Name = new() { Value = "Moved room" }
+                Location = new() { LocationId = target.Id },
+                Name = new() { Value = "Moved room" }
             }
         };
 
@@ -81,7 +96,8 @@ public sealed class NativeLocationRoomMutationTests
         {
             UpdateLocationRoomDto = new()
             {
-                Location = new() { LocationId = location.Id }, Name = new() { Value = "Renamed room" }
+                Location = new() { LocationId = location.Id },
+                Name = new() { Value = "Renamed room" }
             }
         }, default);
         await Assert.That(renamed.IsSuccess).IsTrue();

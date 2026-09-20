@@ -62,8 +62,11 @@ public sealed partial class NativeEventDayHttpTests
         await using var factory = await DayFactory.CreateAsync();
         using var owner = factory.Client(factory.OwnerId);
         var image = await factory.ImageAsync();
-        var command = new CreateEventDayCommand { EventDayDto = new CreateEventDayDto
-        { EventId = factory.PublicEventId, LocalDate = new DateOnly(2027, 4, 1), BannerImageId = image } };
+        var command = new CreateEventDayCommand
+        {
+            EventDayDto = new CreateEventDayDto
+            { EventId = factory.PublicEventId, LocalDate = new DateOnly(2027, 4, 1), BannerImageId = image }
+        };
         var failure = new IOException("Injected storage metadata read failure.");
         factory.StorageReads.Failure = () => failure;
         var observed = await Assert.That(async () => { await factory.CreateDayAsync(command); }).Throws<IOException>();
@@ -97,9 +100,20 @@ public sealed partial class NativeEventDayHttpTests
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(tenant);
             var image = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant, Tenant = null!, FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-                Uri = "https://images.example.test/day.png", Provider = "legacy_external", FullName = "day.png", SafeDisplayName = "day.png",
-                Extension = extension, ContentType = contentType, Visibility = visibility, Purpose = StorageObjectPurposes.EventImage, LifecycleState = state
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Image,
+                FileType = null!,
+                Uri = "https://images.example.test/day.png",
+                Provider = "legacy_external",
+                FullName = "day.png",
+                SafeDisplayName = "day.png",
+                Extension = extension,
+                ContentType = contentType,
+                Visibility = visibility,
+                Purpose = StorageObjectPurposes.EventImage,
+                LifecycleState = state
             };
             db.StorageObjects.Add(image);
             await db.SaveChangesAsync();
@@ -112,8 +126,11 @@ public sealed partial class NativeEventDayHttpTests
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
             var accessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
             var previous = accessor.HttpContext;
-            accessor.HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim("sub", OwnerId.ToString())], "Test")) };
+            accessor.HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim("sub", OwnerId.ToString())], "Test"))
+            };
             try
             {
                 return await scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>>()

@@ -56,7 +56,8 @@ public sealed class NotificationControllerTests
         var links = new NotificationPreferenceMatrixLinkPolicy().GetLinks(new NotificationPreferenceMatrixDto
         {
             TenantId = tenantId,
-            Scope = scope, OrganizationId = scope == "organization" ? resourceId : parentOrganizationId,
+            Scope = scope,
+            OrganizationId = scope == "organization" ? resourceId : parentOrganizationId,
             GroupId = scope == "group" ? resourceId : null
         }, user: null).Where(link => link.Rel is "save" or "set-mute").ToArray();
         await Assert.That(links.Length).IsEqualTo(2);
@@ -285,8 +286,10 @@ public sealed class NotificationControllerTests
         using var stranger = factory.Client(factory.StrangerId);
         var input = new SubscribeCurrentUserWebPushSubscriptionCommand
         {
-            DeviceIdentifier = "browser", Endpoint = "https://push.example.test/" + Guid.CreateVersion7(),
-            P256Dh = Base64Url(65), Auth = Base64Url(16)
+            DeviceIdentifier = "browser",
+            Endpoint = "https://push.example.test/" + Guid.CreateVersion7(),
+            P256Dh = Base64Url(65),
+            Auth = Base64Url(16)
         };
         var first = await SubscribeAsync(owner, input, HttpStatusCode.OK);
         var replay = await SubscribeAsync(owner, input, HttpStatusCode.OK);
@@ -359,7 +362,9 @@ public sealed class NotificationControllerTests
 
     private static UpdateNotificationPreferenceCellDto Cell(string category, string channel, bool enabled) => new()
     {
-        CategoryCode = category, ChannelCode = channel, IsEnabled = enabled
+        CategoryCode = category,
+        ChannelCode = channel,
+        IsEnabled = enabled
     };
 
     private static NotificationPreferenceCellDto FindCell(NotificationPreferenceMatrixDto matrix, string category, string channel) =>

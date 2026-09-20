@@ -68,7 +68,9 @@ public sealed class TagTypeTagsMapperTests
     {
         var source = new CreateTagTypeTagsDto
         {
-            TagId = TagId, TagTypeId = 19, TenantId = Guid.Parse("01900000-0000-7000-8000-000000000133")
+            TagId = TagId,
+            TagTypeId = 19,
+            TenantId = Guid.Parse("01900000-0000-7000-8000-000000000133")
         };
         var result = TagTypeTagsMapper.Create(source, TenantId);
         await Assert.That(result.TenantId).IsEqualTo(TenantId);
@@ -102,10 +104,12 @@ public sealed class TagTypeTagsMapperTests
 
     private static TagTypeTags Source() => new()
     {
-        Id = LinkId, TagId = TagId,
+        Id = LinkId,
+        TagId = TagId,
         Tag = new Tag { Id = TagId, MasterCode = "COMMUNITY", FullName = "Community", TenantId = TenantId, Tenant = null! },
         TagTypeId = 19,
         TagType = new TagType { Id = 19, MasterCode = "INTEREST", FullName = "Interest", Description = "Not surfaced" },
-        TenantId = TenantId, Tenant = null!
+        TenantId = TenantId,
+        Tenant = null!
     };
 }

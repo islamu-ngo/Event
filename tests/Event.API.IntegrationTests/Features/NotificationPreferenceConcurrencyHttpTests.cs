@@ -116,16 +116,28 @@ public sealed class NotificationPreferenceConcurrencyHttpTests
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.NotificationChannelPreferences.Add(new NotificationChannelPreference
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ScopeId = (int)ConfigurationScopeEnum.Tenant, Scope = null!,
-                CategoryId = (int)NotificationPreferenceCategoryEnum.Marketing, Category = null!,
-                ChannelId = (int)NotificationPreferenceChannelEnum.Email, Channel = null!,
-                IsEnabled = true, IsLocked = true, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ScopeId = (int)ConfigurationScopeEnum.Tenant,
+                Scope = null!,
+                CategoryId = (int)NotificationPreferenceCategoryEnum.Marketing,
+                Category = null!,
+                ChannelId = (int)NotificationPreferenceChannelEnum.Email,
+                Channel = null!,
+                IsEnabled = true,
+                IsLocked = true,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
             db.NotificationPreferenceProfiles.Add(new NotificationPreferenceProfile
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ScopeId = (int)ConfigurationScopeEnum.Tenant, Scope = null!, IsMuted = false, IsLocked = true
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ScopeId = (int)ConfigurationScopeEnum.Tenant,
+                Scope = null!,
+                IsMuted = false,
+                IsLocked = true
             });
             await db.SaveChangesAsync();
         }

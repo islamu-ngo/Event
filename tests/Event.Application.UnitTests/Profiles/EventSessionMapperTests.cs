@@ -85,11 +85,15 @@ public sealed class EventSessionMapperTests
         session.EndTimeType = SessionEndTimeType.RelativeToPrayer;
         session.IslamicAspect = new EventSessionIslamicAspect
         {
-            EventSessionId = SessionId, EventSession = session,
+            EventSessionId = SessionId,
+            EventSession = session,
             StartTimeType = SessionStartTimeType.RelativeToPrayer,
-            ReferencePrayer = PrayerTime.Dhuhr, OffsetMinutes = 5,
-            EndReferencePrayer = PrayerTime.Fajr, EndOffsetMinutes = offset,
-            RequiresWudu = true, RitualRequirementsJson = "{\"ritual\":true}"
+            ReferencePrayer = PrayerTime.Dhuhr,
+            OffsetMinutes = 5,
+            EndReferencePrayer = PrayerTime.Fajr,
+            EndOffsetMinutes = offset,
+            RequiresWudu = true,
+            RitualRequirementsJson = "{\"ritual\":true}"
         };
         var detail = EventSessionMapper.ToDetail(session);
         var list = EventSessionMapper.ToListItem(session);
@@ -207,9 +211,16 @@ public sealed class EventSessionMapperTests
         await Assert.That(EventSessionMapper.ToDetail(group).LocationId).IsNull();
         var agenda = new EventSessionAgendaItem
         {
-            Id = Stamp, EventSessionId = SessionId, EventSession = session,
-            TenantId = TenantId, Tenant = null!, Title = "Agenda", Description = "Notes",
-            StartTime = Start, EndTime = Start.AddMinutes(5), LocationId = Stamp
+            Id = Stamp,
+            EventSessionId = SessionId,
+            EventSession = session,
+            TenantId = TenantId,
+            Tenant = null!,
+            Title = "Agenda",
+            Description = "Notes",
+            StartTime = Start,
+            EndTime = Start.AddMinutes(5),
+            LocationId = Stamp
         };
         await Assert.That(EventSessionMapper.ToDetail(agenda).EventId).IsEqualTo(EventId);
         await Assert.That(EventSessionMapper.ToListItem(agenda).EventSessionTitle).IsEqualTo("Session");
@@ -217,9 +228,14 @@ public sealed class EventSessionMapperTests
         await Assert.That(EventSessionMapper.ToListItem(agenda).EndTime).IsEqualTo(Start.AddMinutes(5));
         var speaker = new EventSessionSpeaker
         {
-            Id = Stamp, ConcurrencyStamp = Stamp, EventSessionId = SessionId, EventSession = session,
-            ActorId = EventId, Actor = new Actor { ActorType = null!, Pii = new ActorPii { DisplayName = "Speaker" } },
-            TenantId = TenantId, Tenant = null!
+            Id = Stamp,
+            ConcurrencyStamp = Stamp,
+            EventSessionId = SessionId,
+            EventSession = session,
+            ActorId = EventId,
+            Actor = new Actor { ActorType = null!, Pii = new ActorPii { DisplayName = "Speaker" } },
+            TenantId = TenantId,
+            Tenant = null!
         };
         await Assert.That(EventSessionMapper.ToDetail(speaker).ActorDisplayName).IsEqualTo("Speaker");
         await Assert.That(EventSessionMapper.ToListItem(speaker).EventId).IsEqualTo(EventId);
@@ -229,9 +245,14 @@ public sealed class EventSessionMapperTests
         await Assert.That(EventSessionMapper.ToListItem(speaker).EventId).IsEqualTo(Guid.Empty);
         var language = new EventSessionLanguage
         {
-            Id = 12, ConcurrencyStamp = Stamp, EventSessionId = SessionId, EventSession = session,
-            LanguageId = 4, Language = new Language { FullName = "Arabic", MasterCode = "ar" },
-            TenantId = TenantId, Tenant = null!
+            Id = 12,
+            ConcurrencyStamp = Stamp,
+            EventSessionId = SessionId,
+            EventSession = session,
+            LanguageId = 4,
+            Language = new Language { FullName = "Arabic", MasterCode = "ar" },
+            TenantId = TenantId,
+            Tenant = null!
         };
         await Assert.That(EventSessionMapper.ToDetail(language).LanguageMasterCode).IsEqualTo("ar");
         await Assert.That(EventSessionMapper.ToListItem(language).LanguageFullName).IsEqualTo("Arabic");
@@ -245,11 +266,22 @@ public sealed class EventSessionMapperTests
 
     private static EventSession Session(EventStatusEnum parentStatus = EventStatusEnum.Published) => new(EventSessionStatusEnum.Draft)
     {
-        Id = SessionId, EventId = EventId, TenantId = TenantId, Tenant = null!, ConcurrencyStamp = Stamp, Title = "Session",
+        Id = SessionId,
+        EventId = EventId,
+        TenantId = TenantId,
+        Tenant = null!,
+        ConcurrencyStamp = Stamp,
+        Title = "Session",
         Event = new Explore.Domain.Event(parentStatus)
         {
-            Id = EventId, Title = "Parent event", TenantId = TenantId,
-            Actor = null!, Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!
+            Id = EventId,
+            Title = "Parent event",
+            TenantId = TenantId,
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!
         }
     };
 
@@ -258,14 +290,27 @@ public sealed class EventSessionMapperTests
         var group = new EventSessionGroup
         {
             Id = Guid.Parse($"01900000-0000-7000-8000-{order + 2:000000000000}"),
-            EventId = EventId, Event = session.Event, TenantId = TenantId, Tenant = null!,
-            Name = name, Slug = "track", Color = "blue", IsPublished = published
+            EventId = EventId,
+            Event = session.Event,
+            TenantId = TenantId,
+            Tenant = null!,
+            Name = name,
+            Slug = "track",
+            Color = "blue",
+            IsPublished = published
         };
         var assignment = new EventSessionGroupSession
         {
-            EventSessionGroupId = group.Id, EventSessionGroup = group,
-            EventSessionId = SessionId, EventSession = session, EventId = EventId, Event = session.Event,
-            TenantId = TenantId, Tenant = null!, IsPrimary = primary, SortOrder = order
+            EventSessionGroupId = group.Id,
+            EventSessionGroup = group,
+            EventSessionId = SessionId,
+            EventSession = session,
+            EventId = EventId,
+            Event = session.Event,
+            TenantId = TenantId,
+            Tenant = null!,
+            IsPrimary = primary,
+            SortOrder = order
         };
         group.Sessions.Add(assignment);
         return assignment;

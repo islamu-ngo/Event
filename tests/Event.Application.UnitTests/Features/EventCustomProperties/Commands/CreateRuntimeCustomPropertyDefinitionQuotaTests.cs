@@ -231,8 +231,14 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var events = Substitute.For<IEventRepository>();
         events.GetById(eventId).Returns(new Explore.Domain.Event
         {
-            Id = eventId, TenantId = tenantId, Title = "Owned event", Actor = null!, Tenant = null!,
-            VisibilityType = null!, EventStatus = null!, EventFormat = null!
+            Id = eventId,
+            TenantId = tenantId,
+            Title = "Owned event",
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!
         });
 
         return new CreateEventCustomPropertyDefinitionCommandHandler(
@@ -270,7 +276,10 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var sessions = Substitute.For<IEventSessionRepository>();
         sessions.GetById(Arg.Any<Guid>()).Returns(call => new EventSession
         {
-            Id = call.Arg<Guid>(), TenantId = tenantId, Tenant = null!, Event = null!
+            Id = call.Arg<Guid>(),
+            TenantId = tenantId,
+            Tenant = null!,
+            Event = null!
         });
 
         return new CreateEventSessionCustomPropertyDefinitionCommandHandler(

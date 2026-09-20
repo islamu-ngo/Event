@@ -36,11 +36,16 @@ public sealed class NativeRegistrationScopeHttpTests
             ?? throw new InvalidOperationException("Expected a registration-scope catalogue.");
         await Assert.That(catalogue.Single(item => item.Id == 8008)).IsEqualTo(new RegistrationScopeListDto
         {
-            Id = 8008, MasterCode = "NATIVE_FIRST", FullName = "First scope", Description = "Public description"
+            Id = 8008,
+            MasterCode = "NATIVE_FIRST",
+            FullName = "First scope",
+            Description = "Public description"
         });
         await Assert.That(catalogue.Single(item => item.Id == 8002)).IsEqualTo(new RegistrationScopeListDto
         {
-            Id = 8002, MasterCode = "NATIVE_SECOND", FullName = "Second scope"
+            Id = 8002,
+            MasterCode = "NATIVE_SECOND",
+            FullName = "Second scope"
         });
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var withoutDescription = payload.RootElement.EnumerateArray()

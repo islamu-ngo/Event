@@ -36,18 +36,24 @@ public sealed class NativeCategoryTypeHttpTests
             ?? throw new InvalidOperationException("Expected a category-type array.");
         await Assert.That(list.Single(item => item.Id == 8008)).IsEqualTo(new CategoryTypeListDto
         {
-            Id = 8008, MasterCode = "TEST_FIRST", FullName = "Test First"
+            Id = 8008,
+            MasterCode = "TEST_FIRST",
+            FullName = "Test First"
         });
         await Assert.That(list.Single(item => item.Id == 8002)).IsEqualTo(new CategoryTypeListDto
         {
-            Id = 8002, MasterCode = "TEST_SECOND", FullName = "Test Second"
+            Id = 8002,
+            MasterCode = "TEST_SECOND",
+            FullName = "Test Second"
         });
 
         using var detailResponse = await client.GetAsync("/api/CategoryType/8002");
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(await detailResponse.Content.ReadFromJsonAsync<CategoryTypeDto>()).IsEqualTo(new CategoryTypeDto
         {
-            Id = 8002, MasterCode = "TEST_SECOND", FullName = "Test Second"
+            Id = 8002,
+            MasterCode = "TEST_SECOND",
+            FullName = "Test Second"
         });
         using var payload = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
         await Assert.That(payload.RootElement.EnumerateObject().Select(property => property.Name).ToArray())

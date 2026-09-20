@@ -41,9 +41,14 @@ public sealed class AnonymousRetentionReadBoundaryTests
         {
             fixture.Context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
             });
             await fixture.Context.SaveChangesAsync();
         }

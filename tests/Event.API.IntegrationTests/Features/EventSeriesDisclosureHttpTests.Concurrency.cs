@@ -72,7 +72,8 @@ public sealed partial class EventSeriesDisclosureHttpTests
         var signal = entered.Task;
         var operation = port.ExecuteAsync(new()
         {
-            EventSeriesId = data.PublicId, ExpectedConcurrencyStamp = original.ConcurrencyStamp,
+            EventSeriesId = data.PublicId,
+            ExpectedConcurrencyStamp = original.ConcurrencyStamp,
             EventSeriesDto = new() { Title = new() { Value = "Must not persist" } }
         }, default);
         Guid newActorId;

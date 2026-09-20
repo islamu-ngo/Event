@@ -26,10 +26,17 @@ public sealed class CustomPropertyProjectionMapperTests
     {
         var source = new CustomPropertyProjectionStatus
         {
-            ProjectionName = "event", ProjectionVersion = 2, TenantId = TenantId,
-            State = CustomPropertyProjectionState.Failed, LastRebuildStartedAt = RebuildStarted,
-            LastRebuildCompletedAt = null, RowsProcessed = 6_000_000_000L, RowsFailed = 3,
-            LastCheckpoint = checkpoint, LastErrorMessage = null, ConcurrencyStamp = RowId
+            ProjectionName = "event",
+            ProjectionVersion = 2,
+            TenantId = TenantId,
+            State = CustomPropertyProjectionState.Failed,
+            LastRebuildStartedAt = RebuildStarted,
+            LastRebuildCompletedAt = null,
+            RowsProcessed = 6_000_000_000L,
+            RowsFailed = 3,
+            LastCheckpoint = checkpoint,
+            LastErrorMessage = null,
+            ConcurrencyStamp = RowId
         };
         var expected = JsonNode.Parse("""
             {
@@ -52,10 +59,16 @@ public sealed class CustomPropertyProjectionMapperTests
     {
         var source = new CustomPropertyProjectionDirtyScope
         {
-            Id = 5_000_000_001L, ProjectionName = "session", ProjectionVersion = 2,
-            TenantId = TenantId, ScopeType = CustomPropertyProjectionScopeType.EventSession,
-            ScopeId = ResourceId, DefinitionId = null, Reason = "value_changed",
-            CreatedAt = RebuildStarted, DrainedAt = null
+            Id = 5_000_000_001L,
+            ProjectionName = "session",
+            ProjectionVersion = 2,
+            TenantId = TenantId,
+            ScopeType = CustomPropertyProjectionScopeType.EventSession,
+            ScopeId = ResourceId,
+            DefinitionId = null,
+            Reason = "value_changed",
+            CreatedAt = RebuildStarted,
+            DrainedAt = null
         };
         var expected = JsonNode.Parse("""
             {
@@ -75,14 +88,26 @@ public sealed class CustomPropertyProjectionMapperTests
     {
         var source = new EventCustomPropertyProjection
         {
-            Id = RowId, EventCustomPropertyDefinitionId = DefinitionId,
-            EventCustomPropertyValueId = ValueId, EventId = ResourceId, TenantId = TenantId,
-            Namespace = "test", Key = "capacity", PropertyType = PropertyType.Number,
-            ExposureLevel = ExposureLevel.OrganizerOnly, IsSearchable = true,
-            IsFilterable = false, IsExportable = true, IsModerationRelevant = false,
-            IsAnalyticsRelevant = true, Ordinal = 7, OptionId = nullableValues ? null : OptionId,
-            TextValue = nullableValues ? null : "", NumberValue = nullableValues ? null : 42.75m,
-            BooleanValue = nullableValues ? null : false, DateTimeValue = nullableValues ? null : RebuildStarted,
+            Id = RowId,
+            EventCustomPropertyDefinitionId = DefinitionId,
+            EventCustomPropertyValueId = ValueId,
+            EventId = ResourceId,
+            TenantId = TenantId,
+            Namespace = "test",
+            Key = "capacity",
+            PropertyType = PropertyType.Number,
+            ExposureLevel = ExposureLevel.OrganizerOnly,
+            IsSearchable = true,
+            IsFilterable = false,
+            IsExportable = true,
+            IsModerationRelevant = false,
+            IsAnalyticsRelevant = true,
+            Ordinal = 7,
+            OptionId = nullableValues ? null : OptionId,
+            TextValue = nullableValues ? null : "",
+            NumberValue = nullableValues ? null : 42.75m,
+            BooleanValue = nullableValues ? null : false,
+            DateTimeValue = nullableValues ? null : RebuildStarted,
             NormalizedValue = nullableValues ? null : "normalized",
             UpdatedAt = new DateTime(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc)
         };
@@ -96,14 +121,26 @@ public sealed class CustomPropertyProjectionMapperTests
     {
         var source = new EventSessionCustomPropertyProjection
         {
-            Id = RowId, EventSessionCustomPropertyDefinitionId = DefinitionId,
-            EventSessionCustomPropertyValueId = ValueId, EventSessionId = ResourceId, TenantId = TenantId,
-            Namespace = "test", Key = "capacity", PropertyType = PropertyType.Number,
-            ExposureLevel = ExposureLevel.OrganizerOnly, IsSearchable = true,
-            IsFilterable = false, IsExportable = true, IsModerationRelevant = false,
-            IsAnalyticsRelevant = true, Ordinal = 7, OptionId = nullableValues ? null : OptionId,
-            TextValue = nullableValues ? null : "", NumberValue = nullableValues ? null : 42.75m,
-            BooleanValue = nullableValues ? null : false, DateTimeValue = nullableValues ? null : RebuildStarted,
+            Id = RowId,
+            EventSessionCustomPropertyDefinitionId = DefinitionId,
+            EventSessionCustomPropertyValueId = ValueId,
+            EventSessionId = ResourceId,
+            TenantId = TenantId,
+            Namespace = "test",
+            Key = "capacity",
+            PropertyType = PropertyType.Number,
+            ExposureLevel = ExposureLevel.OrganizerOnly,
+            IsSearchable = true,
+            IsFilterable = false,
+            IsExportable = true,
+            IsModerationRelevant = false,
+            IsAnalyticsRelevant = true,
+            Ordinal = 7,
+            OptionId = nullableValues ? null : OptionId,
+            TextValue = nullableValues ? null : "",
+            NumberValue = nullableValues ? null : 42.75m,
+            BooleanValue = nullableValues ? null : false,
+            DateTimeValue = nullableValues ? null : RebuildStarted,
             NormalizedValue = nullableValues ? null : "normalized",
             UpdatedAt = new DateTime(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc)
         };

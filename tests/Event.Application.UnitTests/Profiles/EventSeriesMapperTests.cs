@@ -14,9 +14,15 @@ public sealed class EventSeriesMapperTests
     {
         var series = new EventSeries
         {
-            Id = Guid.CreateVersion7(), Title = "Summer Series", Description = "Weekly workshops",
-            Slug = "summer-series", ActorId = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(),
-            IsPublished = true, VisibilityTypeId = 1, VisibilityType = null!
+            Id = Guid.CreateVersion7(),
+            Title = "Summer Series",
+            Description = "Weekly workshops",
+            Slug = "summer-series",
+            ActorId = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            IsPublished = true,
+            VisibilityTypeId = 1,
+            VisibilityType = null!
         };
         var detail = EventMapper.ToDetail(series);
         var list = EventMapper.ToListItem(series);

@@ -104,6 +104,10 @@ public sealed class EventAuthoritySnapshotSqliteTests
 
     private static RolePermission Grant(RoleEnum role, int permissionId) => new()
     {
-        RoleId = (int)role, Role = null!, PermissionId = permissionId, Permission = null!, GrantedAt = DateTime.UtcNow
+        RoleId = (int)role,
+        Role = null!,
+        PermissionId = permissionId,
+        Permission = null!,
+        GrantedAt = DateTime.UtcNow
     };
 }

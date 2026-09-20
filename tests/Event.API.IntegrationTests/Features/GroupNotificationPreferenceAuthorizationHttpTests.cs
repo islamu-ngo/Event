@@ -34,9 +34,12 @@ public sealed class GroupNotificationPreferenceAuthorizationHttpTests
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = factory.StrangerId, User = null!,
+                Id = Guid.CreateVersion7(),
+                UserId = factory.StrangerId,
+                User = null!,
                 RoleId = (await db.Roles.SingleAsync(role => role.MasterCode == "platform.admin")).Id,
-                Role = null!, GrantedAt = DateTime.UtcNow
+                Role = null!,
+                GrantedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
             var group = await db.GroupTenants.SingleAsync(row => row.GroupId == factory.GroupId);
@@ -76,16 +79,26 @@ public sealed class GroupNotificationPreferenceAuthorizationHttpTests
             var group = new Group { Id = groupId, FullName = "Unparented notification group", ConcurrencyStamp = Guid.CreateVersion7() };
             db.GroupTenants.Add(new GroupTenant
             {
-                Id = Guid.CreateVersion7(), GroupId = groupId, Group = group,
-                TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                GroupId = groupId,
+                Group = group,
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
             var membership = await db.TenantUsers.SingleAsync(row => row.UserId == factory.StrangerId);
             db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
             });
             await db.SaveChangesAsync();
         }

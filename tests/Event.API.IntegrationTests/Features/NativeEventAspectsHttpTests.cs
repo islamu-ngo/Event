@@ -62,7 +62,9 @@ public sealed partial class NativeEventAspectsHttpTests
             using var deniedPatch = await outsider.PatchAsJsonAsync(Public(target, kind), PatchBody(kind));
             using var forged = await outsider.PatchAsJsonAsync(Public(target, kind), new
             {
-                eventId = data.EmptyId, tenantId = PlatformDefaults.DefaultTenantId, userId = data.OwnerId
+                eventId = data.EmptyId,
+                tenantId = PlatformDefaults.DefaultTenantId,
+                userId = data.OwnerId
             });
             await Assert.That(forged.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
             using var deniedDelete = await outsider.DeleteAsync(Public(target, kind));

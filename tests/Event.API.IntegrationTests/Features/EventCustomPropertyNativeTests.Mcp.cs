@@ -43,9 +43,12 @@ public sealed partial class EventCustomPropertyNativeTests
             db.EventCustomPropertyDefinitions.Add(definition);
             db.EventCustomPropertyValues.Add(new EventCustomPropertyValue
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId,
-                EventId = eventId, EventCustomPropertyDefinitionId = definitionId,
-                TextValue = new string('x', 500) + "TRUNCATED_TAIL", CreatedBy = data.MemberId
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                EventId = eventId,
+                EventCustomPropertyDefinitionId = definitionId,
+                TextValue = new string('x', 500) + "TRUNCATED_TAIL",
+                CreatedBy = data.MemberId
             });
             await db.SaveChangesAsync();
         }
@@ -102,7 +105,9 @@ public sealed partial class EventCustomPropertyNativeTests
         {
             Content = JsonContent.Create(new
             {
-                jsonrpc = "2.0", id = 1, method = "tools/call",
+                jsonrpc = "2.0",
+                id = 1,
+                method = "tools/call",
                 @params = new { name = "get_event_custom_properties_context", arguments = new { eventId, pageSize = 999 } }
             })
         };

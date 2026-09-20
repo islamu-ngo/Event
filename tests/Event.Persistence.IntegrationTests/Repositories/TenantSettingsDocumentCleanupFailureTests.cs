@@ -191,7 +191,9 @@ public sealed class TenantSettingsDocumentCleanupFailureTests
         var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Provider = PrimaryDatabaseProvider.Sqlite, Role = PrimaryDatabaseRole.Runtime, Database = _databasePath
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Role = PrimaryDatabaseRole.Runtime,
+            Database = _databasePath
         });
         options.UseSnakeCaseNamingConvention().AddInterceptors(new SaveFailure(faults), new TransactionFailure(faults), new ReadObservation(faults));
         var context = new ExploreDbContext(options.Options);
@@ -203,8 +205,11 @@ public sealed class TenantSettingsDocumentCleanupFailureTests
             await LookupTableSeeder.SeedAsync(context, CancellationToken.None);
             context.Tenants.Add(new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Cleanup tenant", Slug = $"cleanup-{Guid.CreateVersion7():N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = Guid.CreateVersion7(),
+                FullName = "Cleanup tenant",
+                Slug = $"cleanup-{Guid.CreateVersion7():N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             await context.SaveChangesAsync();
             return context;

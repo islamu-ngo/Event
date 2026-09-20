@@ -116,7 +116,9 @@ public sealed class NativeEventTagsOperationTests
                 .Throws<AuthorizationException>();
             await Assert.That(async () => await Send(scope, new UpdateEventTagsCommand
             {
-                EventTagId = id, EventId = data.EventId, TenantId = PlatformDefaults.DefaultTenantId,
+                EventTagId = id,
+                EventId = data.EventId,
+                TenantId = PlatformDefaults.DefaultTenantId,
                 EventTagsDto = new() { Tag = new() { TagId = data.SecondTagId } }
             })).Throws<AuthorizationException>();
         }
@@ -328,7 +330,9 @@ public sealed class NativeEventTagsOperationTests
 
     private static UpdateEventTagsCommand Move(EventTagsDto row, Guid eventId, Guid tagId) => new()
     {
-        EventTagId = row.Id, EventId = row.EventId, TenantId = row.TenantId,
+        EventTagId = row.Id,
+        EventId = row.EventId,
+        TenantId = row.TenantId,
         ExpectedConcurrencyStamp = row.ConcurrencyStamp,
         EventTagsDto = new() { Event = new() { EventId = eventId }, Tag = new() { TagId = tagId } }
     };
@@ -354,8 +358,14 @@ public sealed class NativeEventTagsOperationTests
 
     private static EventTags Assignment(Guid eventId, Guid tagId, Guid tenantId) => new()
     {
-        Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(),
-        EventId = eventId, TagId = tagId, TenantId = tenantId, Event = null!, Tag = null!, Tenant = null!
+        Id = Guid.CreateVersion7(),
+        ConcurrencyStamp = Guid.CreateVersion7(),
+        EventId = eventId,
+        TagId = tagId,
+        TenantId = tenantId,
+        Event = null!,
+        Tag = null!,
+        Tenant = null!
     };
 
     private static async Task<SeedData> SeedAsync(NativeEventTagsFactory factory)

@@ -36,11 +36,16 @@ public sealed class NativeApprovalStatusHttpTests
             ?? throw new InvalidOperationException("Expected an approval-status catalogue.");
         await Assert.That(catalogue.Single(item => item.Id == 8008)).IsEqualTo(new StatusTypeListDto
         {
-            Id = 8008, MasterCode = "NATIVE_FIRST", FullName = "First status", Description = "Public description"
+            Id = 8008,
+            MasterCode = "NATIVE_FIRST",
+            FullName = "First status",
+            Description = "Public description"
         });
         await Assert.That(catalogue.Single(item => item.Id == 8002)).IsEqualTo(new StatusTypeListDto
         {
-            Id = 8002, MasterCode = "NATIVE_SECOND", FullName = "Second status"
+            Id = 8002,
+            MasterCode = "NATIVE_SECOND",
+            FullName = "Second status"
         });
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var withoutDescription = payload.RootElement.EnumerateArray()

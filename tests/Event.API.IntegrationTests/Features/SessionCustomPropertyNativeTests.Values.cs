@@ -26,7 +26,9 @@ public sealed partial class SessionCustomPropertyNativeTests
         await db.SaveChangesAsync();
         using var set = await client.PutAsJsonAsync($"{Root}/values", new SetEventSessionCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.DefinitionId, EventSessionId = data.SessionId, Values = [ValueDto(data, "First"), ValueDto(data, "Second")]
+            DefinitionId = data.DefinitionId,
+            EventSessionId = data.SessionId,
+            Values = [ValueDto(data, "First"), ValueDto(data, "Second")]
         });
         await Assert.That(set.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var detail = await DetailAsync(factory, PlatformDefaults.DefaultTenantId, data.DefinitionId);
@@ -45,7 +47,9 @@ public sealed partial class SessionCustomPropertyNativeTests
         }
         using var clear = await client.PutAsJsonAsync($"{Root}/values", new SetEventSessionCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.DefinitionId, EventSessionId = data.SessionId, Values = []
+            DefinitionId = data.DefinitionId,
+            EventSessionId = data.SessionId,
+            Values = []
         });
         await Assert.That(clear.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That((await ValuesAsync(factory, PlatformDefaults.DefaultTenantId, data.SessionId)).Count).IsEqualTo(0);
@@ -81,7 +85,8 @@ public sealed partial class SessionCustomPropertyNativeTests
         using var response = multiple
             ? await client.PutAsJsonAsync($"{Root}/values", new SetEventSessionCustomPropertyMultiValuesDto
             {
-                DefinitionId = data.DefinitionId, EventSessionId = data.SessionId,
+                DefinitionId = data.DefinitionId,
+                EventSessionId = data.SessionId,
                 Values = [ValueDto(data, "Replaced"), ValueDto(data, "Second")]
             })
             : await client.PutAsJsonAsync($"{Root}/value", ValueDto(data, "Replaced"));
@@ -122,7 +127,8 @@ public sealed partial class SessionCustomPropertyNativeTests
         }
         using var foreignMulti = await client.PutAsJsonAsync($"{Root}/values", new SetEventSessionCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.ForeignDefinitionId, EventSessionId = data.ForeignSessionId,
+            DefinitionId = data.ForeignDefinitionId,
+            EventSessionId = data.ForeignSessionId,
             Values = [ValueDto(data, "Foreign")]
         });
         await ProblemAsync(foreignMulti, HttpStatusCode.BadRequest, "validation_failed", "eventSessionCustomPropertyValue");
@@ -134,7 +140,8 @@ public sealed partial class SessionCustomPropertyNativeTests
         }
         using var duplicate = await client.PutAsJsonAsync($"{Root}/values", new SetEventSessionCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.DefinitionId, EventSessionId = data.SessionId,
+            DefinitionId = data.DefinitionId,
+            EventSessionId = data.SessionId,
             Values = [ValueDto(data, "Alpha"), ValueDto(data, " alpha ")]
         });
         await ProblemAsync(duplicate, HttpStatusCode.BadRequest, "validation_failed", "eventSessionCustomPropertyValue");

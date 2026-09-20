@@ -42,8 +42,14 @@ public sealed class CustomPropertyConversionHandlerTests
         var events = Substitute.For<IEventRepository>();
         events.GetById(EventId).Returns(new Explore.Domain.Event
         {
-            Id = EventId, TenantId = TenantId, Title = "Owned event", Actor = null!, Tenant = null!,
-            VisibilityType = null!, EventStatus = null!, EventFormat = null!
+            Id = EventId,
+            TenantId = TenantId,
+            Title = "Owned event",
+            Actor = null!,
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!
         });
         var handler = new CreateEventCustomPropertyDefinitionCommandHandler(
             store, new CustomPropertyGovernancePolicy(), new QuotaResolver(), context, context,
@@ -78,8 +84,13 @@ public sealed class CustomPropertyConversionHandlerTests
         definition.Description = "previous";
         var option = new EventCustomPropertyOption
         {
-            Id = originalAuthor, EventCustomPropertyDefinitionId = DefinitionId,
-            Namespace = "tenant.community", Key = "ar", DisplayName = "Arabic", Value = "ar", IsActive = true
+            Id = originalAuthor,
+            EventCustomPropertyDefinitionId = DefinitionId,
+            Namespace = "tenant.community",
+            Key = "ar",
+            DisplayName = "Arabic",
+            Value = "ar",
+            IsActive = true
         };
         definition.AddOption(option);
         definition.DefaultOptionId = option.Id;
@@ -93,12 +104,16 @@ public sealed class CustomPropertyConversionHandlerTests
         {
             Metadata = new UpdateCustomPropertyDefinitionMetadataDto
             {
-                DisplayName = "Updated", Description = OptionalUpdate<string?>.Set(null)
+                DisplayName = "Updated",
+                Description = OptionalUpdate<string?>.Set(null)
             }
         };
         var result = await handler.ExecuteAsync(new UpdateEventCustomPropertyDefinitionCommand
         {
-            DefinitionId = DefinitionId, ExpectedConcurrencyStamp = Stamp, TenantId = Guid.NewGuid(), DefinitionDto = patch
+            DefinitionId = DefinitionId,
+            ExpectedConcurrencyStamp = Stamp,
+            TenantId = Guid.NewGuid(),
+            DefinitionDto = patch
         }, CancellationToken.None);
         var saved = (await store.GetAllDefinitionsForEvent(EventId)).Single();
 
@@ -130,7 +145,8 @@ public sealed class CustomPropertyConversionHandlerTests
         var handler = UpdateHandler(store);
         await Assert.That(async () => await handler.ExecuteAsync(new UpdateEventCustomPropertyDefinitionCommand
         {
-            DefinitionId = DefinitionId, ExpectedConcurrencyStamp = UserId,
+            DefinitionId = DefinitionId,
+            ExpectedConcurrencyStamp = UserId,
             DefinitionDto = new UpdateEventCustomPropertyDefinitionDto
             {
                 Metadata = new UpdateCustomPropertyDefinitionMetadataDto { DisplayName = "forged" }
@@ -156,7 +172,8 @@ public sealed class CustomPropertyConversionHandlerTests
         var context = new RequestContext(TenantId, UserId);
         var input = new SetEventCustomPropertyValueDto
         {
-            EventCustomPropertyDefinitionId = DefinitionId, EventId = EventId,
+            EventCustomPropertyDefinitionId = DefinitionId,
+            EventId = EventId,
             TextValue = propertyType == PropertyType.Text ? "Arabic" : null,
             NumberValue = propertyType == PropertyType.Number ? 0m : null,
             BooleanValue = propertyType == PropertyType.Boolean ? false : null,
@@ -186,7 +203,8 @@ public sealed class CustomPropertyConversionHandlerTests
         var handler = new SetEventCustomPropertyMultiValuesCommandHandler(store, new ProjectionUpdater(), new QuotaResolver(), context, context, new InlineUnitOfWork());
         var result = await handler.ExecuteAsync(new SetEventCustomPropertyMultiValuesCommand
         {
-            DefinitionId = DefinitionId, EventId = EventId,
+            DefinitionId = DefinitionId,
+            EventId = EventId,
             Values =
             [
                 new SetEventCustomPropertyValueDto { EventCustomPropertyDefinitionId = UserId, EventId = UserId, Ordinal = 9, TextValue = "Arabic" },
@@ -203,9 +221,16 @@ public sealed class CustomPropertyConversionHandlerTests
 
     private static EventCustomPropertyDefinition CreateDefinition() => new()
     {
-        Id = DefinitionId, ConcurrencyStamp = Stamp, EventId = EventId, TenantId = TenantId,
-        Namespace = "tenant.community", Key = "language", DisplayName = "Language",
-        PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.OrganizerOnly, IsActive = true
+        Id = DefinitionId,
+        ConcurrencyStamp = Stamp,
+        EventId = EventId,
+        TenantId = TenantId,
+        Namespace = "tenant.community",
+        Key = "language",
+        DisplayName = "Language",
+        PropertyType = PropertyType.Text,
+        ExposureLevel = ExposureLevel.OrganizerOnly,
+        IsActive = true
     };
 
     private sealed record RequestContext(Guid TenantId, Guid? UserId) : ITenantContext, ICurrentUserService

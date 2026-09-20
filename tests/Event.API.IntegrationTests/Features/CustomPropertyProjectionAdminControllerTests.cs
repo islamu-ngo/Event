@@ -354,9 +354,14 @@ public sealed partial class CustomPropertyProjectionAdminControllerTests
         var membership = await db.TenantUsers.Include(row => row.Tenant).SingleAsync(row => row.UserId == admin.UserId);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = membership.Tenant,
-            TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-            Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = membership.TenantId,
+            Tenant = membership.Tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var own = await EventScenarioSeed.SeedPublishedEventAsync(db, admin.ActorId, admin.TenantId);
         var other = await EventScenarioSeed.SeedPublishedEventAsync(db, foreign.ActorId, foreign.TenantId);
@@ -371,14 +376,25 @@ public sealed partial class CustomPropertyProjectionAdminControllerTests
         {
             var definition = new EventCustomPropertyDefinition
             {
-                Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventId = own.EventId,
-                Namespace = "tenant.custom", Key = key, DisplayName = key, IsActive = true,
-                PropertyType = PropertyType.Text, ExposureLevel = exposure, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = admin.TenantId,
+                EventId = own.EventId,
+                Namespace = "tenant.custom",
+                Key = key,
+                DisplayName = key,
+                IsActive = true,
+                PropertyType = PropertyType.Text,
+                ExposureLevel = exposure,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             var value = new EventCustomPropertyValue
             {
-                Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventId = own.EventId,
-                EventCustomPropertyDefinitionId = definition.Id, TextValue = text, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = admin.TenantId,
+                EventId = own.EventId,
+                EventCustomPropertyDefinitionId = definition.Id,
+                TextValue = text,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             db.AddRange(definition, value);
             if (exposure == ExposureLevel.Public) publicValueId = value.Id;
@@ -391,14 +407,25 @@ public sealed partial class CustomPropertyProjectionAdminControllerTests
         {
             var definition = new EventSessionCustomPropertyDefinition
             {
-                Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventSessionId = session.Id,
-                Namespace = "tenant.custom", Key = key, DisplayName = key, IsActive = true,
-                PropertyType = PropertyType.Text, ExposureLevel = exposure, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = admin.TenantId,
+                EventSessionId = session.Id,
+                Namespace = "tenant.custom",
+                Key = key,
+                DisplayName = key,
+                IsActive = true,
+                PropertyType = PropertyType.Text,
+                ExposureLevel = exposure,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             db.AddRange(definition, new EventSessionCustomPropertyValue
             {
-                Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventSessionId = session.Id,
-                EventSessionCustomPropertyDefinitionId = definition.Id, TextValue = text, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = admin.TenantId,
+                EventSessionId = session.Id,
+                EventSessionCustomPropertyDefinitionId = definition.Id,
+                TextValue = text,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
         }
         AddDirty(db, admin.TenantId, own.EventId, EventProjection, CustomPropertyProjectionScopeType.Event);
@@ -411,8 +438,14 @@ public sealed partial class CustomPropertyProjectionAdminControllerTests
     private static void AddDirty(ExploreDbContext db, Guid tenantId, Guid id, string projection, CustomPropertyProjectionScopeType type, Guid? definitionId = null)
         => db.CustomPropertyProjectionDirtyScopes.Add(new CustomPropertyProjectionDirtyScope
         {
-            ProjectionName = projection, ProjectionVersion = 1, TenantId = tenantId, ScopeId = id,
-            ScopeType = type, DefinitionId = definitionId, Reason = "rebuild_in_progress", CreatedAt = DateTimeOffset.UtcNow
+            ProjectionName = projection,
+            ProjectionVersion = 1,
+            TenantId = tenantId,
+            ScopeId = id,
+            ScopeType = type,
+            DefinitionId = definitionId,
+            Reason = "rebuild_in_progress",
+            CreatedAt = DateTimeOffset.UtcNow
         });
 
     private sealed record SeedData(Guid AdminId, Guid MemberId, Guid EventId, Guid SessionId, Guid ForeignTenantId, Guid ForeignEventId, Guid PublicValueId, Guid ForeignSessionId);

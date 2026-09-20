@@ -67,9 +67,14 @@ public sealed partial class NativeStorageObjectHttpTests
                 var membership = await db.TenantUsers.SingleAsync(item => item.UserId == userId);
                 db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = organization.TenantId, Tenant = null!,
-                    TenantUserId = membership.Id, TenantUser = membership,
-                    RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                    Id = Guid.CreateVersion7(),
+                    TenantId = organization.TenantId,
+                    Tenant = null!,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant
                 });
             }
             var foreignOrganization = new Organization
@@ -80,17 +85,27 @@ public sealed partial class NativeStorageObjectHttpTests
             };
             var foreignParticipation = new OrganizationTenant
             {
-                Id = foreignParticipationId, TenantId = factory.OtherTenantId, Tenant = null!,
-                OrganizationId = foreignOrganizationId, Organization = foreignOrganization,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!,
+                Id = foreignParticipationId,
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                OrganizationId = foreignOrganizationId,
+                Organization = foreignOrganization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                ApprovalStatus = null!,
                 ConcurrencyStamp = Guid.CreateVersion7()
             };
             db.OrganizationTenants.Add(foreignParticipation);
             db.OrganizationMembers.Add(new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
-                OrganizationTenantId = foreignParticipationId, OrganizationTenant = foreignParticipation,
-                UserId = userId, User = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = factory.OtherTenantId,
+                Tenant = null!,
+                OrganizationTenantId = foreignParticipationId,
+                OrganizationTenant = foreignParticipation,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!
             });
             await db.SaveChangesAsync();
             await Assert.That(await scope.ServiceProvider.GetRequiredService<IAdminContext>()
@@ -100,7 +115,9 @@ public sealed partial class NativeStorageObjectHttpTests
         using var client = Client(factory, userId);
         var upload = new CreateOrganizationTenantEvidenceUploadSessionDto
         {
-            FileName = " evidence.pdf ", ContentType = "application/pdf", ExpectedSizeBytes = 5
+            FileName = " evidence.pdf ",
+            ContentType = "application/pdf",
+            ExpectedSizeBytes = 5
         };
         using var accepted = await client.PostAsJsonAsync(
             $"/api/organizations/{organizationId}/legitimacy-evidence/upload-session", upload);
@@ -120,9 +137,14 @@ public sealed partial class NativeStorageObjectHttpTests
         await Assert.That(foreignParent.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         using var forgedChild = await client.PostAsJsonAsync(Root + "/upload-sessions", new CreateStorageUploadSessionDto
         {
-            ExpectedSizeBytes = 5, ContentType = "application/pdf", OriginalFileName = "foreign.pdf", Extension = "pdf",
-            Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.PrivateOwner,
-            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant, OwningResourceId = foreignParticipationId,
+            ExpectedSizeBytes = 5,
+            ContentType = "application/pdf",
+            OriginalFileName = "foreign.pdf",
+            Extension = "pdf",
+            Purpose = StorageObjectPurposes.Document,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant,
+            OwningResourceId = foreignParticipationId,
             IdempotencyKey = "foreign-evidence"
         });
         await Assert.That(forgedChild.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
@@ -242,7 +264,9 @@ public sealed partial class NativeStorageObjectHttpTests
         using var client = Client(factory, factory.OwnerId);
         var pdf = await ReserveAsync(client, Upload("invalid-pdf") with
         {
-            ContentType = "application/pdf", OriginalFileName = "file.pdf", Extension = "pdf"
+            ContentType = "application/pdf",
+            OriginalFileName = "file.pdf",
+            Extension = "pdf"
         });
         using (var invalid = await PutAsync(client, pdf.Id, "hello"u8.ToArray()))
             await ProblemAsync(invalid, HttpStatusCode.BadRequest, FailureCodes.StorageUploadContentSignatureMismatch);
@@ -290,8 +314,13 @@ public sealed partial class NativeStorageObjectHttpTests
 
     private static CreateStorageUploadSessionDto Upload(string key, long size = 5) => new()
     {
-        ExpectedSizeBytes = size, ContentType = "text/plain", OriginalFileName = "file.txt", Extension = "txt",
-        Purpose = StorageObjectPurposes.Attachment, Visibility = StorageObjectVisibilities.PrivateOwner, IdempotencyKey = key
+        ExpectedSizeBytes = size,
+        ContentType = "text/plain",
+        OriginalFileName = "file.txt",
+        Extension = "txt",
+        Purpose = StorageObjectPurposes.Attachment,
+        Visibility = StorageObjectVisibilities.PrivateOwner,
+        IdempotencyKey = key
     };
 
     private static HttpClient Client(StorageFactory factory, Guid userId)
@@ -390,7 +419,9 @@ public sealed partial class NativeStorageObjectHttpTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _database
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _database
             });
             options.UseSnakeCaseNamingConvention();
             if (_transactionObserver is not null)

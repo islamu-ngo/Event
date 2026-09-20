@@ -157,9 +157,16 @@ public sealed partial class NativeCustomPropertyGovernanceHttpTests
         GrantAdmin(db, membership);
         var foreignMembership = new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = other.TenantId, Tenant = null!,
-            UserId = other.UserId, User = null!, ActorId = other.ActorId, Actor = null!,
-            StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = LastUsed, CreatedAt = LastUsed
+            Id = Guid.CreateVersion7(),
+            TenantId = other.TenantId,
+            Tenant = null!,
+            UserId = other.UserId,
+            User = null!,
+            ActorId = other.ActorId,
+            Actor = null!,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = LastUsed,
+            CreatedAt = LastUsed
         };
         db.TenantUsers.Add(foreignMembership);
         GrantAdmin(db, foreignMembership);
@@ -182,21 +189,38 @@ public sealed partial class NativeCustomPropertyGovernanceHttpTests
         var session = await db.EventSessions.SingleAsync(row => row.EventId == ownEvent.EventId);
         db.EventSessionCustomPropertyDefinitions.Add(new EventSessionCustomPropertyDefinition
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventSessionId = session.Id,
-            Namespace = "tenant.custom", Key = "d-session", DisplayName = "Session searchable",
-            IsActive = true, IsSearchable = true, PropertyType = PropertyType.Text,
-            ExposureLevel = ExposureLevel.Public, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            EventSessionId = session.Id,
+            Namespace = "tenant.custom",
+            Key = "d-session",
+            DisplayName = "Session searchable",
+            IsActive = true,
+            IsSearchable = true,
+            PropertyType = PropertyType.Text,
+            ExposureLevel = ExposureLevel.Public,
+            ConcurrencyStamp = Guid.CreateVersion7()
         });
         db.EventCustomPropertyValues.AddRange(new EventCustomPropertyValue
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventId = ownEvent.EventId,
-            EventCustomPropertyDefinitionId = search.Id, TextValue = "private-value-sentinel",
-            UpdatedAt = LastUsed, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            EventId = ownEvent.EventId,
+            EventCustomPropertyDefinitionId = search.Id,
+            TextValue = "private-value-sentinel",
+            UpdatedAt = LastUsed,
+            ConcurrencyStamp = Guid.CreateVersion7()
         }, new EventCustomPropertyValue
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, EventId = ownEvent.EventId,
-            EventCustomPropertyDefinitionId = search.Id, Ordinal = 1, TextValue = "deleted-value-sentinel",
-            UpdatedAt = LastUsed.AddDays(1), IsDeleted = true, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            EventId = ownEvent.EventId,
+            EventCustomPropertyDefinitionId = search.Id,
+            Ordinal = 1,
+            TextValue = "deleted-value-sentinel",
+            UpdatedAt = LastUsed.AddDays(1),
+            IsDeleted = true,
+            ConcurrencyStamp = Guid.CreateVersion7()
         });
         await db.SaveChangesAsync();
         return new(admin.UserId, member.UserId, other.UserId, other.TenantId);
@@ -204,16 +228,28 @@ public sealed partial class NativeCustomPropertyGovernanceHttpTests
 
     private static void GrantAdmin(ExploreDbContext db, TenantUser membership) => db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
     {
-        Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = membership.Tenant,
-        TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-        Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+        Id = Guid.CreateVersion7(),
+        TenantId = membership.TenantId,
+        Tenant = membership.Tenant,
+        TenantUserId = membership.Id,
+        TenantUser = membership,
+        RoleId = (int)RoleEnum.TenantAdmin,
+        Role = null!,
+        RoleScopeId = (int)RoleScopeEnum.Tenant
     });
 
     private static EventCustomPropertyDefinition Definition(Guid tenantId, Guid eventId, string key) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenantId, EventId = eventId, Namespace = "tenant.custom",
-        Key = key, DisplayName = key, IsActive = true, PropertyType = PropertyType.Text,
-        ExposureLevel = ExposureLevel.Public, ConcurrencyStamp = Guid.CreateVersion7()
+        Id = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        EventId = eventId,
+        Namespace = "tenant.custom",
+        Key = key,
+        DisplayName = key,
+        IsActive = true,
+        PropertyType = PropertyType.Text,
+        ExposureLevel = ExposureLevel.Public,
+        ConcurrencyStamp = Guid.CreateVersion7()
     };
 
     private sealed record SeedData(Guid AdminId, Guid MemberId, Guid ForeignAdminId, Guid ForeignTenantId);

@@ -26,7 +26,9 @@ public sealed partial class EventCustomPropertyNativeTests
         await db.SaveChangesAsync();
         using var set = await client.PutAsJsonAsync($"{Root}/values", new SetEventCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.DefinitionId, EventId = data.EventId, Values = [ValueDto(data, "First"), ValueDto(data, "Second")]
+            DefinitionId = data.DefinitionId,
+            EventId = data.EventId,
+            Values = [ValueDto(data, "First"), ValueDto(data, "Second")]
         });
         await Assert.That(set.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var detail = await DetailAsync(factory, PlatformDefaults.DefaultTenantId, data.DefinitionId);
@@ -45,7 +47,9 @@ public sealed partial class EventCustomPropertyNativeTests
         }
         using var clear = await client.PutAsJsonAsync($"{Root}/values", new SetEventCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.DefinitionId, EventId = data.EventId, Values = []
+            DefinitionId = data.DefinitionId,
+            EventId = data.EventId,
+            Values = []
         });
         await Assert.That(clear.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That((await ValuesAsync(factory, PlatformDefaults.DefaultTenantId, data.EventId)).Count).IsEqualTo(0);
@@ -81,7 +85,8 @@ public sealed partial class EventCustomPropertyNativeTests
         using var response = multiple
             ? await client.PutAsJsonAsync($"{Root}/values", new SetEventCustomPropertyMultiValuesDto
             {
-                DefinitionId = data.DefinitionId, EventId = data.EventId,
+                DefinitionId = data.DefinitionId,
+                EventId = data.EventId,
                 Values = [ValueDto(data, "Replaced"), ValueDto(data, "Second")]
             })
             : await client.PutAsJsonAsync($"{Root}/value", ValueDto(data, "Replaced"));
@@ -122,7 +127,8 @@ public sealed partial class EventCustomPropertyNativeTests
         }
         using var foreignMulti = await client.PutAsJsonAsync($"{Root}/values", new SetEventCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.ForeignDefinitionId, EventId = data.ForeignEventId,
+            DefinitionId = data.ForeignDefinitionId,
+            EventId = data.ForeignEventId,
             Values = [ValueDto(data, "Foreign")]
         });
         await ProblemAsync(foreignMulti, HttpStatusCode.BadRequest, "validation_failed", "eventCustomPropertyValue");
@@ -134,7 +140,8 @@ public sealed partial class EventCustomPropertyNativeTests
         }
         using var duplicate = await client.PutAsJsonAsync($"{Root}/values", new SetEventCustomPropertyMultiValuesDto
         {
-            DefinitionId = data.DefinitionId, EventId = data.EventId,
+            DefinitionId = data.DefinitionId,
+            EventId = data.EventId,
             Values = [ValueDto(data, "Alpha"), ValueDto(data, " alpha ")]
         });
         await ProblemAsync(duplicate, HttpStatusCode.BadRequest, "validation_failed", "eventCustomPropertyValue");

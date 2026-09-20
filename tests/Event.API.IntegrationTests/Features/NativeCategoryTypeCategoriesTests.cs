@@ -399,11 +399,15 @@ public sealed class NativeCategoryTypeCategoriesTests
         };
         var zetaType = new CategoryType
         {
-            Id = ZetaTypeId, MasterCode = "ZETA_TYPE", FullName = "Zeta type"
+            Id = ZetaTypeId,
+            MasterCode = "ZETA_TYPE",
+            FullName = "Zeta type"
         };
         db.CategoryTypes.AddRange(zetaType, alphaType, new CategoryType
         {
-            Id = UnusedTypeId, MasterCode = "UNUSED_TYPE", FullName = "Unused type"
+            Id = UnusedTypeId,
+            MasterCode = "UNUSED_TYPE",
+            FullName = "Unused type"
         });
         var alpha = NewCategory(tenant, "ALPHA", "Alpha category");
         var beta = NewCategory(tenant, "BETA", "Beta category");

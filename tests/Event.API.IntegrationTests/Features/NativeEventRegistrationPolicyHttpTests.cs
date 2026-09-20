@@ -36,11 +36,16 @@ public sealed class NativeEventRegistrationPolicyHttpTests
             ?? throw new InvalidOperationException("Expected an event registration-policy catalogue.");
         await Assert.That(catalogue.Single(item => item.Id == 8008)).IsEqualTo(new EventRegistrationPolicyListDto
         {
-            Id = 8008, MasterCode = "NATIVE_FIRST", FullName = "First policy", Description = "Public description"
+            Id = 8008,
+            MasterCode = "NATIVE_FIRST",
+            FullName = "First policy",
+            Description = "Public description"
         });
         await Assert.That(catalogue.Single(item => item.Id == 8002)).IsEqualTo(new EventRegistrationPolicyListDto
         {
-            Id = 8002, MasterCode = "NATIVE_SECOND", FullName = "Second policy"
+            Id = 8002,
+            MasterCode = "NATIVE_SECOND",
+            FullName = "Second policy"
         });
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var withoutDescription = payload.RootElement.EnumerateArray()

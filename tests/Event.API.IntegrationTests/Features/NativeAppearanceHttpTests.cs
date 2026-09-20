@@ -219,8 +219,11 @@ public sealed class NativeAppearanceHttpTests
         }
         using (var forged = await client.PatchAsJsonAsync("/api/user/appearance", new
         {
-            userId = data.TenantAdmin.Id, tenantId = data.Foreign.TenantId,
-            localization = new { language = "fr", direction = "rtl" }, themeMode = "dark", activeProfileId = Guid.CreateVersion7()
+            userId = data.TenantAdmin.Id,
+            tenantId = data.Foreign.TenantId,
+            localization = new { language = "fr", direction = "rtl" },
+            themeMode = "dark",
+            activeProfileId = Guid.CreateVersion7()
         }))
         {
             await ProblemAsync(forged, HttpStatusCode.BadRequest);
@@ -298,8 +301,14 @@ public sealed class NativeAppearanceHttpTests
         var membership = new TenantUser { Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, UserId = tenantAdmin.Id, User = tenantAdmin, StatusId = (int)TenantUserStatusEnum.Active };
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, TenantUserId = membership.Id, TenantUser = membership,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = await db.Set<Role>().SingleAsync(item => item.Id == (int)RoleEnum.TenantAdmin), RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = await db.Set<Role>().SingleAsync(item => item.Id == (int)RoleEnum.TenantAdmin),
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var local = Theme(tenant, "local", isDefault: true);
         var alternative = Theme(tenant, "alternative");
@@ -316,27 +325,52 @@ public sealed class NativeAppearanceHttpTests
 
     private static User NewUser(string name) => new()
     {
-        Id = Guid.CreateVersion7(), Pii = new() { Email = $"{name}@example.test", FirstName = name, LastName = "User" }
+        Id = Guid.CreateVersion7(),
+        Pii = new() { Email = $"{name}@example.test", FirstName = name, LastName = "User" }
     };
 
     private static UiTheme Theme(Tenant? tenant, string key, bool isDefault = false, bool active = true) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenant?.Id, Tenant = tenant, ThemeKey = key, DisplayName = key, Description = "Original description",
-        IsDefault = isDefault, IsActive = active, RowVersion = 1,
-        LightPalette = EmergencyFallbackPalettes.FallbackLight, DarkPalette = EmergencyFallbackPalettes.FallbackDark
+        Id = Guid.CreateVersion7(),
+        TenantId = tenant?.Id,
+        Tenant = tenant,
+        ThemeKey = key,
+        DisplayName = key,
+        Description = "Original description",
+        IsDefault = isDefault,
+        IsActive = active,
+        RowVersion = 1,
+        LightPalette = EmergencyFallbackPalettes.FallbackLight,
+        DarkPalette = EmergencyFallbackPalettes.FallbackDark
     };
 
     private static CreateUiThemeDto Input(string key) => new()
     {
-        ThemeKey = key, DisplayName = key, LightPalette = Palette(), DarkPalette = Palette()
+        ThemeKey = key,
+        DisplayName = key,
+        LightPalette = Palette(),
+        DarkPalette = Palette()
     };
 
     private static UiThemePaletteDto Palette() => new()
     {
-        Primary = "#aabbcc", Secondary = "#112233", Background = "#FFFFFF", Surface = "#FFFFFF",
-        AppbarBackground = "#112233", AppbarText = "#FFFFFF", DrawerBackground = "#FFFFFF", DrawerText = "#112233", DrawerIcon = "#112233",
-        TextPrimary = "#112233", TextSecondary = "#112233", Info = "#112233", Success = "#112233", Warning = "#112233", Error = "#112233",
-        LinesDefault = "#112233", Divider = "rgba(0,0,0,0.12)"
+        Primary = "#aabbcc",
+        Secondary = "#112233",
+        Background = "#FFFFFF",
+        Surface = "#FFFFFF",
+        AppbarBackground = "#112233",
+        AppbarText = "#FFFFFF",
+        DrawerBackground = "#FFFFFF",
+        DrawerText = "#112233",
+        DrawerIcon = "#112233",
+        TextPrimary = "#112233",
+        TextSecondary = "#112233",
+        Info = "#112233",
+        Success = "#112233",
+        Warning = "#112233",
+        Error = "#112233",
+        LinesDefault = "#112233",
+        Divider = "rgba(0,0,0,0.12)"
     };
 
     private static HttpClient Client(AuthenticatedWebApplicationFactory factory, Guid userId)

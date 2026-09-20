@@ -244,7 +244,11 @@ public sealed class NativeLocationHttpTests
 
     private static CreateLocationDto Input(string name) => new()
     {
-        FullName = name, Country = "BE", City = "Brussels", Address = "Private street 1", Postcode = "1000"
+        FullName = name,
+        Country = "BE",
+        City = "Brussels",
+        Address = "Private street 1",
+        Postcode = "1000"
     };
 
     private static async Task<SeedData> SeedAsync(AuthenticatedWebApplicationFactory factory)
@@ -254,13 +258,19 @@ public sealed class NativeLocationHttpTests
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         var tenant = new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-locations", FullName = "Native locations",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-locations",
+            FullName = "Native locations",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var foreignTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = "foreign-locations", FullName = "Foreign locations",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = Guid.CreateVersion7(),
+            Slug = "foreign-locations",
+            FullName = "Foreign locations",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var owner = NewUser("owner");
         var incoming = NewUser("incoming");
@@ -274,7 +284,9 @@ public sealed class NativeLocationHttpTests
         db.Locations.AddRange(local, foreign, erased);
         db.Set<TenantSetting>().Add(new TenantSetting
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
             SettingKey = GovernanceSettingKeys.AddressGovernance.CreationMode,
             Value = "\"OpenWithModeration\""
         });
@@ -284,15 +296,20 @@ public sealed class NativeLocationHttpTests
 
     private static User NewUser(string name) => new()
     {
-        Id = Guid.CreateVersion7(), Pii = new() { Email = $"{name}@example.test", FirstName = name, LastName = "User" }
+        Id = Guid.CreateVersion7(),
+        Pii = new() { Email = $"{name}@example.test", FirstName = name, LastName = "User" }
     };
 
     private static Location NewLocation(Tenant tenant, string name)
     {
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), FullName = name, Country = "BE", City = "Brussels",
-            TenantId = tenant.Id, Tenant = tenant
+            Id = Guid.CreateVersion7(),
+            FullName = name,
+            Country = "BE",
+            City = "Brussels",
+            TenantId = tenant.Id,
+            Tenant = tenant
         };
         location.SetManualAddress("Private street 1", "1000");
         return location;

@@ -43,9 +43,14 @@ public sealed partial class EventSeriesDisclosureHttpTests
             Membership(foreignTenant, owner, actor));
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            TenantUserId = adminMembership.Id, TenantUser = adminMembership,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            TenantUserId = adminMembership.Id,
+            TenantUser = adminMembership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         Guid publicEventId = default;
         foreach (var (title, status, visibility, deleted) in new[]
@@ -78,15 +83,29 @@ public sealed partial class EventSeriesDisclosureHttpTests
 
     private static TenantUser Membership(Tenant tenant, User user, Actor? actor = null) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, UserId = user.Id, User = user,
-        ActorId = actor?.Id, Actor = actor, StatusId = (int)TenantUserStatusEnum.Active
+        Id = Guid.CreateVersion7(),
+        TenantId = tenant.Id,
+        Tenant = tenant,
+        UserId = user.Id,
+        User = user,
+        ActorId = actor?.Id,
+        Actor = actor,
+        StatusId = (int)TenantUserStatusEnum.Active
     };
 
     private static EventSeries Series(string title, bool published, VisibilityTypeEnum visibility, Tenant tenant, Actor actor) => new()
     {
-        Id = Guid.CreateVersion7(), Title = title, Description = "Initial description", Slug = title.Replace(' ', '-'),
-        TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-        IsPublished = published, VisibilityTypeId = (int)visibility, VisibilityType = null!
+        Id = Guid.CreateVersion7(),
+        Title = title,
+        Description = "Initial description",
+        Slug = title.Replace(' ', '-'),
+        TenantId = tenant.Id,
+        Tenant = tenant,
+        ActorId = actor.Id,
+        Actor = actor,
+        IsPublished = published,
+        VisibilityTypeId = (int)visibility,
+        VisibilityType = null!
     };
 
     private static IServiceScope Scope(NativeEventSeriesFactory factory, Guid? userId = null, Guid? tenantId = null)

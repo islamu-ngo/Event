@@ -17,8 +17,14 @@ public sealed class CustomPropertyMapperTests
         parent.Parent = parent;
         var source = new Category
         {
-            Id = DefinitionId, ConcurrencyStamp = OptionId, MasterCode = "LECTURE", FullName = "Lecture",
-            ParentId = OptionId, Parent = parent, TenantId = DefinitionId, Tenant = null!
+            Id = DefinitionId,
+            ConcurrencyStamp = OptionId,
+            MasterCode = "LECTURE",
+            FullName = "Lecture",
+            ParentId = OptionId,
+            Parent = parent,
+            TenantId = DefinitionId,
+            Tenant = null!
         };
         var detail = CustomPropertyMapper.ToDetail(source);
         var list = CustomPropertyMapper.ToListItem(source);
@@ -41,14 +47,32 @@ public sealed class CustomPropertyMapperTests
     {
         var source = new CustomPropertyDefinition
         {
-            Id = DefinitionId, ConcurrencyStamp = OptionId, TenantId = DefinitionId,
-            Namespace = "tenant.community", Key = "notes", DisplayName = "Notes", Description = "",
-            PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.OrganizerOnly,
-            IsRequired = true, IsMulti = true, IsActive = true, SortOrder = 9,
-            IsSearchable = true, IsFilterable = true, IsExportable = true, IsModerationRelevant = true,
-            IsAnalyticsRelevant = true, IsSystemOwned = true, DefaultTextValue = "default",
-            MinLength = 2, MaxLength = 40, RegexPattern = "^[a-z]+$", AllowedUrlSchemes = "https",
-            MinNumber = -3m, MaxNumber = 12m,
+            Id = DefinitionId,
+            ConcurrencyStamp = OptionId,
+            TenantId = DefinitionId,
+            Namespace = "tenant.community",
+            Key = "notes",
+            DisplayName = "Notes",
+            Description = "",
+            PropertyType = PropertyType.Text,
+            ExposureLevel = ExposureLevel.OrganizerOnly,
+            IsRequired = true,
+            IsMulti = true,
+            IsActive = true,
+            SortOrder = 9,
+            IsSearchable = true,
+            IsFilterable = true,
+            IsExportable = true,
+            IsModerationRelevant = true,
+            IsAnalyticsRelevant = true,
+            IsSystemOwned = true,
+            DefaultTextValue = "default",
+            MinLength = 2,
+            MaxLength = 40,
+            RegexPattern = "^[a-z]+$",
+            AllowedUrlSchemes = "https",
+            MinNumber = -3m,
+            MaxNumber = 12m,
             MinDateTime = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
             MaxDateTime = new DateTimeOffset(2026, 9, 30, 0, 0, 0, TimeSpan.Zero)
         };
@@ -81,27 +105,55 @@ public sealed class CustomPropertyMapperTests
         var time = new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.FromHours(2));
         var eventValue = CustomPropertyMapper.ToValue(new EventCustomPropertyValue
         {
-            Id = OptionId, EventCustomPropertyDefinitionId = DefinitionId, EventId = OptionId, Ordinal = 3,
-            TextValue = "", NumberValue = 12.50m, BooleanValue = false, DateTimeValue = time, OptionId = DefinitionId,
-            TenantId = DefinitionId, CreatedBy = DefinitionId
+            Id = OptionId,
+            EventCustomPropertyDefinitionId = DefinitionId,
+            EventId = OptionId,
+            Ordinal = 3,
+            TextValue = "",
+            NumberValue = 12.50m,
+            BooleanValue = false,
+            DateTimeValue = time,
+            OptionId = DefinitionId,
+            TenantId = DefinitionId,
+            CreatedBy = DefinitionId
         });
         var sessionValue = CustomPropertyMapper.ToValue(new EventSessionCustomPropertyValue
         {
-            Id = OptionId, EventSessionCustomPropertyDefinitionId = DefinitionId, EventSessionId = OptionId, Ordinal = 3,
-            TextValue = "", NumberValue = 12.50m, BooleanValue = false, DateTimeValue = time, OptionId = DefinitionId,
-            TenantId = DefinitionId, CreatedBy = DefinitionId
+            Id = OptionId,
+            EventSessionCustomPropertyDefinitionId = DefinitionId,
+            EventSessionId = OptionId,
+            Ordinal = 3,
+            TextValue = "",
+            NumberValue = 12.50m,
+            BooleanValue = false,
+            DateTimeValue = time,
+            OptionId = DefinitionId,
+            TenantId = DefinitionId,
+            CreatedBy = DefinitionId
         });
         await Assert.That(eventValue).IsEqualTo(new Explore.Application.DTOs.EventCustomProperty.EventCustomPropertyValueDto
         {
-            Id = OptionId, EventCustomPropertyDefinitionId = DefinitionId, EventId = OptionId, Ordinal = 3,
-            TextValue = "", NumberValue = 12.50m, BooleanValue = false,
-            DateTimeValue = new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.FromHours(2)), OptionId = DefinitionId
+            Id = OptionId,
+            EventCustomPropertyDefinitionId = DefinitionId,
+            EventId = OptionId,
+            Ordinal = 3,
+            TextValue = "",
+            NumberValue = 12.50m,
+            BooleanValue = false,
+            DateTimeValue = new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.FromHours(2)),
+            OptionId = DefinitionId
         });
         await Assert.That(sessionValue).IsEqualTo(new Explore.Application.DTOs.EventSessionCustomProperty.EventSessionCustomPropertyValueDto
         {
-            Id = OptionId, EventSessionCustomPropertyDefinitionId = DefinitionId, EventSessionId = OptionId, Ordinal = 3,
-            TextValue = "", NumberValue = 12.50m, BooleanValue = false,
-            DateTimeValue = new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.FromHours(2)), OptionId = DefinitionId
+            Id = OptionId,
+            EventSessionCustomPropertyDefinitionId = DefinitionId,
+            EventSessionId = OptionId,
+            Ordinal = 3,
+            TextValue = "",
+            NumberValue = 12.50m,
+            BooleanValue = false,
+            DateTimeValue = new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.FromHours(2)),
+            OptionId = DefinitionId
         });
         await Assert.That(CustomPropertyMapper.ToValue(new EventCustomPropertyValue()).TextValue).IsNull();
         await Assert.That(CustomPropertyMapper.ToValue(new EventSessionCustomPropertyValue()).NumberValue).IsNull();
@@ -115,15 +167,28 @@ public sealed class CustomPropertyMapperTests
     {
         var definition = new EventCustomPropertyDefinition
         {
-            Id = DefinitionId, Namespace = "tenant.community", Key = "language", DisplayName = "Language",
-            PropertyType = PropertyType.Option, ExposureLevel = ExposureLevel.OrganizerOnly,
-            DefaultOptionId = OptionId, SourceTemplateVersion = 7, IsMulti = true,
-            CreatedBy = Guid.NewGuid(), IsDeleted = true
+            Id = DefinitionId,
+            Namespace = "tenant.community",
+            Key = "language",
+            DisplayName = "Language",
+            PropertyType = PropertyType.Option,
+            ExposureLevel = ExposureLevel.OrganizerOnly,
+            DefaultOptionId = OptionId,
+            SourceTemplateVersion = 7,
+            IsMulti = true,
+            CreatedBy = Guid.NewGuid(),
+            IsDeleted = true
         };
         var option = new EventCustomPropertyOption
         {
-            Id = OptionId, EventCustomPropertyDefinitionId = DefinitionId, Definition = definition,
-            Namespace = "tenant.community", Key = "ar", DisplayName = "Arabic", Value = "ar", IsActive = true,
+            Id = OptionId,
+            EventCustomPropertyDefinitionId = DefinitionId,
+            Definition = definition,
+            Namespace = "tenant.community",
+            Key = "ar",
+            DisplayName = "Arabic",
+            Value = "ar",
+            IsActive = true,
             SourceTemplateVersion = 4
         };
         option.ParentOption = option;
@@ -135,7 +200,10 @@ public sealed class CustomPropertyMapperTests
         definition.AddOption(new EventCustomPropertyOption
         {
             EventCustomPropertyDefinitionId = DefinitionId,
-            Namespace = "tenant.community", Key = "en", DisplayName = "English", Value = "en"
+            Namespace = "tenant.community",
+            Key = "en",
+            DisplayName = "English",
+            Value = "en"
         });
 
         await Assert.That(detail.Options.Count).IsEqualTo(1);
@@ -156,14 +224,25 @@ public sealed class CustomPropertyMapperTests
     {
         var definition = new EventSessionCustomPropertyDefinition
         {
-            Id = DefinitionId, Namespace = "tenant.community", Key = "language", DisplayName = "Language",
-            PropertyType = PropertyType.Option, DefaultTextValue = "", DefaultNumberValue = 0,
-            DefaultBooleanValue = false, DefaultOptionId = OptionId
+            Id = DefinitionId,
+            Namespace = "tenant.community",
+            Key = "language",
+            DisplayName = "Language",
+            PropertyType = PropertyType.Option,
+            DefaultTextValue = "",
+            DefaultNumberValue = 0,
+            DefaultBooleanValue = false,
+            DefaultOptionId = OptionId
         };
         var option = new EventSessionCustomPropertyOption
         {
-            Id = OptionId, EventSessionCustomPropertyDefinitionId = DefinitionId, Definition = definition,
-            Namespace = "tenant.community", Key = "ar", DisplayName = "Arabic", Value = "ar"
+            Id = OptionId,
+            EventSessionCustomPropertyDefinitionId = DefinitionId,
+            Definition = definition,
+            Namespace = "tenant.community",
+            Key = "ar",
+            DisplayName = "Arabic",
+            Value = "ar"
         };
         definition.AddOption(option);
         var detail = CustomPropertyMapper.ToDetail(definition);
@@ -184,17 +263,27 @@ public sealed class CustomPropertyMapperTests
     {
         var template = new EventTemplate
         {
-            TemplateKey = "conference", DisplayName = "Conference", Version = 3,
+            TemplateKey = "conference",
+            DisplayName = "Conference",
+            Version = 3,
             CreatedAt = new DateTime(2026, 9, 11, 0, 0, 0, DateTimeKind.Utc)
         };
         var definition = new EventTemplateCustomPropertyDefinition
         {
-            Id = DefinitionId, EventTemplate = template,
-            Namespace = "tenant.community", Key = "language", DisplayName = "Language"
+            Id = DefinitionId,
+            EventTemplate = template,
+            Namespace = "tenant.community",
+            Key = "language",
+            DisplayName = "Language"
         };
         var option = new EventTemplateCustomPropertyOption
         {
-            Id = OptionId, Definition = definition, Namespace = "tenant.community", Key = "ar", DisplayName = "Arabic", Value = "ar"
+            Id = OptionId,
+            Definition = definition,
+            Namespace = "tenant.community",
+            Key = "ar",
+            DisplayName = "Arabic",
+            Value = "ar"
         };
         definition.ReplaceOptions([option]);
         template.ReplaceDefinitions([definition]);
@@ -219,13 +308,18 @@ public sealed class CustomPropertyMapperTests
         var author = Guid.Parse("018e4e5c-7f00-7000-8000-000000000013");
         var template = new EventSessionTemplate
         {
-            SessionTemplateKey = "talk", DisplayName = "Talk", CreatedBy = author,
+            SessionTemplateKey = "talk",
+            DisplayName = "Talk",
+            CreatedBy = author,
             CreatedAt = new DateTime(2026, 9, 11, 10, 0, 0, DateTimeKind.Utc)
         };
         var definition = new EventSessionTemplateCustomPropertyDefinition
         {
-            Id = DefinitionId, EventSessionTemplate = template,
-            Namespace = "tenant.community", Key = "language", DisplayName = "Language"
+            Id = DefinitionId,
+            EventSessionTemplate = template,
+            Namespace = "tenant.community",
+            Key = "language",
+            DisplayName = "Language"
         };
         definition.ReplaceOptions([new EventSessionTemplateCustomPropertyOption
         {

@@ -48,8 +48,11 @@ public sealed partial class NativeEventPublicActionsHttpTests
 
     private static ManageEventPublicActionDto Input(Guid stamp = default) => new()
     {
-        KindId = (int)EventPublicActionKindEnum.OriginalSource, Url = "https://example.test/updated",
-        Label = "  Source  ", SortOrder = 12, ExpectedConcurrencyStamp = stamp
+        KindId = (int)EventPublicActionKindEnum.OriginalSource,
+        Url = "https://example.test/updated",
+        Label = "  Source  ",
+        SortOrder = 12,
+        ExpectedConcurrencyStamp = stamp
     };
 
     private static async Task<EventPublicActionDto?> Detail(NativeEventSeriesFactory factory, Guid eventId, Guid actionId)
@@ -106,9 +109,14 @@ public sealed partial class NativeEventPublicActionsHttpTests
         {
             var action = new EventPublicAction
             {
-                Id = Guid.CreateVersion7(), EventId = parent.Id, TenantId = parent.TenantId,
-                EventPublicActionKindId = (int)kind, HealthStateId = (int)health, SortOrder = order,
-                Label = "Reviewed source", ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                EventId = parent.Id,
+                TenantId = parent.TenantId,
+                EventPublicActionKindId = (int)kind,
+                HealthStateId = (int)health,
+                SortOrder = order,
+                Label = "Reviewed source",
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             action.SetDestination(ExternalActionUrl.Create("https://example.test/original?ref=public"));
             db.EventPublicActions.Add(action);

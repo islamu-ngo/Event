@@ -243,17 +243,31 @@ public sealed class ActorSubscriptionMapperTests
         user.Actor = actor;
         return new ActorSubscription
         {
-            Id = SubscriptionId, TenantId = TenantId, Tenant = null!,
-            SubscriberTenantUserId = MembershipId, SubscriberTenantUser = membership,
-            SubscriberUserId = UserId, SubscriberUser = user,
-            TargetActorId = ActorId, TargetActor = actor, TargetActorTypeId = 7, TargetActorType = type,
-            StatusId = 8, Status = new ActorSubscriptionStatus { Id = 8, MasterCode = "ACTIVE", FullName = "Active label", Description = "private status metadata" },
-            NotificationLevelId = 9, NotificationLevel = new ActorSubscriptionNotificationLevel { Id = 9, MasterCode = "ALL", FullName = "All updates", Description = "private notification metadata" },
+            Id = SubscriptionId,
+            TenantId = TenantId,
+            Tenant = null!,
+            SubscriberTenantUserId = MembershipId,
+            SubscriberTenantUser = membership,
+            SubscriberUserId = UserId,
+            SubscriberUser = user,
+            TargetActorId = ActorId,
+            TargetActor = actor,
+            TargetActorTypeId = 7,
+            TargetActorType = type,
+            StatusId = 8,
+            Status = new ActorSubscriptionStatus { Id = 8, MasterCode = "ACTIVE", FullName = "Active label", Description = "private status metadata" },
+            NotificationLevelId = 9,
+            NotificationLevel = new ActorSubscriptionNotificationLevel { Id = 9, MasterCode = "ALL", FullName = "All updates", Description = "private notification metadata" },
             SubscribedAt = new DateTime(2026, 9, 3, 12, 0, 0, DateTimeKind.Utc),
             UnsubscribedAt = new DateTime(2026, 9, 4, 13, 0, 0, DateTimeKind.Utc),
-            ConcurrencyStamp = Stamp, CreatedAt = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
-            CreatedBy = Stamp, UpdatedAt = new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc), UpdatedBy = Stamp,
-            IsDeleted = true, DeletedAt = new DateTime(2026, 9, 5, 0, 0, 0, DateTimeKind.Utc), DeletedBy = Stamp
+            ConcurrencyStamp = Stamp,
+            CreatedAt = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
+            CreatedBy = Stamp,
+            UpdatedAt = new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc),
+            UpdatedBy = Stamp,
+            IsDeleted = true,
+            DeletedAt = new DateTime(2026, 9, 5, 0, 0, 0, DateTimeKind.Utc),
+            DeletedBy = Stamp
         };
     }
 

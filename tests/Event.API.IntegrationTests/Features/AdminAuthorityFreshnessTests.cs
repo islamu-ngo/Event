@@ -49,7 +49,8 @@ public sealed class AdminAuthorityFreshnessTests
                 // Both hosts have now observed denial. A real grant must become usable without changing claims.
                 using var created = await administrator.PostAsJsonAsync(Grants, new CreateTenantUserRoleGrantDto
                 {
-                    TenantUserId = seed.TenantUserId, RoleId = (int)RoleEnum.TenantAdmin
+                    TenantUserId = seed.TenantUserId,
+                    RoleId = (int)RoleEnum.TenantAdmin
                 });
                 await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.OK);
                 var grant = await created.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
@@ -192,9 +193,16 @@ public sealed class AdminAuthorityFreshnessTests
         var operatorMembership = await db.TenantUsers.SingleAsync(row => row.UserId == administrator.UserId);
         var foreignMembership = new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = foreign.TenantId, Tenant = null!,
-            UserId = subject.UserId, User = null!, ActorId = subject.ActorId, Actor = null!,
-            StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = foreign.TenantId,
+            Tenant = null!,
+            UserId = subject.UserId,
+            User = null!,
+            ActorId = subject.ActorId,
+            Actor = null!,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
         };
         db.TenantUsers.Add(foreignMembership);
         var grant = Grant(membership);
@@ -206,9 +214,14 @@ public sealed class AdminAuthorityFreshnessTests
 
     private static TenantUserRoleGrant Grant(TenantUser membership) => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!,
-        TenantUserId = membership.Id, TenantUser = membership,
-        RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+        Id = Guid.CreateVersion7(),
+        TenantId = membership.TenantId,
+        Tenant = null!,
+        TenantUserId = membership.Id,
+        TenantUser = membership,
+        RoleId = (int)RoleEnum.TenantAdmin,
+        Role = null!,
+        RoleScopeId = (int)RoleScopeEnum.Tenant
     };
 
     private sealed record Seed(Guid UserId, Guid OperatorId, Guid TenantUserId, Guid GrantId,

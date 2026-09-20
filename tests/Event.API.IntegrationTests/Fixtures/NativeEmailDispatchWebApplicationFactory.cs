@@ -48,21 +48,37 @@ internal sealed class NativeEmailDispatchWebApplicationFactory : AuthenticatedWe
             factory.OtherTenantId = other.TenantId;
             context.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = other.TenantId, Tenant = null!,
-                UserId = other.UserId, User = null!, ActorId = other.ActorId, Actor = null!,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = other.TenantId,
+                Tenant = null!,
+                UserId = other.UserId,
+                User = null!,
+                ActorId = other.ActorId,
+                Actor = null!,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             });
             var role = await context.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
             context.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = factory.AdminId, User = null!, RoleId = role.Id, Role = role
+                Id = Guid.CreateVersion7(),
+                UserId = factory.AdminId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role
             });
             var membership = await context.TenantUsers.SingleAsync(item => item.UserId == factory.TenantAdminId);
             context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                Id = Guid.CreateVersion7(),
+                TenantId = membership.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
             });
             await context.SaveChangesAsync();
             return factory;
@@ -89,27 +105,42 @@ internal sealed class NativeEmailDispatchWebApplicationFactory : AuthenticatedWe
         var now = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
         var intent = new NotificationIntent
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant,
             CategoryId = (int)NotificationCategoryEnum.RegistrationLifecycle,
             OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
             RecipientKindId = (int)NotificationRecipientKindEnum.User,
             StatusId = (int)NotificationIntentStatusEnum.DispatchQueued,
-            TemplateKey = "registration.confirmed", DeduplicationKey = Guid.CreateVersion7().ToString("N"),
-            RecipientUserId = member.UserId, RecipientTenantUser = member, CreatedAt = now
+            TemplateKey = "registration.confirmed",
+            DeduplicationKey = Guid.CreateVersion7().ToString("N"),
+            RecipientUserId = member.UserId,
+            RecipientTenantUser = member,
+            CreatedAt = now
         };
         var row = new EmailDispatchOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant, NotificationIntent = intent,
-            NotificationIntentId = intent.Id, SourceType = "notification_intent", SourceId = intent.Id,
-            Kind = EmailDispatchKind.RegistrationConfirmation, RecipientUserId = member.UserId,
-            RecipientTenantUser = member, RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant,
+            NotificationIntent = intent,
+            NotificationIntentId = intent.Id,
+            SourceType = "notification_intent",
+            SourceId = intent.Id,
+            Kind = EmailDispatchKind.RegistrationConfirmation,
+            RecipientUserId = member.UserId,
+            RecipientTenantUser = member,
+            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
             RecipientEmail = redacted ? string.Empty : "private-recipient@example.test",
             Subject = redacted ? string.Empty : "Private subject canary",
             PlainTextBody = redacted ? null : "Private body canary",
             ProviderMessageId = redacted ? null : "private-provider-canary",
             LastError = redacted ? null : "private-error-canary",
-            LastFailureCategory = "smtp_send_failed", LastFailureAt = now,
-            Status = status, AttemptCount = 3, MaxAttempts = 5, CreatedAt = now, UpdatedAt = now,
+            LastFailureCategory = "smtp_send_failed",
+            LastFailureAt = now,
+            Status = status,
+            AttemptCount = 3,
+            MaxAttempts = 5,
+            CreatedAt = now,
+            UpdatedAt = now,
             ProcessingStartedAt = status == EmailDispatchStatus.Processing ? now : null,
             ProcessingLeaseToken = status == EmailDispatchStatus.Processing ? Guid.CreateVersion7() : null,
             UnknownAt = status == EmailDispatchStatus.Unknown ? now : null,
@@ -120,28 +151,47 @@ internal sealed class NativeEmailDispatchWebApplicationFactory : AuthenticatedWe
         db.EmailDispatchOutbox.Add(row);
         db.EmailDispatchReceipts.Add(new EmailDispatchReceipt
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant, EmailDispatchOutbox = row,
-            EmailDispatchOutboxId = row.Id, PublishEventId = row.PublishEventId,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant,
+            EmailDispatchOutbox = row,
+            EmailDispatchOutboxId = row.Id,
+            PublishEventId = row.PublishEventId,
             Status = status == EmailDispatchStatus.Unknown ? EmailDispatchReceiptStatus.Unknown : EmailDispatchReceiptStatus.Failed,
-            FirstSeenAt = now, FailedAt = now, FailureCode = "smtp_send_failed", CreatedAt = now
+            FirstSeenAt = now,
+            FailedAt = now,
+            FailureCode = "smtp_send_failed",
+            CreatedAt = now
         });
         if (status == EmailDispatchStatus.Unknown)
         {
             db.EmailDispatchAttempts.Add(new EmailDispatchAttempt
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant, EmailDispatchOutboxId = row.Id,
-                AttemptNumber = row.AttemptCount, Outcome = EmailDispatchAttemptOutcome.Unknown,
-                StartedAt = now, FailureCategory = "smtp_outcome_unknown", CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant,
+                EmailDispatchOutboxId = row.Id,
+                AttemptNumber = row.AttemptCount,
+                Outcome = EmailDispatchAttemptOutcome.Unknown,
+                StartedAt = now,
+                FailureCategory = "smtp_outcome_unknown",
+                CreatedAt = now
             });
             db.NotificationDeliveries.Add(new NotificationDelivery
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant, NotificationIntent = intent,
-                NotificationIntentId = intent.Id, EmailDispatchOutbox = row, EmailDispatchOutboxId = row.Id,
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant,
+                NotificationIntent = intent,
+                NotificationIntentId = intent.Id,
+                EmailDispatchOutbox = row,
+                EmailDispatchOutboxId = row.Id,
                 ChannelId = (int)NotificationPreferenceChannelEnum.Email,
                 DeliveryPolicyId = (int)NotificationDeliveryPolicyEnum.RegistrationStatusOptional,
-                PolicyVersion = 1, RecipientAddressSource = row.RecipientAddressSource,
-                DisclosureLevel = "standard", TemplateKey = intent.TemplateKey, TemplateVersion = 1,
-                StatusId = (int)NotificationDeliveryStatusEnum.Unknown, CreatedAt = now
+                PolicyVersion = 1,
+                RecipientAddressSource = row.RecipientAddressSource,
+                DisclosureLevel = "standard",
+                TemplateKey = intent.TemplateKey,
+                TemplateVersion = 1,
+                StatusId = (int)NotificationDeliveryStatusEnum.Unknown,
+                CreatedAt = now
             });
         }
         await db.SaveChangesAsync();
@@ -152,7 +202,9 @@ internal sealed class NativeEmailDispatchWebApplicationFactory : AuthenticatedWe
     {
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _database
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _database
         });
         options.UseSnakeCaseNamingConvention();
         if (Interceptor is not null) options.AddInterceptors(Interceptor);

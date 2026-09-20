@@ -42,14 +42,18 @@ public sealed class TenantSettingsDocumentsControllerPortContractTests
         await cache.SetAsync(CacheKey, Shell, ["public-experience-shell"], TimeSpan.FromMinutes(5), default);
         var commandDocument = new TenantBrandingSettingsDocumentDto
         {
-            DocumentKey = "tenant.branding", SchemaVersion = 1, DefaultsVersion = "test",
+            DocumentKey = "tenant.branding",
+            SchemaVersion = 1,
+            DefaultsVersion = "test",
             Payload = new() { DisplayName = "Command response must not be assembled" },
-            Source = "Tenant", SourceScopeId = PlatformDefaults.DefaultTenantId,
+            Source = "Tenant",
+            SourceScopeId = PlatformDefaults.DefaultTenantId,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         var authoritative = commandDocument with
         {
-            Payload = new() { DisplayName = "Authoritative reload" }, ConcurrencyStamp = Guid.CreateVersion7()
+            Payload = new() { DisplayName = "Authoritative reload" },
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var ensure = Substitute.For<ICommandHandler<EnsureTenantBrandingSettingsDocumentCommand, TenantBrandingSettingsDocumentDto?>>();
         ensure.ExecuteAsync(Arg.Any<EnsureTenantBrandingSettingsDocumentCommand>(), Arg.Any<CancellationToken>())
@@ -96,14 +100,18 @@ public sealed class TenantSettingsDocumentsControllerPortContractTests
         await cache.SetAsync(CacheKey, Shell, ["public-experience-shell"], TimeSpan.FromMinutes(5), default);
         var commandDocument = new TenantDirectoryOperatorIdentityDocumentDto
         {
-            DocumentKey = "tenant.directory_operator_identity", SchemaVersion = 1, DefaultsVersion = "test",
+            DocumentKey = "tenant.directory_operator_identity",
+            SchemaVersion = 1,
+            DefaultsVersion = "test",
             Payload = new() { LegalName = "Command response must not be assembled" },
-            Source = "Tenant", SourceScopeId = PlatformDefaults.DefaultTenantId,
+            Source = "Tenant",
+            SourceScopeId = PlatformDefaults.DefaultTenantId,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         var authoritative = commandDocument with
         {
-            Payload = new() { LegalName = "Authoritative operator ASBL" }, ConcurrencyStamp = Guid.CreateVersion7()
+            Payload = new() { LegalName = "Authoritative operator ASBL" },
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var query = Substitute.For<IQueryHandler<GetTenantDirectoryOperatorIdentityDocumentQuery, TenantDirectoryOperatorIdentityDocumentDto?>>();
         query.QueryAsync(Arg.Any<GetTenantDirectoryOperatorIdentityDocumentQuery>(), Arg.Any<CancellationToken>())

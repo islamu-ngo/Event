@@ -33,8 +33,11 @@ public sealed class NativeOrganizationReviewHttpTests
         using var anonymous = factory.CreateClient();
         var input = new CreateOrganizationReviewDto
         {
-            OrganizationId = data.Organization.Id, ProgramId = data.Program.Id,
-            ReviewerName = "Submitted name", Rating = 4, Comment = "Useful program"
+            OrganizationId = data.Organization.Id,
+            ProgramId = data.Program.Id,
+            ReviewerName = "Submitted name",
+            Rating = 4,
+            Comment = "Useful program"
         };
         using var unauthenticated = await anonymous.PostAsJsonAsync("/api/organizationreview", input);
         await Assert.That(unauthenticated.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
@@ -93,10 +96,17 @@ public sealed class NativeOrganizationReviewHttpTests
                 Review(newer, data, new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc)),
                 new OrganizationReview
                 {
-                    Id = Guid.CreateVersion7(), OrganizationId = data.Organization.Id, Organization = null!,
-                    EventId = data.Program.Id, Event = null!, UserId = data.User.Id,
-                    TenantId = data.ForeignTenantId, Tenant = null!, ReviewerName = "Foreign",
-                    Rating = 1, CreatedAt = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc)
+                    Id = Guid.CreateVersion7(),
+                    OrganizationId = data.Organization.Id,
+                    Organization = null!,
+                    EventId = data.Program.Id,
+                    Event = null!,
+                    UserId = data.User.Id,
+                    TenantId = data.ForeignTenantId,
+                    Tenant = null!,
+                    ReviewerName = "Foreign",
+                    Rating = 1,
+                    CreatedAt = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc)
                 });
             var deleted = Review(Guid.CreateVersion7(), data, new DateTime(2026, 1, 4, 0, 0, 0, DateTimeKind.Utc));
             deleted.IsDeleted = true;
@@ -141,8 +151,11 @@ public sealed class NativeOrganizationReviewHttpTests
             ReviewerUserId = data.User.Id,
             CreateOrganizationReviewDto = new()
             {
-                OrganizationId = data.Organization.Id, ProgramId = data.Program.Id,
-                ReviewerName = "Denied", Rating = 4, Comment = "Denied"
+                OrganizationId = data.Organization.Id,
+                ProgramId = data.Program.Id,
+                ReviewerName = "Denied",
+                Rating = 4,
+                Comment = "Denied"
             }
         }, default)).Throws<AuthorizationException>();
         await Assert.That(await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
@@ -151,10 +164,18 @@ public sealed class NativeOrganizationReviewHttpTests
 
     private static OrganizationReview Review(Guid id, SeedData data, DateTime createdAt) => new()
     {
-        Id = id, OrganizationId = data.Organization.Id, Organization = null!,
-        EventId = data.Program.Id, Event = null!, UserId = data.User.Id,
-        TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-        ReviewerName = "Not a public identity", Rating = 4, Comment = "Public comment", CreatedAt = createdAt
+        Id = id,
+        OrganizationId = data.Organization.Id,
+        Organization = null!,
+        EventId = data.Program.Id,
+        Event = null!,
+        UserId = data.User.Id,
+        TenantId = PlatformDefaults.DefaultTenantId,
+        Tenant = null!,
+        ReviewerName = "Not a public identity",
+        Rating = 4,
+        Comment = "Public comment",
+        CreatedAt = createdAt
     };
 
     private static async Task<SeedData> SeedAsync(AuthenticatedWebApplicationFactory factory)
@@ -164,34 +185,54 @@ public sealed class NativeOrganizationReviewHttpTests
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         var tenant = new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-reviews", FullName = "Native reviews",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-reviews",
+            FullName = "Native reviews",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var foreignTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = "foreign-reviews", FullName = "Foreign reviews",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = Guid.CreateVersion7(),
+            Slug = "foreign-reviews",
+            FullName = "Foreign reviews",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         db.Tenants.AddRange(tenant, foreignTenant);
         var user = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new() { Email = "reviewer@example.test", FirstName = "Trusted", LastName = "Reviewer" }
+            Id = Guid.CreateVersion7(),
+            Pii = new() { Email = "reviewer@example.test", FirstName = "Trusted", LastName = "Reviewer" }
         };
         var organization = new Organization
         {
-            Id = Guid.CreateVersion7(), Pii = new() { FullName = "Review organization" }
+            Id = Guid.CreateVersion7(),
+            Pii = new() { FullName = "Review organization" }
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.Organization, ActorType = null!,
-            OrganizationId = organization.Id, Organization = organization, Pii = new() { DisplayName = "Review actor" }
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.Organization,
+            ActorType = null!,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            Pii = new() { DisplayName = "Review actor" }
         };
         var program = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Review program", ActorId = actor.Id, Actor = actor,
-            TenantId = tenant.Id, Tenant = tenant, EventStatus = null!,
+            Id = Guid.CreateVersion7(),
+            Title = "Review program",
+            ActorId = actor.Id,
+            Actor = actor,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            EventStatus = null!,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = 1, VisibilityType = null!, EventFormatId = 1, EventFormat = null!
+            VisibilityTypeId = 1,
+            VisibilityType = null!,
+            EventFormatId = 1,
+            EventFormat = null!
         };
         db.Users.Add(user);
         db.Events.Add(program);

@@ -224,11 +224,14 @@ public sealed class NativeOrganizationsHttpTests
             ICommandHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>>>();
         await Assert.That(async () => await approval.ExecuteAsync(new UpdateOrganizationApprovalStatusCommand
         {
-            OrganizationId = id, ApprovalStatusDto = new() { ApprovalStatusId = (int)ApprovalStatusEnum.Approved }
+            OrganizationId = id,
+            ApprovalStatusDto = new() { ApprovalStatusId = (int)ApprovalStatusEnum.Approved }
         }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await update.ExecuteAsync(new UpdateOrganizationCommand
         {
-            OrganizationId = id, UserId = userId.ToString(), ExpectedConcurrencyStamp = before.ConcurrencyStamp,
+            OrganizationId = id,
+            UserId = userId.ToString(),
+            ExpectedConcurrencyStamp = before.ConcurrencyStamp,
             UpdateOrganizationDto = new() { FullName = new() { Value = "Denied" } }
         }, default)).Throws<AuthorizationException>();
         var after = await ReadAsync(factory, id);
@@ -241,8 +244,13 @@ public sealed class NativeOrganizationsHttpTests
 
     private static CreateOrganizationDto Input(string name) => new()
     {
-        FullName = name, WebsiteUrl = "https://organization.example.test", Email = "office@example.test",
-        Country = "BE", City = "Brussels", Postcode = 1000, Address = "Square 1"
+        FullName = name,
+        WebsiteUrl = "https://organization.example.test",
+        Email = "office@example.test",
+        Country = "BE",
+        City = "Brussels",
+        Postcode = 1000,
+        Address = "Square 1"
     };
 
     private static HttpClient Client(AuthenticatedWebApplicationFactory factory, Guid userId)
@@ -261,13 +269,17 @@ public sealed class NativeOrganizationsHttpTests
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         db.Tenants.Add(new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-organizations", FullName = "Native organizations",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-organizations",
+            FullName = "Native organizations",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         });
         var userId = Guid.CreateVersion7();
         db.Users.Add(new User
         {
-            Id = userId, Pii = new() { Email = "organization-user@example.test", FirstName = "Organization", LastName = "User" }
+            Id = userId,
+            Pii = new() { Email = "organization-user@example.test", FirstName = "Organization", LastName = "User" }
         });
         await db.SaveChangesAsync();
         return userId;

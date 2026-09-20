@@ -395,11 +395,15 @@ public sealed class NativeTagTypeTagsTests
         };
         var zetaType = new TagType
         {
-            Id = ZetaTypeId, MasterCode = "ZETA_TYPE", FullName = "Zeta type"
+            Id = ZetaTypeId,
+            MasterCode = "ZETA_TYPE",
+            FullName = "Zeta type"
         };
         db.TagTypes.AddRange(zetaType, alphaType, new TagType
         {
-            Id = UnusedTypeId, MasterCode = "UNUSED_TYPE", FullName = "Unused type"
+            Id = UnusedTypeId,
+            MasterCode = "UNUSED_TYPE",
+            FullName = "Unused type"
         });
         var alpha = NewTag(tenant, "ALPHA", "Alpha tag");
         var beta = NewTag(tenant, "BETA", "Beta tag");

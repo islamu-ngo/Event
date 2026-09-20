@@ -62,8 +62,11 @@ public class GetEventSessionDetailsRequestHandlerTests
         {
             Id = Guid.Parse("01900000-0000-7000-8000-000000000001"),
             EventId = Guid.Parse("01900000-0000-7000-8000-000000000002"),
-            Event = null!, Tenant = null!, Title = "Test Session",
-            LocationId = Guid.Parse("01900000-0000-7000-8000-000000000003"), Location = location,
+            Event = null!,
+            Tenant = null!,
+            Title = "Test Session",
+            LocationId = Guid.Parse("01900000-0000-7000-8000-000000000003"),
+            Location = location,
             RoomId = Guid.Parse("01900000-0000-7000-8000-000000000004"),
             Room = new LocationRoom { Name = "Private room", Location = location, Tenant = null! }
         };

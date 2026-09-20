@@ -73,7 +73,8 @@ public sealed class UserMappingHandlerTests
         var handler = UpdateHandler(UserRepository(user), cache);
         await Assert.That(async () => await handler.ExecuteAsync(new UpdateUserCommand
         {
-            UserId = user.Id, ExpectedConcurrencyStamp = Guid.Empty,
+            UserId = user.Id,
+            ExpectedConcurrencyStamp = Guid.Empty,
             UpdateUserDto = new UpdateUserDto { Names = new UpdateUserNamesDto { FirstName = "Changed", LastName = "Person" } }
         }, CancellationToken.None)).Throws<ConcurrencyConflictException>();
         await Assert.That(user.FirstName).IsEqualTo("First");
@@ -88,7 +89,8 @@ public sealed class UserMappingHandlerTests
         var cache = new InlineCache();
         var result = await UpdateHandler(UserRepository(user), cache).ExecuteAsync(new UpdateUserCommand
         {
-            UserId = user.Id, ExpectedConcurrencyStamp = user.ConcurrencyStamp,
+            UserId = user.Id,
+            ExpectedConcurrencyStamp = user.ConcurrencyStamp,
             UpdateUserDto = new UpdateUserDto { Names = new UpdateUserNamesDto { FirstName = "", LastName = "Person" } }
         }, CancellationToken.None);
         await Assert.That(result.IsSuccess).IsFalse();

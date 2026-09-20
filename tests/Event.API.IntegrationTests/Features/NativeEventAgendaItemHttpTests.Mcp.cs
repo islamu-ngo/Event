@@ -55,7 +55,9 @@ public sealed partial class NativeEventAgendaItemHttpTests
         {
             Content = JsonContent.Create(new
             {
-                jsonrpc = "2.0", id = 1, method = "tools/call",
+                jsonrpc = "2.0",
+                id = 1,
+                method = "tools/call",
                 @params = new { name = "get_event_program_management_context", arguments = new { eventId } }
             })
         };

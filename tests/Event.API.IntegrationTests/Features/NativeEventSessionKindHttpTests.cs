@@ -36,11 +36,16 @@ public sealed class NativeEventSessionKindHttpTests
             ?? throw new InvalidOperationException("Expected an event-session-kind catalogue.");
         await Assert.That(catalogue.Single(item => item.Id == 8008)).IsEqualTo(new EventSessionKindListDto
         {
-            Id = 8008, MasterCode = "NATIVE_FIRST", FullName = "First kind", Description = "Public description"
+            Id = 8008,
+            MasterCode = "NATIVE_FIRST",
+            FullName = "First kind",
+            Description = "Public description"
         });
         await Assert.That(catalogue.Single(item => item.Id == 8002)).IsEqualTo(new EventSessionKindListDto
         {
-            Id = 8002, MasterCode = "NATIVE_SECOND", FullName = "Second kind"
+            Id = 8002,
+            MasterCode = "NATIVE_SECOND",
+            FullName = "Second kind"
         });
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var withoutDescription = payload.RootElement.EnumerateArray()

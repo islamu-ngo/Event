@@ -245,9 +245,12 @@ public sealed class NativeLegalDocumentHttpTests
     private static string IdentityJson(string legalName, string legalNoticeUrl = "https://tenant.example.test/legal") =>
         JsonSerializer.Serialize(new TenantDirectoryOperatorIdentitySettings
         {
-            PublicName = "Tenant public name", LegalName = legalName,
-            OperatorKindCode = "registered_organization", JurisdictionCountryCode = "BE",
-            PublicContactEmail = "public@tenant.example.test", LegalNoticeUrl = legalNoticeUrl,
+            PublicName = "Tenant public name",
+            LegalName = legalName,
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            PublicContactEmail = "public@tenant.example.test",
+            LegalNoticeUrl = legalNoticeUrl,
             PrivacyUrl = "https://tenant.example.test/privacy"
             // TermsUrl is deliberately absent: public disclosure must not require paid-commerce readiness.
         }, JsonSerializerOptions.Web);
@@ -322,7 +325,9 @@ public sealed class NativeLegalDocumentHttpTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _databasePath
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
             });
             options.UseSnakeCaseNamingConvention();
         }

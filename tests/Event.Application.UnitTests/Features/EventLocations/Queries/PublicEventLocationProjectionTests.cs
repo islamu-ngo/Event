@@ -290,7 +290,11 @@ public sealed class PublicEventLocationProjectionTests
         var session = new EventSession
         {
             Id = Guid.Parse("01900000-0000-7000-8000-000000000011"),
-            EventId = eventId, TenantId = tenantId, Event = null!, Tenant = null!, Title = "Public session"
+            EventId = eventId,
+            TenantId = tenantId,
+            Event = null!,
+            Tenant = null!,
+            Title = "Public session"
         };
         session.StartTime = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero);
         session.EndTime = session.StartTime.Value.AddHours(1);
@@ -341,7 +345,11 @@ public sealed class PublicEventLocationProjectionTests
         var item = new EventAgendaItem
         {
             Id = Guid.Parse("01900000-0000-7000-8000-000000000013"),
-            EventId = eventId, TenantId = tenantId, Event = null!, Tenant = null!, Title = "Event agenda"
+            EventId = eventId,
+            TenantId = tenantId,
+            Event = null!,
+            Tenant = null!,
+            Title = "Event agenda"
         };
         item.StartTime = new DateTimeOffset(2026, 7, 20, 10, 30, 0, TimeSpan.Zero);
         item.EndTime = item.StartTime.AddMinutes(30);
@@ -363,8 +371,12 @@ public sealed class PublicEventLocationProjectionTests
         var item = new EventSessionAgendaItem
         {
             Id = Guid.Parse("01900000-0000-7000-8000-000000000012"),
-            EventSessionId = session.Id, EventSession = session, TenantId = tenantId, Tenant = null!,
-            Title = "Session agenda", StartTime = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero),
+            EventSessionId = session.Id,
+            EventSession = session,
+            TenantId = tenantId,
+            Tenant = null!,
+            Title = "Session agenda",
+            StartTime = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero),
             EndTime = new DateTimeOffset(2026, 7, 20, 9, 30, 0, TimeSpan.Zero)
         };
         item.AssignEventLocation(session.EventLocation!);
@@ -376,8 +388,10 @@ public sealed class PublicEventLocationProjectionTests
     {
         var location = new Location
         {
-            FullName = "Private venue canary", City = "Private city canary",
-            Country = "Private country canary", Tenant = null!
+            FullName = "Private venue canary",
+            City = "Private city canary",
+            Country = "Private country canary",
+            Tenant = null!
         };
         location.SetManualAddress("Private address canary", "1000");
         return location;

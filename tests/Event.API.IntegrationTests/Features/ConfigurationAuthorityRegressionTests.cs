@@ -133,8 +133,12 @@ public sealed class ConfigurationAuthorityRegressionTests
         ]);
         using var source = new InfisicalConfigurationProvider(new()
         {
-            Url = server.Url, ProjectId = "project-id", ClientId = "client-id",
-            ClientSecret = Guid.CreateVersion7().ToString("N"), Environment = "testing", Paths = ["/database"],
+            Url = server.Url,
+            ProjectId = "project-id",
+            ClientId = "client-id",
+            ClientSecret = Guid.CreateVersion7().ToString("N"),
+            Environment = "testing",
+            Paths = ["/database"],
         });
         source.Load();
         source.TryGet("Database:Host", out string? primary);
@@ -212,8 +216,11 @@ public sealed class ConfigurationAuthorityRegressionTests
     {
         var source = new BffSource
         {
-            Url = url, ProjectId = "project-id", ClientId = "client-id",
-            ClientSecret = Guid.CreateVersion7().ToString("N"), Environment = "testing",
+            Url = url,
+            ProjectId = "project-id",
+            ClientId = "client-id",
+            ClientSecret = Guid.CreateVersion7().ToString("N"),
+            Environment = "testing",
         };
         source.Paths.Clear();
         source.Paths.Add(path);

@@ -81,8 +81,13 @@ public sealed partial class NativeEventAgendaItemHttpTests
                     (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddDays(-1), null, outsider.UserId));
                 var location = new Location
                 {
-                    Id = Guid.CreateVersion7(), TenantId = owner.TenantId, Tenant = null!,
-                    FullName = "Approved agenda venue", City = "Hidden city", Country = "Hidden country", Timezone = "Europe/Brussels"
+                    Id = Guid.CreateVersion7(),
+                    TenantId = owner.TenantId,
+                    Tenant = null!,
+                    FullName = "Approved agenda venue",
+                    City = "Hidden city",
+                    Country = "Hidden country",
+                    Timezone = "Europe/Brussels"
                 };
                 location.ClassifyAs(LocationKindEnum.CommercialVenue);
                 location.SetManualAddress("Hidden street", "Hidden postcode");
@@ -140,7 +145,12 @@ public sealed partial class NativeEventAgendaItemHttpTests
         {
             var item = new EventAgendaItem
             {
-                Id = Guid.CreateVersion7(), TenantId = parent.TenantId, Tenant = null!, EventId = parent.Id, Event = parent, Title = title
+                Id = Guid.CreateVersion7(),
+                TenantId = parent.TenantId,
+                Tenant = null!,
+                EventId = parent.Id,
+                Event = parent,
+                Title = title
             };
             item.Reschedule(UtcInstantRange.Create(Start, Start.AddHours(1)), parent.EventTimeZoneId!, new EventScheduleProjectionCalculator());
             return item;
@@ -148,8 +158,13 @@ public sealed partial class NativeEventAgendaItemHttpTests
 
         private static EventDay Day(Explore.Domain.Event parent, DateOnly date) => new()
         {
-            Id = Guid.CreateVersion7(), TenantId = parent.TenantId, Tenant = null!, EventId = parent.Id, Event = parent,
-            LocalDate = date, IsPublished = true
+            Id = Guid.CreateVersion7(),
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            EventId = parent.Id,
+            Event = parent,
+            LocalDate = date,
+            IsPublished = true
         };
 
         public HttpClient Client(Guid userId)

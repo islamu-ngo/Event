@@ -258,8 +258,13 @@ public sealed class EventSessionRepositorySqliteTests
         var parent = await SeedEventAsync(context, tenantId, EventStatusEnum.Published);
         var hiddenDay = new EventDay
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-            TenantId = tenantId, Tenant = null!, LocalDate = new DateOnly(2026, 8, 15), IsPublished = false
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = tenantId,
+            Tenant = null!,
+            LocalDate = new DateOnly(2026, 8, 15),
+            IsPublished = false
         };
         var later = AgendaItem(parent, "Later instant", 1, new DateTimeOffset(2026, 8, 15, 9, 0, 0, TimeSpan.Zero));
         var earlier = AgendaItem(parent, "Earlier instant", 1, new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.FromHours(2)));
@@ -296,9 +301,15 @@ public sealed class EventSessionRepositorySqliteTests
     {
         var item = new EventAgendaItem
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-            TenantId = parent.TenantId, Tenant = null!, Title = title, SortOrder = order,
-            StartTime = start, EndTime = start.AddMinutes(30)
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = parent.TenantId,
+            Tenant = null!,
+            Title = title,
+            SortOrder = order,
+            StartTime = start,
+            EndTime = start.AddMinutes(30)
         };
         item.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
         return item;

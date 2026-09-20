@@ -69,7 +69,11 @@ public sealed class NativeLocalizationHttpTests
                 var role = await db.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
                 db.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = admin.Id, User = admin, RoleId = role.Id, Role = role
+                    Id = Guid.CreateVersion7(),
+                    UserId = admin.Id,
+                    User = admin,
+                    RoleId = role.Id,
+                    Role = role
                 });
                 db.SecretBindings.Add(Binding(SecretScope.Tenant, foreignTenantId));
                 await db.SaveChangesAsync();
@@ -197,19 +201,25 @@ public sealed class NativeLocalizationHttpTests
 
     private static User NewUser(Guid id, string name) => new()
     {
-        Id = id, Pii = new() { Email = $"{name}@example.test", FirstName = name, LastName = "User" }
+        Id = id,
+        Pii = new() { Email = $"{name}@example.test", FirstName = name, LastName = "User" }
     };
 
     private static SecretBinding Binding(SecretScope scope, Guid? scopeId) => new()
     {
-        Id = Guid.CreateVersion7(), SettingKey = SecretDefinitionRegistry.Keys.Localization.TmsApiKey,
-        Scope = scope, ScopeId = scopeId, SourceType = SecretSourceType.EnvironmentVariable,
-        EnvironmentVariableName = "LOCALIZATION_TMS_API_KEY", LastValidationResult = SecretValidationResult.NotValidated
+        Id = Guid.CreateVersion7(),
+        SettingKey = SecretDefinitionRegistry.Keys.Localization.TmsApiKey,
+        Scope = scope,
+        ScopeId = scopeId,
+        SourceType = SecretSourceType.EnvironmentVariable,
+        EnvironmentVariableName = "LOCALIZATION_TMS_API_KEY",
+        LastValidationResult = SecretValidationResult.NotValidated
     };
 
     private static ImportLocalizationBundleDto Bundle(string value) => new()
     {
-        LanguageCode = " FR ", Translations = new Dictionary<string, string> { ["ui.native_cohort.greeting"] = value }
+        LanguageCode = " FR ",
+        Translations = new Dictionary<string, string> { ["ui.native_cohort.greeting"] = value }
     };
 
     private static UpdateLocalizationGovernanceDto Governance() => new()

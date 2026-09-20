@@ -200,7 +200,8 @@ public sealed class NativeListmonkHttpTests
         using var anonymous = factory.CreateClient();
         var resolution = new ResolveIntegrationSyncAmbiguityDto
         {
-            Decision = decision, EvidenceReference = "  incident-reviewed  "
+            Decision = decision,
+            EvidenceReference = "  incident-reviewed  "
         };
         string route = $"{Root}/queue/{outboxId}/resolve";
         using (var denied = await anonymous.PostAsJsonAsync(route, resolution))
@@ -258,9 +259,14 @@ public sealed class NativeListmonkHttpTests
             .SingleAsync(item => item.UserId == admin.UserId);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, Tenant = membership.Tenant,
-            TenantUserId = membership.Id, TenantUser = membership,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            Tenant = membership.Tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         await db.SaveChangesAsync();
         await scope.ServiceProvider.GetRequiredService<IHierarchicalSettingsResolver>().SetValueAsync(
@@ -275,11 +281,21 @@ public sealed class NativeListmonkHttpTests
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var row = new IntegrationSyncOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, Kind = IntegrationKind.Listmonk,
-            SourceType = "registration", SourceId = Guid.CreateVersion7(), SubscriberEmail = "subscriber@example.test",
-            SubscriberPayloadJson = "{}", ListmonkListId = 1, Status = IntegrationSyncStatus.DeadLettered,
-            LastError = IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous, AttemptCount = 1, MaxAttempts = 5,
-            CreatedAt = DateTime.UtcNow, DeadLetteredAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            Kind = IntegrationKind.Listmonk,
+            SourceType = "registration",
+            SourceId = Guid.CreateVersion7(),
+            SubscriberEmail = "subscriber@example.test",
+            SubscriberPayloadJson = "{}",
+            ListmonkListId = 1,
+            Status = IntegrationSyncStatus.DeadLettered,
+            LastError = IntegrationSyncFailureCodes.ProviderOutcomeAmbiguous,
+            AttemptCount = 1,
+            MaxAttempts = 5,
+            CreatedAt = DateTime.UtcNow,
+            DeadLetteredAt = DateTime.UtcNow
         };
         db.IntegrationSyncOutbox.Add(row);
         await db.SaveChangesAsync();
@@ -342,7 +358,9 @@ public sealed class NativeListmonkHttpTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _databasePath
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
             });
             options.UseSnakeCaseNamingConvention();
         }

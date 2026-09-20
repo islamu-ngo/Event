@@ -29,7 +29,11 @@ public sealed partial class NativeCustomPropertyGovernanceHttpTests
             var role = await db.Set<Role>().SingleAsync(row => row.MasterCode == "platform.admin");
             db.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = instanceId, User = null!, RoleId = role.Id, Role = role
+                Id = Guid.CreateVersion7(),
+                UserId = instanceId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role
             });
             await db.SaveChangesAsync();
         }

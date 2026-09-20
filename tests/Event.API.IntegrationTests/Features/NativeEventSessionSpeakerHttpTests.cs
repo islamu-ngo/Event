@@ -319,15 +319,25 @@ public sealed class NativeEventSessionSpeakerHttpTests
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var alpha = new EventSessionSpeaker
         {
-            Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(),
-            TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            EventSessionId = data.SessionAId, EventSession = null!, ActorId = data.AlphaActorId, Actor = null!
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            EventSessionId = data.SessionAId,
+            EventSession = null!,
+            ActorId = data.AlphaActorId,
+            Actor = null!
         };
         var beta = new EventSessionSpeaker
         {
-            Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(),
-            TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            EventSessionId = data.SessionBId, EventSession = null!, ActorId = data.BetaActorId, Actor = null!
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            EventSessionId = data.SessionBId,
+            EventSession = null!,
+            ActorId = data.BetaActorId,
+            Actor = null!
         };
         db.EventSessionSpeakers.AddRange(alpha, beta);
         await db.SaveChangesAsync();
@@ -384,10 +394,14 @@ public sealed class NativeEventSessionSpeakerHttpTests
         db.Events.AddRange(localEvent, foreignEvent);
         var foreignAssignment = new EventSessionSpeaker
         {
-            Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(),
-            TenantId = foreignTenant.Id, Tenant = foreignTenant,
-            EventSessionId = foreignSession.Id, EventSession = foreignSession,
-            ActorId = foreignActor.Id, Actor = foreignActor
+            Id = Guid.CreateVersion7(),
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            TenantId = foreignTenant.Id,
+            Tenant = foreignTenant,
+            EventSessionId = foreignSession.Id,
+            EventSession = foreignSession,
+            ActorId = foreignActor.Id,
+            Actor = foreignActor
         };
         db.EventSessionSpeakers.Add(foreignAssignment);
         db.EventRoleAssignments.Add(EventRoleAssignment.Create(
@@ -406,8 +420,12 @@ public sealed class NativeEventSessionSpeakerHttpTests
     private static EventSession Session(Explore.Domain.Event parent, Tenant tenant, string title) =>
         new(EventSessionStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), EventId = parent.Id, Event = parent,
-            TenantId = tenant.Id, Tenant = tenant, Title = title,
+            Id = Guid.CreateVersion7(),
+            EventId = parent.Id,
+            Event = parent,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            Title = title,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
 

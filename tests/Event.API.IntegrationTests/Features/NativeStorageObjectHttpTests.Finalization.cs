@@ -83,7 +83,9 @@ public sealed partial class NativeStorageObjectHttpTests
                 using var bytes = new MemoryStream("%PDF-"u8.ToArray());
                 var command = new FinalizeStorageUploadSessionCommand
                 {
-                    UploadSessionId = reserved.Id, Content = bytes, TenantId = owner.TenantId
+                    UploadSessionId = reserved.Id,
+                    Content = bytes,
+                    TenantId = owner.TenantId
                 };
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
                 await Assert.That(async () => await handler.ExecuteAsync(command, default))
@@ -189,8 +191,11 @@ public sealed partial class NativeStorageObjectHttpTests
             using var content = new MemoryStream("%PDF-"u8.ToArray());
             var command = new FinalizeStorageUploadSessionCommand
             {
-                UploadSessionId = reserved.Id, TenantId = factory.OtherTenantId, Content = content,
-                ContentType = "text/plain", ContentLength = 999
+                UploadSessionId = reserved.Id,
+                TenantId = factory.OtherTenantId,
+                Content = content,
+                ContentType = "text/plain",
+                ContentLength = 999
             };
             var resolver = scope.ServiceProvider.GetRequiredService<AuthorizationResourceContextResolver>();
             var resolved = await resolver.ResolveAsync(command, ResourceKinds.StorageObject, AuthorizationActions.Create,
@@ -263,9 +268,14 @@ public sealed partial class NativeStorageObjectHttpTests
             var member = await db.TenantUsers.SingleAsync(item => item.UserId == owner.UserId);
             db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = owner.TenantId, Tenant = null!,
-                TenantUserId = member.Id, TenantUser = member,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                Id = Guid.CreateVersion7(),
+                TenantId = owner.TenantId,
+                Tenant = null!,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
             });
         }
         await db.SaveChangesAsync();
@@ -277,7 +287,9 @@ public sealed partial class NativeStorageObjectHttpTests
         using var response = await client.PostAsJsonAsync($"/api/organizations/{organizationId}/legitimacy-evidence/upload-session",
             new CreateOrganizationTenantEvidenceUploadSessionDto
             {
-                FileName = "evidence.pdf", ContentType = "application/pdf", ExpectedSizeBytes = 5
+                FileName = "evidence.pdf",
+                ContentType = "application/pdf",
+                ExpectedSizeBytes = 5
             });
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         return (await response.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!;

@@ -151,23 +151,36 @@ public sealed class NativeGroupsHttpTests
             var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
             var foreignTenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), Slug = "foreign-group", FullName = "Foreign group tenant",
-                TenantStatusId = status.Id, TenantStatus = status
+                Id = Guid.CreateVersion7(),
+                Slug = "foreign-group",
+                FullName = "Foreign group tenant",
+                TenantStatusId = status.Id,
+                TenantStatus = status
             };
             db.Tenants.Add(foreignTenant);
             var foreignGroup = new Group { Id = foreignId, FullName = "Foreign" };
             var foreign = new GroupTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = foreignTenant.Id, Tenant = foreignTenant,
-                GroupId = foreignId, Group = foreignGroup,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = foreignTenant.Id,
+                Tenant = foreignTenant,
+                GroupId = foreignId,
+                Group = foreignGroup,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                ApprovalStatus = null!
             };
             db.GroupTenants.Add(foreign);
             db.GroupMembers.Add(new GroupMember
             {
-                Id = Guid.CreateVersion7(), GroupTenantId = foreign.Id, GroupTenant = foreign,
-                TenantId = foreignTenant.Id, Tenant = foreignTenant,
-                UserId = userId, User = null!, RoleId = (int)RoleEnum.GroupAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                GroupTenantId = foreign.Id,
+                GroupTenant = foreign,
+                TenantId = foreignTenant.Id,
+                Tenant = foreignTenant,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.GroupAdmin,
+                Role = null!
             });
             await db.SaveChangesAsync();
         }
@@ -240,12 +253,15 @@ public sealed class NativeGroupsHttpTests
             ICommandHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>>>();
         await Assert.That(async () => await update.ExecuteAsync(new UpdateGroupCommand
         {
-            GroupId = id, UserId = userId.ToString(), ExpectedConcurrencyStamp = before.Group.ConcurrencyStamp,
+            GroupId = id,
+            UserId = userId.ToString(),
+            ExpectedConcurrencyStamp = before.Group.ConcurrencyStamp,
             UpdateGroupDto = new() { FullName = new() { Value = "Forbidden change" } }
         }, default)).Throws<AuthorizationException>();
         await Assert.That(async () => await approval.ExecuteAsync(new UpdateGroupApprovalStatusCommand
         {
-            Id = id, GroupApprovalStatusDto = new() { ApprovalStatusId = (int)ApprovalStatusEnum.Approved }
+            Id = id,
+            GroupApprovalStatusDto = new() { ApprovalStatusId = (int)ApprovalStatusEnum.Approved }
         }, default)).Throws<AuthorizationException>();
         var after = await ReadParticipationAsync(factory, id);
         await Assert.That(after.Group.FullName).IsEqualTo(before.Group.FullName);
@@ -269,13 +285,17 @@ public sealed class NativeGroupsHttpTests
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         db.Tenants.Add(new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-groups", FullName = "Native groups",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-groups",
+            FullName = "Native groups",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         });
         var userId = Guid.CreateVersion7();
         db.Users.Add(new User
         {
-            Id = userId, Pii = new() { Email = "group-user@example.test", FirstName = "Group", LastName = "User" }
+            Id = userId,
+            Pii = new() { Email = "group-user@example.test", FirstName = "Group", LastName = "User" }
         });
         var role = await db.Roles.SingleAsync(item => item.Id == (int)RoleEnum.GroupAdmin);
         foreach (var code in new[] { PermissionCodes.GroupManage, PermissionCodes.GroupDelete })
@@ -285,8 +305,13 @@ public sealed class NativeGroupsHttpTests
             {
                 permission = new Permission
                 {
-                    MasterCode = code, ResourceKind = "group", Action = code.Split(':')[1],
-                    FullName = code, GroupName = "Groups", RoleScopeId = role.RoleScopeId, IsActive = true
+                    MasterCode = code,
+                    ResourceKind = "group",
+                    Action = code.Split(':')[1],
+                    FullName = code,
+                    GroupName = "Groups",
+                    RoleScopeId = role.RoleScopeId,
+                    IsActive = true
                 };
                 db.Set<Permission>().Add(permission);
             }
@@ -295,7 +320,10 @@ public sealed class NativeGroupsHttpTests
             {
                 db.Set<RolePermission>().Add(new RolePermission
                 {
-                    RoleId = role.Id, Role = role, PermissionId = permission.Id, Permission = permission
+                    RoleId = role.Id,
+                    Role = role,
+                    PermissionId = permission.Id,
+                    Permission = permission
                 });
             }
         }

@@ -33,7 +33,9 @@ public sealed partial class NativeEventPublicActionsHttpTests
         await Assert.That(firstSnapshot.ConcurrencyStamp).IsEqualTo(secondSnapshot.ConcurrencyStamp);
         var command = new UpdateEventPublicActionCommand
         {
-            EventId = data.PublicId, ActionId = data.ActionId, Action = Input(firstSnapshot.ConcurrencyStamp)
+            EventId = data.PublicId,
+            ActionId = data.ActionId,
+            Action = Input(firstSnapshot.ConcurrencyStamp)
         };
         var winner = await first.ServiceProvider.GetRequiredService<ICommandHandler<UpdateEventPublicActionCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(command, default);
@@ -127,12 +129,20 @@ public sealed partial class NativeEventPublicActionsHttpTests
         var primary = await create.ExecuteAsync(new() { EventId = data.PublicId, Action = Input() with { IsPrimary = true } }, default);
         await Assert.That(primary.IsSuccess).IsTrue();
         await Assert.That((await create.ExecuteAsync(new() { EventId = data.PublicId, Action = Input() with { IsPrimary = true } }, default)).IsSuccess).IsFalse();
-        await Assert.That((await update.ExecuteAsync(new() { EventId = data.PublicId, ActionId = data.ActionId,
-            Action = Input(original.Stamp) with { IsPrimary = true } }, default)).IsSuccess).IsFalse();
+        await Assert.That((await update.ExecuteAsync(new()
+        {
+            EventId = data.PublicId,
+            ActionId = data.ActionId,
+            Action = Input(original.Stamp) with { IsPrimary = true }
+        }, default)).IsSuccess).IsFalse();
         await Assert.That(await State(factory, data.ActionId)).IsEqualTo(original);
         var primaryState = (await State(factory, primary.Id))!;
-        await Assert.That((await update.ExecuteAsync(new() { EventId = data.PublicId, ActionId = primary.Id,
-            Action = Input(primaryState.Stamp) with { IsPrimary = true } }, default)).IsSuccess).IsTrue();
+        await Assert.That((await update.ExecuteAsync(new()
+        {
+            EventId = data.PublicId,
+            ActionId = primary.Id,
+            Action = Input(primaryState.Stamp) with { IsPrimary = true }
+        }, default)).IsSuccess).IsTrue();
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync();
         await Assert.That(async () => await create.ExecuteAsync(new() { EventId = data.PublicId, Action = Input() }, cancelled.Token))

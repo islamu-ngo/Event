@@ -463,11 +463,11 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
             // Exact downloads previously reached fallback with tenant-only collection facts.
             // Do not turn newly resolved creator/visibility facts into an outage-only grant.
             .Select(check => check is
-                {
-                    ResourceKind: ResourceKinds.StorageObject,
-                    Action: AuthorizationActions.StorageObjects.Download,
-                    Facts: PersistedStorageObjectAuthorizationFacts storage
-                }
+            {
+                ResourceKind: ResourceKinds.StorageObject,
+                Action: AuthorizationActions.StorageObjects.Download,
+                Facts: PersistedStorageObjectAuthorizationFacts storage
+            }
                 ? check with { Facts = new StorageObjectCollectionAuthorizationFacts(storage.TenantId) }
                 : check)
             .ToArray();

@@ -244,9 +244,13 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
             using var scope = TenantScope(factory, PlatformDefaults.DefaultTenantId);
             await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().Create(new AuditLog
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                EntityType = nameof(CustomPropertyDefinition), EntityId = data.Seed.OwnDefinitionId.ToString(),
-                Action = "RetainedReference", Timestamp = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                EntityType = nameof(CustomPropertyDefinition),
+                EntityId = data.Seed.OwnDefinitionId.ToString(),
+                Action = "RetainedReference",
+                Timestamp = DateTime.UtcNow
             });
         }
         await WarmAsync(factory, data);
@@ -291,15 +295,27 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
 
     private static CustomPropertyOption Option(Guid definitionId, string key, int sortOrder, bool isDefault) => new()
     {
-        Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(), CustomPropertyDefinitionId = definitionId,
-        Namespace = "tenant.community", Key = key, DisplayName = key, Value = key,
-        SortOrder = sortOrder, IsDefault = isDefault, IsActive = true
+        Id = Guid.CreateVersion7(),
+        ConcurrencyStamp = Guid.CreateVersion7(),
+        CustomPropertyDefinitionId = definitionId,
+        Namespace = "tenant.community",
+        Key = key,
+        DisplayName = key,
+        Value = key,
+        SortOrder = sortOrder,
+        IsDefault = isDefault,
+        IsActive = true
     };
 
     private static CreateCustomPropertyDefinitionDto CreateDto() => new()
     {
-        EntityTypeName = EntityTypeName.Organization, Namespace = "tenant.community", Key = "created_definition",
-        DisplayName = "Created definition", PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.Internal, SortOrder = 5
+        EntityTypeName = EntityTypeName.Organization,
+        Namespace = "tenant.community",
+        Key = "created_definition",
+        DisplayName = "Created definition",
+        PropertyType = PropertyType.Text,
+        ExposureLevel = ExposureLevel.Internal,
+        SortOrder = 5
     };
 
     private static async Task<HttpResponseMessage> MutateAsync(HttpClient client, MutationData data, string mutation)

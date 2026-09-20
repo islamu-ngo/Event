@@ -210,8 +210,13 @@ public sealed partial class NativeEmailDispatchHttpTests
             boundary.Armed = true;
             Task<BaseCommandResponse<Guid>> pending = reconcile
                 ? scope.ServiceProvider.GetRequiredService<ICommandHandler<ReconcileUnknownEmailDispatchCommand, BaseCommandResponse<Guid>>>()
-                    .ExecuteAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, OutboxId = id,
-                        Outcome = EmailDispatchUnknownReconciliationOutcome.Delivered, Reason = "reviewed" }, cancellation.Token)
+                    .ExecuteAsync(new()
+                    {
+                        TenantId = PlatformDefaults.DefaultTenantId,
+                        OutboxId = id,
+                        Outcome = EmailDispatchUnknownReconciliationOutcome.Delivered,
+                        Reason = "reviewed"
+                    }, cancellation.Token)
                 : scope.ServiceProvider.GetRequiredService<ICommandHandler<ResolveEmailDispatchWithoutReplayCommand, BaseCommandResponse<Guid>>>()
                     .ExecuteAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, OutboxId = id, Reason = "reviewed" }, cancellation.Token);
             try
@@ -257,8 +262,13 @@ public sealed partial class NativeEmailDispatchHttpTests
             await Assert.That(response.FailureCode).IsNull();
         }
         var reconcile = await services.GetRequiredService<ICommandHandler<ReconcileUnknownEmailDispatchCommand, BaseCommandResponse<Guid>>>()
-            .ExecuteAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, OutboxId = id,
-                Reason = "reviewed", Outcome = (EmailDispatchUnknownReconciliationOutcome)int.MaxValue }, default);
+            .ExecuteAsync(new()
+            {
+                TenantId = PlatformDefaults.DefaultTenantId,
+                OutboxId = id,
+                Reason = "reviewed",
+                Outcome = (EmailDispatchUnknownReconciliationOutcome)int.MaxValue
+            }, default);
         var pause = await services.GetRequiredService<ICommandHandler<SetEmailDispatchTenantPauseStateCommand, BaseCommandResponse<Guid>>>()
             .ExecuteAsync(new() { TenantId = PlatformDefaults.DefaultTenantId, IsPaused = true, PauseReason = new string('x', 501) }, default);
         await Assert.That(reconcile.FailureCode).IsEqualTo(EmailDispatchFailureCodes.ValidationFailed);

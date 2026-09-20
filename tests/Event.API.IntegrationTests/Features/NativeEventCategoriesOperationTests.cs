@@ -53,7 +53,8 @@ public sealed class NativeEventCategoriesOperationTests
         var changed = await UpdateAsync(factory, data.OwnerId, Update(original,
             new() { Category = new() { CategoryId = data.SecondCategoryId } }) with
         {
-            EventId = data.ForeignEventId, TenantId = data.ForeignTenantId
+            EventId = data.ForeignEventId,
+            TenantId = data.ForeignTenantId
         });
         await Assert.That(changed.IsSuccess).IsTrue();
         var current = await DetailAsync(factory, created.Id);
@@ -103,7 +104,8 @@ public sealed class NativeEventCategoriesOperationTests
             .Throws<AuthorizationException>();
         await Assert.That(async () => await UpdateAsync(factory, data.OwnerId, new()
         {
-            EventCategoryId = data.ForeignAssignmentId, EventId = data.EventId,
+            EventCategoryId = data.ForeignAssignmentId,
+            EventId = data.EventId,
             EventCategoriesDto = new() { Category = new() { CategoryId = data.CategoryId } }
         })).Throws<AuthorizationException>();
         await Assert.That(await DetailAsync(factory, data.OtherAssignmentId)).IsEqualTo(original);
@@ -202,7 +204,8 @@ public sealed class NativeEventCategoriesOperationTests
             {
                 Event = new() { EventId = destinationId },
                 Category = new() { CategoryId = data.SecondCategoryId }
-            }) with { EventId = data.ForeignEventId, TenantId = data.ForeignTenantId };
+            }) with
+            { EventId = data.ForeignEventId, TenantId = data.ForeignTenantId };
             Func<Task> move = async () => { await port.ExecuteAsync(command, default); };
             if (unavailable)
                 await Assert.That(move).Throws<AuthorizationProviderUnavailableException>();
@@ -336,8 +339,11 @@ public sealed class NativeEventCategoriesOperationTests
 
     private static UpdateEventCategoriesCommand Update(EventCategoriesDto row, UpdateEventCategoriesDto change) => new()
     {
-        EventCategoryId = row.Id, ExpectedConcurrencyStamp = row.ConcurrencyStamp,
-        EventCategoriesDto = change, EventId = row.EventId, TenantId = row.TenantId
+        EventCategoryId = row.Id,
+        ExpectedConcurrencyStamp = row.ConcurrencyStamp,
+        EventCategoriesDto = change,
+        EventId = row.EventId,
+        TenantId = row.TenantId
     };
 
     private static IServiceScope Scope(NativeEventCategoriesFactory factory, Guid? userId = null, Guid? tenantId = null)
@@ -395,8 +401,14 @@ public sealed class NativeEventCategoriesOperationTests
 
     private static EventCategories Assignment(Guid eventId, Guid categoryId, Guid tenantId) => new()
     {
-        Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(), EventId = eventId,
-        CategoryId = categoryId, TenantId = tenantId, Event = null!, Category = null!, Tenant = null!
+        Id = Guid.CreateVersion7(),
+        ConcurrencyStamp = Guid.CreateVersion7(),
+        EventId = eventId,
+        CategoryId = categoryId,
+        TenantId = tenantId,
+        Event = null!,
+        Category = null!,
+        Tenant = null!
     };
 
     private static async Task<SeedData> SeedAsync(NativeEventCategoriesFactory factory)

@@ -90,7 +90,15 @@ public sealed class EventAgendaMapperTests
 
     private static Explore.Domain.Event Parent() => new()
     {
-        Id = EventId, TenantId = TenantId, Title = "Festival", EventTimeZoneId = "Europe/Brussels", Actor = null!, Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!
+        Id = EventId,
+        TenantId = TenantId,
+        Title = "Festival",
+        EventTimeZoneId = "Europe/Brussels",
+        Actor = null!,
+        Tenant = null!,
+        VisibilityType = null!,
+        EventStatus = null!,
+        EventFormat = null!
     };
 
     private sealed class InlineUnitOfWork : IUnitOfWork

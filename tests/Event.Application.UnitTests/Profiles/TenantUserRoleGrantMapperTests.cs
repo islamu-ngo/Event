@@ -19,18 +19,36 @@ public sealed class TenantUserRoleGrantMapperTests
         object expected = detail
             ? new
             {
-                grant.Id, grant.TenantUserId, UserId = grant.TenantUser.UserId,
-                UserEmail = "member@example.test", UserFullName = "Member Name",
-                grant.TenantId, TenantFullName = "Tenant", grant.RoleId, RoleName = "Member",
-                grant.GrantedAt, grant.GrantedBy, grant.RevokedAt, grant.RevokedBy,
-                grant.RevocationReason, grant.CreatedAt, grant.UpdatedAt
+                grant.Id,
+                grant.TenantUserId,
+                UserId = grant.TenantUser.UserId,
+                UserEmail = "member@example.test",
+                UserFullName = "Member Name",
+                grant.TenantId,
+                TenantFullName = "Tenant",
+                grant.RoleId,
+                RoleName = "Member",
+                grant.GrantedAt,
+                grant.GrantedBy,
+                grant.RevokedAt,
+                grant.RevokedBy,
+                grant.RevocationReason,
+                grant.CreatedAt,
+                grant.UpdatedAt
             }
             : new
             {
-                grant.Id, grant.TenantUserId, UserId = grant.TenantUser.UserId,
-                UserEmail = "member@example.test", UserFullName = "Member Name",
-                grant.TenantId, TenantFullName = "Tenant", grant.RoleId, RoleName = "Member",
-                grant.GrantedAt, grant.RevokedAt
+                grant.Id,
+                grant.TenantUserId,
+                UserId = grant.TenantUser.UserId,
+                UserEmail = "member@example.test",
+                UserFullName = "Member Name",
+                grant.TenantId,
+                TenantFullName = "Tenant",
+                grant.RoleId,
+                RoleName = "Member",
+                grant.GrantedAt,
+                grant.RevokedAt
             };
 
         await Assert.That(JsonSerializer.Serialize(result)).IsEqualTo(JsonSerializer.Serialize(expected));
@@ -83,7 +101,9 @@ public sealed class TenantUserRoleGrantMapperTests
         var tenant = new Tenant
         {
             Id = Guid.Parse("01990000-0000-7000-8000-000000000030"),
-            FullName = "Tenant", Slug = "tenant", TenantStatus = null!
+            FullName = "Tenant",
+            Slug = "tenant",
+            TenantStatus = null!
         };
         var user = new User
         {
@@ -93,18 +113,31 @@ public sealed class TenantUserRoleGrantMapperTests
         var tenantUser = new TenantUser
         {
             Id = Guid.Parse("01990000-0000-7000-8000-000000000032"),
-            TenantId = tenant.Id, Tenant = tenant, UserId = user.Id, User = user,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
             ModerationNote = "Not part of grant disclosure"
         };
         return new TenantUserRoleGrant
         {
             Id = Guid.Parse("01990000-0000-7000-8000-000000000033"),
-            TenantId = tenant.Id, Tenant = tenant, TenantUserId = tenantUser.Id, TenantUser = tenantUser,
-            RoleId = 3, Role = new Role { Id = 3, MasterCode = "PRIVATE_CODE", FullName = "Member" },
-            RoleScopeId = 999, GrantedAt = DateTime.UnixEpoch, GrantedBy = user.Id,
-            RevokedAt = DateTime.UnixEpoch.AddDays(1), RevokedBy = user.Id,
-            RevocationReason = "Completed", CreatedAt = DateTime.UnixEpoch,
-            CreatedBy = user.Id, UpdatedAt = DateTime.UnixEpoch.AddHours(1), UpdatedBy = user.Id
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            TenantUserId = tenantUser.Id,
+            TenantUser = tenantUser,
+            RoleId = 3,
+            Role = new Role { Id = 3, MasterCode = "PRIVATE_CODE", FullName = "Member" },
+            RoleScopeId = 999,
+            GrantedAt = DateTime.UnixEpoch,
+            GrantedBy = user.Id,
+            RevokedAt = DateTime.UnixEpoch.AddDays(1),
+            RevokedBy = user.Id,
+            RevocationReason = "Completed",
+            CreatedAt = DateTime.UnixEpoch,
+            CreatedBy = user.Id,
+            UpdatedAt = DateTime.UnixEpoch.AddHours(1),
+            UpdatedBy = user.Id
         };
     }
 }

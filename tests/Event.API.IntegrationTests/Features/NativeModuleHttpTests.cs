@@ -179,7 +179,10 @@ public sealed class NativeModuleHttpTests
             new ModuleDefinition { Id = moduleId, ModuleKey = ModuleKey, Name = "Native module", IsActive = true },
             new ModuleDefinition
             {
-                Id = Guid.CreateVersion7(), ModuleKey = InactiveModuleKey, Name = "Inactive module", IsActive = false
+                Id = Guid.CreateVersion7(),
+                ModuleKey = InactiveModuleKey,
+                Name = "Inactive module",
+                IsActive = false
             });
         await db.SaveChangesAsync();
         return new SeedData(tenant.UserId, other.TenantId, other.UserId, moduleId);

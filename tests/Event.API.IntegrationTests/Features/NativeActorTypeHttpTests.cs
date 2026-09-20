@@ -36,18 +36,25 @@ public sealed class NativeActorTypeHttpTests
             ?? throw new InvalidOperationException("Expected an actor-type array.");
         await Assert.That(list.Single(item => item.Id == 8008)).IsEqualTo(new ActorTypeListDto
         {
-            Id = 8008, MasterCode = "TEST_SERVICE", FullName = "Test Service", Description = "Service actor"
+            Id = 8008,
+            MasterCode = "TEST_SERVICE",
+            FullName = "Test Service",
+            Description = "Service actor"
         });
         await Assert.That(list.Single(item => item.Id == 8002)).IsEqualTo(new ActorTypeListDto
         {
-            Id = 8002, MasterCode = "TEST_BOT", FullName = "Test Bot"
+            Id = 8002,
+            MasterCode = "TEST_BOT",
+            FullName = "Test Bot"
         });
 
         using var detailResponse = await client.GetAsync("/api/ActorType/8002");
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(await detailResponse.Content.ReadFromJsonAsync<ActorTypeDto>()).IsEqualTo(new ActorTypeDto
         {
-            Id = 8002, MasterCode = "TEST_BOT", FullName = "Test Bot"
+            Id = 8002,
+            MasterCode = "TEST_BOT",
+            FullName = "Test Bot"
         });
         using var payload = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
         await Assert.That(payload.RootElement.EnumerateObject().Select(property => property.Name).ToArray())

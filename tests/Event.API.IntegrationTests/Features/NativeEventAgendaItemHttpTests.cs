@@ -116,7 +116,11 @@ public sealed partial class NativeEventAgendaItemHttpTests
         using var owner = factory.Client(factory.OwnerId);
         using var created = await owner.PostAsJsonAsync("/api/eventagendaitem", new
         {
-            eventId = factory.PublicId, title = "Opening", startTime = Start, endTime = Start.AddHours(1), sortOrder = 4
+            eventId = factory.PublicId,
+            title = "Opening",
+            startTime = Start,
+            endTime = Start.AddHours(1),
+            sortOrder = 4
         });
         await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
         var id = (await JsonAsync(created)).GetProperty("id").GetGuid();

@@ -161,8 +161,13 @@ public sealed class OrganizationMappingHandlerTests
             CreatorUserId = ActorId,
             OrganizationDto = new CreateOrganizationDto
             {
-                FullName = "New organization", WebsiteUrl = "https://new.example.test", Email = "office@example.test",
-                Country = "BE", City = "Brussels", Postcode = 1000, Address = "Square 1"
+                FullName = "New organization",
+                WebsiteUrl = "https://new.example.test",
+                Email = "office@example.test",
+                Country = "BE",
+                City = "Brussels",
+                Postcode = 1000,
+                Address = "Square 1"
             }
         }, default);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -234,14 +239,33 @@ public sealed class OrganizationMappingHandlerTests
     {
         var first = new OrganizationReview
         {
-            Id = Id, OrganizationId = Id, Organization = CreateOrganization(), EventId = Stamp, Event = null!,
-            UserId = ActorId, User = CreateUser(), ReviewerName = "Private submitted reviewer", Rating = 5,
-            Comment = "Public comment", CreatedAt = CreatedAt, TenantId = TenantId, Tenant = null!, CreatedBy = TenantId, IsDeleted = true
+            Id = Id,
+            OrganizationId = Id,
+            Organization = CreateOrganization(),
+            EventId = Stamp,
+            Event = null!,
+            UserId = ActorId,
+            User = CreateUser(),
+            ReviewerName = "Private submitted reviewer",
+            Rating = 5,
+            Comment = "Public comment",
+            CreatedAt = CreatedAt,
+            TenantId = TenantId,
+            Tenant = null!,
+            CreatedBy = TenantId,
+            IsDeleted = true
         };
         var second = new OrganizationReview
         {
-            Id = Stamp, OrganizationId = Id, Organization = null!, Event = null!, UserId = ActorId,
-            ReviewerName = "Do not use as fallback", Rating = 1, Tenant = null!, Comment = null
+            Id = Stamp,
+            OrganizationId = Id,
+            Organization = null!,
+            Event = null!,
+            UserId = ActorId,
+            ReviewerName = "Do not use as fallback",
+            Rating = 1,
+            Tenant = null!,
+            Comment = null
         };
         var store = new ReviewStore([second, first]);
         var items = await new GetOrganizationReviewsQueryHandler(store).QueryAsync(new GetOrganizationReviewsQuery(Id), default);

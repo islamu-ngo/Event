@@ -42,7 +42,11 @@ public sealed class NativeLocationRoomHttpTests(RealRuntimeApiFixture fixture)
         }
         using var created = await client.PostAsJsonAsync("/api/locationroom", new CreateLocationRoomDto
         {
-            LocationId = data.First.Id, Name = "Main room", Slug = "main", Capacity = 20, SortOrder = 2
+            LocationId = data.First.Id,
+            Name = "Main room",
+            Slug = "main",
+            Capacity = 20,
+            SortOrder = 2
         });
         await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
         var id = (await JsonAsync(created)).GetProperty("id").GetGuid();
@@ -143,11 +147,13 @@ public sealed class NativeLocationRoomHttpTests(RealRuntimeApiFixture fixture)
             IQueryHandler<GetLocationRoomDetailRequest, LocationRoomDto?>>();
         await Assert.That(await rooms.QueryAsync(new GetLocationRoomsByLocationRequest
         {
-            LocationId = data.Foreign.Id, TenantId = PlatformDefaults.DefaultTenantId
+            LocationId = data.Foreign.Id,
+            TenantId = PlatformDefaults.DefaultTenantId
         }, default)).IsEmpty();
         await Assert.That(await roomDetail.QueryAsync(new GetLocationRoomDetailRequest
         {
-            Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId
+            Id = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId
         }, default)).IsNull();
     }
 
@@ -170,7 +176,8 @@ public sealed class NativeLocationRoomHttpTests(RealRuntimeApiFixture fixture)
             ICommandHandler<UpdateLocationRoomCommand, BaseCommandResponse<Guid>>>();
         await Assert.That(async () => await update.ExecuteAsync(new UpdateLocationRoomCommand
         {
-            LocationRoomId = Guid.CreateVersion7(), ExpectedConcurrencyStamp = Guid.CreateVersion7(),
+            LocationRoomId = Guid.CreateVersion7(),
+            ExpectedConcurrencyStamp = Guid.CreateVersion7(),
             UpdateLocationRoomDto = new() { Name = new() { Value = "Denied update" } }
         }, default)).Throws<AuthorizationException>();
         await Assert.That(await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
@@ -193,13 +200,19 @@ public sealed class NativeLocationRoomHttpTests(RealRuntimeApiFixture fixture)
         var status = await db.TenantStatuses.SingleAsync(item => item.Id == (int)TenantStatusEnum.Active);
         var tenant = new Tenant
         {
-            Id = PlatformDefaults.DefaultTenantId, Slug = "native-rooms", FullName = "Native rooms",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = PlatformDefaults.DefaultTenantId,
+            Slug = "native-rooms",
+            FullName = "Native rooms",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var foreignTenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), Slug = "foreign-rooms", FullName = "Foreign rooms",
-            TenantStatusId = status.Id, TenantStatus = status
+            Id = Guid.CreateVersion7(),
+            Slug = "foreign-rooms",
+            FullName = "Foreign rooms",
+            TenantStatusId = status.Id,
+            TenantStatus = status
         };
         var first = NewLocation(tenant, "First venue");
         var second = NewLocation(tenant, "Second venue");
@@ -213,8 +226,12 @@ public sealed class NativeLocationRoomHttpTests(RealRuntimeApiFixture fixture)
     {
         var location = new Location
         {
-            Id = Guid.CreateVersion7(), FullName = name, Country = "BE", City = "Brussels",
-            TenantId = tenant.Id, Tenant = tenant
+            Id = Guid.CreateVersion7(),
+            FullName = name,
+            Country = "BE",
+            City = "Brussels",
+            TenantId = tenant.Id,
+            Tenant = tenant
         };
         location.SetManualAddress("Private street 1", "1000");
         return location;
@@ -222,8 +239,13 @@ public sealed class NativeLocationRoomHttpTests(RealRuntimeApiFixture fixture)
 
     private static LocationRoom NewRoom(Location location, string name, int order) => new()
     {
-        Id = Guid.CreateVersion7(), LocationId = location.Id, Location = null!,
-        TenantId = location.TenantId, Tenant = null!, Name = name, SortOrder = order
+        Id = Guid.CreateVersion7(),
+        LocationId = location.Id,
+        Location = null!,
+        TenantId = location.TenantId,
+        Tenant = null!,
+        Name = name,
+        SortOrder = order
     };
 
     private static async Task<LocationRoom> ReadAsync(WebApplicationFactory<Program> factory, Guid id)

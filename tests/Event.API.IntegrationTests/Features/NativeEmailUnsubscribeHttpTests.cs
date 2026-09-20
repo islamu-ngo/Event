@@ -84,7 +84,9 @@ public sealed class NativeEmailUnsubscribeHttpTests
         {
             var fields = new Dictionary<string, string>
             {
-                ["List-Unsubscribe"] = "One-Click", ["userId"] = otherUserId.ToString(), ["category"] = "event-updates"
+                ["List-Unsubscribe"] = "One-Click",
+                ["userId"] = otherUserId.ToString(),
+                ["category"] = "event-updates"
             };
             using var content = new FormUrlEncodedContent(fields);
             using var post = await client.PostAsync(path, content);
@@ -121,7 +123,9 @@ public sealed class NativeEmailUnsubscribeHttpTests
         var command = scope.ServiceProvider.GetRequiredService<ICommandHandler<UnsubscribeFromEmailCategoryCommand, BaseCommandResponse<Guid>>>();
         var result = await command.ExecuteAsync(new UnsubscribeFromEmailCategoryCommand
         {
-            TenantId = PlatformDefaults.DefaultTenantId, UserId = userId, Category = "password-reset"
+            TenantId = PlatformDefaults.DefaultTenantId,
+            UserId = userId,
+            Category = "password-reset"
         }, cancellation.Token);
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("unknown_notification_category");
@@ -237,7 +241,11 @@ public sealed class NativeEmailUnsubscribeHttpTests
 
     private static UserNotificationPreference Preference(Guid userId, string category) => new()
     {
-        TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!, UserId = userId, Category = category, IsEnabled = true
+        TenantId = PlatformDefaults.DefaultTenantId,
+        Tenant = null!,
+        UserId = userId,
+        Category = category,
+        IsEnabled = true
     };
 
     private static async Task<List<UserNotificationPreference>> PreferencesAsync(UnsubscribeFactory factory, Guid userId, Guid? tenantId = null)
@@ -296,7 +304,9 @@ public sealed class NativeEmailUnsubscribeHttpTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _databasePath
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
             });
             options.UseSnakeCaseNamingConvention();
         }

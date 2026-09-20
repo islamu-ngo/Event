@@ -69,8 +69,12 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         await Assert.That(warm.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var created = await client.PostAsJsonAsync(Root, new CreateCustomPropertyDefinitionDto
         {
-            EntityTypeName = EntityTypeName.Organization, Namespace = "tenant.community", Key = "new_definition",
-            DisplayName = "New definition", PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.Internal
+            EntityTypeName = EntityTypeName.Organization,
+            Namespace = "tenant.community",
+            Key = "new_definition",
+            DisplayName = "New definition",
+            PropertyType = PropertyType.Text,
+            ExposureLevel = ExposureLevel.Internal
         });
         await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
         var command = (await created.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>())!;
@@ -95,9 +99,14 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         var membership = await db.TenantUsers.Include(row => row.Tenant).SingleAsync(row => row.UserId == admin.UserId);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, Tenant = membership.Tenant,
-            TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-            Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            Tenant = membership.Tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var own = Definition(admin.TenantId, "own_definition");
         db.CustomPropertyDefinitions.Add(own);
@@ -112,9 +121,16 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
 
     private static CustomPropertyDefinition Definition(Guid tenantId, string key) => new()
     {
-        Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(), TenantId = tenantId,
-        EntityTypeName = EntityTypeName.Organization, Namespace = "tenant.community", Key = key,
-        DisplayName = key, PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.Internal, IsActive = true
+        Id = Guid.CreateVersion7(),
+        ConcurrencyStamp = Guid.CreateVersion7(),
+        TenantId = tenantId,
+        EntityTypeName = EntityTypeName.Organization,
+        Namespace = "tenant.community",
+        Key = key,
+        DisplayName = key,
+        PropertyType = PropertyType.Text,
+        ExposureLevel = ExposureLevel.Internal,
+        IsActive = true
     };
 
     private sealed record SeedData(Guid UserId, Guid ForeignTenantId, Guid OwnDefinitionId, Guid ForeignDefinitionId);
@@ -150,7 +166,9 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _databasePath
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
             });
             options.UseSnakeCaseNamingConvention().AddInterceptors(Reads, Commits);
         }

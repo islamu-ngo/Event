@@ -257,16 +257,26 @@ public sealed class NativeTenantStorageHttpTests
         var membership = await db.TenantUsers.Include(item => item.Tenant).SingleAsync(item => item.UserId == admin.UserId);
         db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, Tenant = membership.Tenant,
-            TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-            Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            Tenant = membership.Tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant
         });
         var role = await db.Set<Role>().SingleAsync(item => item.MasterCode == "platform.admin");
         db.PlatformUserRoles.Add(new PlatformUserRole { Id = Guid.CreateVersion7(), UserId = instance.UserId, User = null!, RoleId = role.Id, Role = role });
         db.StorageUsageCounters.Add(new StorageUsageCounter
         {
-            Id = Guid.CreateVersion7(), TenantId = admin.TenantId, Provider = StorageProviders.S3Compatible,
-            UsedBytes = 123, ReservedBytes = 17, ObjectCount = 2, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = admin.TenantId,
+            Provider = StorageProviders.S3Compatible,
+            UsedBytes = 123,
+            ReservedBytes = 17,
+            ObjectCount = 2,
+            ConcurrencyStamp = Guid.CreateVersion7()
         });
         await db.SaveChangesAsync();
         var resolver = scope.ServiceProvider.GetRequiredService<IHierarchicalSettingsResolver>();
@@ -336,7 +346,9 @@ public sealed class NativeTenantStorageHttpTests
         {
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
             {
-                Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _databasePath
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = _databasePath
             });
             options.UseSnakeCaseNamingConvention().AddInterceptors(CommitFault);
         }

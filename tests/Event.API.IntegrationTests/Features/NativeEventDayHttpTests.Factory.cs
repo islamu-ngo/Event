@@ -109,8 +109,15 @@ public sealed partial class NativeEventDayHttpTests
 
         private static EventDay Day(Explore.Domain.Event parent, int order) => new()
         {
-            Id = Guid.CreateVersion7(), TenantId = parent.TenantId, EventId = parent.Id, Event = parent, Tenant = null!,
-            LocalDate = new DateOnly(2027, 1, order), SortOrder = order, Label = $"Day {order}", IsPublished = true
+            Id = Guid.CreateVersion7(),
+            TenantId = parent.TenantId,
+            EventId = parent.Id,
+            Event = parent,
+            Tenant = null!,
+            LocalDate = new DateOnly(2027, 1, order),
+            SortOrder = order,
+            Label = $"Day {order}",
+            IsPublished = true
         };
 
         public HttpClient Client(Guid userId)

@@ -32,11 +32,16 @@ public sealed class NativeEventTypeHttpTests
             ?? throw new InvalidOperationException("Expected an event-type catalogue.");
         await Assert.That(catalogue.Single(item => item.Id == 8008)).IsEqualTo(new EventTypeListDto
         {
-            Id = 8008, MasterCode = "NATIVE_GLOBAL", FullName = "Global event type", Description = "Shared type"
+            Id = 8008,
+            MasterCode = "NATIVE_GLOBAL",
+            FullName = "Global event type",
+            Description = "Shared type"
         });
         await Assert.That(catalogue.Single(item => item.Id == 8002)).IsEqualTo(new EventTypeListDto
         {
-            Id = 8002, MasterCode = "NATIVE_LOCAL", FullName = "Current tenant type"
+            Id = 8002,
+            MasterCode = "NATIVE_LOCAL",
+            FullName = "Current tenant type"
         });
         await Assert.That(catalogue.Any(item => item.Id == 8010)).IsFalse();
 
@@ -118,17 +123,26 @@ public sealed class NativeEventTypeHttpTests
         db.EventTypes.AddRange(
             new EventType
             {
-                Id = 8008, MasterCode = "NATIVE_GLOBAL", FullName = "Global event type", Description = "Shared type"
+                Id = 8008,
+                MasterCode = "NATIVE_GLOBAL",
+                FullName = "Global event type",
+                Description = "Shared type"
             },
             new EventType
             {
-                Id = 8002, MasterCode = "NATIVE_LOCAL", FullName = "Current tenant type",
-                TenantId = currentTenant.Id, Tenant = currentTenant
+                Id = 8002,
+                MasterCode = "NATIVE_LOCAL",
+                FullName = "Current tenant type",
+                TenantId = currentTenant.Id,
+                Tenant = currentTenant
             },
             new EventType
             {
-                Id = 8010, MasterCode = "NATIVE_FOREIGN", FullName = "Foreign tenant type",
-                TenantId = otherTenant.Id, Tenant = otherTenant
+                Id = 8010,
+                MasterCode = "NATIVE_FOREIGN",
+                FullName = "Foreign tenant type",
+                TenantId = otherTenant.Id,
+                Tenant = otherTenant
             });
         await db.SaveChangesAsync();
         return otherTenant.Id;

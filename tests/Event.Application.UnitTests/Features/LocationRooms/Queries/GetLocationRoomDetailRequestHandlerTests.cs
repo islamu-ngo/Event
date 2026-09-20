@@ -42,7 +42,13 @@ internal sealed class RoomQueryStore(params LocationRoom[] rooms) : ILocationRoo
 
     internal static LocationRoom Room(Guid id, string name, int sortOrder = 0) => new()
     {
-        Id = id, LocationId = ParentId, Name = name, Capacity = 120, SortOrder = sortOrder, Location = null!, Tenant = null!,
+        Id = id,
+        LocationId = ParentId,
+        Name = name,
+        Capacity = 120,
+        SortOrder = sortOrder,
+        Location = null!,
+        Tenant = null!,
         TenantId = Guid.Parse("01900000-0000-7000-8000-000000000094"),
         ConcurrencyStamp = Guid.Parse("01900000-0000-7000-8000-000000000095")
     };

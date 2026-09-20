@@ -98,8 +98,13 @@ public sealed partial class NativeEventSessionLanguageHttpTests
 
     private static EventSessionLanguage Insert(int id, Guid sessionId, int languageId) => new()
     {
-        Id = id, TenantId = PlatformDefaults.DefaultTenantId, EventSessionId = sessionId,
-        LanguageId = languageId, EventSession = null!, Language = null!, Tenant = null!
+        Id = id,
+        TenantId = PlatformDefaults.DefaultTenantId,
+        EventSessionId = sessionId,
+        LanguageId = languageId,
+        EventSession = null!,
+        Language = null!,
+        Tenant = null!
     };
 
     private static async Task DuplicateProblemAsync(HttpResponseMessage response, HttpResponseMessage validation)

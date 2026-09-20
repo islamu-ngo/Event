@@ -68,7 +68,9 @@ public sealed class CategoryTypeCategoriesMapperTests
     {
         var source = new CreateCategoryTypeCategoriesDto
         {
-            CategoryId = CategoryId, CategoryTypeId = 17, TenantId = Guid.Parse("01900000-0000-7000-8000-000000000123")
+            CategoryId = CategoryId,
+            CategoryTypeId = 17,
+            TenantId = Guid.Parse("01900000-0000-7000-8000-000000000123")
         };
         var result = CategoryTypeCategoriesMapper.Create(source, TenantId);
         await Assert.That(result.TenantId).IsEqualTo(TenantId);
@@ -106,9 +108,13 @@ public sealed class CategoryTypeCategoriesMapperTests
         category.Parent = category;
         return new CategoryTypeCategories
         {
-            Id = LinkId, CategoryId = CategoryId, Category = category, CategoryTypeId = 17,
+            Id = LinkId,
+            CategoryId = CategoryId,
+            Category = category,
+            CategoryTypeId = 17,
             CategoryType = new CategoryType { Id = 17, MasterCode = "TOPIC", FullName = "Topic", Description = "Not surfaced" },
-            TenantId = TenantId, Tenant = null!
+            TenantId = TenantId,
+            Tenant = null!
         };
     }
 }

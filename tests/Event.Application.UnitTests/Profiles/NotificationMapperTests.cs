@@ -166,12 +166,16 @@ public sealed class NotificationMapperTests
         var user = new User { Id = UserId, Pii = new UserPii { Email = "private@example.test", FirstName = "Private", LastName = "Recipient" } };
         var sourceActor = new Actor
         {
-            Id = SourceId, ActorType = null!, User = user,
+            Id = SourceId,
+            ActorType = null!,
+            User = user,
             Pii = new ActorPii { DisplayName = "Source display", ProfilePictureUri = "https://private.example.test/source" }
         };
         var recipientActor = new Actor
         {
-            Id = RecipientId, ActorType = null!, User = user,
+            Id = RecipientId,
+            ActorType = null!,
+            User = user,
             Pii = new ActorPii { DisplayName = "Recipient display", ProfilePictureUri = "https://private.example.test/recipient" }
         };
         sourceActor.Pii.Actor = sourceActor;
@@ -179,22 +183,40 @@ public sealed class NotificationMapperTests
         user.Actor = sourceActor;
         return new Notification
         {
-            Id = NotificationId, UserId = UserId, User = user, TenantId = TenantId, Tenant = null!,
-            NotificationIntentId = SourceId, DeduplicationKey = "private-deduplication-key",
-            NotificationTypeId = 11, NotificationType = new NotificationType { Id = 11, FullName = "Event update", MasterCode = "PRIVATE_TYPE" },
-            Title = "Published title", Body = "Published body",
-            IsRead = true, ReadAt = new DateTime(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc),
-            NotificationEntityTypeId = 12, NotificationEntityType = new NotificationEntityType { Id = 12, FullName = "Event", MasterCode = "PRIVATE_ENTITY" },
+            Id = NotificationId,
+            UserId = UserId,
+            User = user,
+            TenantId = TenantId,
+            Tenant = null!,
+            NotificationIntentId = SourceId,
+            DeduplicationKey = "private-deduplication-key",
+            NotificationTypeId = 11,
+            NotificationType = new NotificationType { Id = 11, FullName = "Event update", MasterCode = "PRIVATE_TYPE" },
+            Title = "Published title",
+            Body = "Published body",
+            IsRead = true,
+            ReadAt = new DateTime(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc),
+            NotificationEntityTypeId = 12,
+            NotificationEntityType = new NotificationEntityType { Id = 12, FullName = "Event", MasterCode = "PRIVATE_ENTITY" },
             EntityId = "public-event",
-            NotificationScopeId = 13, NotificationScope = new NotificationScopeType { Id = 13, FullName = "Group", MasterCode = "PRIVATE_SCOPE" },
-            SourceActorId = SourceId, SourceActor = sourceActor,
-            RecipientContextActorId = RecipientId, RecipientContextActor = recipientActor,
-            NotificationReasonId = 14, NotificationReason = new NotificationReason { Id = 14, FullName = "Following", MasterCode = "PRIVATE_REASON" },
-            IsArchived = true, ArchivedAt = new DateTime(2026, 9, 3, 10, 0, 0, DateTimeKind.Utc),
+            NotificationScopeId = 13,
+            NotificationScope = new NotificationScopeType { Id = 13, FullName = "Group", MasterCode = "PRIVATE_SCOPE" },
+            SourceActorId = SourceId,
+            SourceActor = sourceActor,
+            RecipientContextActorId = RecipientId,
+            RecipientContextActor = recipientActor,
+            NotificationReasonId = 14,
+            NotificationReason = new NotificationReason { Id = 14, FullName = "Following", MasterCode = "PRIVATE_REASON" },
+            IsArchived = true,
+            ArchivedAt = new DateTime(2026, 9, 3, 10, 0, 0, DateTimeKind.Utc),
             SnoozedUntil = new DateTime(2026, 9, 4, 10, 0, 0, DateTimeKind.Utc),
             CreatedAt = new DateTime(2026, 9, 1, 10, 0, 0, DateTimeKind.Utc),
-            CreatedBy = SourceId, UpdatedAt = new DateTime(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc), UpdatedBy = RecipientId,
-            IsDeleted = true, DeletedAt = new DateTime(2026, 9, 5, 10, 0, 0, DateTimeKind.Utc), DeletedBy = RecipientId
+            CreatedBy = SourceId,
+            UpdatedAt = new DateTime(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc),
+            UpdatedBy = RecipientId,
+            IsDeleted = true,
+            DeletedAt = new DateTime(2026, 9, 5, 10, 0, 0, DateTimeKind.Utc),
+            DeletedBy = RecipientId
         };
     }
 }

@@ -143,7 +143,9 @@ public sealed class ActorFederationMapperTests
         {
             ActorDto = new CreateActorDto
             {
-                ActorTypeId = 7, UserId = invalid == "missing-owner" ? null : OwnerId, DisplayName = "Rejected profile",
+                ActorTypeId = 7,
+                UserId = invalid == "missing-owner" ? null : OwnerId,
+                DisplayName = "Rejected profile",
                 ProfilePictureId = invalid == "cross-tenant-image" ? Stamp : null
             }
         }, default);
@@ -161,10 +163,21 @@ public sealed class ActorFederationMapperTests
         {
             ActorDto = new CreateActorDto
             {
-                ActorTypeId = 7, UserId = OwnerId, TenantId = Stamp, DisplayName = "New display",
-                Description = "New description", ProfilePictureUri = "https://images.example.test/new.png", ProfilePictureCid = "new-cid",
-                BackgroundColor = "blue", BackgroundEffect = "none", BannerColor = "green",
-                Did = "did:plc:unverified", Handle = "unverified.example.test", PdsHost = "https://unverified.example.test", IndexedAt = ResolvedAt, DidCustodyTypeId = 10
+                ActorTypeId = 7,
+                UserId = OwnerId,
+                TenantId = Stamp,
+                DisplayName = "New display",
+                Description = "New description",
+                ProfilePictureUri = "https://images.example.test/new.png",
+                ProfilePictureCid = "new-cid",
+                BackgroundColor = "blue",
+                BackgroundEffect = "none",
+                BannerColor = "green",
+                Did = "did:plc:unverified",
+                Handle = "unverified.example.test",
+                PdsHost = "https://unverified.example.test",
+                IndexedAt = ResolvedAt,
+                DidCustodyTypeId = 10
             }
         }, default);
         await Assert.That(result.IsSuccess).IsTrue();
@@ -430,14 +443,28 @@ public sealed class ActorFederationMapperTests
     {
         var actor = new Actor
         {
-            Id = ActorId, ActorTypeId = 7,
+            Id = ActorId,
+            ActorTypeId = 7,
             ActorType = new ActorType { Id = 7, MasterCode = "COMMUNITY", FullName = "Community", Description = "private lookup metadata" },
             Pii = new ActorPii { DisplayName = "Public display", ProfilePictureUri = "https://images.example.test/avatar.png" },
-            UserId = OwnerId, OrganizationId = OwnerId, GroupId = TenantId,
+            UserId = OwnerId,
+            OrganizationId = OwnerId,
+            GroupId = TenantId,
             User = new User { Id = OwnerId, Pii = new UserPii { Email = "private@example.test", FirstName = "Private", LastName = "Owner" } },
-            Description = "Public description", ProfilePictureCid = "public-cid", BackgroundColor = "blue", BackgroundEffect = "none", BannerColor = "green",
-            CreatedAt = ResolvedAt, CreatedBy = OwnerId, UpdatedAt = ResolvedAt, UpdatedBy = OwnerId,
-            IsSuspended = true, SuspendedAt = ResolvedAt, SuspendedBy = OwnerId, ModerationReasonCode = "private-reason", ConcurrencyStamp = Stamp
+            Description = "Public description",
+            ProfilePictureCid = "public-cid",
+            BackgroundColor = "blue",
+            BackgroundEffect = "none",
+            BannerColor = "green",
+            CreatedAt = ResolvedAt,
+            CreatedBy = OwnerId,
+            UpdatedAt = ResolvedAt,
+            UpdatedBy = OwnerId,
+            IsSuspended = true,
+            SuspendedAt = ResolvedAt,
+            SuspendedBy = OwnerId,
+            ModerationReasonCode = "private-reason",
+            ConcurrencyStamp = Stamp
         };
         actor.Pii.Actor = actor;
         actor.User.Actor = actor;
@@ -458,14 +485,39 @@ public sealed class ActorFederationMapperTests
 
     private static StorageObject CreateStorage() => new()
     {
-        Id = Stamp, FileTypeId = 8, FileType = new FileType { Id = 8, MasterCode = "IMAGE", FullName = "Image", Description = "private file metadata" },
-        Uri = "https://images.example.test/file.png", ObjectKey = "private/object-key", Provider = "local", FullName = "file.png", SafeDisplayName = "Safe file", Extension = "png",
-        ContentType = "image/png", Sha256Checksum = "checksum", Size = long.MaxValue - 1,
-        Visibility = "public-image", Purpose = "profile-image", LifecycleState = "quarantined", OwningResourceKind = "Actor", OwningResourceId = ActorId,
-        TenantId = TenantId, Tenant = new Tenant { Id = TenantId, FullName = "Tenant display", Slug = "private-slug", TenantStatus = null! },
-        ActorId = ActorId, Actor = CreateActor(), IsDeleted = true, DeletedAt = ResolvedAt, DeletedBy = OwnerId,
-        QuarantinedAt = ResolvedAt, QuarantinedBy = OwnerId, QuarantineReason = "review", RegistrationContentRetentionUntilUtc = ResolvedAt,
-        CreatedAt = ResolvedAt, CreatedBy = OwnerId, UpdatedAt = ResolvedAt, UpdatedBy = OwnerId, ConcurrencyStamp = Stamp
+        Id = Stamp,
+        FileTypeId = 8,
+        FileType = new FileType { Id = 8, MasterCode = "IMAGE", FullName = "Image", Description = "private file metadata" },
+        Uri = "https://images.example.test/file.png",
+        ObjectKey = "private/object-key",
+        Provider = "local",
+        FullName = "file.png",
+        SafeDisplayName = "Safe file",
+        Extension = "png",
+        ContentType = "image/png",
+        Sha256Checksum = "checksum",
+        Size = long.MaxValue - 1,
+        Visibility = "public-image",
+        Purpose = "profile-image",
+        LifecycleState = "quarantined",
+        OwningResourceKind = "Actor",
+        OwningResourceId = ActorId,
+        TenantId = TenantId,
+        Tenant = new Tenant { Id = TenantId, FullName = "Tenant display", Slug = "private-slug", TenantStatus = null! },
+        ActorId = ActorId,
+        Actor = CreateActor(),
+        IsDeleted = true,
+        DeletedAt = ResolvedAt,
+        DeletedBy = OwnerId,
+        QuarantinedAt = ResolvedAt,
+        QuarantinedBy = OwnerId,
+        QuarantineReason = "review",
+        RegistrationContentRetentionUntilUtc = ResolvedAt,
+        CreatedAt = ResolvedAt,
+        CreatedBy = OwnerId,
+        UpdatedAt = ResolvedAt,
+        UpdatedBy = OwnerId,
+        ConcurrencyStamp = Stamp
     };
 
     private sealed record TenantContext(Guid TenantId) : ITenantContext;

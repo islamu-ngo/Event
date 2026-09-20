@@ -56,7 +56,9 @@ public sealed class EventAgendaItemLocationPrivacyHandlerTests
     {
         Id = Guid.Parse("01900000-0000-7000-8000-000000000001"),
         EventId = Guid.Parse("01900000-0000-7000-8000-000000000002"),
-        Event = null!, Title = "Agenda", Tenant = null!,
+        Event = null!,
+        Title = "Agenda",
+        Tenant = null!,
         LocationId = Guid.Parse("01900000-0000-7000-8000-000000000003"),
         RoomId = Guid.Parse("01900000-0000-7000-8000-000000000004")
     };

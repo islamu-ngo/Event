@@ -210,11 +210,21 @@ public sealed partial class NativeStorageObjectHttpTests
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.StorageObjects.Add(new StorageObject
             {
-                Id = id, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!, CreatedBy = factory.OwnerId,
-                FileTypeId = image ? (int)FileTypeEnum.Image : (int)FileTypeEnum.Document, FileType = null!,
-                FullName = "stored", SafeDisplayName = image ? "image.png" : "document.pdf", Uri = string.Empty,
-                ObjectKey = key, Provider = StorageProviders.Local, Purpose = purpose, Size = bytes.Length,
-                ContentType = image ? "image/png" : "application/pdf", Extension = image ? "png" : "pdf",
+                Id = id,
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                CreatedBy = factory.OwnerId,
+                FileTypeId = image ? (int)FileTypeEnum.Image : (int)FileTypeEnum.Document,
+                FileType = null!,
+                FullName = "stored",
+                SafeDisplayName = image ? "image.png" : "document.pdf",
+                Uri = string.Empty,
+                ObjectKey = key,
+                Provider = StorageProviders.Local,
+                Purpose = purpose,
+                Size = bytes.Length,
+                ContentType = image ? "image/png" : "application/pdf",
+                Extension = image ? "png" : "pdf",
                 Visibility = image ? StorageObjectVisibilities.PublicImage : StorageObjectVisibilities.AuthenticatedTenant,
                 LifecycleState = StorageObjectLifecycleStates.Active
             });

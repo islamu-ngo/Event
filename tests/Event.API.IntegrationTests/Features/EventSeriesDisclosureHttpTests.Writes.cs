@@ -40,7 +40,7 @@ public sealed partial class EventSeriesDisclosureHttpTests
         foreach (var slug in new string?[] { null, "custom" })
         {
             using var created = await admin.PostAsJsonAsync("/api/eventseries", new
-                { input.title, input.description, input.actorId, input.isPublished, slug });
+            { input.title, input.description, input.actorId, input.isPublished, slug });
             await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
             var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
             await Assert.That(created.Headers.Location!.AbsolutePath).IsEqualTo(Detail(id));
@@ -129,11 +129,11 @@ public sealed partial class EventSeriesDisclosureHttpTests
         })
         {
             using var rejected = await admin.PostAsJsonAsync("/api/eventseries", new
-                { title = "Invalid image", actorId = data.ActorId, featuredImageId = invalid });
+            { title = "Invalid image", actorId = data.ActorId, featuredImageId = invalid });
             await ProblemAsync(rejected, HttpStatusCode.BadRequest);
         }
         using var created = await admin.PostAsJsonAsync("/api/eventseries", new
-            { title = "Image series", description = "Original", actorId = data.ActorId, featuredImageId = image, isPublished = true });
+        { title = "Image series", description = "Original", actorId = data.ActorId, featuredImageId = image, isPublished = true });
         await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var before = await DetailAsync(admin, id);
@@ -195,7 +195,7 @@ public sealed partial class EventSeriesDisclosureHttpTests
         var original = (await read.QueryAsync(new(data.PublicId), default))!;
         var update = scope.ServiceProvider.GetRequiredService<ICommandHandler<UpdateEventSeriesCommand, BaseCommandResponse<Guid>>>();
         var invalid = new UpdateEventSeriesCommand
-            { EventSeriesId = data.PublicId, ExpectedConcurrencyStamp = original.ConcurrencyStamp, EventSeriesDto = new() };
+        { EventSeriesId = data.PublicId, ExpectedConcurrencyStamp = original.ConcurrencyStamp, EventSeriesDto = new() };
         await Assert.That((await update.ExecuteAsync(invalid, default)).IsSuccess).IsFalse();
         await Assert.That(await cache.GetOrCreateAsync(detailKey, _ => ValueTask.FromResult(2))).IsEqualTo(1);
         await Assert.That(await cache.GetOrCreateAsync(localKey, _ => ValueTask.FromResult(2))).IsEqualTo(1);
@@ -216,10 +216,20 @@ public sealed partial class EventSeriesDisclosureHttpTests
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var image = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = foreign ? data.ForeignTenantId : PlatformDefaults.DefaultTenantId,
-            Tenant = null!, FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-            Uri = "https://images.example.test/series.png", Provider = "legacy_external", FullName = "series.png", SafeDisplayName = "series.png",
-            Extension = extension, ContentType = contentType, Visibility = visibility, Purpose = StorageObjectPurposes.EventImage, LifecycleState = state
+            Id = Guid.CreateVersion7(),
+            TenantId = foreign ? data.ForeignTenantId : PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Image,
+            FileType = null!,
+            Uri = "https://images.example.test/series.png",
+            Provider = "legacy_external",
+            FullName = "series.png",
+            SafeDisplayName = "series.png",
+            Extension = extension,
+            ContentType = contentType,
+            Visibility = visibility,
+            Purpose = StorageObjectPurposes.EventImage,
+            LifecycleState = state
         };
         db.StorageObjects.Add(image);
         await db.SaveChangesAsync();

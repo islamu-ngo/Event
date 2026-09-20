@@ -32,9 +32,15 @@ public sealed partial class NativeEventAspectsHttpTests
         foreach (var parentTenant in new[] { tenant, foreignTenant })
             db.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = parentTenant.Id, Tenant = parentTenant,
-                UserId = owner.Id, User = owner, ActorId = actor.Id, Actor = actor,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UnixEpoch
+                Id = Guid.CreateVersion7(),
+                TenantId = parentTenant.Id,
+                Tenant = parentTenant,
+                UserId = owner.Id,
+                User = owner,
+                ActorId = actor.Id,
+                Actor = actor,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UnixEpoch
             });
         foreach (var parent in new[] { published, hidden, draft, empty, foreign })
             db.EventRoleAssignments.Add(EventRoleAssignment.Create(parent.TenantId, parent.Id, owner.Id,
@@ -43,13 +49,18 @@ public sealed partial class NativeEventAspectsHttpTests
         {
             db.EventIslamicAspects.Add(new EventIslamicAspect
             {
-                Id = parent.Id, Event = parent, GenderMode = GenderSegregationMode.Family,
+                Id = parent.Id,
+                Event = parent,
+                GenderMode = GenderSegregationMode.Family,
                 IncludesQuranRecitation = true
             });
             db.EventTechAspects.Add(new EventTechAspect
             {
-                Id = parent.Id, Event = parent, SkillLevel = SkillLevel.AllLevels,
-                GithubRepoUrl = "https://code.example.test/private", RequiresLaptop = true
+                Id = parent.Id,
+                Event = parent,
+                SkillLevel = SkillLevel.AllLevels,
+                GithubRepoUrl = "https://code.example.test/private",
+                RequiresLaptop = true
             });
         }
         await db.SaveChangesAsync();

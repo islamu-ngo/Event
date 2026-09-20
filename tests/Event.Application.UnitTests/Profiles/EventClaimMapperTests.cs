@@ -22,10 +22,17 @@ public sealed class EventClaimMapperTests
         var claim = EventOrganizerClaim.CreatePending(tenantId, eventId, groupId, "domain-proof", "bounded-reference", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         var parent = new Explore.Domain.Event
         {
-            Id = eventId, TenantId = tenantId, Title = "Claimed event", ActorId = groupId,
+            Id = eventId,
+            TenantId = tenantId,
+            Title = "Claimed event",
+            ActorId = groupId,
             Actor = new Actor { GroupId = groupId, Pii = new ActorPii { DisplayName = "Publisher" }, ActorType = null! },
-            Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!,
-            EventProvenanceTypeId = 2, EventProvenanceType = new EventProvenanceType { MasterCode = "COMMUNITY_REPORTED", FullName = "Community reported" }
+            Tenant = null!,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormat = null!,
+            EventProvenanceTypeId = 2,
+            EventProvenanceType = new EventProvenanceType { MasterCode = "COMMUNITY_REPORTED", FullName = "Community reported" }
         };
         if (unloadedPii)
             parent.Actor.Pii = null!;

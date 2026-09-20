@@ -24,15 +24,19 @@ public sealed class NativeSeoHttpTests
         await using var factory = new AuthenticatedWebApplicationFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://sitemap.example.test"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://sitemap.example.test"),
+            AllowAutoRedirect = false
         });
         var foreignTenantId = Guid.CreateVersion7();
         var created = new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc);
         var updated = new DateTime(2026, 9, 2, 15, 0, 0, DateTimeKind.Utc);
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), Pii = new() { DisplayName = "Sitemap organizer" },
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, UserId = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            Pii = new() { DisplayName = "Sitemap organizer" },
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = Guid.CreateVersion7()
         };
         var first = NewEvent(actor, PlatformDefaults.DefaultTenantId, created);
         var second = NewEvent(actor, PlatformDefaults.DefaultTenantId, created);
@@ -49,8 +53,11 @@ public sealed class NativeSeoHttpTests
             db.EnableTenantFilterBypass("Seed both sitemap tenant boundaries.");
             db.Tenants.Add(new Tenant
             {
-                Id = foreignTenantId, FullName = "Foreign sitemap tenant", Slug = "foreign-sitemap",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = foreignTenantId,
+                FullName = "Foreign sitemap tenant",
+                Slug = "foreign-sitemap",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             });
             db.Users.Add(new User
             {
@@ -61,7 +68,11 @@ public sealed class NativeSeoHttpTests
             foreach (var tenantId in new[] { PlatformDefaults.DefaultTenantId, foreignTenantId })
                 db.TenantUsers.Add(new TenantUser
                 {
-                    TenantId = tenantId, Tenant = null!, UserId = actor.UserId.Value, User = null!, ActorId = actor.Id,
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    UserId = actor.UserId.Value,
+                    User = null!,
+                    ActorId = actor.Id,
                     StatusId = (int)TenantUserStatusEnum.Active
                 });
             db.Events.AddRange(first, second, draft, privateEvent, deleted, foreign);
@@ -116,11 +127,20 @@ public sealed class NativeSeoHttpTests
 
     private static DomainEvent NewEvent(Actor actor, Guid tenantId, DateTime created, EventStatusEnum status = EventStatusEnum.Published) => new(status)
     {
-        Id = Guid.CreateVersion7(), Title = "Sitemap event", PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
-        ActorId = actor.Id, Actor = actor, TenantId = tenantId, Tenant = null!,
-        VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!,
-        EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
+        Id = Guid.CreateVersion7(),
+        Title = "Sitemap event",
+        PublicCode = Guid.CreateVersion7().ToString("N")[^12..],
+        ActorId = actor.Id,
+        Actor = actor,
+        TenantId = tenantId,
+        Tenant = null!,
+        VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+        VisibilityType = null!,
+        EventStatus = null!,
+        EventFormatId = (int)EventFormatEnum.Local,
+        EventFormat = null!,
         EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-        CreatedAt = created, ConcurrencyStamp = Guid.CreateVersion7()
+        CreatedAt = created,
+        ConcurrencyStamp = Guid.CreateVersion7()
     };
 }

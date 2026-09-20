@@ -89,13 +89,18 @@ public sealed class GenericRepositoryTests(PostgreSqlContainerFixture fixture)
         {
             var tenant = new Tenant
             {
-                FullName = "Tracked group deletion", Slug = $"tracked-group-{Guid.CreateVersion7():N}",
-                TenantStatusId = 2, TenantStatus = null!
+                FullName = "Tracked group deletion",
+                Slug = $"tracked-group-{Guid.CreateVersion7():N}",
+                TenantStatusId = 2,
+                TenantStatus = null!
             };
             var group = new Group { FullName = "Tracked group" };
             var participation = new GroupTenant
             {
-                Tenant = tenant, TenantId = tenant.Id, Group = group, GroupId = group.Id,
+                Tenant = tenant,
+                TenantId = tenant.Id,
+                Group = group,
+                GroupId = group.Id,
                 ApprovalStatusId = (int)Explore.Domain.Enums.ApprovalStatusEnum.Pending,
                 ApprovalStatus = null!
             };

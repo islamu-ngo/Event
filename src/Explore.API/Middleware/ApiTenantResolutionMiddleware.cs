@@ -161,7 +161,7 @@ public sealed class ApiTenantResolutionMiddleware
         return NormalizeHost(context.Request.Host.Host) ?? string.Empty;
     }
 
-    private static bool IsTenantExemptPath(PathString path)
+    internal static bool IsTenantExemptPath(PathString path)
     {
         return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
             || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)

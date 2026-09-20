@@ -164,6 +164,7 @@ public static class ApplicationServicesRegistration
             .Bind(configuration.GetSection(PaidCheckoutGovernanceOptions.SectionName));
         services.AddOptions<InstanceOperatorIdentityOptions>()
             .Bind(configuration.GetSection(InstanceOperatorIdentityOptions.SectionName));
+        services.AddScoped<ITenantLifecycleAccessService, TenantLifecycleAccessService>();
         services.AddSingleton<TenantDirectoryOperatorReadinessTelemetry>();
         services.AddScoped<
             ITenantDirectoryOperatorReadinessEvaluator,

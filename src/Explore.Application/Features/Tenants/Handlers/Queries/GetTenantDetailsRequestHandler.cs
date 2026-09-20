@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Domain.ValueObjects;
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;
@@ -17,8 +18,8 @@ public class GetTenantDetailsRequestHandler : IQueryHandler<GetTenantDetailsRequ
 
     public async Task<TenantDto?> QueryAsync(GetTenantDetailsRequest request, CancellationToken cancellationToken = default)
     {
-        var tenant = await _tenantRepository.GetById(request.Id);
-        if (tenant == null)
+        var tenant = await _tenantRepository.GetByIdAsNoTrackingAsync(request.Id, cancellationToken);
+        if (tenant == null || !TenantLifecycleAccessPolicy.AllowsPublic(tenant.TenantStatusId))
         {
             return null;
         }

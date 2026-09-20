@@ -54,6 +54,7 @@ public sealed class TenantSettingsDocumentsController(
         "Tenant directory operator identity not found",
         "Tenant directory operator identity not found.");
 
+    [TenantLifecycleManagement]
     [HttpGet("branding", Name = RouteNames.GetTenantBrandingSettingsDocument)]
     [EndpointSummary("Get Tenant Branding Settings Document")]
     [EndpointDescription("Returns the current tenant branding typed settings document, provisioning the default typed row when it is missing.")]
@@ -74,6 +75,7 @@ public sealed class TenantSettingsDocumentsController(
         return Ok(resource);
     }
 
+    [TenantLifecycleManagement]
     [HttpPatch("branding", Name = RouteNames.PatchTenantBrandingSettingsDocument)]
     [EndpointSummary("Patch Tenant Branding Settings Document")]
     [EndpointDescription("Patches supplied tenant branding groups with optimistic concurrency while preserving omitted JSONB settings leaves.")]
@@ -121,6 +123,7 @@ public sealed class TenantSettingsDocumentsController(
         return Ok(resource);
     }
 
+    [TenantLifecycleManagement]
     [HttpGet(
         "directory-operator-identity",
         Name = RouteNames.GetTenantDirectoryOperatorIdentityDocument)]
@@ -148,6 +151,7 @@ public sealed class TenantSettingsDocumentsController(
         return Ok(resource);
     }
 
+    [TenantLifecycleManagement]
     [HttpPatch(
         "directory-operator-identity",
         Name = RouteNames.PatchTenantDirectoryOperatorIdentityDocument)]

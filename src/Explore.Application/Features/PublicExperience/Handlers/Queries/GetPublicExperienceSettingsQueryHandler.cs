@@ -21,6 +21,7 @@ namespace Explore.Application.Features.PublicExperience.Handlers.Queries;
 
 public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>
 {
+    private readonly ITenantLifecycleAccessService _lifecycle;
     private readonly ITenantContext _tenantContext;
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly IAnalyticsConfigResolver _analyticsConfigResolver;
@@ -52,8 +53,10 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
         IFooterLinkGroupRepository footerLinkGroupRepository,
         ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
         IInstanceOperatorIdentityReadinessEvaluator instanceOperatorReadiness,
-        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
+        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
+        ITenantLifecycleAccessService lifecycle)
     {
+        _lifecycle = lifecycle;
         _tenantContext = tenantContext;
         _systemSettingRepository = systemSettingRepository;
         _analyticsConfigResolver = analyticsConfigResolver;
@@ -74,6 +77,16 @@ public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicEx
     public async Task<PublicExperienceSettingsDto> QueryAsync(GetPublicExperienceSettingsQuery query, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
+        if (!await _lifecycle.IsPublicAsync(tenantId, cancellationToken))
+        {
+            return new PublicExperienceSettingsDto
+            {
+                TenantId = tenantId,
+                IsAvailable = false,
+                UnavailableCode = "tenant_lifecycle_unavailable"
+            };
+        }
+
         TenantDirectoryOperatorReadinessAssessment directoryAssessment =
             await _directoryOperatorReadiness.EvaluateAsync(
                 tenantId,

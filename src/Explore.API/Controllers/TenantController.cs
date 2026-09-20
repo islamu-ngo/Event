@@ -142,7 +142,7 @@ public class TenantController : EventControllerBase
     {
         var tenant = await _getTenantDetails.QueryAsync(new GetTenantDetailsRequest { Id = id }, cancellationToken);
 
-        return Ok(tenant);
+        return tenant is null ? NotFound() : Ok(tenant);
     }
 
     // POST: api/tenant

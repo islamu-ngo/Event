@@ -2,6 +2,8 @@ using System.CodeDom.Compiler;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using TenantStatusEnum = Explore.Domain.Enums.TenantStatusEnum;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Event.Web.BffHosting.Options;
@@ -73,6 +75,7 @@ public sealed class StandaloneHostGraphTests
             BaseAddress = new Uri("https://localhost")
         });
 
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         using var api = await client.GetAsync("/api/EventType");
         using var auth = await client.GetAsync("/auth/status");
         using var css = await client.GetAsync("/css/layers.css");
@@ -174,6 +177,7 @@ public sealed class StandaloneHostGraphTests
             AllowAutoRedirect = false,
             HandleCookies = false
         });
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         var bffOptions = factory.Services.GetRequiredService<IOptions<EventBffHostingOptions>>().Value;
         var cookieOptions = factory.Services
             .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
@@ -211,6 +215,7 @@ public sealed class StandaloneHostGraphTests
     {
         await using var factory = new StandaloneWebApplicationFactory();
         using var publicClient = factory.CreateClient();
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         await using var scope = factory.Services.CreateAsyncScope();
 
         var apiClient = scope.ServiceProvider.GetRequiredService<IEventTypeClient>();
@@ -234,6 +239,7 @@ public sealed class StandaloneHostGraphTests
     {
         await using var factory = new StandaloneWebApplicationFactory();
         using var publicClient = factory.CreateClient();
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         await using var scope = factory.Services.CreateAsyncScope();
 
         var expectedInterfaces = typeof(IEventTypeClient).Assembly.GetTypes()
@@ -298,6 +304,7 @@ public sealed class StandaloneHostGraphTests
     {
         await using var factory = new StandaloneWebApplicationFactory();
         using var publicClient = factory.CreateClient();
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
         var clientFactory = factory.Services.GetRequiredService<IHttpClientFactory>();
         using var internalClient = clientFactory.CreateClient("AdminAuthority");
         using var request = new HttpRequestMessage(HttpMethod.Get, "api/EventType");
@@ -318,6 +325,7 @@ public sealed class StandaloneHostGraphTests
     {
         await using var factory = new StandaloneWebApplicationFactory();
         using var client = factory.CreateClient();
+        await factory.SeedDefaultTenantAsync(TenantStatusEnum.Active);
 
         var responses = await Task.WhenAll(Enumerable.Range(0, 8)
             .Select(_ => client.GetAsync("/auth/status")));
@@ -342,6 +350,29 @@ public sealed class StandaloneHostGraphTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(factory.Services.GetRequiredService<DynamicAuthInitializationProbe>().InitializationCount)
             .IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(null, HttpStatusCode.NotFound)]
+    [Arguments(TenantStatusEnum.Provisioning, HttpStatusCode.NotFound)]
+    [Arguments(TenantStatusEnum.Active, HttpStatusCode.OK)]
+    public async Task PublicApiRequiresExplicitActiveLifecycleFacts(TenantStatusEnum? status, HttpStatusCode expected)
+    {
+        await using var factory = new StandaloneWebApplicationFactory();
+        using var publicClient = factory.CreateClient();
+        if (status is { } seededStatus)
+            await factory.SeedDefaultTenantAsync(seededStatus);
+        using var internalClient = factory.Services.GetRequiredService<IHttpClientFactory>().CreateClient("AdminAuthority");
+
+        using var response = await internalClient.GetAsync("api/EventType");
+
+        await Assert.That(response.StatusCode).IsEqualTo(expected);
+        if (expected == HttpStatusCode.NotFound)
+        {
+            await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
+            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("tenant_lifecycle_unavailable");
+        }
     }
 
     private static AuthenticationProperties CreateTokenProperties()

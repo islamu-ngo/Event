@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Infrastructure.ConfigurationManifest;
 using Event.Standalone.Hosting;
@@ -27,6 +28,7 @@ public sealed class StandaloneWebApplicationFactory : WebApplicationFactory<Stan
         Guid.CreateVersion7().ToString("N");
     private readonly IReadOnlyDictionary<string, string?>? _configurationOverrides;
     private readonly IConfigurationManifestStartupRunner? _startupRunner;
+    private readonly string _databaseName = $"StandaloneGraphTests-{Guid.CreateVersion7():N}";
 
     public StandaloneWebApplicationFactory(
         IReadOnlyDictionary<string, string?>? configurationOverrides = null,
@@ -128,11 +130,26 @@ public sealed class StandaloneWebApplicationFactory : WebApplicationFactory<Stan
         });
     }
 
-    private static void AddInMemoryExploreDbContext(IServiceCollection services)
+    public async Task SeedDefaultTenantAsync(TenantStatusEnum status)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        database.Tenants.Add(new Explore.Domain.Tenant
+        {
+            Id = PlatformDefaults.DefaultTenantId,
+            FullName = "Standalone transport directory",
+            Slug = "standalone-transport",
+            TenantStatusId = (int)status,
+            TenantStatus = null!
+        });
+        await database.SaveChangesAsync();
+    }
+
+    private void AddInMemoryExploreDbContext(IServiceCollection services)
     {
         services.AddDbContextFactory<ExploreDbContext>(options =>
         {
-            options.UseInMemoryDatabase("StandaloneGraphTests");
+            options.UseInMemoryDatabase(_databaseName);
             options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
         });
         services.AddScoped(serviceProvider =>

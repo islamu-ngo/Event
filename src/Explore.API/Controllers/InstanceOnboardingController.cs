@@ -138,7 +138,7 @@ public class InstanceOnboardingController : EventControllerBase
         return Ok(resource);
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [PrivateNoStore]
     [EndpointClassification(EndpointClass.Admin)]
     [HttpGet("journey", Name = RouteNames.GetInstanceOnboardingJourney)]
@@ -146,6 +146,7 @@ public class InstanceOnboardingController : EventControllerBase
     [EndpointDescription("Returns one fail-closed setup snapshot with provider readiness, persisted profile, generation, checks and authorized HAL actions.")]
     [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
     [ProducesResponseType(typeof(HalResource<InstanceOnboardingJourneyDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalResource<InstanceOnboardingJourneyDto>>> GetJourney(CancellationToken cancellationToken = default)
     {

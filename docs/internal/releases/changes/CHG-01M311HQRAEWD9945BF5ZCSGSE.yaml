@@ -1,0 +1,30 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M311HQRAEWD9945BF5ZCSGSE
+Title: "require authentication for the private setup journey"
+Type: fix
+Scope: onboarding
+Summary: "Declare the existing setup or administrator journey authority at the HTTP boundary."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Require authentication before the existing active-setup or persisted-administrator check; no anonymous journey access."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Declare journey authentication and its 401 response; authenticated unauthorized callers still receive 403."
+  Operator:
+    Reference: docs/public/api-reference/readme/hal-rest.md
+    Disposition: documented
+    Detail: "Use active BFF-held setup authority or normal instance-administrator sign-in for private journey reads."

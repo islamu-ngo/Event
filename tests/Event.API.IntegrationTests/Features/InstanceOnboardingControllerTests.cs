@@ -81,7 +81,35 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
         using var response = await client.GetAsync($"{BaseUrl}/journey");
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.TryGetProperty("profile", out _)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(true, HttpStatusCode.OK)]
+    [Arguments(false, HttpStatusCode.Forbidden)]
+    public async Task Journey_AuthenticatedCallerRequiresPersistedAdministratorAuthority(bool administrator, HttpStatusCode expectedStatus)
+    {
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        var userId = Guid.CreateVersion7();
+        if (administrator)
+            await EnsureInstanceAdminRoleAsync(factory, userId);
+        else
+            await EnsureUserExistsAsync(factory, userId);
+
+        using var request = CreateInstanceAdminRequest(HttpMethod.Get, $"{BaseUrl}/journey", userId,
+            body: null, includeSetupSecret: false);
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(expectedStatus);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.TryGetProperty("profile", out _)).IsEqualTo(administrator);
+        if (administrator)
+        {
+            await Assert.That(body.RootElement.GetProperty("bootstrap").GetProperty("isCurrentUserInstanceAdmin").GetBoolean()).IsTrue();
+            await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
+        }
     }
 
     [Test]

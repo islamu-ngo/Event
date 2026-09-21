@@ -35,8 +35,8 @@ public sealed class LocalInstanceOnboardingHttpTests
 
     [Test]
     [Arguments("active", HttpStatusCode.OK)]
-    [Arguments("forged", HttpStatusCode.Forbidden)]
-    [Arguments("expired", HttpStatusCode.Forbidden)]
+    [Arguments("forged", HttpStatusCode.Unauthorized)]
+    [Arguments("expired", HttpStatusCode.Unauthorized)]
     public async Task JourneyReadUsesOnlyActiveBffSetupAuthority(string authority, HttpStatusCode expectedStatus)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
@@ -96,7 +96,8 @@ public sealed class LocalInstanceOnboardingHttpTests
         }
         else
         {
-            await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("forbidden");
+            await Assert.That(body.RootElement.GetProperty("status").GetInt32()).IsEqualTo(401);
+            await Assert.That(body.RootElement.TryGetProperty("profile", out _)).IsFalse();
         }
     }
 

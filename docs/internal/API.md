@@ -95,7 +95,11 @@ For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Gen
 ### Canonical Instance Onboarding Journey
 
 `GET /api/instanceonboarding/journey` requires active setup authority or instance
-administrator authority and returns a private, no-store HAL snapshot. The native
+administrator authority and returns a private, no-store HAL snapshot. Declarative
+`[Authorize]` admits the exact setup-secret authentication scheme or a normal
+authenticated principal; the action still requires active setup or persisted
+instance-administrator authority. Missing authentication returns 401; an
+authenticated non-administrator without setup authority receives 403. The native
 `GetInstanceOnboardingJourneyQuery` composes bootstrap status, selected deployment,
 existing provider configuration contracts, persisted profile, operator identity,
 and existing preflight checks. Two sequential projections must agree; changing,

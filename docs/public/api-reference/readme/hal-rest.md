@@ -22,6 +22,14 @@ A resource or collection may expose relations such as `self`, `edit`, `delete`, 
 
 Do not construct mutation URLs from naming conventions or enable controls from local roles/claims. A link may disappear after state, tenant, policy, concurrency, or provider changes. Refresh the representation after a mutation or authorization-relevant event.
 
+## Private setup journey
+
+`GET /api/instanceonboarding/journey` requires active setup credentials forwarded
+by the BFF or a signed-in instance administrator. It returns a private, no-store
+snapshot; follow its current HAL actions. Unauthenticated requests receive 401,
+and signed-in callers without setup or administrator authority receive 403.
+Finishing setup does not grant public access to a Provisioning directory.
+
 ## Operator identity form metadata
 
 After normal sign-in, follow the instance identity document's `form-options` link

@@ -32,6 +32,8 @@ public sealed class EmailOptionalStandaloneTests
 {
     private const string SmtpPath = "/api/instance/settings/smtp";
     private const string HealthyStatus = "Healthy";
+    private const string UnhealthyStatus = "Unhealthy";
+    private const string StatusProperty = "status";
     private const string SmtpDisabledCode = "smtp_disabled";
     private const string LoginPath = "/api/auth/local/login";
     private const string TokenProperty = "token";
@@ -304,9 +306,9 @@ public sealed class EmailOptionalStandaloneTests
         using var health = await client.GetAsync("/health");
         await AssertStatusAsync(health, HttpStatusCode.ServiceUnavailable);
         JsonElement body = await BodyAsync(health);
-        await Assert.That(Check(body, "database").GetProperty("status").GetString()).IsEqualTo(HealthyStatus);
-        await Assert.That(Check(body, "smtp").GetProperty("status").GetString()).IsEqualTo("Unhealthy");
-        await Assert.That(Check(body, "cerbos").GetProperty("status").GetString()).IsEqualTo("Unhealthy");
+        await Assert.That(Check(body, "database").GetProperty(StatusProperty).GetString()).IsEqualTo(HealthyStatus);
+        await Assert.That(Check(body, "smtp").GetProperty(StatusProperty).GetString()).IsEqualTo(UnhealthyStatus);
+        await Assert.That(Check(body, "cerbos").GetProperty(StatusProperty).GetString()).IsEqualTo(UnhealthyStatus);
         await Assert.That(deployment.Transport.Attempts).IsEqualTo(0);
     }
 
@@ -387,11 +389,11 @@ public sealed class EmailOptionalStandaloneTests
         JsonElement body = await BodyAsync(health);
         // Only bounded health names/statuses enter assertion diagnostics, never provider error text.
         string unhealthy = string.Join(",", body.GetProperty("checks").EnumerateArray()
-            .Where(check => check.GetProperty("status").GetString() == "Unhealthy")
+            .Where(check => check.GetProperty(StatusProperty).GetString() == UnhealthyStatus)
             .Select(check => check.GetProperty("name").GetString()));
         await Assert.That(unhealthy).IsEqualTo(string.Empty);
         await AssertStatusAsync(health, HttpStatusCode.OK);
-        await Assert.That(Check(body, "smtp").GetProperty("status").GetString()).IsEqualTo(smtpStatus);
+        await Assert.That(Check(body, "smtp").GetProperty(StatusProperty).GetString()).IsEqualTo(smtpStatus);
         await Assert.That(Check(body, "smtp").GetProperty("description").GetString()).IsEqualTo(smtpCode);
         await Assert.That(body.GetRawText().Contains("external-transport-diagnostic-canary", StringComparison.Ordinal)).IsFalse();
         foreach (string path in new[] { "/alive", "/api/EventType", "/auth/status" })

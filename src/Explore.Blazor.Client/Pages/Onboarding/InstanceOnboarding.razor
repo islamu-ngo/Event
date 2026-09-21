@@ -701,7 +701,10 @@
             ApplyJourneyProfile();
             await AnnounceJourneyStatusAsync(status);
         }
-        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { return; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+        {
+            // Disposal cancelled this refresh; do not announce an error or update the disposed component.
+        }
         catch (Exception ex)
         {
             if (lifetimeToken.IsCancellationRequested) return;
@@ -834,7 +837,10 @@
             }
             await RefreshAsync();
         }
-        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { return; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+        {
+            // Disposal cancelled this save; the lifetime guard also prevents resetting disposed UI state.
+        }
         finally
         {
             if (!lifetimeToken.IsCancellationRequested) _isSavingProfile = false;

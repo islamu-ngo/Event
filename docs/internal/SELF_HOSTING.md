@@ -6,7 +6,7 @@
 > **Audience:** Contributors | Operators
 > **Status:** Implemented
 > **Owner:** Platform/Ops
-> **Last Verified:** 2026-09-08
+> **Last Verified:** 2026-09-21
 > **Source Anchors:** `src/Event.Standalone/Program.cs`, `src/Explore.API/Hosting/`, `src/Explore.Infrastructure/Mail/EmailDeliveryCapabilityResolver.cs`, `docker-compose.yml`
 
 ---

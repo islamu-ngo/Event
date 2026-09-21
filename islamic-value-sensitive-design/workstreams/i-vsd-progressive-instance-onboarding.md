@@ -1,18 +1,18 @@
-# Progressive Instance Onboarding - I-VSD Planning Review
+# Progressive Instance Onboarding - I-VSD Implementation Closure Review
 
-Last Updated: 2026-09-20 Europe/Brussels
+Last Updated: 2026-09-21 Europe/Brussels
 
 ## Review Metadata
 
-- Mode: planning
+- Mode: implementation closure
 - Subject: Installation reliability, progressive operator disclosure, and commerce readiness
 - Workstream: progressive-instance-onboarding
-- Report kind: Provider-responsibility design review
-- Report status: current
-- Disposition: plan-aligned
-- Evidence cutoff: 2026-09-20
-- Reviewed input: progressive-instance-onboarding triad revision `R2`, grounded in `origin/develop` `7f78e938f`
-- Supersedes: R1 review at this same canonical report path
+- Report kind: Provider-responsibility implementation closure review
+- Report status: implemented; final audit current
+- Disposition: implementation-aligned with recorded validation gaps
+- Evidence cutoff: 2026-09-21
+- Reviewed input: progressive-instance-onboarding triad revision `R2`, grounded in `origin/develop` `7f78e938f`; final implementation `f5ccd58f468f374ff259a8d5c557c3c1cfeb62b1`
+- Supersedes: R1 review and the R2 planning review at this same canonical report path
 
 ## Scope
 
@@ -26,8 +26,9 @@ authority to make a screen work.
 ## Claim Boundary
 
 This is design reasoning and implementation traceability, not a religious ruling,
-legal certification, or proof of runtime correctness. Reported browser failures
-establish a problem to reproduce, not its root cause. No claim is made that
+legal certification, or a claim of universal runtime assurance. Historical browser
+failures were reproduced and repaired with the bounded Local and Split evidence
+recorded below; residual assurance gaps remain explicit. No claim is made that
 non-payment deployments have no disclosure obligations.
 
 ## Findings
@@ -90,10 +91,23 @@ governance and evaluation require explicit activation and observable evidence.
 
 ## Validation Gaps
 
-The browser failure still lacks a current authenticated reproduction. No fresh
-usability study, accessibility audit, Standalone/Split deployment trial, journey
-timing, or legal review occurred during revalidation. R2 converts each gap into a
-test or real-surface evidence requirement rather than treating it as satisfied.
+Fresh real-browser evidence now covers Local lost-response recovery and an explicit
+Keycloak Split callback through durable administrator readback; the former is in
+`.omo/evidence/20260921-mad-required-repairs/f4-summary.md` and the latter in
+`.omo/evidence/20260921-external-circuit-identity/RESULT.md`. Those desktop
+journeys do not constitute a fresh usability study, accessibility/mobile/RTL audit,
+or legal review.
+
+Whole-project assurance is intentionally not represented as globally green. The
+API attempt is incomplete (320 failures and one skipped record without a final
+pass/total/exit), and the Persistence attempt observed one failure and five skips
+while its wrapper supplied no final summary; newer Application/Persistence/Standalone
+failures lack paired baseline attribution. See
+`.omo/evidence/20260921-ring3-repairs/summary.md`. The provider exit evidence proves
+live PostgreSQL activation plus five-provider model/composition and pending-model
+checks, not five live activation backends or independent capacity-race/post-commit-
+invalidation ordering. See
+`.omo/evidence/20260920-progressive-instance-onboarding/provider-matrix-final/summary.md`.
 
 ## Escalation Needed
 
@@ -104,16 +118,17 @@ workstream and require qualified authority before any such claim is released.
 
 ## Evidence Reviewed
 
-- E1: `src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs`
-  currently requires complete instance identity during completion.
+- E1: R1 baseline evidence recorded that
+  `src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs`
+  required complete instance identity during completion; the implemented R2 outcome removed that coupling.
 - E2: `src/Explore.Domain/ValueObjects/InstanceOperatorIdentityReadiness.cs` and
   tenant identity values own draft and capability requirements.
 - E3: Public experience and paid event preflight consumers demonstrate distinct
   disclosure and commerce boundaries.
 - E4: `src/Explore.Blazor/Services/SetupSecretForwardingHandler.cs` and
   `InstancePresentationSettingsController.cs` define the purpose-bound setup path.
-- E5: The reported browser failure and current authorization-provider component
-  establish a reproduction obligation, not a proven root cause.
+- E5: The R2 reported browser failure established the reproduction obligation;
+  current Split callback and Local response-loss evidence records the bounded repairs and outcomes.
 - E6: Current identity editors and onboarding page expose code-shaped choices and
   broad pre-completion demands.
 - E7: The onboarding readiness ADR and security model establish permanent
@@ -126,10 +141,11 @@ workstream and require qualified authority before any such claim is released.
 
 ## Missing Evidence
 
-Authenticated-browser reproduction and correction of the interaction defect;
-before/after invariant-breaker output; real-provider and five-database evidence;
-fresh-install timing; accessibility tree and viewport evidence; implementation
-review; and final zero-sensitive-telemetry inspection.
+No fresh usability study, accessibility tree/mobile/RTL audit, fresh-install timing
+measurement, legal review, zero-sensitive-telemetry inspection, or five-live-provider
+activation matrix was performed. Full API/Persistence project assurance remains
+incomplete and attribution-limited as stated in Validation Gaps. These do not
+invalidate the completed bounded implementation evidence or its R2 mappings.
 
 ## Context Inventory
 
@@ -156,13 +172,14 @@ prove or repair a Blazor circuit defect.
 | 2026-09-20 | Draft | Current / plan-aligned | Completed R1 mapping | Original R1 plan/tasks |
 | 2026-09-20 | Current | Stale | Senior CTO material rewrite to R2 | Revised private-completion journey and task mapping |
 | 2026-09-20 | Stale | Current / plan-aligned | Full R2 revalidation | E9; mappings below |
+| 2026-09-21 | Current / plan-aligned | Implemented / implementation-aligned with recorded gaps | Final implementation closure audit at `f5ccd58f4` | Provider, browser, MAD, and full-project attribution evidence referenced above |
 
-## Planning Handoff
+## Implementation Closure Handoff
 
 - Workstream: progressive-instance-onboarding
-- Status: current
-- Disposition: plan-aligned
-- Reviewed input: R2 triad grounded in `origin/develop` `7f78e938f`
+- Status: implemented; final audit current
+- Disposition: implementation-aligned with recorded validation gaps
+- Reviewed input: R2 triad grounded in `origin/develop` `7f78e938f`; final implementation `f5ccd58f4`
 - Findings and mitigations: IVSD-F001 -> IVSD-M001 through IVSD-F006 -> IVSD-M006
 - Required plan mappings:
   - IVSD-F001 / IVSD-M001 -> S02, S09, S20; Tasks 1.1-1.2, 2.1-2.3, 3.1-3.3.

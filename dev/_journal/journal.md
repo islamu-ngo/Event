@@ -2401,3 +2401,29 @@ dependent retention and unchanged hard-deletion behavior.
 - [x] Stays in journal only (protected by focused repository regressions)
 
 ---
+
+[2026-09-21 Europe/Brussels] — Private onboarding keeps lifecycle authority exact
+
+**Context**: During progressive instance onboarding closure, private instance-management and completion recovery were verified across Local and Split deployment journeys.
+
+**Symptom / Observation**: A Provisioning directory must remain unreachable to public lifecycle paths while its exact instance administrator can manage authentication, authorization, and operator identity. Completion must reject stale or blocked state even when a HAL affordance was previously displayed.
+
+**Root Cause**: Tenant lifecycle visibility and instance-management authority are separate decisions, while completion-time readiness and generation can change between a client snapshot and a durable mutation.
+
+**Resolution**: `a4fdf332e` classifies only exact private management actions independently of tenant binding while retaining server authority checks. `9b22c996c` revalidates generation and profile-save authority under the bootstrap mutation fence; `15c9c84f2` admits completion only when canonical readiness is unblocked.
+
+**Why This Matters for Future Work**: Keep private instance management independent from the public tenant lifecycle, but never broaden its authority. Treat readiness and generation as durable mutation-fence checks, not HAL or controller-only prechecks.
+
+**References**:
+- `docs/internal/SELF_HOSTING.md:90-105`
+- `.omo/evidence/20260921-mad-required-repairs/f1-summary.md`
+- `.omo/evidence/20260921-mad-required-repairs/f2-summary.md`
+- `.omo/evidence/20260921-mad-required-repairs/f3-summary.md`
+- Commit: `a4fdf332e`
+- Commit: `15c9c84f2`
+- Commit: `9b22c996c`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (implementation invariants are already anchored in self-hosting guidance)
+
+---

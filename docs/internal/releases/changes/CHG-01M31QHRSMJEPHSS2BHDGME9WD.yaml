@@ -1,0 +1,28 @@
+Change-Id: CHG-01M31QHRSMJEPHSS2BHDGME9WD
+Title: "Keep provisioning directories out of public operations"
+Type: fix
+Scope: onboarding
+Summary: "Enforce fresh tenant lifecycle facts after trusted tenant binding and in public aggregates while retaining explicit management and historical callbacks."
+Group: provisioning-public-boundary
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: "Provisioning directories are denied public reads and visitor allocation. Exact management actions retain their existing authority checks; tenant binding is not an authorization grant."
+  Migration:
+    Reference: docs/internal/adr/ADR-032-progressive-instance-onboarding.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Complete private administration before explicitly activating a directory. Legal identity edits and setup completion do not publish it."

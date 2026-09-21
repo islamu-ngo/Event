@@ -1,0 +1,7 @@
+# ABOUTME: Commit-bound correction for a colliding immutable Change-Id footer.
+# ABOUTME: Maps only the exact recorded Git object to its replacement public fragment.
+Schema-Version: change-id-rename.v1
+Commit-Oid: d36ed070220fc839afcd0ae2cac2228c0ece1e59
+Old-Change-Id: CHG-01M2ZZ352TC94N16HMTKQAA5TK
+New-Change-Id: CHG-01M31QF0PTF0EEEQ7QBCE3ZFZH
+Reason: Separate the public-read gap repair from the preceding lifecycle boundary commit without changing immutable history.

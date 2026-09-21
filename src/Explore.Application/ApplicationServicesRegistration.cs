@@ -273,6 +273,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IInstanceSmtpSettingService, InstanceSmtpSettingService>();
         services.AddScoped<IInstanceBootstrapAuditLogger, InstanceBootstrapAuditLogger>();
         services.AddScoped<InstanceOnboardingCompletionOperation>();
+        services.AddScoped<IInstanceOnboardingGenerationReader, InstanceOnboardingGenerationReader>();
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();

@@ -1,8 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Operations;
-using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
@@ -46,7 +44,7 @@ public sealed class InstanceOnboardingCompletionOperation(
     IJwtAuthorityRefreshNotifier jwtRefreshNotifier,
     ILogger<InstanceOnboardingCompletionOperation> logger,
     IUnitOfWork unitOfWork,
-    IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto> journeyQuery,
+    IInstanceOnboardingGenerationReader generationReader,
     IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null)
 {
     private static readonly JsonSerializerOptions IdentitySerializerOptions = new(JsonSerializerDefaults.Web);
@@ -290,10 +288,9 @@ public sealed class InstanceOnboardingCompletionOperation(
         CompleteInstanceOnboardingRequest settings, CancellationToken cancellationToken)
     {
         var bootstrap = await bootstrapRepository.GetCurrentForUpdate(cancellationToken);
-        var journey = await journeyQuery.QueryAsync(new(), cancellationToken);
-        if (journey.State != "Available" || journey.Preflight?.IsReadyToLaunch != true
-            || string.IsNullOrWhiteSpace(settings.ExpectedJourneyGeneration)
-            || !string.Equals(settings.ExpectedJourneyGeneration, journey.Generation, StringComparison.Ordinal))
+        var generation = await generationReader.ReadAsync(bootstrap, cancellationToken);
+        if (string.IsNullOrWhiteSpace(settings.ExpectedJourneyGeneration)
+            || !string.Equals(settings.ExpectedJourneyGeneration, generation, StringComparison.Ordinal))
             throw new ConcurrencyConflictException("onboarding_generation_changed",
                 "Refresh authoritative setup status before submitting a new completion request.");
         return bootstrap;

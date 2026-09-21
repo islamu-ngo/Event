@@ -22,7 +22,10 @@ If the snapshot is unavailable, contradictory or changed while being read, repai
 the selected source and refresh; do not proceed using an older screen's actions.
 Custom setup clients must replace `/api/system/onboarding-preflight` with
 `/api/instanceonboarding/journey`, using active setup or administrator authority.
-Completion and sign-in recovery rules are unchanged.
+Completion and sign-in recovery rules are unchanged. The journey generation
+tracks saved setup state, not a guarantee of continued external availability.
+Completion checks readiness again before taking the setup write lock; changed
+saved settings still require a refresh.
 
 ## Getting-Started And Identity Controls
 

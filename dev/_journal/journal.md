@@ -2427,3 +2427,21 @@ dependent retention and unchanged hard-deletion behavior.
 - [x] Stays in journal only (implementation invariants are already anchored in self-hosting guidance)
 
 ---
+
+## 2026-09-21 - Separate readiness admission from the durable completion fence
+
+PR #46 exposed external work inside the bootstrap transaction: the full journey
+ran preflight twice, including S3 verification and SMTP resolution; authorization
+configuration also resolves secrets. The transaction-marker regression reproduced
+one journey call under lock before the fix. It now exercises the real journey and
+preflight with an SMTP boundary probe, asserting positive outside-transaction work
+and zero inside-transaction work.
+
+`IInstanceOnboardingGenerationReader` owns the shared database-only generation.
+The public journey brackets live reads with it, while completion compares it under
+the existing serializable/convergence lock. Readiness remains a controller
+admission check, not a network operation under lock. This refines the prior
+journal entry's wording: durable races belong under the fence; live external
+readiness does not. See `docs/internal/OPERATIONS.md` for generation ownership.
+
+---

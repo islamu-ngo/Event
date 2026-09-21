@@ -51,6 +51,13 @@ the temporary password, complete the existing private replacement flow, then sig
 in afresh. The login flow, not the onboarding status projection, decides whether
 password replacement is required.
 
+Journey generation hashes bootstrap authority and ordinally ordered persisted
+instance setting keys, values and locks. Live readiness and provider secret
+resolution run outside completion transactions; the journey checks durable
+generation before and after those reads. Completion recomputes only that durable
+generation under the bootstrap lock. Local reservation IDs and timestamps are
+excluded so reserving an operation does not invalidate its admitted generation.
+
 ## Anonymous Registration Retention
 
 Anonymous names and answers stop being operationally readable at their original

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -19,6 +18,8 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
     IAuthProviderConfigurationService authentication,
     IAuthorizationProviderConfigurationService authorization,
     ISystemSettingRepository settings,
+    IInstanceBootstrapStateRepository bootstrapRepository,
+    IInstanceOnboardingGenerationReader generationReader,
     ILogger<GetInstanceOnboardingJourneyQueryHandler> logger)
     : IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto>
 {
@@ -26,10 +27,15 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
     {
         try
         {
-            var first = await ReadAsync(request, cancellationToken);
-            if (first.State == "Failed") return first;
-            var confirmed = await ReadAsync(request, cancellationToken);
-            return first.Generation == confirmed.Generation ? confirmed : new() { ReasonCode = "snapshot_changed" };
+            var generation = await generationReader.ReadAsync(
+                await bootstrapRepository.GetCurrent(cancellationToken), cancellationToken);
+            var snapshot = await ReadAsync(request, cancellationToken);
+            if (snapshot.State == "Failed") return snapshot;
+            var confirmed = await generationReader.ReadAsync(
+                await bootstrapRepository.GetCurrent(cancellationToken), cancellationToken);
+            return generation == confirmed
+                ? snapshot with { Generation = confirmed }
+                : new() { ReasonCode = "snapshot_changed" };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
@@ -108,44 +114,52 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
         var projectedPreflight = preflight with
         {
             BlockingChecks = preflight.BlockingChecks.Select(check => check.Code == "auth_config"
-                ? check with { Status = auth.State == "Ready" ? "Pass" : "Fail", ReasonCode = auth.ReasonCode,
-                    RemediationAuthority = auth.RemediationAuthority, RestartRequired = auth.RestartRequired,
-                    ActionRelation = auth.ActionRelation }
+                ? check with
+                {
+                    Status = auth.State == "Ready" ? "Pass" : "Fail",
+                    ReasonCode = auth.ReasonCode,
+                    RemediationAuthority = auth.RemediationAuthority,
+                    RestartRequired = auth.RestartRequired,
+                    ActionRelation = auth.ActionRelation
+                }
                 : check).Append(new OnboardingPreflightCheckDto
                 {
-                    Code = "authorization_config", Name = "Authorization configuration",
-                    Status = authz.State == "Ready" ? "Pass" : "Fail", ReasonCode = authz.ReasonCode,
-                    RemediationAuthority = authz.RemediationAuthority, RestartRequired = authz.RestartRequired,
-                    ActionRelation = authz.ActionRelation, Message = "Selected authorization provider readiness."
+                    Code = "authorization_config",
+                    Name = "Authorization configuration",
+                    Status = authz.State == "Ready" ? "Pass" : "Fail",
+                    ReasonCode = authz.ReasonCode,
+                    RemediationAuthority = authz.RemediationAuthority,
+                    RestartRequired = authz.RestartRequired,
+                    ActionRelation = authz.ActionRelation,
+                    Message = "Selected authorization provider readiness."
                 }).ToArray()
         };
-        var snapshot = new InstanceOnboardingJourneyDto
+        return new InstanceOnboardingJourneyDto
         {
-            State = "Available", ReasonCode = "snapshot_available", Bootstrap = bootstrap,
-            Authentication = auth, Authorization = authz, Profile = profile,
-            Preflight = projectedPreflight, OperatorIdentity = identity
+            State = "Available",
+            ReasonCode = "snapshot_available",
+            Bootstrap = bootstrap,
+            Authentication = auth,
+            Authorization = authz,
+            Profile = profile,
+            Preflight = projectedPreflight,
+            OperatorIdentity = identity
         };
-        var durableSnapshot = snapshot with
-        {
-            Bootstrap = bootstrap with
-            {
-                IsAuthenticated = false,
-                IsCurrentUserInstanceAdmin = false,
-                PendingOperationId = null
-            }
-        };
-        return snapshot with { Generation = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(durableSnapshot))) };
     }
 
     private static OnboardingProviderReadinessDto Readiness(string provider, string state, bool deploymentManaged, string relation) => new()
     {
-        Provider = provider, State = state,
+        Provider = provider,
+        State = state,
         RemediationAuthority = deploymentManaged ? "Deployment" : "SetupOperator",
-        RestartRequired = state == "DeploymentRestartRequired", ActionRelation = relation,
+        RestartRequired = state == "DeploymentRestartRequired",
+        ActionRelation = relation,
         ReasonCode = state switch
         {
-            "Ready" => "provider_ready", "Failed" => "provider_failed",
-            "DeploymentRestartRequired" => "deployment_restart_required", _ => "provider_configuration_required"
+            "Ready" => "provider_ready",
+            "Failed" => "provider_failed",
+            "DeploymentRestartRequired" => "deployment_restart_required",
+            _ => "provider_configuration_required"
         }
     };
 }

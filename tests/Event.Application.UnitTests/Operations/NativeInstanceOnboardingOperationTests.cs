@@ -62,11 +62,12 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Test]
     public async Task Journey_GenerationIsStableUntilAuthoritativeProfileChanges()
     {
-        var provider = new AuthorizationProviderConfigurationDto { Provider = "local", AuthorizationProviderConfigured = true };
-        var first = ProjectJourney(provider);
+        var scenario = new Features.InstanceOnboarding.OnboardingCompletionScenario(interactive: true);
+        var first = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
         await Assert.That(first.Generation).IsNotNull();
-        await Assert.That(ProjectJourney(provider).Generation).IsEqualTo(first.Generation);
-        await Assert.That(ProjectJourney(provider, "changed").Generation).IsNotEqualTo(first.Generation);
+        await Assert.That((await scenario.Journey.QueryAsync(new(), CancellationToken.None)).Generation).IsEqualTo(first.Generation);
+        scenario.ChangeSetting(Explore.Domain.Constants.GovernanceSettingKeys.Branding.DisplayName, "changed");
+        await Assert.That((await scenario.Journey.QueryAsync(new(), CancellationToken.None)).Generation).IsNotEqualTo(first.Generation);
     }
 
     private static InstanceOnboardingJourneyDto ProjectJourney(AuthorizationProviderConfigurationDto? provider, string name = "site") =>

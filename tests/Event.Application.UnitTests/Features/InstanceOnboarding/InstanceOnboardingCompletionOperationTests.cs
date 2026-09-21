@@ -1,4 +1,9 @@
+using System.Text.Json;
 using Explore.Application.Authentication;
+using Explore.Application.Exceptions;
+using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
+using Explore.Application.Features.InstanceOnboarding.Queries;
+using Microsoft.Extensions.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
@@ -88,7 +93,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
     public async Task InteractiveCompletion_RequiresNoDirectoryLegalIdentity()
     {
         var scenario = new OnboardingCompletionScenario(interactive: true);
-        var command = scenario.InteractiveCommand();
+        var command = await scenario.InteractiveCommandAsync();
         command = command with { Settings = command.Settings with { DirectoryOperatorIdentity = null } };
         var handler = new CompleteInstanceOnboardingCommandHandler(
             scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
@@ -97,6 +102,66 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(scenario.CreatedTenant?.TenantStatusId).IsEqualTo((int)TenantStatusEnum.Provisioning);
+    }
+
+    [Test]
+    public async Task InteractiveCompletion_DoesNotEvaluateExternalReadinessInsideTransaction()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        var handler = new CompleteInstanceOnboardingCommandHandler(
+            scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+
+        var response = await handler.ExecuteAsync(await scenario.InteractiveCommandAsync(), CancellationToken.None);
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.ExternalReadinessCallsOutsideTransaction).IsGreaterThan(0);
+        await Assert.That(scenario.ExternalReadinessCallsInsideTransaction).IsEqualTo(0);
+        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Completed);
+    }
+
+    [Test]
+    [Arguments(GovernanceSettingKeys.Branding.DisplayName)]
+    [Arguments(GovernanceSettingKeys.Security.AuthorizationProvider)]
+    [Arguments(Explore.Application.Settings.InstanceOperatorIdentitySettingKeys.OperatorIdentity)]
+    public async Task InteractiveCompletion_FencesDurableChangesAfterJourneyAdmission(string key)
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        var command = await scenario.InteractiveCommandAsync();
+        scenario.ChangeSetting(key, "changed");
+        var handler = new CompleteInstanceOnboardingCommandHandler(
+            scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() => handler.ExecuteAsync(command, CancellationToken.None));
+
+        await Assert.That(scenario.CommittedWrites).IsEmpty();
+        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
+        await Assert.That(scenario.ExternalReadinessCallsInsideTransaction).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Journey_RejectsDurableChangeDuringExternalReadiness()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.DuringExternalReadiness = () => scenario.ChangeSetting(GovernanceSettingKeys.Branding.DisplayName, "changed");
+
+        var journey = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(journey.ReasonCode).IsEqualTo("snapshot_changed");
+        await Assert.That(journey.Generation).IsNull();
+    }
+
+    [Test]
+    public async Task Generation_LocalReservationPreservesAuthorityButCompletionChangesIt()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        var unreserved = await scenario.GenerationReader.ReadAsync(null, CancellationToken.None);
+        var reserved = await scenario.GenerationReader.ReadAsync(scenario.Bootstrap, CancellationToken.None);
+        var journey = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(reserved).IsEqualTo(unreserved);
+        await Assert.That(journey.Generation).IsEqualTo(reserved);
+        scenario.Bootstrap.CompleteInteractive(scenario.UserId, DateTime.UtcNow);
+        await Assert.That(await scenario.GenerationReader.ReadAsync(scenario.Bootstrap, CancellationToken.None)).IsNotEqualTo(reserved);
     }
 
     [Test]
@@ -213,7 +278,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
             interactive.DeploymentModeProvider,
             interactive.Operation);
         BaseCommandResponse<Guid> interactiveResponse = await handler.ExecuteAsync(
-            interactive.InteractiveCommand(),
+            await interactive.InteractiveCommandAsync(),
             CancellationToken.None);
 
         await Assert.That(configuredResponse.IsSuccess).IsTrue();
@@ -491,9 +556,55 @@ internal sealed class OnboardingCompletionScenario
                 }),
                 Guid.CreateVersion7()));
 
-        var journey = Substitute.For<IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto>>();
-        journey.QueryAsync(Arg.Any<GetInstanceOnboardingJourneyQuery>(), Arg.Any<CancellationToken>())
-            .Returns(new InstanceOnboardingJourneyDto { State = "Available", Generation = "scenario", Preflight = new() });
+        systemSettings.GetAllSettings(Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(_ => _settings.ToList());
+        systemSettings.GetByKey(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => _settings.SingleOrDefault(setting => setting.SettingKey == call.Arg<string>()));
+        GenerationReader = new InstanceOnboardingGenerationReader(systemSettings, DeploymentModeProvider);
+        var smtp = Substitute.For<ISmtpConfigResolver>();
+        smtp.ResolveAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (_unitOfWork.InTransaction) ExternalReadinessCallsInsideTransaction++;
+            else ExternalReadinessCallsOutsideTransaction++;
+            DuringExternalReadiness?.Invoke();
+            return Task.FromResult<SmtpConfiguration?>(null);
+        });
+        var status = Substitute.For<IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto>>();
+        status.QueryAsync(Arg.Any<GetInstanceOnboardingStatusQuery>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new InstanceOnboardingStatusDto
+            {
+                State = "InteractivePending",
+                Provider = providerKind.ToString(),
+                Generation = Bootstrap.Generation,
+                SelectedDeploymentMode = Bootstrap.DeploymentMode.ToString()
+            });
+        var authentication = Substitute.For<IAuthProviderConfigurationService>();
+        authentication.ReadConfigurationAsync().Returns(new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = (int)providerKind,
+            PrimaryProviderCode = providerKind.ToString().ToLowerInvariant(),
+            KeycloakAuthority = "https://identity.example.test",
+            KeycloakClientId = "event"
+        });
+        var authorization = Substitute.For<IAuthorizationProviderConfigurationService>();
+        authorization.ReadConfigurationAsync().Returns(new AuthorizationProviderConfigurationDto
+        {
+            Provider = "local",
+            AuthorizationProviderConfigured = true
+        });
+        var dispatcher = Substitute.For<IAuthenticationProviderDispatcher>();
+        dispatcher.GetActivePrimaryProviderAsync(Arg.Any<CancellationToken>()).Returns(providerKind);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PublicBaseUrl"] = "https://example.test",
+            ["Keycloak:Authority"] = "https://identity.example.test",
+            ["Keycloak:ClientId"] = "event"
+        }).Build();
+        var preflight = new GetOnboardingPreflightQueryHandler(BootstrapRepository, DeploymentModeProvider,
+            setupSecret, tenants, systemSettings, config, dispatcher, smtpConfigResolver: smtp);
+        Journey = new GetInstanceOnboardingJourneyQueryHandler(status, preflight,
+            Substitute.For<IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto>>(),
+            authentication, authorization, systemSettings, BootstrapRepository, GenerationReader,
+            NullLogger<GetInstanceOnboardingJourneyQueryHandler>.Instance);
         Operation = new InstanceOnboardingCompletionOperation(
             BootstrapRepository,
             platformRoles,
@@ -513,7 +624,7 @@ internal sealed class OnboardingCompletionScenario
             jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance,
             _unitOfWork,
-            journey);
+            GenerationReader);
     }
 
     public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();
@@ -538,6 +649,17 @@ internal sealed class OnboardingCompletionScenario
     public ProviderAccountKey BindingAccount { get => _provider.BindingAccount; set => _provider.BindingAccount = value; }
     public bool ProviderAvailable { get => _provider.Available; set => _provider.Available = value; }
     public bool JwtCancellationWasRequested { get; private set; }
+    public int ExternalReadinessCallsInsideTransaction { get; private set; }
+    public int ExternalReadinessCallsOutsideTransaction { get; private set; }
+    public Action? DuringExternalReadiness { get; set; }
+    public IInstanceOnboardingGenerationReader GenerationReader { get; }
+    public IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto> Journey { get; }
+
+    public void ChangeSetting(string key, string value)
+    {
+        _settings.RemoveAll(setting => setting.SettingKey == key);
+        _settings.Add(new SystemSetting { SettingKey = key, Value = JsonSerializer.Serialize(value) });
+    }
 
     public ClaimConfiguredInstanceAdministratorCommand Command(Guid? userId = null, ProviderAccountKey? account = null) => new()
     {
@@ -608,7 +730,7 @@ internal sealed class OnboardingCompletionScenario
         return bootstrap.CompleteConfiguredAsync(Account);
     }
 
-    public CompleteInstanceOnboardingCommand InteractiveCommand() => new()
+    public async Task<CompleteInstanceOnboardingCommand> InteractiveCommandAsync() => new()
     {
         UserId = UserId,
         Email = "interactive@example.test",
@@ -616,7 +738,10 @@ internal sealed class OnboardingCompletionScenario
         LastName = "Admin",
         AuthProvider = "keycloak",
         AuthProviderId = "interactive-subject",
-        Settings = Settings()
+        Settings = Settings() with
+        {
+            ExpectedJourneyGeneration = (await Journey.QueryAsync(new(), CancellationToken.None)).Generation
+        }
     };
 
     public void CompleteBootstrap(Guid? userId = null) =>

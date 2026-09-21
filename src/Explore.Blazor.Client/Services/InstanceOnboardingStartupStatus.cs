@@ -31,6 +31,8 @@ public sealed record InstanceOnboardingStartupStatus(
 
 internal static class InstanceOnboardingStartupStatusAdapter
 {
+    private const string Keycloak = "Keycloak";
+    private const string Atproto = "Atproto";
     public static InstanceOnboardingStartupStatus FromGenerated(InstanceOnboardingStatusDto? status)
     {
         if (status is null)
@@ -52,13 +54,13 @@ internal static class InstanceOnboardingStartupStatusAdapter
 
         var disposition = (status.IsCompleted, state, mode, provider) switch
         {
-            (false, "InteractivePending", "Interactive", null or "Local" or "Keycloak" or "Atproto") =>
+            (false, "InteractivePending", "Interactive", null or "Local" or Keycloak or Atproto) =>
                 InstanceOnboardingStartupDisposition.InteractivePending,
-            (false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", "Keycloak" or "Atproto") =>
+            (false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", Keycloak or Atproto) =>
                 InstanceOnboardingStartupDisposition.ConfiguredAdministratorPending,
-            (true, "Completed", "Interactive", null or "Local" or "Keycloak" or "Atproto") =>
+            (true, "Completed", "Interactive", null or "Local" or Keycloak or Atproto) =>
                 InstanceOnboardingStartupDisposition.Completed,
-            (true, "Completed", "ConfiguredAdministrator", null or "Local" or "Keycloak" or "Atproto") =>
+            (true, "Completed", "ConfiguredAdministrator", null or "Local" or Keycloak or Atproto) =>
                 InstanceOnboardingStartupDisposition.Completed,
             _ => InstanceOnboardingStartupDisposition.Unavailable
         };

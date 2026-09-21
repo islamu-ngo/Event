@@ -463,7 +463,7 @@ public sealed class InstanceOnboardingService(
         {
             var status = await authorizationClient.GetInstanceAuthorizationProviderConfigurationStatusAsync(
                 cancellationToken: CancellationToken.None);
-            return status.Configured == true &&
+            return status.Configured &&
                 (status.AuthorizationProviderManagedByDeployment != true || string.Equals(
                     status.AuthorizationProviderBootstrapStatus, "ready", StringComparison.OrdinalIgnoreCase));
         }

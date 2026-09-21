@@ -6,7 +6,7 @@
 <section class="instance-getting-started" aria-labelledby="instance-getting-started-heading" aria-busy="@(_loading ? "true" : "false")">
     <MudText Typo="Typo.h5" HtmlTag="h2" id="instance-getting-started-heading">Administration ready</MudText>
     <MudText>Setup is finished. Completing identity does not publish a directory; activation is a separate action.</MudText>
-    <p role="status" aria-live="polite" aria-atomic="true">@(_loading ? "Refreshing administration status..." : _status is null || _journey is null ? "Administration status is unavailable. Refresh to recover the server's current actions." : "Administration status refreshed.")</p>
+    <p role="status" aria-live="polite" aria-atomic="true">@RefreshStatus</p>
     @foreach (var group in Groups)
     {
         <section class="instance-getting-started__group" data-requirement-group="@group.Code" aria-labelledby="@($"getting-started-{group.Code}")">
@@ -17,7 +17,7 @@
                 var reasons = group.Code == "PublicDisclosure" ? _journey?.OperatorIdentity?.PublicDisclosure?.ReasonCodes : _journey?.OperatorIdentity?.PaidCommerce?.ReasonCodes;
                 <div class="instance-getting-started__check" data-check="@group.Code" data-requirement-category="@group.Code">
                     <h4>Instance operator identity</h4>
-                    <p>@(ready is null ? "Unavailable" : ready == true ? "Ready" : "Action required")</p>
+                    <p>@ReadinessLabel(ready)</p>
                     @foreach (var reason in reasons ?? [])
                     {
                         <p data-reason>@reason</p>
@@ -70,6 +70,24 @@
     private InstanceOnboardingStatusDto? _status;
     private HalResourceOfInstanceOnboardingJourneyDto? _journey;
     private bool _loading;
+
+    private string RefreshStatus
+    {
+        get
+        {
+            if (_loading) return "Refreshing administration status...";
+            return _status is null || _journey is null
+                ? "Administration status is unavailable. Refresh to recover the server's current actions."
+                : "Administration status refreshed.";
+        }
+    }
+
+    private static string ReadinessLabel(bool? ready) => ready switch
+    {
+        true => "Ready",
+        false => "Action required",
+        null => "Unavailable"
+    };
 
     private IEnumerable<OnboardingPreflightCheckDto> ChecksFor(string group) =>
         (_journey?.Preflight?.WarningChecks ?? []).Where(check =>

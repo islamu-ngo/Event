@@ -695,93 +695,13 @@
             if (lifetimeToken.IsCancellationRequested) return;
 
             _journey = journey?.State == "Available" ? journey : null;
-            var status = _journey?.Bootstrap;
-            if (_journey is null)
-            {
-                var terminal = await InstanceOnboardingService.GetStatusAsync();
-                if (lifetimeToken.IsCancellationRequested) return;
-                if (terminal is { IsCompleted: true, State: "Completed", Provider: "Local" })
-                    status = terminal;
-            }
-            if (status is not null && _journey is not null)
-            {
-                status = status with
-                {
-                    AdditionalProperties = new Dictionary<string, object>(status.AdditionalProperties)
-                    {
-                        ["_links"] = System.Text.Json.JsonSerializer.SerializeToElement(_journey!._links)
-                    }
-                };
-            }
-            var identityJourney = _journey;
-            _operatorIdentity = identityJourney is { OperatorIdentity: { } identity } ? new()
-            {
-                CanEdit = identityJourney._links?.ContainsKey("update-operator-identity") == true,
-                Revision = identity.Revision, OperatorId = identity.OperatorId,
-                PublicName = identity.PublicName, LegalName = identity.LegalName,
-                OperatorKindCode = identity.OperatorKindCode, JurisdictionCountryCode = identity.JurisdictionCountryCode,
-                RegistrationIdentifier = identity.RegistrationIdentifier, PublicContactEmail = identity.PublicContactEmail,
-                WebsiteUrl = identity.WebsiteUrl, LegalNoticeUrl = identity.LegalNoticeUrl,
-                TermsUrl = identity.TermsUrl, PrivacyUrl = identity.PrivacyUrl,
-                IsOfficialInstance = identity.IsOfficialInstance == true, OfficialOrigin = identity.OfficialOrigin,
-                PaidCommerceIsReady = identity.PaidCommerce?.IsReady == true,
-                PublicDisclosure = identity.PublicDisclosure is { } disclosure ? new()
-                {
-                    IsReady = disclosure.IsReady, FailureCode = disclosure.FailureCode, ReasonCodes = disclosure.ReasonCodes
-                } : null,
-                FailureCode = identity.PaidCommerce?.FailureCode, ReasonCodes = identity.PaidCommerce?.ReasonCodes ?? []
-            } : InstanceOperatorIdentityAdminModel.Failed();
-
-            bool wasLocal = IsLocalSetup;
-            _status = status;
-            _isCompleted = status?.IsCompleted == true;
-            _localCompleted = status is { IsCompleted: true, Provider: "Local", IsAuthenticated: not true };
-            if (wasLocal && !IsLocalSetup)
-            {
-                _localPassword = string.Empty;
-                _localRequestGeneration++;
-            }
-            if (IsLocalSetup)
-                _localOperationId = status?.PendingOperationId ?? _localOperationId;
-            _deploymentMode = NormalizeDeploymentMode(status?.SelectedDeploymentMode);
-            _authProviderConfigured = _journey is null ? null : _journey.Authentication?.State == "Ready";
-            _authorizationProviderConfigured = _journey is null ? null : _journey.Authorization?.State == "Ready";
-            _preflight = _journey?.Preflight;
-            _acknowledgePublicExposure = false;
-
-            if (_journey?.Profile is { } profile)
-            {
-                _siteProfile.SiteName = profile.SiteName;
-                _siteProfile.SupportEmail = profile.SupportEmail;
-                _siteProfile.Locale = profile.Locale;
-                if (Uri.TryCreate(profile.CanonicalUrl, UriKind.Absolute, out _))
-                    _siteProfile.CanonicalUrl = profile.CanonicalUrl;
-            }
-
-            if (_localCompleted)
-            {
-                _localPassword = string.Empty;
-                _localRequestGeneration++;
-                _setupSecretSynced = false;
-                _setupSecretError = null;
-                _syncWarning = null;
-                await Announcer.AnnouncePoliteAsync(T("local.completed", "Setup is complete. Sign in and replace your temporary password."));
-            }
-            else if (status is null
-                || _journey is null
-                || _deploymentMode is null
-                || _preflight is null
-                || !_authProviderConfigured.HasValue
-                || !_authorizationProviderConfigured.HasValue)
-            {
-                await SetLoadErrorAsync(T("errors.status_unavailable", "Some authoritative setup state is unavailable. Refresh before launching."));
-            }
-            else
-            {
-                await Announcer.AnnouncePoliteAsync(T("announcements.loaded", "Setup status loaded."));
-            }
+            var status = await ReadJourneyStatusAsync();
+            if (lifetimeToken.IsCancellationRequested) return;
+            ApplyJourneyStatus(status);
+            ApplyJourneyProfile();
+            await AnnounceJourneyStatusAsync(status);
         }
-        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { return; }
         catch (Exception ex)
         {
             if (lifetimeToken.IsCancellationRequested) return;
@@ -804,6 +724,99 @@
         }
     }
 
+    private async Task<InstanceOnboardingStatusDto?> ReadJourneyStatusAsync()
+    {
+        if (_journey is not null) return _journey.Bootstrap;
+        var terminal = await InstanceOnboardingService.GetStatusAsync();
+        return terminal is { IsCompleted: true, State: "Completed", Provider: "Local" } ? terminal : null;
+    }
+
+    private async Task AnnounceJourneyStatusAsync(InstanceOnboardingStatusDto? status)
+    {
+        if (_localCompleted)
+        {
+            _localPassword = string.Empty;
+            _localRequestGeneration++;
+            _setupSecretSynced = false;
+            _setupSecretError = null;
+            _syncWarning = null;
+            await Announcer.AnnouncePoliteAsync(T("local.completed", "Setup is complete. Sign in and replace your temporary password."));
+        }
+        else if (status is null || _journey is null || _deploymentMode is null || _preflight is null
+            || !_authProviderConfigured.HasValue || !_authorizationProviderConfigured.HasValue)
+        {
+            await SetLoadErrorAsync(T("errors.status_unavailable", "Some authoritative setup state is unavailable. Refresh before launching."));
+        }
+        else
+        {
+            await Announcer.AnnouncePoliteAsync(T("announcements.loaded", "Setup status loaded."));
+        }
+    }
+
+    private void ApplyJourneyStatus(InstanceOnboardingStatusDto? status)
+    {
+        if (status is not null && _journey is not null)
+        {
+            status = status with
+            {
+                AdditionalProperties = new Dictionary<string, object>(status.AdditionalProperties)
+                {
+                    ["_links"] = System.Text.Json.JsonSerializer.SerializeToElement(_journey._links)
+                }
+            };
+        }
+        _operatorIdentity = ProjectIdentity(_journey);
+        bool wasLocal = IsLocalSetup;
+        _status = status;
+        _isCompleted = status?.IsCompleted == true;
+        _localCompleted = status is { IsCompleted: true, Provider: "Local", IsAuthenticated: not true };
+        if (wasLocal && !IsLocalSetup)
+        {
+            _localPassword = string.Empty;
+            _localRequestGeneration++;
+        }
+        if (IsLocalSetup)
+            _localOperationId = status?.PendingOperationId ?? _localOperationId;
+        _deploymentMode = NormalizeDeploymentMode(status?.SelectedDeploymentMode);
+        _authProviderConfigured = _journey is null ? null : _journey.Authentication?.State == "Ready";
+        _authorizationProviderConfigured = _journey is null ? null : _journey.Authorization?.State == "Ready";
+        _preflight = _journey?.Preflight;
+        _acknowledgePublicExposure = false;
+    }
+
+    private static InstanceOperatorIdentityAdminModel ProjectIdentity(HalResourceOfInstanceOnboardingJourneyDto? journey)
+    {
+        if (journey?.OperatorIdentity is not { } identity)
+            return InstanceOperatorIdentityAdminModel.Failed();
+        return new()
+        {
+            CanEdit = journey._links?.ContainsKey("update-operator-identity") == true,
+            Revision = identity.Revision, OperatorId = identity.OperatorId,
+            PublicName = identity.PublicName, LegalName = identity.LegalName,
+            OperatorKindCode = identity.OperatorKindCode, JurisdictionCountryCode = identity.JurisdictionCountryCode,
+            RegistrationIdentifier = identity.RegistrationIdentifier, PublicContactEmail = identity.PublicContactEmail,
+            WebsiteUrl = identity.WebsiteUrl, LegalNoticeUrl = identity.LegalNoticeUrl,
+            TermsUrl = identity.TermsUrl, PrivacyUrl = identity.PrivacyUrl,
+            IsOfficialInstance = identity.IsOfficialInstance == true, OfficialOrigin = identity.OfficialOrigin,
+            PaidCommerceIsReady = identity.PaidCommerce?.IsReady == true,
+            PublicDisclosure = identity.PublicDisclosure is { } disclosure ? new()
+            {
+                IsReady = disclosure.IsReady, FailureCode = disclosure.FailureCode, ReasonCodes = disclosure.ReasonCodes
+            } : null,
+            FailureCode = identity.PaidCommerce?.FailureCode, ReasonCodes = identity.PaidCommerce?.ReasonCodes ?? []
+        };
+    }
+
+    private void ApplyJourneyProfile()
+    {
+        if (_journey?.Profile is not { } profile) return;
+        _siteProfile.SiteName = profile.SiteName;
+        _siteProfile.SupportEmail = profile.SupportEmail;
+        _siteProfile.Locale = profile.Locale;
+        if (Uri.TryCreate(profile.CanonicalUrl, UriKind.Absolute, out _))
+            _siteProfile.CanonicalUrl = profile.CanonicalUrl;
+    }
+
     private async Task SaveProfileAsync()
     {
         if (_disposed || _isSavingProfile || _journey?._links?.ContainsKey("save-profile") != true
@@ -814,14 +827,14 @@
         {
             var response = await InstanceOnboardingService.SaveProfileAsync(CreateCompletionProfile(), lifetimeToken);
             if (lifetimeToken.IsCancellationRequested) return;
-            if (response.Success != true)
+            if (!response.Success)
             {
                 await SetLoadErrorAsync("The site profile could not be saved. Readiness has not been refreshed.");
                 return;
             }
             await RefreshAsync();
         }
-        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { return; }
         finally
         {
             if (!lifetimeToken.IsCancellationRequested) _isSavingProfile = false;

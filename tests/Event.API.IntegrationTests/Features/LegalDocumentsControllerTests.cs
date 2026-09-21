@@ -1,6 +1,7 @@
 namespace Event.Api.IntegrationTests.Features;
 
 using Explore.API.Controllers;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -9,6 +10,8 @@ using Explore.Application.DTOs.LegalDocuments;
 using Explore.Application.Features.ConfigurationManifest.LegalDocuments;
 using Explore.Application.Features.LegalDocuments.Handlers.Queries;
 using Explore.Application.Features.LegalDocuments.Requests.Queries;
+using Explore.Application.Services;
+using Explore.Infrastructure.Identity;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
@@ -105,6 +108,16 @@ public sealed class LegalDocumentsControllerTests
 
             var services = new ServiceCollection();
             services.AddSingleton(context);
+            services.AddLogging();
+            services.AddHttpContextAccessor();
+            services.AddSingleton<ITenantRepository, TenantRepository>();
+            services.AddSingleton<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
+            services.AddSingleton<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();
+            services.AddSingleton<IOrganizationMemberRepository, OrganizationMemberRepository>();
+            services.AddSingleton<IGroupMemberRepository, GroupMemberRepository>();
+            services.AddSingleton<IUserExternalLoginRepository, UserExternalLoginRepository>();
+            services.AddSingleton<IAdminContext, AdminContext>();
+            services.AddSingleton<ITenantLifecycleAccessService, TenantLifecycleAccessService>();
             services.AddSingleton<ILegalDocumentRepository>(
                 new LegalDocumentRepository(context));
             services.AddSingleton<LegalDocumentRenderingService>();

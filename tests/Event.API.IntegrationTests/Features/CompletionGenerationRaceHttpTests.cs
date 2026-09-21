@@ -41,7 +41,8 @@ public sealed class CompletionGenerationRaceHttpTests
         {
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Authorization:Provider"] = "local", ["Keycloak:ClientId"] = "islamu-event-blazor",
+                ["Authorization:Provider"] = "local",
+                ["Keycloak:ClientId"] = "islamu-event-blazor",
                 ["PublicBaseUrl"] = "https://example.test"
             }));
             builder.ConfigureTestServices(services =>
@@ -67,13 +68,16 @@ public sealed class CompletionGenerationRaceHttpTests
         await Assert.That(journey.RootElement.GetProperty("preflight").GetProperty("isReadyToLaunch").GetBoolean()).IsTrue();
         var settings = new CompleteInstanceOnboardingRequest
         {
-            SiteProfile = profile, ExpectedJourneyGeneration = journey.RootElement.GetProperty("generation").GetString()
+            SiteProfile = profile,
+            ExpectedJourneyGeneration = journey.RootElement.GetProperty("generation").GetString()
         };
         Task<HttpResponseMessage> CompleteAsync() => provider == AuthenticationProviderKind.Local
             ? client.PostAsJsonAsync("/api/instanceonboarding/complete-local", new CompleteLocalInstanceOnboardingRequestDto
             {
-                OperationId = Guid.CreateVersion7(), Username = $"operator-{Guid.CreateVersion7():N}",
-                TemporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}", Settings = settings
+                OperationId = Guid.CreateVersion7(),
+                Username = $"operator-{Guid.CreateVersion7():N}",
+                TemporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}",
+                Settings = settings
             }, token)
             : client.PostAsJsonAsync("/api/instanceonboarding/complete", settings, token);
         Task<HttpResponseMessage> ChangeProfileAsync() => client.PatchAsJsonAsync("/api/instanceonboarding/profile",

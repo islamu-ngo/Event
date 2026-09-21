@@ -149,9 +149,12 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             (await db.InstanceBootstrapStates.SingleAsync(Token)).TransitionDeploymentMode(DeploymentMode.MultiTenant);
             db.TenantSettingOverrides.Add(new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = TenantId,
+                Tenant = null!,
                 SettingKey = GovernanceSettingKeys.Domains.TenantCustomDomain,
-                Value = JsonSerializer.Serialize("private.example.test"), CreatedAt = DateTime.UtcNow
+                Value = JsonSerializer.Serialize("private.example.test"),
+                CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync(Token);
         }
@@ -180,11 +183,19 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             Guid ownerId = (await db.InstanceBootstrapStates.SingleAsync(Token)).CompletedByUserId!.Value;
             db.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), TenantId = TenantId, Name = "Lifecycle key", KeyId = keyId,
-                SecretHash = Explore.Application.Services.ApiKeyHashing.ComputeHash(secret), Scopes = "[\"events:read\"]",
-                OwnerType = ExternalApiKeyOwnerType.User, OwnerId = ownerId,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = 1, ExternalApiKeyCreditPeriod = null!, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = TenantId,
+                Name = "Lifecycle key",
+                KeyId = keyId,
+                SecretHash = Explore.Application.Services.ApiKeyHashing.ComputeHash(secret),
+                Scopes = "[\"events:read\"]",
+                OwnerType = ExternalApiKeyOwnerType.User,
+                OwnerId = ownerId,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = 1,
+                ExternalApiKeyCreditPeriod = null!,
+                CreatedAt = DateTime.UtcNow
             });
             (await db.InstanceBootstrapStates.SingleAsync(Token)).TransitionDeploymentMode(DeploymentMode.MultiTenant);
             await db.SaveChangesAsync(Token);
@@ -222,8 +233,15 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             if (authority != "member")
                 db.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = targetId, Tenant = null!, Role = null!, TenantUserId = membership.Id, TenantUser = membership,
-                    RoleId = (int)RoleEnum.TenantAdmin, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = targetId,
+                    Tenant = null!,
+                    Role = null!,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    GrantedAt = DateTime.UtcNow
                 });
             await db.SaveChangesAsync(Token);
         }
@@ -374,11 +392,17 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         {
             db.ExternalApiKeys.Add(new ExternalApiKey
             {
-                Id = Guid.CreateVersion7(), Name = "Private management machine", KeyId = keyId,
-                SecretHash = Explore.Application.Services.ApiKeyHashing.ComputeHash(secret), Scopes = "[\"admin:instance\"]",
-                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin, OwnerId = (await db.InstanceBootstrapStates.SingleAsync(Token)).CompletedByUserId!.Value,
-                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active, ExternalApiKeyStatus = null!,
-                ExternalApiKeyCreditPeriodId = 1, ExternalApiKeyCreditPeriod = null!
+                Id = Guid.CreateVersion7(),
+                Name = "Private management machine",
+                KeyId = keyId,
+                SecretHash = Explore.Application.Services.ApiKeyHashing.ComputeHash(secret),
+                Scopes = "[\"admin:instance\"]",
+                OwnerType = ExternalApiKeyOwnerType.InstanceAdmin,
+                OwnerId = (await db.InstanceBootstrapStates.SingleAsync(Token)).CompletedByUserId!.Value,
+                ExternalApiKeyStatusId = (int)ExternalApiKeyStatusEnum.Active,
+                ExternalApiKeyStatus = null!,
+                ExternalApiKeyCreditPeriodId = 1,
+                ExternalApiKeyCreditPeriod = null!
             });
             await db.SaveChangesAsync(Token);
         }
@@ -406,8 +430,15 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             var membership = new TenantUser { Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active };
             db.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync(Token);
         }
@@ -423,10 +454,14 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         await using var db = factory.CreateDatabase();
         db.Add(TenantDirectoryOperatorIdentityDocumentDefaults.Create(TenantId, new TenantDirectoryOperatorIdentitySettings
         {
-            PublicName = "Lifecycle operator", LegalName = "Lifecycle operator ASBL",
-            OperatorKindCode = "registered_organization", JurisdictionCountryCode = "BE",
-            PublicContactEmail = "operator@example.test", LegalNoticeUrl = "https://example.test/legal",
-            TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy"
+            PublicName = "Lifecycle operator",
+            LegalName = "Lifecycle operator ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            PublicContactEmail = "operator@example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            TermsUrl = "https://example.test/terms",
+            PrivacyUrl = "https://example.test/privacy"
         }));
         await db.SaveChangesAsync(Token);
         return factory;
@@ -441,7 +476,8 @@ public sealed partial class ProvisioningTenantAccessHttpTests
 
     private static HttpClient CreateClient(LocalAdmissionWebApplicationFactory factory) => factory.CreateClient(new WebApplicationFactoryClientOptions
     {
-        BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+        BaseAddress = new Uri("https://localhost"),
+        AllowAutoRedirect = false
     });
 
     private static async Task SignInAsync(LocalAdmissionWebApplicationFactory factory, HttpClient client)

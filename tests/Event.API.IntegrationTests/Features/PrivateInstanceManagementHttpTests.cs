@@ -51,21 +51,48 @@ public sealed class PrivateInstanceManagementHttpTests
                 if (authority == "administrator")
                     database.PlatformUserRoles.Add(new PlatformUserRole
                     {
-                        Id = Guid.CreateVersion7(), UserId = user.Id, User = user, RoleId = (int)RoleEnum.Admin,
-                        Role = null!, GrantedAt = DateTime.UtcNow, GrantedBy = user.Id
+                        Id = Guid.CreateVersion7(),
+                        UserId = user.Id,
+                        User = user,
+                        RoleId = (int)RoleEnum.Admin,
+                        Role = null!,
+                        GrantedAt = DateTime.UtcNow,
+                        GrantedBy = user.Id
                     });
                 if (authority == "unrelated-tenant-admin")
                 {
-                    var other = new Tenant { Id = Guid.CreateVersion7(), FullName = "Other", Slug = "other",
-                        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow };
-                    var member = new TenantUser { Id = Guid.CreateVersion7(), TenantId = other.Id, Tenant = other,
-                        UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow };
+                    var other = new Tenant
+                    {
+                        Id = Guid.CreateVersion7(),
+                        FullName = "Other",
+                        Slug = "other",
+                        TenantStatusId = (int)TenantStatusEnum.Active,
+                        TenantStatus = null!,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    var member = new TenantUser
+                    {
+                        Id = Guid.CreateVersion7(),
+                        TenantId = other.Id,
+                        Tenant = other,
+                        UserId = user.Id,
+                        User = user,
+                        StatusId = (int)TenantUserStatusEnum.Active,
+                        CreatedAt = DateTime.UtcNow
+                    };
                     database.Tenants.Add(other);
                     database.TenantUsers.Add(member);
                     database.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
                     {
-                        Id = Guid.CreateVersion7(), TenantId = other.Id, Tenant = other, TenantUserId = member.Id, TenantUser = member,
-                        RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow
+                        Id = Guid.CreateVersion7(),
+                        TenantId = other.Id,
+                        Tenant = other,
+                        TenantUserId = member.Id,
+                        TenantUser = member,
+                        RoleId = (int)RoleEnum.TenantAdmin,
+                        Role = null!,
+                        RoleScopeId = (int)RoleScopeEnum.Tenant,
+                        GrantedAt = DateTime.UtcNow
                     });
                 }
                 await database.SaveChangesAsync(token);

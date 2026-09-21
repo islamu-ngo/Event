@@ -76,8 +76,10 @@ public sealed class CompletionReadinessHttpTests
         using var response = provider == AuthenticationProviderKind.Local
             ? await client.PostAsJsonAsync("/api/instanceonboarding/complete-local", new CompleteLocalInstanceOnboardingRequestDto
             {
-                OperationId = Guid.CreateVersion7(), Username = $"operator-{Guid.CreateVersion7():N}",
-                TemporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}", Settings = settings
+                OperationId = Guid.CreateVersion7(),
+                Username = $"operator-{Guid.CreateVersion7():N}",
+                TemporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}",
+                Settings = settings
             }, token)
             : await client.PostAsJsonAsync("/api/instanceonboarding/complete", settings, token);
         await using var database = factory.CreateDatabase();

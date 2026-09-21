@@ -52,7 +52,9 @@ public sealed class LocalInstanceOnboardingHttpTests
                     Configuration = Explore.Application.Models.Common.OptionalUpdate<AuthorizationProviderConfigurationWriteDto>.Set(
                         new AuthorizationProviderConfigurationWriteDto
                         {
-                            Provider = "local", CerbosGrpcEndpoint = string.Empty, CerbosAdminEndpoint = string.Empty
+                            Provider = "local",
+                            CerbosGrpcEndpoint = string.Empty,
+                            CerbosAdminEndpoint = string.Empty
                         })
                 }, CancellationToken);
             await Assert.That(configured.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -470,10 +472,13 @@ public sealed class LocalInstanceOnboardingHttpTests
         using var response = await client.GetAsync("/api/instanceonboarding/journey", CancellationToken);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var journey = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
-        return request with { Settings = request.Settings with
+        return request with
         {
-            ExpectedJourneyGeneration = journey.RootElement.GetProperty("generation").GetString()
-        } };
+            Settings = request.Settings with
+            {
+                ExpectedJourneyGeneration = journey.RootElement.GetProperty("generation").GetString()
+            }
+        };
     }
 
     private static CompleteLocalInstanceOnboardingRequestDto Request() => new()

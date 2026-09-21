@@ -62,9 +62,12 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
             captures.Enqueue((bearer, setup, context.Request.Headers.ContainsKey("Cookie")));
             return setup ? Results.Json(new
             {
-                state = "Available", generation = "transport-test", profile = new { siteName = "Private instance" },
+                state = "Available",
+                generation = "transport-test",
+                profile = new { siteName = "Private instance" },
                 bootstrap = new { isCompleted = false, isAuthenticated = bearer, state = "InteractivePending", provider = "Keycloak", selectedDeploymentMode = "SingleTenant" },
-                authentication = new { provider = "Keycloak", state = "Ready" }, authorization = new { provider = "local", state = "Ready" },
+                authentication = new { provider = "Keycloak", state = "Ready" },
+                authorization = new { provider = "local", state = "Ready" },
                 preflight = new { isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>() },
                 _links = new { refresh = new { href = "/api/instanceonboarding/journey" } }
             }) : Results.Problem(statusCode: 403);

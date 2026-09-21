@@ -241,6 +241,7 @@ public sealed class EventTicketingHalRuntimeTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             AuthorizationProviderOverride = authorizationProvider;
+            SeedActiveDefaultTenant = true;
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {

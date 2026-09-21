@@ -23,10 +23,10 @@ public sealed class PrivacyErasureReceiptApiTests
         request.Headers.Authorization = new AuthenticationHeaderValue("ErasureReceipt", ReceiptService.ValidReceipt);
 
         using HttpResponseMessage response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string body = await response.Content.ReadAsStringAsync();
         PrivacyErasureStatusDto? status = await response.Content.ReadFromJsonAsync<PrivacyErasureStatusDto>();
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
         await Assert.That(status?.Status).IsEqualTo("completed");
         await Assert.That(body).DoesNotContain(ReceiptService.SubjectCanary);
@@ -54,6 +54,7 @@ public sealed class PrivacyErasureReceiptApiTests
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            SeedActiveDefaultTenant = true;
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>
             {

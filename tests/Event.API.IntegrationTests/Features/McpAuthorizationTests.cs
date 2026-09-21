@@ -9,6 +9,9 @@ using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 
 namespace ApiIntegrationTests.Features;
@@ -141,6 +144,27 @@ public sealed class McpAuthorizationTests
         var toolNames = await ReadToolNamesAsync(response);
         await AssertEventManagementReadsDiscoverable(toolNames);
         await AssertProposalToolsDiscoverable(toolNames, includeGeneric: false);
+    }
+
+    [Test]
+    public async Task McpEndpoint_WhenProvisioning_DeniesToolDiscovery()
+    {
+        await using var factory = CreateMcpEnabledFactory();
+        using var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var tenant = await database.Tenants.SingleAsync(tenant => tenant.Id == PlatformDefaults.DefaultTenantId);
+            tenant.TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            await database.SaveChangesAsync();
+        }
+        using var request = CreateMcpRequest();
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("tenant_lifecycle_unavailable");
+        await Assert.That(body.RootElement.TryGetProperty("result", out _)).IsFalse();
     }
 
     [Test]
@@ -685,6 +709,7 @@ public sealed class McpAuthorizationTests
     {
         var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider()
         };
         factory.AdditionalConfiguration["Mcp:Enabled"] = "true";

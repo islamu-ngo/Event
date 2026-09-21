@@ -23,8 +23,7 @@ public class SetupSecretForwardingHandler : DelegatingHandler
         _ = request.Headers.Remove("X-Setup-Secret");
 
         var authenticatedStateRead = request.Method == HttpMethod.Get
-            && (path.Equals("/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
-                || path.Equals("/api/instanceonboarding/journey", StringComparison.OrdinalIgnoreCase))
+            && path.Equals("/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
             && string.Equals(request.Headers.Authorization?.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase)
             && Event.Web.BffHosting.Security.EventBffTokenSafety.IsTokenForwardable(request.Headers.Authorization?.Parameter);
 

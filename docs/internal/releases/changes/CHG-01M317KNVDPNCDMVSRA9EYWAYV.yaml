@@ -1,0 +1,30 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M317KNVDPNCDMVSRA9EYWAYV
+Title: "Retain private setup authority after provider sign-in"
+Type: fix
+Scope: onboarding
+Summary: "Keep protected setup authority alongside the verified external session for the private onboarding journey."
+Group: external-setup-journey
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Exact journey GET retains verified provider identity and independently checked BFF-held setup authority. Bearer-only pre-administrator callers remain denied."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/api-reference/readme/hal-rest.md
+    Disposition: documented
+    Detail: "External sign-in can continue the private setup journey; completed administrator sessions are not shadowed by obsolete setup credentials."

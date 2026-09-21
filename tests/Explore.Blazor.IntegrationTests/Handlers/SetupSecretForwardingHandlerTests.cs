@@ -11,9 +11,9 @@ namespace Explore.Blazor.IntegrationTests.Handlers;
 public class SetupSecretForwardingHandlerTests
 {
     [Test]
-    [Arguments("status")]
-    [Arguments("journey")]
-    public async Task AuthenticatedStateReadsDoNotRestoreObsoleteSetupAuthority(string endpoint)
+    [Arguments("status", false)]
+    [Arguments("journey", true)]
+    public async Task AuthenticatedJourneyRetainsSetupAuthorityWhileStatusUsesOnlyTheSession(string endpoint, bool forwardsSetup)
     {
         var secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
@@ -29,7 +29,9 @@ public class SetupSecretForwardingHandlerTests
 
         using var response = await invoker.SendAsync(request, CancellationToken.None);
 
-        await Assert.That(capture.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsFalse();
+        await Assert.That(capture.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsEqualTo(forwardsSetup);
+        if (forwardsSetup)
+            await Assert.That(capture.CapturedRequest.Headers.GetValues("X-Setup-Secret").Single()).IsEqualTo(secret);
         await Assert.That(capture.CapturedRequest.Headers.Authorization?.Parameter).IsEqualTo(token);
     }
 

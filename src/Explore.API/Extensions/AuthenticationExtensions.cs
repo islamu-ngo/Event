@@ -374,7 +374,12 @@ public static class AuthenticationExtensions
             return AtprotoTransientAuthenticationDefaults.Scheme;
         }
 
-        if (SetupSecretAuthenticationHandler.SupportsRequest(context.Request)
+        // Journey reads retain the provider identity alongside independently validated setup authority.
+        // A stale setup cookie must not replace a completed administrator's ordinary session.
+        bool signedInJourney = HttpMethods.IsGet(context.Request.Method)
+            && context.Request.Path.Equals(new PathString("/api/instanceonboarding/journey"), StringComparison.OrdinalIgnoreCase)
+            && context.Request.Headers.ContainsKey("Authorization");
+        if (!signedInJourney && SetupSecretAuthenticationHandler.SupportsRequest(context.Request)
             && context.Request.Headers.ContainsKey(SetupSecretAuthenticationHandler.HeaderName))
         {
             return ApiAuthenticationSchemeNames.SetupSecret;

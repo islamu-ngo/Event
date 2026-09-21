@@ -28,7 +28,11 @@ Do not construct mutation URLs from naming conventions or enable controls from l
 by the BFF or a signed-in instance administrator. It returns a private, no-store
 snapshot; follow its current HAL actions. Unauthenticated requests receive 401,
 and signed-in callers without setup or administrator authority receive 403.
-Finishing setup does not grant public access to a Provisioning directory.
+Provider sign-in during setup does not replace setup authority: the BFF retains
+its protected setup credentials for this journey read alongside the signed-in
+session. After completion, only persisted administrator authority grants access;
+old setup credentials cannot reopen setup. Finishing setup does not grant public
+access to a Provisioning directory.
 
 ## Operator identity form metadata
 

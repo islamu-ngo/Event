@@ -98,7 +98,12 @@ For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Gen
 administrator authority and returns a private, no-store HAL snapshot. Declarative
 `[Authorize]` admits the exact setup-secret authentication scheme or a normal
 authenticated principal; the action still requires active setup or persisted
-instance-administrator authority. Missing authentication returns 401; an
+instance-administrator authority. On this exact GET, an Authorization header
+selects normal bearer validation even when a setup header is present. The BFF
+forwards its protected setup authority alongside that bearer; the action validates
+setup independently. A pre-administrator bearer alone remains insufficient, and a
+stale setup cookie cannot shadow a persisted administrator's ordinary session.
+Missing authentication returns 401; an
 authenticated non-administrator without setup authority receives 403. The native
 `GetInstanceOnboardingJourneyQuery` composes bootstrap status, selected deployment,
 existing provider configuration contracts, persisted profile, operator identity,

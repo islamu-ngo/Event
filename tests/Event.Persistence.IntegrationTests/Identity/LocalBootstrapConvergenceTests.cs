@@ -10,6 +10,9 @@ using Explore.Infrastructure.Authentication;
 using Microsoft.Extensions.Options;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
+using NSubstitute;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Infrastructure.Identity;
@@ -311,6 +314,7 @@ public sealed class LocalBootstrapConvergenceTests
 
     private static CompleteInstanceOnboardingRequest WizardSettings() => new()
     {
+        ExpectedJourneyGeneration = "credential-convergence",
         DeploymentMode = DeploymentMode.MultiTenant,
         SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Wizard Operator", Locale = "en", TimeZone = "UTC" }
     };
@@ -400,6 +404,10 @@ public sealed class LocalBootstrapConvergenceTests
             var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
             var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
             var systemSettings = new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork));
+            var journey = Substitute.For<IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto>>();
+            journey.QueryAsync(Arg.Any<GetInstanceOnboardingJourneyQuery>(), Arg.Any<CancellationToken>())
+                .Returns(new InstanceOnboardingJourneyDto
+                { State = "Available", Generation = "credential-convergence", Preflight = new() });
             var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles, tenantRoles,
                 new TenantUserRepository(application), new RoleRepository(application), new UserRepository(application),
                 new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents),
@@ -407,7 +415,7 @@ public sealed class LocalBootstrapConvergenceTests
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 deployment, new RuntimeMetadataRefresh(),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
-                OperatorOptions);
+                journey, OperatorOptions);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
                 new RuntimeAuthenticationProviderDispatcher(

@@ -43,20 +43,22 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
         }
 
         var profile = InstanceOnboardingProfileSettingHelpers.Normalize(request.Profile);
-        await unitOfWork.ExecuteInTransactionAsync(
-            async transactionToken => await InstanceOnboardingProfileSettingHelpers.PersistAsync(
-                systemSettingRepository,
-                profile,
-                transactionToken),
-            cancellationToken);
+        var response = await unitOfWork.ExecuteBootstrapConvergenceAsync(async transactionToken =>
+        {
+            var current = await instanceBootstrapStateRepository.GetCurrentForUpdate(transactionToken);
+            if (current?.Status == InstanceBootstrapStatus.Completed
+                || !await setupSecretProvider.IsSetupModeActiveAsync(transactionToken))
+                return BaseCommandResponse.Validation<Guid>(["Setup mode is no longer active."], "Setup mode is no longer active.");
+            await InstanceOnboardingProfileSettingHelpers.PersistAsync(systemSettingRepository, profile, transactionToken);
+            return BaseCommandResponse.Success(current?.Id ?? Guid.Empty, "Instance onboarding profile saved successfully.");
+        }, cancellationToken);
+        if (!response.IsSuccess) return response;
 
         instanceBootstrapAuditLogger.Log(new InstanceBootstrapAuditEvent(
             InstanceBootstrapAuditEventType.SetupProfileSaved,
             Operation: "instance_onboarding_profile_save",
             Outcome: "saved"));
 
-        return BaseCommandResponse.Success(
-            bootstrap?.Id ?? Guid.Empty,
-            "Instance onboarding profile saved successfully.");
+        return response;
     }
 }

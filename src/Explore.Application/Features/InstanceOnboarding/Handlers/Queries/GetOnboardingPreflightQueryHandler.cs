@@ -36,7 +36,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
         result.DeploymentMode = deploymentMode.ToString();
 
         AddSetupSecretCheck(result, onboardingCompleted);
-        AddRepositoryReachabilityCheck(result, bootstrap);
+        AddRepositoryReachabilityCheck(result);
         AddMigrationCheck(result);
         AddDeploymentModeCheck(result, deploymentMode);
         await AddDefaultTenantCheckAsync(result, deploymentMode, onboardingCompleted);
@@ -66,16 +66,14 @@ public sealed class GetOnboardingPreflightQueryHandler(
         AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Pass, $"Setup secret is active from {source}.");
     }
 
-    private static void AddRepositoryReachabilityCheck(OnboardingPreflightDto result, object? bootstrap)
+    private static void AddRepositoryReachabilityCheck(OnboardingPreflightDto result)
     {
         AddBlocking(
             result,
             "database_reachable",
             "Database reachable",
             OnboardingPreflightCheckStatus.Pass,
-            bootstrap is null
-                ? "Database read completed and no completed bootstrap state exists yet."
-                : "Database read completed and bootstrap state is available.");
+            "Database read completed.");
     }
 
     private static void AddMigrationCheck(OnboardingPreflightDto result)

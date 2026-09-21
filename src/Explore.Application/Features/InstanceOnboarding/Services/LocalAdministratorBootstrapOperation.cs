@@ -64,7 +64,7 @@ public sealed class LocalAdministratorBootstrapOperation(
 
         bool admitted = await unitOfWork.ExecuteBootstrapConvergenceAsync(async token =>
         {
-            InstanceBootstrapState? current = await bootstrapRepository.GetCurrentForUpdate(token);
+            InstanceBootstrapState? current = await completion.AdmitInteractiveGenerationAsync(settings, token);
             if (current is null)
             {
                 await bootstrapRepository.Create(InstanceBootstrapState.CreateInteractivePending(

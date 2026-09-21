@@ -1,0 +1,28 @@
+Change-Id: CHG-01M31GXREJPZHV57HMSHVENTYH
+Title: "Fence setup completion against concurrent profile saves"
+Type: fix
+Scope: onboarding
+Summary: "Revalidate interactive setup generation inside the shared bootstrap transaction fence."
+Group: onboarding-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Both interactive completion paths and profile writes share a transaction-owned mutation fence. Revalidate generation and readiness on every completion attempt, and reject profile writes after durable completion."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Refresh setup after a concurrent profile save. Stale completion preserves the committed profile; completed setup stays locked. Local reserved operations retain their existing recovery path."

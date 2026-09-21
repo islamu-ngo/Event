@@ -1,5 +1,7 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
@@ -486,6 +488,9 @@ internal sealed class OnboardingCompletionScenario
                 }),
                 Guid.CreateVersion7()));
 
+        var journey = Substitute.For<IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto>>();
+        journey.QueryAsync(Arg.Any<GetInstanceOnboardingJourneyQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new InstanceOnboardingJourneyDto { State = "Available", Generation = "scenario", Preflight = new() });
         Operation = new InstanceOnboardingCompletionOperation(
             BootstrapRepository,
             platformRoles,
@@ -504,7 +509,8 @@ internal sealed class OnboardingCompletionScenario
             DeploymentModeProvider,
             jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance,
-            _unitOfWork);
+            _unitOfWork,
+            journey);
     }
 
     public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();
@@ -627,6 +633,7 @@ internal sealed class OnboardingCompletionScenario
 
     private static CompleteInstanceOnboardingRequest Settings() => new()
     {
+        ExpectedJourneyGeneration = "scenario",
         DeploymentMode = DeploymentMode.SingleTenant,
         InstanceName = "Invariant Instance",
         SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Invariant Instance" },

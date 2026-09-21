@@ -94,7 +94,7 @@ public sealed class CompletionReadinessHttpTests
         await Assert.That(await database.InstanceBootstrapStates.AnyAsync(state => state.Status == InstanceBootstrapStatus.Completed, token)).IsFalse();
         await Assert.That(await database.PlatformUserRoles.AnyAsync(token)).IsFalse();
         await Assert.That(await database.LocalIdentityUsers.AnyAsync(token)).IsFalse();
-        await Assert.That(await database.LocalIdentityLifecycleOperations.AnyAsync(token)).IsFalse();
+        await Assert.That(await database.Set<Explore.Persistence.Identity.LocalIdentityCredentialOperation>().AnyAsync(token)).IsFalse();
         using var stillAuthorized = await client.GetAsync("/api/instanceonboarding/journey", token);
         await Assert.That(stillAuthorized.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var status = JsonDocument.Parse(await stillAuthorized.Content.ReadAsStringAsync(token));

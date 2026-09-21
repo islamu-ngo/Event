@@ -61,6 +61,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private string? _identityConnectionString;
     private bool _incompleteSetup;
     private bool _enableRateLimiting;
+    private string? _postgreSqlConnectionString;
 
     public string SetupSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -92,7 +93,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         IdentityDatabaseTopology identityTopology = IdentityDatabaseTopology.Colocated,
         bool incompleteSetup = false,
         bool enableRateLimiting = false,
-        bool enableAtproto = false)
+        bool enableAtproto = false,
+        string? postgreSqlConnectionString = null)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto)
         {
@@ -100,7 +102,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             _logCapture = logCapture,
             _identityTopology = identityTopology,
             _incompleteSetup = incompleteSetup,
-            _enableRateLimiting = enableRateLimiting
+            _enableRateLimiting = enableRateLimiting,
+            _postgreSqlConnectionString = postgreSqlConnectionString
         };
         try
         {
@@ -167,6 +170,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 settings["PublicBaseUrl"] = "https://example.test";
             }
 
+            if (_postgreSqlConnectionString is not null)
+                TestDatabaseConfiguration.AddPostgreSql(settings, _postgreSqlConnectionString);
             configuration.AddInMemoryCollection(settings);
         });
         builder.ConfigureTestServices(services =>
@@ -471,7 +476,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 Environment.SetEnvironmentVariable(name, value);
             }
 
-            if (_connectionString is not null)
+            if (_connectionString is not null && _postgreSqlConnectionString is null)
             {
                 using var connection = new SqliteConnection(_connectionString);
                 SqliteConnection.ClearPool(connection);
@@ -497,6 +502,16 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     private void ConfigureDatabase(DbContextOptionsBuilder options)
     {
+        if (_postgreSqlConnectionString is not null)
+        {
+            var configuration = new Dictionary<string, string?>();
+            TestDatabaseConfiguration.AddPostgreSql(configuration, _postgreSqlConnectionString);
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options,
+                PrimaryDatabaseConfiguration.BindRuntime(new ConfigurationBuilder().AddInMemoryCollection(configuration).Build()));
+            if (_persistenceInterceptor is not null)
+                options.AddInterceptors(_persistenceInterceptor);
+            return;
+        }
         PrimaryDatabaseConnectionResult database = PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder: options,
             options: new PrimaryDatabaseConnectionOptions
@@ -515,7 +530,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     {
         await using ExploreDbContext database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
-        await SqliteDatabaseInitializer.InitializeAsync(database, CancellationToken.None);
+        if (_postgreSqlConnectionString is null)
+            await SqliteDatabaseInitializer.InitializeAsync(database, CancellationToken.None);
         await LookupTableSeeder.SeedAsync(database);
         DateTime now = DateTime.UtcNow;
         var bootstrapUser = new User

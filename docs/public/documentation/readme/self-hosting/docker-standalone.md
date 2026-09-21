@@ -23,6 +23,10 @@ restart requirements are not hidden by the simplified setup form. Completion als
 checks provider readiness on the server: a blocked authorization provider cannot
 be bypassed by submitting setup directly. Resolve the blocker and refresh setup
 before completing; rejected attempts do not create administrator credentials.
+If another setup tab saves the profile while completion is in flight, completion
+rejects the stale version instead of replacing that saved profile. Refresh before
+retrying. Profile saves already in flight cannot change the instance after setup
+has completed; setup authority remains permanently locked.
 
 ---
 

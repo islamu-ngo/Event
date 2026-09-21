@@ -123,6 +123,16 @@ provider readiness. Failure returns 409 ProblemDetails with a journey refresh
 relation before Local credential reservation or external administrator creation.
 Missing HAL links are never the server-side enforcement mechanism.
 
+Interactive completion reprojects readiness and generation inside each owning
+transaction under the bootstrap mutation fence. Profile save uses that same fence
+and rechecks durable completion, so a profile committed after HTTP admission cannot
+be overwritten by stale completion, and an admitted profile cannot write after
+completion. The fence covers an absent bootstrap row as well as an existing one.
+Local reservation validates before credential creation and final convergence
+validates again; a stale final attempt leaves the existing reservation recoverable
+with refreshed setup state. Serializable retries repeat admission. Reserving a
+Local operation does not change the journey generation or repository readiness.
+
 The duplicate `GET /api/system/onboarding-preflight` and its generated method are
 removed with no alias. Clients refresh the journey, and save profile through the
 existing setup-only PATCH operation before refreshing readiness. Persisted profile

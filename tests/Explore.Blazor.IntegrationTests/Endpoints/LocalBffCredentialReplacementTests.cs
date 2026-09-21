@@ -61,6 +61,26 @@ public sealed class LocalBffCredentialReplacementTests
     }
 
     [Test]
+    [Arguments(true, "/", "/settings/instance?section=getting-started")]
+    [Arguments(true, "https://untrusted.example.test/redirect", "/settings/instance?section=getting-started")]
+    [Arguments(true, "/events", "/events")]
+    [Arguments(false, "/", "/")]
+    public async Task FreshAdministratorSignInDefaultsToGettingStartedWithoutPublicShell(
+        bool instanceAdmin, string returnUrl, string expectedDestination)
+    {
+        await using var fixture = new Fixture();
+        fixture.Transport.OrdinaryLogin = true;
+        fixture.Transport.InstanceAdmin = instanceAdmin;
+
+        using var response = await fixture.LoginAsync(returnUrl);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        await Assert.That(body.RootElement.GetProperty("redirectUrl").GetString()).IsEqualTo(expectedDestination);
+        await Assert.That(fixture.ReadCookieTicket(response).Properties.RedirectUri).IsEqualTo(expectedDestination);
+    }
+
+    [Test]
     public async Task CancellationAfterCurrentUserDeserializationDoesNotLogOutOrEvictNativeSession()
     {
         await using var fixture = new Fixture();
@@ -867,7 +887,7 @@ public sealed class LocalBffCredentialReplacementTests
             catch { socket.Dispose(); throw; }
         }
 
-        internal async Task<HttpResponseMessage> LoginAsync()
+        internal async Task<HttpResponseMessage> LoginAsync(string returnUrl = "https://untrusted.example.test/redirect")
         {
             string csrf = await CsrfAsync();
             using var request = new HttpRequestMessage(HttpMethod.Post, "/bff/auth/local/login")
@@ -877,7 +897,7 @@ public sealed class LocalBffCredentialReplacementTests
                     identifier = $"browser-{Guid.CreateVersion7():N}",
                     password = NewPassword(),
                     isPersistent = true,
-                    returnUrl = "https://untrusted.example.test/redirect"
+                    returnUrl
                 })
             };
             request.Headers.Add("X-CSRF-TOKEN", csrf);

@@ -192,6 +192,7 @@ Setup-secret handling is intentionally BFF-owned:
 4. `SameSite=Lax` is intentional because onboarding may cross top-level OIDC redirects before the first administrator completes setup.
 5. Setup-secret validation is rate-limited at the BFF edge and again at the API edge.
 6. Completed Interactive and ConfiguredAdministrator states retain their canonical Local, Keycloak, or Atproto provider. The BFF admits fresh sign-in for those completed states without reopening setup authority; unknown providers and inconsistent status remain closed.
+7. A fresh Local sign-in with server-verified instance-administrator authority and completed setup defaults to `/settings/instance?section=getting-started` instead of loading the public shell. Explicit safe return URLs and non-administrator destinations remain unchanged.
 6. The BFF limiter partitions requests by authenticated user when available, then antiforgery/session cookie state, then IP as the final fallback.
 
 When debugging onboarding, check both BFF setup-secret endpoints and API setup-secret validation rather than adding client-side storage shortcuts.

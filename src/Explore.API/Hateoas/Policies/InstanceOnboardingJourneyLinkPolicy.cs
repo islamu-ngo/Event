@@ -21,7 +21,7 @@ public sealed class InstanceOnboardingJourneyLinkPolicy(
         foreach (var link in statusPolicy.GetLinks(dto.Bootstrap, user))
         {
             if (link.Rel is LinkRelations.Self or "save-profile") continue;
-            if (link.Rel is "complete" or "complete-local" && dto.Preflight?.IsReadyToLaunch != true) continue;
+            if (link.Rel is "complete" or "complete-local" && dto.Preflight is not { IsReadyToLaunch: true }) continue;
             yield return link;
         }
         foreach (var link in IdentityLinks(dto.OperatorIdentity, user))

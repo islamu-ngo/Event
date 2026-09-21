@@ -12,4 +12,7 @@ public interface IInstanceOnboardingGenerationReader
 }
 
 /// <summary>The generation and profile projected from the same durable settings read.</summary>
-public sealed record InstanceOnboardingDurableSnapshot(string Generation, SelfHostOnboardingProfileDto Profile);
+public sealed record InstanceOnboardingDurableSnapshot(string Generation, SelfHostOnboardingProfileDto Profile)
+{
+    public override string ToString() => nameof(InstanceOnboardingDurableSnapshot);
+}

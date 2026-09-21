@@ -37,6 +37,26 @@ public sealed class CombinedApiBridgeMiddlewareTests
     }
 
     [Test]
+    [Arguments("/api/instanceonboarding/status")]
+    [Arguments("/api/instanceonboarding/journey")]
+    public async Task AuthenticatedOnboardingReadPreservesOnlyServerOwnedBearer(string path)
+    {
+        string token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        await using var app = await CreateApplicationAsync(cookieToken: token);
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add("X-Test-Cookie", "valid");
+        request.Headers.Add("Authorization", "Bearer " + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+
+        using var response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.GetValues("X-Seen-Authorization").Single()).IsEqualTo($"Bearer {token}");
+        // Old setup cookies must not shadow the ordinary identity after setup locks.
+        await Assert.That(response.Headers.Contains("X-Seen-Setup")).IsFalse();
+    }
+
+    [Test]
     public async Task NoCookieLeavesExternalBearerRequestUnchanged()
     {
         await using var app = await CreateApplicationAsync(cookieToken: "server-token");

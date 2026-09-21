@@ -77,6 +77,8 @@ MultiTenant creates none. Configure operator identity before dependent public or
 paid operations. If completion is uncertain, refresh status before retrying; a
 completed instance must not receive the temporary credential again. The selected
 provider remains available for fresh sign-in while setup authority stays locked.
+After sign-in, browser startup and readiness reads use the ordinary session rather
+than any old setup cookie, so administration remains available after setup closes.
 
 For later accounts, current instance administrators use the
 [Local accounts screen](../administration-and-branding/admin-guide.md#local-accounts)

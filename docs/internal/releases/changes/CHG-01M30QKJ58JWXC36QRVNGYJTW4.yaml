@@ -1,0 +1,27 @@
+Change-Id: CHG-01M30QKJ58JWXC36QRVNGYJTW4
+Title: "Preserve authenticated onboarding state reads"
+Type: fix
+Scope: onboarding
+Summary: "Keep cookie-owned bearer identity on exact status and journey GETs instead of degrading authenticated startup to anonymous setup state."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "The two exact state GETs retain only server-owned forwardable bearer authority and omit setup authority when that bearer exists. Browser-controlled headers remain sanitized; bootstrap and other routes retain existing treatment."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/5-minute-quickstart.md
+    Disposition: documented
+    Detail: "Authenticated browser startup and readiness reads use the ordinary session after setup locks, without an old setup cookie shadowing administrator identity."

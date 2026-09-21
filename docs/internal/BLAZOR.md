@@ -193,6 +193,7 @@ Setup-secret handling is intentionally BFF-owned:
 5. Setup-secret validation is rate-limited at the BFF edge and again at the API edge.
 6. Completed Interactive and ConfiguredAdministrator states retain their canonical Local, Keycloak, or Atproto provider. The BFF admits fresh sign-in for those completed states without reopening setup authority; unknown providers and inconsistent status remain closed.
 7. A fresh Local sign-in with server-verified instance-administrator authority and completed setup defaults to `/settings/instance?section=getting-started` instead of loading the public shell. Explicit safe return URLs and non-administrator destinations remain unchanged.
+8. Browser-proxied exact `GET /api/instanceonboarding/status` and `GET /api/instanceonboarding/journey` retain the BFF-owned bearer identity when present. Those authenticated reads omit setup-secret authority so an old setup cookie cannot shadow the ordinary session after completion. Anonymous bootstrap requests and other onboarding routes keep their existing treatment; browser-supplied authority headers remain stripped.
 6. The BFF limiter partitions requests by authenticated user when available, then antiforgery/session cookie state, then IP as the final fallback.
 
 When debugging onboarding, check both BFF setup-secret endpoints and API setup-secret validation rather than adding client-side storage shortcuts.

@@ -19,7 +19,10 @@ completion response without replaying credentials; completed setup stays locked.
 Use the [categorized checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
 to distinguish disclosure and paid-event prerequisites from recommended operational
 work. Optional profile details are disclosed on demand; provider failures and
-restart requirements are not hidden by the simplified setup form.
+restart requirements are not hidden by the simplified setup form. Completion also
+checks provider readiness on the server: a blocked authorization provider cannot
+be bypassed by submitting setup directly. Resolve the blocker and refresh setup
+before completing; rejected attempts do not create administrator credentials.
 
 ---
 

@@ -22,6 +22,8 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -40,7 +42,8 @@ public sealed class LocalInstanceOnboardingHttpTests
     public async Task JourneyReadUsesOnlyActiveBffSetupAuthority(string authority, HttpStatusCode expectedStatus)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
-        using (var setupClient = CreateClient(factory))
+        using (var setupClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") }))
         {
             setupClient.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
             using var configured = await setupClient.PatchAsJsonAsync("/api/instance/settings/authz-provider",
@@ -381,7 +384,8 @@ public sealed class LocalInstanceOnboardingHttpTests
             await Assert.That(interrupted.IsSuccessStatusCode).IsFalse();
             await Assert.That(fault.Observed).IsTrue();
         }
-        await using var restarted = factory.WithWebHostBuilder(_ => { });
+        await using var restarted = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Authorization:Provider"] = "local" })));
         using HttpClient browser = restarted.CreateClient(new WebApplicationFactoryClientOptions
         { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
         using JsonDocument anonymous = await StatusAsync(browser);
@@ -494,6 +498,13 @@ public sealed class LocalInstanceOnboardingHttpTests
     };
 
     private static string NewPassword() => $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
-    private static HttpClient CreateClient(LocalAdmissionWebApplicationFactory factory) => factory.CreateClient(
+    private static HttpClient CreateClient(LocalAdmissionWebApplicationFactory factory) => factory.WithWebHostBuilder(
+        builder => builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Authorization:Provider"] = "local",
+                ["Keycloak:ClientId"] = "islamu-event-blazor",
+                ["PublicBaseUrl"] = "https://example.test"
+            }))).CreateClient(
         new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
 }

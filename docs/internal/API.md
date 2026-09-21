@@ -116,9 +116,12 @@ Provider states are `Ready`, `ActionRequired`, `DeploymentRestartRequired`,
 `Unavailable`, and `Failed`. Deployment ownership alone never implies readiness.
 Checks carry requirement category, remediation authority, restart requirement,
 reason code and action relation; only actual HAL links authorize UI actions.
-Generation is an opaque content fingerprint, not completion authority. Completion
-still performs its existing checks; expected-generation fencing belongs to the
-subsequent completion change.
+Generation is an opaque content fingerprint, not completion authority. Both
+interactive completion POSTs require an Available snapshot, the exact current
+generation, and every projected blocking check to pass, including authorization
+provider readiness. Failure returns 409 ProblemDetails with a journey refresh
+relation before Local credential reservation or external administrator creation.
+Missing HAL links are never the server-side enforcement mechanism.
 
 The duplicate `GET /api/system/onboarding-preflight` and its generated method are
 removed with no alias. Clients refresh the journey, and save profile through the

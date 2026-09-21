@@ -289,7 +289,8 @@ public class InstanceOnboardingController : EventControllerBase
     private async Task<ObjectResult?> CheckCompletionJourneyAsync(string? expectedGeneration, CancellationToken cancellationToken)
     {
         var journey = await _journeyQuery.QueryAsync(new() { SetupPrincipal = User }, cancellationToken);
-        if (journey.State == "Available" && !string.IsNullOrWhiteSpace(expectedGeneration)
+        if (journey.State == "Available" && journey.Preflight?.IsReadyToLaunch == true
+            && !string.IsNullOrWhiteSpace(expectedGeneration)
             && string.Equals(expectedGeneration, journey.Generation, StringComparison.Ordinal))
             return null;
 

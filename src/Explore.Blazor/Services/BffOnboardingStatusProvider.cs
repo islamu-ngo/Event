@@ -131,9 +131,8 @@ public sealed class BffOnboardingStatusProvider : IBffOnboardingStatusProvider
         if (isCompleted
             && string.Equals(state, "Completed", StringComparison.Ordinal)
             && (string.Equals(mode, "Interactive", StringComparison.Ordinal)
-                && string.IsNullOrEmpty(provider)
-                || string.Equals(mode, "ConfiguredAdministrator", StringComparison.Ordinal)
-                && (string.IsNullOrEmpty(provider) || provider is "Keycloak" or "Atproto")))
+                || string.Equals(mode, "ConfiguredAdministrator", StringComparison.Ordinal))
+            && (string.IsNullOrEmpty(provider) || provider is "Local" or "Keycloak" or "Atproto"))
         {
             return BffOnboardingDisposition.Completed;
         }

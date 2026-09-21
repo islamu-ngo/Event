@@ -75,6 +75,31 @@ public sealed class BffOnboardingStatusProviderTests
     }
 
     [Test]
+    [Arguments("Interactive", "Local")]
+    [Arguments("Interactive", "Keycloak")]
+    [Arguments("Interactive", "Atproto")]
+    [Arguments("ConfiguredAdministrator", "Local")]
+    [Arguments("ConfiguredAdministrator", "Keycloak")]
+    [Arguments("ConfiguredAdministrator", "Atproto")]
+    public async Task CompletedProviderRemainsAvailableForFreshSignIn(string mode, string provider)
+    {
+        using var context = CreateContext(new HalResourceOfInstanceOnboardingStatusDto
+        {
+            IsCompleted = true,
+            State = "Completed",
+            Mode = mode,
+            Provider = provider,
+            Generation = 1
+        });
+
+        var status = await context.Provider.GetStatusAsync();
+
+        await Assert.That(status.Disposition).IsEqualTo(BffOnboardingDisposition.Completed);
+        await Assert.That(status.Provider).IsEqualTo(provider);
+    }
+
+    [Test]
+    [Arguments(true, "Completed", "Interactive", "Unknown", 2L)]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", null, 2L)]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", "Google", 2L)]
     [Arguments(false, "InteractivePending", "Interactive", "Unknown", 2L)]

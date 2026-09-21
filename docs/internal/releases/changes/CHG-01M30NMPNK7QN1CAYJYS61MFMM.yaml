@@ -1,0 +1,27 @@
+Change-Id: CHG-01M30NMPNK7QN1CAYJYS61MFMM
+Title: "Keep completed provider sign-in available"
+Type: fix
+Scope: onboarding
+Summary: "Recognize durable Local and external provider identities after completion so BFF startup admits fresh sign-in without reopening setup."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Completed Interactive and ConfiguredAdministrator statuses accept only canonical provider identities; setup revocation, credential replacement and ordinary authentication remain unchanged."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/5-minute-quickstart.md
+    Disposition: documented
+    Detail: "After completion, the selected provider remains available for password replacement and fresh sign-in while setup stays locked."

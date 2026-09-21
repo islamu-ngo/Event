@@ -74,7 +74,8 @@ Choose **Finish setup** after entering the site name. After fresh sign-in, open
 directory: a new SingleTenant directory stays private until explicit activation;
 MultiTenant creates none. Configure operator identity before dependent public or
 paid operations. If completion is uncertain, refresh status before retrying; a
-completed instance must not receive the temporary credential again.
+completed instance must not receive the temporary credential again. The selected
+provider remains available for fresh sign-in while setup authority stays locked.
 
 For later accounts, current instance administrators use the
 [Local accounts screen](../administration-and-branding/admin-guide.md#local-accounts)

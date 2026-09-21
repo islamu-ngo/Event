@@ -154,6 +154,22 @@ public partial class InstanceOperatorIdentityEditor
         return "instance-operator-public-name";
     }
 
+    private string FieldLabel(string name, string fallback)
+    {
+        var field = Model.FormOptions?.Fields?.FirstOrDefault(field => field.Name == name);
+        return field?.LabelId is { } key ? T(key, fallback) : fallback;
+    }
+
+    private string FieldHelp(string name, string fallback)
+    {
+        var field = Model.FormOptions?.Fields?.FirstOrDefault(field => field.Name == name);
+        return field?.HelpId is { } key ? T(key, fallback) : fallback;
+    }
+
+    private string ChoiceDescription(string name, string field) => HasError(field)
+        ? $"instance-operator-{name}-help instance-operator-{name}-error"
+        : $"instance-operator-{name}-help";
+
     private bool HasError(string field) => _validationErrors.ContainsKey(field);
     private string? ErrorFor(string field) => _validationErrors.GetValueOrDefault(field);
     private string AriaInvalid(string field) => HasError(field) ? "true" : "false";

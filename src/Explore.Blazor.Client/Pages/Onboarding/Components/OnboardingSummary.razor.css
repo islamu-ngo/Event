@@ -63,6 +63,7 @@ a.onboarding-summary__step-link:focus-visible {
 .onboarding-summary__step-label {
     grid-area: label;
     min-inline-size: 0;
+    color: var(--isl-color-text-primary);
     font-size: var(--isl-typography-body2-size);
     font-weight: 600;
 }

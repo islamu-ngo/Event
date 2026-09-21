@@ -86,7 +86,11 @@ Subdomain extraction behavior:
 
 Custom/subdomain values are stored as JSON-serialized strings in `TenantSetting.Value`.
 
-The multi-tenant Instance Console (`/admin/instance`, `/admin/instance/tenants`, `/admin/instance/domains`) and `Explore.API` control-plane endpoints are multi-tenant-only. In single-tenant mode, the Blazor route guard redirects the control-plane console back to tenant/instance settings surfaces, while API endpoints marked `[RequireMultiTenant]` return `403` with a multi-tenant-required problem response.
+The multi-tenant Instance Console (`/admin/instance`, `/admin/instance/tenants`, `/admin/instance/domains`) and fleet operations remain multi-tenant-only. In single-tenant mode, the Blazor route guard redirects the console back to tenant/instance settings surfaces; API endpoints marked `[RequireMultiTenant]` return `403`.
+
+The existing control-plane tenant detail and activation routes are the narrow exception: instance administrators may address only `PlatformDefaults.DefaultTenantId` in SingleTenant mode. Other target IDs return `404`; no public slug lookup is needed. Detail HAL retains only the authorized `self` and state-valid `activate` relations in this mode. MultiTenant exact-target lifecycle semantics are unchanged.
+
+Provisioning identity and branding documents remain private, authorized tenant-management resources. Completing identity does not activate a directory. Explicit activation rechecks the persisted identity under the shared mutation lock; identity document resolution bypasses the node-local cache so a prior ready revision cannot publish a now-incomplete directory. See [ADR-032](adr/ADR-032-progressive-instance-onboarding.md).
 
 ## Data Isolation Enforcement
 

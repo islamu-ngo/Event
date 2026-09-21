@@ -1,0 +1,27 @@
+Change-Id: CHG-01M2ZX72N4T02P8DWM9CXAQRJB
+Title: "guide operators from setup to safe publication"
+Type: feat
+Scope: self-hosting
+Summary: "Present categorized server-owned readiness, optional setup details and canonical operator identity choices without changing publication or commerce authority."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SELF_HOSTING.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Exact authenticated status/journey reads retain ordinary bearer authority instead of restoring obsolete setup headers. Anonymous setup and completion-write requirements are unchanged. Identity document HAL remains the edit authority."
+  Migration:
+    Reference: docs/internal/SELF_HOSTING.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: "Getting-started separates disclosure, paid-event and recommended work. Kind/country controls consume existing metadata; deployment guides retain explicit SQLite bounds and avoid unmeasured startup guarantees. Remaining browser verification gaps and clean-parent test failures are recorded in the onboarding journal."

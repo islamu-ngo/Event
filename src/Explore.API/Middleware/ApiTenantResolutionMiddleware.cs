@@ -1,4 +1,5 @@
 using Explore.API.Authentication;
+using Explore.API.Attributes;
 using Explore.API.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Services;
@@ -45,7 +46,8 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        if (IsTenantExemptPath(context.Request.Path))
+        if (IsTenantExemptPath(context.Request.Path)
+            || context.GetEndpoint()?.Metadata.GetMetadata<InstanceManagementAttribute>() is not null)
         {
             await _next(context);
             return;
@@ -161,10 +163,11 @@ public sealed class ApiTenantResolutionMiddleware
         return NormalizeHost(context.Request.Host.Host) ?? string.Empty;
     }
 
-    private static bool IsTenantExemptPath(PathString path)
+    internal static bool IsTenantExemptPath(PathString path)
     {
         return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
             || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
+            || path.Equals(new PathString("/api/operator-identity-metadata"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/System", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/admin/control-plane", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/managed-provider-provisioning", StringComparison.OrdinalIgnoreCase)

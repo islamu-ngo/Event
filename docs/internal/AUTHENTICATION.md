@@ -15,6 +15,24 @@
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
 9. Public Local enrollment is closed. Instance email-delivery intent governs unverified Local token issuance, independently of SMTP availability and tenant overrides. It never changes provider-owned verification facts.
 
+## External OIDC Callback Identity
+
+Both static and dynamically registered BFF OIDC schemes preserve protocol claim
+names and use the registered provider authentication type. The issuer retained in
+the cookie principal is the issuer from the validated ID token; UserInfo claim
+actions must not delete it. Subject and issuer never come from a request header,
+setup secret, session ID or platform user ID. Provider `email_verified` evidence
+is preserved unchanged. Cookie serialization, circuit storage and forwarded
+access-token bytes are not rewritten.
+
+The shipped Keycloak realms explicitly attach Keycloak's built-in
+`oidc-sub-mapper` to the BFF client, so Keycloak itself includes its account subject
+in issued access tokens. This is independent of ID-token subject issuance.
+Subjectless access tokens remain rejected by native API account synchronization;
+there is no BFF subject synthesis or SID fallback. Existing imported realms need
+the same provider mapper applied by their operator; replacing the export file
+does not update an already imported realm.
+
 ## Clean Architecture Flow
 
 Local HTTP requests enter through `LocalAuthController` or the antiforgery-protected BFF endpoints. Controllers create immutable Local authentication commands and dispatch through MediatR:

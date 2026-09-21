@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database.ProviderPrimitives;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -24,9 +25,13 @@ public class InstanceBootstrapStateRepository : GenericRepository<InstanceBootst
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<InstanceBootstrapState?> GetCurrentForUpdate(
-        CancellationToken cancellationToken = default) =>
-        RelationalInstanceBootstrapStateLock.LoadCurrentAsync(
-            _dbContext,
-            cancellationToken);
+    public async Task<InstanceBootstrapState?> GetCurrentForUpdate(
+        CancellationToken cancellationToken = default)
+    {
+        var current = await RelationalInstanceBootstrapStateLock.LoadCurrentAsync(_dbContext, cancellationToken);
+        // Preserve the row-lock ordering and additionally fence the empty first-setup state.
+        await using var lease = await RelationalNamedLock.AcquireTransactionAsync(
+            _dbContext, "explore:instance-onboarding", cancellationToken);
+        return current;
+    }
 }

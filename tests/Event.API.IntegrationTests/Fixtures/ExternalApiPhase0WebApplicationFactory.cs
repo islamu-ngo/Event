@@ -171,6 +171,13 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
             using var scope = services.BuildServiceProvider().CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             dbContext.Database.EnsureCreated();
+            var tenantIds = TenantSlugMappings.Values.Concat(TenantDomainMappings.Values)
+                .Concat(ApiKeyClients.Select(client => client.TenantId))
+                .Concat(PersistedApiKeys.Where(key => key.TenantId.HasValue).Select(key => key.TenantId!.Value));
+            if (DeploymentMode == DeploymentMode.SingleTenant)
+                tenantIds = tenantIds.Append(DefaultTenantId);
+            foreach (var tenantId in tenantIds.Distinct())
+                dbContext.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder().WithId(tenantId).Build());
 
             var completedAt = DateTime.UtcNow;
             var bootstrap = InstanceBootstrapState.CreateInteractivePending(

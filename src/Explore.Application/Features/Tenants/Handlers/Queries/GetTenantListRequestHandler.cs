@@ -18,7 +18,7 @@ public class GetTenantListRequestHandler : IQueryHandler<GetTenantListRequest, L
 
     public async Task<List<TenantListDto>> QueryAsync(GetTenantListRequest request, CancellationToken cancellationToken = default)
     {
-        var tenants = await _tenantRepository.GetAll();
+        var tenants = await _tenantRepository.GetActiveAsNoTrackingAsync(cancellationToken);
         return tenants.Select(TenantMapper.ToListItem).ToList();
     }
 }

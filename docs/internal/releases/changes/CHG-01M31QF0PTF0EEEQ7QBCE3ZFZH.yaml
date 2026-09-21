@@ -1,0 +1,28 @@
+Change-Id: CHG-01M31QF0PTF0EEEQ7QBCE3ZFZH
+Title: "Close provisioning public-read gaps"
+Type: fix
+Scope: onboarding
+Summary: "Check current directory lifecycle in host-only and direct public queries that do not pass through request middleware."
+Group: provisioning-direct-public-reads
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: "Calendar export, event details, discovery, Open Graph, legal documents, public images and navigation queries reject Provisioning directories even without middleware. Existing exact-tenant and disclosure checks remain authoritative."
+  Migration:
+    Reference: docs/internal/adr/ADR-032-progressive-instance-onboarding.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Complete private administration before explicitly activating a directory. Legal identity edits and setup completion do not publish it."

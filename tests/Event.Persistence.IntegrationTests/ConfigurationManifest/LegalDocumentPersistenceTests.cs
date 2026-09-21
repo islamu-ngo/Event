@@ -211,7 +211,10 @@ public sealed class LegalDocumentPersistenceTests
             new LegalDocumentRenderingService(),
             new FixedTenantContext(Guid.CreateVersion7()),
             new UnexpectedTenantIdentityEvaluator(),
-            new FixedInstanceIdentityEvaluator(identity));
+            new FixedInstanceIdentityEvaluator(identity),
+            new Explore.Application.Services.TenantLifecycleAccessService(
+                new TenantRepository(context),
+                NSubstitute.Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>()));
 
         PublicLegalDocumentQueryResult result = await handler.QueryAsync(
             new GetPublicLegalDocumentQuery("terms-of-service", "en"),
@@ -388,6 +391,7 @@ public sealed class LegalDocumentPersistenceTests
         IInstanceOperatorIdentityReadinessEvaluator
     {
         public Task<InstanceOperatorIdentityReadinessAssessment> EvaluateAsync(
+            InstanceOperatorIdentityCapability capability,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new InstanceOperatorIdentityReadinessAssessment(
                 true,

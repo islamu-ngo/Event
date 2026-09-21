@@ -1,0 +1,29 @@
+Change-Id: CHG-01M2ZX726SGFMK6AN8F4QHABP0
+Title: "evaluate identity for each protected capability"
+Type: feat
+Scope: onboarding
+Summary: "Permit valid administrative identity drafts and evaluate public disclosure separately from paid commerce."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Identity GET and PUT responses replace top-level readiness with publicDisclosure and paidCommerce assessments. Evaluator callers must select a capability explicitly. Regenerate clients before upgrading."
+  Security:
+    Reference: docs/internal/PAYMENTS.md
+    Disposition: documented
+    Detail: "Draft saves do not authorize protected operations. Paid terms, merchant and recipient fencing, current revisions, acknowledgement, and immutable acceptance remain required."
+  Migration:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "The instance identity document and save response expose two bounded capability assessments instead of universal readiness."
+  Operator:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Administrators can save incomplete but well-formed identity drafts. Public disclosure no longer requires commercial terms; paid commerce still does. Setup completion retains its existing gate in this safety slice."

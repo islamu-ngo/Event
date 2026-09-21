@@ -562,11 +562,13 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
-    [Arguments(true, false, "pending", true)]
+    [Arguments(true, false, "pending", false)]
+    [Arguments(true, true, "pending", false)]
+    [Arguments(true, true, "failed", false)]
     [Arguments(true, false, "failed", false)]
     [Arguments(false, true, null, true)]
     [Arguments(false, false, null, false)]
-    public async Task ShouldSkipAuthorizationProviderStepAsync_UsesDeploymentOwnershipOrReadiness(
+    public async Task ShouldSkipAuthorizationProviderStepAsync_RequiresExplicitReadiness(
         bool managedByDeployment,
         bool configured,
         string? bootstrapStatus,
@@ -975,13 +977,17 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
-    public async Task GetStartupStatusAsync_MapsCompletedInteractive_AndSurfacesServerAuthority()
+    [Arguments(null)]
+    [Arguments("Local")]
+    [Arguments("Keycloak")]
+    [Arguments("Atproto")]
+    public async Task GetStartupStatusAsync_MapsCompletedInteractive_AndSurfacesServerAuthority(string? provider)
     {
         SetupBffClient(CreateJsonResponse(CreateStatusResource(
             isCompleted: true,
             state: "Completed",
             mode: "Interactive",
-            provider: null,
+            provider: provider,
             generation: 7,
             isAuthenticated: true,
             isCurrentUserInstanceAdmin: true,
@@ -994,6 +1000,7 @@ public class InstanceOnboardingServiceTests
         await Assert.That(status.IsCurrentUserInstanceAdmin).IsTrue();
         await Assert.That(status.SelectedDeploymentMode).IsEqualTo("MultiTenant");
         await Assert.That(status.Generation).IsEqualTo(7L);
+        await Assert.That(status.Provider).IsEqualTo(provider);
     }
 
     [Test]

@@ -1,0 +1,31 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M31BRQ0X180ZCAD8H3HPSFKC
+Title: "Preserve provider account identity through browser sign-in"
+Type: fix
+Scope: access
+Summary: "Retain validated OIDC account claims and configure Keycloak to issue its own subject in API access tokens."
+Group: external-account-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: "Preserve validated issuer, canonical subject and provider-owned verification under trusted OIDC scheme identities. Cookie, circuit and outbound token bytes remain unchanged; subjectless or forged API credentials remain denied."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: "The production and test Keycloak exports enable the built-in provider subject mapper. Existing imported realms require the same mapper applied by their operator; exports do not update existing realms."
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: "After applying the provider mapper, sign in afresh to obtain tokens. Do not use session IDs, platform identifiers or forced email verification as workarounds."

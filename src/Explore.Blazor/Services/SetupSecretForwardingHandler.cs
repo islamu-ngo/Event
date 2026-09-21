@@ -22,7 +22,12 @@ public class SetupSecretForwardingHandler : DelegatingHandler
         var path = request.RequestUri?.AbsolutePath ?? string.Empty;
         _ = request.Headers.Remove("X-Setup-Secret");
 
-        if (!RequiresSetupSecret(request.Method.Method, path))
+        var authenticatedStateRead = request.Method == HttpMethod.Get
+            && path.Equals("/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(request.Headers.Authorization?.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase)
+            && Event.Web.BffHosting.Security.EventBffTokenSafety.IsTokenForwardable(request.Headers.Authorization?.Parameter);
+
+        if (authenticatedStateRead || !RequiresSetupSecret(request.Method.Method, path))
         {
             return base.SendAsync(request, cancellationToken);
         }
@@ -46,6 +51,15 @@ public class SetupSecretForwardingHandler : DelegatingHandler
         if ((HttpMethods.IsGet(method) || HttpMethods.IsPatch(method))
             && (path.Equals("/api/instance/settings/auth-provider", StringComparison.OrdinalIgnoreCase)
                 || path.Equals("/api/instance/settings/authz-provider", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsGet(method)
+                && (path.Equals("/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
+                    || path.Equals("/api/instanceonboarding/journey", StringComparison.OrdinalIgnoreCase))
+            || HttpMethods.IsPatch(method)
+                && path.Equals("/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }

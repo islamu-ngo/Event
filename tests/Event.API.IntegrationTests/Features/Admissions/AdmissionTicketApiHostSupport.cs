@@ -33,6 +33,7 @@ internal sealed class AdmissionApiFactory : AuthenticatedWebApplicationFactory
         this.scenario = scenario;
         this.logs = logs;
         this.enableRecoveryRateLimit = enableRecoveryRateLimit;
+        SeedActiveDefaultTenant = true;
         AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true };
         AdditionalConfiguration["RateLimiting:DisableInTesting"] = (!enableRecoveryRateLimit).ToString();
         AdditionalConfiguration["RateLimiting:AdmissionTicketRecovery:PermitLimit"] = "1";

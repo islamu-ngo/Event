@@ -888,6 +888,14 @@ public static class BffAuthEndpoints
             return LocalAuthenticationFailure(StatusCodes.Status403Forbidden);
         }
 
+        if (hasAdminAuthority
+            && refreshedStatus.Disposition == BffOnboardingDisposition.Completed
+            && safeReturnUrl == "/")
+        {
+            safeReturnUrl = "/settings/instance?section=getting-started";
+            properties.RedirectUri = safeReturnUrl;
+        }
+
         ExploreBffCookieSessionHandler.MarkUserSynchronizationCompleted(properties);
         await ctx.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,

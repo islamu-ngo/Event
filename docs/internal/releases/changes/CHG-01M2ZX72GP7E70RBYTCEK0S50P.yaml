@@ -1,0 +1,41 @@
+Change-Id: CHG-01M2ZX72GP7E70RBYTCEK0S50P
+Title: Manage private directories before explicit activation
+Type: feat
+Scope: onboarding
+Summary: >-
+  Authorized administrators can prepare the fixed default directory privately in
+  SingleTenant mode and explicitly activate it using freshly persisted identity.
+Group: progressive-instance-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Exact fixed-default target restrictions preserve existing instance and tenant
+      authorization. Activation reads fresh identity under the existing mutation
+      lock; machine and unrelated tenant authority remain denied.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Existing detail and activation operations no longer declare universal
+      multi-tenant-only mode. Routes and payload shapes are unchanged; the
+      generated schema removes those two mode annotations.
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: >-
+      Preparing identity and branding does not publish a Provisioning directory.
+      Follow the server-authored activation relation explicitly. No migration,
+      new configuration or dependency is required.

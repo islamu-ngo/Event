@@ -171,6 +171,32 @@ In Split, YARP carries the sanitized request to the API host. In Standalone, `Co
 
 The `InProcessEventApiHttpMessageHandler` used by server-side generated API clients is an isolated in-process API/BFF bridge: it creates a fresh service scope and HTTP context and deliberately excludes browser cookies, `Host`, and ambient principals. It preserves HTTP request/response semantics, not ambient authority.
 
+### Private Local setup handoff
+
+Tenant lifecycle enforcement admits only the credential-replacement controller's
+exact completion action with validated restricted replacement authority. The
+selected identity store still checks the current subject, operation and security
+stamp and consumes the challenge once; setup secrets and ordinary access tokens
+cannot substitute for it. Tenant resolution is unchanged.
+
+The exact current-user and current-user-admin-authority reads retain normal Active
+behavior. For a private directory they require persisted instance-administrator
+or exact bound-tenant administrator authority. This lets the BFF complete fresh
+sign-in and session revalidation without publishing the directory. Public tenant
+reads remain lifecycle-denied even for that administrator.
+
+### Private instance management
+
+`InstanceManagementAttribute` classifies only GET/PATCH on the exact
+`/api/instance/settings/auth-provider` and `authz-provider` routes, and GET/PUT
+on `/api/instance-operator-identity`. Tenant resolution and lifecycle middleware
+let these instance-owned actions reach their existing setup/administrator checks,
+without requiring a tenant in MultiTenant mode or an Active directory in
+SingleTenant mode. Responses are no-store. The classification grants no identity,
+role or command authority and does not cover descendants, anonymous provider
+status routes or public experience. Setup expiry and persisted administrator
+checks remain owned by the existing authentication, controller and command paths.
+
 ### Antiforgery boundaries
 
 Unsafe browser `/api/*` requests require the BFF antiforgery token: the BFF issues `XSRF-TOKEN` and the client returns it as `X-CSRF-TOKEN`. In Split, the BFF proxy validates this before YARP forwarding. In Standalone, the Combined bridge validates it before API dispatch. Direct API bearer-token and API-key clients do not traverse a browser-cookie boundary and are not subject to BFF antiforgery.
@@ -448,6 +474,30 @@ In YARP transforms:
 - Inbound request headers are never trusted as setup-secret sources. Browser-controlled `X-Setup-Secret` values must be stripped and ignored by both YARP and server-side forwarding handlers.
 
 This prevents stale outgoing proxy headers and browser-controlled privileged headers from leaking across requests. Treat the setup secret as bootstrap-only sensitive material; the BFF protects the setup cookie with a 30-minute time-limited ASP.NET Core Data Protection payload, applies the same rolling inactivity limit to server-side setup sessions, and forwards only resolver output to downstream API calls.
+
+### Initial Sign-In Setup Authority
+
+Both the server-side generated-client handler and the shared browser proxy/bridge
+policy forward trusted setup authority to exactly `GET /api/instance/settings/branding`
+and `PATCH /api/InstanceOnboarding/profile`. The API authenticates these operations
+through the purpose-bound setup scheme. Only a validated setup principal bypasses
+the tenant lifecycle gate for the exact branding GET, so initial preparation does
+not require a public tenant. The controller still requires instance-administrator
+or validated setup authority. Branding PATCH and all other settings routes gain no
+new setup permissions.
+
+Provider sign-in (Local, Keycloak, or ATProto) is not an administrator grant.
+Setup authority does not become a platform identity or unlock UI-shell settings
+scopes. The browser cannot supply authorization, provider assertions, tenant, or
+setup-secret headers; existing BFF sanitization and write antiforgery remain in
+force. Generated clients remain the component boundary.
+
+Persisted BFF setup cookies/sessions are revalidated before status renewal or
+sign-in synchronization. Durable API completion rejects setup authentication with
+`410` / `setup_already_completed`; the BFF clears its setup cookies/session rather
+than renewing or rebinding them. Neither a retained cookie nor restarting a BFF
+reopens setup. Troubleshooting must use bounded, value-free codes, never secret or
+provider response content.
 
 ## Embedded Control Plane Boundary
 

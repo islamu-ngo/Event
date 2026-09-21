@@ -80,7 +80,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(TenantDirectoryOperatorReadinessAssessment.Ready(identity, Guid.CreateVersion7(), Guid.CreateVersion7()));
         var instanceReadiness = Substitute.For<IInstanceOperatorIdentityReadinessEvaluator>();
-        instanceReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+        instanceReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, Arg.Any<CancellationToken>())
             .Returns(new InstanceOperatorIdentityReadinessAssessment(
                 true,
                 null,
@@ -169,7 +169,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandlerTests
         events.IsPubliclyEligibleAsync(tenantId, eventId, Arg.Any<CancellationToken>()).Returns(true);
         catalogs.GetPublishedCatalogAsync(eventId, tenantId, Arg.Any<CancellationToken>()).Returns(catalog);
 
-        instanceReadiness.EvaluateAsync(Arg.Any<CancellationToken>())
+        instanceReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, Arg.Any<CancellationToken>())
             .Returns(new InstanceOperatorIdentityReadinessAssessment(
                 false,
                 InstanceOperatorIdentityFailureCodes.Missing,

@@ -80,6 +80,8 @@ public static class EventBffAuthenticationExtensions
         options.ClientSecret = authOptions.ClientSecret?.Trim() ?? string.Empty;
         options.UsePkce = true;
         options.SaveTokens = true;
+        options.MapInboundClaims = false;
+        options.ClaimActions.Remove("iss");
         options.GetClaimsFromUserInfoEndpoint = true;
         options.RequireHttpsMetadata = authOptions.RequireHttpsMetadata ?? !environment.IsDevelopment();
         options.CallbackPath = authOptions.CallbackPath;
@@ -98,7 +100,8 @@ public static class EventBffAuthenticationExtensions
             : CookieSecurePolicy.Always;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            NameClaimType = "preferred_username"
+            NameClaimType = "preferred_username",
+            AuthenticationType = EventBffAuthenticationSchemes.Keycloak
         };
         options.Scope.Clear();
         options.Scope.Add("openid");

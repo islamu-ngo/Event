@@ -3,7 +3,59 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-21
+
+- **Canonical operator form metadata.** Authenticated
+  `GET /api/operator-identity-metadata` (`GetOperatorIdentityFormOptions`) returns
+  value-free operator-kind codes, runtime country/region display choices, shared
+  legal-identity constraints and stable label/help identifiers. Missing runtime
+  globalization data is explicit `Unavailable`, with
+  `operator_identity_countries_unavailable`; no partial mandatory selector is
+  supplied. Registration identifiers remain optional; authority options are empty
+  with `registrationAuthorityState: NotSupported` because no registry exists.
+  The tenant-independent resource is private/no-store and exposes only `self` and
+  `refresh`, never edit authority. Normal authenticated instance identity readers
+  discover it through `form-options`; setup-secret authority is not extended.
+  No persisted identity values, credentials, migration or new dependency is added.
+
 ## 2026-09-20
+
+- **Breaking: setup finishes before publication.** Completion requests must submit
+  the current journey `generation` as `expectedJourneyGeneration` (nested under
+  `settings` for Local completion). Stale or unavailable state returns HTTP 409
+  with a HAL refresh link before mutation. Legal identity is no longer an
+  installation prerequisite. A new SingleTenant default is Provisioning with
+  canonical draft documents; existing tenants/documents are preserved and
+  MultiTenant creates no directory. Completed status retains the provider for
+  credential-free recovery. Setup stays locked; administrators land at
+  `/settings/instance?section=getting-started`. Disclosure, activation and paid
+  commerce keep their separate readiness and authorization checks.
+
+- **Breaking: canonical onboarding journey.** Setup clients use private HAL
+  `GET /api/instanceonboarding/journey` for one snapshot of bootstrap, provider
+  readiness, persisted profile and categorized preflight checks. Failed or changing
+  sources return bounded failure state and refresh authority, not fallback defaults.
+  The duplicate System onboarding-preflight route and generated client method are
+  removed without aliases. Existing profile PATCH precedes readiness refresh.
+  Completion semantics, schema and dependencies are unchanged.
+
+- **Private default-directory administration.** Existing control-plane tenant
+  detail and activation routes now accept the fixed default tenant in SingleTenant
+  mode with unchanged instance-administrator authorization. Arbitrary targets are
+  rejected; fleet operations remain MultiTenant-only. SingleTenant detail HAL omits
+  fleet-only actions. Identity/branding edits retain exact tenant permissions, and
+  identity completion does not activate. Explicit activation reads the current
+  identity under its existing mutation lock, not a stale cached revision. OpenAPI
+  is regenerated to remove the two obsolete multi-tenant-required annotations;
+  route, payload and generated-client method shapes are unchanged. No migration
+  or deployment configuration change is required.
+
+- **Breaking: capability-specific instance identity readiness.** Identity GET and
+  PUT responses replace top-level readiness fields with `publicDisclosure` and
+  `paidCommerce` assessments. Valid incomplete administrative drafts can be saved
+  after setup. Public disclosure permits missing commercial terms; commerce still
+  requires them and current immutable acceptance evidence. Update generated clients;
+  no database migration, route alias, or configuration change is required.
 
 - **Security: provider credential HTTP nonretention.** The seven existing
   credential-bearing provider-management POST operations are now

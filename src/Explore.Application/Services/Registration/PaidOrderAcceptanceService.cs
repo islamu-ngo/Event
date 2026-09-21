@@ -163,7 +163,7 @@ public sealed class PaidOrderAcceptanceService(
         }
 
         InstanceOperatorIdentityReadinessAssessment instanceAssessment =
-            await instanceIdentityReadiness.EvaluateAsync(cancellationToken);
+            await instanceIdentityReadiness.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce, cancellationToken);
         if (!instanceAssessment.IsReady || instanceAssessment.Identity is null)
         {
             return Failure("instance_operator_identity_unavailable", "Instance operator identity is unavailable for paid commerce.");
@@ -192,7 +192,7 @@ public sealed class PaidOrderAcceptanceService(
                 instanceOperatorIdentity.OperatorId, instanceOperatorIdentity.PublicName,
                 instanceOperatorIdentity.IsOfficialInstance, instanceOperatorIdentity.OfficialOrigin,
                 instanceOperatorIdentity.JurisdictionCountryCode, instanceOperatorIdentity.WebsiteUrl,
-                instanceOperatorIdentity.LegalNoticeUrl, instanceOperatorIdentity.TermsUrl,
+                instanceOperatorIdentity.LegalNoticeUrl, instanceOperatorIdentity.TermsUrl!,
                 instanceOperatorIdentity.PrivacyUrl, instanceOperatorIdentity.PublicContactEmail,
                 governance.ComplaintOwner, governance.RefundOwner, governance.DisputeOwner,
                 governance.ReconciliationOwner, governance.ActivationStatus,

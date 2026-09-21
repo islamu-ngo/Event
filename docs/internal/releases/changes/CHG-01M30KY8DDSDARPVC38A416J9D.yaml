@@ -1,0 +1,27 @@
+Change-Id: CHG-01M30KY8DDSDARPVC38A416J9D
+Title: "Forward protected setup authority to the journey read"
+Type: fix
+Scope: onboarding
+Summary: "Keep Local onboarding readiness available through the BFF by forwarding protected setup authority to the exact journey GET."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "The server-side client forwards only resolver-owned setup authority to the exact journey GET; forged and expired cookies, other methods, and descendant paths remain excluded."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/5-minute-quickstart.md
+    Disposition: documented
+    Detail: "Active setup access carries through to the site profile and readiness read without another sign-in or browser-supplied authority header."

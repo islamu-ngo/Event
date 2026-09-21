@@ -36,19 +36,19 @@ public sealed class InstanceOnboardingCompletionOperation(
     IUserExternalLoginRepository externalLoginRepository,
     ITenantRepository tenantRepository,
     ITenantCreationService tenantCreationService,
-    ITenantSettingsDocumentRepository tenantSettingsRepository,
     ISystemSettingRepository systemSettingRepository,
     IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders,
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger auditLogger,
     IDeploymentModeProvider deploymentModeProvider,
     IJwtAuthorityRefreshNotifier jwtRefreshNotifier,
-    ITenantBrandingSettingsDocumentProvisioningService brandingProvisioner,
     ILogger<InstanceOnboardingCompletionOperation> logger,
     IUnitOfWork unitOfWork,
-    IInstanceOperatorIdentityReadinessEvaluator instanceOperatorIdentityReadiness,
+    IInstanceOnboardingGenerationReader generationReader,
     IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null)
 {
+    private static readonly JsonSerializerOptions IdentitySerializerOptions = new(JsonSerializerDefaults.Web);
+
     public Task<BaseCommandResponse<Guid>> CompleteInteractiveAsync(
         CompleteInstanceOnboardingCommand command,
         DeploymentMode deploymentMode,
@@ -118,8 +118,9 @@ public sealed class InstanceOnboardingCompletionOperation(
         CompletionInput input,
         CancellationToken cancellationToken)
     {
-        InstanceBootstrapState? bootstrap =
-            await bootstrapRepository.GetCurrentForUpdate(cancellationToken);
+        InstanceBootstrapState? bootstrap = input.IsConfigured
+            ? await bootstrapRepository.GetCurrentForUpdate(cancellationToken)
+            : await AdmitInteractiveGenerationAsync(input.Settings!, cancellationToken);
         Admission admission = !input.IsConfigured
             ? AdmitInteractive(input, bootstrap)
             : await AdmitConfiguredAsync(input, bootstrap, cancellationToken);
@@ -164,7 +165,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         if (input.IsConfigured && operatorIdentityOptions?.Value is { } options)
         {
-            var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options);
+            var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
             if (configuredIdentity is not null)
             {
                 SystemSetting? existingIdentitySetting = await systemSettingRepository.GetByKey(
@@ -202,18 +203,21 @@ public sealed class InstanceOnboardingCompletionOperation(
             }
         }
 
-        InstanceOperatorIdentityReadinessAssessment identityReadiness =
-            await instanceOperatorIdentityReadiness.EvaluateAsync(cancellationToken);
-        if (!identityReadiness.IsReady)
+        if (await systemSettingRepository.GetByKey(InstanceOperatorIdentitySettingKeys.OperatorIdentity, cancellationToken) is null)
         {
-            return new(
-                BaseCommandResponse.Failure<Guid>(
-                    identityReadiness.FailureCode ?? "instance_operator_identity_incomplete",
-                    "Instance operator identity is not ready for onboarding completion.",
-                    identityReadiness.ReasonCodes.IsEmpty ? null : identityReadiness.ReasonCodes),
-                false,
-                admission.DeploymentMode,
-                admission.AuditOperation);
+            var draft = new InstanceOperatorIdentitySettings
+            {
+                OperatorId = Guid.CreateVersion7(),
+                Revision = Guid.CreateVersion7()
+            };
+            await systemSettingRepository.UpsertInCurrentTransactionAsync(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
+                Value = JsonSerializer.Serialize(draft, IdentitySerializerOptions),
+                ValueType = SettingValueType.Json,
+                CreatedAt = input.CompletedAt
+            }, cancellationToken);
         }
 
         CompleteInstanceOnboardingRequest settings = admission.Settings!;
@@ -222,7 +226,6 @@ public sealed class InstanceOnboardingCompletionOperation(
         if (singleTenant)
         {
             Tenant tenant = await EnsureDefaultTenantAsync(
-                settings.DirectoryOperatorIdentity!,
                 admission.SiteProfile!.SiteName,
                 input.UserId,
                 cancellationToken);
@@ -238,10 +241,6 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         if (singleTenant && defaultTenantId.HasValue)
         {
-            await brandingProvisioner.EnsureTenantBrandingDocumentAsync(
-                defaultTenantId.Value,
-                admission.SiteProfile!.SiteName,
-                cancellationToken);
             await EnsureDefaultTenantAdministratorAsync(defaultTenantId.Value, user);
             logger.LogInformation("Onboarding: Assigned Tenant Admin role for default tenant");
         }
@@ -283,6 +282,18 @@ public sealed class InstanceOnboardingCompletionOperation(
             true,
             admission.DeploymentMode,
             admission.AuditOperation);
+    }
+
+    internal async Task<InstanceBootstrapState?> AdmitInteractiveGenerationAsync(
+        CompleteInstanceOnboardingRequest settings, CancellationToken cancellationToken)
+    {
+        var bootstrap = await bootstrapRepository.GetCurrentForUpdate(cancellationToken);
+        var generation = await generationReader.ReadAsync(bootstrap, cancellationToken);
+        if (string.IsNullOrWhiteSpace(settings.ExpectedJourneyGeneration)
+            || !string.Equals(settings.ExpectedJourneyGeneration, generation, StringComparison.Ordinal))
+            throw new ConcurrencyConflictException("onboarding_generation_changed",
+                "Refresh authoritative setup status before submitting a new completion request.");
+        return bootstrap;
     }
 
     private static Admission AdmitInteractive(
@@ -420,14 +431,6 @@ public sealed class InstanceOnboardingCompletionOperation(
             settings.SiteProfile.SiteName = settings.InstanceName;
         }
 
-        if (settings.DeploymentMode == DeploymentMode.SingleTenant
-            && settings.DirectoryOperatorIdentity is null)
-        {
-            return ConfiguredTerminal(
-                "configured_administrator_configuration_incomplete",
-                "Configured administrator onboarding is not ready.");
-        }
-
         var validator = new CompleteInstanceOnboardingRequestValidator();
         var validation = await validator.ValidateAsync(settings, cancellationToken);
         if (!validation.IsValid)
@@ -541,7 +544,6 @@ public sealed class InstanceOnboardingCompletionOperation(
     }
 
     private async Task<Tenant> EnsureDefaultTenantAsync(
-        TenantDirectoryOperatorIdentityInputDto identityInput,
         string displayName,
         Guid actorUserId,
         CancellationToken cancellationToken)
@@ -549,7 +551,6 @@ public sealed class InstanceOnboardingCompletionOperation(
         Tenant? tenant = await tenantRepository.GetById(PlatformDefaults.DefaultTenantId);
         if (tenant is not null)
         {
-            await UpsertDefaultTenantIdentityAsync(identityInput, actorUserId, cancellationToken);
             return tenant;
         }
 
@@ -558,14 +559,13 @@ public sealed class InstanceOnboardingCompletionOperation(
             PlatformDefaults.DefaultTenantId,
             displayName);
         TenantSettingsDocument identity = TenantDirectoryOperatorIdentityDocumentDefaults.Create(
-            PlatformDefaults.DefaultTenantId,
-            identityInput.ToPayload());
+            PlatformDefaults.DefaultTenantId);
         TenantCreationOutcome outcome = await tenantCreationService.CreateInCurrentTransactionAsync(
             new TenantCreationRequest(
                 PlatformDefaults.DefaultTenantId,
                 PlatformDefaults.DefaultTenantName,
                 PlatformDefaults.DefaultTenantSlug,
-                (int)TenantStatusEnum.Active,
+                (int)TenantStatusEnum.Provisioning,
                 actorUserId,
                 occurredAt,
                 new TenantBrandingDocumentSeed(
@@ -580,38 +580,6 @@ public sealed class InstanceOnboardingCompletionOperation(
                     identity.PayloadJson)),
             cancellationToken);
         return outcome.Tenant;
-    }
-
-    private async Task UpsertDefaultTenantIdentityAsync(
-        TenantDirectoryOperatorIdentityInputDto identityInput,
-        Guid actorUserId,
-        CancellationToken cancellationToken)
-    {
-        TenantSettingsDocument replacement = TenantDirectoryOperatorIdentityDocumentDefaults.Create(
-            PlatformDefaults.DefaultTenantId,
-            identityInput.ToPayload());
-        TenantSettingsDocument? existing =
-            await tenantSettingsRepository.GetTrackedByTenantAndDocumentKey(
-                PlatformDefaults.DefaultTenantId,
-                SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity,
-                cancellationToken);
-        DateTime changedAt = DateTime.UtcNow;
-        if (existing is null)
-        {
-            replacement.Id = Guid.CreateVersion7();
-            replacement.CreatedAt = changedAt;
-            replacement.CreatedBy = actorUserId;
-            await tenantSettingsRepository.Create(replacement);
-            return;
-        }
-
-        existing.UpdatePayload(
-            replacement.SchemaVersion,
-            replacement.DefaultsVersion,
-            replacement.PayloadJson);
-        existing.UpdatedAt = changedAt;
-        existing.UpdatedBy = actorUserId;
-        await tenantSettingsRepository.Update(existing);
     }
 
     private async Task EnsurePlatformAdministratorAsync(Guid userId)

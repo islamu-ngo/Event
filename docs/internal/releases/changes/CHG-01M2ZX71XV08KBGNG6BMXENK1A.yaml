@@ -1,0 +1,41 @@
+Change-Id: CHG-01M2ZX71XV08KBGNG6BMXENK1A
+Title: Preserve setup authority through initial sign-in
+Type: fix
+Scope: onboarding
+Summary: >-
+  Trusted first-run sessions can read branding and save the installation profile
+  before a public directory exists without acquiring administrator rights.
+Group: progressive-instance-onboarding
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Both BFF forwarding paths and API setup authentication allow only branding
+      GET and onboarding profile PATCH. Only validated setup authentication
+      bypasses tenant lifecycle for that exact branding read. Branding writes
+      remain administrator-only. Browser header stripping and antiforgery remain
+      enforced. Persisted BFF authority is revalidated before renewal or binding;
+      durable completion permanently revokes setup authority.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: >-
+      Renew expired setup sessions only while installation is incomplete. After
+      completion use normal sign-in, not a setup reset. Provider sign-in alone
+      grants no administrator rights. No migration, configuration change, or new
+      dependency is required.

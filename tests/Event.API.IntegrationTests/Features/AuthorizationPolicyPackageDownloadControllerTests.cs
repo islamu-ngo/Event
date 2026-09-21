@@ -51,7 +51,9 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
             Substitute.For<ILogger<InstanceOnboardingController>>(),
             Substitute.For<IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto>>(),
             Substitute.For<IVisitorAccessCapabilityResolver>(),
-            Substitute.For<Explore.Application.Contracts.Infrastructure.ITenantContext>());
+            Substitute.For<Explore.Application.Contracts.Infrastructure.ITenantContext>(),
+            scope.ServiceProvider.GetRequiredService<IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto>>(),
+            scope.ServiceProvider.GetRequiredService<IResourceAssembler<InstanceOnboardingJourneyDto, InstanceOnboardingJourneyDto>>());
 
         IActionResult result = await controller.DownloadAuthorizationPolicyPackage(CancellationToken.None);
 

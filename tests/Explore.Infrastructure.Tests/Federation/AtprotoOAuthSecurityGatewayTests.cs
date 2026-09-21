@@ -152,7 +152,9 @@ public sealed class AtprotoOAuthSecurityGatewayTests
             new VisitorAccessCapabilityResolver(
                 systemSettings,
                 new TenantSettingRepository(visitorSettings.Context, visitorSettings.MutationLock),
-                new VisitorAccessProviderReader(systemSettings, configuration)),
+                new VisitorAccessProviderReader(systemSettings, configuration),
+                new TenantLifecycleAccessService(new TenantRepository(visitorSettings.Context),
+                    Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>())),
             tenantContext,
             configuration,
             TimeProvider.System);

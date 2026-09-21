@@ -1,0 +1,27 @@
+Change-Id: CHG-01M30PEVT9DBKEX3CC2TFTJV7R
+Title: "Land fresh Local administrators in getting-started"
+Type: fix
+Scope: onboarding
+Summary: "Use server-verified completed administrator authority to choose the default Local sign-in destination without loading the public shell."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Default redirect uses existing server-verified administrator enrichment and completed bootstrap status; explicit safe destinations and non-administrator routing remain unchanged."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/5-minute-quickstart.md
+    Disposition: documented
+    Detail: "Fresh Local administrator sign-in defaults to getting-started after private password replacement, without depending on the public event shell."

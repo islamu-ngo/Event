@@ -3,7 +3,7 @@
 > **Audience:** Contributors | Operators | AI agents
 > **Status:** Implemented
 > **Owner:** Security / Platform
-> **Last Verified:** 2026-09-14
+> **Last Verified:** 2026-09-20
 > **Source Anchors:** `src/Explore.Domain/ValueObjects/InstanceOperatorIdentityReadiness.cs`, `src/Explore.Application/Services/InstanceOperatorIdentityService.cs`, `src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs`, `src/Explore.Application/Services/Registration/PaidCheckoutActivationService.cs`, `src/Explore.API/Controllers/InstanceOperatorIdentityController.cs`
 
 - **Decision:** Decouple process-level .NET host startup from operator business identity; persist operator identity as a versioned document in `SystemSetting` storage (`instance.operator_identity`); gate dependent disclosures and commerce fail-closed at runtime.
@@ -52,17 +52,26 @@ Rather than crashing the host or returning misleading placeholder values, depend
 3. **Paid Commerce Gating (`PaidCheckoutActivationService` & `GetRegistrationCheckoutCompositionQueryHandler`):** Evaluates `EvaluateSaleControlAsync`. If operator identity is not ready, activation returns `PaidCheckoutActivationResult.Failure("instance_operator_identity_unavailable", ...)`, blocking payment reservations and gateway handoffs. Checkout composition returns `null` for paid ticket types.
 4. **Historical Immutability:** Historical `PaidOrderAcceptanceSnapshot` records remain immutable; they snapshot validated identity at acceptance time and are never modified by subsequent operator identity updates.
 
-### 4. Transactional Onboarding Completion Enforcement & Rollback
+### 4. Transactional Private Completion
 
-`InstanceOnboardingCompletionOperation.PersistAsync` evaluates `IInstanceOperatorIdentityReadinessEvaluator` within the serializable completion transaction before creating users, default tenants, or assigning administrator roles.
+As refined by [ADR-032](ADR-032-progressive-instance-onboarding.md),
+`InstanceOnboardingCompletionOperation.PersistAsync` no longer evaluates legal
+readiness as an installation gate. It creates a missing instance draft and, in
+SingleTenant mode, a missing Provisioning default directory with canonical identity
+and branding drafts inside the completion transaction. Existing documents and
+tenant lifecycle are preserved. MultiTenant creates no directory. Administrator
+bootstrap, transactional finality and rollback remain unchanged.
 
-If operator identity is missing or incomplete, the transaction aborts with `BaseCommandResponse.Failure<Guid>("instance_operator_identity_incomplete", ...)`. Zero users, tenants, or roles are committed, and `InstanceBootstrapState.Status` remains `Pending`.
+The HTTP boundary freshly checks the journey generation before mutation. This is
+a stale-view check, not a cross-provider transaction fence. Completion never grants
+public access; disclosure, directory activation and paid commerce still evaluate
+their own capabilities.
 
 ### 5. Permanent Setup Secret Lockout ("The Worst Break" Prevention)
 
 `SetupSecretProvider` checks durable bootstrap completion state (`InstanceBootstrapState.Status == Completed`) independently of operator identity presence.
 
-Even if an already-completed instance suffers corrupted or missing operator identity in `SystemSetting`, setup mode **never** re-enables and the setup secret remains permanently locked (returning HTTP 410 Gone). Only authenticated platform administrators (`platform.admin`) can repair identity via `/admin/instance`.
+Even if an already-completed instance suffers corrupted or missing operator identity in `SystemSetting`, setup mode **never** re-enables and the setup secret remains permanently locked (returning HTTP 410 Gone). Only authenticated platform administrators (`platform.admin`) can repair identity via `/settings/instance?section=operator-identity`.
 
 ### 6. Optional Headless Bootstrap Input
 
@@ -70,7 +79,7 @@ Unattended setups may supply structured identity via `INSTANCE__OPERATORIDENTITY
 
 ## Consequences
 
-- **Positive:** Self-hosters can launch containers with a minimal `.env` (or zero identity variables) and complete legal identity configuration through the web UI at `/setup`.
+- **Positive:** Self-hosters can launch containers with a minimal `.env` (or zero identity variables) and finish private setup before configuring legal identity through authenticated administration.
 - **Positive:** Infrastructure availability is strictly decoupled from business legal compliance.
 - **Positive:** Attacking or corrupting stored identity cannot reopen the setup secret or grant unauthenticated platform administrative access.
 - **Negative:** Dependent public notices and paid commerce features require valid operator identity to become active, returning HTTP 503 or checkout failure if identity is omitted.

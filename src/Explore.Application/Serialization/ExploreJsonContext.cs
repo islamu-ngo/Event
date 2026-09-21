@@ -331,6 +331,8 @@ namespace Explore.Application.Serialization;
 [JsonSerializable(typeof(Explore.Application.DTOs.Instance.AiAssistantGovernanceSettingsDto))]
 [JsonSerializable(typeof(Explore.Application.DTOs.Instance.McpGovernanceSettingsDto))]
 [JsonSerializable(typeof(InstanceOnboardingStatusDto))]
+[JsonSerializable(typeof(InstanceOnboardingJourneyDto))]
+[JsonSerializable(typeof(HalResource<InstanceOnboardingJourneyDto>))]
 [JsonSerializable(typeof(InstanceStorageSettingsDto))]
 [JsonSerializable(typeof(InstanceStorageEffectivePolicyDto))]
 [JsonSerializable(typeof(InstanceStorageUsageDto))]

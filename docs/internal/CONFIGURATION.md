@@ -8,6 +8,14 @@ The exhaustive environment-variable reference is maintained in
 `.env.example` is intentionally a curated baseline, not a complete catalogue.
 This document owns configuration architecture, source anchors and invariants.
 
+## Guided Setup Configuration Boundary
+
+The guided administrator checklist introduces no environment keys, configuration
+store or provider fallback. Existing journey/preflight projections remain the
+source of requirement categories and remediation authority. Value-free operator
+form metadata supplies canonical choices; persisted identity and revision remain
+in the existing document. See [SELF_HOSTING.md](SELF_HOSTING.md#2-operator-identity-governance--readiness-gate).
+
 ## Anonymous Registration Intake Controls
 
 `AnonymousRegistrationRateLimiting` resolves final host configuration from
@@ -111,8 +119,12 @@ lineage to force an older constraint to accept newer state.
 ## Legal-Identity Configuration Boundaries
 
 General instance accountability is stored in the database under system setting
-`instance.operator_identity` and managed via `/setup` or `/admin/instance`
-(`GET/PUT /api/instance-operator-identity`). The `.env` representation uses
+`instance.operator_identity` and managed after setup at
+`/settings/instance?section=operator-identity`
+(`GET/PUT /api/instance-operator-identity`). Setup authority can still use the
+identity API, but legal identity is not required to finish installation. Completion
+creates a canonical draft only when no instance identity document exists; existing
+identity and directory documents are not replaced. The `.env` representation uses
 `INSTANCE__OPERATORIDENTITY__*` as an optional bootstrap seed for headless
 `ConfiguredAdministrator` mode, including the UUIDv7 operator ID, public and
 legal names, official-instance flag/origin, operator kind, jurisdiction,

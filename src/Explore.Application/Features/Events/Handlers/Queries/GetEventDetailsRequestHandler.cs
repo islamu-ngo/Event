@@ -15,17 +15,20 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
     private readonly IEventRepository _eventRepository;
     private readonly IEventDetailsProjectionService _detailsProjectionService;
     private readonly HybridCache _cache;
+    private readonly ITenantLifecycleAccessService _lifecycle;
     private readonly IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> _optionalQuestionnaireHandler;
 
     public GetEventDetailsRequestHandler(
         IEventRepository eventRepository,
         IEventDetailsProjectionService detailsProjectionService,
         HybridCache cache,
-        IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> optionalQuestionnaireHandler)
+        IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> optionalQuestionnaireHandler,
+        ITenantLifecycleAccessService lifecycle)
     {
         _eventRepository = eventRepository;
         _detailsProjectionService = detailsProjectionService;
         _cache = cache;
+        _lifecycle = lifecycle;
         _optionalQuestionnaireHandler = optionalQuestionnaireHandler;
     }
 
@@ -52,8 +55,8 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
             ],
             cancellationToken: cancellationToken);
 
-        if (eventDto is null)
-            return eventDto;
+        if (eventDto is null || !await _lifecycle.IsPublicAsync(eventDto.TenantId, cancellationToken))
+            return null;
 
         var isPubliclyEligible = await _eventRepository.IsPubliclyEligibleAsync(
             eventDto.TenantId,

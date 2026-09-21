@@ -265,6 +265,17 @@
       },
       "protocolMappers": [
         {
+          "name": "provider-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
           "name": "islamu-event-api-audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",

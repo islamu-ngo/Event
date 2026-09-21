@@ -29,9 +29,14 @@ public sealed class SetupSecretAuthenticationHandler(
            || (HttpMethods.IsGet(request.Method) || HttpMethods.IsPut(request.Method))
                && string.Equals(request.Path.Value, OperatorIdentityPath, StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsGet(request.Method)
-               && string.Equals(request.Path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+               && (string.Equals(request.Path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(request.Path.Value, "/api/instanceonboarding/journey", StringComparison.OrdinalIgnoreCase))
            || HttpMethods.IsPost(request.Method)
-               && string.Equals(request.Path.Value, "/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase);
+               && string.Equals(request.Path.Value, "/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase)
+           || HttpMethods.IsGet(request.Method)
+               && string.Equals(request.Path.Value, "/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
+           || HttpMethods.IsPatch(request.Method)
+               && string.Equals(request.Path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase);
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

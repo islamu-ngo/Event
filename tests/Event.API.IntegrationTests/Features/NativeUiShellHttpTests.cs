@@ -48,6 +48,10 @@ public sealed class NativeUiShellHttpTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
         using var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(scope.ServiceProvider.GetRequiredService<ExploreDbContext>());
+        }
         using var anonymous = await client.GetAsync("/api/ui-shell/context");
         await UnauthorizedAsync(anonymous);
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/ui-shell/context");
@@ -151,6 +155,10 @@ public sealed class NativeUiShellHttpTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
         using var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(scope.ServiceProvider.GetRequiredService<ExploreDbContext>());
+        }
         using var request = Request(Guid.CreateVersion7());
         using var response = await client.SendAsync(request);
         var shell = await ReadShellAsync(response);
@@ -250,6 +258,81 @@ public sealed class NativeUiShellHttpTests
         {
             accessor.HttpContext = null;
         }
+    }
+
+    [Test]
+    public async Task SetupAuthorityPreparesProfileButNeverBecomesShellOrAdministratorAuthority()
+    {
+        await using var factory = new OnboardingWebApplicationFactory();
+        using var client = factory.CreateClient();
+        string secret = OnboardingWebApplicationFactory.SetupSecret;
+        using (var branding = new HttpRequestMessage(HttpMethod.Get, "/api/instance/settings/branding"))
+        {
+            branding.Headers.Add("X-Setup-Secret", secret);
+            using var response = await client.SendAsync(branding);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+        using (var profile = new HttpRequestMessage(HttpMethod.Patch, "/api/InstanceOnboarding/profile")
+        {
+            Content = JsonContent.Create(new { siteName = "Private installation", canonicalUrl = "https://private.example.test", locale = "en", timeZone = "UTC" })
+        })
+        {
+            profile.Headers.Add("X-Setup-Secret", secret);
+            using var response = await client.SendAsync(profile);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+        var data = await SeedAuthorityAsync(factory);
+        foreach (string path in new[] { "/api/ui-shell/context", "/api/instance/settings/domains" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.Add("X-Setup-Secret", secret);
+            using var response = await client.SendAsync(request);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        }
+        using (var brandingWrite = new HttpRequestMessage(HttpMethod.Patch, "/api/instance/settings/branding")
+        { Content = JsonContent.Create(new { defaultBrandDisplayName = "Unauthorized change" }) })
+        {
+            brandingWrite.Headers.Add("X-Setup-Secret", secret);
+            using var response = await client.SendAsync(brandingWrite);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        }
+
+        // A provider sign-in is not an administrator grant, even while setup is active.
+        using (var signedIn = Request(data.Other.UserId, claims: [("explore:admin:instance", "true")]))
+        {
+            signedIn.Headers.Add("X-Setup-Secret", secret);
+            using var response = await client.SendAsync(signedIn);
+            var shell = await ReadShellAsync(response);
+            await Assert.That(shell.SettingsScopes.Select(item => item.Scope).ToArray()).IsEquivalentTo(new[] { "Personal" });
+            await PrivateAsync(response);
+        }
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var bootstrap = await db.Set<InstanceBootstrapState>().SingleOrDefaultAsync();
+            if (bootstrap is null)
+            {
+                bootstrap = InstanceBootstrapState.CreateInteractivePending(Guid.CreateVersion7(), DeploymentMode.SingleTenant, DateTime.UtcNow);
+                db.Set<InstanceBootstrapState>().Add(bootstrap);
+            }
+            bootstrap.CompleteInteractive(data.Owner.UserId, DateTime.UtcNow);
+            await db.SaveChangesAsync();
+        }
+        // Durable completion, not BFF memory or process age, revokes the purpose-bound credential.
+        foreach (var (method, path) in new[] { (HttpMethod.Get, "/api/instance/settings/branding"), (HttpMethod.Patch, "/api/InstanceOnboarding/profile") })
+        {
+            using var replay = new HttpRequestMessage(method, path);
+            replay.Headers.Add("X-Setup-Secret", secret);
+            if (method == HttpMethod.Patch) replay.Content = JsonContent.Create(new { siteName = "Replay", locale = "en", timeZone = "UTC" });
+            using var response = await client.SendAsync(replay);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Gone);
+            using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            await Assert.That(problem.RootElement.GetProperty("code").GetString()).IsEqualTo("setup_already_completed");
+        }
+        using var admin = Request(data.Owner.UserId);
+        using var adminResponse = await client.SendAsync(admin);
+        var adminShell = await ReadShellAsync(adminResponse);
+        await Assert.That(adminShell.SettingsScopes.Any(item => item.Scope == "Instance")).IsTrue();
     }
 
     private static async Task<AuthorityData> SeedAuthorityAsync(AuthenticatedWebApplicationFactory factory)

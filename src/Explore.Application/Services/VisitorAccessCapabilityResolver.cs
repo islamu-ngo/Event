@@ -13,7 +13,8 @@ namespace Explore.Application.Services;
 public sealed class VisitorAccessCapabilityResolver(
     ISystemSettingRepository systemSettings,
     ITenantSettingRepository tenantSettings,
-    IVisitorAccessProviderReader providerReader) : IVisitorAccessCapabilityResolver
+    IVisitorAccessProviderReader providerReader,
+    ITenantLifecycleAccessService lifecycle) : IVisitorAccessCapabilityResolver
 {
     /// <summary>
     /// Complete ordinal-ordered authority fence. Acquire the FULL group through
@@ -38,6 +39,9 @@ public sealed class VisitorAccessCapabilityResolver(
 
     public async Task<VisitorAccessCapability> ResolveAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
+        if (!await lifecycle.IsPublicAsync(tenantId, cancellationToken))
+            return new VisitorAccessCapability(VisitorAccessMode.DirectoryListingOnly, false, []);
+
         SystemSetting? instance = await systemSettings.GetByKey(
             GovernanceSettingKeys.PublicExperience.VisitorAccessMode, cancellationToken);
         TenantSetting? tenant = await tenantSettings.GetByTenantAndKey(

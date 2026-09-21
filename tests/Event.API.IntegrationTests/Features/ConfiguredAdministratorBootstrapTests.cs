@@ -258,6 +258,8 @@ public sealed class ConfiguredAdministratorBootstrapTests
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()
+            .WithId(Explore.Domain.Constants.PlatformDefaults.DefaultTenantId).Build());
         db.InstanceBootstrapStates.Add(InstanceBootstrapState.CreateConfiguredAdministratorPending(
             Guid.CreateVersion7(),
             AuthenticationProviderKind.Keycloak,

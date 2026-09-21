@@ -8,6 +8,11 @@ description: >-
 
 Select a topology by operational needs, then follow its dedicated runbook. The project is in active pre-release development with no official release yet: pre-built images and versioned tags will become available upon initial release.
 
+Private setup needs the site name and initial administrator, not legal identity.
+The [getting-started checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+then separates disclosure, paid-event and recommended work. Provider and deployment
+requirements still apply; the wizard never silently substitutes another provider.
+
 ## Deployment paths
 
 | Path                                                       | Best fit                                                | Primary constraint                                                     |
@@ -66,9 +71,9 @@ the selected hosting topology remain unchanged.
 All self-hosted topologies feature a guided first-run web wizard at `/setup`:
 
 1. **Decoupled Startup:** The server process boots cleanly without requiring operator legal identity environment variables up front. Optional `INSTANCE__OPERATORIDENTITY__*` variables can be provided to pre-seed initial defaults, but they are not required to start the container.
-2. **Setup Wizard Configuration (`/setup`):** Operators use the temporary setup secret to select the deployment mode (`SingleTenant` or `MultiTenant`), configure initial administrator credentials, and complete the operator's legal identity (legal name, jurisdiction, contact email, and legal disclosure URLs).
+2. **Private Setup (`/setup`):** Deployment configuration selects `SingleTenant` or `MultiTenant`. Use the temporary setup secret, confirm the site name and establish the initial administrator. Legal identity is not required to finish setup. A new SingleTenant directory remains private; MultiTenant creates none.
 3. **Fail-Closed Consumer Protections:** Completed instances with missing or incomplete operator identity will start, but will fail closed for consumer-facing legal operations: public legal notices return HTTP 503 (`Unavailable`), and paid ticket checkout activation is blocked until identity requirements are satisfied.
-4. **Post-Launch Maintenance (`/settings/instance`):** Once onboarding completes, the setup wizard locks permanently. Authorized administrators maintain and update operator legal details under **Settings → Instance → Operator Identity** (`/settings/instance?section=operator-identity`).
+4. **Administration Ready:** Once onboarding completes, setup locks permanently. Local administrators replace their temporary password through sign-in and then sign in afresh. Open `/settings/instance?section=getting-started` for server-authorized actions. Maintain legal details under **Settings → Instance → Operator Identity** (`/settings/instance?section=operator-identity`); activate the directory explicitly only when its own readiness checks pass.
 
 ## Shared production gate
 

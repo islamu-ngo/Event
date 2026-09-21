@@ -1,13 +1,19 @@
+using System.Collections.Immutable;
+
 namespace Explore.Application.DTOs.Onboarding;
+
+public sealed record InstanceOperatorIdentityCapabilityReadinessDto(
+    bool IsReady,
+    string? FailureCode,
+    ImmutableArray<string> ReasonCodes);
 
 /// <summary>
 /// Public document and readiness assessment representing the instance operator identity.
 /// </summary>
 public sealed record InstanceOperatorIdentityDocumentDto
 {
-    public bool IsReady { get; init; }
-    public string? FailureCode { get; init; }
-    public IReadOnlyList<string> ReasonCodes { get; init; } = [];
+    public required InstanceOperatorIdentityCapabilityReadinessDto PublicDisclosure { get; init; }
+    public required InstanceOperatorIdentityCapabilityReadinessDto PaidCommerce { get; init; }
     public Guid? Revision { get; init; }
     public Guid? OperatorId { get; init; }
     public string? PublicName { get; init; }
@@ -49,8 +55,7 @@ public sealed record SaveInstanceOperatorIdentityRequestDto
 public sealed record InstanceOperatorIdentitySavedDocumentDto
 {
     public Guid Revision { get; init; }
-    public bool IsReady { get; init; }
-    public string? FailureCode { get; init; }
-    public IReadOnlyList<string> ReasonCodes { get; init; } = [];
+    public required InstanceOperatorIdentityCapabilityReadinessDto PublicDisclosure { get; init; }
+    public required InstanceOperatorIdentityCapabilityReadinessDto PaidCommerce { get; init; }
     public Guid? OperatorId { get; init; }
 }

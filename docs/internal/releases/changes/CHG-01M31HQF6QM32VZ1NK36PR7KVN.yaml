@@ -1,0 +1,28 @@
+Change-Id: CHG-01M31HQF6QM32VZ1NK36PR7KVN
+Title: "Keep private instance management reachable"
+Type: fix
+Scope: onboarding
+Summary: "Admit exact instance management actions without public tenant lifecycle or unrelated tenant binding."
+Group: private-instance-management
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Exact action metadata exempts six instance-owned management actions from tenant binding and lifecycle availability, retaining every existing setup and persisted-administrator authority check. Public and descendant routes remain unchanged."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Manage authentication, authorization and instance operator identity before directory publication, including MultiTenant instances with no directory. Tenant-only administrators do not gain access."

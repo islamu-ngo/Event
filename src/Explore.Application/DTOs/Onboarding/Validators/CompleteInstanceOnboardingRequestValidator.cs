@@ -1,6 +1,4 @@
 using Explore.Domain.Enums;
-using Explore.Application.DTOs.TenantSettings.Validators;
-using Explore.Domain.ValueObjects;
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;
@@ -17,15 +15,6 @@ public class CompleteInstanceOnboardingRequestValidator : AbstractValidator<Comp
             .NotNull()
             .WithMessage("SiteProfile is required.")
             .SetValidator(new SelfHostOnboardingProfileDtoValidator());
-
-        When(x => x.DeploymentMode == DeploymentMode.SingleTenant, () =>
-        {
-            RuleFor(x => x.DirectoryOperatorIdentity)
-                .NotNull()
-                .WithMessage("Directory operator identity is required for single-tenant onboarding.")
-                .SetValidator(new TenantDirectoryOperatorIdentityInputDtoValidator(
-                    TenantDirectoryOperatorIdentityCapability.Activation)!);
-        });
 
         RuleFor(x => x.InstanceName)
             .MaximumLength(200)

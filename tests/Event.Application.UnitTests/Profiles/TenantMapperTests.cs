@@ -50,10 +50,18 @@ public sealed class TenantMapperTests
     public async Task QueryHandlersPreserveMissingResultsAndDetachedSnapshots()
     {
         var tenant = Tenant();
+        tenant.TenantStatusId = (int)TenantStatusEnum.Active;
+        tenant.TenantStatus = new TenantStatus
+        {
+            Id = (int)TenantStatusEnum.Active,
+            MasterCode = "Active",
+            FullName = "Active",
+            IsActiveState = true
+        };
         var rows = new List<Tenant> { tenant };
         var repository = Substitute.For<ITenantRepository>();
-        repository.GetById(tenant.Id).Returns(tenant);
-        repository.GetAll().Returns(rows);
+        repository.GetByIdAsNoTrackingAsync(tenant.Id, Arg.Any<CancellationToken>()).Returns(tenant);
+        repository.GetActiveAsNoTrackingAsync(Arg.Any<CancellationToken>()).Returns(rows);
         var detailHandler = new GetTenantDetailsRequestHandler(repository);
         var listHandler = new GetTenantListRequestHandler(repository);
 

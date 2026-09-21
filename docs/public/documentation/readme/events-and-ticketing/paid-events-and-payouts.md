@@ -17,7 +17,7 @@ ISLAMU Event utilizes **Stripe Connect** as its primary payment adapter. The com
 
 > [!IMPORTANT]
 > **Operator Legal Identity Prerequisite:**  
-> Paid checkout and ticket publication fail closed until the operator's legal identity parameters are configured in `.env` (see [Operator Legal Identity Reference](../configuration-and-operations/environment-variables.md#9-operator-legal-identity-production-gate)).
+> Paid checkout and ticket publication retain their persisted operator-identity readiness gates. Review **Required before paid events** in the [getting-started checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup); installation completion and disclosure readiness alone do not imply commerce readiness. Configure the current document through authenticated administration. Environment identity values are optional bootstrap seeds. Merchant, recipient, revision, terms and payment-acceptance checks remain independently enforced.
 
 ---
 

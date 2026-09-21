@@ -22,6 +22,35 @@ A resource or collection may expose relations such as `self`, `edit`, `delete`, 
 
 Do not construct mutation URLs from naming conventions or enable controls from local roles/claims. A link may disappear after state, tenant, policy, concurrency, or provider changes. Refresh the representation after a mutation or authorization-relevant event.
 
+## Private setup journey
+
+`GET /api/instanceonboarding/journey` requires active setup credentials forwarded
+by the BFF or a signed-in instance administrator. It returns a private, no-store
+snapshot; follow its current HAL actions. Unauthenticated requests receive 401,
+and signed-in callers without setup or administrator authority receive 403.
+Provider sign-in during setup does not replace setup authority: the BFF retains
+its protected setup credentials for this journey read alongside the signed-in
+session. After completion, only persisted administrator authority grants access;
+old setup credentials cannot reopen setup. Finishing setup does not grant public
+access to a Provisioning directory.
+
+## Operator identity form metadata
+
+After normal sign-in, follow the instance identity document's `form-options` link
+for shared form vocabulary. The metadata resource returns no saved names, contact
+emails, registration values or credentials, and offers no edit authority.
+Use its stable `labelId` and `helpId` keys for localized labels and visible,
+programmatically associated guidance. Country display names come from installed
+runtime globalization data; `countryState: Unavailable` means the selector must
+show an unavailable state, not silently invent choices. Domain validation remains
+authoritative, including country-code shape and field length limits.
+
+Registration identifiers are optional. `registrationAuthorityState: NotSupported`
+and an empty authority list mean there is no authority registry to present.
+Metadata describes disclosure and commerce requirements separately, not draft-save
+requirements. Follow the value-bearing identity document's authorized save link
+and revision; metadata `self` and `refresh` are read-only affordances.
+
 ## Registration provider administration
 
 Registration provider management remains one `RegistrationProviderManagement` API/SDK

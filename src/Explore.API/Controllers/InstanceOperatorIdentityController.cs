@@ -64,10 +64,11 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
     /// <summary>
     /// Retrieves current instance operator identity document and readiness assessment.
     /// </summary>
+    [InstanceManagement]
     [HttpGet(Name = RouteNames.GetInstanceOperatorIdentity)]
     [PrivateNoStore]
     [EndpointSummary("Get Instance Operator Identity")]
-    [EndpointDescription("Returns current instance operator identity and readiness assessment.")]
+    [EndpointDescription("Returns the current instance operator identity with separate public-disclosure and paid-commerce readiness assessments.")]
     [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
     [ProducesResponseType(typeof(HalResource<InstanceOperatorIdentityDocumentDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -90,11 +91,12 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
     /// <summary>
     /// Saves candidate instance operator identity settings.
     /// </summary>
+    [InstanceManagement]
     [HttpPut(Name = RouteNames.SaveInstanceOperatorIdentity)]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [EndpointSummary("Update Instance Operator Identity")]
-    [EndpointDescription("Saves candidate instance operator identity settings.")]
+    [EndpointDescription("Saves a syntactically valid instance operator identity draft and returns separate public-disclosure and paid-commerce readiness assessments.")]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]

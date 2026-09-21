@@ -3,6 +3,61 @@
 
 # Operations
 
+## Guided Administration Verification
+
+After private setup, inspect the disclosure, paid-event and recommended groups at
+`/settings/instance?section=getting-started`. Resource actions come from current
+HAL links; a readiness result does not authorize a write. Missing form metadata
+must remain visible without clearing identity values or granting edit access.
+
+When browser GET status/journey succeeds but interactive server components fail,
+compare the BFF proxy and circuit forwarding paths. Exact authenticated reads
+must not reintroduce an obsolete setup-secret header over the ordinary bearer.
+Preserve setup requirements on completion writes. For repeated 429 responses,
+inspect the named limiter and request sequence rather than adding blind retries.
+
+Use the documented bounded SQLite profile for evaluation. A setup/browser check
+does not certify optional background processors or production load. Record timing
+start/end events and excluded work; do not infer a container startup benchmark
+from an interactive browser stopwatch.
+
+## Private Directory Preparation And Activation
+
+In SingleTenant mode, use the authenticated control-plane detail at
+`GET /api/admin/control-plane/tenants/{tenantId}` with the fixed default tenant ID.
+Fleet listing and other fleet operations remain MultiTenant-only. Identity and
+branding management use the existing tenant document routes and exact tenant
+permissions; public discovery is not a management entry point.
+
+Saving a complete identity leaves a Provisioning tenant private. Invoke the
+server-advertised `activate` relation explicitly. The existing transition handler
+rechecks identity and managed capacity under mutation locks, uses expected-old-status
+CAS, and writes lifecycle history atomically. Same-state retries add no history.
+Identity resolution now reads the current persisted document rather than a warmed
+node-local revision. A concurrent stale identity edit must reload its revision;
+do not retry it by overwriting current data.
+
+No schema migration, new configuration, dependency, or payment-history change is
+required. Setup completion now creates a missing SingleTenant default directory
+as Provisioning, without changing an existing tenant's status or documents.
+MultiTenant completion creates no directory. After sign-in, administrators open
+`/settings/instance?section=getting-started` without loading the public shell.
+
+Completion submits the generation returned by the current private journey. HTTP
+409 means refresh that journey before another attempt. If a response is lost,
+read durable status first: Completed is final and never permits credential replay
+or reopening setup. Local completion does not sign the operator in. Sign in with
+the temporary password, complete the existing private replacement flow, then sign
+in afresh. The login flow, not the onboarding status projection, decides whether
+password replacement is required.
+
+Journey generation hashes bootstrap authority and ordinally ordered persisted
+instance setting keys, values and locks. Live readiness and provider secret
+resolution run outside completion transactions; the journey checks durable
+generation before and after those reads. Completion recomputes only that durable
+generation under the bootstrap lock. Local reservation IDs and timestamps are
+excluded so reserving an operation does not invalidate its admitted generation.
+
 ## Anonymous Registration Retention
 
 Anonymous names and answers stop being operationally readable at their original

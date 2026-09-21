@@ -1,0 +1,30 @@
+Change-Id: CHG-01M2ZX72BP2JCT91QAPTR0XHVA
+Title: "finish setup before directory publication"
+Type: feat
+Scope: onboarding
+Summary: "Finish administrator setup with private drafts and a getting-started landing before explicit directory publication."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Completion requires the current journey generation, no longer requires legal identity, and creates a missing SingleTenant directory as Provisioning rather than Active."
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: "Setup remains permanently locked after completion. Private deployment-mode reads retain administrator authorization; public tenant denial and protected readiness gates remain intact."
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: "Legal identity is optional for installation. No new environment variable, dependency or schema migration is required."
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Submit expectedJourneyGeneration on completion, nested under settings for Local completion. HTTP 409 supplies a refresh action when the snapshot is stale or unavailable."
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/5-minute-quickstart.md
+    Disposition: documented
+    Detail: "After sign-in open getting-started administration. Local temporary passwords still require private replacement and fresh sign-in. Finishing setup does not publish a directory."

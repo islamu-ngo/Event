@@ -250,7 +250,8 @@ public class SetupSecretFlowTests
         using var response = await client.SendAsync(request);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var saved = await response.Content.ReadFromJsonAsync<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>();
-        await Assert.That(saved!.Id!.IsReady).IsTrue();
+        await Assert.That(saved!.Id!.PublicDisclosure.IsReady).IsTrue();
+        await Assert.That(saved.Id.PaidCommerce.IsReady).IsTrue();
     }
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret()

@@ -50,7 +50,7 @@ public sealed class LocalAdministratorBootstrapOperation(
 
         settings.DeploymentMode = await deploymentModeProvider.GetConfiguredOnboardingModeAsync(cancellationToken);
         var validation = await new CompleteInstanceOnboardingRequestValidator().ValidateAsync(settings, cancellationToken);
-        if (!validation.IsValid || (settings.DeploymentMode == DeploymentMode.SingleTenant && settings.DirectoryOperatorIdentity is null))
+        if (!validation.IsValid)
             return Failure("local_bootstrap_settings_invalid");
         LocalCredentialCreateRequest intent;
         try
@@ -64,7 +64,7 @@ public sealed class LocalAdministratorBootstrapOperation(
 
         bool admitted = await unitOfWork.ExecuteBootstrapConvergenceAsync(async token =>
         {
-            InstanceBootstrapState? current = await bootstrapRepository.GetCurrentForUpdate(token);
+            InstanceBootstrapState? current = await completion.AdmitInteractiveGenerationAsync(settings, token);
             if (current is null)
             {
                 await bootstrapRepository.Create(InstanceBootstrapState.CreateInteractivePending(

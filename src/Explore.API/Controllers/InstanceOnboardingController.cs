@@ -73,6 +73,8 @@ public class InstanceOnboardingController : EventControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly ILogger<InstanceOnboardingController> _logger;
     private readonly IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> _statusAssembler;
+    private readonly IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto> _journeyQuery;
+    private readonly IResourceAssembler<InstanceOnboardingJourneyDto, InstanceOnboardingJourneyDto> _journeyAssembler;
 
     public InstanceOnboardingController(
         IQueryHandler<GetInstanceOnboardingStatusQuery, InstanceOnboardingStatusDto> onboardingStatusQuery,
@@ -93,7 +95,9 @@ public class InstanceOnboardingController : EventControllerBase
         ILogger<InstanceOnboardingController> logger,
         IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> statusAssembler,
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto> journeyQuery,
+        IResourceAssembler<InstanceOnboardingJourneyDto, InstanceOnboardingJourneyDto> journeyAssembler)
     {
         _onboardingStatusQuery = onboardingStatusQuery;
         _onboardingPreflightQuery = onboardingPreflightQuery;
@@ -114,6 +118,8 @@ public class InstanceOnboardingController : EventControllerBase
         _statusAssembler = statusAssembler;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
         _tenantContext = tenantContext;
+        _journeyQuery = journeyQuery;
+        _journeyAssembler = journeyAssembler;
     }
 
     [AllowAnonymous]
@@ -130,6 +136,29 @@ public class InstanceOnboardingController : EventControllerBase
         var status = await _onboardingStatusQuery.QueryAsync(new GetInstanceOnboardingStatusQuery { SetupPrincipal = User }, cancellationToken);
         var resource = await _statusAssembler.ToResource(status, HttpContext);
         return Ok(resource);
+    }
+
+    [Authorize]
+    [PrivateNoStore]
+    [EndpointClassification(EndpointClass.Admin)]
+    [HttpGet("journey", Name = RouteNames.GetInstanceOnboardingJourney)]
+    [EndpointSummary("Get Instance Onboarding Journey")]
+    [EndpointDescription("Returns one fail-closed setup snapshot with provider readiness, persisted profile, generation, checks and authorized HAL actions.")]
+    [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
+    [ProducesResponseType(typeof(HalResource<InstanceOnboardingJourneyDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<HalResource<InstanceOnboardingJourneyDto>>> GetJourney(CancellationToken cancellationToken = default)
+    {
+        var setup = await _setupSecretProvider.ValidateSecretAsync(Request.Headers["X-Setup-Secret"].FirstOrDefault(), cancellationToken);
+        if (setup != SetupSecretValidationOutcome.Accepted)
+        {
+            var status = await _onboardingStatusQuery.QueryAsync(new() { SetupPrincipal = User }, cancellationToken);
+            if (!status.IsCurrentUserInstanceAdmin)
+                return this.ToForbiddenProblem(detail: "Active setup or instance administrator authority is required.");
+        }
+        var journey = await _journeyQuery.QueryAsync(new() { SetupPrincipal = User }, cancellationToken);
+        return Ok(await _journeyAssembler.ToResource(journey, HttpContext));
     }
 
     [Authorize]
@@ -199,6 +228,9 @@ public class InstanceOnboardingController : EventControllerBase
             return this.ToValidationProblem(CompleteValidationProblem, PreflightBlockedMessage);
         }
 
+        if (await CheckCompletionJourneyAsync(settings.ExpectedJourneyGeneration, cancellationToken) is { } conflict)
+            return conflict;
+
         providerSubject ??= currentUserId.Value.ToString("D");
         var authProvider = User.GetAuthProvider();
         var email = User.GetEmail();
@@ -247,8 +279,32 @@ public class InstanceOnboardingController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> CompleteLocal(
         [FromBody] CompleteLocalInstanceOnboardingRequestDto request, CancellationToken cancellationToken = default)
     {
+        if (await CheckCompletionJourneyAsync(request.Settings?.ExpectedJourneyGeneration, cancellationToken) is { } conflict)
+            return conflict;
+
         var response = await _completeLocalOnboardingCommand.ExecuteAsync(new CompleteLocalInstanceOnboardingCommand(request, User), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, CompleteValidationProblem);
+    }
+
+    private async Task<ObjectResult?> CheckCompletionJourneyAsync(string? expectedGeneration, CancellationToken cancellationToken)
+    {
+        var journey = await _journeyQuery.QueryAsync(new() { SetupPrincipal = User }, cancellationToken);
+        if (journey.State == "Available" && journey.Preflight is { IsReadyToLaunch: true }
+            && !string.IsNullOrWhiteSpace(expectedGeneration)
+            && string.Equals(expectedGeneration, journey.Generation, StringComparison.Ordinal))
+            return null;
+
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = "Setup state changed",
+            Detail = "Refresh authoritative setup status before submitting a new completion request."
+        };
+        problem.Extensions["_links"] = new Dictionary<string, object>
+        {
+            ["refresh"] = new { href = "/api/instanceonboarding/journey", method = "GET" }
+        };
+        return new ObjectResult(problem) { StatusCode = StatusCodes.Status409Conflict };
     }
 
     [AllowAnonymous]

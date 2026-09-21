@@ -80,6 +80,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         _rotateClientSecretHandler = rotateClientSecretHandler;
     }
 
+    [InstanceManagement]
     [HttpGet("auth-provider", Name = RouteNames.GetInstanceAuthProviderConfiguration)]
     [EndpointSummary("Get Auth Provider Configuration")]
     [EndpointDescription("Returns current auth provider configuration. Secrets are redacted.")]
@@ -93,6 +94,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         return Ok(configuration);
     }
 
+    [InstanceManagement]
     [HttpPatch("auth-provider", Name = RouteNames.UpdateInstanceAuthProviderConfiguration)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [EndpointSummary("Update Auth Provider Configuration")]

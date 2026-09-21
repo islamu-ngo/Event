@@ -10,6 +10,36 @@ This guide provides fast diagnostic procedures and step-by-step recovery recipes
 
 ---
 
+## Setup Readiness
+
+The setup overview refreshes one server journey snapshot. Save the site profile
+before refreshing readiness so its canonical host is evaluated from persisted
+settings. A deployment-managed provider is not ready merely because deployment
+selected it: pending, failed and restart-required states require the displayed
+repair action. Setup never silently selects a replacement provider.
+
+If the snapshot is unavailable, contradictory or changed while being read, repair
+the selected source and refresh; do not proceed using an older screen's actions.
+Custom setup clients must replace `/api/system/onboarding-preflight` with
+`/api/instanceonboarding/journey`, using active setup or administrator authority.
+Completion and sign-in recovery rules are unchanged. The journey generation
+tracks saved setup state, not a guarantee of continued external availability.
+Completion checks readiness again before taking the setup write lock; changed
+saved settings still require a refresh.
+
+## Getting-Started And Identity Controls
+
+An unavailable checklist is not a ready result. Use its Refresh status action and
+inspect the bounded reason before proceeding; do not infer permission from a
+readiness label. After sign-in, status/journey reads should use the normal session,
+not old setup authority. A 429 response requires inspecting request volume and the
+configured limiter, not repeatedly pressing Refresh.
+
+If kind/country choices are unavailable, existing identity values are retained.
+Refresh after restoring the metadata service; do not invent a replacement choice
+registry. An omitted Save action means the document did not grant editing.
+A revision conflict requires reviewing the authoritative document before saving.
+
 ## Quick Diagnostic Flow
 
 When diagnosing an unexpected failure, follow this four-step sequence:
@@ -172,6 +202,23 @@ When `AUTHORIZATION_PROVIDER=cerbos` is selected, ISLAMU Event enforces **fail-c
 ---
 
 ### Recipe 6: Lost Setup Secret Recovery
+
+During first-run setup, the protected BFF session can read branding and save the
+installation profile before a directory is public. Signing in with Local,
+Keycloak, or ATProto does not itself grant administrator rights; normal branding
+changes still require an administrator.
+
+If profile save loses setup authority after sign-in, refresh setup status and
+return to `/setup` to renew the session while setup is incomplete. Keep browser
+cookies enabled and use the normal form so write requests retain antiforgery
+protection. Do not add authorization, provider, tenant, or setup-secret headers,
+or copy secrets/tokens into browser storage.
+
+A completed installation permanently rejects setup authority. The BFF rechecks
+persisted authority before renewing or synchronizing it and clears setup state
+when the API reports `410` / `setup_already_completed`. Use normal sign-in instead;
+retained cookies and restarts cannot reopen setup. Share only bounded reason codes
+with support, never secrets or raw provider responses.
 
 #### Why this happens
 If you left `SETUP_SECRET=` blank in `.env`, the container generated an ephemeral single-use secret inside the volume upon first boot.

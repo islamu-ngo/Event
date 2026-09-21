@@ -3,6 +3,21 @@ ABOUTME: Prioritizes repeat incidents and non-obvious checks over generic .NET a
 
 # Troubleshooting
 
+## Onboarding Journey Readiness
+
+Use the private `GET /api/instanceonboarding/journey` resource with active setup
+or administrator authority. `source_unavailable`, `source_contradiction`, and
+`snapshot_changed` mean the snapshot cannot safely offer mutations; follow its
+`refresh` relation after repairing the selected source. Do not infer readiness
+from deployment ownership or select a different provider to hide failure.
+Save the profile through its HAL action before refreshing canonical-host checks.
+The old System preflight route is removed, not redirected.
+
+A failed browser environment is not evidence of a render/circuit defect. Capture
+actual browser, network and circuit evidence before changing render modes or
+navigation. Completion-time identity, publication and handoff behavior is unchanged
+by the journey projection.
+
 ## Legal Identity And Readiness
 
 | Symptom | Likely authority | Repair |
@@ -331,6 +346,21 @@ Checks:
 6. Do not paste temporary admin credentials, Keycloak access tokens, client secrets, raw Admin API response bodies, or screenshots containing secrets into support tickets. Use the safe finding/operation codes from the doctor or sync plan.
 
 ## Setup Secret Failures
+
+During initial preparation, the BFF forwards trusted setup authority only to the
+exact branding GET and onboarding profile PATCH, in addition to existing bootstrap
+operations. Branding writes remain administrator-only. A missing public tenant
+must not block branding GET for a validated setup principal; ordinary tenant and
+UI-shell lifecycle checks are unchanged.
+
+If profile save fails after sign-in, refresh setup status and renew authority
+through `/setup` while setup remains incomplete. Provider login alone does not
+grant administrator rights. Keep the native antiforgery cookie/header pair on
+writes; never repair this by supplying privileged browser headers or storing a
+secret/token in browser storage. BFF status renewal and sign-in synchronization
+revalidate persisted authority with the API. A `410` / `setup_already_completed`
+clears BFF setup state and requires normal sign-in, not a setup reset. Retain only
+bounded reason codes in diagnostics, never raw secrets or provider error bodies.
 
 Symptoms:
 - onboarding blocked at `/setup`.

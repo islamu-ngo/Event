@@ -47,14 +47,20 @@ public sealed class EventBffRequestEnricher(
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        if (EventBffRequestPolicy.IsAnonymousOnboardingPath(httpContext.Request.Path))
+        var isOnboardingStatusRead = HttpMethods.IsGet(httpContext.Request.Method)
+            && string.Equals(httpContext.Request.Path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase);
+        var isOnboardingStateRead = isOnboardingStatusRead || HttpMethods.IsGet(httpContext.Request.Method)
+            && string.Equals(httpContext.Request.Path.Value, "/api/instanceonboarding/journey", StringComparison.OrdinalIgnoreCase);
+        if (EventBffRequestPolicy.IsAnonymousOnboardingPath(httpContext.Request.Path) && !isOnboardingStateRead)
         {
             accessToken = null;
         }
 
+        var hasForwardableToken = EventBffTokenSafety.IsTokenForwardable(accessToken);
         var setupSecret = EventBffRequestPolicy.RequiresSetupSecret(
             httpContext.Request.Method,
             httpContext.Request.Path)
+            && !(isOnboardingStatusRead && hasForwardableToken)
             ? await setupSecretProvider.ResolveSetupSecretAsync(httpContext, cancellationToken)
             : null;
         var supportAccessSessionId = await supportAccessProvider.ResolveSupportAccessSessionIdAsync(
@@ -62,7 +68,7 @@ public sealed class EventBffRequestEnricher(
             cancellationToken);
 
         return new EventBffTrustedRequest(
-            EventBffTokenSafety.IsTokenForwardable(accessToken) ? accessToken : null,
+            hasForwardableToken ? accessToken : null,
             tenantHintProvider.ResolveTenantSlug(httpContext),
             setupSecret,
             supportAccessSessionId);
@@ -149,7 +155,16 @@ public static class EventBffRequestPolicy
     public static bool RequiresSetupSecret(string method, PathString path)
     {
         if (HttpMethods.IsGet(method)
-                && string.Equals(path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(path.Value, "/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPatch(method)
+                && string.Equals(path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsGet(method)
+                && (string.Equals(path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(path.Value, "/api/instanceonboarding/journey", StringComparison.OrdinalIgnoreCase))
             || HttpMethods.IsPost(method)
                 && string.Equals(path.Value, "/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase))
         {

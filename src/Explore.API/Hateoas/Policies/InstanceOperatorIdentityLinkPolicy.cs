@@ -1,6 +1,7 @@
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;
+using Explore.Application.Constants;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Hateoas;
@@ -14,6 +15,13 @@ public sealed class InstanceOperatorIdentityLinkPolicy : ILinkPolicy<InstanceOpe
     public IEnumerable<LinkDefinition> GetLinks(InstanceOperatorIdentityDocumentDto dto, ClaimsPrincipal? user)
     {
         yield return LinkDefinition.Self(RouteNames.GetInstanceOperatorIdentity);
+
+        // This lookup uses normal authentication, not the bootstrap secret scheme.
+        if (user?.Identities.Any(identity => identity.IsAuthenticated
+            && identity.AuthenticationType != ApiAuthenticationSchemeNames.SetupSecret) == true)
+        {
+            yield return LinkDefinition.Related("form-options", RouteNames.GetOperatorIdentityFormOptions).Authenticated();
+        }
 
         yield return new LinkDefinition(
             "update",

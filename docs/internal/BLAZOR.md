@@ -25,6 +25,35 @@ Use the specialized docs for deep detail:
 | Accessibility rules | [ACCESSIBILITY.md](ACCESSIBILITY.md) |
 | Localization stack | [LOCALIZATION.md](LOCALIZATION.md) |
 
+## Guided Instance Administration
+
+`InstanceGettingStartedSection` reads existing onboarding status/journey services;
+it groups capability readiness and preflight checks without recreating server
+requirements. `InstanceOnboarding` keeps one primary Finish setup action and a
+native disclosure for optional site details. Provider state and restart/remediation
+information remain visible rather than becoming a configured/not-configured guess.
+
+Local completion transport failure is ambiguous because the transaction may have
+committed before the response was lost. The component clears its transient password
+and never resubmits. Refresh first attempts the private journey; only when that is
+unavailable does it read the public status and accept the exact terminal tuple
+`Completed` + `Local`. That tuple renders the sign-in/replacement handoff, advances
+the local request generation and deletes BFF-held setup authority. Nonterminal
+public status never hydrates private profile, readiness or operation data and never
+forgets active setup authority.
+
+`InstanceOperatorIdentityAdminService` loads generated form metadata only when the
+identity document advertises `form-options`. Metadata populates native labeled
+kind/country selectors; document HAL and revision still own editing. The generated
+`HalResourceOfOperatorIdentityFormOptionsDto` is registered in
+`AppJsonSerializerContext`, including unknown extension-data round-tripping.
+
+For exact authenticated GET status/journey calls, the server-side
+`SetupSecretForwardingHandler` strips stale setup authority and retains the
+forwarded bearer, matching the shared BFF request enricher. Anonymous setup reads
+and completion writes keep their existing setup-secret requirements. No token is
+exposed to a browser component.
+
 ## Project Roles
 
 | Project | Role | Must not own |
@@ -170,7 +199,7 @@ There are two related but separate transport paths:
    - `SupportAccessForwardingHandler`,
    - `BffCookieForwardingHandler` for self/BFF calls that must preserve cookie/XSRF context.
 
-All server-side handlers use `UseCookies = false` where applicable to avoid pooled `CookieContainer` leakage between requests.
+All server-side handlers use `UseCookies = false` where applicable to avoid pooled `CookieContainer` leakage between requests. The setup-secret handler includes the exact `GET /api/instanceonboarding/journey` read so protected setup authority reaches the site-profile/readiness snapshot. The API authenticates that exact read with the existing SetupSecret scheme, allowing the status policy to materialize `complete-local` on a ready Local journey. This does not authorize other methods or descendant routes; forged and expired setup cookies remain rejected.
 
 ## Dedicated Admin Host Classification
 
@@ -191,13 +220,20 @@ Setup-secret handling is intentionally BFF-owned:
 3. The setup cookie is protected with time-limited ASP.NET Core Data Protection, `HttpOnly`, invalidated by the BFF setup-secret endpoints, and `Secure` outside local development. The cookie and server-side entry use a 30-minute rolling inactivity timeout refreshed by successful status and synchronization calls.
 4. `SameSite=Lax` is intentional because onboarding may cross top-level OIDC redirects before the first administrator completes setup.
 5. Setup-secret validation is rate-limited at the BFF edge and again at the API edge.
+6. Completed Interactive and ConfiguredAdministrator states retain their canonical Local, Keycloak, or Atproto provider. The BFF admits fresh sign-in for those completed states without reopening setup authority; unknown providers and inconsistent status remain closed.
+7. A fresh Local sign-in with server-verified instance-administrator authority and completed setup defaults to `/settings/instance?section=getting-started` instead of loading the public shell. Explicit safe return URLs and non-administrator destinations remain unchanged.
+8. Browser-proxied exact `GET /api/instanceonboarding/status` and `GET /api/instanceonboarding/journey` retain the BFF-owned bearer identity when present. Those authenticated reads omit setup-secret authority so an old setup cookie cannot shadow the ordinary session after completion. Anonymous bootstrap requests and other onboarding routes keep their existing treatment; browser-supplied authority headers remain stripped.
 6. The BFF limiter partitions requests by authenticated user when available, then antiforgery/session cookie state, then IP as the final fallback.
 
 When debugging onboarding, check both BFF setup-secret endpoints and API setup-secret validation rather than adding client-side storage shortcuts.
 
 ## Onboarding UI Contract
 
-`/setup` is the dedicated pre-authentication operator gateway and renders through `SetupLayout`, separate from authenticated application/admin navigation. After provider authentication, the setup experience becomes one task overview composed from existing server onboarding-status, provider-status/sync, and preflight services.
+`/setup` is the dedicated pre-authentication operator gateway and renders through `SetupLayout`, separate from authenticated application/admin navigation. The instance wizard refreshes through one generated journey request, including bootstrap state, profile, provider readiness, identity and preflight. It no longer merges independently timed status, branding, provider and preflight requests. Overlapping refreshes share one task and disposal cancels the request.
+
+The `save-profile` HAL relation exposes the existing profile PATCH operation. A successful save is awaited before one journey refresh; failed saves do not present newly evaluated readiness. Provider navigation skips deployment-managed authorization only when configured and explicitly ready. Failed journey reads discard old actions rather than substitute defaults.
+
+This projection change does not change the authorization page render mode or repair the reported loss of interactivity. Browser reproduction remains a separate evidence gate; no render/navigation root cause has been established.
 
 Contributor rules:
 

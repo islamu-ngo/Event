@@ -37,14 +37,6 @@ public sealed class CompleteInstanceOnboardingCommandHandler(
             request.Settings.SiteProfile.SiteName = request.Settings.InstanceName;
         }
 
-        if (deploymentMode == DeploymentMode.SingleTenant
-            && request.Settings.DirectoryOperatorIdentity is null)
-        {
-            return BaseCommandResponse.Failure<Guid>(
-                "tenant_directory_operator_identity_incomplete",
-                "Tenant directory operator identity is not ready.");
-        }
-
         var validator = new CompleteInstanceOnboardingRequestValidator();
         var validation = await validator.ValidateAsync(request.Settings, cancellationToken);
         if (!validation.IsValid)

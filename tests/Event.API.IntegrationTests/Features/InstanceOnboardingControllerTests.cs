@@ -42,6 +42,77 @@ public class InstanceOnboardingControllerTests
     private const string CerbosBootstrapEndpoint = "http://cerbos-bootstrap.test:3593";
 
     [Test]
+    public async Task Journey_ProvidesOneSnapshotAndProfileSaveChangesItsGeneration()
+    {
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", SetupSecret);
+        using var beforeResponse = await client.GetAsync($"{BaseUrl}/journey");
+        await Assert.That(beforeResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var before = JsonDocument.Parse(await beforeResponse.Content.ReadAsStringAsync());
+        var snapshot = before.RootElement;
+        await Assert.That(snapshot.GetProperty("state").GetString()).IsEqualTo("Available");
+        await Assert.That(snapshot.GetProperty("generation").GetString()).IsNotNullOrEmpty();
+        await Assert.That(snapshot.GetProperty("bootstrap").GetProperty("selectedDeploymentMode").GetString())
+            .IsEqualTo(snapshot.GetProperty("preflight").GetProperty("deploymentMode").GetString());
+        await Assert.That(snapshot.GetProperty("_links").TryGetProperty("refresh", out _)).IsTrue();
+        await Assert.That(snapshot.GetProperty("_links").TryGetProperty("save-profile", out _)).IsTrue();
+        var checks = snapshot.GetProperty("preflight").GetProperty("blockingChecks").EnumerateArray().ToArray();
+        await Assert.That(checks.All(check => check.TryGetProperty("requirementCategory", out _)
+            && check.TryGetProperty("remediationAuthority", out _)
+            && check.TryGetProperty("restartRequired", out _)
+            && check.TryGetProperty("reasonCode", out _))).IsTrue();
+        using var save = CreateInstanceAdminRequest(HttpMethod.Patch, $"{BaseUrl}/profile", Guid.CreateVersion7(),
+            new SelfHostOnboardingProfileDto { SiteName = "Journey profile", CanonicalUrl = "https://journey.example.org" }, true);
+        using var saved = await client.SendAsync(save);
+        await Assert.That(saved.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var afterResponse = await client.GetAsync($"{BaseUrl}/journey");
+        using var after = JsonDocument.Parse(await afterResponse.Content.ReadAsStringAsync());
+        await Assert.That(after.RootElement.GetProperty("profile").GetProperty("siteName").GetString()).IsEqualTo("Journey profile");
+        await Assert.That(after.RootElement.GetProperty("generation").GetString())
+            .IsNotEqualTo(snapshot.GetProperty("generation").GetString());
+        await Assert.That(after.RootElement.GetProperty("preflight").GetProperty("blockingChecks").EnumerateArray()
+            .Single(check => check.GetProperty("code").GetString() == "canonical_host").GetProperty("status").GetString()).IsEqualTo("Pass");
+    }
+
+    [Test]
+    public async Task Journey_MissingSetupAuthority_DoesNotExposeProfile()
+    {
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync($"{BaseUrl}/journey");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.TryGetProperty("profile", out _)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(true, HttpStatusCode.OK)]
+    [Arguments(false, HttpStatusCode.Forbidden)]
+    public async Task Journey_AuthenticatedCallerRequiresPersistedAdministratorAuthority(bool administrator, HttpStatusCode expectedStatus)
+    {
+        using var factory = CreateFactoryWithSetupSecret();
+        using var client = factory.CreateClient();
+        var userId = Guid.CreateVersion7();
+        if (administrator)
+            await EnsureInstanceAdminRoleAsync(factory, userId);
+        else
+            await EnsureUserExistsAsync(factory, userId);
+
+        using var request = CreateInstanceAdminRequest(HttpMethod.Get, $"{BaseUrl}/journey", userId,
+            body: null, includeSetupSecret: false);
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(expectedStatus);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.TryGetProperty("profile", out _)).IsEqualTo(administrator);
+        if (administrator)
+        {
+            await Assert.That(body.RootElement.GetProperty("bootstrap").GetProperty("isCurrentUserInstanceAdmin").GetBoolean()).IsTrue();
+            await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
+        }
+    }
+
+    [Test]
     public async Task GetStatus_Anonymous_ShouldReturnOk()
     {
         using var factory = CreateFactoryWithSetupSecret();
@@ -297,7 +368,10 @@ public class InstanceOnboardingControllerTests
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
-        var completePayload = CreateValidOnboardingRequest();
+        var completePayload = CreateValidOnboardingRequest() with
+        {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client)
+        };
 
         using var completeRequest = CreateInstanceAdminRequest(HttpMethod.Post, $"{BaseUrl}/complete", userId, completePayload, includeSetupSecret: true);
         var completeResponse = await client.SendAsync(completeRequest);
@@ -332,7 +406,7 @@ public class InstanceOnboardingControllerTests
             HttpMethod.Post,
             $"{BaseUrl}/complete",
             userId,
-            CreateValidOnboardingRequest(),
+            CreateValidOnboardingRequest() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client) },
             includeSetupSecret: true);
         using var response = await client.SendAsync(request);
 
@@ -387,7 +461,7 @@ public class InstanceOnboardingControllerTests
         using var request = CreateCustomAuthRequest(
             HttpMethod.Post,
             $"{BaseUrl}/complete",
-            CreateValidOnboardingRequest(),
+            CreateValidOnboardingRequest() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client) },
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Unlinked Bootstrap User"),
             new("sub", providerId),
@@ -427,7 +501,7 @@ public class InstanceOnboardingControllerTests
         using var request = CreateCustomAuthRequest(
             HttpMethod.Post,
             $"{BaseUrl}/complete",
-            CreateValidOnboardingRequest(),
+            CreateValidOnboardingRequest() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client) },
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Sid Only User"),
             new("internal_user_id", internalUserId.ToString()),
@@ -475,13 +549,15 @@ public class InstanceOnboardingControllerTests
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
-        using var preflightResponse = await client.GetAsync("/api/system/onboarding-preflight");
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", SetupSecret);
+        using var preflightResponse = await client.GetAsync($"{BaseUrl}/journey");
         await Assert.That(preflightResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var preflight = await preflightResponse.Content.ReadFromJsonAsync<OnboardingPreflightDto>(TestJsonOptions.Default);
+        using var journey = JsonDocument.Parse(await preflightResponse.Content.ReadAsStringAsync());
+        var preflight = journey.RootElement.GetProperty("preflight").Deserialize<OnboardingPreflightDto>(TestJsonOptions.Default);
         await Assert.That(preflight).IsNotNull();
         await Assert.That(preflight!.IsReadyToLaunch).IsFalse();
-        await Assert.That(preflight.BlockingChecks.Single(check => check.Status == OnboardingPreflightCheckStatus.Fail).Code)
-            .IsEqualTo("canonical_host");
+        await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "canonical_host").Status)
+            .IsEqualTo(OnboardingPreflightCheckStatus.Fail);
         await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "auth_config").Status)
             .IsEqualTo(OnboardingPreflightCheckStatus.Pass);
 
@@ -559,7 +635,10 @@ public class InstanceOnboardingControllerTests
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
-        var clientPayload = CreateValidOnboardingRequest();
+        var clientPayload = CreateValidOnboardingRequest() with
+        {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client)
+        };
         clientPayload.DeploymentMode = DeploymentMode.MultiTenant;
 
         using var completeRequest = CreateInstanceAdminRequest(HttpMethod.Post, $"{BaseUrl}/complete", userId, clientPayload, includeSetupSecret: true);
@@ -587,6 +666,7 @@ public class InstanceOnboardingControllerTests
 
         var clientPayload = new CompleteInstanceOnboardingRequest
         {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client),
             DeploymentMode = DeploymentMode.SingleTenant,
             SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Integration Test Instance" }
         };
@@ -1307,6 +1387,16 @@ public class InstanceOnboardingControllerTests
     private static string EncodeClaims(params TestAuthHandler.TestClaimDto[] claims)
     {
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(claims)));
+    }
+
+    private static async Task<string?> ReadGenerationAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/journey");
+        request.Headers.Add("X-Setup-Secret", SetupSecret);
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var journey = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return journey.RootElement.GetProperty("generation").GetString();
     }
 
     private static CompleteInstanceOnboardingRequest CreateValidOnboardingRequest()

@@ -8,6 +8,7 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Domain.ValueObjects;
 using NSubstitute;
 
 namespace Event.Application.UnitTests.Features.InstanceOnboarding;
@@ -22,7 +23,7 @@ public sealed class InstanceOperatorIdentityCommandTests
         var scenario = new InstanceOperatorIdentityServiceScenario();
 
         InstanceOperatorIdentityReadinessAssessment assessment =
-            await scenario.Service.EvaluateAsync();
+            await scenario.Service.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(assessment.IsReady).IsFalse();
         await Assert.That(assessment.FailureCode)
@@ -39,7 +40,7 @@ public sealed class InstanceOperatorIdentityCommandTests
             .WithStoredSetting("{ this is not json");
 
         InstanceOperatorIdentityReadinessAssessment assessment =
-            await scenario.Service.EvaluateAsync();
+            await scenario.Service.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(assessment.IsReady).IsFalse();
         await Assert.That(assessment.FailureCode)
@@ -59,7 +60,7 @@ public sealed class InstanceOperatorIdentityCommandTests
             });
 
         InstanceOperatorIdentityReadinessAssessment assessment =
-            await scenario.Service.EvaluateAsync();
+            await scenario.Service.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(assessment.IsReady).IsFalse();
         await Assert.That(assessment.FailureCode)
@@ -89,7 +90,7 @@ public sealed class InstanceOperatorIdentityCommandTests
             .WithStoredPayload(CompleteCandidate() with { Revision = storedRevision });
 
         InstanceOperatorIdentityReadinessAssessment assessment =
-            await scenario.Service.EvaluateAsync();
+            await scenario.Service.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce);
 
         await Assert.That(assessment.IsReady).IsTrue();
         await Assert.That(assessment.FailureCode).IsNull();
@@ -118,8 +119,9 @@ public sealed class InstanceOperatorIdentityCommandTests
         await Assert.That(saved.OperatorId is { } operatorId && operatorId.Version == 7).IsTrue();
         await Assert.That(saved.IsOfficialInstance).IsFalse();
         await Assert.That(saved.Revision is { } revision && revision.Version == 7).IsTrue();
-        await Assert.That(response.Id!.Readiness.IsReady).IsFalse();
-        await Assert.That(response.Id.Readiness.FailureCode)
+        await Assert.That(response.Id!.PublicDisclosure.IsReady).IsFalse();
+        await Assert.That(response.Id.PaidCommerce.IsReady).IsFalse();
+        await Assert.That(response.Id.PaidCommerce.FailureCode)
             .IsEqualTo("instance_operator_identity_incomplete");
     }
 
@@ -140,7 +142,7 @@ public sealed class InstanceOperatorIdentityCommandTests
     }
 
     [Test]
-    public async Task SaveAsync_CompletedBootstrap_RejectsIncompleteReplacementWithoutPersisting()
+    public async Task SaveAsync_CompletedBootstrap_PersistsValidIncompleteDraftWithoutGrantingReadiness()
     {
         Guid storedRevision = Guid.CreateVersion7();
         var scenario = new InstanceOperatorIdentityServiceScenario()
@@ -151,10 +153,13 @@ public sealed class InstanceOperatorIdentityCommandTests
             new InstanceOperatorIdentitySettings { PublicName = "Independent Operator" },
             expectedRevision: storedRevision);
 
-        await Assert.That(response.IsSuccess).IsFalse();
-        await Assert.That(response.Errors)
+        await Assert.That(response.IsSuccess).IsTrue();
+        await Assert.That(scenario.Upserted).IsNotNull();
+        await Assert.That(response.Id!.PublicDisclosure.IsReady).IsFalse();
+        await Assert.That(response.Id.PaidCommerce.IsReady).IsFalse();
+        await Assert.That(response.Id.PaidCommerce.ReasonCodes)
             .Contains("instance_operator_identity_terms_url_missing");
-        await Assert.That(scenario.Upserted).IsNull();
+        await Assert.That(response.Id.Revision).IsNotEqualTo(storedRevision);
     }
 
     [Test]
@@ -173,7 +178,8 @@ public sealed class InstanceOperatorIdentityCommandTests
         InstanceOperatorIdentitySettings saved = Parse(scenario.Upserted!.Value);
         await Assert.That(saved.Revision).IsNotEqualTo(storedRevision);
         await Assert.That(response.Id!.Revision).IsEqualTo(saved.Revision);
-        await Assert.That(response.Id.Readiness.IsReady).IsTrue();
+        await Assert.That(response.Id.PublicDisclosure.IsReady).IsTrue();
+        await Assert.That(response.Id.PaidCommerce.IsReady).IsTrue();
     }
 
     [Test]
@@ -202,6 +208,22 @@ public sealed class InstanceOperatorIdentityCommandTests
         await Assert.That(saved.OperatorId).IsEqualTo(storedOperatorId);
         await Assert.That(saved.IsOfficialInstance).IsTrue();
         await Assert.That(saved.Revision).IsNotEqualTo(storedRevision);
+    }
+
+    [Test]
+    public async Task EvaluateAsync_DisclosureWithoutTerms_DoesNotAuthorizePaidCommerce()
+    {
+        var scenario = new InstanceOperatorIdentityServiceScenario()
+            .WithStoredPayload(CompleteCandidate() with { TermsUrl = null });
+
+        var disclosure = await scenario.Service.EvaluateAsync(InstanceOperatorIdentityCapability.PublicDisclosure);
+        var commerce = await scenario.Service.EvaluateAsync(InstanceOperatorIdentityCapability.PaidCommerce);
+
+        await Assert.That(disclosure.IsReady).IsTrue();
+        await Assert.That(disclosure.Identity!.TermsUrl).IsNull();
+        await Assert.That(commerce.IsReady).IsFalse();
+        await Assert.That(commerce.Identity).IsNull();
+        await Assert.That(commerce.ReasonCodes).IsEquivalentTo(["instance_operator_identity_terms_url_missing"]);
     }
 
     private static InstanceOperatorIdentitySettings Parse(string json) =>
@@ -244,7 +266,7 @@ public sealed class InstanceOperatorIdentityCommandTests
                 .Returns(callInfo => callInfo.Arg<Func<CancellationToken, Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocument>>>>()(
                     CancellationToken.None));
 
-            Service = new InstanceOperatorIdentityService(SystemSettings, BootstrapStates, UnitOfWork);
+            Service = new InstanceOperatorIdentityService(SystemSettings, UnitOfWork);
         }
 
         public ISystemSettingRepository SystemSettings { get; } = Substitute.For<ISystemSettingRepository>();

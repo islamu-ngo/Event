@@ -149,8 +149,9 @@ public class InstanceOperatorIdentityStartupTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var doc = await response.Content.ReadFromJsonAsync<InstanceOperatorIdentityDocumentDto>();
         await Assert.That(doc).IsNotNull();
-        await Assert.That(doc!.IsReady).IsFalse();
-        await Assert.That(doc.FailureCode).IsEqualTo("instance_operator_identity_missing");
+        await Assert.That(doc!.PublicDisclosure.IsReady).IsFalse();
+        await Assert.That(doc.PaidCommerce.IsReady).IsFalse();
+        await Assert.That(doc.PublicDisclosure.FailureCode).IsEqualTo("instance_operator_identity_missing");
     }
 
     [Test]

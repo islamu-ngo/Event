@@ -1190,7 +1190,7 @@ public static class RouteNames
     #region System Routes
 
     public const string GetSystemOnboardingStatus = nameof(GetSystemOnboardingStatus);
-    public const string GetSystemOnboardingPreflight = nameof(GetSystemOnboardingPreflight);
+    public const string GetInstanceOnboardingJourney = nameof(GetInstanceOnboardingJourney);
 
     #endregion
 
@@ -1208,6 +1208,7 @@ public static class RouteNames
     public const string VerifyInstanceOnboardingAuthorizationProviderEndpoint = nameof(VerifyInstanceOnboardingAuthorizationProviderEndpoint);
     public const string SyncInstanceOnboardingAuthorizationPolicyPackage = nameof(SyncInstanceOnboardingAuthorizationPolicyPackage);
     public const string DownloadInstanceOnboardingAuthorizationPolicyPackage = nameof(DownloadInstanceOnboardingAuthorizationPolicyPackage);
+    public const string GetOperatorIdentityFormOptions = nameof(GetOperatorIdentityFormOptions);
     public const string GetInstanceOperatorIdentity = nameof(GetInstanceOperatorIdentity);
     public const string SaveInstanceOperatorIdentity = nameof(SaveInstanceOperatorIdentity);
 

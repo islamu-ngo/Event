@@ -7,7 +7,8 @@ using Explore.Domain.Enums;
 namespace Explore.Application.Features.Events.Handlers.Queries;
 
 public sealed class GetPublicEventDetailsRequestHandler(
-    IEventDetailsProjectionService detailsProjectionService)
+    IEventDetailsProjectionService detailsProjectionService,
+    ITenantLifecycleAccessService lifecycle)
     : IQueryHandler<GetPublicEventDetailsRequest, EventDto?>
 {
     public async Task<EventDto?> QueryAsync(GetPublicEventDetailsRequest request, CancellationToken cancellationToken)
@@ -18,7 +19,7 @@ public sealed class GetPublicEventDetailsRequestHandler(
 
         var eventDto = await detailsProjectionService.BuildByPublicCodeAsync(publicCode, cancellationToken);
 
-        if (eventDto is null)
+        if (eventDto is null || !await lifecycle.IsPublicAsync(eventDto.TenantId, cancellationToken))
             return null;
 
         if (eventDto.EventStatusId is not (int)EventStatusEnum.Published ||

@@ -30,6 +30,9 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
     /// </summary>
     public IAuthorizationProvider? AuthorizationProviderOverride { get; set; }
 
+    /// <summary>Opt in for endpoint scenarios representing an already published directory, not fresh setup.</summary>
+    public bool SeedActiveDefaultTenant { get; set; }
+
     /// <summary>
     /// Additional in-memory configuration applied after the default test host configuration.
     /// </summary>
@@ -95,7 +98,8 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
             services.AddDistributedMemoryCache();
 
             // Register background seeder to ensure lookup data (roles, etc.) is available in tests
-            services.AddHostedService<SeedingHostedService>();
+            services.AddHostedService(provider => new SeedingHostedService(
+                provider, provider.GetRequiredService<IHostEnvironment>(), SeedActiveDefaultTenant));
         });
 
         // ConfigureTestServices runs AFTER the app's ConfigureServices,
@@ -156,13 +160,20 @@ public class AuthenticatedWebApplicationFactory : WebApplicationFactory<Program>
         }
     }
 
-    private sealed class SeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment) : IHostedService
+    private sealed class SeedingHostedService(IServiceProvider serviceProvider, IHostEnvironment environment,
+        bool seedActiveDefaultTenant) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = serviceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             await DatabaseSeeder.SeedAsync(db, environment, cancellationToken: cancellationToken);
+            if (seedActiveDefaultTenant && await db.Tenants.FindAsync([PlatformDefaults.DefaultTenantId], cancellationToken) is null)
+            {
+                db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()
+                    .WithId(PlatformDefaults.DefaultTenantId).Build());
+                await db.SaveChangesAsync(cancellationToken);
+            }
 
             // Refresh the lookup cache to ensure it picks up the seeded data (roles, etc.)
             var cache = scope.ServiceProvider.GetService<ILookupDataCache>();

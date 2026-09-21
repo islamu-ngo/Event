@@ -29,6 +29,7 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
     private readonly IModuleService _moduleService;
     private readonly ITenantContext _tenantContext;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
+    private readonly ITenantLifecycleAccessService _lifecycle;
 
     public GetEventListRequestHandler(
         IEventRepository eventRepository,
@@ -38,7 +39,8 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
         HybridCache cache,
         IModuleService moduleService,
         ITenantContext tenantContext,
-        ICustomPropertyQuotaResolver quotaResolver)
+        ICustomPropertyQuotaResolver quotaResolver,
+        ITenantLifecycleAccessService lifecycle)
     {
         _eventRepository = eventRepository;
         _actorRepository = actorRepository;
@@ -48,10 +50,14 @@ public class GetEventListRequestHandler : IQueryHandler<GetEventListRequest, Pag
         _moduleService = moduleService;
         _tenantContext = tenantContext;
         _quotaResolver = quotaResolver;
+        _lifecycle = lifecycle;
     }
 
     public async Task<PaginatedResult<EventListDto>> QueryAsync(GetEventListRequest request, CancellationToken cancellationToken)
     {
+        if (!await _lifecycle.IsPublicAsync(_tenantContext.TenantId, cancellationToken))
+            return PaginatedResult<EventListDto>.Create([], 0, request.PageNumber, request.PageSize);
+
         var ownershipActorId = await ResolveOwnershipActorIdAsync(request);
         if (ownershipActorId == MissingOwnershipActorId)
         {

@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.Tenants.Requests.Queries;
 
@@ -18,17 +19,23 @@ public class GetTenantNavLinksQueryHandler : IQueryHandler<GetTenantNavLinksQuer
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
+    private readonly ITenantLifecycleAccessService _lifecycle;
 
     public GetTenantNavLinksQueryHandler(
         ITenantNavigationLinkRepository navigationLinkRepository,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        ITenantLifecycleAccessService lifecycle)
     {
         _navigationLinkRepository = navigationLinkRepository;
         _tenantContext = tenantContext;
+        _lifecycle = lifecycle;
     }
 
     public async Task<List<TenantNavigationLinkDto>> QueryAsync(GetTenantNavLinksQuery request, CancellationToken cancellationToken = default)
     {
+        if (!await _lifecycle.IsPublicAsync(_tenantContext.TenantId, cancellationToken))
+            return [];
+
         // Get all navigation links for the current tenant, ordered by Order property
         var navigationLinks = await _navigationLinkRepository.GetByTenantIdOrderedAsync(
             _tenantContext.TenantId,

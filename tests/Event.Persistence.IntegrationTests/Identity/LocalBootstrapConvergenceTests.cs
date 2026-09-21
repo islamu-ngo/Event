@@ -10,6 +10,9 @@ using Explore.Infrastructure.Authentication;
 using Microsoft.Extensions.Options;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
+using NSubstitute;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Infrastructure.Identity;
@@ -164,13 +167,13 @@ public sealed class LocalBootstrapConvergenceTests
         await using var scope = fixture.Provider.CreateAsyncScope();
         var principal = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: ApiAuthenticationSchemeNames.SetupSecret));
         var result = await fixture.Operation(scope).CompleteInteractiveAsync(operationId, "wizard-operator", fixture.OriginalPassword,
-            null, null, null, WizardSettings(), principal, fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), principal, fixture.Token);
         await Assert.That(result.IsSuccess).IsTrue();
         var receipt = await fixture.Store(scope).ReadOperationAsync(operationId, fixture.Token);
         await Assert.That(receipt!.Receipt.LocalSubjectId).IsNotEqualTo(operationId);
         await fixture.AssertCompletedAsync(receipt.Receipt.LocalSubjectId);
         var second = await fixture.Operation(scope).CompleteInteractiveAsync(Guid.CreateVersion7(), "another-operator", NewPassword(),
-            null, null, null, WizardSettings(), principal, fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), principal, fixture.Token);
         await Assert.That(second.IsSuccess).IsFalse();
         await fixture.AssertCompletedAsync(receipt.Receipt.LocalSubjectId);
     }
@@ -195,7 +198,7 @@ public sealed class LocalBootstrapConvergenceTests
         await using var scope = fixture.Provider.CreateAsyncScope();
         var principal = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: authenticationType));
         var result = await fixture.Operation(scope).CompleteInteractiveAsync(Guid.CreateVersion7(), "operator", fixture.OriginalPassword,
-            null, null, null, WizardSettings(), principal, fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), principal, fixture.Token);
         await Assert.That(result.IsSuccess).IsFalse();
         var identities = await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token);
         await Assert.That(identities.TotalCount).IsEqualTo(0);
@@ -245,7 +248,7 @@ public sealed class LocalBootstrapConvergenceTests
         else
         {
             var result = await fixture.Operation(scope).CompleteInteractiveAsync(Guid.CreateVersion7(), "operator", fixture.OriginalPassword,
-                null, null, null, WizardSettings(), SetupPrincipal(), fixture.Token);
+                null, null, null, await WizardSettingsAsync(fixture, scope), SetupPrincipal(), fixture.Token);
             await Assert.That(result.IsSuccess).IsFalse();
         }
         await Assert.That((await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token)).TotalCount).IsEqualTo(0);
@@ -265,13 +268,13 @@ public sealed class LocalBootstrapConvergenceTests
         string password = invalidUsername ? fixture.OriginalPassword : Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         var rejected = await fixture.Operation(scope).CompleteInteractiveAsync(Guid.CreateVersion7(),
             invalidUsername ? "operator name" : "operator", password,
-            null, null, null, WizardSettings(), SetupPrincipal(), fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), SetupPrincipal(), fixture.Token);
         await Assert.That(rejected.IsSuccess).IsFalse();
         await Assert.That(await new InstanceBootstrapStateRepository(fixture.Application(scope)).GetCurrent(fixture.Token)).IsNull();
         await Assert.That((await fixture.Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), fixture.Token)).TotalCount).IsEqualTo(0);
         Guid freshOperation = Guid.CreateVersion7();
         var accepted = await fixture.Operation(scope).CompleteInteractiveAsync(freshOperation, "fresh-operator", fixture.OriginalPassword,
-            null, null, null, WizardSettings(), SetupPrincipal(), fixture.Token);
+            null, null, null, await WizardSettingsAsync(fixture, scope), SetupPrincipal(), fixture.Token);
         await Assert.That(accepted.IsSuccess).IsTrue();
         var receipt = await fixture.Store(scope).ReadOperationAsync(freshOperation, fixture.Token);
         await fixture.AssertCompletedAsync(receipt!.Receipt.LocalSubjectId);
@@ -309,8 +312,10 @@ public sealed class LocalBootstrapConvergenceTests
 
     private static ClaimsPrincipal SetupPrincipal() => new(new ClaimsIdentity(authenticationType: ApiAuthenticationSchemeNames.SetupSecret));
 
-    private static CompleteInstanceOnboardingRequest WizardSettings() => new()
+    private static async Task<CompleteInstanceOnboardingRequest> WizardSettingsAsync(Fixture fixture, AsyncServiceScope scope) => new()
     {
+        ExpectedJourneyGeneration = await fixture.GenerationReader(scope).ReadAsync(
+            await new InstanceBootstrapStateRepository(fixture.Application(scope)).GetCurrent(fixture.Token), fixture.Token),
         DeploymentMode = DeploymentMode.MultiTenant,
         SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Wizard Operator", Locale = "en", TimeZone = "UTC" }
     };
@@ -400,21 +405,29 @@ public sealed class LocalBootstrapConvergenceTests
             var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
             var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
             var systemSettings = new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork));
-            var identityEvaluator = new InstanceOperatorIdentityService(systemSettings, bootstrap, unitOfWork);
             var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles, tenantRoles,
                 new TenantUserRepository(application), new RoleRepository(application), new UserRepository(application),
-                new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents), documents,
+                new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents),
                 systemSettings,
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 deployment, new RuntimeMetadataRefresh(),
-                new TenantBrandingSettingsDocumentProvisioningService(tenants, documents, new TypedSettingsDocumentResolver(documents, cache)),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
-                identityEvaluator, OperatorOptions);
+                GenerationReader(scope), OperatorOptions);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
                 new RuntimeAuthenticationProviderDispatcher(
                     systemSettings,
                     cache, Options.Create(new AuthenticationProviderDeploymentOptions())));
+        }
+
+        internal IInstanceOnboardingGenerationReader GenerationReader(AsyncServiceScope scope)
+        {
+            var application = Application(scope);
+            var unitOfWork = new EfCoreUnitOfWork(application);
+            return new InstanceOnboardingGenerationReader(
+                new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
+                scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>(),
+                new InstanceBootstrapStateRepository(application));
         }
 
         internal async Task AssertCompletedAsync(Guid? expectedSubject = null)

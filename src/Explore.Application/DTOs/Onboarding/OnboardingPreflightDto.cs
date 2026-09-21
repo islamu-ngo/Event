@@ -31,6 +31,11 @@ public sealed record OnboardingPreflightCheckDto
     public string Status { get; init; } = OnboardingPreflightCheckStatus.Pass;
     public string Message { get; init; } = string.Empty;
     public string? Detail { get; init; }
+    public string RemediationAuthority { get; init; } = "SetupOperator";
+    public string RequirementCategory { get; init; } = "RequiredNow";
+    public bool RestartRequired { get; init; }
+    public string ReasonCode { get; init; } = "check_pending";
+    public string? ActionRelation { get; init; }
 }
 
 public static class OnboardingPreflightCheckSeverity

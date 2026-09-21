@@ -14,8 +14,7 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 public sealed class SystemController(
-    IQueryHandler<GetSystemOnboardingStatusQuery, SystemOnboardingStatusDto> onboardingStatusHandler,
-    IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto> preflightHandler) : EventControllerBase
+    IQueryHandler<GetSystemOnboardingStatusQuery, SystemOnboardingStatusDto> onboardingStatusHandler) : EventControllerBase
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
@@ -28,17 +27,5 @@ public sealed class SystemController(
     {
         var status = await onboardingStatusHandler.QueryAsync(new GetSystemOnboardingStatusQuery(), cancellationToken);
         return Ok(status);
-    }
-
-    [AllowAnonymous]
-    [EndpointClassification(EndpointClass.Public)]
-    [HttpGet("onboarding-preflight", Name = RouteNames.GetSystemOnboardingPreflight)]
-    [EndpointSummary("Get System Onboarding Preflight")]
-    [EndpointDescription("Returns non-sensitive blocking checks and operational warnings for first-run launch readiness.")]
-    [ProducesResponseType(typeof(OnboardingPreflightDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<OnboardingPreflightDto>> GetOnboardingPreflight(CancellationToken cancellationToken = default)
-    {
-        var preflight = await preflightHandler.QueryAsync(new GetOnboardingPreflightQuery(), cancellationToken);
-        return Ok(preflight);
     }
 }

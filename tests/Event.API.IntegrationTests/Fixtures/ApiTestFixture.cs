@@ -1,3 +1,7 @@
+using Event.Api.IntegrationTests.Builders;
+using Explore.Domain.Constants;
+using Explore.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 using TUnit.Core.Interfaces;
 
@@ -12,7 +16,13 @@ public class ApiTestFixture : IAsyncInitializer, IAsyncDisposable
     {
         Factory = new CustomWebApplicationFactory();
         Client = Factory.CreateClient();
-        await Task.CompletedTask;
+        using var scope = Factory.Services.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        if (await database.Tenants.FindAsync(PlatformDefaults.DefaultTenantId) is null)
+        {
+            database.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
+            await database.SaveChangesAsync();
+        }
     }
 
     public async ValueTask DisposeAsync()

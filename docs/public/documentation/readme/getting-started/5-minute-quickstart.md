@@ -1,5 +1,5 @@
 ---
-description: Evaluate ISLAMU Event locally in under five minutes using Docker.
+description: Start a small local evaluation with Docker and complete private administrator setup.
 ---
 <!-- ABOUTME: Routes Docker evaluation through the real zero-email setup requirements. -->
 <!-- ABOUTME: Distinguishes durable Standalone startup, Split dependencies and optional mail capture. -->
@@ -26,8 +26,8 @@ You only need:
 
 First prepare the private `.env` from the
 [Standalone configuration step](../self-hosting/docker-standalone.md#step-2-prepare-configuration-env):
-select the secret authority, generate the Local signing key, and supply operator
-legal identity and your URL. An unconfigured production container is not a
+select the secret authority, generate the Local signing key, and configure your
+URL. Legal identity is completed later in authenticated administration. An unconfigured production container is not a
 working quickstart. SMTP is not required.
 
 Keep the recipe's [bounded SQLite processing profile](../self-hosting/docker-standalone.md#bounded-sqlite-processing-profile),
@@ -66,6 +66,28 @@ Do not use public **Create an account** registration. Complete mandatory private
 password replacement, then sign in afresh. Delete the host secret copy after use
 with `rm -f ./setup-secret`; never include it in logs or tickets.
 
+Active setup access carries through to the site profile and readiness checks; no
+additional sign-in or manually supplied authority header is needed for that read.
+Ready Local setup exposes **Finish setup** only through its authorized journey action.
+Keep optional site details collapsed unless needed; the selected providers' ready,
+action-required, unavailable, failure and restart states remain explicit.
+Choose **Finish setup** after entering the site name. Fresh Local administrator
+sign-in opens `/settings/instance?section=getting-started` by default; an explicit
+return destination is preserved. Finishing setup does not publish a
+directory: a new SingleTenant directory stays private until explicit activation;
+MultiTenant creates none. Configure operator identity before dependent public or
+paid operations. If completion is uncertain, refresh status before retrying; a
+completed instance must not receive the temporary credential again. The selected
+provider remains available for fresh sign-in while setup authority stays locked.
+After sign-in, browser startup and readiness reads use the ordinary session rather
+than any old setup cookie, so administration remains available after setup closes.
+
+The [getting-started checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+separates disclosure, paid-event and recommended work. These groups do not add
+installation requirements. The five-minute title is an evaluation goal, not a
+startup or usability guarantee: image downloads, migrations, host resources and
+provider configuration affect elapsed time.
+
 For later accounts, current instance administrators use the
 [Local accounts screen](../administration-and-branding/admin-guide.md#local-accounts)
 and private temporary-password handover. Email delivery remains optional.
@@ -88,7 +110,8 @@ chmod 600 .env
 
 Complete the [Compose preparation](../self-hosting/docker-compose.md#2-prerequisites--preparation)
 before starting: the template's empty secrets must be provisioned, and your
-operator identity and provider settings must be valid. The full environment
+provider settings must be valid. Operator legal identity is not an installation
+prerequisite; it is required by later disclosure, activation and commerce checks. The full environment
 catalogue is separate from this baseline.
 
 ```bash

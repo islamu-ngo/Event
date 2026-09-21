@@ -14,7 +14,8 @@ public sealed class GetPublicEventOpenGraphImageRequestHandler(
     IEventRepository eventRepository,
     ITenantPolicySettingService tenantPolicySettingService,
     IStorageObjectContentReader contentReader,
-    IEventOpenGraphImageRenderer renderer)
+    IEventOpenGraphImageRenderer renderer,
+    ITenantLifecycleAccessService lifecycle)
     : IQueryHandler<GetPublicEventOpenGraphImageRequest, EventOpenGraphImageRenderResult?>
 {
     public async Task<EventOpenGraphImageRenderResult?> QueryAsync(
@@ -28,7 +29,8 @@ public sealed class GetPublicEventOpenGraphImageRequestHandler(
         Event? eventEntity = await eventRepository.GetPublicEventForOpenGraphAsync(publicCode, cancellationToken);
         if (eventEntity is null ||
             eventEntity.EventStatusId != (int)EventStatusEnum.Published ||
-            eventEntity.VisibilityTypeId != (int)VisibilityTypeEnum.Public)
+            eventEntity.VisibilityTypeId != (int)VisibilityTypeEnum.Public ||
+            !await lifecycle.IsPublicAsync(eventEntity.TenantId, cancellationToken))
         {
             return null;
         }

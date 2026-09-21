@@ -142,6 +142,7 @@ namespace Explore.Blazor.Client.Serialization;
 [JsonSerializable(typeof(InstanceOnboardingStatusDto))]
 [JsonSerializable(typeof(LanguageDto))]
 [JsonSerializable(typeof(LanguageListDto))]
+[JsonSerializable(typeof(HalResourceOfOperatorIdentityFormOptionsDto))]
 [JsonSerializable(typeof(LocationDto))]
 [JsonSerializable(typeof(LocationListDto))]
 [JsonSerializable(typeof(MadhabDto))]

@@ -5,6 +5,47 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Structured Legal-Identity Contracts
 
+### Value-Free Operator Form Metadata
+
+Authenticated `GET /api/operator-identity-metadata` dispatches native
+`GetOperatorIdentityFormOptionsQuery` and assembles a HAL resource through the
+standard registered assembler/policy. The exact route is tenant-independent so
+an unpublished or absent directory cannot block its static vocabulary; this does
+not bypass authentication or grant document access. Responses are private/no-store.
+
+The immutable DTO snapshots its collections. Operator kinds come from
+`TenantDirectoryOperatorKinds.All`; country choices project the runtime
+`CultureInfo`/`RegionInfo` data, deduplicated and ordered by alpha-2 code. These are
+display choices, not a new jurisdictional compliance registry: domain validation
+still owns the alpha-2 shape. Empty or invalid region data returns
+`countryState: Unavailable` and `operator_identity_countries_unavailable` rather
+than a partial mandatory selector. Country display names use runtime localization;
+kind and field label/help identifiers are stable client localization/association
+keys, not translated prose supplied by this endpoint.
+
+Shared legal-identity field lengths reuse Domain constants. Disclosure and paid
+commerce requirements are separate; saving a draft still permits missing fields.
+Registration identifiers are optional, while authority choices are explicitly
+empty with `registrationAuthorityState: NotSupported`. Instance-specific identity
+and readiness rules remain on the value-bearing document contract.
+
+No identity service, tenant repository, credential provider or logger participates
+in the metadata query. HAL supplies authenticated `self` and `refresh`, omitting
+unresolved links. Normal authenticated instance identity documents expose the
+`form-options` lookup relation; the setup-secret scheme does not gain access.
+Metadata never supplies an edit link. Consumers must retain the independently
+authorized identity document's mutation links and revisions.
+
+
+`GET/PUT /api/instance-operator-identity` return separate `publicDisclosure` and
+`paidCommerce` assessments, each containing `isReady`, `failureCode`, and bounded
+`reasonCodes`. The former top-level readiness fields are removed. Authorized
+administrators may save syntactically valid incomplete drafts after setup as well
+as during setup; saving never grants a protected capability. Disclosure does not
+require commercial terms, but paid commerce does. Missing or corrupt documents
+fail both assessments closed. Routes, setup/admin authority, and revision conflicts
+are unchanged.
+
 Authenticated tenant administration exposes:
 
 | Route | Operation | Contract |
@@ -50,6 +91,53 @@ is permitted; the parsed stamp reaches the handler for the existing stale-write
 check. No client timestamp or new concurrency authority is introduced.
 
 For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Generated OpenAPI output remains the endpoint and DTO reference; Scalar is a development/testing UI over that contract.
+
+### Canonical Instance Onboarding Journey
+
+`GET /api/instanceonboarding/journey` requires active setup authority or instance
+administrator authority and returns a private, no-store HAL snapshot. Declarative
+`[Authorize]` admits the exact setup-secret authentication scheme or a normal
+authenticated principal; the action still requires active setup or persisted
+instance-administrator authority. On this exact GET, an Authorization header
+selects normal bearer validation even when a setup header is present. The BFF
+forwards its protected setup authority alongside that bearer; the action validates
+setup independently. A pre-administrator bearer alone remains insufficient, and a
+stale setup cookie cannot shadow a persisted administrator's ordinary session.
+Missing authentication returns 401; an
+authenticated non-administrator without setup authority receives 403. The native
+`GetInstanceOnboardingJourneyQuery` composes bootstrap status, selected deployment,
+existing provider configuration contracts, persisted profile, operator identity,
+and existing preflight checks. Two sequential projections must agree; changing,
+unavailable or contradictory sources return `Failed` with a bounded reason and
+`refresh`, without mutation affordances. This is a read projection, not a database
+transaction or a new workflow engine.
+
+Provider states are `Ready`, `ActionRequired`, `DeploymentRestartRequired`,
+`Unavailable`, and `Failed`. Deployment ownership alone never implies readiness.
+Checks carry requirement category, remediation authority, restart requirement,
+reason code and action relation; only actual HAL links authorize UI actions.
+Generation is an opaque content fingerprint, not completion authority. Both
+interactive completion POSTs require an Available snapshot, the exact current
+generation, and every projected blocking check to pass, including authorization
+provider readiness. Failure returns 409 ProblemDetails with a journey refresh
+relation before Local credential reservation or external administrator creation.
+Missing HAL links are never the server-side enforcement mechanism.
+
+Interactive completion reprojects readiness and generation inside each owning
+transaction under the bootstrap mutation fence. Profile save uses that same fence
+and rechecks durable completion, so a profile committed after HTTP admission cannot
+be overwritten by stale completion, and an admitted profile cannot write after
+completion. The fence covers an absent bootstrap row as well as an existing one.
+Local reservation validates before credential creation and final convergence
+validates again; a stale final attempt leaves the existing reservation recoverable
+with refreshed setup state. Serializable retries repeat admission. Reserving a
+Local operation does not change the journey generation or repository readiness.
+
+The duplicate `GET /api/system/onboarding-preflight` and its generated method are
+removed with no alias. Clients refresh the journey, and save profile through the
+existing setup-only PATCH operation before refreshing readiness. Persisted profile
+projection includes the stored canonical host; it does not invent a URL scheme or
+persist the non-persisted purpose/time-zone fields.
 
 ### Generated C# Client Shape
 

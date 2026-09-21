@@ -7,6 +7,7 @@
 
 <section class="instance-operator-identity-editor"
          aria-labelledby="instance-operator-identity-heading"
+         aria-busy="@(_saving ? "true" : "false")"
          data-testid="instance-operator-identity-editor">
     <div class="instance-operator-identity__header mb-4">
         <MudText Id="instance-operator-identity-heading"
@@ -76,33 +77,48 @@
                               aria-invalid="@AriaInvalid(nameof(Model.LegalName))"
                               Required="true"
                               FullWidth="true" />
-                <div class="d-flex gap-3 flex-column flex-sm-row">
-                    <AppTextField T="string"
-                                  Label="@T("operator.kindCode", "Operator kind code")"
-                                  Id="instance-operator-kind-code"
-                                  @bind-Value="Model.OperatorKindCode"
-                                  Disabled="@Disabled"
-                                  ReadOnly="@IsReadOnly"
-                                  Error="@HasError(nameof(Model.OperatorKindCode))"
-                                  ErrorText="@ErrorFor(nameof(Model.OperatorKindCode))"
-                                  aria-invalid="@AriaInvalid(nameof(Model.OperatorKindCode))"
-                                  Required="true"
-                                  FullWidth="true"
-                                  dir="ltr" />
-                    <AppTextField T="string"
-                                  Label="@T("operator.jurisdictionCountryCode", "Jurisdiction country code")"
-                                  Id="instance-operator-jurisdiction-country-code"
-                                  @bind-Value="Model.JurisdictionCountryCode"
-                                  Disabled="@Disabled"
-                                  ReadOnly="@IsReadOnly"
-                                  Error="@HasError(nameof(Model.JurisdictionCountryCode))"
-                                  ErrorText="@ErrorFor(nameof(Model.JurisdictionCountryCode))"
-                                  aria-invalid="@AriaInvalid(nameof(Model.JurisdictionCountryCode))"
-                                  Required="true"
-                                  FullWidth="true"
-                                  MaxLength="2"
-                                  dir="ltr" />
+                <div class="instance-operator-identity-editor__choices">
+                    <div class="instance-operator-identity-editor__choice">
+                        <label for="instance-operator-kind-code">@FieldLabel("operatorKindCode", "Operator kind")</label>
+                        <select id="instance-operator-kind-code" @bind="Model.OperatorKindCode"
+                                disabled="@(IsReadOnly || Model.FormOptions is null)"
+                                aria-invalid="@AriaInvalid(nameof(Model.OperatorKindCode))"
+                                aria-describedby="@ChoiceDescription("kind", nameof(Model.OperatorKindCode))">
+                            <option value="">@T("operator.chooseKind", "Choose an operator kind")</option>
+                            @foreach (var kind in Model.FormOptions?.OperatorKinds ?? [])
+                            {
+                                <option value="@kind.Code">@T(kind.LabelId!, kind.Code!)</option>
+                            }
+                        </select>
+                        <p id="instance-operator-kind-help">@FieldHelp("operatorKindCode", "Choose the legal form of the operator. Required before public disclosure and paid events, not to save a draft.")</p>
+                        @if (HasError(nameof(Model.OperatorKindCode)))
+                        {
+                            <p id="instance-operator-kind-error">@ErrorFor(nameof(Model.OperatorKindCode))</p>
+                        }
+                    </div>
+                    <div class="instance-operator-identity-editor__choice">
+                        <label for="instance-operator-jurisdiction-country-code">@FieldLabel("jurisdictionCountryCode", "Jurisdiction country")</label>
+                        <select id="instance-operator-jurisdiction-country-code" @bind="Model.JurisdictionCountryCode"
+                                disabled="@(IsReadOnly || Model.FormOptions?.CountryState != "Available")"
+                                aria-invalid="@AriaInvalid(nameof(Model.JurisdictionCountryCode))"
+                                aria-describedby="@ChoiceDescription("country", nameof(Model.JurisdictionCountryCode))">
+                            <option value="">@T("operator.chooseCountry", "Choose a country")</option>
+                            @foreach (var country in Model.FormOptions?.Countries ?? [])
+                            {
+                                <option value="@country.Code">@country.DisplayName</option>
+                            }
+                        </select>
+                        <p id="instance-operator-country-help">@FieldHelp("jurisdictionCountryCode", "Select the country where the operator is legally based. This is independent of the directory's identity.")</p>
+                        @if (HasError(nameof(Model.JurisdictionCountryCode)))
+                        {
+                            <p id="instance-operator-country-error">@ErrorFor(nameof(Model.JurisdictionCountryCode))</p>
+                        }
+                    </div>
                 </div>
+                @if (Model.FormOptions is null || Model.FormOptions.CountryState != "Available")
+                {
+                    <p role="status">@T("operator.choicesUnavailable", "Operator choices are unavailable. Existing values are preserved; refresh the page to recover the server's choices.")</p>
+                }
                 <AppTextField T="string"
                               Label="@T("operator.registrationIdentifier", "Registration identifier")"
                               Id="instance-operator-registration-identifier"
@@ -208,7 +224,7 @@
                      Class="mb-2">
                 @T("operator.readinessStatus", "Readiness status")
             </MudText>
-            @if (Model.IsReady)
+            @if (Model.PaidCommerceIsReady)
             {
                 <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" data-testid="operator-readiness-ready">
                     @T("operator.readyMessage", "Instance operator identity is verified and ready for public disclosures and paid commerce.")

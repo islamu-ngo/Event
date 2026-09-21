@@ -24,6 +24,8 @@ public sealed class GetOnboardingPreflightQueryHandler(
     IS3PreflightVerifier? s3PreflightVerifier = null)
     : IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto>
 {
+    private const string SetupSecretCheck = "setup_secret";
+
     public async Task<OnboardingPreflightDto> QueryAsync(GetOnboardingPreflightQuery request, CancellationToken cancellationToken)
     {
         var result = new OnboardingPreflightDto();
@@ -36,7 +38,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
         result.DeploymentMode = deploymentMode.ToString();
 
         AddSetupSecretCheck(result, onboardingCompleted);
-        AddRepositoryReachabilityCheck(result, bootstrap);
+        AddRepositoryReachabilityCheck(result);
         AddMigrationCheck(result);
         AddDeploymentModeCheck(result, deploymentMode);
         await AddDefaultTenantCheckAsync(result, deploymentMode, onboardingCompleted);
@@ -52,30 +54,28 @@ public sealed class GetOnboardingPreflightQueryHandler(
     {
         if (onboardingCompleted)
         {
-            AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Pass, "Onboarding is already completed and setup mode is locked.");
+            AddBlocking(result, SetupSecretCheck, "Setup secret", OnboardingPreflightCheckStatus.Pass, "Onboarding is already completed and setup mode is locked.");
             return;
         }
 
         if (!setupSecretProvider.IsSetupModeActive)
         {
-            AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Fail, "Setup mode is not active.", "The setup secret provider is locked or has not initialized setup state.");
+            AddBlocking(result, SetupSecretCheck, "Setup secret", OnboardingPreflightCheckStatus.Fail, "Setup mode is not active.", "The setup secret provider is locked or has not initialized setup state.");
             return;
         }
 
         var source = setupSecretProvider.IsFromEnvironmentVariable ? "environment" : "internal generated fallback";
-        AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Pass, $"Setup secret is active from {source}.");
+        AddBlocking(result, SetupSecretCheck, "Setup secret", OnboardingPreflightCheckStatus.Pass, $"Setup secret is active from {source}.");
     }
 
-    private static void AddRepositoryReachabilityCheck(OnboardingPreflightDto result, object? bootstrap)
+    private static void AddRepositoryReachabilityCheck(OnboardingPreflightDto result)
     {
         AddBlocking(
             result,
             "database_reachable",
             "Database reachable",
             OnboardingPreflightCheckStatus.Pass,
-            bootstrap is null
-                ? "Database read completed and no completed bootstrap state exists yet."
-                : "Database read completed and bootstrap state is available.");
+            "Database read completed.");
     }
 
     private static void AddMigrationCheck(OnboardingPreflightDto result)
@@ -359,6 +359,11 @@ public sealed class GetOnboardingPreflightQueryHandler(
             Name = name,
             Severity = OnboardingPreflightCheckSeverity.Blocking,
             Status = status,
+            ReasonCode = status == OnboardingPreflightCheckStatus.Pass ? "check_passed" : "check_failed",
+            RequirementCategory = "RequiredNow",
+            RemediationAuthority = code is "database_reachable" or "deployment_mode" or SetupSecretCheck ? "Deployment" : "SetupOperator",
+            RestartRequired = status == OnboardingPreflightCheckStatus.Fail && code == SetupSecretCheck,
+            ActionRelation = code switch { "canonical_host" => "save-profile", "auth_config" => "manage-authentication", _ => "refresh" },
             Message = message,
             Detail = detail
         });
@@ -372,6 +377,15 @@ public sealed class GetOnboardingPreflightQueryHandler(
             Name = name,
             Severity = OnboardingPreflightCheckSeverity.Warning,
             Status = OnboardingPreflightCheckStatus.Warning,
+            ReasonCode = "operator_review_required",
+            RequirementCategory = code switch
+            {
+                "smtp" or "object_storage" or "dns_custom_domain_cname" => "Optional",
+                "public_exposure" or "dns_public_platform" => "RequiredToPublish",
+                _ => "Recommended"
+            },
+            RemediationAuthority = "Deployment",
+            ActionRelation = "refresh",
             Message = message,
             Detail = detail
         });

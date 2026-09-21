@@ -164,6 +164,7 @@ public static class ApplicationServicesRegistration
             .Bind(configuration.GetSection(PaidCheckoutGovernanceOptions.SectionName));
         services.AddOptions<InstanceOperatorIdentityOptions>()
             .Bind(configuration.GetSection(InstanceOperatorIdentityOptions.SectionName));
+        services.AddScoped<ITenantLifecycleAccessService, TenantLifecycleAccessService>();
         services.AddSingleton<TenantDirectoryOperatorReadinessTelemetry>();
         services.AddScoped<
             ITenantDirectoryOperatorReadinessEvaluator,
@@ -272,6 +273,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IInstanceSmtpSettingService, InstanceSmtpSettingService>();
         services.AddScoped<IInstanceBootstrapAuditLogger, InstanceBootstrapAuditLogger>();
         services.AddScoped<InstanceOnboardingCompletionOperation>();
+        services.AddScoped<IInstanceOnboardingGenerationReader, InstanceOnboardingGenerationReader>();
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();

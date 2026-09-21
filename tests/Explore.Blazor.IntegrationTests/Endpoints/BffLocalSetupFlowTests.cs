@@ -111,16 +111,53 @@ public sealed class BffLocalSetupFlowTests
         await Assert.That(result.RootElement.TryGetProperty("token", out _)).IsFalse();
     }
 
+    [Test]
+    public async Task ProfilePreparationUsesTrustedCookiesAndAntiforgeryNotBrowserHeaders()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        string csrf = await fixture.CsrfAsync();
+        using (var persist = new HttpRequestMessage(HttpMethod.Post, "/bff/setup-secret")
+        {
+            Content = JsonContent.Create(new { secret = fixture.Secret })
+        })
+        {
+            persist.Headers.Add("X-CSRF-TOKEN", csrf);
+            using var response = await fixture.Browser.SendAsync(persist, CancellationToken);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+
+        using (var denied = await fixture.Browser.PatchAsJsonAsync("/api/InstanceOnboarding/profile", new { siteName = "Private site" }, CancellationToken))
+        {
+            await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+            await Assert.That(fixture.SavedSiteName).IsNull();
+        }
+        using var save = new HttpRequestMessage(HttpMethod.Patch, "/api/InstanceOnboarding/profile")
+        {
+            Content = JsonContent.Create(new { siteName = "Private site" })
+        };
+        save.Headers.Add("X-CSRF-TOKEN", csrf);
+        foreach (string header in new[] { "Authorization", "X-Setup-Secret", "X-Tenant-Id", "X-Tenant-Slug", "X-API-Key",
+            "X-Atproto-Bootstrap-Assertion", "X-Atproto-Session-Bridge-Assertion", "X-Atproto-Transient-Assertion" })
+            save.Headers.TryAddWithoutValidation(header, $"forged-{Guid.NewGuid():N}");
+        using var saved = await fixture.Browser.SendAsync(save, CancellationToken);
+        await Assert.That(saved.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(fixture.SavedSiteName).IsEqualTo("Private site");
+        using var branding = await fixture.Browser.GetAsync("/api/instance/settings/branding", CancellationToken);
+        await Assert.That(branding.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await branding.Content.ReadAsStringAsync(CancellationToken));
+        await Assert.That(body.RootElement.GetProperty("defaultBrandDisplayName").GetString()).IsEqualTo("Private site");
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         internal string Secret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         internal Guid PendingOperationId { get; } = Guid.CreateVersion7();
         internal bool Completed { get; private set; }
+        internal string? SavedSiteName { get; private set; }
         internal HttpClient Browser { get; private set; } = null!;
         private readonly BlazorBffWebApplicationFactory _root = new();
         private WebApplicationFactory<Program> _factory = null!;
         private WebApplication _upstream = null!;
-        private HttpClient _api = null!;
 
         internal static async Task<Fixture> CreateAsync()
         {
@@ -135,7 +172,20 @@ public sealed class BffLocalSetupFlowTests
             _upstream = builder.Build();
             _upstream.MapGet("/api/system/onboarding-status", () => Results.Json(new { requiresOnboarding = !Completed, deploymentMode = "SingleTenant" }));
             _upstream.MapGet("/api/system/onboarding-preflight", () => Results.Json(new { isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>() }));
-            _upstream.MapGet("/api/instance/settings/branding", () => Results.Json(new { defaultBrandDisplayName = "Local setup" }));
+            _upstream.MapGet("/api/instance/settings/branding", (HttpContext context) =>
+                context.Request.Headers["X-Setup-Secret"] == Secret
+                    ? Results.Json(new { defaultBrandDisplayName = SavedSiteName ?? "Local setup" })
+                    : Results.Unauthorized());
+            _upstream.MapPatch("/api/InstanceOnboarding/profile", async (HttpContext context) =>
+            {
+                if (context.Request.Headers["X-Setup-Secret"] != Secret) return Results.Unauthorized();
+                if (new[] { "Authorization", "X-Tenant-Id", "X-Tenant-Slug", "X-API-Key", "X-Atproto-Bootstrap-Assertion",
+                    "X-Atproto-Session-Bridge-Assertion", "X-Atproto-Transient-Assertion" }.Any(context.Request.Headers.ContainsKey))
+                    return Results.Forbid();
+                using var body = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
+                SavedSiteName = body.RootElement.GetProperty("siteName").GetString();
+                return Results.Ok();
+            });
             _upstream.MapGet("/api/instance/settings/auth-provider/status", () => Results.Json(new { configured = true }));
             _upstream.MapGet("/api/instance/settings/authz-provider/status", () => Results.Json(new { configured = true }));
             _upstream.MapPost("/api/instanceonboarding/validate-secret", async (HttpContext context) =>
@@ -153,6 +203,31 @@ public sealed class BffLocalSetupFlowTests
                     generation = 1,
                     pendingOperationId = context.Request.Headers["X-Setup-Secret"] == Secret ? PendingOperationId : (Guid?)null
                 }));
+            _upstream.MapGet("/api/instanceonboarding/journey", (HttpContext context) =>
+                context.Request.Headers["X-Setup-Secret"] == Secret
+                    ? Results.Json(new
+                    {
+                        state = "Available",
+                        generation = "bff-local-fixture",
+                        bootstrap = new
+                        {
+                            isCompleted = Completed,
+                            provider = "Local",
+                            state = Completed ? "Completed" : "InteractivePending",
+                            isAuthenticated = true,
+                            selectedDeploymentMode = "SingleTenant",
+                            pendingOperationId = PendingOperationId
+                        },
+                        profile = new { siteName = SavedSiteName ?? "Local setup" },
+                        authentication = new { provider = "Local", state = "Ready" },
+                        authorization = new { provider = "Local", state = "Ready" },
+                        preflight = new { isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>() },
+                        _links = new Dictionary<string, object>
+                        {
+                            ["complete-local"] = new { href = "/api/instanceonboarding/complete-local", method = "POST" }
+                        }
+                    })
+                    : Results.Unauthorized());
             _upstream.MapPost("/api/instanceonboarding/complete-local", async (HttpContext context) =>
             {
                 if (context.Request.Headers["X-Setup-Secret"] != Secret) return Results.Unauthorized();
@@ -163,7 +238,6 @@ public sealed class BffLocalSetupFlowTests
             });
             await _upstream.StartAsync(CancellationToken);
             string address = _upstream.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
-            _api = new HttpClient { BaseAddress = new Uri(address) };
             _factory = _root.WithWebHostBuilder(host =>
             {
                 host.UseSetting("ExploreApi:BaseUrl", address);
@@ -172,7 +246,9 @@ public sealed class BffLocalSetupFlowTests
                     services.RemoveAll<IBffOnboardingStatusProvider>();
                     services.AddSingleton<IBffOnboardingStatusProvider, BffOnboardingStatusProvider>();
                     services.RemoveAll<IInstanceOnboardingClient>();
-                    services.AddSingleton<IInstanceOnboardingClient>(new InstanceOnboardingClient(_api));
+                    services.AddHttpClient<IInstanceOnboardingClient, InstanceOnboardingClient>(
+                            "local-setup-fixture", client => client.BaseAddress = new Uri(address))
+                        .AddHttpMessageHandler<SetupSecretForwardingHandler>();
                 });
             });
             Browser = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -189,7 +265,6 @@ public sealed class BffLocalSetupFlowTests
             Browser?.Dispose();
             if (_factory is not null) await _factory.DisposeAsync();
             await _root.DisposeAsync();
-            _api?.Dispose();
             if (_upstream is not null) await _upstream.DisposeAsync();
         }
     }

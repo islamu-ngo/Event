@@ -8,8 +8,36 @@ The standalone image (`Event.Standalone`) is the simplest and lowest-overhead op
 
 You can complete Local administrator setup and use the core without SMTP,
 Mailpit or a credential email address. Public operator contact and legal identity
-are still required. Email delivery starts disabled and is an optional,
-administrator-controlled capability.
+are not required to finish setup; configure them before dependent disclosure,
+directory activation or paid commerce. Email delivery starts disabled and is an
+optional, administrator-controlled capability.
+
+After setup and Local password replacement, sign in afresh and open
+`/settings/instance?section=getting-started`. A new SingleTenant directory stays
+Provisioning and private until explicitly activated. Setup status recovers a lost
+completion response without replaying credentials: select **Refresh status** and
+the page will use public terminal status only to show the Local sign-in handoff.
+It clears the password and setup session and never resubmits credentials. If setup
+is still pending, private setup status remains authoritative and setup authority is
+retained. Completed setup stays locked.
+Use the [categorized checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+to distinguish disclosure and paid-event prerequisites from recommended operational
+work. Optional profile details are disclosed on demand; provider failures and
+restart requirements are not hidden by the simplified setup form. Completion also
+checks provider readiness on the server: a blocked authorization provider cannot
+be bypassed by submitting setup directly. Resolve the blocker and refresh setup
+before completing; rejected attempts do not create administrator credentials.
+If another setup tab saves the profile while completion is in flight, completion
+rejects the stale version instead of replacing that saved profile. Refresh before
+retrying. Profile saves already in flight cannot change the instance after setup
+has completed; setup authority remains permanently locked.
+
+Authentication-provider, authorization-provider and instance operator-identity
+settings remain manageable with active setup authority or a signed-in instance
+administrator while the directory is private. MultiTenant instances do not need
+to create or bind an unrelated directory first. Ordinary users and tenant-only
+administrators do not gain instance-management access, and public pages stay
+unavailable until explicit directory activation.
 
 ---
 

@@ -1,0 +1,30 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M319Q9C3HPKH4F4P8Y2EX9AN
+Title: "Forward protected setup authority through the browser proxy"
+Type: fix
+Scope: onboarding
+Summary: "Preserve the external session and protected setup authority together on the exact private journey GET."
+Group: split-setup-transport
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "The browser proxy now forwards independently protected setup authority on the exact journey GET alongside the native session bearer, without forwarding cookies or trusting browser authority headers."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/api-reference/readme/hal-rest.md
+    Disposition: documented
+    Detail: "The existing private setup journey contract now works through YARP after external login. No configuration, public API shape, or Local credential behavior changes."

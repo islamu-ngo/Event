@@ -196,6 +196,7 @@ public sealed class InstancePresentationSettingsController : InstanceSettingsCon
         return HandleCommandResponse(response);
     }
 
+    [TenantLifecycleManagement]
     [HttpGet("deployment-mode", Name = RouteNames.GetInstanceDeploymentMode)]
     [EndpointSummary("Get Deployment Mode")]
     [EndpointDescription("Returns the current instance deployment mode.")]

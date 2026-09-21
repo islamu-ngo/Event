@@ -1,0 +1,28 @@
+Change-Id: CHG-01M31F5GRNA0QE5ZT4GTEBXPH6
+Title: "Reject completion while provider readiness is blocked"
+Type: fix
+Scope: onboarding
+Summary: "Require authoritative blocking readiness for Local and external interactive setup completion."
+Group: onboarding-admission
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "Both completion routes require all canonical blocking checks to pass before credential or administrator creation, even for an exact current generation."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "Resolve provider readiness blockers and refresh setup before completing. Rejected requests preserve active setup authority and create no credentials."

@@ -104,6 +104,7 @@ public static class ApiHostApplicationExtensions
         pipeline.UseWhen(context => !AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path),
             branch => branch.UseRateLimiter());
         pipeline.UseAuthorization();
+        pipeline.UseMiddleware<TenantLifecycleAccessMiddleware>();
         pipeline.UseMiddleware<IdempotencyMiddleware>();
         pipeline.UseMiddleware<SupportAccessAuditMiddleware>();
     }

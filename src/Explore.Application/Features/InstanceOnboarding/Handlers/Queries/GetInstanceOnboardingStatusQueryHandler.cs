@@ -57,11 +57,8 @@ public class GetInstanceOnboardingStatusQueryHandler : IQueryHandler<GetInstance
             IsCompleted = isCompleted,
             State = state,
             Mode = bootstrap?.Mode.ToString() ?? InstanceBootstrapMode.Interactive.ToString(),
-            Provider = state == "ConfiguredAdministratorPending"
-                ? bootstrap!.ProviderKind?.ToString()
-                : state == "InteractivePending"
-                    ? (await _providers.GetActivePrimaryProviderAsync(cancellationToken)).ToString()
-                    : null,
+            Provider = bootstrap?.ProviderKind?.ToString()
+                ?? (await _providers.GetActivePrimaryProviderAsync(cancellationToken)).ToString(),
             PendingOperationId = state == "InteractivePending"
                 && request.SetupPrincipal?.Identities.Any(identity => identity.IsAuthenticated
                     && identity.AuthenticationType == ApiAuthenticationSchemeNames.SetupSecret) == true

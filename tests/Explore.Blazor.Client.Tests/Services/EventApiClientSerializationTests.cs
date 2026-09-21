@@ -19,6 +19,20 @@ namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class EventApiClientSerializationTests
 {
+    [Test]
+    public async Task OperatorMetadataHal_RoundTripsExtensionDataThroughAotContext()
+    {
+        const string json = """
+            {"countryState":"Available","operatorKinds":[{"code":"ASSOCIATION","labelId":"operator-identity-kind-ASSOCIATION-label"}],"fields":[{"name":"publicName","labelId":"operator-identity-publicName-label","helpId":"operator-identity-publicName-help","requiredForDisclosure":true}],"_links":{"self":{"href":"/api/operator-identity-metadata"}},"futureCapability":{"enabled":true}}
+            """;
+        var options = new JsonSerializerOptions { TypeInfoResolver = AppJsonSerializerContext.Default };
+        var resource = JsonSerializer.Deserialize<HalResourceOfOperatorIdentityFormOptionsDto>(json, options)!;
+        await Assert.That(resource.Fields!.Single().HelpId).IsEqualTo("operator-identity-publicName-help");
+        await Assert.That(resource._links!["self"].Href).IsEqualTo("/api/operator-identity-metadata");
+        using var roundTrip = JsonDocument.Parse(JsonSerializer.Serialize(resource, options));
+        await Assert.That(roundTrip.RootElement.GetProperty("futureCapability").GetProperty("enabled").GetBoolean()).IsTrue();
+    }
+
     private static readonly Type[] AuthorityFreeRequestBodies =
     [
         typeof(CreateCategoryDto),

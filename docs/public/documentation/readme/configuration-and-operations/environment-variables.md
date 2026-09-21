@@ -13,6 +13,14 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 
 ---
 
+## Guided Setup Adds No Environment Inputs
+
+Legal identity seeds are optional during installation. Configure disclosure and
+paid-event identity later through authenticated administration; canonical
+kind/country choices come from the server rather than another environment list.
+The [getting-started groups](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+do not change provider responsibility, secret authority or SQLite processing bounds.
+
 ## Removed edition inputs
 
 There is one supported build, with the same dependency versions for contributors,

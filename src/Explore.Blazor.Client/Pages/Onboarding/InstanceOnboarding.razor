@@ -15,7 +15,6 @@
 @attribute [AllowAnonymous]
 @rendermode InteractiveServer
 @inject IInstanceOnboardingService InstanceOnboardingService
-@inject IInstanceOperatorIdentityAdminService OperatorIdentityService
 @inject IUserService UserService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -92,23 +91,23 @@
                 </MudText>
                 <div role="status">
                     <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
-                        @T("success.message", "The platform is live. Continue with the destination that matches this deployment mode.")
+                        @T("success.administration_ready", "Administration is ready. Setup does not publish a directory.")
                     </MudAlert>
                 </div>
                 <div class="instance-onboarding__actions">
                     @if (_localCompleted)
                     {
                         <MudAlert Severity="Severity.Info">Sign in with the temporary password, replace it privately, then sign in again. Setup has not created a signed-in session.</MudAlert>
-                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/login?provider=local">Sign in to replace password</MudButton>
+                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/login?provider=local&amp;returnUrl=%2Fsettings%2Finstance%3Fsection%3Dgetting-started">Sign in to continue</MudButton>
                     }
                     else if (IsSingleTenantMode)
                     {
                         <MudButton Elevation="0"
                                    Color="Color.Primary"
                                    Variant="Variant.Filled"
-                                   Href="/events"
-                                   StartIcon="@Icons.Material.Filled.Event">
-                            @T("success.single_primary", "Browse events")
+                                   Href="/settings/instance?section=getting-started"
+                                   StartIcon="@Icons.Material.Filled.Settings">
+                            @T("success.getting_started", "Open administration")
                         </MudButton>
                         <MudButton Elevation="0"
                                    Color="Color.Secondary"
@@ -123,9 +122,9 @@
                         <MudButton Elevation="0"
                                    Color="Color.Primary"
                                    Variant="Variant.Filled"
-                                   Href="@ControlPlaneRoutes.Overview"
+                                   Href="/settings/instance?section=getting-started"
                                    StartIcon="@Icons.Material.Filled.Dashboard">
-                            @T("success.multi_primary", "Open control plane")
+                            @T("success.getting_started", "Open administration")
                         </MudButton>
                         @if (CanManageTenants)
                         {
@@ -168,6 +167,8 @@
                                       Placeholder="@T("profile.site_name_placeholder", "Community Events")" />
                         <ValidationMessage For="@(() => _siteProfile.SiteName)" />
 
+                        <details class="instance-onboarding__advanced" data-testid="advanced-setup">
+                            <summary>@T("profile.advanced", "Advanced site details (optional)")</summary>
                         <MudTextField T="string"
                                       Label="@T("profile.support_email_label", "Support email (optional)")"
                                       Variant="Variant.Outlined"
@@ -192,35 +193,16 @@
                                       @bind-Value="_siteProfile.Purpose"
                                       Placeholder="@T("profile.purpose_placeholder", "A short note for future administrators about this site.")" />
                         <ValidationMessage For="@(() => _siteProfile.Purpose)" />
+                        </details>
                     </div>
+                    @if (_journey?._links?.ContainsKey("save-profile") == true)
+                    {
+                        <MudButton ButtonType="ButtonType.Button" data-testid="save-onboarding-profile"
+                                   Disabled="@(_isSavingProfile || _isRefreshing)" OnClick="SaveProfileAsync">
+                            Save profile and refresh readiness
+                        </MudButton>
+                    }
                 </section>
-
-                <section id="instance-operator-identity" class="instance-onboarding__section" aria-labelledby="instance-operator-identity-heading">
-                    <InstanceOperatorIdentityEditor @ref="_operatorIdentityEditor"
-                                                    Model="_operatorIdentity"
-                                                    IsSingleTenantMode="IsSingleTenantMode"
-                                                    ShowCopyToDirectoryIdentity="IsSingleTenantMode"
-                                                    AllowIncompleteDraft="true"
-                                                    Disabled="_submitState.IsSubmitting"
-                                                    OnCopyToDirectoryIdentity="HandleCopyToDirectoryIdentity" />
-                </section>
-
-                @if (IsSingleTenantMode)
-                {
-                    <fieldset class="instance-onboarding__section">
-                        <legend>Directory operator identity</legend>
-                        <MudText Typo="Typo.body2">These public accountability details are separate from the administrator's optional credential email.</MudText>
-                        <AppTextField T="string" Id="operator-public-name" Label="Public name" Required="true" @bind-Value="_directoryOperator.PublicName" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-legal-name" Label="Legal name" Required="true" @bind-Value="_directoryOperator.LegalName" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-kind-code" Label="Operator kind code" Required="true" @bind-Value="_directoryOperator.OperatorKindCode" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-jurisdiction-country-code" Label="Jurisdiction country code" Required="true" MaxLength="2" @bind-Value="_directoryOperator.JurisdictionCountryCode" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-registration-identifier" Label="Registration identifier (optional)" @bind-Value="_directoryOperator.RegistrationIdentifier" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-public-contact-email" Label="Public contact email" InputType="InputType.Email" Required="true" @bind-Value="_directoryOperator.PublicContactEmail" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-legal-notice-url" Label="Legal notice URL" InputType="InputType.Url" Required="true" @bind-Value="_directoryOperator.LegalNoticeUrl" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-terms-url" Label="Terms URL (optional)" InputType="InputType.Url" @bind-Value="_directoryOperator.TermsUrl" Disabled="_submitState.IsSubmitting" />
-                        <AppTextField T="string" Id="operator-privacy-url" Label="Privacy URL" InputType="InputType.Url" Required="true" @bind-Value="_directoryOperator.PrivacyUrl" Disabled="_submitState.IsSubmitting" />
-                    </fieldset>
-                }
 
                 @if (IsLocalSetup)
                 {
@@ -235,6 +217,19 @@
                         <MudButton ButtonType="ButtonType.Button" OnClick="CancelLocalSetup">Cancel Local setup</MudButton>
                     </fieldset>
                 }
+
+                <section class="instance-onboarding__section" aria-labelledby="provider-readiness-heading">
+                    <h2 id="provider-readiness-heading">@T("providers.heading", "Provider readiness")</h2>
+                    @foreach (var provider in new[] { (Code: "authentication", Label: "Authentication", Readiness: _journey?.Authentication), (Code: "authorization", Label: "Authorization", Readiness: _journey?.Authorization) })
+                    {
+                        <div data-provider="@provider.Code" data-state="@(provider.Readiness?.State ?? "Unavailable")" data-restart-required="@(provider.Readiness?.RestartRequired == true ? "true" : "false")">
+                            <h3>@provider.Label</h3>
+                            <p>@provider.Readiness?.Provider · @(provider.Readiness?.State ?? "Unavailable")</p>
+                            <p data-reason>@provider.Readiness?.ReasonCode</p>
+                            <p>@provider.Readiness?.RemediationAuthority@(provider.Readiness?.RestartRequired == true ? " · Restart required" : "")</p>
+                        </div>
+                    }
+                </section>
 
                 <section id="launch-readiness" class="instance-onboarding__section" aria-labelledby="launch-readiness-heading">
                     <MudText Typo="Typo.h5" HtmlTag="h2" id="launch-readiness-heading">
@@ -358,7 +353,6 @@
     private readonly SelfHostOnboardingProfileDto _siteProfile = new();
     private readonly TenantDirectoryOperatorIdentityInputDto _directoryOperator = new();
     private InstanceOperatorIdentityAdminModel _operatorIdentity = new();
-    private InstanceOperatorIdentityEditor? _operatorIdentityEditor;
     private string _localUsername = string.Empty;
     private string _localPassword = string.Empty;
     private string? _localEmail;
@@ -372,6 +366,8 @@
     private Task? _refreshTask;
     private string? _deploymentMode;
     private OnboardingPreflightDto? _preflight;
+    private HalResourceOfInstanceOnboardingJourneyDto? _journey;
+    private bool _isSavingProfile;
     private InstanceOnboardingStatusDto? _status;
     private bool? _authProviderConfigured;
     private bool? _authorizationProviderConfigured;
@@ -381,6 +377,7 @@
     private bool _isCompleted;
     private bool _acknowledgePublicExposure;
     private bool _setupSecretSynced;
+    private bool _setupAuthorityForgetAttempted;
     private bool _disposed;
     private FormSubmitState _submitState = new();
     private string? _loadError;
@@ -478,8 +475,8 @@
         : "/onboarding/authz-provider";
     private string? CurrentError => _completionError ?? _setupSecretError ?? _loadError;
     private string CompleteButtonLabel => _submitState.IsSubmitting
-        ? T("actions.launching", "Launching...")
-        : T("actions.launch", "Launch instance");
+        ? T("actions.finishing", "Finishing setup...")
+        : T("actions.finish", "Finish setup");
     private bool HasSeriousWarning => _preflight?.WarningChecks?.Any(check =>
         string.Equals(check.Severity, "Critical", StringComparison.OrdinalIgnoreCase)
         || string.Equals(check.Severity, "High", StringComparison.OrdinalIgnoreCase)) == true;
@@ -491,7 +488,6 @@
         || _authProviderConfigured != true
         || _authorizationProviderConfigured != true
         || _preflight?.IsReadyToLaunch != true
-        || !_operatorIdentity.IsReady
         || !AllAcknowledgementsChecked
         || _status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true;
 
@@ -636,6 +632,22 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_localCompleted && !_setupAuthorityForgetAttempted && !_disposed)
+        {
+            _setupAuthorityForgetAttempted = true;
+            try
+            {
+                var module = await GetBffModuleAsync();
+                var result = await module.InvokeAsync<BffMutationResult>("deleteSetupSecret");
+                if (result?.Ok != true)
+                    Logger.LogWarning("Completed Local setup authority cleanup was not confirmed.");
+            }
+            catch (JSException)
+            {
+                Logger.LogWarning("Completed Local setup authority cleanup was interrupted.");
+            }
+            return;
+        }
         if (!firstRender || IsLocalSetup || _setupSecretSynced || _disposed || _status?.HasHalLink("complete") != true)
         {
             return;
@@ -665,6 +677,7 @@
             return;
         }
 
+        var lifetimeToken = _lifetimeCancellation.Token;
         if (_hasLoaded && IsLocalSetup)
         {
             _localPassword = string.Empty;
@@ -674,70 +687,27 @@
         _isRefreshing = true;
         _loadError = null;
         _completionError = null;
+        _setupAuthorityForgetAttempted = false;
 
         try
         {
-            var status = await InstanceOnboardingService.GetStatusAsync();
-            if (_disposed)
-            {
-                return;
-            }
+            var journey = await InstanceOnboardingService.GetJourneyAsync(lifetimeToken);
+            if (lifetimeToken.IsCancellationRequested) return;
 
-            var systemStatusTask = InstanceOnboardingService.GetSystemOnboardingStatusAsync();
-            var brandingTask = InstanceOnboardingService.GetBrandingSettingsAsync();
-            var authenticationTask = InstanceOnboardingService.GetAuthProviderConfiguredStateAsync();
-            var authorizationTask = InstanceOnboardingService.GetAuthorizationProviderConfiguredStateAsync();
-            var preflightTask = InstanceOnboardingService.GetOnboardingPreflightAsync();
-            var operatorIdentityTask = OperatorIdentityService.GetAsync(_lifetimeCancellation.Token);
-
-            await Task.WhenAll(systemStatusTask, brandingTask, authenticationTask, authorizationTask, preflightTask, operatorIdentityTask);
-            if (_disposed)
-            {
-                return;
-            }
-
-            var systemStatus = await systemStatusTask;
-            var branding = await brandingTask;
-            _operatorIdentity = await operatorIdentityTask ?? new();
-
-            bool wasLocal = IsLocalSetup;
-            _status = status;
-            _isCompleted = status?.IsCompleted == true;
-            if (wasLocal && !IsLocalSetup)
-            {
-                _localPassword = string.Empty;
-                _localRequestGeneration++;
-            }
-            if (IsLocalSetup)
-                _localOperationId = status?.PendingOperationId ?? _localOperationId;
-            _deploymentMode = NormalizeDeploymentMode(systemStatus?.DeploymentMode);
-            _authProviderConfigured = await authenticationTask;
-            _authorizationProviderConfigured = await authorizationTask;
-            _preflight = await preflightTask;
-            _acknowledgePublicExposure = false;
-
-            if (!string.IsNullOrWhiteSpace(branding?.DefaultBrandDisplayName))
-            {
-                _siteProfile.SiteName = branding.DefaultBrandDisplayName;
-            }
-            _siteProfile.SupportEmail = branding?.SupportEmail;
-
-            if (status is null
-                || systemStatus is null
-                || _deploymentMode is null
-                || _preflight is null
-                || !_authProviderConfigured.HasValue
-                || !_authorizationProviderConfigured.HasValue)
-            {
-                await SetLoadErrorAsync(T("errors.status_unavailable", "Some authoritative setup state is unavailable. Refresh before launching."));
-            }
-            else
-            {
-                await Announcer.AnnouncePoliteAsync(T("announcements.loaded", "Setup status loaded."));
-            }
+            _journey = journey?.State == "Available" ? journey : null;
+            var status = await ReadJourneyStatusAsync();
+            if (lifetimeToken.IsCancellationRequested) return;
+            ApplyJourneyStatus(status);
+            ApplyJourneyProfile();
+            await AnnounceJourneyStatusAsync(status);
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+        {
+            // Disposal cancelled this refresh; do not announce an error or update the disposed component.
         }
         catch (Exception ex)
         {
+            if (lifetimeToken.IsCancellationRequested) return;
             Logger.LogWarning(ex, "Could not load authoritative instance onboarding state.");
             _deploymentMode = null;
             _preflight = null;
@@ -748,12 +718,132 @@
         }
         finally
         {
-            if (!_disposed)
+            if (!lifetimeToken.IsCancellationRequested)
             {
                 _hasLoaded = true;
                 _isLoading = false;
                 _isRefreshing = false;
             }
+        }
+    }
+
+    private async Task<InstanceOnboardingStatusDto?> ReadJourneyStatusAsync()
+    {
+        if (_journey is not null) return _journey.Bootstrap;
+        var terminal = await InstanceOnboardingService.GetStatusAsync();
+        return terminal is { IsCompleted: true, State: "Completed", Provider: "Local" } ? terminal : null;
+    }
+
+    private async Task AnnounceJourneyStatusAsync(InstanceOnboardingStatusDto? status)
+    {
+        if (_localCompleted)
+        {
+            _localPassword = string.Empty;
+            _localRequestGeneration++;
+            _setupSecretSynced = false;
+            _setupSecretError = null;
+            _syncWarning = null;
+            await Announcer.AnnouncePoliteAsync(T("local.completed", "Setup is complete. Sign in and replace your temporary password."));
+        }
+        else if (status is null || _journey is null || _deploymentMode is null || _preflight is null
+            || !_authProviderConfigured.HasValue || !_authorizationProviderConfigured.HasValue)
+        {
+            await SetLoadErrorAsync(T("errors.status_unavailable", "Some authoritative setup state is unavailable. Refresh before launching."));
+        }
+        else
+        {
+            await Announcer.AnnouncePoliteAsync(T("announcements.loaded", "Setup status loaded."));
+        }
+    }
+
+    private void ApplyJourneyStatus(InstanceOnboardingStatusDto? status)
+    {
+        if (status is not null && _journey is not null)
+        {
+            status = status with
+            {
+                AdditionalProperties = new Dictionary<string, object>(status.AdditionalProperties)
+                {
+                    ["_links"] = System.Text.Json.JsonSerializer.SerializeToElement(_journey._links)
+                }
+            };
+        }
+        _operatorIdentity = ProjectIdentity(_journey);
+        bool wasLocal = IsLocalSetup;
+        _status = status;
+        _isCompleted = status?.IsCompleted == true;
+        _localCompleted = status is { IsCompleted: true, Provider: "Local", IsAuthenticated: not true };
+        if (wasLocal && !IsLocalSetup)
+        {
+            _localPassword = string.Empty;
+            _localRequestGeneration++;
+        }
+        if (IsLocalSetup)
+            _localOperationId = status?.PendingOperationId ?? _localOperationId;
+        _deploymentMode = NormalizeDeploymentMode(status?.SelectedDeploymentMode);
+        _authProviderConfigured = _journey is null ? null : _journey.Authentication?.State == "Ready";
+        _authorizationProviderConfigured = _journey is null ? null : _journey.Authorization?.State == "Ready";
+        _preflight = _journey?.Preflight;
+        _acknowledgePublicExposure = false;
+    }
+
+    private static InstanceOperatorIdentityAdminModel ProjectIdentity(HalResourceOfInstanceOnboardingJourneyDto? journey)
+    {
+        if (journey?.OperatorIdentity is not { } identity)
+            return InstanceOperatorIdentityAdminModel.Failed();
+        return new()
+        {
+            CanEdit = journey._links?.ContainsKey("update-operator-identity") == true,
+            Revision = identity.Revision, OperatorId = identity.OperatorId,
+            PublicName = identity.PublicName, LegalName = identity.LegalName,
+            OperatorKindCode = identity.OperatorKindCode, JurisdictionCountryCode = identity.JurisdictionCountryCode,
+            RegistrationIdentifier = identity.RegistrationIdentifier, PublicContactEmail = identity.PublicContactEmail,
+            WebsiteUrl = identity.WebsiteUrl, LegalNoticeUrl = identity.LegalNoticeUrl,
+            TermsUrl = identity.TermsUrl, PrivacyUrl = identity.PrivacyUrl,
+            IsOfficialInstance = identity.IsOfficialInstance == true, OfficialOrigin = identity.OfficialOrigin,
+            PaidCommerceIsReady = identity.PaidCommerce?.IsReady == true,
+            PublicDisclosure = identity.PublicDisclosure is { } disclosure ? new()
+            {
+                IsReady = disclosure.IsReady, FailureCode = disclosure.FailureCode, ReasonCodes = disclosure.ReasonCodes
+            } : null,
+            FailureCode = identity.PaidCommerce?.FailureCode, ReasonCodes = identity.PaidCommerce?.ReasonCodes ?? []
+        };
+    }
+
+    private void ApplyJourneyProfile()
+    {
+        if (_journey?.Profile is not { } profile) return;
+        _siteProfile.SiteName = profile.SiteName;
+        _siteProfile.SupportEmail = profile.SupportEmail;
+        _siteProfile.Locale = profile.Locale;
+        if (Uri.TryCreate(profile.CanonicalUrl, UriKind.Absolute, out _))
+            _siteProfile.CanonicalUrl = profile.CanonicalUrl;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (_disposed || _isSavingProfile || _journey?._links?.ContainsKey("save-profile") != true
+            || !_profileEditContext.Validate()) return;
+        var lifetimeToken = _lifetimeCancellation.Token;
+        _isSavingProfile = true;
+        try
+        {
+            var response = await InstanceOnboardingService.SaveProfileAsync(CreateCompletionProfile(), lifetimeToken);
+            if (lifetimeToken.IsCancellationRequested) return;
+            if (!response.Success)
+            {
+                await SetLoadErrorAsync("The site profile could not be saved. Readiness has not been refreshed.");
+                return;
+            }
+            await RefreshAsync();
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+        {
+            // Disposal cancelled this save; the lifetime guard also prevents resetting disposed UI state.
+        }
+        finally
+        {
+            if (!lifetimeToken.IsCancellationRequested) _isSavingProfile = false;
         }
     }
 
@@ -796,12 +886,6 @@
             return;
         }
 
-        if (!_operatorIdentity.IsReady)
-        {
-            await SetCompletionErrorAsync(T("errors.operator_identity_incomplete", "Complete all required instance operator identity fields before launching."));
-            return;
-        }
-
         if (IsLocalSetup)
         {
             await CompleteLocalSetupAsync();
@@ -821,11 +905,11 @@
 
             var completion = new CompleteInstanceOnboardingRequest
             {
+                ExpectedJourneyGeneration = _journey?.Generation,
                 DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
                 AdministrationAccessMode = "Embedded",
                 SiteProfile = CreateCompletionProfile(),
-                InstanceName = _siteProfile.SiteName?.Trim(),
-                DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null
+                InstanceName = _siteProfile.SiteName?.Trim()
             };
 
             var preRefreshed = await InstanceOnboardingService.RefreshAuthSessionAsync();
@@ -940,9 +1024,9 @@
                 Email = NormalizeOptional(_localEmail), FirstName = NormalizeOptional(_localFirstName), LastName = NormalizeOptional(_localLastName),
                 Settings = new CompleteInstanceOnboardingRequest
                 {
+                    ExpectedJourneyGeneration = _journey?.Generation,
                     DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
                     SiteProfile = CreateCompletionProfile(),
-                    DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null,
                     AdministrationAccessMode = "Embedded", InstanceName = _siteProfile.SiteName?.Trim()
                 }
             }, _lifetimeCancellation.Token);

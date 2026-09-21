@@ -26,9 +26,6 @@ public sealed class InstanceOperatorIdentityOptions
 
 public sealed record InstanceOperatorIdentity : IInstanceOperatorIdentity
 {
-    private const string TenantReasonPrefix = "tenant_directory_operator_identity_";
-    private const string InstanceReasonPrefix = "instance_operator_identity_";
-
     private InstanceOperatorIdentity(
         Guid operatorId,
         string publicName,
@@ -41,7 +38,7 @@ public sealed record InstanceOperatorIdentity : IInstanceOperatorIdentity
         string publicContactEmail,
         string websiteUrl,
         string legalNoticeUrl,
-        string termsUrl,
+        string? termsUrl,
         string privacyUrl)
     {
         OperatorId = operatorId;
@@ -70,12 +67,12 @@ public sealed record InstanceOperatorIdentity : IInstanceOperatorIdentity
     public string PublicContactEmail { get; }
     public string WebsiteUrl { get; }
     public string LegalNoticeUrl { get; }
-    public string TermsUrl { get; }
+    public string? TermsUrl { get; }
     public string PrivacyUrl { get; }
 
     public static InstanceOperatorIdentity Create(InstanceOperatorIdentityOptions options)
     {
-        (InstanceOperatorIdentity? identity, ImmutableArray<string> failures) = TryCreate(options);
+        (InstanceOperatorIdentity? identity, ImmutableArray<string> failures) = TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
         if (identity is null)
         {
             throw new OptionsValidationException(
@@ -89,105 +86,49 @@ public sealed record InstanceOperatorIdentity : IInstanceOperatorIdentity
 
     internal static (
         InstanceOperatorIdentity? Identity,
-        ImmutableArray<string> Failures) TryCreate(InstanceOperatorIdentityOptions options)
+        ImmutableArray<string> Failures) TryCreate(
+            InstanceOperatorIdentityOptions options,
+            InstanceOperatorIdentityCapability capability)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var failures = ImmutableArray.CreateBuilder<string>();
-        if (options.OperatorId == Guid.Empty || options.OperatorId.Version != 7)
+        InstanceOperatorIdentityReadiness readiness = InstanceOperatorIdentityReadiness.Evaluate(
+            new InstanceOperatorIdentitySettings
+            {
+                OperatorId = options.OperatorId,
+                PublicName = options.PublicName,
+                LegalName = options.LegalName,
+                IsOfficialInstance = options.IsOfficialInstance,
+                OfficialOrigin = options.OfficialOrigin,
+                OperatorKindCode = options.OperatorKindCode,
+                JurisdictionCountryCode = options.JurisdictionCountryCode,
+                RegistrationIdentifier = options.RegistrationIdentifier,
+                PublicContactEmail = options.PublicContactEmail,
+                WebsiteUrl = options.WebsiteUrl,
+                LegalNoticeUrl = options.LegalNoticeUrl,
+                TermsUrl = options.TermsUrl,
+                PrivacyUrl = options.PrivacyUrl
+            }, capability);
+        if (readiness.Normalized is not { } identity)
         {
-            failures.Add("instance_operator_identity_operator_id_invalid");
+            return (null, readiness.ReasonCodes);
         }
 
-        TenantDirectoryOperatorIdentityReadiness readiness =
-            TenantDirectoryOperatorIdentity.Evaluate(
-                new TenantDirectoryOperatorIdentitySettings
-                {
-                    PublicName = options.PublicName,
-                    LegalName = options.LegalName,
-                    OperatorKindCode = options.OperatorKindCode,
-                    JurisdictionCountryCode = options.JurisdictionCountryCode,
-                    RegistrationIdentifier = options.RegistrationIdentifier,
-                    PublicContactEmail = options.PublicContactEmail,
-                    LegalNoticeUrl = options.LegalNoticeUrl,
-                    TermsUrl = options.TermsUrl,
-                    PrivacyUrl = options.PrivacyUrl
-                },
-                TenantDirectoryOperatorIdentityCapability.PaidCommerce);
-        failures.AddRange(readiness.ReasonCodes.Select(MapReasonCode));
-
-        string? officialOrigin = NormalizeOfficialOrigin(options.OfficialOrigin);
-        if (officialOrigin is null)
-        {
-            failures.Add(
-                string.IsNullOrWhiteSpace(options.OfficialOrigin)
-                    ? "instance_operator_identity_official_origin_missing"
-                    : "instance_operator_identity_official_origin_invalid");
-        }
-
-        string? websiteUrl = NormalizeHttpsUrl(options.WebsiteUrl);
-        if (websiteUrl is null)
-        {
-            failures.Add(
-                string.IsNullOrWhiteSpace(options.WebsiteUrl)
-                    ? "instance_operator_identity_website_url_missing"
-                    : "instance_operator_identity_website_url_invalid");
-        }
-
-        if (failures.Count > 0 || readiness.Identity is null)
-        {
-            return (null, failures.ToImmutable());
-        }
-
-        TenantDirectoryOperatorIdentity legalIdentity = readiness.Identity;
         return (
             new InstanceOperatorIdentity(
-                options.OperatorId,
-                legalIdentity.PublicName,
-                legalIdentity.LegalName,
-                options.IsOfficialInstance,
-                officialOrigin!,
-                legalIdentity.OperatorKindCode,
-                legalIdentity.JurisdictionCountryCode,
-                legalIdentity.RegistrationIdentifier,
-                legalIdentity.PublicContactEmail,
-                websiteUrl!,
-                legalIdentity.LegalNoticeUrl,
-                legalIdentity.TermsUrl!,
-                legalIdentity.PrivacyUrl),
+                identity.OperatorId!.Value,
+                identity.PublicName!,
+                identity.LegalName!,
+                identity.IsOfficialInstance,
+                identity.OfficialOrigin!,
+                identity.OperatorKindCode!,
+                identity.JurisdictionCountryCode!,
+                identity.RegistrationIdentifier,
+                identity.PublicContactEmail!,
+                identity.WebsiteUrl!,
+                identity.LegalNoticeUrl!,
+                identity.TermsUrl,
+                identity.PrivacyUrl!),
             []);
-    }
-
-    private static string MapReasonCode(string reasonCode) =>
-        reasonCode.StartsWith(TenantReasonPrefix, StringComparison.Ordinal)
-            ? string.Concat(InstanceReasonPrefix, reasonCode.AsSpan(TenantReasonPrefix.Length))
-            : reasonCode;
-
-    private static string? NormalizeOfficialOrigin(string? value)
-    {
-        string? normalized = NormalizeHttpsUrl(value);
-        if (normalized is null
-            || !Uri.TryCreate(normalized, UriKind.Absolute, out Uri? uri)
-            || uri.AbsolutePath != "/"
-            || !string.IsNullOrEmpty(uri.Query))
-        {
-            return null;
-        }
-
-        return uri.GetLeftPart(UriPartial.Authority);
-    }
-
-    private static string? NormalizeHttpsUrl(string? value)
-    {
-        try
-        {
-            return string.IsNullOrWhiteSpace(value)
-                ? null
-                : ExternalActionUrl.Create(value).Value;
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
     }
 }
 
@@ -198,7 +139,7 @@ public sealed class InstanceOperatorIdentityOptionsValidator :
     {
         ArgumentNullException.ThrowIfNull(options);
         _ = name;
-        (_, ImmutableArray<string> failures) = InstanceOperatorIdentity.TryCreate(options);
+        (_, ImmutableArray<string> failures) = InstanceOperatorIdentity.TryCreate(options, InstanceOperatorIdentityCapability.PaidCommerce);
         return failures.IsEmpty
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);

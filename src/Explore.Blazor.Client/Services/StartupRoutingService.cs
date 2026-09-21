@@ -50,9 +50,7 @@ public sealed class StartupRoutingService : IStartupRoutingService
             return StartupRouteDecision.Unavailable;
         }
 
-        if (instanceStatus.IsAuthenticated &&
-            instanceStatus.IsCurrentUserInstanceAdmin &&
-            (isMultiTenant || instanceStatus.RequiresIdentityRepair))
+        if (instanceStatus.IsAuthenticated && instanceStatus.IsCurrentUserInstanceAdmin)
         {
             return StartupRouteDecision.InstanceAdmin;
         }

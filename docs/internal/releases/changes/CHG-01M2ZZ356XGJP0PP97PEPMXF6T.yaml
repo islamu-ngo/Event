@@ -1,0 +1,28 @@
+Change-Id: CHG-01M2ZZ356XGJP0PP97PEPMXF6T
+Title: "publish canonical operator form choices"
+Type: feat
+Scope: onboarding
+Summary: "Expose canonical operator kinds, runtime country choices and shared identity field constraints without saved identity values."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: "The exact tenant-independent metadata route requires normal authentication and returns private/no-store data. Metadata grants no edit authority and does not extend setup-secret access."
+  Migration:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: "Adds GetOperatorIdentityFormOptions and generated value-free HAL schemas. Country unavailability and unsupported registration authorities are explicit."
+  Operator:
+    Reference: docs/public/api-reference/readme/hal-rest.md
+    Disposition: documented
+    Detail: "Forms can reuse canonical choices, field limits and label/help keys while retaining identity-document save authority. Registration identifiers remain optional."

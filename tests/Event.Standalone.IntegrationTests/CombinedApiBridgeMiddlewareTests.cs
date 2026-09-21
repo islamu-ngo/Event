@@ -19,6 +19,7 @@ namespace Event.Standalone.IntegrationTests;
 
 public sealed class CombinedApiBridgeMiddlewareTests
 {
+    private const string SeenAuthorizationHeader = "X-Seen-Authorization";
     [Test]
     public async Task ValidCookieWithoutTokenSanitizesAndFailsClosed()
     {
@@ -37,6 +38,26 @@ public sealed class CombinedApiBridgeMiddlewareTests
     }
 
     [Test]
+    [Arguments("/api/instanceonboarding/status")]
+    [Arguments("/api/instanceonboarding/journey")]
+    public async Task AuthenticatedOnboardingReadPreservesOnlyServerOwnedBearer(string path)
+    {
+        string token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        await using var app = await CreateApplicationAsync(cookieToken: token);
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add("X-Test-Cookie", "valid");
+        request.Headers.Add("Authorization", "Bearer " + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+
+        using var response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single()).IsEqualTo($"Bearer {token}");
+        // Old setup cookies must not shadow the ordinary identity after setup locks.
+        await Assert.That(response.Headers.Contains("X-Seen-Setup")).IsFalse();
+    }
+
+    [Test]
     public async Task NoCookieLeavesExternalBearerRequestUnchanged()
     {
         await using var app = await CreateApplicationAsync(cookieToken: "server-token");
@@ -48,7 +69,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         using var response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(response.Headers.GetValues("X-Seen-Authorization").Single())
+        await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single())
             .IsEqualTo("Bearer external-token");
         await Assert.That(response.Headers.GetValues("X-Seen-Api-Key").Single())
             .IsEqualTo("external-key");
@@ -73,7 +94,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         using var response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(response.Headers.GetValues("X-Seen-Authorization").Single())
+        await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single())
             .IsEqualTo("Bearer server-token");
         await Assert.That(response.Headers.GetValues("X-Seen-Tenant").Single())
             .IsEqualTo("trusted-tenant");
@@ -125,7 +146,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         using var response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(response.Headers.GetValues("X-Seen-Authorization").Single())
+        await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single())
             .IsEqualTo("Bearer external-token");
         await Assert.That(response.Headers.GetValues("X-Seen-Api-Key").Single())
             .IsEqualTo("external-key");
@@ -207,7 +228,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         using var response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(response.Headers.GetValues("X-Seen-Authorization").Single())
+        await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single())
             .IsEqualTo("Bearer external-token");
     }
 
@@ -300,7 +321,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         app.Run(context =>
         {
             context.Response.Headers["X-Next-Reached"] = "true";
-            CopyHeader(context, "Authorization", "X-Seen-Authorization");
+            CopyHeader(context, "Authorization", SeenAuthorizationHeader);
             CopyHeader(context, EventBffHeaderNames.ApiKey, "X-Seen-Api-Key");
             CopyHeader(context, "X-Control-Plane-Key", "X-Seen-Control-Plane-Key");
             CopyHeader(context, EventBffHeaderNames.TenantSlug, "X-Seen-Tenant");

@@ -6,10 +6,18 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Options;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
+using Event.Web.BffHosting.Security;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Components.Server.Circuits;
@@ -39,7 +47,11 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         string secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         Guid userId = Guid.CreateVersion7();
         var captures = new System.Collections.Concurrent.ConcurrentQueue<(bool Bearer, bool Setup, bool Cookie)>();
-        var circuitResult = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var circuitResult = new TaskCompletionSource<CircuitIdentityObservation>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var syncTokens = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        ClaimsPrincipal? callbackPrincipal = null;
+        string? validatedIdToken = null;
+        string? providerAccessToken = null;
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         await using var upstream = builder.Build();
@@ -71,7 +83,11 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         { primaryProviderId = 1, keycloakAuthority = keycloak.Authority, keycloakClientId = BffKeycloakFixture.TestClientId }));
         upstream.MapGet("/api/instance/settings/branding", () => Results.Json(new { defaultBrandDisplayName = "Private instance" }));
         upstream.MapGet("/api/user/admin-authority", () => Results.Json(new { isInstanceAdmin = false }));
-        upstream.MapPost("/api/user/sync", () => Results.Json(new { success = true, id = userId }));
+        upstream.MapPost("/api/user/sync", (HttpContext context) =>
+        {
+            syncTokens.Enqueue(context.Request.Headers.Authorization.ToString());
+            return Results.Json(new { success = true, id = userId });
+        });
         upstream.MapGet("/api/user", () => Results.Json(new { id = userId }));
         await upstream.StartAsync(ct);
         string address = upstream.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
@@ -89,7 +105,10 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
                 services.RemoveAll<IBffOnboardingStatusProvider>();
                 services.AddSingleton<IBffOnboardingStatusProvider, BffOnboardingStatusProvider>();
                 services.AddScoped<CircuitHandler>(provider => new JourneyCircuitProbe(
-                    provider.GetRequiredService<IInstanceOnboardingService>(), circuitResult));
+                    provider.GetRequiredService<IInstanceOnboardingService>(),
+                    provider.GetRequiredService<AuthenticationStateProvider>(),
+                    provider.GetRequiredService<ICircuitAccessTokenService>(),
+                    provider.GetRequiredService<IUserService>(), circuitResult));
             });
         });
         using var browser = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -115,6 +134,16 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         }
         using var challenge = await SendAsync(new(HttpMethod.Get, "/auth/challenge?provider=keycloak&returnUrl=/onboarding/instance"));
         await Assert.That(challenge.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+        var oidc = factory.Services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get("Keycloak");
+        var onValidated = oidc.Events.OnTokenValidated;
+        oidc.Events.OnTokenValidated = async context =>
+        {
+            providerAccessToken = context.TokenEndpointResponse?.AccessToken;
+            await onValidated(context);
+            callbackPrincipal = context.Principal is null ? null : new ClaimsPrincipal(
+                context.Principal.Identities.Select(identity => new ClaimsIdentity(identity)));
+            validatedIdToken = context.TokenEndpointResponse?.IdToken ?? context.ProtocolMessage.IdToken;
+        };
         using var idpHandler = new HttpClientHandler { AllowAutoRedirect = false, CookieContainer = new CookieContainer() };
         using var idp = new HttpClient(idpHandler);
         using var loginPage = await idp.GetAsync(challenge.Headers.Location, ct);
@@ -137,6 +166,13 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
             using var body = JsonDocument.Parse(await status.Content.ReadAsStringAsync(ct));
             await Assert.That(body.RootElement.GetProperty("isAuthenticated").GetBoolean()).IsTrue();
         }
+        var cookieOptions = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get("Cookies");
+        var cookieContext = new DefaultHttpContext();
+        cookieContext.Request.Headers.Cookie = cookies.GetCookieHeader(browser.BaseAddress!);
+        var ticket = cookieOptions.TicketDataFormat.Unprotect(cookieOptions.CookieManager.GetRequestCookie(cookieContext, cookieOptions.Cookie.Name!)!);
+        await Assert.That(ticket).IsNotNull();
+        var idToken = new JwtSecurityTokenHandler().ReadJwtToken(validatedIdToken);
+        var accessToken = new JwtSecurityTokenHandler().ReadJwtToken(ticket!.Properties.GetTokenValue("access_token"));
         using var page = await SendAsync(new(HttpMethod.Get, "/onboarding/instance"));
         await Assert.That(page.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string rendered = await page.Content.ReadAsStringAsync(ct);
@@ -161,7 +197,19 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         protocol.WriteMessage(new InvocationMessage("start", "StartCircuit",
             ["https://localhost/", "https://localhost/onboarding/instance", $"[{string.Join(',', descriptors)}]", string.Empty]), writer);
         await socket.SendAsync(writer.WrittenMemory, WebSocketMessageType.Binary, true, ct);
-        await Assert.That(await circuitResult.Task.WaitAsync(ct)).IsTrue().Because("The hosted circuit must read the setup journey after the real external callback.");
+        var circuit = await circuitResult.Task.WaitAsync(ct);
+        await Assert.That(providerAccessToken == ticket.Properties.GetTokenValue("access_token")).IsTrue();
+        await Assert.That(accessToken.Subject == idToken.Subject && accessToken.Issuer == idToken.Issuer).IsTrue();
+        await Assert.That(circuit.Principal.TryGetCircuitSubject(out _)).IsTrue();
+        await Assert.That(circuit.Journey).IsTrue();
+        await Assert.That(circuit.Token == ticket.Properties.GetTokenValue("access_token")).IsTrue();
+        foreach (ClaimsPrincipal stage in new[] { callbackPrincipal!, ticket.Principal, circuit.Principal })
+        {
+            await Assert.That(stage.FindFirst("sub")?.Value == idToken.Subject).IsTrue();
+            await Assert.That(stage.FindFirst("iss")?.Value == idToken.Issuer).IsTrue();
+            await Assert.That(stage.FindFirst("email_verified")?.Value == idToken.Claims.SingleOrDefault(claim => claim.Type == "email_verified")?.Value).IsTrue();
+        }
+        await Assert.That(!syncTokens.IsEmpty && syncTokens.All(value => value == "Bearer " + ticket.Properties.GetTokenValue("access_token"))).IsTrue();
         await Assert.That(captures.Any(capture => capture.Bearer && capture.Setup && !capture.Cookie)).IsTrue();
         using (var setupStatus = await SendAsync(new(HttpMethod.Get, "/bff/setup-secret")))
         {
@@ -208,12 +256,21 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         }
     }
 
-    private sealed class JourneyCircuitProbe(IInstanceOnboardingService journey, TaskCompletionSource<bool> result) : CircuitHandler
+    private sealed record CircuitIdentityObservation(ClaimsPrincipal Principal, string? Token, bool Journey);
+
+    private sealed class JourneyCircuitProbe(IInstanceOnboardingService journey, AuthenticationStateProvider authentication,
+        ICircuitAccessTokenService tokens, IUserService users, TaskCompletionSource<CircuitIdentityObservation> result) : CircuitHandler
     {
         public override int Order => int.MaxValue;
         public override async Task OnCircuitOpenedAsync(Circuit circuit, CancellationToken cancellationToken)
         {
-            try { result.TrySetResult(await journey.GetJourneyAsync(cancellationToken) is not null); }
+            try
+            {
+                var principal = (await authentication.GetAuthenticationStateAsync()).User;
+                await users.SyncUserAsync();
+                bool available = await journey.GetJourneyAsync(cancellationToken) is not null;
+                result.TrySetResult(new(principal.Clone(), tokens.AccessToken, available));
+            }
             catch (Exception exception) { result.TrySetException(exception); throw; }
         }
     }

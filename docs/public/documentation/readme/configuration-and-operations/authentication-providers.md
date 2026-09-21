@@ -54,6 +54,21 @@ would remove every usable administrator sign-in path.
 `ATPROTO_LOGIN_ENABLED=true`. The application rejects the contradictory
 `false` combination. Google SSO is disabled in AT Protocol-only mode.
 
+## Keycloak Account Claims
+
+Keycloak must issue the same canonical account `sub` in the ID token and API
+access token, with its configured issuer. A successful browser callback alone is
+not enough if the API access token has no subject. Session IDs and platform user
+IDs are not substitutes.
+
+The supplied realm exports include Keycloak's built-in **Subject** mapper
+(`oidc-sub-mapper`) on the `islamu-event-blazor` client, with inclusion enabled for
+access tokens, ID tokens and introspection. For an already imported realm, apply
+that mapper in Keycloak and sign in again to obtain new tokens; replacing the
+export file does not update an existing realm. Keep the existing API audience
+mapper and email-verification mapping. Do not add a hard-coded subject or mark an
+email verified to work around sign-in failures.
+
 ## Passwordless AT Protocol Onboarding
 
 1. Start first-run setup and choose **AT Protocol** as the primary provider.

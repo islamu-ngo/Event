@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
@@ -37,6 +38,7 @@ public sealed class EventBffOidcOptionsFactory(
             callbackPath: "/signin-oidc",
             signedOutCallbackPath: "/signout-callback-oidc",
             nameClaimType: "preferred_username",
+            authenticationType: EventBffAuthenticationSchemes.Keycloak,
             requireHttpsMetadata: provider.RequireHttpsMetadata ?? !environment.IsDevelopment(),
             forceIpv4Backchannel: true);
 
@@ -55,6 +57,7 @@ public sealed class EventBffOidcOptionsFactory(
             callbackPath: "/signin-google",
             signedOutCallbackPath: null,
             nameClaimType: "name",
+            authenticationType: EventBffAuthenticationSchemes.Google,
             requireHttpsMetadata: true,
             forceIpv4Backchannel: false);
 
@@ -71,6 +74,7 @@ public sealed class EventBffOidcOptionsFactory(
         string callbackPath,
         string? signedOutCallbackPath,
         string nameClaimType,
+        string authenticationType,
         bool requireHttpsMetadata,
         bool forceIpv4Backchannel)
     {
@@ -88,6 +92,7 @@ public sealed class EventBffOidcOptionsFactory(
             ClientSecret = provider.ClientSecret?.Trim() ?? string.Empty,
             UsePkce = true,
             SaveTokens = true,
+            MapInboundClaims = false,
             GetClaimsFromUserInfoEndpoint = true,
             RequireHttpsMetadata = requireHttpsMetadata,
             CallbackPath = callbackPath,
@@ -107,10 +112,14 @@ public sealed class EventBffOidcOptionsFactory(
             },
             TokenValidationParameters = new TokenValidationParameters
             {
-                NameClaimType = nameClaimType
+                NameClaimType = nameClaimType,
+                AuthenticationType = authenticationType
             },
             Events = CreateEvents()
         };
+
+        // Retain the cryptographically validated issuer when UserInfo claim actions run.
+        options.ClaimActions.Remove("iss");
 
         if (!string.IsNullOrWhiteSpace(provider.MetadataAddress))
         {

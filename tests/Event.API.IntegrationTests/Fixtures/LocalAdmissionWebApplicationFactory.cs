@@ -315,11 +315,6 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     public string CreateExternalProviderToken(Guid subject, string email, bool? emailVerified)
     {
-        if (_externalSigningKey is null)
-        {
-            throw new InvalidOperationException("The external OIDC authority was not selected for this host.");
-        }
-
         List<Claim> claims =
         [
             new(JwtRegisteredClaimNames.Sub, subject.ToString("D")),
@@ -334,10 +329,19 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             claims.Add(new Claim("email_verified", emailVerified.Value ? "true" : "false", ClaimValueTypes.Boolean));
         }
 
+        return CreateExternalProviderToken(claims, _externalIssuer);
+    }
+
+    public string CreateExternalProviderToken(IEnumerable<Claim> claims, string? issuer)
+    {
+        if (_externalSigningKey is null)
+        {
+            throw new InvalidOperationException("The external OIDC authority was not selected for this host.");
+        }
         DateTime now = DateTime.UtcNow;
         var descriptor = new SecurityTokenDescriptor
         {
-            Issuer = _externalIssuer,
+            Issuer = issuer,
             Audience = ExternalAudience,
             Subject = new ClaimsIdentity(claims),
             IssuedAt = now,

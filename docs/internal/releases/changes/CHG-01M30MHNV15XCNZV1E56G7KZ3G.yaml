@@ -1,0 +1,27 @@
+Change-Id: CHG-01M30MHNV15XCNZV1E56G7KZ3G
+Title: "Expose Local completion on the authenticated journey"
+Type: fix
+Scope: onboarding
+Summary: "Authenticate active setup authority on the exact journey GET so ready Local journeys expose their completion action."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "The exact journey GET uses the existing SetupSecret authentication scheme. HAL retains the active-authority, Local-provider and readiness requirements; other methods and descendant paths remain excluded."
+  Migration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/getting-started/5-minute-quickstart.md
+    Disposition: documented
+    Detail: "Ready Local setup exposes Finish setup using its authorized journey action rather than an inferred client-side permission."

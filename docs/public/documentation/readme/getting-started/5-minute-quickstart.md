@@ -68,6 +68,7 @@ with `rm -f ./setup-secret`; never include it in logs or tickets.
 
 Active setup access carries through to the site profile and readiness checks; no
 additional sign-in or manually supplied authority header is needed for that read.
+Ready Local setup exposes **Finish setup** only through its authorized journey action.
 Choose **Finish setup** after entering the site name. After fresh sign-in, open
 `/settings/instance?section=getting-started`. Finishing setup does not publish a
 directory: a new SingleTenant directory stays private until explicit activation;

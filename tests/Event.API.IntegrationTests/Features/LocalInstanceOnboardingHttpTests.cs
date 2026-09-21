@@ -15,6 +15,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.TenantSettings;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -39,6 +40,20 @@ public sealed class LocalInstanceOnboardingHttpTests
     public async Task JourneyReadUsesOnlyActiveBffSetupAuthority(string authority, HttpStatusCode expectedStatus)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
+        using (var setupClient = CreateClient(factory))
+        {
+            setupClient.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
+            using var configured = await setupClient.PatchAsJsonAsync("/api/instance/settings/authz-provider",
+                new PatchAuthorizationProviderConfigurationDto
+                {
+                    Configuration = Explore.Application.Models.Common.OptionalUpdate<AuthorizationProviderConfigurationWriteDto>.Set(
+                        new AuthorizationProviderConfigurationWriteDto
+                        {
+                            Provider = "local", CerbosGrpcEndpoint = string.Empty, CerbosAdminEndpoint = string.Empty
+                        })
+                }, CancellationToken);
+            await Assert.That(configured.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
         var protection = new EphemeralDataProtectionProvider();
         var protector = new BffServices.SetupSecretCookieProtector(protection);
         var context = new DefaultHttpContext();
@@ -71,11 +86,31 @@ public sealed class LocalInstanceOnboardingHttpTests
             await Assert.That(body.RootElement.GetProperty("bootstrap").GetProperty("isSetupModeActive").GetBoolean()).IsTrue();
             await Assert.That(body.RootElement.GetProperty("_links").GetProperty("save-profile").GetProperty("href").GetString())
                 .IsEqualTo("/api/instanceonboarding/profile");
+            var preflight = body.RootElement.GetProperty("preflight");
+            await Assert.That(preflight.GetProperty("isReadyToLaunch").GetBoolean()).IsTrue()
+                .Because(string.Join(",", preflight.GetProperty("blockingChecks").EnumerateArray()
+                    .Where(check => check.GetProperty("status").GetString() != "Pass")
+                    .Select(check => check.GetProperty("code").GetString())));
+            await Assert.That(body.RootElement.GetProperty("_links").GetProperty("complete-local").GetProperty("href").GetString())
+                .IsEqualTo(CompletePath);
         }
         else
         {
             await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("forbidden");
         }
+    }
+
+    [Test]
+    [Arguments("POST", "/api/instanceonboarding/journey")]
+    [Arguments("GET", "/api/instanceonboarding/journey/details")]
+    [Arguments("GET", "/api/instanceonboarding/journey-report")]
+    public async Task JourneySetupAuthenticationExcludesOtherMethodsAndDescendants(string method, string path)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = method;
+        context.Request.Path = path;
+
+        await Assert.That(Explore.API.Authentication.SetupSecretAuthenticationHandler.SupportsRequest(context.Request)).IsFalse();
     }
 
     [Test]

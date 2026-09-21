@@ -72718,6 +72718,69 @@
         "x-endpoint-class": "Authenticated"
       }
     },
+    "/api/operator-identity-metadata": {
+      "get": {
+        "tags": [
+          "OperatorIdentityMetadata"
+        ],
+        "summary": "Get Operator Identity Form Options",
+        "description": "Returns value-free operator kinds, country display choices, shared identity field constraints and accessible label/help identifiers. Registration authorities are explicitly unsupported. No identity values or edit authority are returned.",
+        "operationId": "GetOperatorIdentityFormOptions",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfOperatorIdentityFormOptionsDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfOperatorIdentityFormOptionsDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated"
+      }
+    },
     "/api/organization": {
       "get": {
         "tags": [
@@ -144068,6 +144131,61 @@
           }
         }
       },
+      "HalResourceOfOperatorIdentityFormOptionsDto": {
+        "type": "object",
+        "properties": {
+          "operatorKinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityKindOptionDto"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityCountryOptionDto"
+            }
+          },
+          "countryState": {
+            "type": "string"
+          },
+          "countryFailureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registrationAuthorityState": {
+            "type": "string"
+          },
+          "registrationAuthorities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityKindOptionDto"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityFieldConstraintDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfOptionalQuestionnaireDto": {
         "required": [
           "eventId",
@@ -159324,6 +159442,118 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "OperatorIdentityCountryOptionDto": {
+        "required": [
+          "code",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "OperatorIdentityFieldConstraintDto": {
+        "required": [
+          "name",
+          "labelId",
+          "helpId",
+          "format",
+          "maxLength",
+          "requiredForDisclosure",
+          "requiredForPaidCommerce"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "labelId": {
+            "type": "string"
+          },
+          "helpId": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "maxLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "requiredForDisclosure": {
+            "type": "boolean"
+          },
+          "requiredForPaidCommerce": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OperatorIdentityFormOptionsDto": {
+        "type": "object",
+        "properties": {
+          "operatorKinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityKindOptionDto"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityCountryOptionDto"
+            }
+          },
+          "countryState": {
+            "type": "string"
+          },
+          "countryFailureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registrationAuthorityState": {
+            "type": "string"
+          },
+          "registrationAuthorities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityKindOptionDto"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorIdentityFieldConstraintDto"
+            }
+          }
+        }
+      },
+      "OperatorIdentityKindOptionDto": {
+        "required": [
+          "code",
+          "labelId"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "labelId": {
+            "type": "string"
           }
         }
       },
@@ -180252,6 +180482,9 @@
     },
     {
       "name": "Notification"
+    },
+    {
+      "name": "OperatorIdentityMetadata"
     },
     {
       "name": "Organization"

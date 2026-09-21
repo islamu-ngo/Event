@@ -19,6 +19,22 @@ The draft HTTP API version is `0.1`. In pre-release development before v1, break
 
 ## Recent externally visible themes
 
+### Operator form choices (2026-09-21)
+
+Authenticated clients can read `GET /api/operator-identity-metadata` through the
+generated `GetOperatorIdentityFormOptionsAsync` operation. It supplies canonical
+operator-kind codes, runtime country display choices, shared field limits and
+label/help identifiers without returning saved identity values. An unavailable
+country catalogue is explicit; do not replace it with invented choices.
+Registration identifiers remain optional, and registration-authority options are
+explicitly unsupported rather than a new list of authorities.
+
+The resource is private/no-store and independent of directory publication. Its
+`self` and `refresh` links do not authorize identity edits. Normal authenticated
+instance identity documents advertise the `form-options` lookup; use the identity
+document's own mutation links and revision for saves. Setup-secret access is not
+extended. No database migration or deployment setting is required.
+
 ### Operations and configuration
 
 Operational control-plane reads, safe health output, configuration-manifest workflows, privacy-erasure topology, and explicit managed-mode interfaces have been added or tightened. Optional managed interfaces remain disabled by default.

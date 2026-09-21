@@ -5,6 +5,38 @@ ABOUTME: Authoritative source for Explore.API patterns — middleware order, req
 
 ## Structured Legal-Identity Contracts
 
+### Value-Free Operator Form Metadata
+
+Authenticated `GET /api/operator-identity-metadata` dispatches native
+`GetOperatorIdentityFormOptionsQuery` and assembles a HAL resource through the
+standard registered assembler/policy. The exact route is tenant-independent so
+an unpublished or absent directory cannot block its static vocabulary; this does
+not bypass authentication or grant document access. Responses are private/no-store.
+
+The immutable DTO snapshots its collections. Operator kinds come from
+`TenantDirectoryOperatorKinds.All`; country choices project the runtime
+`CultureInfo`/`RegionInfo` data, deduplicated and ordered by alpha-2 code. These are
+display choices, not a new jurisdictional compliance registry: domain validation
+still owns the alpha-2 shape. Empty or invalid region data returns
+`countryState: Unavailable` and `operator_identity_countries_unavailable` rather
+than a partial mandatory selector. Country display names use runtime localization;
+kind and field label/help identifiers are stable client localization/association
+keys, not translated prose supplied by this endpoint.
+
+Shared legal-identity field lengths reuse Domain constants. Disclosure and paid
+commerce requirements are separate; saving a draft still permits missing fields.
+Registration identifiers are optional, while authority choices are explicitly
+empty with `registrationAuthorityState: NotSupported`. Instance-specific identity
+and readiness rules remain on the value-bearing document contract.
+
+No identity service, tenant repository, credential provider or logger participates
+in the metadata query. HAL supplies authenticated `self` and `refresh`, omitting
+unresolved links. Normal authenticated instance identity documents expose the
+`form-options` lookup relation; the setup-secret scheme does not gain access.
+Metadata never supplies an edit link. Consumers must retain the independently
+authorized identity document's mutation links and revisions.
+
+
 `GET/PUT /api/instance-operator-identity` return separate `publicDisclosure` and
 `paidCommerce` assessments, each containing `isReady`, `failureCode`, and bounded
 `reasonCodes`. The former top-level readiness fields are removed. Authorized

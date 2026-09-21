@@ -3,6 +3,21 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-21
+
+- **Canonical operator form metadata.** Authenticated
+  `GET /api/operator-identity-metadata` (`GetOperatorIdentityFormOptions`) returns
+  value-free operator-kind codes, runtime country/region display choices, shared
+  legal-identity constraints and stable label/help identifiers. Missing runtime
+  globalization data is explicit `Unavailable`, with
+  `operator_identity_countries_unavailable`; no partial mandatory selector is
+  supplied. Registration identifiers remain optional; authority options are empty
+  with `registrationAuthorityState: NotSupported` because no registry exists.
+  The tenant-independent resource is private/no-store and exposes only `self` and
+  `refresh`, never edit authority. Normal authenticated instance identity readers
+  discover it through `form-options`; setup-secret authority is not extended.
+  No persisted identity values, credentials, migration or new dependency is added.
+
 ## 2026-09-20
 
 - **Breaking: setup finishes before publication.** Completion requests must submit

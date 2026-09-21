@@ -242,6 +242,7 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<InstanceOnboardingJourneyDto, InstanceOnboardingJourneyLinkPolicy, InstanceOnboardingJourneyCollectionLinkPolicy>();
         services.AddHalResource<TenantOnboardingStatusDto, TenantOnboardingStatusLinkPolicy, TenantOnboardingStatusCollectionLinkPolicy>();
         services.AddHalResource<InstanceOperatorIdentityDocumentDto, InstanceOperatorIdentityLinkPolicy, InstanceOperatorIdentityCollectionLinkPolicy>();
+        services.AddHalResource<OperatorIdentityFormOptionsDto, OperatorIdentityFormOptionsLinkPolicy, OperatorIdentityFormOptionsCollectionLinkPolicy>();
 
         // Storage administration
         services.AddHalResourceWithAssembler<InstanceStorageSettingsDto, InstanceStorageSettingsLinkPolicy, InstanceStorageSettingsCollectionLinkPolicy, InstanceStorageSettingsResourceAssembler>();

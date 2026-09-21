@@ -11,6 +11,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Instance;
+using Explore.Application.DTOs.TenantSettingsDocuments;
+using Explore.Domain.Constants;
 using Explore.Application.Models.Common;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
@@ -48,7 +50,7 @@ public sealed class EmailOptionalStandaloneTests
             using HttpClient client = host.OpenClient();
             client.Timeout = RequestTimeout;
             await AssertNativeOwnershipAsync(host);
-            await AssertCoreAsync(client, "Healthy", "smtp_disabled");
+            await AssertCoreAsync(client, "Healthy", "smtp_disabled", HttpStatusCode.NotFound);
             await Assert.That(deployment.Transport.Attempts).IsEqualTo(0);
 
             // Headless bootstrap does not create ordinary session authority. Its only login
@@ -63,13 +65,15 @@ public sealed class EmailOptionalStandaloneTests
             await Assert.That(challenge.TryGetProperty("token", out _)).IsFalse();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 challenge.GetProperty("replacementChallenge").GetProperty("token").GetString());
-            using (var denied = await client.GetAsync("/api/instance/local-identities"))
-                await AssertStatusAsync(denied, HttpStatusCode.Forbidden);
+            using (var denied = await client.GetAsync(
+                $"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}"))
+                await AssertStatusAsync(denied, HttpStatusCode.Unauthorized);
             using (var replaced = await client.PostAsJsonAsync("/api/auth/local/credential-replacement", new { newPassword = privatePassword }))
                 await AssertStatusAsync(replaced, HttpStatusCode.NoContent);
             client.DefaultRequestHeaders.Authorization = null;
             bearer = await LoginAsync(client, deployment.Subject, privatePassword);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+            await ActivateDirectoryAsync(client);
             await AssertAdministratorAsync(client);
             await AssertSupportContactAsync(client, "contact@standalone.example.test");
 
@@ -176,6 +180,22 @@ public sealed class EmailOptionalStandaloneTests
         await using var host = deployment.CreateHost();
         using var client = host.OpenClient();
         client.Timeout = RequestTimeout;
+        string password = NativeEmailOptionalStandaloneFixture.NewPassword();
+        using var login = await client.PostAsJsonAsync("/api/auth/local/login", new
+        {
+            identifier = deployment.Subject.ToString("D"), password = deployment.InitialPassword
+        });
+        await AssertStatusAsync(login, HttpStatusCode.OK);
+        JsonElement challenge = await BodyAsync(login);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            challenge.GetProperty("replacementChallenge").GetProperty("token").GetString());
+        using (var replaced = await client.PostAsJsonAsync("/api/auth/local/credential-replacement", new { newPassword = password }))
+            await AssertStatusAsync(replaced, HttpStatusCode.NoContent);
+        client.DefaultRequestHeaders.Authorization = null;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            await LoginAsync(client, deployment.Subject, password));
+        await ActivateDirectoryAsync(client);
+        client.DefaultRequestHeaders.Authorization = null;
         using var response = await client.GetAsync("/api/Event");
         await AssertStatusAsync(response, HttpStatusCode.OK);
     }
@@ -269,7 +289,7 @@ public sealed class EmailOptionalStandaloneTests
         await using var host = deployment.CreateHost();
         using HttpClient client = host.OpenClient();
         client.Timeout = RequestTimeout;
-        await AssertCoreAsync(client, "Healthy", "smtp_disabled");
+        await AssertCoreAsync(client, "Healthy", "smtp_disabled", HttpStatusCode.NotFound);
         await using (var scope = host.Services.CreateAsyncScope())
         {
             var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -309,7 +329,53 @@ public sealed class EmailOptionalStandaloneTests
         await Assert.That(bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Completed);
     }
 
-    private static async Task AssertCoreAsync(HttpClient client, string smtpStatus, string smtpCode)
+    private static async Task ActivateDirectoryAsync(HttpClient client)
+    {
+        const string identityPath = "/api/tenant/settings/documents/directory-operator-identity";
+        using (var privateDirectory = await client.GetAsync("/api/Event"))
+        {
+            await AssertStatusAsync(privateDirectory, HttpStatusCode.NotFound);
+            await Assert.That((await BodyAsync(privateDirectory)).GetProperty("code").GetString())
+                .IsEqualTo("tenant_lifecycle_unavailable");
+        }
+        using var identity = await client.GetAsync(identityPath);
+        await AssertStatusAsync(identity, HttpStatusCode.OK);
+        JsonElement document = await BodyAsync(identity);
+        await Assert.That(document.GetProperty("isActivationReady").GetBoolean()).IsFalse();
+
+        // Public contact information belongs to directory disclosure, not the email-free
+        // administrator credential or SMTP delivery policy. Save it only after private setup.
+        using var saved = await client.PatchAsJsonAsync(identityPath, new PatchTenantDirectoryOperatorIdentityDocumentDto
+        {
+            ExpectedConcurrencyStamp = document.GetProperty("concurrencyStamp").GetGuid(),
+            LegalEntity = new PatchTenantDirectoryOperatorLegalEntityDto
+            {
+                PublicName = OptionalUpdate<string?>.Set("Standalone directory"),
+                LegalName = OptionalUpdate<string?>.Set("Standalone Directory ASBL"),
+                OperatorKindCode = OptionalUpdate<string?>.Set("registered_organization"),
+                JurisdictionCountryCode = OptionalUpdate<string?>.Set("BE")
+            },
+            Contacts = new PatchTenantDirectoryOperatorContactsDto
+            {
+                PublicContactEmail = OptionalUpdate<string?>.Set("contact@standalone.example.test")
+            },
+            LegalLinks = new PatchTenantDirectoryOperatorLegalLinksDto
+            {
+                LegalNoticeUrl = OptionalUpdate<string?>.Set("https://standalone.example.test/legal"),
+                PrivacyUrl = OptionalUpdate<string?>.Set("https://standalone.example.test/privacy")
+            }
+        });
+        await AssertStatusAsync(saved, HttpStatusCode.OK);
+        await Assert.That((await BodyAsync(saved)).GetProperty("isActivationReady").GetBoolean()).IsTrue();
+        using (var stillPrivate = await client.GetAsync("/api/Event"))
+            await AssertStatusAsync(stillPrivate, HttpStatusCode.NotFound);
+        using var activated = await client.PostAsJsonAsync(
+            $"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}/activate", new { });
+        await AssertStatusAsync(activated, HttpStatusCode.OK);
+    }
+
+    private static async Task AssertCoreAsync(HttpClient client, string smtpStatus, string smtpCode,
+        HttpStatusCode directoryStatus = HttpStatusCode.OK)
     {
         using var health = await client.GetAsync("/health");
         JsonElement body = await BodyAsync(health);
@@ -325,7 +391,7 @@ public sealed class EmailOptionalStandaloneTests
         foreach (string path in new[] { "/alive", "/api/EventType", "/auth/status" })
         {
             using var response = await client.GetAsync(path);
-            await AssertStatusAsync(response, HttpStatusCode.OK);
+            await AssertStatusAsync(response, path == "/api/EventType" ? directoryStatus : HttpStatusCode.OK);
         }
     }
 

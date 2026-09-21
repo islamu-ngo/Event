@@ -234,11 +234,22 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             using var body = await JsonDocument.ParseAsync(await login.Content.ReadAsStreamAsync(Token), cancellationToken: Token);
             client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", body.RootElement.GetProperty("token").GetString());
         }
+        string[] sessionPaths = ["/api/user", "/api/user/admin-authority"];
+        foreach (string path in sessionPaths)
+        {
+            using var active = await client.GetAsync(path, Token);
+            await Assert.That(active.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
         await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
-        using var response = await client.GetAsync("/api/tenant/settings/documents/directory-operator-identity", Token);
-        await Assert.That(response.StatusCode).IsEqualTo(expected);
-        if (expected == HttpStatusCode.NotFound)
-            await AssertLifecycleDenialAsync(response);
+        foreach (string path in sessionPaths.Append("/api/tenant/settings/documents/directory-operator-identity"))
+        {
+            using var response = await client.GetAsync(path, Token);
+            await Assert.That(response.StatusCode).IsEqualTo(expected);
+            if (expected == HttpStatusCode.NotFound)
+                await AssertLifecycleDenialAsync(response);
+        }
+        using var publicRead = await client.GetAsync("/api/PublicExperience/settings", Token);
+        await AssertLifecycleDenialAsync(publicRead);
     }
 
     [Test]

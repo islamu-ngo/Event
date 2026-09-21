@@ -2,6 +2,7 @@ using Explore.API.Attributes;
 using Explore.API.Configuration;
 using Explore.API.Controllers;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Options;
@@ -20,7 +21,7 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)
                 && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
         if (!tenantSurface || ApiTenantResolutionMiddleware.IsTenantExemptPath(context.Request.Path)
-            || IsExistingAuthenticationOrSignedCallback(context.GetEndpoint())
+            || IsExistingAuthenticationOrSignedCallback(context)
             || HttpMethods.IsGet(context.Request.Method)
                 && context.Request.Path.Equals(new PathString("/api/instance/settings/branding"), StringComparison.OrdinalIgnoreCase)
                 && context.User.Identities.Any(identity => identity.IsAuthenticated
@@ -34,10 +35,13 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         bool allowed = management
             ? context.User.Identity?.IsAuthenticated == true
                 && await lifecycle.CanManageAsync(tenantContext.TenantId, context.RequestAborted)
-            : await lifecycle.IsPublicAsync(tenantContext.TenantId, context.RequestAborted);
+            : await lifecycle.IsPublicAsync(tenantContext.TenantId, context.RequestAborted)
+                || IsPrivateAdministratorSessionRead(context.GetEndpoint())
+                    && context.User.Identity?.IsAuthenticated == true
+                    && await lifecycle.CanManageAsync(tenantContext.TenantId, context.RequestAborted);
         if (allowed)
         {
-            if (management)
+            if (management || IsPrivateAdministratorSessionRead(context.GetEndpoint()))
                 context.Response.Headers.CacheControl = "no-store";
             await next(context);
             return;
@@ -57,12 +61,22 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         });
     }
 
-    private static bool IsExistingAuthenticationOrSignedCallback(Endpoint? endpoint)
+    private static bool IsPrivateAdministratorSessionRead(Endpoint? endpoint)
     {
         var action = endpoint?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        return action?.ControllerTypeInfo.AsType() == typeof(UserController)
+            && action.MethodInfo.Name is nameof(UserController.GetCurrentUser) or nameof(UserController.GetAdminAuthority);
+    }
+
+    private static bool IsExistingAuthenticationOrSignedCallback(HttpContext context)
+    {
+        var action = context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
         return action is not null
             && (action.ControllerTypeInfo.AsType() == typeof(LocalAuthController)
                 && action.MethodInfo.Name == nameof(LocalAuthController.Login)
+                || action.ControllerTypeInfo.AsType() == typeof(LocalCredentialReplacementController)
+                && action.MethodInfo.Name == nameof(LocalCredentialReplacementController.Complete)
+                && context.User.TryGetLocalCredentialReplacementAuthority() is not null
                 || action.ControllerTypeInfo.AsType() == typeof(IncomingWebhooksController)
                 && action.MethodInfo.Name is nameof(IncomingWebhooksController.RecordStripeConnectCallback)
                     or nameof(IncomingWebhooksController.RecordSvixOperationalCallback));

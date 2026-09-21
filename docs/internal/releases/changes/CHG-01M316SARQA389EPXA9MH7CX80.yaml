@@ -1,0 +1,30 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M316SARQA389EPXA9MH7CX80
+Title: "Complete private Local administrator sign-in"
+Type: fix
+Scope: onboarding
+Summary: "Allow restricted credential replacement and exact administrator session reads while the directory remains private."
+Group: private-local-handoff
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: "Restricted replacement proof and persisted exact administrator authority admit private handoff only; public lifecycle denial remains intact."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: "Temporary password replacement and fresh administrator sign-in work before directory publication; no configuration or data migration required."

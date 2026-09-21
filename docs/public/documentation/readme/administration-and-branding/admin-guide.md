@@ -50,6 +50,11 @@ complete. The completed setup administrator can manage its branding and operator
 identity with the existing default-tenant permissions. Saving those documents
 never publishes the directory.
 
+Local administrators can replace the temporary password and sign in afresh while
+the directory remains private. Replacement requires the protected, short-lived
+challenge from temporary-password sign-in, not the completed setup secret. The
+private administrator session does not grant public directory access.
+
 In SingleTenant mode, authenticated instance administrators can read the default
 directory through the existing control-plane tenant-detail API and follow its
 `activate` link when offered. Only the fixed default directory is accepted; this

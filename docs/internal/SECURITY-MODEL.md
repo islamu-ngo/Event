@@ -171,6 +171,20 @@ In Split, YARP carries the sanitized request to the API host. In Standalone, `Co
 
 The `InProcessEventApiHttpMessageHandler` used by server-side generated API clients is an isolated in-process API/BFF bridge: it creates a fresh service scope and HTTP context and deliberately excludes browser cookies, `Host`, and ambient principals. It preserves HTTP request/response semantics, not ambient authority.
 
+### Private Local setup handoff
+
+Tenant lifecycle enforcement admits only the credential-replacement controller's
+exact completion action with validated restricted replacement authority. The
+selected identity store still checks the current subject, operation and security
+stamp and consumes the challenge once; setup secrets and ordinary access tokens
+cannot substitute for it. Tenant resolution is unchanged.
+
+The exact current-user and current-user-admin-authority reads retain normal Active
+behavior. For a private directory they require persisted instance-administrator
+or exact bound-tenant administrator authority. This lets the BFF complete fresh
+sign-in and session revalidation without publishing the directory. Public tenant
+reads remain lifecycle-denied even for that administrator.
+
 ### Antiforgery boundaries
 
 Unsafe browser `/api/*` requests require the BFF antiforgery token: the BFF issues `XSRF-TOKEN` and the client returns it as `X-CSRF-TOKEN`. In Split, the BFF proxy validates this before YARP forwarding. In Standalone, the Combined bridge validates it before API dispatch. Direct API bearer-token and API-key clients do not traverse a browser-cookie boundary and are not subject to BFF antiforgery.

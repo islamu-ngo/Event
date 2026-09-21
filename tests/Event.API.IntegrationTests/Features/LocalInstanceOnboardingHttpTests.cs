@@ -160,6 +160,58 @@ public sealed class LocalInstanceOnboardingHttpTests
     }
 
     [Test]
+    public async Task PrivateProvisioningSetupAllowsCredentialReplacementWithoutPublishingDirectory()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(incompleteSetup: true);
+        await using (var database = factory.CreateDatabase())
+        {
+            (await database.Tenants.SingleAsync(CancellationToken)).TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            await database.SaveChangesAsync(CancellationToken);
+        }
+        using HttpClient client = CreateClient(factory);
+        client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
+        var request = await WithCurrentJourneyAsync(client, Request());
+        using var completed = await client.PostAsJsonAsync(CompletePath, request, CancellationToken);
+        await Assert.That(completed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var setupOnly = await client.PostAsJsonAsync("/api/auth/local/credential-replacement",
+            new { newPassword = NewPassword() }, CancellationToken);
+        await Assert.That(setupOnly.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Remove("X-Setup-Secret");
+        using var login = await client.PostAsJsonAsync("/api/auth/local/login",
+            new { identifier = request.Username, password = request.TemporaryPassword }, CancellationToken);
+        await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var challengeBody = JsonDocument.Parse(await login.Content.ReadAsStringAsync(CancellationToken));
+        string challenge = challengeBody.RootElement.GetProperty("replacementChallenge").GetProperty("token").GetString()!;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", challenge);
+        string password = NewPassword();
+        using var wrongAccount = await client.PostAsJsonAsync("/api/auth/local/credential-replacement",
+            new { newPassword = password, userId = Guid.CreateVersion7() }, CancellationToken);
+        await Assert.That(wrongAccount.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        using var replaced = await client.PostAsJsonAsync("/api/auth/local/credential-replacement",
+            new { newPassword = password }, CancellationToken);
+        await Assert.That(replaced.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        using var replay = await client.PostAsJsonAsync("/api/auth/local/credential-replacement",
+            new { newPassword = NewPassword() }, CancellationToken);
+        await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = null;
+        using var oldPassword = await client.PostAsJsonAsync("/api/auth/local/login",
+            new { identifier = request.Username, password = request.TemporaryPassword }, CancellationToken);
+        await Assert.That(oldPassword.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        using var fresh = await client.PostAsJsonAsync("/api/auth/local/login",
+            new { identifier = request.Username, password }, CancellationToken);
+        await Assert.That(fresh.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var freshBody = JsonDocument.Parse(await fresh.Content.ReadAsStringAsync(CancellationToken));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", freshBody.RootElement.GetProperty("token").GetString());
+        using var current = await client.GetAsync("/api/user", CancellationToken);
+        await Assert.That(current.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var denied = await client.GetAsync("/api/PublicExperience/settings", CancellationToken);
+        await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await using var persisted = factory.CreateDatabase();
+        await Assert.That((await persisted.Tenants.SingleAsync(CancellationToken)).TenantStatusId)
+            .IsEqualTo((int)TenantStatusEnum.Provisioning);
+    }
+
+    [Test]
     [Arguments(IdentityDatabaseTopology.Colocated, false)]
     [Arguments(IdentityDatabaseTopology.External, false)]
     [Arguments(IdentityDatabaseTopology.Colocated, true)]

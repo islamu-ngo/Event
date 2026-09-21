@@ -53,7 +53,10 @@ public sealed class TenantMapperTests
         tenant.TenantStatusId = (int)TenantStatusEnum.Active;
         tenant.TenantStatus = new TenantStatus
         {
-            Id = (int)TenantStatusEnum.Active, MasterCode = "Active", FullName = "Active", IsActiveState = true
+            Id = (int)TenantStatusEnum.Active,
+            MasterCode = "Active",
+            FullName = "Active",
+            IsActiveState = true
         };
         var rows = new List<Tenant> { tenant };
         var repository = Substitute.For<ITenantRepository>();

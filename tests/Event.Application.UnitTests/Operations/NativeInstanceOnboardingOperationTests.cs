@@ -27,9 +27,12 @@ public sealed class NativeInstanceOnboardingOperationTests
     {
         var journey = ProjectJourney(new AuthorizationProviderConfigurationDto
         {
-            Provider = "cerbos", AuthorizationProviderManagedByDeployment = managed,
-            AuthorizationProviderBootstrapStatus = state, AuthorizationProviderConfigured = configured,
-            CerbosEndpointVerified = configured, CerbosPoliciesSynchronized = configured
+            Provider = "cerbos",
+            AuthorizationProviderManagedByDeployment = managed,
+            AuthorizationProviderBootstrapStatus = state,
+            AuthorizationProviderConfigured = configured,
+            CerbosEndpointVerified = configured,
+            CerbosPoliciesSynchronized = configured
         });
         await Assert.That(journey.State).IsEqualTo("Available");
         await Assert.That(journey.Authorization.State).IsEqualTo(expected);
@@ -47,8 +50,10 @@ public sealed class NativeInstanceOnboardingOperationTests
         await Assert.That(unavailable.Generation).IsNull();
         var contradiction = ProjectJourney(new AuthorizationProviderConfigurationDto
         {
-            Provider = "cerbos", AuthorizationProviderManagedByDeployment = true,
-            AuthorizationProviderBootstrapStatus = "failed", AuthorizationProviderConfigured = true
+            Provider = "cerbos",
+            AuthorizationProviderManagedByDeployment = true,
+            AuthorizationProviderBootstrapStatus = "failed",
+            AuthorizationProviderConfigured = true
         });
         await Assert.That(contradiction.State).IsEqualTo("Failed");
         await Assert.That(contradiction.ReasonCode).IsEqualTo("source_contradiction");

@@ -99,7 +99,8 @@ public class InstanceOnboardingTests : IDisposable
     {
         var journey = new HalResourceOfInstanceOnboardingJourneyDto
         {
-            State = "Available", Generation = "first",
+            State = "Available",
+            Generation = "first",
             Bootstrap = CreateStatus(false, "MultiTenant"),
             Profile = new SelfHostOnboardingProfileDto { SiteName = "Journey site" },
             Authentication = new OnboardingProviderReadinessDto { State = "Ready" },
@@ -489,20 +490,24 @@ public class InstanceOnboardingTests : IDisposable
         var status = CreateStatus(false, deploymentMode);
         _journey = statusAvailable && systemStatusAvailable && preflightAvailable
             && authenticationConfigured.HasValue && authorizationConfigured.HasValue ? new()
-        {
-            State = "Available", Generation = "fixture", Bootstrap = status,
-            Profile = new() { SiteName = "ISLAMU Explore" },
-            Authentication = new() { State = authenticationConfigured == true ? "Ready" : "ActionRequired" },
-            Authorization = new() { State = authorizationConfigured == true ? "Ready" : "ActionRequired" },
-            Preflight = preflight ?? CreatePreflight(deploymentMode),
-            OperatorIdentity = new()
             {
-                PublicName = "ISLAMU Explore", LegalName = "ISLAMU Explore", OperatorKindCode = "individual",
-                PaidCommerce = new() { IsReady = _identityReady, ReasonCodes = [] },
-                PublicDisclosure = new() { IsReady = true, ReasonCodes = [] }
-            },
-            _links = JsonSerializer.Deserialize<Dictionary<string, HalLink>>(((JsonElement)status.AdditionalProperties["_links"]).GetRawText())
-        } : null;
+                State = "Available",
+                Generation = "fixture",
+                Bootstrap = status,
+                Profile = new() { SiteName = "ISLAMU Explore" },
+                Authentication = new() { State = authenticationConfigured == true ? "Ready" : "ActionRequired" },
+                Authorization = new() { State = authorizationConfigured == true ? "Ready" : "ActionRequired" },
+                Preflight = preflight ?? CreatePreflight(deploymentMode),
+                OperatorIdentity = new()
+                {
+                    PublicName = "ISLAMU Explore",
+                    LegalName = "ISLAMU Explore",
+                    OperatorKindCode = "individual",
+                    PaidCommerce = new() { IsReady = _identityReady, ReasonCodes = [] },
+                    PublicDisclosure = new() { IsReady = true, ReasonCodes = [] }
+                },
+                _links = JsonSerializer.Deserialize<Dictionary<string, HalLink>>(((JsonElement)status.AdditionalProperties["_links"]).GetRawText())
+            } : null;
         if (_journey is not null) _journey._links!["update-operator-identity"] = new() { Href = "/api/instance-operator-identity", Method = "PUT" };
         _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult(_journey));
 

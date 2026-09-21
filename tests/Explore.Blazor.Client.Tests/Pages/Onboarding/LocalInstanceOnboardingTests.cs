@@ -176,8 +176,14 @@ public sealed class LocalInstanceOnboardingTests
             if (path == "/api/instanceonboarding/status")
             {
                 PublicStatusReads++;
-                return Json(new { isCompleted = PublicStatusCompleted, provider = "Local", isAuthenticated = false,
-                    state = PublicStatusCompleted ? "Completed" : "InteractivePending", selectedDeploymentMode = "SingleTenant" });
+                return Json(new
+                {
+                    isCompleted = PublicStatusCompleted,
+                    provider = "Local",
+                    isAuthenticated = false,
+                    state = PublicStatusCompleted ? "Completed" : "InteractivePending",
+                    selectedDeploymentMode = "SingleTenant"
+                });
             }
             if (path == "/api/instanceonboarding/journey" && CompletionCommitted.Task.IsCompleted)
                 return new HttpResponseMessage(HttpStatusCode.Gone) { Content = JsonContent.Create(new { status = 410 }) };

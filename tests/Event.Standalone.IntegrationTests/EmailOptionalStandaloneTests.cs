@@ -183,7 +183,8 @@ public sealed class EmailOptionalStandaloneTests
         string password = NativeEmailOptionalStandaloneFixture.NewPassword();
         using var login = await client.PostAsJsonAsync("/api/auth/local/login", new
         {
-            identifier = deployment.Subject.ToString("D"), password = deployment.InitialPassword
+            identifier = deployment.Subject.ToString("D"),
+            password = deployment.InitialPassword
         });
         await AssertStatusAsync(login, HttpStatusCode.OK);
         JsonElement challenge = await BodyAsync(login);

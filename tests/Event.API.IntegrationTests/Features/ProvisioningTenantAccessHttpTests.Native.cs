@@ -41,14 +41,19 @@ public sealed partial class ProvisioningTenantAccessHttpTests
             (await db.InstanceBootstrapStates.SingleAsync(Token)).TransitionDeploymentMode(DeploymentMode.MultiTenant);
             db.TenantSettingOverrides.Add(new TenantSetting
             {
-                Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = TenantId,
+                Tenant = null!,
                 SettingKey = GovernanceSettingKeys.Domains.TenantCustomDomain,
-                Value = "\"private.example.test\"", CreatedAt = DateTime.UtcNow
+                Value = "\"private.example.test\"",
+                CreatedAt = DateTime.UtcNow
             });
             db.SystemSettings.Add(new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Routing.ResolverCustomDomainEnabled,
-                Value = "true", CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Routing.ResolverCustomDomainEnabled,
+                Value = "true",
+                CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync(Token);
         }
@@ -159,43 +164,88 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         var user = await db.Users.SingleAsync(Token);
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = user.Id, Pii = new ActorPii { DisplayName = "Public organizer" }, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = user.Id,
+            Pii = new ActorPii { DisplayName = "Public organizer" },
+            CreatedAt = DateTime.UtcNow
         };
         db.Actors.Add(actor);
         db.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, UserId = user.Id, User = user,
-            ActorId = actor.Id, Actor = actor, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            Tenant = null!,
+            UserId = user.Id,
+            User = user,
+            ActorId = actor.Id,
+            Actor = actor,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = DateTime.UtcNow
         });
         var entity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, ActorId = actor.Id, Actor = actor,
-            Title = "Lifecycle public event", Slug = "lifecycle", PublicCode = "ABCDEFGH",
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!,
-            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated, CreatedAt = DateTime.UtcNow,
-            EventFormatId = (int)EventFormatEnum.Digital, EventFormat = null!,
-            FirstSessionDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)), LastSessionDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            FirstSessionStartUtc = DateTimeOffset.UtcNow.AddDays(1), LastSessionEndUtc = DateTimeOffset.UtcNow.AddDays(1).AddHours(1)
+            Id = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            Tenant = null!,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Lifecycle public event",
+            Slug = "lifecycle",
+            PublicCode = "ABCDEFGH",
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            CreatedAt = DateTime.UtcNow,
+            EventFormatId = (int)EventFormatEnum.Digital,
+            EventFormat = null!,
+            FirstSessionDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+            LastSessionDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+            FirstSessionStartUtc = DateTimeOffset.UtcNow.AddDays(1),
+            LastSessionEndUtc = DateTimeOffset.UtcNow.AddDays(1).AddHours(1)
         };
         entity.Sessions.Add(new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, EventId = entity.Id, Event = entity,
-            Title = "Public session", StartTime = DateTimeOffset.UtcNow.AddDays(1), EndTime = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
+            Id = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            Tenant = null!,
+            EventId = entity.Id,
+            Event = entity,
+            Title = "Public session",
+            StartTime = DateTimeOffset.UtcNow.AddDays(1),
+            EndTime = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
             CreatedAt = DateTime.UtcNow
         });
         db.Events.Add(entity);
         db.TenantNavigationLinks.Add(new TenantNavigationLink
         {
-            Id = Guid.CreateVersion7(), TenantId = TenantId, Label = "Public navigation", Url = "/events", CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            Label = "Public navigation",
+            Url = "/events",
+            CreatedAt = DateTime.UtcNow
         });
         var image = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Image, FileType = null!,
-            Uri = "lifecycle.png", ObjectKey = $"tenants/{TenantId:N}/lifecycle.png", Provider = StorageProviders.Local,
-            FullName = "lifecycle.png", SafeDisplayName = "lifecycle.png", Extension = ".png", ContentType = "image/png",
-            Visibility = StorageObjectVisibilities.PublicImage, Purpose = StorageObjectPurposes.EventImage, LifecycleState = StorageObjectLifecycleStates.Active,
-            CreatedAt = DateTime.UtcNow, CreatedBy = user.Id
+            Id = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Image,
+            FileType = null!,
+            Uri = "lifecycle.png",
+            ObjectKey = $"tenants/{TenantId:N}/lifecycle.png",
+            Provider = StorageProviders.Local,
+            FullName = "lifecycle.png",
+            SafeDisplayName = "lifecycle.png",
+            Extension = ".png",
+            ContentType = "image/png",
+            Visibility = StorageObjectVisibilities.PublicImage,
+            Purpose = StorageObjectPurposes.EventImage,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = user.Id
         };
         db.StorageObjects.Add(image);
         var now = DateTime.UtcNow.AddHours(-1);
@@ -209,33 +259,61 @@ public sealed partial class ProvisioningTenantAccessHttpTests
         db.LegalDocuments.Add(legal);
         var record = new AtprotoRecord
         {
-            Id = Guid.CreateVersion7(), Did = "did:plc:lifecyclefixture", Collection = "community.lexicon.calendar.event", RecordKey = "lifecycle",
-            Direction = AtprotoRecordDirection.Inbound, Provenance = AtprotoRecordProvenance.Jetstream,
-            SourceVersion = 1, UpdatedAt = now
+            Id = Guid.CreateVersion7(),
+            Did = "did:plc:lifecyclefixture",
+            Collection = "community.lexicon.calendar.event",
+            RecordKey = "lifecycle",
+            Direction = AtprotoRecordDirection.Inbound,
+            Provenance = AtprotoRecordProvenance.Jetstream,
+            SourceVersion = 1,
+            UpdatedAt = now
         };
         db.AtprotoRecords.Add(record);
         db.AtprotoIdentities.Add(new AtprotoIdentity(AtprotoDid.Parse(record.Did))
         {
-            Id = Guid.CreateVersion7(), ActorId = actor.Id, Actor = actor, IsActive = true,
-            PdsHost = "https://pds.example.test", CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            ActorId = actor.Id,
+            Actor = actor,
+            IsActive = true,
+            PdsHost = "https://pds.example.test",
+            CreatedAt = now
         });
         db.Events.Add(new Explore.Domain.Event(EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), TenantId = TenantId, Tenant = null!, ActorId = actor.Id, Actor = actor,
-            Title = "Federated lifecycle event", PublicCode = "IJKLMNOP", AtprotoRecordId = record.Id,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!,
-            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.Federated, CreatedAt = now,
-            EventFormatId = (int)EventFormatEnum.Digital, EventFormat = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = TenantId,
+            Tenant = null!,
+            ActorId = actor.Id,
+            Actor = actor,
+            Title = "Federated lifecycle event",
+            PublicCode = "IJKLMNOP",
+            AtprotoRecordId = record.Id,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.Federated,
+            CreatedAt = now,
+            EventFormatId = (int)EventFormatEnum.Digital,
+            EventFormat = null!
         });
         db.AtprotoRecordTenantPresentations.Add(new AtprotoRecordTenantPresentation
         {
-            TenantId = TenantId, AtprotoRecordId = record.Id, IsVisible = true, SourceVersion = 1, EvaluatedAt = now
+            TenantId = TenantId,
+            AtprotoRecordId = record.Id,
+            IsVisible = true,
+            SourceVersion = 1,
+            EvaluatedAt = now
         });
         db.AtprotoEventProjections.Add(new AtprotoEventProjection
         {
-            AtprotoRecordId = record.Id, Name = "Federated lifecycle event", CreatedAt = now,
-            StartsAt = DateTimeOffset.UtcNow.AddDays(1), EndsAt = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
-            Mode = "virtual", SourceVersion = 1, MaterializedAt = now
+            AtprotoRecordId = record.Id,
+            Name = "Federated lifecycle event",
+            CreatedAt = now,
+            StartsAt = DateTimeOffset.UtcNow.AddDays(1),
+            EndsAt = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
+            Mode = "virtual",
+            SourceVersion = 1,
+            MaterializedAt = now
         });
         (await db.SystemSettings.SingleAsync(
             setting => setting.SettingKey == GovernanceSettingKeys.Federation.AtprotoEventsEnabled, Token)).Value = enableFederation ? "true" : "false";

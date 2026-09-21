@@ -250,8 +250,13 @@ public sealed class TenantLifecycleTransitionRepositoryTests(PostgreSqlContainer
         db.Tenants.Add(new Tenant { Id = id, FullName = "Private directory", Slug = "private-race", TenantStatusId = (int)TenantStatusEnum.Provisioning, TenantStatus = null! });
         var identity = TenantDirectoryOperatorIdentityDocumentDefaults.Create(id, new TenantDirectoryOperatorIdentitySettings
         {
-            PublicName = "Private operator", LegalName = "Private operator ASBL", OperatorKindCode = "registered_organization",
-            JurisdictionCountryCode = "BE", PublicContactEmail = "operator@example.test", LegalNoticeUrl = "https://example.test/legal", PrivacyUrl = "https://example.test/privacy"
+            PublicName = "Private operator",
+            LegalName = "Private operator ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            PublicContactEmail = "operator@example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            PrivacyUrl = "https://example.test/privacy"
         });
         db.TenantSettingsDocuments.Add(identity);
         await db.SaveChangesAsync();

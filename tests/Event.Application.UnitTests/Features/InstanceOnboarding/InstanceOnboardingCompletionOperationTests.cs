@@ -133,8 +133,11 @@ public sealed class InstanceOnboardingCompletionOperationTests
         {
             ExistingTenant = new Tenant
             {
-                Id = PlatformDefaults.DefaultTenantId, FullName = "Existing", Slug = "existing",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = PlatformDefaults.DefaultTenantId,
+                FullName = "Existing",
+                Slug = "existing",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             }
         };
 

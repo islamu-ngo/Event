@@ -31,6 +31,11 @@ namespace Event.Standalone.IntegrationTests;
 public sealed class EmailOptionalStandaloneTests
 {
     private const string SmtpPath = "/api/instance/settings/smtp";
+    private const string HealthyStatus = "Healthy";
+    private const string SmtpDisabledCode = "smtp_disabled";
+    private const string LoginPath = "/api/auth/local/login";
+    private const string TokenProperty = "token";
+    private const string PublicContact = "contact@standalone.example.test";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
     [Test]
@@ -50,21 +55,21 @@ public sealed class EmailOptionalStandaloneTests
             using HttpClient client = host.OpenClient();
             client.Timeout = RequestTimeout;
             await AssertNativeOwnershipAsync(host);
-            await AssertCoreAsync(client, "Healthy", "smtp_disabled", HttpStatusCode.NotFound);
+            await AssertCoreAsync(client, HealthyStatus, SmtpDisabledCode, HttpStatusCode.NotFound);
             await Assert.That(deployment.Transport.Attempts).IsEqualTo(0);
 
             // Headless bootstrap does not create ordinary session authority. Its only login
             // result is the production purpose-limited first-use challenge, even without email.
-            using var login = await client.PostAsJsonAsync("/api/auth/local/login", new
+            using var login = await client.PostAsJsonAsync(LoginPath, new
             {
                 identifier = deployment.Subject.ToString("D"),
                 password = deployment.InitialPassword
             });
             await AssertStatusAsync(login, HttpStatusCode.OK);
             JsonElement challenge = await BodyAsync(login);
-            await Assert.That(challenge.TryGetProperty("token", out _)).IsFalse();
+            await Assert.That(challenge.TryGetProperty(TokenProperty, out _)).IsFalse();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
-                challenge.GetProperty("replacementChallenge").GetProperty("token").GetString());
+                challenge.GetProperty("replacementChallenge").GetProperty(TokenProperty).GetString());
             using (var denied = await client.GetAsync(
                 $"/api/admin/control-plane/tenants/{PlatformDefaults.DefaultTenantId}"))
                 await AssertStatusAsync(denied, HttpStatusCode.Unauthorized);
@@ -75,7 +80,7 @@ public sealed class EmailOptionalStandaloneTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
             await ActivateDirectoryAsync(client);
             await AssertAdministratorAsync(client);
-            await AssertSupportContactAsync(client, "contact@standalone.example.test");
+            await AssertSupportContactAsync(client, PublicContact);
 
             await using var scope = host.Services.CreateAsyncScope();
             var credentials = scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>();
@@ -125,7 +130,7 @@ public sealed class EmailOptionalStandaloneTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
             await AssertAdministratorAsync(client);
             await AssertDurableIdentityAsync(restarted, deployment.Subject, binding, bootstrapId);
-            await AssertSupportContactAsync(client, "contact@standalone.example.test");
+            await AssertSupportContactAsync(client, PublicContact);
             string recovered = restarted.Services.GetRequiredService<IDataProtectionProvider>()
                 .CreateProtector("native-standalone-restart-proof").Unprotect(protectedValue);
             await Assert.That(recovered).IsEqualTo("restart-continuity");
@@ -139,7 +144,7 @@ public sealed class EmailOptionalStandaloneTests
                 acknowledgement = "DISABLE EMAIL DELIVERY"
             });
             await AssertStatusAsync(disabled, HttpStatusCode.OK);
-            await AssertCoreAsync(client, "Healthy", "smtp_disabled");
+            await AssertCoreAsync(client, HealthyStatus, SmtpDisabledCode);
         }
 
         int attemptsBeforeDisabledRestart = deployment.Transport.Attempts;
@@ -148,7 +153,7 @@ public sealed class EmailOptionalStandaloneTests
             using HttpClient client = restartedDisabled.OpenClient();
             client.Timeout = RequestTimeout;
             await AssertNativeOwnershipAsync(restartedDisabled);
-            await AssertCoreAsync(client, "Healthy", "smtp_disabled");
+            await AssertCoreAsync(client, HealthyStatus, SmtpDisabledCode);
             await Assert.That(deployment.Transport.Attempts).IsEqualTo(attemptsBeforeDisabledRestart);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 await LoginAsync(client, deployment.Subject, privatePassword));
@@ -159,11 +164,11 @@ public sealed class EmailOptionalStandaloneTests
             JsonElement settings = await BodyAsync(settingsResponse);
             await Assert.That(settings.GetProperty("deliveryEnabled").GetBoolean()).IsFalse();
             await Assert.That(settings.GetProperty("fromAddress").GetString()).IsEqualTo("events@example.test");
-            await AssertSupportContactAsync(client, "contact@standalone.example.test");
+            await AssertSupportContactAsync(client, PublicContact);
             await using var scope = restartedDisabled.Services.CreateAsyncScope();
             await Assert.That(await scope.ServiceProvider.GetRequiredService<DataProtectionKeyContext>()
                 .DataProtectionKeys.CountAsync()).IsEqualTo(keyCount);
-            using var oldPassword = await client.PostAsJsonAsync("/api/auth/local/login", new
+            using var oldPassword = await client.PostAsJsonAsync(LoginPath, new
             {
                 identifier = deployment.Subject.ToString("D"),
                 password = deployment.InitialPassword
@@ -181,7 +186,7 @@ public sealed class EmailOptionalStandaloneTests
         using var client = host.OpenClient();
         client.Timeout = RequestTimeout;
         string password = NativeEmailOptionalStandaloneFixture.NewPassword();
-        using var login = await client.PostAsJsonAsync("/api/auth/local/login", new
+        using var login = await client.PostAsJsonAsync(LoginPath, new
         {
             identifier = deployment.Subject.ToString("D"),
             password = deployment.InitialPassword
@@ -189,7 +194,7 @@ public sealed class EmailOptionalStandaloneTests
         await AssertStatusAsync(login, HttpStatusCode.OK);
         JsonElement challenge = await BodyAsync(login);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
-            challenge.GetProperty("replacementChallenge").GetProperty("token").GetString());
+            challenge.GetProperty("replacementChallenge").GetProperty(TokenProperty).GetString());
         using (var replaced = await client.PostAsJsonAsync("/api/auth/local/credential-replacement", new { newPassword = password }))
             await AssertStatusAsync(replaced, HttpStatusCode.NoContent);
         client.DefaultRequestHeaders.Authorization = null;
@@ -290,7 +295,7 @@ public sealed class EmailOptionalStandaloneTests
         await using var host = deployment.CreateHost();
         using HttpClient client = host.OpenClient();
         client.Timeout = RequestTimeout;
-        await AssertCoreAsync(client, "Healthy", "smtp_disabled", HttpStatusCode.NotFound);
+        await AssertCoreAsync(client, HealthyStatus, SmtpDisabledCode, HttpStatusCode.NotFound);
         await using (var scope = host.Services.CreateAsyncScope())
         {
             var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -299,7 +304,7 @@ public sealed class EmailOptionalStandaloneTests
         using var health = await client.GetAsync("/health");
         await AssertStatusAsync(health, HttpStatusCode.ServiceUnavailable);
         JsonElement body = await BodyAsync(health);
-        await Assert.That(Check(body, "database").GetProperty("status").GetString()).IsEqualTo("Healthy");
+        await Assert.That(Check(body, "database").GetProperty("status").GetString()).IsEqualTo(HealthyStatus);
         await Assert.That(Check(body, "smtp").GetProperty("status").GetString()).IsEqualTo("Unhealthy");
         await Assert.That(Check(body, "cerbos").GetProperty("status").GetString()).IsEqualTo("Unhealthy");
         await Assert.That(deployment.Transport.Attempts).IsEqualTo(0);
@@ -358,7 +363,7 @@ public sealed class EmailOptionalStandaloneTests
             },
             Contacts = new PatchTenantDirectoryOperatorContactsDto
             {
-                PublicContactEmail = OptionalUpdate<string?>.Set("contact@standalone.example.test")
+                PublicContactEmail = OptionalUpdate<string?>.Set(PublicContact)
             },
             LegalLinks = new PatchTenantDirectoryOperatorLegalLinksDto
             {
@@ -446,11 +451,11 @@ public sealed class EmailOptionalStandaloneTests
 
     private static async Task<string> LoginAsync(HttpClient client, Guid subject, string password)
     {
-        using var response = await client.PostAsJsonAsync("/api/auth/local/login", new { identifier = subject.ToString("D"), password });
+        using var response = await client.PostAsJsonAsync(LoginPath, new { identifier = subject.ToString("D"), password });
         await AssertStatusAsync(response, HttpStatusCode.OK);
         JsonElement body = await BodyAsync(response);
         await Assert.That(body.TryGetProperty("replacementChallenge", out _)).IsFalse();
-        return body.GetProperty("token").GetString()!;
+        return body.GetProperty(TokenProperty).GetString()!;
     }
 
     private static async Task AssertStatusAsync(HttpResponseMessage response, HttpStatusCode expected) =>

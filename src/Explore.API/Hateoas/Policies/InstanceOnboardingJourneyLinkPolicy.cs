@@ -24,15 +24,19 @@ public sealed class InstanceOnboardingJourneyLinkPolicy(
             if (link.Rel is "complete" or "complete-local" && dto.Preflight?.IsReadyToLaunch != true) continue;
             yield return link;
         }
-        if (dto.OperatorIdentity is not null)
-        {
-            foreach (var link in identityPolicy.GetLinks(dto.OperatorIdentity, user))
-                if (link.Rel == "update") yield return link with { Rel = "update-operator-identity" };
-        }
+        foreach (var link in IdentityLinks(dto.OperatorIdentity, user))
+            yield return link;
         if (!dto.Bootstrap.IsCompleted && setupSecretProvider.IsSetupModeActive
             && setupSecretProvider.ValidateSecret(context.HttpContext?.Request.Headers["X-Setup-Secret"].FirstOrDefault()))
             yield return new LinkDefinition("save-profile", RouteNames.SaveInstanceOnboardingProfile,
                 Method: HttpMethods.Patch);
+    }
+
+    private IEnumerable<LinkDefinition> IdentityLinks(InstanceOperatorIdentityDocumentDto? identity, ClaimsPrincipal? user)
+    {
+        if (identity is null) yield break;
+        foreach (var link in identityPolicy.GetLinks(identity, user))
+            if (link.Rel == "update") yield return link with { Rel = "update-operator-identity" };
     }
 }
 

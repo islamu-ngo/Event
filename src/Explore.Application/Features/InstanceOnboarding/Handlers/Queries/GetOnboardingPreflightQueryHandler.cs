@@ -24,6 +24,8 @@ public sealed class GetOnboardingPreflightQueryHandler(
     IS3PreflightVerifier? s3PreflightVerifier = null)
     : IQueryHandler<GetOnboardingPreflightQuery, OnboardingPreflightDto>
 {
+    private const string SetupSecretCheck = "setup_secret";
+
     public async Task<OnboardingPreflightDto> QueryAsync(GetOnboardingPreflightQuery request, CancellationToken cancellationToken)
     {
         var result = new OnboardingPreflightDto();
@@ -52,18 +54,18 @@ public sealed class GetOnboardingPreflightQueryHandler(
     {
         if (onboardingCompleted)
         {
-            AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Pass, "Onboarding is already completed and setup mode is locked.");
+            AddBlocking(result, SetupSecretCheck, "Setup secret", OnboardingPreflightCheckStatus.Pass, "Onboarding is already completed and setup mode is locked.");
             return;
         }
 
         if (!setupSecretProvider.IsSetupModeActive)
         {
-            AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Fail, "Setup mode is not active.", "The setup secret provider is locked or has not initialized setup state.");
+            AddBlocking(result, SetupSecretCheck, "Setup secret", OnboardingPreflightCheckStatus.Fail, "Setup mode is not active.", "The setup secret provider is locked or has not initialized setup state.");
             return;
         }
 
         var source = setupSecretProvider.IsFromEnvironmentVariable ? "environment" : "internal generated fallback";
-        AddBlocking(result, "setup_secret", "Setup secret", OnboardingPreflightCheckStatus.Pass, $"Setup secret is active from {source}.");
+        AddBlocking(result, SetupSecretCheck, "Setup secret", OnboardingPreflightCheckStatus.Pass, $"Setup secret is active from {source}.");
     }
 
     private static void AddRepositoryReachabilityCheck(OnboardingPreflightDto result)
@@ -359,8 +361,8 @@ public sealed class GetOnboardingPreflightQueryHandler(
             Status = status,
             ReasonCode = status == OnboardingPreflightCheckStatus.Pass ? "check_passed" : "check_failed",
             RequirementCategory = "RequiredNow",
-            RemediationAuthority = code is "database_reachable" or "deployment_mode" or "setup_secret" ? "Deployment" : "SetupOperator",
-            RestartRequired = status == OnboardingPreflightCheckStatus.Fail && code == "setup_secret",
+            RemediationAuthority = code is "database_reachable" or "deployment_mode" or SetupSecretCheck ? "Deployment" : "SetupOperator",
+            RestartRequired = status == OnboardingPreflightCheckStatus.Fail && code == SetupSecretCheck,
             ActionRelation = code switch { "canonical_host" => "save-profile", "auth_config" => "manage-authentication", _ => "refresh" },
             Message = message,
             Detail = detail

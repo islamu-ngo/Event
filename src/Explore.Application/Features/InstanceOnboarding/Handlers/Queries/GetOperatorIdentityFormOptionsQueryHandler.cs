@@ -11,7 +11,7 @@ public sealed class GetOperatorIdentityFormOptionsQueryHandler
     : IQueryHandler<GetOperatorIdentityFormOptionsQuery, OperatorIdentityFormOptionsDto>
 {
     public Task<OperatorIdentityFormOptionsDto> QueryAsync(
-        GetOperatorIdentityFormOptionsQuery request, CancellationToken cancellationToken) =>
+        GetOperatorIdentityFormOptionsQuery request, CancellationToken cancellationToken = default) =>
         Task.FromResult(Create(CultureInfo.GetCultures(CultureTypes.SpecificCultures)));
 
     internal static OperatorIdentityFormOptionsDto Create(IEnumerable<CultureInfo> cultures)

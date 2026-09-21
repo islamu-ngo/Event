@@ -65,6 +65,15 @@ Both browser completion paths submit the current journey generation; conflicts
 require a refresh rather than blind credential replay. Completed Local status
 retains its provider so a refreshed browser can offer sign-in without resubmitting
 credentials. Password replacement remains owned by the existing Local login flow.
+
+Journey reads bracket readiness work with two durable generation reads. Each hashes
+all system settings so even a non-profile change invalidates stale admission. The
+first read also projects the persisted profile; it does not issue four additional
+profile lookups. The second read must remain independent to reject concurrent
+changes. Completion uses the same generation algorithm without projecting the
+profile, resolving secrets, or performing external readiness I/O under its lock.
+This work is confined to setup/administration refreshes, not ordinary public reads.
+
 Subsequent Local account creation/reset belongs to a current instance
 administrator, not a tenant administrator or setup-secret holder. Issued
 credentials are handed over privately and replaced before normal session

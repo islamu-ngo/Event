@@ -426,7 +426,8 @@ public sealed class LocalBootstrapConvergenceTests
             var unitOfWork = new EfCoreUnitOfWork(application);
             return new InstanceOnboardingGenerationReader(
                 new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
-                scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>());
+                scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>(),
+                new InstanceBootstrapStateRepository(application));
         }
 
         internal async Task AssertCompletedAsync(Guid? expectedSubject = null)

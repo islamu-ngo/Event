@@ -139,6 +139,30 @@ public sealed class InstanceOnboardingCompletionOperationTests
     }
 
     [Test]
+    public async Task Journey_ReusesDurableProfileWithoutAdditionalSettingQueries()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.ChangeSetting(GovernanceSettingKeys.Branding.DisplayName, "Snapshot site");
+        scenario.ChangeSetting(GovernanceSettingKeys.Branding.SupportEmail, "support@example.test");
+        scenario.ChangeSetting(GovernanceSettingKeys.Domains.InstanceBaseDomain, "https://example.test");
+        scenario.ChangeSetting(GovernanceSettingKeys.Localization.DefaultLanguage, "fr");
+
+        var journey = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(journey.State).IsEqualTo("Available");
+        await Assert.That(journey.Profile!.SiteName).IsEqualTo("Snapshot site");
+        await Assert.That(journey.Profile.SupportEmail).IsEqualTo("support@example.test");
+        await Assert.That(journey.Profile.CanonicalUrl).IsEqualTo("https://example.test");
+        await Assert.That(journey.Profile.Locale).IsEqualTo("fr");
+        await Assert.That(scenario.FullSettingsReads).IsEqualTo(2);
+        await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Branding.DisplayName);
+        await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Branding.SupportEmail);
+        await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Localization.DefaultLanguage);
+        // Preflight still independently checks the canonical host.
+        await Assert.That(scenario.SettingKeysRead.Count(key => key == GovernanceSettingKeys.Domains.InstanceBaseDomain)).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task Journey_RejectsDurableChangeDuringExternalReadiness()
     {
         var scenario = new OnboardingCompletionScenario(interactive: true);
@@ -556,10 +580,19 @@ internal sealed class OnboardingCompletionScenario
                 }),
                 Guid.CreateVersion7()));
 
-        systemSettings.GetAllSettings(Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(_ => _settings.ToList());
+        systemSettings.GetAllSettings(Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            FullSettingsReads++;
+            return _settings.ToList();
+        });
         systemSettings.GetByKey(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(call => _settings.SingleOrDefault(setting => setting.SettingKey == call.Arg<string>()));
-        GenerationReader = new InstanceOnboardingGenerationReader(systemSettings, DeploymentModeProvider);
+            .Returns(call =>
+            {
+                var key = call.Arg<string>();
+                SettingKeysRead.Add(key);
+                return _settings.SingleOrDefault(setting => setting.SettingKey == key);
+            });
+        GenerationReader = new InstanceOnboardingGenerationReader(systemSettings, DeploymentModeProvider, BootstrapRepository);
         var smtp = Substitute.For<ISmtpConfigResolver>();
         smtp.ResolveAsync(Arg.Any<CancellationToken>()).Returns(_ =>
         {
@@ -603,7 +636,7 @@ internal sealed class OnboardingCompletionScenario
             setupSecret, tenants, systemSettings, config, dispatcher, smtpConfigResolver: smtp);
         Journey = new GetInstanceOnboardingJourneyQueryHandler(status, preflight,
             Substitute.For<IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto>>(),
-            authentication, authorization, systemSettings, BootstrapRepository, GenerationReader,
+            authentication, authorization, GenerationReader,
             NullLogger<GetInstanceOnboardingJourneyQueryHandler>.Instance);
         Operation = new InstanceOnboardingCompletionOperation(
             BootstrapRepository,
@@ -651,6 +684,8 @@ internal sealed class OnboardingCompletionScenario
     public bool JwtCancellationWasRequested { get; private set; }
     public int ExternalReadinessCallsInsideTransaction { get; private set; }
     public int ExternalReadinessCallsOutsideTransaction { get; private set; }
+    public int FullSettingsReads { get; private set; }
+    public List<string> SettingKeysRead { get; } = [];
     public Action? DuringExternalReadiness { get; set; }
     public IInstanceOnboardingGenerationReader GenerationReader { get; }
     public IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto> Journey { get; }

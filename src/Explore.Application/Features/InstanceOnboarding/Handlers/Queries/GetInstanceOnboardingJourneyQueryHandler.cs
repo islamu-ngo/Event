@@ -1,12 +1,10 @@
-using System.Text.Json;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Queries;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
@@ -17,23 +15,22 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
     IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto> identityQuery,
     IAuthProviderConfigurationService authentication,
     IAuthorizationProviderConfigurationService authorization,
-    ISystemSettingRepository settings,
-    IInstanceBootstrapStateRepository bootstrapRepository,
     IInstanceOnboardingGenerationReader generationReader,
     ILogger<GetInstanceOnboardingJourneyQueryHandler> logger)
     : IQueryHandler<GetInstanceOnboardingJourneyQuery, InstanceOnboardingJourneyDto>
 {
-    public async Task<InstanceOnboardingJourneyDto> QueryAsync(GetInstanceOnboardingJourneyQuery request, CancellationToken cancellationToken)
+    private const string Ready = "Ready";
+    private const string DeploymentRestartRequired = "DeploymentRestartRequired";
+
+    public async Task<InstanceOnboardingJourneyDto> QueryAsync(GetInstanceOnboardingJourneyQuery request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var generation = await generationReader.ReadAsync(
-                await bootstrapRepository.GetCurrent(cancellationToken), cancellationToken);
-            var snapshot = await ReadAsync(request, cancellationToken);
+            var durable = await generationReader.ReadSnapshotAsync(cancellationToken);
+            var snapshot = await ReadAsync(request, durable.Profile, cancellationToken);
             if (snapshot.State == "Failed") return snapshot;
-            var confirmed = await generationReader.ReadAsync(
-                await bootstrapRepository.GetCurrent(cancellationToken), cancellationToken);
-            return generation == confirmed
+            var confirmed = await generationReader.ReadCurrentAsync(cancellationToken);
+            return durable.Generation == confirmed
                 ? snapshot with { Generation = confirmed }
                 : new() { ReasonCode = "snapshot_changed" };
         }
@@ -45,28 +42,16 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
         }
     }
 
-    private async Task<InstanceOnboardingJourneyDto> ReadAsync(GetInstanceOnboardingJourneyQuery request, CancellationToken cancellationToken)
+    private async Task<InstanceOnboardingJourneyDto> ReadAsync(GetInstanceOnboardingJourneyQuery request,
+        SelfHostOnboardingProfileDto profile, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var bootstrap = await statusQuery.QueryAsync(new() { SetupPrincipal = request.SetupPrincipal }, cancellationToken);
         var auth = await authentication.ReadConfigurationAsync();
         var authz = await authorization.ReadConfigurationAsync();
-        var profile = new SelfHostOnboardingProfileDto
-        {
-            SiteName = await ReadSettingAsync(GovernanceSettingKeys.Branding.DisplayName) ?? string.Empty,
-            SupportEmail = await ReadSettingAsync(GovernanceSettingKeys.Branding.SupportEmail),
-            CanonicalUrl = await ReadSettingAsync(GovernanceSettingKeys.Domains.InstanceBaseDomain),
-            Locale = await ReadSettingAsync(GovernanceSettingKeys.Localization.DefaultLanguage) ?? "en"
-        };
         var preflight = await preflightQuery.QueryAsync(new(), cancellationToken);
         var identity = await identityQuery.QueryAsync(new(), cancellationToken);
         return Project(bootstrap, auth, authz, profile, preflight, identity);
-    }
-
-    private async Task<string?> ReadSettingAsync(string key)
-    {
-        var setting = await settings.GetByKey(key);
-        return string.IsNullOrWhiteSpace(setting?.Value) ? null : JsonSerializer.Deserialize<string>(setting.Value);
     }
 
     public static InstanceOnboardingJourneyDto Project(
@@ -77,56 +62,23 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
         if (bootstrap is null || authentication is null || authorization is null || profile is null || preflight is null)
             return new();
 
-        var authProvider = (Explore.Domain.Enums.AuthenticationProviderKind)authentication.PrimaryProviderId;
+        var authProvider = (AuthenticationProviderKind)authentication.PrimaryProviderId;
         var providerName = authProvider.ToString();
-        var bootstrapValid = bootstrap.State is "InteractivePending" or "ConfiguredAdministratorPending" or "Completed";
-        var authorizationState = authorization.AuthorizationProviderBootstrapStatus;
-        if (!bootstrapValid || bootstrap.IsCompleted != (bootstrap.State == "Completed")
-            || bootstrap.SelectedDeploymentMode is not ("SingleTenant" or "MultiTenant")
-            || bootstrap.SelectedDeploymentMode != preflight.DeploymentMode
-            || !Enum.IsDefined(authProvider)
-            || !string.Equals(providerName, authentication.PrimaryProviderCode, StringComparison.OrdinalIgnoreCase)
-            || (!bootstrap.IsCompleted && bootstrap.Provider != providerName)
-            || authorization.Provider is not ("local" or "cerbos")
-            || (authorization.AuthorizationProviderManagedByDeployment
-                && (authorizationState is not ("ready" or "pending" or "failed")
-                    || authorization.AuthorizationProviderConfigured != (authorizationState == "ready"))))
+        if (!IsConsistent(bootstrap, authentication, authorization, preflight, authProvider))
             return new() { ReasonCode = "source_contradiction" };
 
-        var authReady = authProvider switch
-        {
-            Explore.Domain.Enums.AuthenticationProviderKind.Local => true,
-            Explore.Domain.Enums.AuthenticationProviderKind.Keycloak => !string.IsNullOrWhiteSpace(authentication.KeycloakAuthority)
-                && !string.IsNullOrWhiteSpace(authentication.KeycloakClientId),
-            Explore.Domain.Enums.AuthenticationProviderKind.Atproto => authentication.AtprotoLoginEnabled
-                && !string.IsNullOrWhiteSpace(authentication.AtprotoPublicUrl),
-            Explore.Domain.Enums.AuthenticationProviderKind.Google => authentication.GoogleSsoEnabled
-                && !string.IsNullOrWhiteSpace(authentication.GoogleClientId),
-            _ => false
-        };
-        var auth = Readiness(providerName, authReady ? "Ready" : authentication.LockPrimaryProvider
-            ? "DeploymentRestartRequired" : "ActionRequired", authentication.LockPrimaryProvider, "manage-authentication");
-        var authz = Readiness(authorization.Provider,
-            authorization.AuthorizationProviderConfigured ? "Ready"
-                : authorizationState == "failed" ? "Failed"
-                : authorization.AuthorizationProviderManagedByDeployment ? "DeploymentRestartRequired" : "ActionRequired",
+        var auth = Readiness(providerName, AuthenticationState(authentication, authProvider),
+            authentication.LockPrimaryProvider, "manage-authentication");
+        var authz = Readiness(authorization.Provider, AuthorizationState(authorization),
             authorization.AuthorizationProviderManagedByDeployment, "manage-authorization");
         var projectedPreflight = preflight with
         {
-            BlockingChecks = preflight.BlockingChecks.Select(check => check.Code == "auth_config"
-                ? check with
-                {
-                    Status = auth.State == "Ready" ? "Pass" : "Fail",
-                    ReasonCode = auth.ReasonCode,
-                    RemediationAuthority = auth.RemediationAuthority,
-                    RestartRequired = auth.RestartRequired,
-                    ActionRelation = auth.ActionRelation
-                }
-                : check).Append(new OnboardingPreflightCheckDto
+            BlockingChecks = preflight.BlockingChecks.Select(check => ProjectAuthenticationCheck(check, auth))
+                .Append(new OnboardingPreflightCheckDto
                 {
                     Code = "authorization_config",
                     Name = "Authorization configuration",
-                    Status = authz.State == "Ready" ? "Pass" : "Fail",
+                    Status = authz.State == Ready ? "Pass" : "Fail",
                     ReasonCode = authz.ReasonCode,
                     RemediationAuthority = authz.RemediationAuthority,
                     RestartRequired = authz.RestartRequired,
@@ -147,18 +99,83 @@ public sealed class GetInstanceOnboardingJourneyQueryHandler(
         };
     }
 
+    private static OnboardingPreflightCheckDto ProjectAuthenticationCheck(
+        OnboardingPreflightCheckDto check, OnboardingProviderReadinessDto authentication)
+    {
+        if (check.Code != "auth_config") return check;
+        return check with
+        {
+            Status = authentication.State == Ready ? "Pass" : "Fail",
+            ReasonCode = authentication.ReasonCode,
+            RemediationAuthority = authentication.RemediationAuthority,
+            RestartRequired = authentication.RestartRequired,
+            ActionRelation = authentication.ActionRelation
+        };
+    }
+
+    private static bool IsConsistent(InstanceOnboardingStatusDto bootstrap,
+        AuthProviderConfigurationDto authentication, AuthorizationProviderConfigurationDto authorization,
+        OnboardingPreflightDto preflight, AuthenticationProviderKind provider)
+    {
+        var providerName = provider.ToString();
+        return bootstrap.State is "InteractivePending" or "ConfiguredAdministratorPending" or "Completed"
+            && bootstrap.IsCompleted == (bootstrap.State == "Completed")
+            && bootstrap.SelectedDeploymentMode is "SingleTenant" or "MultiTenant"
+            && bootstrap.SelectedDeploymentMode == preflight.DeploymentMode
+            && Enum.IsDefined(provider)
+            && string.Equals(providerName, authentication.PrimaryProviderCode, StringComparison.OrdinalIgnoreCase)
+            && (bootstrap.IsCompleted || bootstrap.Provider == providerName)
+            && IsAuthorizationConsistent(authorization);
+    }
+
+    private static bool IsAuthorizationConsistent(AuthorizationProviderConfigurationDto authorization)
+    {
+        var state = authorization.AuthorizationProviderBootstrapStatus;
+        return authorization.Provider is "local" or "cerbos"
+            && (!authorization.AuthorizationProviderManagedByDeployment
+                || state is "ready" or "pending" or "failed"
+                    && authorization.AuthorizationProviderConfigured == (state == "ready"));
+    }
+
+    private static string AuthenticationState(AuthProviderConfigurationDto authentication, AuthenticationProviderKind provider)
+    {
+        var ready = provider switch
+        {
+            AuthenticationProviderKind.Local => true,
+            AuthenticationProviderKind.Keycloak => !string.IsNullOrWhiteSpace(authentication.KeycloakAuthority)
+                && !string.IsNullOrWhiteSpace(authentication.KeycloakClientId),
+            AuthenticationProviderKind.Atproto => authentication.AtprotoLoginEnabled
+                && !string.IsNullOrWhiteSpace(authentication.AtprotoPublicUrl),
+            AuthenticationProviderKind.Google => authentication.GoogleSsoEnabled
+                && !string.IsNullOrWhiteSpace(authentication.GoogleClientId),
+            _ => false
+        };
+        if (ready) return Ready;
+        return ConfigurationRequiredState(authentication.LockPrimaryProvider);
+    }
+
+    private static string AuthorizationState(AuthorizationProviderConfigurationDto authorization)
+    {
+        if (authorization.AuthorizationProviderConfigured) return Ready;
+        if (authorization.AuthorizationProviderBootstrapStatus == "failed") return "Failed";
+        return ConfigurationRequiredState(authorization.AuthorizationProviderManagedByDeployment);
+    }
+
+    private static string ConfigurationRequiredState(bool deploymentManaged) =>
+        deploymentManaged ? DeploymentRestartRequired : "ActionRequired";
+
     private static OnboardingProviderReadinessDto Readiness(string provider, string state, bool deploymentManaged, string relation) => new()
     {
         Provider = provider,
         State = state,
         RemediationAuthority = deploymentManaged ? "Deployment" : "SetupOperator",
-        RestartRequired = state == "DeploymentRestartRequired",
+        RestartRequired = state == DeploymentRestartRequired,
         ActionRelation = relation,
         ReasonCode = state switch
         {
-            "Ready" => "provider_ready",
+            Ready => "provider_ready",
             "Failed" => "provider_failed",
-            "DeploymentRestartRequired" => "deployment_restart_required",
+            DeploymentRestartRequired => "deployment_restart_required",
             _ => "provider_configuration_required"
         }
     };

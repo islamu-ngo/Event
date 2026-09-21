@@ -4,7 +4,11 @@ description: Understand infrastructure sizing tiers and scaling profiles for sel
 
 # Deployment Tiers & Capacity Planning
 
-ISLAMU Event is architected to scale from a single lightweight VM to a distributed, multi-datacenter topology without changing the underlying code. The platform defines three primary deployment tiers based on community size, concurrency, and security requirements.
+Use these tiers as planning profiles, not measured capacity guarantees. Select a
+topology for your workload and validate its database, backup and processing needs.
+Private administrator setup is distinct from publication and paid-event readiness;
+the [getting-started checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+keeps those decisions separate.
 
 ---
 
@@ -57,7 +61,8 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 - **Deployment Mode**: `Docker Standalone` (or minimal Compose).
 - **Relational Data**: Single SQLite file or small co-located PostgreSQL container.
 - **Authorization**: `AUTHORIZATION_PROVIDER=local` (uses fast internal database role/permission checks; no external Cerbos PDP required).
-- **Identity**: Co-located Keycloak container or external community OIDC provider.
+- **Identity**: Embedded Local Identity is the recommended minimum; choose an external provider deliberately when needed.
+- **SQLite bounds**: One replica only. Follow the [bounded processing profile](docker-standalone.md#bounded-sqlite-processing-profile); the minimal evaluation lane does not certify optional webhook, notification or scheduled-job workloads.
 - **Media**: Local persistent filesystem volume mounted at `/app/data` or `/app/storage-data/local`.
 
 ---

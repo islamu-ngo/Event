@@ -26,7 +26,7 @@ Depending on delegated administrative scope (see [Admin Hierarchy](admin-hierarc
 ## Visual Branding vs. Legal Accountability Identity
 
 Visual branding is not legal identity:
-* Public pages preserve **Operator Legal Identity** as a mandatory, non-overrideable disclosure resource (configured via `INSTANCE__OPERATORIDENTITY__*` in [Environment Variables](../configuration-and-operations/environment-variables.md#9-operator-legal-identity-production-gate)).
+* Public pages preserve **Operator Legal Identity** as a mandatory disclosure resource. Configure its persisted document through [Getting started](admin-guide.md#getting-started-after-setup); environment identity values are optional bootstrap seeds, not a replacement for the current document. Operator-kind/country choices do not confer edit authority. Instance and directory identities remain independent.
 * If required public disclosure identity is unavailable, the footer fails closed with `503 tenant_identity_unavailable`. A brand logo or display name will never be substituted as a legal fallback.
 
 ---

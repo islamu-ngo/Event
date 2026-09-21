@@ -1,0 +1,32 @@
+.instance-operator-identity-editor__choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: var(--isl-space-4);
+}
+
+.instance-operator-identity-editor__choice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--isl-space-2);
+    min-inline-size: 0;
+
+    & select {
+        inline-size: 100%;
+        min-block-size: 3rem;
+        padding: var(--isl-space-3);
+        border: 1px solid var(--mud-palette-lines-inputs);
+        border-radius: var(--mud-default-borderradius);
+        background: var(--mud-palette-surface);
+        color: var(--mud-palette-text-primary);
+        font: inherit;
+
+        &:focus-visible {
+            outline: 2px solid var(--mud-palette-primary);
+            outline-offset: 2px;
+        }
+    }
+
+    & p {
+        overflow-wrap: anywhere;
+    }
+}

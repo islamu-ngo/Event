@@ -16,6 +16,10 @@ After setup and Local password replacement, sign in afresh and open
 `/settings/instance?section=getting-started`. A new SingleTenant directory stays
 Provisioning and private until explicitly activated. Setup status recovers a lost
 completion response without replaying credentials; completed setup stays locked.
+Use the [categorized checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+to distinguish disclosure and paid-event prerequisites from recommended operational
+work. Optional profile details are disclosed on demand; provider failures and
+restart requirements are not hidden by the simplified setup form.
 
 ---
 

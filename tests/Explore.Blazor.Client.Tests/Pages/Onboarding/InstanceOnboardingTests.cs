@@ -67,6 +67,24 @@ public class InstanceOnboardingTests : IDisposable
     public void Dispose() => _ctx.Dispose();
 
     [Test]
+    public async Task GuidedWizard_DisclosesAdvancedDetailsAndPreservesProviderState()
+    {
+        var cut = RenderForDeploymentMode("SingleTenant");
+        _journey!.Authentication = new() { Provider = "Keycloak", State = "ActionRequired", ReasonCode = "provider_repair_required", RestartRequired = true, RemediationAuthority = "Deployment" };
+        _journey.Authorization = new() { Provider = "Cerbos", State = "Unavailable", ReasonCode = "source_unavailable" };
+        await cut.Find("button[aria-label='Refresh setup status']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(cut.FindAll("button[type=submit]").Count).IsEqualTo(1);
+        await Assert.That(cut.Find("details[data-testid=advanced-setup]").HasAttribute("open")).IsFalse();
+        await Assert.That(cut.Find("details[data-testid=advanced-setup] > summary")).IsNotNull();
+        await Assert.That(cut.Find("[data-provider=authentication]").GetAttribute("data-state")).IsEqualTo("ActionRequired");
+        await Assert.That(cut.Find("[data-provider=authentication] [data-reason]").TextContent).IsEqualTo("provider_repair_required");
+        await Assert.That(cut.Find("[data-provider=authentication]").GetAttribute("data-restart-required")).IsEqualTo("true");
+        await Assert.That(cut.Find("[data-provider=authorization]").GetAttribute("data-state")).IsEqualTo("Unavailable");
+        await Assert.That(cut.FindAll("h1").Count).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task PrivateCompletion_DoesNotRequireLegalIdentity()
     {
         _identityReady = false;

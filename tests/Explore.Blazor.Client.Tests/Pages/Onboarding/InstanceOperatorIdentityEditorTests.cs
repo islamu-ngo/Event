@@ -10,6 +10,35 @@ namespace Explore.Blazor.Client.Tests.Pages.Onboarding;
 public sealed class InstanceOperatorIdentityEditorTests
 {
     [Test]
+    public async Task Metadata_SelectsOnlyServerChoicesWithTranslatedAssociatedGuidanceAndDocumentAuthority()
+    {
+        using var context = new BlazorTestContext();
+        var model = CreateModel(canEdit: false);
+        var revision = model.Revision;
+        model.FormOptions = new()
+        {
+            CountryState = "Available",
+            OperatorKinds = [new() { Code = "ASSOCIATION", LabelId = "kind-label" }],
+            Countries = [new() { Code = "BE", DisplayName = "Belgium" }],
+            Fields = [new() { Name = "operatorKindCode", LabelId = "kind-field-label", HelpId = "kind-help", RequiredForDisclosure = true }],
+            _links = new Dictionary<string, HalLink> { ["update"] = new() { Href = "/not-document-authority" } }
+        };
+        var translation = context.Services.GetRequiredService<ITranslationService>();
+        translation.T("kind-label", Arg.Any<string>()).Returns("Translated kind");
+        translation.T("kind-field-label", Arg.Any<string>()).Returns("Translated label");
+        translation.T("kind-help", Arg.Any<string>()).Returns("Translated help");
+        var cut = Render(context, model);
+        var select = cut.Find("select#instance-operator-kind-code");
+        await Assert.That(select.HasAttribute("disabled")).IsTrue();
+        await Assert.That(cut.Find("label[for=instance-operator-kind-code]").TextContent).IsEqualTo("Translated label");
+        await Assert.That(cut.Find("#" + select.GetAttribute("aria-describedby")).TextContent).IsEqualTo("Translated help");
+        await Assert.That(select.QuerySelectorAll("option[value]:not([value=''])").Select(option => option.GetAttribute("value"))).IsEquivalentTo(new[] { "ASSOCIATION" });
+        await Assert.That(select.QuerySelector("option[value=ASSOCIATION]")!.TextContent).IsEqualTo("Translated kind");
+        await Assert.That(cut.FindAll("[data-testid=save-operator-identity]")).IsEmpty();
+        await Assert.That(model.Revision).IsEqualTo(revision);
+    }
+
+    [Test]
     public async Task Render_DisplaysAllRequiredFieldsWithMudBlazorLabelsAndAccessibilityAttributes()
     {
         using var context = new BlazorTestContext();
@@ -23,8 +52,8 @@ public sealed class InstanceOperatorIdentityEditorTests
 
         await Assert.That(Fields(cut, "Public name").Count).IsEqualTo(1);
         await Assert.That(Fields(cut, "Legal name").Count).IsEqualTo(1);
-        await Assert.That(Fields(cut, "Operator kind code").Count).IsEqualTo(1);
-        await Assert.That(Fields(cut, "Jurisdiction country code").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("label[for=instance-operator-kind-code]").Count).IsEqualTo(1);
+        await Assert.That(cut.FindAll("label[for=instance-operator-jurisdiction-country-code]").Count).IsEqualTo(1);
         await Assert.That(Fields(cut, "Registration identifier").Count).IsEqualTo(1);
         await Assert.That(Fields(cut, "Public contact email").Count).IsEqualTo(1);
         await Assert.That(Fields(cut, "Website URL").Count).IsEqualTo(1);
@@ -33,7 +62,7 @@ public sealed class InstanceOperatorIdentityEditorTests
         await Assert.That(Fields(cut, "Terms URL").Count).IsEqualTo(1);
         await Assert.That(Fields(cut, "Privacy URL").Count).IsEqualTo(1);
 
-        await Assert.That(cut.FindAll("[dir='ltr']").Count).IsGreaterThanOrEqualTo(8);
+        await Assert.That(cut.Find("#instance-operator-website-url").Closest("[dir='ltr']")).IsNotNull();
         await Assert.That(cut.FindAll("[data-testid='operator-readiness-ready']").Count).IsEqualTo(1);
     }
 

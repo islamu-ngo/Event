@@ -11,6 +11,29 @@ namespace Explore.Blazor.IntegrationTests.Handlers;
 public class SetupSecretForwardingHandlerTests
 {
     [Test]
+    [Arguments("status")]
+    [Arguments("journey")]
+    public async Task AuthenticatedStateReadsDoNotRestoreObsoleteSetupAuthority(string endpoint)
+    {
+        var secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var context = new DefaultHttpContext();
+        var protector = CreateCookieProtector();
+        context.Request.Headers.Cookie = $"setup-secret={protector.Protect(secret)}";
+        var capture = new CapturingHandler();
+        using var handler = CreateHandler(context, new SetupSecretSessionService(), capture, protector);
+        using var invoker = new HttpMessageInvoker(handler, disposeHandler: false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.example.test/api/instanceonboarding/{endpoint}");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Add("X-Setup-Secret", secret);
+
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+
+        await Assert.That(capture.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsFalse();
+        await Assert.That(capture.CapturedRequest.Headers.Authorization?.Parameter).IsEqualTo(token);
+    }
+
+    [Test]
     public async Task AnonymousCircuitCookieFlowsThroughTheResolverInAPooledHandlerScope()
     {
         string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));

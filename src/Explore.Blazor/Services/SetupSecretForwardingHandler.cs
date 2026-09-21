@@ -22,7 +22,13 @@ public class SetupSecretForwardingHandler : DelegatingHandler
         var path = request.RequestUri?.AbsolutePath ?? string.Empty;
         _ = request.Headers.Remove("X-Setup-Secret");
 
-        if (!RequiresSetupSecret(request.Method.Method, path))
+        var authenticatedStateRead = request.Method == HttpMethod.Get
+            && (path.Equals("/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("/api/instanceonboarding/journey", StringComparison.OrdinalIgnoreCase))
+            && string.Equals(request.Headers.Authorization?.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase)
+            && Event.Web.BffHosting.Security.EventBffTokenSafety.IsTokenForwardable(request.Headers.Authorization?.Parameter);
+
+        if (authenticatedStateRead || !RequiresSetupSecret(request.Method.Method, path))
         {
             return base.SendAsync(request, cancellationToken);
         }

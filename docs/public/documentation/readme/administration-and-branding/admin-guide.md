@@ -27,6 +27,22 @@ This guide walks administrators through the web consoles in the Blazor managemen
 In multi-tenant deployments, the **Instance Console** (`/admin/instance`) manages
 tenants and platform operations. Instance settings are available in both deployment modes.
 
+### Getting Started After Setup
+
+Open `/settings/instance?section=getting-started` after fresh sign-in. The checklist
+separates **Required before public disclosure**, **Required before paid events**,
+and **Recommended**. Each server-reported check retains its current state,
+requirement category, reason and remediation authority. An optional capability
+shown under Recommended does not become a setup prerequisite.
+
+Use the offered operator-identity and provider actions; missing actions are not
+permissions you can recover by changing a browser role or URL. The identity editor
+uses the server's operator-kind and country choices, with labeled controls and
+visible guidance. If choices are unavailable, refresh rather than inventing a
+country or legal form. Registration identifiers are optional; complete only facts
+that apply to your operator. Saving uses the document's current revision and edit
+permission. Instance and directory identities remain independent.
+
 ### Prepare A Private Default Directory
 
 A directory in **Provisioning** is private even when its operator identity is

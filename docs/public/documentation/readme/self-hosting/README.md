@@ -8,6 +8,11 @@ description: >-
 
 Select a topology by operational needs, then follow its dedicated runbook. The project is in active pre-release development with no official release yet: pre-built images and versioned tags will become available upon initial release.
 
+Private setup needs the site name and initial administrator, not legal identity.
+The [getting-started checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+then separates disclosure, paid-event and recommended work. Provider and deployment
+requirements still apply; the wizard never silently substitutes another provider.
+
 ## Deployment paths
 
 | Path                                                       | Best fit                                                | Primary constraint                                                     |

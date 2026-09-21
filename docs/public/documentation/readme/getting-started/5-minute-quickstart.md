@@ -1,5 +1,5 @@
 ---
-description: Evaluate ISLAMU Event locally in under five minutes using Docker.
+description: Start a small local evaluation with Docker and complete private administrator setup.
 ---
 <!-- ABOUTME: Routes Docker evaluation through the real zero-email setup requirements. -->
 <!-- ABOUTME: Distinguishes durable Standalone startup, Split dependencies and optional mail capture. -->
@@ -69,6 +69,8 @@ with `rm -f ./setup-secret`; never include it in logs or tickets.
 Active setup access carries through to the site profile and readiness checks; no
 additional sign-in or manually supplied authority header is needed for that read.
 Ready Local setup exposes **Finish setup** only through its authorized journey action.
+Keep optional site details collapsed unless needed; the selected providers' ready,
+action-required, unavailable, failure and restart states remain explicit.
 Choose **Finish setup** after entering the site name. Fresh Local administrator
 sign-in opens `/settings/instance?section=getting-started` by default; an explicit
 return destination is preserved. Finishing setup does not publish a
@@ -79,6 +81,12 @@ completed instance must not receive the temporary credential again. The selected
 provider remains available for fresh sign-in while setup authority stays locked.
 After sign-in, browser startup and readiness reads use the ordinary session rather
 than any old setup cookie, so administration remains available after setup closes.
+
+The [getting-started checklist](../administration-and-branding/admin-guide.md#getting-started-after-setup)
+separates disclosure, paid-event and recommended work. These groups do not add
+installation requirements. The five-minute title is an evaluation goal, not a
+startup or usability guarantee: image downloads, migrations, host resources and
+provider configuration affect elapsed time.
 
 For later accounts, current instance administrators use the
 [Local accounts screen](../administration-and-branding/admin-guide.md#local-accounts)

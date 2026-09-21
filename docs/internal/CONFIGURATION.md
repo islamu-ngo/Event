@@ -8,6 +8,14 @@ The exhaustive environment-variable reference is maintained in
 `.env.example` is intentionally a curated baseline, not a complete catalogue.
 This document owns configuration architecture, source anchors and invariants.
 
+## Guided Setup Configuration Boundary
+
+The guided administrator checklist introduces no environment keys, configuration
+store or provider fallback. Existing journey/preflight projections remain the
+source of requirement categories and remediation authority. Value-free operator
+form metadata supplies canonical choices; persisted identity and revision remain
+in the existing document. See [SELF_HOSTING.md](SELF_HOSTING.md#2-operator-identity-governance--readiness-gate).
+
 ## Anonymous Registration Intake Controls
 
 `AnonymousRegistrationRateLimiting` resolves final host configuration from

@@ -3,6 +3,24 @@
 
 # Operations
 
+## Guided Administration Verification
+
+After private setup, inspect the disclosure, paid-event and recommended groups at
+`/settings/instance?section=getting-started`. Resource actions come from current
+HAL links; a readiness result does not authorize a write. Missing form metadata
+must remain visible without clearing identity values or granting edit access.
+
+When browser GET status/journey succeeds but interactive server components fail,
+compare the BFF proxy and circuit forwarding paths. Exact authenticated reads
+must not reintroduce an obsolete setup-secret header over the ordinary bearer.
+Preserve setup requirements on completion writes. For repeated 429 responses,
+inspect the named limiter and request sequence rather than adding blind retries.
+
+Use the documented bounded SQLite profile for evaluation. A setup/browser check
+does not certify optional background processors or production load. Record timing
+start/end events and excluded work; do not infer a container startup benchmark
+from an interactive browser stopwatch.
+
 ## Private Directory Preparation And Activation
 
 In SingleTenant mode, use the authenticated control-plane detail at

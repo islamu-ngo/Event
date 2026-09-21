@@ -31,7 +31,11 @@ directory stays private until explicit activation; MultiTenant creates none.
 Existing directory state and documents are preserved. If completion returns a
 state conflict, refresh setup status before resubmitting. If status says Completed,
 continue through sign-in rather than replaying credentials or reopening setup.
-Public disclosures and paid commerce retain their own readiness checks.
+Public disclosures and paid commerce retain their own readiness checks, shown in
+separate [getting-started groups](../administration-and-branding/admin-guide.md#getting-started-after-setup).
+The Recommended group retains optional capability labels; it does not make every
+Compose integration a setup prerequisite. Advanced provider paths preserve their
+explicit remediation and restart states.
 
 ## 1. Architecture & Service Topology
 

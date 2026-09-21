@@ -24,6 +24,19 @@ Custom setup clients must replace `/api/system/onboarding-preflight` with
 `/api/instanceonboarding/journey`, using active setup or administrator authority.
 Completion and sign-in recovery rules are unchanged.
 
+## Getting-Started And Identity Controls
+
+An unavailable checklist is not a ready result. Use its Refresh status action and
+inspect the bounded reason before proceeding; do not infer permission from a
+readiness label. After sign-in, status/journey reads should use the normal session,
+not old setup authority. A 429 response requires inspecting request volume and the
+configured limiter, not repeatedly pressing Refresh.
+
+If kind/country choices are unavailable, existing identity values are retained.
+Refresh after restoring the metadata service; do not invent a replacement choice
+registry. An omitted Save action means the document did not grant editing.
+A revision conflict requires reviewing the authoritative document before saving.
+
 ## Quick Diagnostic Flow
 
 When diagnosing an unexpected failure, follow this four-step sequence:

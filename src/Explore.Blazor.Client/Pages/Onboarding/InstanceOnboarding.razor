@@ -167,6 +167,8 @@
                                       Placeholder="@T("profile.site_name_placeholder", "Community Events")" />
                         <ValidationMessage For="@(() => _siteProfile.SiteName)" />
 
+                        <details class="instance-onboarding__advanced" data-testid="advanced-setup">
+                            <summary>@T("profile.advanced", "Advanced site details (optional)")</summary>
                         <MudTextField T="string"
                                       Label="@T("profile.support_email_label", "Support email (optional)")"
                                       Variant="Variant.Outlined"
@@ -191,6 +193,7 @@
                                       @bind-Value="_siteProfile.Purpose"
                                       Placeholder="@T("profile.purpose_placeholder", "A short note for future administrators about this site.")" />
                         <ValidationMessage For="@(() => _siteProfile.Purpose)" />
+                        </details>
                     </div>
                     @if (_journey?._links?.ContainsKey("save-profile") == true)
                     {
@@ -214,6 +217,19 @@
                         <MudButton ButtonType="ButtonType.Button" OnClick="CancelLocalSetup">Cancel Local setup</MudButton>
                     </fieldset>
                 }
+
+                <section class="instance-onboarding__section" aria-labelledby="provider-readiness-heading">
+                    <h2 id="provider-readiness-heading">@T("providers.heading", "Provider readiness")</h2>
+                    @foreach (var provider in new[] { (Code: "authentication", Label: "Authentication", Readiness: _journey?.Authentication), (Code: "authorization", Label: "Authorization", Readiness: _journey?.Authorization) })
+                    {
+                        <div data-provider="@provider.Code" data-state="@(provider.Readiness?.State ?? "Unavailable")" data-restart-required="@(provider.Readiness?.RestartRequired == true ? "true" : "false")">
+                            <h3>@provider.Label</h3>
+                            <p>@provider.Readiness?.Provider · @(provider.Readiness?.State ?? "Unavailable")</p>
+                            <p data-reason>@provider.Readiness?.ReasonCode</p>
+                            <p>@provider.Readiness?.RemediationAuthority@(provider.Readiness?.RestartRequired == true ? " · Restart required" : "")</p>
+                        </div>
+                    }
+                </section>
 
                 <section id="launch-readiness" class="instance-onboarding__section" aria-labelledby="launch-readiness-heading">
                     <MudText Typo="Typo.h5" HtmlTag="h2" id="launch-readiness-heading">

@@ -96,6 +96,20 @@ and their documents are preserved. MultiTenant creates no default directory.
 Administrators reach `/settings/instance?section=getting-started` after sign-in;
 publication remains a later explicit, authorized transition.
 
+The getting-started section projects journey identity readiness into **Required
+before public disclosure** and **Required before paid events**. Preflight
+`RequiredToPublish` checks join the disclosure group; other advisory checks appear
+under **Recommended**, retaining their server requirement category (including
+`Optional`), state, bounded reason and remediation authority. This is presentation,
+not a new requirement registry or workflow engine. Resource actions require HAL
+relations; readiness does not grant permissions.
+
+The instance editor retrieves value-free kind/country choices through the identity
+document's `form-options` link. The metadata's label/help identifiers are translation
+keys, not identity values or edit authority. Only the document's `update` relation
+authorizes saves; its revision remains the concurrency token. Unavailable choices
+are explicit and do not erase existing values. Registration stays optional.
+
 - **Decoupled Startup:** API and Standalone hosts boot cleanly without operator identity environment variables, allowing the web onboarding wizard and health probes to respond.
 - **Optional Headless Bootstrap Seed:** For headless `ConfiguredAdministrator` deployments, `INSTANCE__OPERATORIDENTITY__*` in `.env` can optionally provide first-run identity which is validated and persisted to the database during bootstrap completion.
 - **Fail-Closed Consumer Gating:** When operator identity is incomplete, public legal notices return HTTP 503 Service Unavailable, and new paid ticket sales/checkout fail closed (`instance_operator_identity_unavailable`) before payment reservation or provider handoff. First-run setup and administrative repair remain accessible.

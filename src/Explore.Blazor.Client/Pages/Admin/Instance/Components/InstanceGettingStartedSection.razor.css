@@ -1,12 +1,27 @@
 .instance-getting-started {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--isl-space-4);
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+
+    & a,
+    & button {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--isl-target-min);
+        padding-block: var(--isl-space-2);
+
+        &:focus-visible {
+            outline: var(--isl-focus-ring-width) solid var(--isl-color-primary);
+            outline-offset: var(--isl-focus-ring-offset);
+        }
+    }
 }
 
 .instance-getting-started__actions {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--isl-space-3);
     align-items: flex-start;
 }

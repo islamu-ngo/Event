@@ -25,6 +25,26 @@ Use the specialized docs for deep detail:
 | Accessibility rules | [ACCESSIBILITY.md](ACCESSIBILITY.md) |
 | Localization stack | [LOCALIZATION.md](LOCALIZATION.md) |
 
+## Guided Instance Administration
+
+`InstanceGettingStartedSection` reads existing onboarding status/journey services;
+it groups capability readiness and preflight checks without recreating server
+requirements. `InstanceOnboarding` keeps one primary Finish setup action and a
+native disclosure for optional site details. Provider state and restart/remediation
+information remain visible rather than becoming a configured/not-configured guess.
+
+`InstanceOperatorIdentityAdminService` loads generated form metadata only when the
+identity document advertises `form-options`. Metadata populates native labeled
+kind/country selectors; document HAL and revision still own editing. The generated
+`HalResourceOfOperatorIdentityFormOptionsDto` is registered in
+`AppJsonSerializerContext`, including unknown extension-data round-tripping.
+
+For exact authenticated GET status/journey calls, the server-side
+`SetupSecretForwardingHandler` strips stale setup authority and retains the
+forwarded bearer, matching the shared BFF request enricher. Anonymous setup reads
+and completion writes keep their existing setup-secret requirements. No token is
+exposed to a browser component.
+
 ## Project Roles
 
 | Project | Role | Must not own |

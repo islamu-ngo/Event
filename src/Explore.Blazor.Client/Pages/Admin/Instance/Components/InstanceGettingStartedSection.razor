@@ -3,27 +3,57 @@
 @using Explore.Blazor.Client.Helpers
 @inject IInstanceOnboardingService Onboarding
 
-<section class="instance-getting-started" aria-labelledby="instance-getting-started-heading">
+<section class="instance-getting-started" aria-labelledby="instance-getting-started-heading" aria-busy="@(_loading ? "true" : "false")">
     <MudText Typo="Typo.h5" HtmlTag="h2" id="instance-getting-started-heading">Administration ready</MudText>
-    <MudText>Setup is finished. Your directory remains private until you explicitly activate it.</MudText>
-    @if (_status is null)
+    <MudText>Setup is finished. Completing identity does not publish a directory; activation is a separate action.</MudText>
+    <p role="status" aria-live="polite" aria-atomic="true">@(_loading ? "Refreshing administration status..." : _status is null || _journey is null ? "Administration status is unavailable. Refresh to recover the server's current actions." : "Administration status refreshed.")</p>
+    @foreach (var group in Groups)
     {
-        <p role="status">Administration status is unavailable. Refresh to recover the server's current actions.</p>
+        <section class="instance-getting-started__group" data-requirement-group="@group.Code" aria-labelledby="@($"getting-started-{group.Code}")">
+            <h3 id="@($"getting-started-{group.Code}")">@group.Label</h3>
+            @if (group.Code != "Recommended")
+            {
+                var ready = group.Code == "PublicDisclosure" ? _journey?.OperatorIdentity?.PublicDisclosure?.IsReady : _journey?.OperatorIdentity?.PaidCommerce?.IsReady;
+                var reasons = group.Code == "PublicDisclosure" ? _journey?.OperatorIdentity?.PublicDisclosure?.ReasonCodes : _journey?.OperatorIdentity?.PaidCommerce?.ReasonCodes;
+                <div class="instance-getting-started__check" data-check="@group.Code" data-requirement-category="@group.Code">
+                    <h4>Instance operator identity</h4>
+                    <p>@(ready is null ? "Unavailable" : ready == true ? "Ready" : "Action required")</p>
+                    @foreach (var reason in reasons ?? [])
+                    {
+                        <p data-reason>@reason</p>
+                    }
+                    @if (_status?.HasHalLink("manage-operator-identity") == true)
+                    {
+                        <a href="/settings/instance?section=operator-identity">Configure operator identity</a>
+                    }
+                </div>
+            }
+            @foreach (var check in ChecksFor(group.Code))
+            {
+                <div class="instance-getting-started__check" data-check="@check.Code" data-requirement-category="@check.RequirementCategory">
+                    <h4>@check.Name</h4>
+                    <p>@check.Status · @check.RequirementCategory</p>
+                    <p data-reason>@check.ReasonCode</p>
+                    <p>@check.Message</p>
+                    <p>Remediation: @check.RemediationAuthority@(check.RestartRequired == true ? " · Restart required" : "")</p>
+                    @if (check.ActionRelation == "refresh" && _journey?._links?.ContainsKey("refresh") == true)
+                    {
+                        <button type="button" disabled="@_loading" @onclick="RefreshAsync">Refresh status</button>
+                    }
+                </div>
+            }
+        </section>
     }
-    else
+    @if (_status is not null)
     {
         <nav class="instance-getting-started__actions" aria-label="Getting started actions">
             @if (_status.HasHalLink("manage-authentication") || _status.HasHalLink("manage-authorization"))
             {
-                <MudLink Href="/settings/instance?section=auth-providers">Manage providers</MudLink>
-            }
-            @if (_status.HasHalLink("manage-operator-identity"))
-            {
-                <MudLink Href="/settings/instance?section=operator-identity">Configure operator identity</MudLink>
+                <a href="/settings/instance?section=auth-providers">Manage providers</a>
             }
             @if (_status.HasHalLink("manage-tenants"))
             {
-                <MudLink Href="/admin/tenants">Manage directories</MudLink>
+                <a href="/admin/tenants">Manage directories</a>
             }
         </nav>
     }
@@ -31,15 +61,31 @@
 </section>
 
 @code {
+    private static readonly (string Code, string Label)[] Groups =
+    [
+        ("PublicDisclosure", "Required before public disclosure"),
+        ("PaidCommerce", "Required before paid events"),
+        ("Recommended", "Recommended")
+    ];
     private InstanceOnboardingStatusDto? _status;
+    private HalResourceOfInstanceOnboardingJourneyDto? _journey;
     private bool _loading;
+
+    private IEnumerable<OnboardingPreflightCheckDto> ChecksFor(string group) =>
+        (_journey?.Preflight?.WarningChecks ?? []).Where(check =>
+            group == "PublicDisclosure" ? check.RequirementCategory == "RequiredToPublish"
+            : group == "Recommended" && check.RequirementCategory != "RequiredToPublish");
 
     protected override Task OnInitializedAsync() => RefreshAsync();
 
     private async Task RefreshAsync()
     {
         _loading = true;
-        try { _status = await Onboarding.GetStatusAsync(); }
+        try
+        {
+            _status = await Onboarding.GetStatusAsync();
+            _journey = await Onboarding.GetJourneyAsync();
+        }
         finally { _loading = false; }
     }
 }

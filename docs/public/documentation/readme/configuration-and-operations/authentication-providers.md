@@ -13,6 +13,12 @@ ISLAMU Event supports three primary authentication authorities:
 Exactly one provider is primary for new sign-ins. AT Protocol can also remain an
 optional login method while Local Identity or Keycloak is primary.
 
+Setup keeps the selected provider's ready, action-required, unavailable, failed
+and restart-required states visible. Opening advanced configuration does not
+change authority or silently fall back to Local. After completion, use the
+provider-management action offered by the getting-started checklist; ordinary
+sign-in replaces setup authority for status and journey reads.
+
 ## Recommended Choice for Self-Hosters
 
 1. **Local Identity is the recommended default**, especially for Docker

@@ -15,6 +15,7 @@ public interface IInstanceOperatorIdentityAdminService
 
 public sealed class InstanceOperatorIdentityAdminService(
     IInstanceOperatorIdentityClient api,
+    IOperatorIdentityMetadataClient metadata,
     ILogger<InstanceOperatorIdentityAdminService> logger)
     : IInstanceOperatorIdentityAdminService
 {
@@ -27,7 +28,23 @@ public sealed class InstanceOperatorIdentityAdminService(
         {
             HalResourceOfInstanceOperatorIdentityDocumentDto document =
                 await api.GetInstanceOperatorIdentityAsync(cancellationToken: cancellationToken);
-            return Map(document);
+            var model = Map(document);
+            if (document._links?.ContainsKey("form-options") == true)
+            {
+                try
+                {
+                    model.FormOptions = await metadata.GetOperatorIdentityFormOptionsAsync(cancellationToken: cancellationToken);
+                }
+                catch (ApiException exception)
+                {
+                    logger.LogWarning("Operator form choices unavailable. StatusCode={StatusCode}", exception.StatusCode);
+                }
+                catch (HttpRequestException)
+                {
+                    logger.LogWarning("Operator form choices could not be reached.");
+                }
+            }
+            return model;
         }
         catch (Exception exception) when (IsStatus(exception, HttpStatusCode.NotFound))
         {
@@ -181,6 +198,7 @@ public sealed class InstanceOperatorIdentityAdminService(
 
 public sealed class InstanceOperatorIdentityAdminModel
 {
+    public HalResourceOfOperatorIdentityFormOptionsDto? FormOptions { get; set; }
     public bool Exists { get; set; } = true;
     public bool CanEdit { get; set; } = true;
     public Guid? Revision { get; set; }
@@ -219,6 +237,7 @@ public sealed class InstanceOperatorIdentityAdminModel
 
     public void Apply(InstanceOperatorIdentityAdminModel source)
     {
+        FormOptions = source.FormOptions;
         Exists = source.Exists;
         CanEdit = source.CanEdit;
         Revision = source.Revision;

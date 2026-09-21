@@ -677,6 +677,7 @@
             return;
         }
 
+        var lifetimeToken = _lifetimeCancellation.Token;
         if (_hasLoaded && IsLocalSetup)
         {
             _localPassword = string.Empty;
@@ -690,15 +691,15 @@
 
         try
         {
-            var journey = await InstanceOnboardingService.GetJourneyAsync(_lifetimeCancellation.Token);
-            if (_disposed) return;
+            var journey = await InstanceOnboardingService.GetJourneyAsync(lifetimeToken);
+            if (lifetimeToken.IsCancellationRequested) return;
 
             _journey = journey?.State == "Available" ? journey : null;
             var status = _journey?.Bootstrap;
             if (_journey is null)
             {
                 var terminal = await InstanceOnboardingService.GetStatusAsync();
-                if (_disposed) return;
+                if (lifetimeToken.IsCancellationRequested) return;
                 if (terminal is { IsCompleted: true, State: "Completed", Provider: "Local" })
                     status = terminal;
             }
@@ -712,10 +713,10 @@
                     }
                 };
             }
-            var identity = _journey?.OperatorIdentity;
-            _operatorIdentity = identity is null ? InstanceOperatorIdentityAdminModel.Failed() : new()
+            var identityJourney = _journey;
+            _operatorIdentity = identityJourney is { OperatorIdentity: { } identity } ? new()
             {
-                CanEdit = _journey?._links?.ContainsKey("update-operator-identity") == true,
+                CanEdit = identityJourney._links?.ContainsKey("update-operator-identity") == true,
                 Revision = identity.Revision, OperatorId = identity.OperatorId,
                 PublicName = identity.PublicName, LegalName = identity.LegalName,
                 OperatorKindCode = identity.OperatorKindCode, JurisdictionCountryCode = identity.JurisdictionCountryCode,
@@ -729,12 +730,12 @@
                     IsReady = disclosure.IsReady, FailureCode = disclosure.FailureCode, ReasonCodes = disclosure.ReasonCodes
                 } : null,
                 FailureCode = identity.PaidCommerce?.FailureCode, ReasonCodes = identity.PaidCommerce?.ReasonCodes ?? []
-            };
+            } : InstanceOperatorIdentityAdminModel.Failed();
 
             bool wasLocal = IsLocalSetup;
             _status = status;
             _isCompleted = status?.IsCompleted == true;
-            _localCompleted = _isCompleted && status?.Provider == "Local" && status.IsAuthenticated != true;
+            _localCompleted = status is { IsCompleted: true, Provider: "Local", IsAuthenticated: not true };
             if (wasLocal && !IsLocalSetup)
             {
                 _localPassword = string.Empty;
@@ -780,8 +781,10 @@
                 await Announcer.AnnouncePoliteAsync(T("announcements.loaded", "Setup status loaded."));
             }
         }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (lifetimeToken.IsCancellationRequested) return;
             Logger.LogWarning(ex, "Could not load authoritative instance onboarding state.");
             _deploymentMode = null;
             _preflight = null;
@@ -792,7 +795,7 @@
         }
         finally
         {
-            if (!_disposed)
+            if (!lifetimeToken.IsCancellationRequested)
             {
                 _hasLoaded = true;
                 _isLoading = false;
@@ -805,11 +808,12 @@
     {
         if (_disposed || _isSavingProfile || _journey?._links?.ContainsKey("save-profile") != true
             || !_profileEditContext.Validate()) return;
+        var lifetimeToken = _lifetimeCancellation.Token;
         _isSavingProfile = true;
         try
         {
-            var response = await InstanceOnboardingService.SaveProfileAsync(CreateCompletionProfile(), _lifetimeCancellation.Token);
-            if (_disposed) return;
+            var response = await InstanceOnboardingService.SaveProfileAsync(CreateCompletionProfile(), lifetimeToken);
+            if (lifetimeToken.IsCancellationRequested) return;
             if (response.Success != true)
             {
                 await SetLoadErrorAsync("The site profile could not be saved. Readiness has not been refreshed.");
@@ -817,8 +821,11 @@
             }
             await RefreshAsync();
         }
-        catch (OperationCanceledException) when (_lifetimeCancellation.IsCancellationRequested) { }
-        finally { _isSavingProfile = false; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        finally
+        {
+            if (!lifetimeToken.IsCancellationRequested) _isSavingProfile = false;
+        }
     }
 
     private async Task CompleteOnboardingAsync()

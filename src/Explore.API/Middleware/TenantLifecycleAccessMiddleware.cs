@@ -71,7 +71,8 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
     private static bool IsPrivateAdministratorSessionRead(Endpoint? endpoint)
     {
         var action = endpoint?.Metadata.GetMetadata<ControllerActionDescriptor>();
-        return action?.ControllerTypeInfo.AsType() == typeof(UserController)
+        if (action is null) return false;
+        return action.ControllerTypeInfo.AsType() == typeof(UserController)
             && action.MethodInfo.Name is nameof(UserController.GetCurrentUser) or nameof(UserController.GetAdminAuthority);
     }
 

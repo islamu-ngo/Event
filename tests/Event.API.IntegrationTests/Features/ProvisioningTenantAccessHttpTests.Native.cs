@@ -1,5 +1,9 @@
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.API.Configuration;
+using Explore.API.Middleware;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
@@ -32,6 +36,39 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed partial class ProvisioningTenantAccessHttpTests
 {
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingControllerMetadataCannotGrantPrivateLifecycleAccess(bool hasEndpoint)
+    {
+        await using var factory = await CreateReadyAsync();
+        await SetLifecycleAsync(factory, TenantStatusEnum.Provisioning);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
+        tenantContext.SetTenant(TenantId);
+        using var body = new MemoryStream();
+        var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        context.Request.Path = "/api/unclassified";
+        context.Request.Method = HttpMethods.Get;
+        context.Response.Body = body;
+        if (hasEndpoint) context.SetEndpoint(new Endpoint(_ => Task.CompletedTask, new EndpointMetadataCollection(), "unclassified"));
+        var dispatched = false;
+        var middleware = new TenantLifecycleAccessMiddleware(_ =>
+        {
+            dispatched = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, tenantContext,
+            scope.ServiceProvider.GetRequiredService<ITenantLifecycleAccessService>(),
+            scope.ServiceProvider.GetRequiredService<IProblemDetailsService>(),
+            scope.ServiceProvider.GetRequiredService<IOptions<McpAdapterSettings>>());
+
+        await Assert.That(context.Response.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+        await Assert.That(dispatched).IsFalse();
+        await Assert.That(context.Response.Headers.CacheControl.ToString()).IsEqualTo("no-store");
+    }
+
     [Test]
     public async Task ResidualHostOnlyRoutingUsesWarmDomainWithoutSlugHint()
     {
@@ -89,12 +126,17 @@ public sealed partial class ProvisioningTenantAccessHttpTests
     {
         await using var factory = await CreateReadyAsync();
         var fixture = await SeedPublicContentAsync(factory, enableFederation: path == "discovery");
+        using var imageStream = new MemoryStream(fixture.ImageBytes);
         var provider = Substitute.For<IFileStorageProvider>();
         provider.Provider.Returns(StorageProviders.Local);
         provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
-            .Returns(call => call.Arg<FileStorageReadInput>()?.ObjectKey == fixture.ObjectKey
-                ? new FileStorageReadResult(new MemoryStream(fixture.ImageBytes), "image/png", fixture.ImageBytes.Length, null)
-                : throw new FileNotFoundException());
+            .Returns(call =>
+            {
+                if (call.Arg<FileStorageReadInput>()?.ObjectKey != fixture.ObjectKey)
+                    throw new FileNotFoundException();
+                imageStream.Position = 0;
+                return new FileStorageReadResult(imageStream, "image/png", fixture.ImageBytes.Length, null);
+            });
         await using var host = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IFileStorageProvider>();

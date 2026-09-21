@@ -1,10 +1,12 @@
 using System.Text.Json;
 using AngleSharp.Dom;
+using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Models.Responses;
 using Explore.Blazor.Client.Pages.Onboarding;
 using Explore.Blazor.Client.Pages.Onboarding.Components;
 using Explore.Blazor.Client.Routing.ControlPlane;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;
 
@@ -451,6 +453,106 @@ public class InstanceOnboardingTests : IDisposable
         await Task.WhenAll(firstRefresh, overlappingRefresh).WaitAsync(TimeSpan.FromSeconds(5));
 
         await AssertAuthoritativeCallCountAsync(2);
+    }
+
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task DisposedRefresh_IgnoresLateJourneyOrTerminalStatus(bool terminalFallback, bool canceled)
+    {
+        var cut = RenderForDeploymentMode("SingleTenant");
+        var profile = (SelfHostOnboardingProfileDto)cut.FindComponent<EditForm>().Instance.EditContext!.Model;
+        var originalName = profile.SiteName;
+        var announcements = new List<string?>();
+        var announcer = _ctx.Services.GetRequiredService<IAccessibilityAnnouncerService>();
+        announcer.AnnouncePoliteAsync(Arg.Any<string>()).Returns(call =>
+        {
+            announcements.Add(call.Arg<string>());
+            return Task.CompletedTask;
+        });
+        announcer.AnnounceAssertiveAsync(Arg.Any<string>()).Returns(call =>
+        {
+            announcements.Add(call.Arg<string>());
+            return Task.CompletedTask;
+        });
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var journeyGate = new TaskCompletionSource<HalResourceOfInstanceOnboardingJourneyDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var statusGate = new TaskCompletionSource<InstanceOnboardingStatusDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken lifetimeToken = default;
+        _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            lifetimeToken = call.Arg<CancellationToken>();
+            if (!terminalFallback) started.TrySetResult();
+            return terminalFallback ? Task.FromResult<HalResourceOfInstanceOnboardingJourneyDto?>(null) : journeyGate.Task;
+        });
+        _instanceOnboardingService.GetStatusAsync().Returns(_ =>
+        {
+            started.TrySetResult();
+            return statusGate.Task;
+        });
+        Task refresh = Task.CompletedTask;
+        await cut.InvokeAsync(() => { refresh = cut.Instance.RefreshAsync(); });
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cut.InvokeAsync(async () => await cut.Instance.DisposeAsync());
+        if (canceled)
+        {
+            journeyGate.TrySetCanceled(lifetimeToken);
+            statusGate.TrySetCanceled(lifetimeToken);
+        }
+        else
+        {
+            journeyGate.TrySetResult(new()
+            {
+                State = "Available",
+                Profile = new() { SiteName = "Late profile must not be applied" },
+                Bootstrap = CreateStatus(false, "SingleTenant")
+            });
+            statusGate.TrySetResult(new() { IsCompleted = true, State = "Completed", Provider = "Local" });
+        }
+        await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Assert.That(lifetimeToken.IsCancellationRequested).IsTrue();
+        await Assert.That(profile.SiteName).IsEqualTo(originalName);
+        await Assert.That(announcements).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("success")]
+    [Arguments("failure")]
+    [Arguments("canceled")]
+    public async Task DisposedProfileSave_DoesNotRefreshOrPublishLateFailure(string outcome)
+    {
+        var cut = RenderForDeploymentMode("SingleTenant");
+        _journey!._links!["save-profile"] = new() { Href = "/api/instanceonboarding/profile", Method = "PATCH" };
+        await cut.Find("button[aria-label='Refresh setup status']").ClickAsync(new MouseEventArgs());
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveGate = new TaskCompletionSource<BaseCommandResponseOfGuid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken lifetimeToken = default;
+        var readsAfterSave = 0;
+        _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            readsAfterSave++;
+            return Task.FromResult<HalResourceOfInstanceOnboardingJourneyDto?>(_journey);
+        });
+        _instanceOnboardingService.SaveProfileAsync(Arg.Any<SelfHostOnboardingProfileDto>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            lifetimeToken = call.Arg<CancellationToken>();
+            started.TrySetResult();
+            return saveGate.Task;
+        });
+
+        var save = cut.Find("button[data-testid='save-onboarding-profile']").ClickAsync(new MouseEventArgs());
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await cut.InvokeAsync(async () => await cut.Instance.DisposeAsync());
+        if (outcome == "canceled") saveGate.TrySetCanceled(lifetimeToken);
+        else saveGate.TrySetResult(new() { Success = outcome == "success" });
+        await save.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Assert.That(lifetimeToken.IsCancellationRequested).IsTrue();
+        await Assert.That(readsAfterSave).IsEqualTo(0);
+        await Assert.That(cut.FindAll("[role='alert']")).IsEmpty();
     }
 
     [Test]

@@ -1,4 +1,4 @@
-// Exercises public support-contact readback through the generated branding client and existing onboarding form.
+// Exercises public support-contact readback through the generated journey client and existing onboarding form.
 // Keeps support contact independent of Local credential email and verifies cleared server state replaces stale input.
 
 using System.Net;
@@ -60,27 +60,32 @@ public sealed class OnboardingSupportContactTests
             cancellationToken.ThrowIfCancellationRequested();
             object value = request.RequestUri!.AbsolutePath.ToLowerInvariant() switch
             {
-                "/api/instanceonboarding/status" => new
+                "/api/instanceonboarding/journey" => new
                 {
-                    isCompleted = false,
-                    provider = "Local",
-                    state = "InteractivePending",
-                    isAuthenticated = true,
-                    selectedDeploymentMode = "SingleTenant",
-                    pendingOperationId = _pendingOperationId,
+                    state = "Available",
+                    generation = "support-fixture",
+                    bootstrap = new
+                    {
+                        isCompleted = false,
+                        provider = "Local",
+                        state = "InteractivePending",
+                        isAuthenticated = true,
+                        selectedDeploymentMode = "SingleTenant",
+                        pendingOperationId = _pendingOperationId
+                    },
+                    profile = new { siteName = "Public directory", supportEmail = Contact },
+                    authentication = new { provider = "Local", state = "Ready" },
+                    authorization = new { provider = "Local", state = "Ready" },
+                    preflight = new
+                    {
+                        isReadyToLaunch = true,
+                        blockingChecks = Array.Empty<object>(),
+                        warningChecks = Array.Empty<object>()
+                    },
                     _links = new Dictionary<string, object>
                     {
                         ["complete-local"] = new { href = "/api/instanceonboarding/complete-local", method = "POST" }
                     }
-                },
-                "/api/system/onboarding-status" => new { requiresOnboarding = true, deploymentMode = "SingleTenant" },
-                "/api/instance/settings/branding" => new { defaultBrandDisplayName = "Public directory", supportEmail = Contact },
-                "/api/instance/settings/auth-provider/status" or "/api/instance/settings/authz-provider/status" => new { configured = true },
-                "/api/system/onboarding-preflight" => new
-                {
-                    isReadyToLaunch = true,
-                    blockingChecks = Array.Empty<object>(),
-                    warningChecks = Array.Empty<object>()
                 },
                 _ => throw new InvalidOperationException("Unexpected request in support-contact readback.")
             };

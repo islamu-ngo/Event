@@ -21,7 +21,7 @@ public sealed class LocalInstanceOnboardingTests
         await Assert.That(cut.FindAll("input[autocomplete=username][type=text]").Count).IsEqualTo(1);
         await Assert.That(cut.FindAll("input[autocomplete=new-password]").Count).IsEqualTo(1);
         await Assert.That(fixture.Transport.OrdinarySessionWork).IsFalse();
-        await Assert.That(cut.FindAll("#operator-public-name, #operator-legal-name, #operator-public-contact-email").Count).IsEqualTo(3);
+        await Assert.That(cut.FindAll("#operator-public-name, #operator-legal-name, #operator-public-contact-email")).IsEmpty();
     }
 
     [Test]
@@ -37,11 +37,12 @@ public sealed class LocalInstanceOnboardingTests
         await Assert.That(request.Email).IsNull();
         await Assert.That(request.Settings!.SiteProfile!.Locale).IsEqualTo("en");
         await Assert.That(request.Settings.SiteProfile.TimeZone).IsEqualTo("UTC");
-        await Assert.That(request.Settings!.DirectoryOperatorIdentity!.PublicContactEmail).IsEqualTo("directory@example.test");
+        await Assert.That(request.Settings.DirectoryOperatorIdentity).IsNull();
+        await Assert.That(request.Settings.ExpectedJourneyGeneration).IsEqualTo("local-fixture");
         await Assert.That(request.Username).IsEqualTo("instance-operator");
         await Assert.That(fixture.Transport.OrdinarySessionWork).IsFalse();
         await Assert.That(cut.FindAll("input[type=password]")).IsEmpty();
-        await Assert.That(cut.FindAll("a").Any(link => link.GetAttribute("href") == "/login?provider=local")).IsTrue();
+        await Assert.That(cut.FindAll("a").Any(link => link.GetAttribute("href") == "/login?provider=local&returnUrl=%2Fsettings%2Finstance%3Fsection%3Dgetting-started")).IsTrue();
     }
 
     [Test]
@@ -82,20 +83,13 @@ public sealed class LocalInstanceOnboardingTests
         fixture.Transport.CompletionRelease.TrySetResult();
         await submission.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(cut.Find("input[autocomplete=new-password]").GetAttribute("value") ?? "").IsEqualTo("");
-        await Assert.That(cut.FindAll("a[href='/login?provider=local']")).IsEmpty();
+        await Assert.That(cut.FindAll("a[href^='/login?provider=local']")).IsEmpty();
     }
 
     private static void Fill(IRenderedComponent<InstanceOnboarding> cut)
     {
         cut.Find("input[autocomplete=username]").Change("instance-operator");
         cut.Find("input[autocomplete=new-password]").Change($"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}");
-        cut.Find("#operator-public-name").Change("Directory operator");
-        cut.Find("#operator-legal-name").Change("Directory operator ASBL");
-        cut.Find("#operator-kind-code").Change("registered_organization");
-        cut.Find("#operator-jurisdiction-country-code").Change("BE");
-        cut.Find("#operator-public-contact-email").Change("directory@example.test");
-        cut.Find("#operator-legal-notice-url").Change("https://example.test/legal");
-        cut.Find("#operator-privacy-url").Change("https://example.test/privacy");
     }
 
     private sealed class Fixture : IDisposable
@@ -136,20 +130,25 @@ public sealed class LocalInstanceOnboardingTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath.ToLowerInvariant();
-            if (path == "/api/instanceonboarding/status") return Json(new
+            if (path == "/api/instanceonboarding/journey") return Json(new
             {
-                isCompleted = false,
-                provider = "Local",
-                state = "InteractivePending",
-                isAuthenticated = true,
-                selectedDeploymentMode = "SingleTenant",
-                pendingOperationId = PendingOperationId,
+                state = "Available",
+                generation = "local-fixture",
+                bootstrap = new
+                {
+                    isCompleted = false,
+                    provider = "Local",
+                    state = "InteractivePending",
+                    isAuthenticated = true,
+                    selectedDeploymentMode = "SingleTenant",
+                    pendingOperationId = PendingOperationId
+                },
+                profile = new { siteName = "Native Local Site" },
+                authentication = new { provider = "Local", state = "Ready" },
+                authorization = new { provider = "Local", state = "Ready" },
+                preflight = new { isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>() },
                 _links = AllowCompletion ? new Dictionary<string, object> { ["complete-local"] = new { href = "/api/instanceonboarding/complete-local", method = "POST" } } : []
             });
-            if (path == "/api/system/onboarding-status") return Json(new { requiresOnboarding = true, deploymentMode = "SingleTenant" });
-            if (path == "/api/instance/settings/branding") return Json(new { defaultBrandDisplayName = "Native Local Site" });
-            if (path.EndsWith("/status", StringComparison.Ordinal)) return Json(new { configured = true });
-            if (path == "/api/system/onboarding-preflight") return Json(new { isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>() });
             if (path == "/api/instanceonboarding/complete-local")
             {
                 Submitted = await request.Content!.ReadFromJsonAsync<CompleteLocalInstanceOnboardingRequestDto>(cancellationToken);

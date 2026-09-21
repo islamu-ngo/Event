@@ -86,6 +86,41 @@ public sealed class LocalInstanceOnboardingTests
         await Assert.That(cut.FindAll("a[href^='/login?provider=local']")).IsEmpty();
     }
 
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ResponseLossRefreshUsesOnlyTerminalPublicStatus(bool terminalStatus)
+    {
+        using var fixture = new Fixture();
+        fixture.Transport.LoseCompletionResponse = true;
+        fixture.Transport.PublicStatusCompleted = terminalStatus;
+        var forgotten = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Context.JSInterop.SetupModule("/js/bff.js")
+            .Setup<Explore.Blazor.Client.Models.Responses.BffMutationResult>("deleteSetupSecret", invocation =>
+            {
+                fixture.Transport.SetupAuthorityPresent = false;
+                forgotten.TrySetResult();
+                return true;
+            }).SetResult(new() { Ok = true, Status = 200 });
+        var cut = fixture.Context.RenderMudComponent<InstanceOnboarding>();
+        Fill(cut);
+        var committed = fixture.Transport.CompletionCommitted.Task;
+        var submission = cut.InvokeAsync(() => cut.FindComponent<EditForm>().Instance.OnValidSubmit.InvokeAsync());
+        await committed.WaitAsync(TimeSpan.FromSeconds(5));
+        await submission.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(cut.Find("input[autocomplete=new-password]").GetAttribute("value") ?? "").IsEqualTo("");
+        await cut.Find("button[aria-label='Refresh setup status']").ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        await Assert.That(fixture.Transport.PublicStatusReads).IsEqualTo(1);
+        await Assert.That(fixture.Transport.CompletionPosts).IsEqualTo(1);
+        await Assert.That(fixture.Transport.Accounts).IsEqualTo(1);
+        await Assert.That(fixture.Transport.Administrators).IsEqualTo(1);
+        await Assert.That(cut.FindAll("input[type=password]")).IsEmpty();
+        await Assert.That(cut.FindAll("a[href^='/login?provider=local']").Count).IsEqualTo(terminalStatus ? 1 : 0);
+        if (terminalStatus) await forgotten.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(fixture.Transport.SetupAuthorityPresent).IsEqualTo(!terminalStatus);
+        await Assert.That(fixture.Transport.OrdinarySessionWork).IsFalse();
+    }
+
     private static void Fill(IRenderedComponent<InstanceOnboarding> cut)
     {
         cut.Find("input[autocomplete=username]").Change("instance-operator");
@@ -124,12 +159,28 @@ public sealed class LocalInstanceOnboardingTests
         internal bool AllowCompletion { get; set; } = true;
         internal bool FailCompletion { get; set; }
         internal bool PauseCompletion { get; set; }
+        internal bool LoseCompletionResponse { get; set; }
+        internal bool PublicStatusCompleted { get; set; } = true;
+        internal bool SetupAuthorityPresent { get; set; } = true;
+        internal int CompletionPosts { get; private set; }
+        internal int PublicStatusReads { get; private set; }
+        internal int Accounts { get; private set; }
+        internal int Administrators { get; private set; }
+        internal TaskCompletionSource CompletionCommitted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource CompletionStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource CompletionRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal CompleteLocalInstanceOnboardingRequestDto? Submitted { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath.ToLowerInvariant();
+            if (path == "/api/instanceonboarding/status")
+            {
+                PublicStatusReads++;
+                return Json(new { isCompleted = PublicStatusCompleted, provider = "Local", isAuthenticated = false,
+                    state = PublicStatusCompleted ? "Completed" : "InteractivePending", selectedDeploymentMode = "SingleTenant" });
+            }
+            if (path == "/api/instanceonboarding/journey" && CompletionCommitted.Task.IsCompleted)
+                return new HttpResponseMessage(HttpStatusCode.Gone) { Content = JsonContent.Create(new { status = 410 }) };
             if (path == "/api/instanceonboarding/journey") return Json(new
             {
                 state = "Available",
@@ -151,7 +202,15 @@ public sealed class LocalInstanceOnboardingTests
             });
             if (path == "/api/instanceonboarding/complete-local")
             {
+                CompletionPosts++;
                 Submitted = await request.Content!.ReadFromJsonAsync<CompleteLocalInstanceOnboardingRequestDto>(cancellationToken);
+                if (LoseCompletionResponse)
+                {
+                    Accounts++;
+                    Administrators++;
+                    CompletionCommitted.TrySetResult();
+                    throw new HttpRequestException("Completion response lost after commit.");
+                }
                 CompletionStarted.TrySetResult();
                 if (PauseCompletion) await CompletionRelease.Task.WaitAsync(cancellationToken);
                 return FailCompletion

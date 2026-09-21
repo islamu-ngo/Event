@@ -33,6 +33,15 @@ requirements. `InstanceOnboarding` keeps one primary Finish setup action and a
 native disclosure for optional site details. Provider state and restart/remediation
 information remain visible rather than becoming a configured/not-configured guess.
 
+Local completion transport failure is ambiguous because the transaction may have
+committed before the response was lost. The component clears its transient password
+and never resubmits. Refresh first attempts the private journey; only when that is
+unavailable does it read the public status and accept the exact terminal tuple
+`Completed` + `Local`. That tuple renders the sign-in/replacement handoff, advances
+the local request generation and deletes BFF-held setup authority. Nonterminal
+public status never hydrates private profile, readiness or operation data and never
+forgets active setup authority.
+
 `InstanceOperatorIdentityAdminService` loads generated form metadata only when the
 identity document advertises `form-options`. Metadata populates native labeled
 kind/country selectors; document HAL and revision still own editing. The generated

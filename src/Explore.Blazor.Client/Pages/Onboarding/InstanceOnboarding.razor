@@ -377,6 +377,7 @@
     private bool _isCompleted;
     private bool _acknowledgePublicExposure;
     private bool _setupSecretSynced;
+    private bool _setupAuthorityForgetAttempted;
     private bool _disposed;
     private FormSubmitState _submitState = new();
     private string? _loadError;
@@ -631,6 +632,22 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_localCompleted && !_setupAuthorityForgetAttempted && !_disposed)
+        {
+            _setupAuthorityForgetAttempted = true;
+            try
+            {
+                var module = await GetBffModuleAsync();
+                var result = await module.InvokeAsync<BffMutationResult>("deleteSetupSecret");
+                if (result?.Ok != true)
+                    Logger.LogWarning("Completed Local setup authority cleanup was not confirmed.");
+            }
+            catch (JSException)
+            {
+                Logger.LogWarning("Completed Local setup authority cleanup was interrupted.");
+            }
+            return;
+        }
         if (!firstRender || IsLocalSetup || _setupSecretSynced || _disposed || _status?.HasHalLink("complete") != true)
         {
             return;
@@ -669,6 +686,7 @@
         _isRefreshing = true;
         _loadError = null;
         _completionError = null;
+        _setupAuthorityForgetAttempted = false;
 
         try
         {
@@ -677,7 +695,14 @@
 
             _journey = journey?.State == "Available" ? journey : null;
             var status = _journey?.Bootstrap;
-            if (status is not null)
+            if (_journey is null)
+            {
+                var terminal = await InstanceOnboardingService.GetStatusAsync();
+                if (_disposed) return;
+                if (terminal is { IsCompleted: true, State: "Completed", Provider: "Local" })
+                    status = terminal;
+            }
+            if (status is not null && _journey is not null)
             {
                 status = status with
                 {
@@ -732,7 +757,16 @@
                     _siteProfile.CanonicalUrl = profile.CanonicalUrl;
             }
 
-            if (status is null
+            if (_localCompleted)
+            {
+                _localPassword = string.Empty;
+                _localRequestGeneration++;
+                _setupSecretSynced = false;
+                _setupSecretError = null;
+                _syncWarning = null;
+                await Announcer.AnnouncePoliteAsync(T("local.completed", "Setup is complete. Sign in and replace your temporary password."));
+            }
+            else if (status is null
                 || _journey is null
                 || _deploymentMode is null
                 || _preflight is null

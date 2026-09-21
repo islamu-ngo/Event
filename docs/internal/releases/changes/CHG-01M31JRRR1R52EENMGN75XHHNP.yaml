@@ -1,0 +1,28 @@
+Change-Id: CHG-01M31JRRR1R52EENMGN75XHHNP
+Title: "Converge Local setup after a lost completion response"
+Type: fix
+Scope: onboarding
+Summary: "Use public terminal status to render the Local sign-in handoff without replaying credentials."
+Group: onboarding-recovery
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: "Public status may establish only the exact terminal Completed/Local handoff. Pending and private journey data remain private-authority-only; credentials are never replayed and completed setup authority is deleted."
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: "After an ambiguous Local completion response, Refresh status renders the sign-in handoff, clears password/setup state and does not submit completion again."

@@ -164,6 +164,10 @@ public sealed class LocalAuthenticationContractTests
         };
         var validator = new CompleteLocalInstanceOnboardingRequestDtoValidator();
         await Assert.That((await validator.ValidateAsync(request)).IsValid).IsTrue();
+        await Assert.That((await validator.ValidateAsync(request with
+        {
+            Settings = request.Settings with { DeploymentMode = DeploymentMode.SingleTenant }
+        })).IsValid).IsTrue();
         var invalid = new[]
         {
             request with { OperationId = Guid.Empty },
@@ -172,7 +176,7 @@ public sealed class LocalAuthenticationContractTests
             request with { Email = "invalid@" },
             request with { Email = string.Empty },
             request with { TemporaryPassword = new string('x', 129) },
-            request with { Settings = request.Settings with { DeploymentMode = DeploymentMode.SingleTenant } }
+            request with { Settings = request.Settings with { DeploymentMode = (DeploymentMode)int.MaxValue } }
         };
         foreach (var item in invalid)
         {

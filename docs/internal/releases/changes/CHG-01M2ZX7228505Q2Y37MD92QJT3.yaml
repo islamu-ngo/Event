@@ -21,6 +21,12 @@ Impacts:
       The journey includes generation, provider readiness, persisted profile,
       identity and preflight categories, remediation authority and action relations.
       Missing or contradictory sources produce a failed snapshot with refresh only.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
   Security:
     Reference: docs/internal/API.md
     Disposition: documented

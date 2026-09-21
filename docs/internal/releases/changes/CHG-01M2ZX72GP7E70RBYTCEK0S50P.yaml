@@ -8,6 +8,15 @@ Summary: >-
 Group: progressive-instance-onboarding
 Supersedes: []
 Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
   Security:
     Reference: docs/internal/AUTHORIZATION.md
     Disposition: documented

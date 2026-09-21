@@ -16,6 +16,13 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         ITenantLifecycleAccessService lifecycle, IProblemDetailsService problems,
         IOptions<McpAdapterSettings> mcpOptions)
     {
+        if (context.GetEndpoint()?.Metadata.GetMetadata<InstanceManagementAttribute>() is not null)
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            await next(context);
+            return;
+        }
+
         var mcp = mcpOptions.Value;
         bool tenantSurface = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
             || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)

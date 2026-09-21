@@ -77,6 +77,7 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
         _getPolicyPackageStatusHandler = getPolicyPackageStatusHandler;
     }
 
+    [InstanceManagement]
     [HttpGet("authz-provider", Name = RouteNames.GetInstanceAuthorizationProviderConfiguration)]
     [EndpointSummary("Get Authorization Provider Configuration")]
     [EndpointDescription("Returns current authorization provider configuration for instance administration.")]
@@ -90,6 +91,7 @@ public sealed class InstanceAuthorizationSettingsController : InstanceSettingsCo
         return Ok(configuration);
     }
 
+    [InstanceManagement]
     [HttpPatch("authz-provider", Name = RouteNames.UpdateInstanceAuthorizationProviderConfiguration)]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [EndpointSummary("Update Authorization Provider Configuration")]

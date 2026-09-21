@@ -185,6 +185,18 @@ or exact bound-tenant administrator authority. This lets the BFF complete fresh
 sign-in and session revalidation without publishing the directory. Public tenant
 reads remain lifecycle-denied even for that administrator.
 
+### Private instance management
+
+`InstanceManagementAttribute` classifies only GET/PATCH on the exact
+`/api/instance/settings/auth-provider` and `authz-provider` routes, and GET/PUT
+on `/api/instance-operator-identity`. Tenant resolution and lifecycle middleware
+let these instance-owned actions reach their existing setup/administrator checks,
+without requiring a tenant in MultiTenant mode or an Active directory in
+SingleTenant mode. Responses are no-store. The classification grants no identity,
+role or command authority and does not cover descendants, anonymous provider
+status routes or public experience. Setup expiry and persisted administrator
+checks remain owned by the existing authentication, controller and command paths.
+
 ### Antiforgery boundaries
 
 Unsafe browser `/api/*` requests require the BFF antiforgery token: the BFF issues `XSRF-TOKEN` and the client returns it as `X-CSRF-TOKEN`. In Split, the BFF proxy validates this before YARP forwarding. In Standalone, the Combined bridge validates it before API dispatch. Direct API bearer-token and API-key clients do not traverse a browser-cookie boundary and are not subject to BFF antiforgery.

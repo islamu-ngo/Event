@@ -1,4 +1,5 @@
 using Explore.API.Authentication;
+using Explore.API.Attributes;
 using Explore.API.Configuration;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Services;
@@ -45,7 +46,8 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        if (IsTenantExemptPath(context.Request.Path))
+        if (IsTenantExemptPath(context.Request.Path)
+            || context.GetEndpoint()?.Metadata.GetMetadata<InstanceManagementAttribute>() is not null)
         {
             await _next(context);
             return;

@@ -28,6 +28,13 @@ rejects the stale version instead of replacing that saved profile. Refresh befor
 retrying. Profile saves already in flight cannot change the instance after setup
 has completed; setup authority remains permanently locked.
 
+Authentication-provider, authorization-provider and instance operator-identity
+settings remain manageable with active setup authority or a signed-in instance
+administrator while the directory is private. MultiTenant instances do not need
+to create or bind an unrelated directory first. Ordinary users and tenant-only
+administrators do not gain instance-management access, and public pages stay
+unavailable until explicit directory activation.
+
 ---
 
 ## 1. When to Choose Standalone

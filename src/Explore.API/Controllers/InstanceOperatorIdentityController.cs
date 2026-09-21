@@ -64,6 +64,7 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
     /// <summary>
     /// Retrieves current instance operator identity document and readiness assessment.
     /// </summary>
+    [InstanceManagement]
     [HttpGet(Name = RouteNames.GetInstanceOperatorIdentity)]
     [PrivateNoStore]
     [EndpointSummary("Get Instance Operator Identity")]
@@ -90,6 +91,7 @@ public sealed class InstanceOperatorIdentityController : EventControllerBase
     /// <summary>
     /// Saves candidate instance operator identity settings.
     /// </summary>
+    [InstanceManagement]
     [HttpPut(Name = RouteNames.SaveInstanceOperatorIdentity)]
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]

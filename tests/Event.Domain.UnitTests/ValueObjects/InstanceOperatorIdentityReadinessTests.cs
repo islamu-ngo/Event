@@ -177,10 +177,13 @@ public sealed class InstanceOperatorIdentityReadinessTests
     }
 
     [Test]
-    public async Task PublicDisclosure_MalformedOptionalTerms_FailsClosed()
+    [Arguments("http")]
+    [Arguments("ftp")]
+    public async Task PublicDisclosure_NonHttpsOptionalTerms_FailsClosed(string scheme)
     {
+        var terms = new UriBuilder("https://example.test/terms") { Scheme = scheme, Port = -1 };
         var readiness = InstanceOperatorIdentityReadiness.Evaluate(
-            Complete() with { TermsUrl = "http://example.test/terms" }, InstanceOperatorIdentityCapability.PublicDisclosure);
+            Complete() with { TermsUrl = terms.Uri.AbsoluteUri }, InstanceOperatorIdentityCapability.PublicDisclosure);
 
         await Assert.That(readiness.IsReady).IsFalse();
         await Assert.That(readiness.ReasonCodes).IsEquivalentTo(["instance_operator_identity_terms_url_invalid"]);

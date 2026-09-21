@@ -156,8 +156,8 @@ public sealed class InstanceOperatorIdentityService(
 
                 return BaseCommandResponse.Success(
                     new InstanceOperatorIdentitySavedDocument(
-                        saved.Revision!.Value,
-                        saved.OperatorId!.Value,
+                        saved.Revision.Value,
+                        saved.OperatorId.Value,
                         Assess(saved, InstanceOperatorIdentityCapability.PublicDisclosure),
                         Assess(saved, InstanceOperatorIdentityCapability.PaidCommerce)),
                     "Instance operator identity saved.");

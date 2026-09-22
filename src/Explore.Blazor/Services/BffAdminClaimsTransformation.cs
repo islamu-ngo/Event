@@ -9,6 +9,11 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Explore.Blazor.Services;
 
+public readonly record struct BffPrincipalRefreshResult(
+    bool SynchronizationAttempted,
+    bool UserSynchronized,
+    bool AdminClaimsUpdated);
+
 /// <summary>
 /// Enriches the authenticated BFF cookie principal with admin authority claims by calling
 /// the API's admin-authority endpoint at sign-in and refresh boundaries.
@@ -51,12 +56,49 @@ public sealed class BffAdminClaimsTransformation
         _logger = logger;
     }
 
-    public async Task<bool> EnrichPrincipalAsync(
+    public Task<bool> EnrichPrincipalAsync(
         ClaimsPrincipal principal,
         AuthenticationProperties? properties,
         bool forceRefresh = false,
         bool synchronizeUser = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        EnrichPrincipalCoreAsync(
+            principal,
+            properties,
+            forceRefresh,
+            synchronizeUser,
+            synchronizationObserver: null,
+            cancellationToken);
+
+    public async Task<BffPrincipalRefreshResult>
+        RefreshPrincipalAsync(
+            ClaimsPrincipal principal,
+            AuthenticationProperties properties,
+            CancellationToken cancellationToken = default)
+    {
+        bool? synchronized = null;
+        bool adminClaimsUpdated =
+            await EnrichPrincipalCoreAsync(
+                principal,
+                properties,
+                forceRefresh: true,
+                synchronizeUser: true,
+                synchronizationObserver: succeeded =>
+                    synchronized = succeeded,
+                cancellationToken);
+        return new BffPrincipalRefreshResult(
+            SynchronizationAttempted: synchronized.HasValue,
+            UserSynchronized: synchronized == true,
+            AdminClaimsUpdated: adminClaimsUpdated);
+    }
+
+    private async Task<bool> EnrichPrincipalCoreAsync(
+        ClaimsPrincipal principal,
+        AuthenticationProperties? properties,
+        bool forceRefresh,
+        bool synchronizeUser,
+        Action<bool>? synchronizationObserver,
+        CancellationToken cancellationToken)
     {
         if (!await ValidateLocalSessionAsync(
                 principal, properties, properties?.GetTokenValue("access_token"), cancellationToken))
@@ -99,11 +141,13 @@ public sealed class BffAdminClaimsTransformation
             var internalUserId = await SynchronizeUserAsync(accessToken, cancellationToken);
             if (internalUserId is null)
             {
+                synchronizationObserver?.Invoke(false);
                 RemoveAdminClaims(principal);
                 _cache.Remove(cacheKey);
                 return false;
             }
 
+            synchronizationObserver?.Invoke(true);
             ReplaceInternalUserIdClaim(principal, internalUserId.Value);
             _cache.Remove(cacheKey);
             _onboardingStatusProvider.Invalidate();

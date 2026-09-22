@@ -302,15 +302,13 @@ public sealed class KeycloakAdminOperationClient(
             ? new JsonObject
             {
                 ["access.token.claim"] = "true",
-                ["id.token.claim"] = "true",
-                ["introspection.token.claim"] = "true"
+                ["id.token.claim"] = "true"
             }
             : new JsonObject
             {
                 ["included.client.audience"] = request.ApiClientId,
                 ["access.token.claim"] = "true",
-                ["id.token.claim"] = "false",
-                ["introspection.token.claim"] = "true"
+                ["id.token.claim"] = "false"
             };
 
     private static string MapperType(KeycloakMapperSemantic semantic) =>

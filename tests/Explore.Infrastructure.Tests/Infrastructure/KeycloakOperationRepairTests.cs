@@ -54,7 +54,8 @@ public sealed class KeycloakOperationRepairTests
             ProjectAudience(
                 "mapper-42",
                 "event-api",
-                accessToken: false);
+                accessToken: false,
+                name: "operator-owned-audience");
         KeycloakChangeStep step = PlanAudienceUpdate(drifted);
 
         KeycloakMapperOperationResult result =
@@ -149,6 +150,36 @@ public sealed class KeycloakOperationRepairTests
             ProjectAudience(
                 "mapper-42",
                 "event-api",
+                accessToken: false,
+                name: "operator-owned-audience"));
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    approved,
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ExternalMapperTypeDrift_FailsFingerprintPrecondition()
+    {
+        JsonObject externallyEdited = AudienceMapper(
+            id: "mapper-42",
+            name: "event-api-audience",
+            audience: "event-api",
+            accessToken: false);
+        externallyEdited["protocolMapper"] =
+            "oidc-usermodel-attribute-mapper";
+        var handler = new SemanticKeycloakHandler([externallyEdited]);
+        KeycloakChangeStep approved = PlanAudienceUpdate(
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
                 accessToken: false));
 
         KeycloakMapperOperationResult result =
@@ -156,6 +187,37 @@ public sealed class KeycloakOperationRepairTests
                 CreateRequest(
                     approved,
                     KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task NewDifferentlyNamedSubjectClaimProducer_FailsCreate()
+    {
+        var conflictingProducer = new JsonObject
+        {
+            ["id"] = "external-sub",
+            ["name"] = "operator-subject-claim",
+            ["protocol"] = "openid-connect",
+            ["protocolMapper"] = "oidc-usermodel-attribute-mapper",
+            ["config"] = new JsonObject
+            {
+                ["claim.name"] = "sub",
+                ["access.token.claim"] = "true",
+                ["id.token.claim"] = "true"
+            }
+        };
+        var handler = new SemanticKeycloakHandler(
+            [conflictingProducer]);
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    PlanSubjectCreate(),
+                    KeycloakMapperSemantic.Subject),
                 CancellationToken.None);
 
         await Assert.That(result.Outcome)
@@ -381,7 +443,8 @@ public sealed class KeycloakOperationRepairTests
         string id,
         string audience,
         bool accessToken = true,
-        bool idToken = false) =>
+        bool idToken = false,
+        string name = "event-api-audience") =>
         new(
             id,
             KeycloakMapperSemantic.Audience,
@@ -389,7 +452,10 @@ public sealed class KeycloakOperationRepairTests
             audience,
             AddsToAccessToken: accessToken,
             AddsToIdToken: idToken,
-            IsEffective: true);
+            IsEffective: true,
+            Name: name,
+            Protocol: "openid-connect",
+            MapperType: "oidc-audience-mapper");
 
     private static JsonObject AudienceMapper(
         string id,

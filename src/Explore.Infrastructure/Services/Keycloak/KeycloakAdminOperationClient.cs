@@ -191,6 +191,12 @@ public sealed class KeycloakAdminOperationClient(
         IReadOnlyCollection<JsonObject> mappers,
         bool allowWrite)
     {
+        if (request.Semantic == KeycloakMapperSemantic.Subject
+            && mappers.Any(IsConflictingSubjectProducer))
+        {
+            return Conflict("keycloak_mapper_collision");
+        }
+
         JsonObject[] sameName = mappers
             .Where(mapper => string.Equals(
                 StringValue(mapper, "name"),
@@ -332,9 +338,24 @@ public sealed class KeycloakAdminOperationClient(
                 StringComparison.Ordinal)
             && projected.Semantic == request.Semantic
             && string.Equals(
-                KeycloakOperationService.MapperFingerprint(projected),
+                KeycloakOperationService.MapperSemanticFingerprint(projected),
                 request.Step.DesiredFingerprint,
                 StringComparison.Ordinal);
+    }
+
+    private static bool IsConflictingSubjectProducer(JsonObject mapper)
+    {
+        JsonObject config = mapper["config"] as JsonObject ?? [];
+        return !string.Equals(
+                StringValue(mapper, "protocolMapper"),
+                "oidc-sub-mapper",
+                StringComparison.Ordinal)
+            && string.Equals(
+                StringValue(config, "claim.name"),
+                "sub",
+                StringComparison.Ordinal)
+            && (IsTrue(config, "access.token.claim")
+                || IsTrue(config, "id.token.claim"));
     }
 
     private static JsonObject? FindVerifiedMapper(
@@ -358,8 +379,13 @@ public sealed class KeycloakAdminOperationClient(
     {
         string mapperType = StringValue(mapper, "protocolMapper") ?? string.Empty;
         JsonObject config = mapper["config"] as JsonObject ?? [];
+        string? claimName = StringValue(config, "claim.name");
+        bool mappedSubject = string.Equals(
+            claimName,
+            "sub",
+            StringComparison.Ordinal);
         KeycloakMapperSemantic semantic =
-            mapperType == "oidc-sub-mapper"
+            mapperType == "oidc-sub-mapper" || mappedSubject
                 ? KeycloakMapperSemantic.Subject
                 : KeycloakMapperSemantic.Audience;
         string? audience = semantic == KeycloakMapperSemantic.Audience
@@ -372,7 +398,11 @@ public sealed class KeycloakAdminOperationClient(
             audience,
             IsTrue(config, "access.token.claim"),
             IsTrue(config, "id.token.claim"),
-            IsEffective: true);
+            IsEffective: true,
+            Name: StringValue(mapper, "name"),
+            Protocol: StringValue(mapper, "protocol"),
+            MapperType: mapperType,
+            ClaimName: claimName);
     }
 
     private async Task<string?> RequestAccessTokenAsync(

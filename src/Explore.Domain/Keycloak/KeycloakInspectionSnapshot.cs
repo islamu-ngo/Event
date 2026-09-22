@@ -21,7 +21,11 @@ public sealed record KeycloakEffectiveMapperSnapshot(
     bool AddsToAccessToken,
     bool AddsToIdToken,
     bool IsEffective,
-    bool IsConflicting = false);
+    bool IsConflicting = false,
+    string? Name = null,
+    string? Protocol = null,
+    string? MapperType = null,
+    string? ClaimName = null);
 
 public sealed record KeycloakInspectionSnapshot
 {

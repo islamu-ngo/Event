@@ -361,6 +361,49 @@ public sealed class KeycloakOperationExecutionTests
         await Assert.That(harness.Admin.InspectCount).IsEqualTo(1);
     }
 
+    [Test]
+    public async Task Reconcile_AfterProposalExpiry_RemainsAvailableForUncertainWrite()
+    {
+        TestHarness harness = await TestHarness.CreateAsync(
+            twoSteps: false,
+            inspectResults:
+            [
+                Result(KeycloakStepOutcomeKind.Verified)
+            ]);
+        Guid expectedStamp = harness.Operation.ConcurrencyStamp;
+        harness.Operation.AuthorizeApply(
+            harness.Context.Actor,
+            harness.Context.SetupGeneration,
+            harness.Context.Target,
+            harness.Context.Digest,
+            harness.Context.NowUtc);
+        harness.Operation.RecordStepOutcome(new KeycloakStepOutcome(
+            harness.Operation.ChangeSet.Steps.Single().StepId,
+            KeycloakStepOutcomeKind.OutcomeUnknown));
+        harness.Operation.MarkOutcomeUnknown();
+        await harness.Repository.SaveAsync(
+            harness.Operation,
+            expectedStamp);
+        var expiredProposalContext = new KeycloakOperationApplyContext(
+            harness.Operation.Id,
+            harness.Context.Actor,
+            harness.Context.SetupGeneration,
+            harness.Context.Target,
+            harness.Context.Digest,
+            harness.Context.ApiClientId,
+            harness.Context.AdministratorUsername,
+            harness.Context.AdministratorPassword,
+            harness.Operation.ExpiresAtUtc.AddMinutes(1));
+
+        KeycloakOperation result =
+            await harness.Service.ReconcileAsync(expiredProposalContext);
+
+        await Assert.That(result.State)
+            .IsEqualTo(KeycloakOperationState.Verified);
+        await Assert.That(harness.Admin.ApplyCount).IsEqualTo(0);
+        await Assert.That(harness.Admin.InspectCount).IsEqualTo(1);
+    }
+
     private static KeycloakInspectionSnapshot Snapshot(
         IReadOnlyList<KeycloakEffectiveMapperSnapshot> mappers) =>
         new(

@@ -219,6 +219,44 @@ authority backup. Application checkpoints remain append-only evidence. General
 correction outbox retention follows the outbox runbook, but failed and
 dead-lettered corrections remain until operators reconcile them.
 
+## Keycloak Operation Receipt Recovery
+
+`KeycloakOperationReceipts` is part of the primary application database backup.
+It stores only allowlisted change intent, the normalized instance/provider/realm
+target, actor or setup-generation binding, digest, lifecycle timestamps and
+optimistic concurrency state. It never stores administrator credentials,
+provider tokens, runtime client secrets or raw Keycloak responses.
+
+Settled receipts (`Verified`, `PartiallyApplied`, `Conflict`,
+`FailedBeforeWrite`, `Cancelled`, or `Expired`) become deletion-eligible 30 days
+after `settled_at_utc`. `Applying` and `OutcomeUnknown` are unresolved:
+
+- they have no settlement timestamp and are retained indefinitely;
+- they block overlapping operations for the same instance, authority and realm;
+- expiry or cancellation does not turn a submitted request into permission to
+  send it again;
+- only read-only provider reconciliation may settle them.
+
+Restore the primary database and Keycloak from a coordinated backup whenever
+possible. After a primary-database-only restore, inspect every unresolved
+receipt against Keycloak before allowing another operation. A missing receipt
+must not be reconstructed from provider state and a restored receipt must not
+be replayed automatically.
+
+Downgrading across the receipt migration is a checked stop. The registered
+provider migration SQL generators install a temporary enforced constraint
+immediately before the generated table drop. Existing or newly inserted
+`Applying`/`OutcomeUnknown` rows make downgrade fail before destruction.
+Resolve every uncertain receipt through read-only inspection and retry; never
+delete receipts to clear the guard.
+
+MySQL and MariaDB commit DDL implicitly. Interruption after guard installation
+but before the table drop can leave
+`ck_keycloak_receipts_no_unresolved_downgrade` installed. Keep the application
+offline, verify there are no unresolved rows, remove only that known temporary
+constraint (`DROP CHECK` on MySQL, `DROP CONSTRAINT` on MariaDB), and rerun the
+guarded downgrade. Prefer a forward fix for every retained environment.
+
 If startup replay fails:
 
 1. Keep the API and BFF out of service. A failed process, refused socket, and absent readiness response are the expected safe state.

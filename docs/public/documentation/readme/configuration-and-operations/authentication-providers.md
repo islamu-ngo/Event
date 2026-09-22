@@ -94,6 +94,23 @@ without creating duplicates. Ordinary browser refresh does not require
 `offline_access`; missing offline-token policy is not treated as a launch
 failure. Unsupported prerequisites are shown as manual Keycloak steps.
 
+### Approved operations and interrupted requests
+
+Before Event sends an approved Keycloak change, it stores a credential-free
+operation receipt. The receipt binds the exact instance, authority, realm,
+client targets, reviewed change digest and current setup or administrator
+authority. A changed target or approval cannot reuse it.
+
+If the response is lost, Event reports **outcome unknown** and blocks another
+operation for that realm. Do not click Apply again or repeat the change
+manually. Run read-only reconciliation first. Cancellation can prevent work
+that has not been sent; after transmission it records your request but cannot
+undo Keycloak.
+
+Back up the application database together with Keycloak before an approved
+change. Settled receipts are retained for at least 30 days. Unresolved receipts
+are retained until reconciliation and are never replayed automatically.
+
 ## Passwordless AT Protocol Onboarding
 
 1. Start first-run setup and choose **AT Protocol** as the primary provider.

@@ -17,7 +17,7 @@ public class ApplyKeycloakRealmSyncCommandHandler(
         ApplyKeycloakRealmSyncCommand request,
         CancellationToken cancellationToken)
     {
-        var configuration = await _configurationService.ReadConfigurationWithSecretsAsync();
+        var configuration = await _configurationService.ReadConfigurationAsync();
         return await _keycloakBootstrapService.ApplyRealmSyncAsync(configuration, request.Request, cancellationToken);
     }
 }

@@ -559,6 +559,12 @@ public static class InfrastructureServicesRegistration
             client.Timeout = TimeSpan.FromSeconds(45);
         })
             .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
+        services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.MaxResponseContentBufferSize = 1024 * 1024;
+        })
+            .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
         services.AddScoped<IKeycloakBootstrapService, KeycloakBootstrapService>();
         services.Configure<KeycloakLifecycleEmailOptions>(configuration.GetSection(KeycloakLifecycleEmailOptions.SectionName));
         services.AddHttpClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName, client =>
@@ -877,6 +883,8 @@ public static class InfrastructureServicesRegistration
         // Forcing IPv4 avoids a 60s API request timeout while requesting the admin token.
         return new SocketsHttpHandler
         {
+            AllowAutoRedirect = false,
+            UseCookies = false,
             ConnectTimeout = TimeSpan.FromSeconds(10),
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
             PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),

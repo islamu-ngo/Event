@@ -9,22 +9,6 @@ public class EventKeycloakIdentityContractContributor : IKeycloakIdentityContrac
 
     public void Contribute(KeycloakRealmDesiredStateDto desiredState, KeycloakRealmDesiredStateBuildRequestDto request)
     {
-        desiredState.RequiredRealmRoles = Merge(desiredState.RequiredRealmRoles, ["offline_access"]);
-        desiredState.RoleComposites = MergeRoleComposites(
-            desiredState.RoleComposites,
-            new KeycloakRoleCompositeDesiredStateDto
-            {
-                RoleName = $"default-roles-{request.Realm.ToLowerInvariant()}",
-                CompositeRoleNames = ["offline_access"]
-            });
-        desiredState.ClientScopes = MergeClientScopes(
-            desiredState.ClientScopes,
-            new KeycloakClientScopeDesiredStateDto
-            {
-                Name = "offline_access",
-                RealmRoleMappings = ["offline_access"]
-            });
-
         desiredState.Clients = MergeClients(
             desiredState.Clients,
             BuildBlazorClient(request),
@@ -44,18 +28,7 @@ public class EventKeycloakIdentityContractContributor : IKeycloakIdentityContrac
             DirectAccessGrantsEnabled = false,
             ServiceAccountsEnabled = false,
             RedirectUris = request.BlazorRedirectUris,
-            WebOrigins = request.BlazorWebOrigins,
-            OptionalClientScopes = ["offline_access"],
-            ProtocolMappers =
-            [
-                new KeycloakProtocolMapperDesiredStateDto
-                {
-                    Name = "provider-subject",
-                    MapperType = "oidc-sub-mapper",
-                    AddToAccessToken = true,
-                    AddToIdToken = true
-                }
-            ]
+            WebOrigins = request.BlazorWebOrigins
         };
 
     private static KeycloakClientDesiredStateDto? BuildApiClient(KeycloakRealmDesiredStateBuildRequestDto request)
@@ -86,46 +59,6 @@ public class EventKeycloakIdentityContractContributor : IKeycloakIdentityContrac
                 }
             ]
         };
-    }
-
-    private static IReadOnlyList<string> Merge(IReadOnlyList<string> existing, IReadOnlyList<string> additions) =>
-        existing.Concat(additions)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private static IReadOnlyList<KeycloakRoleCompositeDesiredStateDto> MergeRoleComposites(
-        IReadOnlyList<KeycloakRoleCompositeDesiredStateDto> existing,
-        KeycloakRoleCompositeDesiredStateDto addition)
-    {
-        var composites = existing.ToDictionary(composite => composite.RoleName, StringComparer.OrdinalIgnoreCase);
-        if (composites.TryGetValue(addition.RoleName, out var current))
-        {
-            current.CompositeRoleNames = Merge(current.CompositeRoleNames, addition.CompositeRoleNames);
-        }
-        else
-        {
-            composites[addition.RoleName] = addition;
-        }
-
-        return composites.Values.ToArray();
-    }
-
-    private static IReadOnlyList<KeycloakClientScopeDesiredStateDto> MergeClientScopes(
-        IReadOnlyList<KeycloakClientScopeDesiredStateDto> existing,
-        KeycloakClientScopeDesiredStateDto addition)
-    {
-        var scopes = existing.ToDictionary(scope => scope.Name, StringComparer.OrdinalIgnoreCase);
-        if (scopes.TryGetValue(addition.Name, out var current))
-        {
-            current.RealmRoleMappings = Merge(current.RealmRoleMappings, addition.RealmRoleMappings);
-        }
-        else
-        {
-            scopes[addition.Name] = addition;
-        }
-
-        return scopes.Values.ToArray();
     }
 
     private static IReadOnlyList<KeycloakClientDesiredStateDto> MergeClients(

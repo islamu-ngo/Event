@@ -276,6 +276,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IInstanceOnboardingGenerationReader, InstanceOnboardingGenerationReader>();
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
+        services.AddScoped<KeycloakConnectionResolver>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();
         services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
         services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();

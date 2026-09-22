@@ -1,6 +1,7 @@
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Onboarding;
@@ -9,6 +10,7 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Features.Events;
+using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
@@ -490,6 +492,7 @@ public sealed class VisitorAccessSettingsWriterTests
             new EventParticipationConfigurationRepository(fixture.Context), configuration);
         return new AuthProviderConfigurationService(new SystemSettingRepository(fixture.Context, mutationLock), configuration,
             unitOfWork, mutationLock, writer,
+            new KeycloakConnectionResolver(fixture.Services.GetRequiredService<ISecretResolver>(), configuration),
             fixture.Services.GetServices<Explore.Application.Contracts.Operations.INotificationHandler<Explore.Application.Notifications.SettingChangedNotification>>());
     }
 

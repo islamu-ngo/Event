@@ -1,0 +1,34 @@
+# Records the fail-closed Keycloak connection and inspection authority boundary.
+# Removes application-owned secret fallback and broad existing-realm mutation.
+Change-Id: CHG-01M34BFWBKPWKZTZ8ADCAJGWQY
+Title: preserve operator-owned Keycloak configuration during setup
+Type: fix
+Scope: access
+Summary: Resolve Keycloak runtime credentials from the selected deployment authority, keep administrator input request-scoped, and make inspection read-only.
+Group: keycloak-operator-safety
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Keycloak runtime credentials must be deployment-bound; legacy bootstrap, realm-wide synchronization and application-managed rotation no longer mutate existing provider state.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Fresh administrator credentials are accepted only from the foreground form and never sourced from deployment secrets, retained, logged or replayed.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: not-applicable
+    Detail: This phase changes no application schema or provider data.
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Existing Keycloak database-secret fallback is removed in favor of the selected runtime authority.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Public operation replacement and generated contract changes are delivered in the reviewed-operation phase.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Basic discovery requires no administrator input, privileged inspection is read-only, and unsupported existing-realm changes remain manual.

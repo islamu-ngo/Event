@@ -72,6 +72,28 @@ does not repair an existing realm or change issued tokens. Keep the existing API
 mapper and email-verification mapping. Do not add a hard-coded subject or mark an
 email verified to work around sign-in failures.
 
+## Safe Keycloak Connection And Inspection
+
+A correctly configured deployment connects with its existing runtime BFF
+credential. The application resolves the Keycloak endpoint, realm, client ID and
+client secret from the deployment's selected secret authority; it does not copy
+the secret into the application database or ask an administrator to re-enter it.
+If that authority is unavailable or unauthorized, repair the selected authority
+and restart the affected replicas rather than adding a fallback value.
+
+Basic discovery is read-only and needs no Keycloak administrator account.
+Advanced inspection is a separate request and requires credentials entered
+freshly in that form. Those credentials are used only for the foreground
+request and are not read from deployment configuration, retained as a session,
+or written to logs and support artifacts.
+
+For an existing realm, Event does not change realm settings, users, roles,
+shared client scopes, sessions, existing-client flow/type settings, or client
+secrets. It recognizes effective native and inherited subject/audience mappings
+without creating duplicates. Ordinary browser refresh does not require
+`offline_access`; missing offline-token policy is not treated as a launch
+failure. Unsupported prerequisites are shown as manual Keycloak steps.
+
 ## Passwordless AT Protocol Onboarding
 
 1. Start first-run setup and choose **AT Protocol** as the primary provider.

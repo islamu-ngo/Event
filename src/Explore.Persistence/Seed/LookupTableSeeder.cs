@@ -83,6 +83,7 @@ public static class LookupTableSeeder
         await SeedRegistrationProviderLookupsAsync(context, cancellationToken);
         await SeedPlatformMonetizationDefaultsAsync(context, cancellationToken);
         await SeedEventStatusesAsync(context, cancellationToken);
+        await SeedEventResourceLookupsAsync(context, cancellationToken);
         await SeedEventSessionStatusesAsync(context, cancellationToken);
         await SeedEventTypesAsync(context, cancellationToken);
         await SeedFileTypesAsync(context, cancellationToken);
@@ -116,6 +117,24 @@ public static class LookupTableSeeder
         await SeedEventRegistrationPoliciesAsync(context, cancellationToken);
         await SeedRegistrationScopesAsync(context, cancellationToken);
         await SeedUiThemePresetsAsync(context, cancellationToken);
+    }
+
+    private static async Task SeedEventResourceLookupsAsync(
+        ExploreDbContext context,
+        CancellationToken cancellationToken)
+    {
+        await AddMissingLookupRowsAsync(
+            context.EventResourceKinds,
+            EventResourceKind.CreateDefaults(),
+            cancellationToken);
+        await AddMissingLookupRowsAsync(
+            context.EventResourceDeliveryTypes,
+            EventResourceDeliveryType.CreateDefaults(),
+            cancellationToken);
+        if (context.ChangeTracker.HasChanges())
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static async Task SeedWebhookProviderBindingVerificationStatesAsync(

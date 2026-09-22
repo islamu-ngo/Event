@@ -138,6 +138,8 @@ public sealed class EventResourceAudienceTests
         var frozen = new EventResourceAccessFacts(resource.TenantId, subject, false, parent, evidence, true);
         evidence.Clear();
         await Assert.That(resource.AudienceRules.Count).IsEqualTo(2);
+        var exposed = (ICollection<EventResourceAudienceRule>)resource.AudienceRules;
+        await Assert.That(() => exposed.Add(member)).Throws<NotSupportedException>();
         await Assert.That(EventResourceAccessRules.Evaluate(resource, frozen, new DateTimeOffset(EventResourceTestData.Now)).CanAccess).IsTrue();
     }
 
@@ -173,6 +175,19 @@ public sealed class EventResourceAudienceTests
         await Assert.That(EventResourceTestData.Decision(resource, parent, subject, [fact]).CanAccess).IsTrue();
         await Assert.That(EventResourceTestData.Decision(resource, parent, subject,
             [fact with { AdmissionTargetId = resource.EventSessionId }]).CanAccess).IsFalse();
+    }
+
+    [Test]
+    public async Task ReusingAnAudienceEntityCannotRebindPublishedOwnership()
+    {
+        var (resource, _, subject) = EventResourceTestData.CreatePublished();
+        var rule = resource.AudienceRules.Single();
+        var scope = rule.ResourceSessionScopeId;
+        await Assert.That(() => EventResource.CreateDraft(resource.Id, resource.TenantId, resource.EventId,
+            Guid.CreateVersion7(), EventResourceTestData.Metadata, EventResourceDeliveryTypeEnum.StoredFile,
+            EventResourceAvailability.Create(), [rule], subject, EventResourceTestData.Now))
+            .Throws<InvalidOperationException>();
+        await Assert.That(rule.ResourceSessionScopeId).IsEqualTo(scope);
     }
 
     private static EventResourceAudienceFact Fact(EventResource resource, Guid subject, EventResourceAudienceKindEnum kind) => new()

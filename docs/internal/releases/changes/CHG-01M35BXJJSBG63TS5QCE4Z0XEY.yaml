@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M35BXJJSBG63TS5QCE4Z0XEY
+Title: "Persist tenant-isolated event resources"
+Type: feat
+Scope: events
+Summary: "Persist governed event resource policies and minimal management audit with portable tenant-qualified ownership constraints."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: The additive foundation exposes no API and changes no accepted external contract.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Tenant-qualified event, session, storage, alternative, ticket-catalog and admission-target constraints reject cross-owner persisted rows.
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: documented
+    Detail: Apply the generated AddEventResources application migration for PostgreSQL, SQLite, SQL Server, or the shared MySQL/MariaDB history before enabling resource behavior.
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: This schema foundation adds no setting or environment variable.
+  OpenAPI:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: No HTTP resource surface is enabled in this change.
+  Operator:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Deploy the additive schema first; after resource content exists, withdraw the feature and repair forward rather than reversing a data-dropping migration.

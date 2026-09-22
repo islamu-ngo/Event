@@ -7,6 +7,7 @@ namespace Explore.Domain;
 
 public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurrencyAware
 {
+    private readonly List<EventResourceAudienceRule> _audienceRules = [];
     private Guid _tenantId;
 
     public Guid Id { get; private set; }
@@ -22,6 +23,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
     }
     public Guid EventId { get; private set; }
     public Guid? EventSessionId { get; private set; }
+    public Guid SessionScopeId { get; private set; }
     public int EventResourceKindId { get; private set; }
     public int EventResourceDeliveryTypeId { get; private set; }
     public int PublicationStateId { get; private set; }
@@ -51,7 +53,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         AvailabilityStartOffsetTicks.HasValue ? TimeSpan.FromTicks(AvailabilityStartOffsetTicks.Value) : null,
         (EventResourceAvailabilityAnchorEnum?)AvailabilityEndAnchorId,
         AvailabilityEndOffsetTicks.HasValue ? TimeSpan.FromTicks(AvailabilityEndOffsetTicks.Value) : null);
-    public IReadOnlyCollection<EventResourceAudienceRule> AudienceRules { get; private set; } = [];
+    public IReadOnlyCollection<EventResourceAudienceRule> AudienceRules => _audienceRules.AsReadOnly();
     public DateTime CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -97,6 +99,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
             TenantId = tenantId,
             EventId = eventId,
             EventSessionId = sessionId,
+            SessionScopeId = sessionId ?? eventId,
             EventResourceDeliveryTypeId = (int)deliveryType,
             PublicationStateId = (int)EventResourcePublicationStateEnum.Draft,
             CreatedAt = occurredAtUtc,
@@ -104,7 +107,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         };
         resource.ApplyAvailability(availability);
         resource.ApplyMetadata(metadata);
-        resource.AudienceRules = resource.ValidateAudience(audienceRules);
+        resource.ReplaceAudienceRules(resource.ValidateAudience(audienceRules));
         return resource;
     }
 
@@ -122,7 +125,7 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         ArgumentNullException.ThrowIfNull(availability);
         var rules = ValidateAudience(audienceRules);
         ApplyAvailability(availability);
-        AudienceRules = rules;
+        ReplaceAudienceRules(rules);
         Touch(actorId, occurredAtUtc);
     }
 
@@ -266,7 +269,17 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         {
             throw new ArgumentException("Resource audience rules must have valid, matching ownership and scopes.");
         }
+        foreach (EventResourceAudienceRule rule in rules)
+        {
+            rule.BindResourceSession(EventSessionId, SessionScopeId);
+        }
         return Array.AsReadOnly(rules);
+    }
+
+    private void ReplaceAudienceRules(IEnumerable<EventResourceAudienceRule> rules)
+    {
+        _audienceRules.Clear();
+        _audienceRules.AddRange(rules);
     }
 
     private void ApplyAvailability(EventResourceAvailability availability)

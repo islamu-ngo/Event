@@ -3,7 +3,6 @@
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;
-using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -163,7 +162,6 @@ public sealed class SemanticValueConstraintMigrationTests(
         try
         {
             await migrator.MigrateAsync(catalog.MigrationId);
-            await LookupTableSeeder.SeedAsync(context);
             Guid tenantId = await SeedValidScalarRowsAsync();
             string baselineFingerprint = await ReadScalarFingerprintAsync(tenantId);
             await Assert.That(await CountSemanticConstraintsAsync()).IsEqualTo(4);
@@ -207,7 +205,6 @@ public sealed class SemanticValueConstraintMigrationTests(
         try
         {
             await migrator.MigrateAsync(catalog.MigrationId);
-            await LookupTableSeeder.SeedAsync(context);
             Guid tenantId = await SeedValidScalarRowsAsync();
 
             PostgresException? exception = await Assert.That(
@@ -252,7 +249,6 @@ public sealed class SemanticValueConstraintMigrationTests(
         try
         {
             await migrator.MigrateAsync(catalog.MigrationId);
-            await LookupTableSeeder.SeedAsync(context);
             Guid tenantId = await SeedValidScalarRowsAsync();
             Guid locationId = await ReadPairedLocationIdAsync(tenantId);
 
@@ -420,6 +416,8 @@ public sealed class SemanticValueConstraintMigrationTests(
 
     private async Task<Guid> SeedValidScalarRowsAsync()
     {
+        await SeedHistoricalScalarPrerequisitesAsync();
+
         Guid tenantId = Guid.CreateVersion7();
         Guid servicePrincipalId = Guid.CreateVersion7();
         Guid actorId = Guid.CreateVersion7();
@@ -544,6 +542,58 @@ public sealed class SemanticValueConstraintMigrationTests(
             ("null_postcode", "synthetic-null-postcode"));
 
         return tenantId;
+    }
+
+    private async Task SeedHistoricalScalarPrerequisitesAsync()
+    {
+        await ExecuteAsync(
+            """
+            INSERT INTO islamu_event.actor_types (id, master_code, full_name)
+            VALUES (5, 'SYSTEM', 'System');
+
+            INSERT INTO islamu_event.tenant_statuses
+                (id, master_code, full_name, is_active_state)
+            VALUES (2, 'ACTIVE', 'Active', TRUE);
+
+            INSERT INTO islamu_event.event_provenance_types (id, master_code, full_name)
+            VALUES (1, 'ORGANIZER_CREATED', 'Organizer created');
+
+            INSERT INTO islamu_event.visibility_types (id, master_code, full_name)
+            VALUES (1, 'PUBLIC', 'Public');
+
+            INSERT INTO islamu_event.event_statuses (id, master_code, full_name)
+            VALUES (1, 'DRAFT', 'Draft');
+
+            INSERT INTO islamu_event.event_formats (id, master_code, full_name)
+            VALUES (1, 'LOCAL', 'Local (In-Person)');
+
+            INSERT INTO islamu_event.ticket_catalog_statuses (id, master_code, full_name)
+            VALUES (1, 'DRAFT', 'Draft');
+
+            INSERT INTO islamu_event.ticket_pricing_modes (id, master_code, full_name)
+            VALUES
+                (1, 'FIXED', 'Fixed'),
+                (5, 'SLIDING_SCALE', 'Sliding scale');
+
+            INSERT INTO islamu_event.participant_data_collection_modes
+                (id, master_code, full_name)
+            VALUES (1, 'NONE', 'None');
+
+            INSERT INTO islamu_event.location_kinds (id, master_code, full_name)
+            VALUES (2, 'COMMERCIAL_VENUE', 'Commercial venue');
+
+            INSERT INTO islamu_event.location_privacy_states (id, master_code, full_name)
+            VALUES (2, 'ACTIVE', 'Active');
+
+            INSERT INTO islamu_event.location_address_sources (id, master_code, full_name)
+            VALUES (1, 'UNKNOWN_LEGACY', 'Unknown legacy');
+
+            INSERT INTO islamu_event.location_address_visibilities (id, master_code, full_name)
+            VALUES (1, 'QUARANTINED', 'Quarantined');
+
+            INSERT INTO islamu_event.event_session_statuses (id, master_code, full_name)
+            VALUES (1, 'DRAFT', 'Draft');
+            """);
     }
 
     private async Task<string> ReadScalarCardinalityAsync(Guid tenantId)

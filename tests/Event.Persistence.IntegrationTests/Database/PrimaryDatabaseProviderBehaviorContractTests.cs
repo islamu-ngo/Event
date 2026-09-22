@@ -65,6 +65,13 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
     }
 
     [Test]
+    public Task EventResourcesRejectInvalidPersistedOwnership()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceProviderContractAssertions.AssertInvalidPersistedOwnershipRejectedAsync(fixture);
+    }
+
+    [Test]
     public Task DataProtectionKeyRingSurvivesProviderRecreation()
     {
         var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();

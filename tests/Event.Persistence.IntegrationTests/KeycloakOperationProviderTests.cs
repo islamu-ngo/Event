@@ -68,7 +68,11 @@ public sealed class KeycloakOperationProviderTests
                     "expected-fingerprint",
                     "expected-identity-fingerprint",
                     "desired-fingerprint",
-                    "binding-fingerprint")
+                    "binding-fingerprint",
+                    KeycloakDesiredProjection.Mapper(
+                        "event-bff:audience",
+                        KeycloakMapperSemantic.Audience,
+                        "event-api"))
             ]),
             new KeycloakTarget(
                 InstanceId,

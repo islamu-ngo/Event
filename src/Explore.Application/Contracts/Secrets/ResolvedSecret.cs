@@ -13,10 +13,12 @@ namespace Explore.Application.Contracts.Secrets;
 /// <param name="Scope">Scope at which the binding was registered.</param>
 /// <param name="ScopeId">Tenant id when <paramref name="Scope"/> is <see cref="SecretScope.Tenant"/>, otherwise <c>null</c>.</param>
 /// <param name="ResolvedAt">UTC timestamp of resolution (useful for TTL accounting and audit correlation).</param>
+/// <param name="BindingRevision">Stable, value-free provider/binding version. It changes when the selected credential changes.</param>
 public sealed record ResolvedSecret(
     string SettingKey,
     string Value,
     SecretSourceType Source,
     SecretScope Scope,
     Guid? ScopeId,
-    DateTimeOffset ResolvedAt);
+    DateTimeOffset ResolvedAt,
+    string BindingRevision = "");

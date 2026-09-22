@@ -718,7 +718,6 @@ public sealed class UserPiiInventoryArchitectureTests
             typeof(Explore.Application.Contracts.Infrastructure.Ai.IAiChatProvider),
             typeof(Explore.Application.Contracts.Infrastructure.IModerationSignalProvider),
             typeof(Explore.Application.Contracts.Infrastructure.IReviewQueueProvider),
-            typeof(Explore.Application.Contracts.Services.IKeycloakBootstrapService),
             typeof(Explore.Application.Features.AiAssistant.Disclosure.IAiContextGateway),
             typeof(Explore.Infrastructure.Webhooks.ISvixWebhookClient)
         ];

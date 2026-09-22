@@ -42,7 +42,6 @@ public sealed class InstanceBootstrapAuditLogger : IInstanceBootstrapAuditLogger
         {
             InstanceBootstrapAuditEventType.SetupSecretRejected => LogLevel.Warning,
             InstanceBootstrapAuditEventType.SetupModeInactive => LogLevel.Warning,
-            InstanceBootstrapAuditEventType.KeycloakBootstrapFailed => LogLevel.Warning,
             InstanceBootstrapAuditEventType.SetupModeDisabled => LogLevel.Warning,
             _ => LogLevel.Information
         };

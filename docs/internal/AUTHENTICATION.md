@@ -61,8 +61,22 @@ recognize effective native, directly assigned or inherited subject and audience
 mappers, but it does not change realm settings, roles, shared client scopes,
 users, sessions, existing-client type/flow settings or client secrets.
 `offline_access` is optional and is not a repair prerequisite. Legacy bootstrap,
-realm-sync apply and client-secret rotation calls fail before provider mutation;
-the reviewed operation workflow is the only future mutation path.
+realm-sync apply and client-secret rotation routes are removed without aliases.
+
+The reviewed operation workflow can create only a realm or client that a fresh
+Admin REST read proves absent. Realm creation writes the approved initial
+defaults once. Confidential BFF creation receives the current deployment-owned
+runtime secret server-side; bearer-only API creation omits `secret`. A name
+race, ambiguous match, existing resource or incompatible shape is a conflict,
+never an adoption or update. Mapper repair remains the only operation that may
+update an existing Keycloak resource, and it binds the exact provider identity,
+type, name, claim and reviewed semantic state.
+
+Every remote send follows a durable local intent. A timeout, disconnect or 5xx
+after send becomes `OutcomeUnknown`; later steps stop. Reconciliation reads only
+the captured provider identity and never creates, adopts by name, retries or
+rolls back. Proposal expiry blocks a new apply, while an already uncertain write
+remains recoverable through fresh current-authority read-only reconciliation.
 
 ## Clean Architecture Flow
 

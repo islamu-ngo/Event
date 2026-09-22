@@ -73,7 +73,7 @@ public sealed class InstanceKeycloakOperationsController(
         typeof(HalResource<KeycloakInspectionDto>),
         StatusCodes.Status200OK)]
     public async Task<ActionResult<HalResource<KeycloakInspectionDto>>> Inspect(
-        [FromBody] KeycloakOperationInput input,
+        [FromBody] KeycloakInspectionCredentials input,
         [FromServices] IResourceAssembler<
             KeycloakInspectionDto,
             KeycloakInspectionDto> assembler,
@@ -103,7 +103,7 @@ public sealed class InstanceKeycloakOperationsController(
         typeof(HalResource<KeycloakOperationDto>),
         StatusCodes.Status200OK)]
     public async Task<ActionResult<HalResource<KeycloakOperationDto>>> Plan(
-        [FromBody] KeycloakOperationInput input,
+        [FromBody] KeycloakOperationPlanInput input,
         [FromServices] IResourceAssembler<
             KeycloakOperationDto,
             KeycloakOperationDto> assembler,
@@ -168,7 +168,7 @@ public sealed class InstanceKeycloakOperationsController(
         StatusCodes.Status200OK)]
     public Task<ActionResult<HalResource<KeycloakOperationDto>>> Apply(
         Guid operationId,
-        [FromBody] KeycloakOperationInput input,
+        [FromBody] KeycloakOperationCredentials input,
         [FromServices] IResourceAssembler<
             KeycloakOperationDto,
             KeycloakOperationDto> assembler,
@@ -195,7 +195,7 @@ public sealed class InstanceKeycloakOperationsController(
         StatusCodes.Status200OK)]
     public Task<ActionResult<HalResource<KeycloakOperationDto>>> Reconcile(
         Guid operationId,
-        [FromBody] KeycloakOperationInput input,
+        [FromBody] KeycloakOperationCredentials input,
         [FromServices] IResourceAssembler<
             KeycloakOperationDto,
             KeycloakOperationDto> assembler,

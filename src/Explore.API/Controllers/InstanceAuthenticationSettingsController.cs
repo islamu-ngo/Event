@@ -50,10 +50,6 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
     private readonly IQueryHandler<GetAuthProviderConfigurationQuery, AuthProviderConfigurationDto> _getAuthProviderConfigHandler;
     private readonly ICommandHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>> _updateAuthConfigDuringSetupHandler;
     private readonly ICommandHandler<UpdateAuthProviderConfigurationCommand, BaseCommandResponse<Guid>> _updateAuthConfigHandler;
-    private readonly IQueryHandler<RunKeycloakRealmDoctorQuery, KeycloakRealmDoctorResultDto> _realmDoctorHandler;
-    private readonly IQueryHandler<PreviewKeycloakRealmSyncQuery, KeycloakRealmSyncPlanDto> _previewRealmSyncHandler;
-    private readonly ICommandHandler<ApplyKeycloakRealmSyncCommand, KeycloakRealmSyncPlanDto> _applyRealmSyncHandler;
-    private readonly ICommandHandler<RotateKeycloakClientSecretCommand, KeycloakClientSecretRotationResultDto> _rotateClientSecretHandler;
 
     public InstanceAuthenticationSettingsController(
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
@@ -61,10 +57,6 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         IQueryHandler<GetAuthProviderConfigurationQuery, AuthProviderConfigurationDto> getAuthProviderConfigHandler,
         ICommandHandler<UpdateAuthProviderConfigurationDuringSetupCommand, BaseCommandResponse<Guid>> updateAuthConfigDuringSetupHandler,
         ICommandHandler<UpdateAuthProviderConfigurationCommand, BaseCommandResponse<Guid>> updateAuthConfigHandler,
-        IQueryHandler<RunKeycloakRealmDoctorQuery, KeycloakRealmDoctorResultDto> realmDoctorHandler,
-        IQueryHandler<PreviewKeycloakRealmSyncQuery, KeycloakRealmSyncPlanDto> previewRealmSyncHandler,
-        ICommandHandler<ApplyKeycloakRealmSyncCommand, KeycloakRealmSyncPlanDto> applyRealmSyncHandler,
-        ICommandHandler<RotateKeycloakClientSecretCommand, KeycloakClientSecretRotationResultDto> rotateClientSecretHandler,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
@@ -74,10 +66,6 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         _getAuthProviderConfigHandler = getAuthProviderConfigHandler;
         _updateAuthConfigDuringSetupHandler = updateAuthConfigDuringSetupHandler;
         _updateAuthConfigHandler = updateAuthConfigHandler;
-        _realmDoctorHandler = realmDoctorHandler;
-        _previewRealmSyncHandler = previewRealmSyncHandler;
-        _applyRealmSyncHandler = applyRealmSyncHandler;
-        _rotateClientSecretHandler = rotateClientSecretHandler;
     }
 
     [InstanceManagement]
@@ -126,83 +114,6 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         }
 
         return HandleCommandResponse(response);
-    }
-
-    [PrivateNoStore]
-    [SuppressIdempotencyResponseStorage]
-    [HttpPost("auth-provider/keycloak/doctor", Name = RouteNames.RunInstanceKeycloakRealmDoctor)]
-    [EndpointSummary("Run Keycloak Realm Doctor")]
-    [EndpointDescription("Runs read-only Keycloak realm diagnostics. Temporary admin credentials are used only for this request and are not stored.")]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(KeycloakRealmDoctorResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<KeycloakRealmDoctorResultDto>> RunKeycloakRealmDoctor(
-        [FromBody] KeycloakRealmDoctorRequestDto request,
-        CancellationToken cancellationToken = default)
-    {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-
-        var result = await _realmDoctorHandler.QueryAsync(new RunKeycloakRealmDoctorQuery { Request = request }, cancellationToken);
-        return Ok(result);
-    }
-
-    [PrivateNoStore]
-    [SuppressIdempotencyResponseStorage]
-    [HttpPost("auth-provider/keycloak/sync-preview", Name = RouteNames.PreviewInstanceKeycloakRealmSync)]
-    [EndpointSummary("Preview Keycloak Realm Sync")]
-    [EndpointDescription("Generates a read-only additive Keycloak realm sync plan. Temporary admin credentials are used only for this request and are not stored.")]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(KeycloakRealmSyncPlanDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<KeycloakRealmSyncPlanDto>> PreviewKeycloakRealmSync(
-        [FromBody] KeycloakRealmSyncPreviewRequestDto request,
-        CancellationToken cancellationToken = default)
-    {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-
-        var result = await _previewRealmSyncHandler.QueryAsync(new PreviewKeycloakRealmSyncQuery { Request = request }, cancellationToken);
-        return Ok(result);
-    }
-
-    [PrivateNoStore]
-    [SuppressIdempotencyResponseStorage]
-    [HttpPost("auth-provider/keycloak/sync-apply", Name = RouteNames.ApplyInstanceKeycloakRealmSync)]
-    [EndpointSummary("Apply Keycloak Realm Sync")]
-    [EndpointDescription("Applies backup-confirmed additive Keycloak realm repairs. Temporary admin credentials are used only for this request and are not stored.")]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(KeycloakRealmSyncPlanDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<KeycloakRealmSyncPlanDto>> ApplyKeycloakRealmSync(
-        [FromBody] KeycloakRealmSyncApplyRequestDto request,
-        CancellationToken cancellationToken = default)
-    {
-        if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-
-        var result = await _applyRealmSyncHandler.ExecuteAsync(new ApplyKeycloakRealmSyncCommand { Request = request }, cancellationToken);
-        return Ok(result);
-    }
-
-    [PrivateNoStore]
-    [SuppressIdempotencyResponseStorage]
-    [HttpPost("auth-provider/keycloak/client-secret/rotate", Name = RouteNames.RotateInstanceKeycloakClientSecret)]
-    [EndpointSummary("Rotate Keycloak Client Secret")]
-    [EndpointDescription("Rotates an application-managed Keycloak client secret. Deployment-managed secrets return operator instructions and are not changed by the application.")]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(KeycloakClientSecretRotationResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<KeycloakClientSecretRotationResultDto>> RotateKeycloakClientSecret(
-        [FromBody] KeycloakClientSecretRotationRequestDto request,
-        CancellationToken cancellationToken = default)
-    {
-        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
-        if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
-        if (!await AdminContext.IsInstanceAdminAsync(userId.Value, cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator authority is required for this operation.");
-
-        var result = await _rotateClientSecretHandler.ExecuteAsync(
-            new RotateKeycloakClientSecretCommand { UserId = userId.Value, Request = request },
-            cancellationToken);
-        return Ok(result);
     }
 
     [HttpGet("auth-provider/status", Name = RouteNames.GetInstanceAuthProviderConfigurationStatus)]

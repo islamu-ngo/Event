@@ -471,7 +471,26 @@ public sealed class KeycloakOperationPersistenceTests
                 ? "expected-identity-fingerprint"
                 : null,
             "desired-fingerprint",
-            "binding-fingerprint");
+            "binding-fingerprint",
+            kind switch
+            {
+                KeycloakStep.CreateRealm =>
+                    KeycloakDesiredProjection.Realm(
+                        "operators",
+                        "11111111-1111-7111-8111-111111111111"),
+                KeycloakStep.CreateClient =>
+                    KeycloakDesiredProjection.ConfidentialClient(
+                        client,
+                        [],
+                        []),
+                KeycloakStep.CreateMapper
+                    or KeycloakStep.UpdateMapper =>
+                    KeycloakDesiredProjection.Mapper(
+                        $"{client}:audience",
+                        KeycloakMapperSemantic.Audience,
+                        "event-api"),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            });
 
     private static KeycloakTarget Target(
         Guid instanceId,

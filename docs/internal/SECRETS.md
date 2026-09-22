@@ -8,6 +8,23 @@ ABOUTME: Covers bootstrap selection, safe diagnostics, health monitoring, and ro
 local Development/Testing authority. A missing, unsupported, disallowed, or failed
 authority stops required startup work and never falls back to another source.
 
+## Keycloak Runtime Credential Ownership
+
+The Keycloak BFF client secret is deployment-owned runtime material. Event
+resolves it through `ISecretResolver` from exactly one selected authority and
+never stores, rotates, returns or logs it. A reviewed create receipt records
+only a value-free binding generation; it does not persist plaintext, provider
+coordinates, or a secret-derived hash. If that generation changes before
+apply, the plan is rejected before Keycloak administrator authentication or
+provider mutation.
+
+The resolved secret may seed a proven-absent confidential BFF client exactly
+once. Bearer-only API client payloads omit `secret`. Existing-client secret
+endpoints are outside application authority. Rotation is coordinated externally:
+update Keycloak and the selected environment/Infisical authority, restart all
+affected replicas, run read-only inspection, then verify a fresh user sign-in.
+Event provides this guidance but performs no live rotation or fallback copy.
+
 ## Instance Onboarding Keys
 
 The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as

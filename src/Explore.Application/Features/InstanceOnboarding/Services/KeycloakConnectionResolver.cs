@@ -21,7 +21,9 @@ public sealed class KeycloakConnectionResolution
         string? realm,
         string? blazorClientId,
         string? apiClientId,
-        string? clientSecret)
+        string? clientSecret,
+        Uri? publicOrigin,
+        string? credentialBindingRevision)
     {
         Status = status;
         Authority = authority;
@@ -29,6 +31,8 @@ public sealed class KeycloakConnectionResolution
         BlazorClientId = blazorClientId;
         ApiClientId = apiClientId;
         ClientSecret = clientSecret;
+        PublicOrigin = publicOrigin;
+        CredentialBindingRevision = credentialBindingRevision;
     }
 
     public KeycloakConnectionStatus Status { get; }
@@ -43,24 +47,32 @@ public sealed class KeycloakConnectionResolution
 
     public string? ClientSecret { get; }
 
+    public Uri? PublicOrigin { get; }
+
+    public string? CredentialBindingRevision { get; }
+
     public static KeycloakConnectionResolution Resolved(
         Uri authority,
         string realm,
         string blazorClientId,
         string? apiClientId,
-        string clientSecret) =>
+        string clientSecret,
+        Uri? publicOrigin,
+        string credentialBindingRevision) =>
         new(
             KeycloakConnectionStatus.Resolved,
             authority,
             realm,
             blazorClientId,
             apiClientId,
-            clientSecret);
+            clientSecret,
+            publicOrigin,
+            credentialBindingRevision);
 
     public static KeycloakConnectionResolution Failed(KeycloakConnectionStatus status) =>
         status == KeycloakConnectionStatus.Resolved
             ? throw new ArgumentOutOfRangeException(nameof(status))
-            : new(status, null, null, null, null, null);
+            : new(status, null, null, null, null, null, null, null);
 
     public override string ToString() =>
         $"{nameof(KeycloakConnectionResolution)} {{ Status = {Status} }}";
@@ -106,12 +118,23 @@ public sealed class KeycloakAdministratorCredentialResolution
         $"{nameof(KeycloakAdministratorCredentialResolution)} {{ Status = {Status} }}";
 }
 
+public sealed class KeycloakCredentialBindingRevision
+{
+    public string Value { get; } =
+        Guid.CreateVersion7().ToString("N");
+}
+
 public sealed class KeycloakConnectionResolver(
     ISecretResolver secretResolver,
-    IConfiguration? configuration = null)
+    IConfiguration? configuration = null,
+    KeycloakCredentialBindingRevision? bindingRevision = null)
 {
+    private static readonly KeycloakCredentialBindingRevision
+        ProcessBindingRevision = new();
     private readonly ISecretResolver _secretResolver = secretResolver;
     private readonly IConfiguration? _configuration = configuration;
+    private readonly KeycloakCredentialBindingRevision _bindingRevision =
+        bindingRevision ?? ProcessBindingRevision;
 
     public async Task<KeycloakConnectionResolution> ResolveRuntimeAsync(
         CancellationToken cancellationToken = default)
@@ -144,22 +167,41 @@ public sealed class KeycloakConnectionResolver(
         string clientIdValue = clientId.Value!.Trim();
         string secretValue = clientSecret.Value!;
         string? apiClientId = _configuration?["Keycloak:Audience"]?.Trim();
+        string? publicOriginValue =
+            _configuration?["PublicBaseUrl"]
+            ?? _configuration?["App:PublicBaseUrl"]
+            ?? _configuration?["Application:PublicBaseUrl"];
+        Uri? publicOrigin = null;
 
         if (!TryBuildAuthority(endpointValue, realmValue, out Uri? authority)
             || string.IsNullOrWhiteSpace(clientIdValue)
             || string.IsNullOrEmpty(secretValue)
             || (!string.IsNullOrWhiteSpace(apiClientId)
-                && string.Equals(clientIdValue, apiClientId, StringComparison.OrdinalIgnoreCase)))
+                && string.Equals(clientIdValue, apiClientId, StringComparison.OrdinalIgnoreCase))
+            || (!string.IsNullOrWhiteSpace(publicOriginValue)
+                && !TryBuildPublicOrigin(publicOriginValue, out publicOrigin)))
         {
             return KeycloakConnectionResolution.Failed(KeycloakConnectionStatus.Invalid);
         }
+
+        ResolvedSecret resolvedClientSecret = clientSecret.Secret!;
+        string bindingRevision = string.IsNullOrWhiteSpace(
+            resolvedClientSecret.BindingRevision)
+            ? _bindingRevision.Value
+            : resolvedClientSecret.BindingRevision;
+        string credentialBindingRevision =
+            $"{resolvedClientSecret.Source}|{resolvedClientSecret.Scope}|"
+            + $"{resolvedClientSecret.ScopeId}|"
+            + bindingRevision;
 
         return KeycloakConnectionResolution.Resolved(
             authority!,
             realmValue,
             clientIdValue,
             apiClientId,
-            secretValue);
+            secretValue,
+            publicOrigin,
+            credentialBindingRevision);
     }
 
     public Task<KeycloakAdministratorCredentialResolution> ResolveAdministratorCredentialsAsync(
@@ -227,6 +269,30 @@ public sealed class KeycloakConnectionResolver(
             Path = $"{baseUri.AbsolutePath.TrimEnd('/')}/realms/{Uri.EscapeDataString(realm)}"
         };
         authority = builder.Uri;
+        return true;
+    }
+
+    private static bool TryBuildPublicOrigin(
+        string value,
+        out Uri? publicOrigin)
+    {
+        publicOrigin = null;
+        if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out Uri? parsed)
+            || parsed.Scheme != Uri.UriSchemeHttps
+            || !string.IsNullOrEmpty(parsed.UserInfo)
+            || !string.IsNullOrEmpty(parsed.Query)
+            || !string.IsNullOrEmpty(parsed.Fragment))
+        {
+            return false;
+        }
+
+        var builder = new UriBuilder(parsed)
+        {
+            Path = parsed.AbsolutePath.TrimEnd('/') + "/",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        publicOrigin = builder.Uri;
         return true;
     }
 }

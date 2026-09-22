@@ -5,6 +5,16 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-22
 
+- **Breaking: create-only Keycloak provisioning and deployment-owned credentials.**
+  Legacy Keycloak bootstrap, realm-wide sync and application-managed secret
+  rotation routes are removed; runtime credentials remain deployment-owned.
+  `POST /api/instance/keycloak/plans` now requires a closed
+  `RepairClient`, `CreateClients` or `CreateRealm` intent. Creation is allowed
+  only for fresh, proven-absent resources; races and existing names conflict
+  without adoption. Inspection, apply and reconciliation use distinct
+  write-only credential inputs. The connection projection publishes value-free
+  deployment ownership and restart guidance, never a client secret.
+
 - **Breaking: reviewed Keycloak operator operations.**
   Keycloak repairs use approved operation receipts instead of unrestricted bootstrap or sync requests.
   The seven private, no-store routes are `GET /api/instance/keycloak/connection`,

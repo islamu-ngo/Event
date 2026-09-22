@@ -99,4 +99,22 @@ public interface IKeycloakAdminClient
     Task<KeycloakAdminInspectionResult> InspectAsync(
         KeycloakAdminInspectionRequest request,
         CancellationToken cancellationToken);
+
+    Task<KeycloakMapperOperationResult> ApplyApprovedMapperAsync(
+        KeycloakMapperOperationRequest request,
+        CancellationToken cancellationToken);
+
+    Task<KeycloakMapperOperationResult> InspectApprovedMapperAsync(
+        KeycloakMapperOperationRequest request,
+        CancellationToken cancellationToken);
+
+    Task<KeycloakProvisioningOperationResult>
+        ApplyApprovedProvisioningAsync(
+            KeycloakProvisioningOperationRequest request,
+            CancellationToken cancellationToken);
+
+    Task<KeycloakProvisioningOperationResult>
+        InspectApprovedProvisioningAsync(
+            KeycloakProvisioningOperationRequest request,
+            CancellationToken cancellationToken);
 }

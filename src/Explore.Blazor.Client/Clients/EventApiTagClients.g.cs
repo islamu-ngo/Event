@@ -77654,50 +77654,6 @@ namespace Explore.Blazor.Client.Clients
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// Run Keycloak Realm Doctor
-        /// </summary>
-        /// <remarks>
-        /// Runs read-only Keycloak realm diagnostics. Temporary admin credentials are used only for this request and are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeycloakRealmDoctorResultDto> RunInstanceKeycloakRealmDoctorAsync(KeycloakRealmDoctorRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Preview Keycloak Realm Sync
-        /// </summary>
-        /// <remarks>
-        /// Generates a read-only additive Keycloak realm sync plan. Temporary admin credentials are used only for this request and are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeycloakRealmSyncPlanDto> PreviewInstanceKeycloakRealmSyncAsync(KeycloakRealmSyncPreviewRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Apply Keycloak Realm Sync
-        /// </summary>
-        /// <remarks>
-        /// Applies backup-confirmed additive Keycloak realm repairs. Temporary admin credentials are used only for this request and are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeycloakRealmSyncPlanDto> ApplyInstanceKeycloakRealmSyncAsync(KeycloakRealmSyncApplyRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Rotate Keycloak Client Secret
-        /// </summary>
-        /// <remarks>
-        /// Rotates an application-managed Keycloak client secret. Deployment-managed secrets return operator instructions and are not changed by the application.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeycloakClientSecretRotationResultDto> RotateInstanceKeycloakClientSecretAsync(KeycloakClientSecretRotationRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
         /// Check Auth Provider Configuration Status
         /// </summary>
         /// <remarks>
@@ -77959,428 +77915,6 @@ namespace Explore.Blazor.Client.Clients
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Too Many Requests", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Run Keycloak Realm Doctor
-        /// </summary>
-        /// <remarks>
-        /// Runs read-only Keycloak realm diagnostics. Temporary admin credentials are used only for this request and are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeycloakRealmDoctorResultDto> RunInstanceKeycloakRealmDoctorAsync(KeycloakRealmDoctorRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
-        {
-            if (body == null)
-                throw new System.ArgumentNullException("body");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-
-                    if (x_Api_Version != null)
-                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json; v=0.1");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("text/plain; v=0.1"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-
-                    // Operation Path: "api/instance/settings/auth-provider/keycloak/doctor"
-                    urlBuilder_.Append("api/instance/settings/auth-provider/keycloak/doctor");
-                    urlBuilder_.Append('?');
-                    if (api_version != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<KeycloakRealmDoctorResultDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        if (status_ == 403)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Preview Keycloak Realm Sync
-        /// </summary>
-        /// <remarks>
-        /// Generates a read-only additive Keycloak realm sync plan. Temporary admin credentials are used only for this request and are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeycloakRealmSyncPlanDto> PreviewInstanceKeycloakRealmSyncAsync(KeycloakRealmSyncPreviewRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
-        {
-            if (body == null)
-                throw new System.ArgumentNullException("body");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-
-                    if (x_Api_Version != null)
-                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json; v=0.1");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("text/plain; v=0.1"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-
-                    // Operation Path: "api/instance/settings/auth-provider/keycloak/sync-preview"
-                    urlBuilder_.Append("api/instance/settings/auth-provider/keycloak/sync-preview");
-                    urlBuilder_.Append('?');
-                    if (api_version != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<KeycloakRealmSyncPlanDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        if (status_ == 403)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Apply Keycloak Realm Sync
-        /// </summary>
-        /// <remarks>
-        /// Applies backup-confirmed additive Keycloak realm repairs. Temporary admin credentials are used only for this request and are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeycloakRealmSyncPlanDto> ApplyInstanceKeycloakRealmSyncAsync(KeycloakRealmSyncApplyRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
-        {
-            if (body == null)
-                throw new System.ArgumentNullException("body");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-
-                    if (x_Api_Version != null)
-                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json; v=0.1");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("text/plain; v=0.1"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-
-                    // Operation Path: "api/instance/settings/auth-provider/keycloak/sync-apply"
-                    urlBuilder_.Append("api/instance/settings/auth-provider/keycloak/sync-apply");
-                    urlBuilder_.Append('?');
-                    if (api_version != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<KeycloakRealmSyncPlanDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        if (status_ == 403)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Rotate Keycloak Client Secret
-        /// </summary>
-        /// <remarks>
-        /// Rotates an application-managed Keycloak client secret. Deployment-managed secrets return operator instructions and are not changed by the application.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeycloakClientSecretRotationResultDto> RotateInstanceKeycloakClientSecretAsync(KeycloakClientSecretRotationRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
-        {
-            if (body == null)
-                throw new System.ArgumentNullException("body");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-
-                    if (x_Api_Version != null)
-                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json; v=0.1");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("text/plain; v=0.1"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-
-                    // Operation Path: "api/instance/settings/auth-provider/keycloak/client-secret/rotate"
-                    urlBuilder_.Append("api/instance/settings/auth-provider/keycloak/client-secret/rotate");
-                    urlBuilder_.Append('?');
-                    if (api_version != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<KeycloakClientSecretRotationResultDto>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        if (status_ == 400)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ValidationProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ValidationProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        if (status_ == 403)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -81498,7 +81032,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakInspectionCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -81506,7 +81040,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationPlanInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -81522,7 +81056,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -81530,7 +81064,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -81663,7 +81197,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakInspectionCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -81753,7 +81287,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationPlanInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -81940,7 +81474,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (operationId == null)
                 throw new System.ArgumentNullException("operationId");
@@ -82035,7 +81569,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (operationId == null)
                 throw new System.ArgumentNullException("operationId");
@@ -83744,17 +83278,6 @@ namespace Explore.Blazor.Client.Clients
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
-        /// Bootstrap Keycloak Realm (Setup)
-        /// </summary>
-        /// <remarks>
-        /// Bootstraps an external Keycloak realm/client configuration during instance setup. Protected by setup secret; one-time admin credentials are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<BaseCommandResponseOfGuid> BootstrapInstanceOnboardingKeycloakRealmAsync(KeycloakBootstrapRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
         /// Get Authorization Provider Configuration (Internal)
         /// </summary>
         /// <remarks>
@@ -84756,159 +84279,6 @@ namespace Explore.Blazor.Client.Clients
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ProblemDetails>("Too Many Requests", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Bootstrap Keycloak Realm (Setup)
-        /// </summary>
-        /// <remarks>
-        /// Bootstraps an external Keycloak realm/client configuration during instance setup. Protected by setup secret; one-time admin credentials are not stored.
-        /// </remarks>
-        /// <returns>OK</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<BaseCommandResponseOfGuid> BootstrapInstanceOnboardingKeycloakRealmAsync(KeycloakBootstrapRequestDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
-        {
-            if (body == null)
-                throw new System.ArgumentNullException("body");
-
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-
-                    if (x_Api_Version != null)
-                        request_.Headers.TryAddWithoutValidation("X-Api-Version", ConvertToString(x_Api_Version, System.Globalization.CultureInfo.InvariantCulture));
-                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
-                    var content_ = new System.Net.Http.ByteArrayContent(json_);
-                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json; v=0.1");
-                    request_.Content = content_;
-                    request_.Method = new System.Net.Http.HttpMethod("POST");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("text/plain; v=0.1"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-
-                    // Operation Path: "api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap"
-                    urlBuilder_.Append("api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap");
-                    urlBuilder_.Append('?');
-                    if (api_version != null)
-                    {
-                        urlBuilder_.Append(System.Uri.EscapeDataString("api-version")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(api_version, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
-                    }
-                    urlBuilder_.Length--;
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<BaseCommandResponseOfGuid>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        if (status_ == 400)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ValidationProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ValidationProblemDetails>("Bad Request", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        if (status_ == 403)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Forbidden", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        if (status_ == 410)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Gone", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        if (status_ == 429)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Too Many Requests", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        if (status_ == 502)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Bad Gateway", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-                        }
-                        else
-                        if (status_ == 503)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            throw new ApiException<ProblemDetails>("Service Unavailable", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -151734,9 +151104,6 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("keycloakClientId")]
         public string? KeycloakClientId { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("keycloakClientSecret")]
-        public string? KeycloakClientSecret { get; set; } = default!;
-
         [System.Text.Json.Serialization.JsonPropertyName("atprotoLoginEnabled")]
         public bool? AtprotoLoginEnabled { get; set; } = default!;
 
@@ -174897,6 +174264,21 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("available")]
         public bool Available { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("credentialOwnership")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string CredentialOwnership { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("credentialStatus")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string CredentialStatus { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("requiresCoordinatedRestart")]
+        public bool RequiresCoordinatedRestart { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorGuidance")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string OperatorGuidance { get; set; } = default!;
+
         /// <summary>
         /// HAL hypermedia links
         /// </summary>
@@ -182582,241 +181964,6 @@ namespace Explore.Blazor.Client.Clients
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public enum KeycloakBootstrapMode
-    {
-
-        [System.Runtime.Serialization.EnumMember(Value = @"PatchExistingRealm")]
-        PatchExistingRealm = 0,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"CreateRealm")]
-        CreateRealm = 1,
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakBootstrapRequestDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("keycloakBaseUrl")]
-        public string? KeycloakBaseUrl { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("realm")]
-        public string? Realm { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorClientId")]
-        public string? BlazorClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorClientSecret")]
-        public string? BlazorClientSecret { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorRedirectUris")]
-        public System.Collections.Generic.ICollection<string>? BlazorRedirectUris { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorWebOrigins")]
-        public System.Collections.Generic.ICollection<string>? BlazorWebOrigins { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientSecret")]
-        public string? ApiClientSecret { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("mode")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<KeycloakBootstrapMode>))]
-        public KeycloakBootstrapMode? Mode { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminUsername")]
-        public string? BootstrapAdminUsername { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminPassword")]
-        public string? BootstrapAdminPassword { get; set; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakClientDesiredStateDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientId")]
-        public string? ClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("displayName")]
-        public string? DisplayName { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientKind")]
-        public string? ClientKind { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("enabled")]
-        public bool? Enabled { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("protocol")]
-        public string? Protocol { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("publicClient")]
-        public bool? PublicClient { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bearerOnly")]
-        public bool? BearerOnly { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("standardFlowEnabled")]
-        public bool? StandardFlowEnabled { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("directAccessGrantsEnabled")]
-        public bool? DirectAccessGrantsEnabled { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("serviceAccountsEnabled")]
-        public bool? ServiceAccountsEnabled { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("redirectUris")]
-        public System.Collections.Generic.ICollection<string>? RedirectUris { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("webOrigins")]
-        public System.Collections.Generic.ICollection<string>? WebOrigins { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("optionalClientScopes")]
-        public System.Collections.Generic.ICollection<string>? OptionalClientScopes { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("defaultClientScopes")]
-        public System.Collections.Generic.ICollection<string>? DefaultClientScopes { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("realmRoleMappings")]
-        public System.Collections.Generic.ICollection<string>? RealmRoleMappings { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("protocolMappers")]
-        public System.Collections.Generic.ICollection<KeycloakProtocolMapperDesiredStateDto>? ProtocolMappers { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakClientScopeDesiredStateDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("name")]
-        public string? Name { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("protocol")]
-        public string? Protocol { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("realmRoleMappings")]
-        public System.Collections.Generic.ICollection<string>? RealmRoleMappings { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakClientSecretRotationRequestDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientId")]
-        public string? ClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("secretOwnershipMode")]
-        public string? SecretOwnershipMode { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("confirmApplicationManagedSecret")]
-        public bool? ConfirmApplicationManagedSecret { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("newClientSecret")]
-        public string? NewClientSecret { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminUsername")]
-        public string? BootstrapAdminUsername { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminPassword")]
-        public string? BootstrapAdminPassword { get; set; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakClientSecretRotationResultDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("status")]
-        public string? Status { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("message")]
-        public string? Message { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientId")]
-        public string? ClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("secretOwnershipMode")]
-        public string? SecretOwnershipMode { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("authSchemesReloaded")]
-        public bool? AuthSchemesReloaded { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("requiresRestart")]
-        public bool? RequiresRestart { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("operatorInstructions")]
-        public string? OperatorInstructions { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("operations")]
-        public System.Collections.Generic.ICollection<KeycloakRealmSyncOperationDto>? Operations { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class KeycloakConnectionDto
     {
 
@@ -182836,6 +181983,21 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("available")]
         public bool Available { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("credentialOwnership")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string CredentialOwnership { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("credentialStatus")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string CredentialStatus { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("requiresCoordinatedRestart")]
+        public bool RequiresCoordinatedRestart { get; init; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("operatorGuidance")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string OperatorGuidance { get; init; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -182851,6 +182013,27 @@ namespace Explore.Blazor.Client.Clients
             return false;
         }
 }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class KeycloakInspectionCredentials
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("administratorUsername")]
+        public string? AdministratorUsername { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("administratorPassword")]
+        public string? AdministratorPassword { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class KeycloakInspectionDto
@@ -182891,6 +182074,27 @@ namespace Explore.Blazor.Client.Clients
             return false;
         }
 }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class KeycloakOperationCredentials
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("administratorUsername")]
+        public string? AdministratorUsername { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("administratorPassword")]
+        public string? AdministratorPassword { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class KeycloakOperationDto
@@ -182947,8 +182151,11 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakOperationInput
+    public partial class KeycloakOperationPlanInput
     {
+
+        [System.Text.Json.Serialization.JsonPropertyName("intent")]
+        public int? Intent { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("administratorUsername")]
         public string? AdministratorUsername { get; set; } = default!;
@@ -182966,383 +182173,6 @@ namespace Explore.Blazor.Client.Clients
         }
 
     }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakProtocolMapperDesiredStateDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("name")]
-        public string? Name { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("mapperType")]
-        public string? MapperType { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("includedClientAudience")]
-        public string? IncludedClientAudience { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("addToAccessToken")]
-        public bool? AddToAccessToken { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("addToIdToken")]
-        public bool? AddToIdToken { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakRealmDesiredStateDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("realm")]
-        public string? Realm { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorClientId")]
-        public string? BlazorClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("destructiveOperationsSupported")]
-        public bool? DestructiveOperationsSupported { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("requiredRealmRoles")]
-        public System.Collections.Generic.ICollection<string>? RequiredRealmRoles { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("roleComposites")]
-        public System.Collections.Generic.ICollection<KeycloakRoleCompositeDesiredStateDto>? RoleComposites { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientScopes")]
-        public System.Collections.Generic.ICollection<KeycloakClientScopeDesiredStateDto>? ClientScopes { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("clients")]
-        public System.Collections.Generic.ICollection<KeycloakClientDesiredStateDto>? Clients { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakRealmDoctorCheckDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("code")]
-        public string? Code { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("name")]
-        public string? Name { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("status")]
-        public string? Status { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("message")]
-        public string? Message { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("remediation")]
-        public string? Remediation { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakRealmDoctorRequestDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("useTemporaryAdminCredentials")]
-        public bool? UseTemporaryAdminCredentials { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminUsername")]
-        public string? BootstrapAdminUsername { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminPassword")]
-        public string? BootstrapAdminPassword { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; set; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakRealmDoctorResultDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("overallStatus")]
-        public string? OverallStatus { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("message")]
-        public string? Message { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("realm")]
-        public string? Realm { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("authority")]
-        public string? Authority { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientId")]
-        public string? ClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("checks")]
-        public System.Collections.Generic.ICollection<KeycloakRealmDoctorCheckDto>? Checks { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakRealmSyncApplyRequestDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("backupConfirmed")]
-        public bool? BackupConfirmed { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminUsername")]
-        public string? BootstrapAdminUsername { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminPassword")]
-        public string? BootstrapAdminPassword { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorRedirectUris")]
-        public System.Collections.Generic.ICollection<string>? BlazorRedirectUris { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorWebOrigins")]
-        public System.Collections.Generic.ICollection<string>? BlazorWebOrigins { get; set; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakRealmSyncOperationDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("operationId")]
-        public string? OperationId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("category")]
-        public string? Category { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("targetType")]
-        public string? TargetType { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("target")]
-        public string? Target { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("action")]
-        public string? Action { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("status")]
-        public string? Status { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("summary")]
-        public string? Summary { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("reason")]
-        public string? Reason { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("changes")]
-        public System.Collections.Generic.ICollection<string>? Changes { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("requiresBackupBeforeApply")]
-        public bool? RequiresBackupBeforeApply { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakRealmSyncPlanDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("status")]
-        public string? Status { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("message")]
-        public string? Message { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("realm")]
-        public string? Realm { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("authority")]
-        public string? Authority { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("clientId")]
-        public string? ClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("destructiveOperationsSupported")]
-        public bool? DestructiveOperationsSupported { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("requiresBackupBeforeApply")]
-        public bool? RequiresBackupBeforeApply { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("desiredState")]
-        public KeycloakRealmDesiredStateDto? DesiredState { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("operations")]
-        public System.Collections.Generic.ICollection<KeycloakRealmSyncOperationDto>? Operations { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("diagnostics")]
-        public System.Collections.Generic.ICollection<KeycloakRealmDoctorCheckDto>? Diagnostics { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakRealmSyncPreviewRequestDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("useTemporaryAdminCredentials")]
-        public bool? UseTemporaryAdminCredentials { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminUsername")]
-        public string? BootstrapAdminUsername { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("bootstrapAdminPassword")]
-        public string? BootstrapAdminPassword { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("apiClientId")]
-        public string? ApiClientId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorRedirectUris")]
-        public System.Collections.Generic.ICollection<string>? BlazorRedirectUris { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("blazorWebOrigins")]
-        public System.Collections.Generic.ICollection<string>? BlazorWebOrigins { get; set; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial record class KeycloakRoleCompositeDesiredStateDto
-    {
-
-        [System.Text.Json.Serialization.JsonPropertyName("roleName")]
-        public string? RoleName { get; init; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("compositeRoleNames")]
-        public System.Collections.Generic.ICollection<string>? CompositeRoleNames { get; init; } = default!;
-
-        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
-
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        // Generated record values are intentionally omitted from diagnostic text.
-        protected virtual bool PrintMembers(System.Text.StringBuilder builder)
-        {
-            return false;
-        }
-}
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial record class KeycloakStepOutcomeDto

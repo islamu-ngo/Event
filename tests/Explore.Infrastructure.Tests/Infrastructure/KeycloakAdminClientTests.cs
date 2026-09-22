@@ -24,8 +24,16 @@ public sealed class KeycloakAdminClientTests
                 """),
             Expect(
                 HttpMethod.Get,
+                "/base/admin/realms/operators",
+                """{"realm":"operators","enabled":true}"""),
+            Expect(
+                HttpMethod.Get,
                 "/base/admin/realms/operators/clients?clientId=event-bff",
                 """[{ "id": "client-uuid", "clientId": "event-bff" }]"""),
+            Expect(
+                HttpMethod.Get,
+                "/base/admin/realms/operators/clients?clientId=event-api",
+                "[]"),
             Expect(
                 HttpMethod.Get,
                 "/base/admin/realms/operators/clients/client-uuid/protocol-mappers/models",
@@ -107,6 +115,10 @@ public sealed class KeycloakAdminClientTests
             Expect(HttpMethod.Post, "/realms/master/protocol/openid-connect/token", """
                 { "access_token": "admin-token" }
                 """),
+            Expect(
+                HttpMethod.Get,
+                "/admin/realms/operators",
+                """{"realm":"operators","enabled":true}"""),
             Expect(
                 HttpMethod.Get,
                 "/admin/realms/operators/clients?clientId=event-bff",
@@ -253,6 +265,45 @@ public sealed class KeycloakAdminClientTests
 
         await Assert.That(result.Status).IsEqualTo(KeycloakInspectionStatus.InvalidTarget);
         await Assert.That(handler.WasCalled).IsFalse();
+    }
+
+    [Test]
+    public async Task InspectAsync_WithAdminCredentials_ProvesRealmAbsence()
+    {
+        var handler = new OrderedHandler(
+            new ExpectedRequest(
+                HttpMethod.Get,
+                "/auth/realms/operators/.well-known/openid-configuration",
+                () => new HttpResponseMessage(HttpStatusCode.NotFound)),
+            Expect(
+                HttpMethod.Post,
+                "/auth/realms/master/protocol/openid-connect/token",
+                """{"access_token":"admin-token"}"""),
+            new ExpectedRequest(
+                HttpMethod.Get,
+                "/auth/admin/realms/operators",
+                () => new HttpResponseMessage(HttpStatusCode.NotFound)));
+
+        KeycloakAdminInspectionResult result =
+            await CreateClient(handler).InspectAsync(
+                new KeycloakAdminInspectionRequest(
+                    new Uri(
+                        "https://identity.example.test/auth/realms/operators"),
+                    "operators",
+                    "event-bff",
+                    "event-api",
+                    "admin",
+                    "password"),
+                CancellationToken.None);
+
+        await Assert.That(result.Status)
+            .IsEqualTo(KeycloakInspectionStatus.Inspected);
+        await Assert.That(result.Snapshot!.RealmExists).IsFalse();
+        await Assert.That(result.Snapshot.BlazorClient.IsProvenAbsent)
+            .IsTrue();
+        await Assert.That(result.Snapshot.ApiClient!.IsProvenAbsent)
+            .IsTrue();
+        await Assert.That(handler.AllRequestsConsumed).IsTrue();
     }
 
     private static KeycloakAdminClient CreateClient(

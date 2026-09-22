@@ -479,6 +479,9 @@ public sealed class KeycloakOperationTests
             kind == KeycloakStep.UpdateMapper
                 ? "expected-fingerprint"
                 : null,
+            kind == KeycloakStep.UpdateMapper
+                ? "expected-identity-fingerprint"
+                : null,
             "desired-fingerprint",
             "binding-fingerprint");
 }

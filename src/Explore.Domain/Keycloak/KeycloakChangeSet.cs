@@ -32,6 +32,7 @@ public sealed record KeycloakChangeStep
         string targetId,
         KeycloakStepPrecondition precondition,
         string? expectedFingerprint,
+        string? expectedIdentityFingerprint,
         string desiredFingerprint,
         string bindingFingerprint)
     {
@@ -41,6 +42,8 @@ public sealed record KeycloakChangeStep
         TargetId = Required(targetId, nameof(targetId));
         Precondition = precondition;
         ExpectedFingerprint = NormalizeOptional(expectedFingerprint);
+        ExpectedIdentityFingerprint = NormalizeOptional(
+            expectedIdentityFingerprint);
         DesiredFingerprint = Required(
             desiredFingerprint,
             nameof(desiredFingerprint));
@@ -52,9 +55,11 @@ public sealed record KeycloakChangeStep
             || !Enum.IsDefined(resourceKind)
             || !Enum.IsDefined(precondition)
             || (precondition == KeycloakStepPrecondition.MustBeAbsent
-                && ExpectedFingerprint is not null)
+                && (ExpectedFingerprint is not null
+                    || ExpectedIdentityFingerprint is not null))
             || (precondition == KeycloakStepPrecondition.MustMatchFingerprint
-                && ExpectedFingerprint is null))
+                && (ExpectedFingerprint is null
+                    || ExpectedIdentityFingerprint is null)))
         {
             throw new ArgumentException(
                 "The step projection or precondition is invalid.");
@@ -72,6 +77,8 @@ public sealed record KeycloakChangeStep
     public KeycloakStepPrecondition Precondition { get; }
 
     public string? ExpectedFingerprint { get; }
+
+    public string? ExpectedIdentityFingerprint { get; }
 
     public string DesiredFingerprint { get; }
 

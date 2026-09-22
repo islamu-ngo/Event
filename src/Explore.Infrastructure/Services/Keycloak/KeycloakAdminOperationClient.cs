@@ -253,15 +253,22 @@ public sealed class KeycloakAdminOperationClient(
             ProjectMapper(byId, KeycloakMapperOrigin.Direct);
         string currentFingerprint =
             KeycloakOperationService.MapperFingerprint(current);
-        if (IsDesiredMapper(request, byId))
+        if (!string.Equals(
+                request.Step.ExpectedIdentityFingerprint,
+                KeycloakOperationService.MapperIdentityFingerprint(current),
+                StringComparison.Ordinal))
+        {
+            return Conflict("keycloak_mapper_identity_changed");
+        }
+
+        bool desired = IsDesiredMapper(request, byId);
+        if (!allowWrite && desired)
         {
             return new MapperMatch(
                 byId,
                 ProviderResourceId(byId),
                 new KeycloakMapperOperationResult(
-                    allowWrite
-                        ? KeycloakStepOutcomeKind.NoChange
-                        : KeycloakStepOutcomeKind.Verified,
+                    KeycloakStepOutcomeKind.Verified,
                     "keycloak_mapper_already_effective",
                     ProviderResourceId(byId),
                     currentFingerprint));
@@ -273,6 +280,18 @@ public sealed class KeycloakAdminOperationClient(
                 StringComparison.Ordinal))
         {
             return Conflict("keycloak_mapper_precondition_failed");
+        }
+
+        if (desired)
+        {
+            return new MapperMatch(
+                byId,
+                ProviderResourceId(byId),
+                new KeycloakMapperOperationResult(
+                    KeycloakStepOutcomeKind.NoChange,
+                    "keycloak_mapper_already_effective",
+                    ProviderResourceId(byId),
+                    currentFingerprint));
         }
 
         return new MapperMatch(

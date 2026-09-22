@@ -2445,3 +2445,87 @@ journal entry's wording: durable races belong under the fence; live external
 readiness does not. See `docs/internal/OPERATIONS.md` for generation ownership.
 
 ---
+
+[2026-09-21 Europe/Brussels] — Setup read quotas must not fabricate provider state
+
+**Context**: While fixing the security-tier external-provider onboarding flow, two runtime resource dumps were correlated with the Cerbos configuration page and API limiter.
+
+**Symptom / Observation**: Cerbos gRPC health reported `Serving`, but a later `GET /api/instanceonboarding/authz-provider-configuration/internal` returned `429`. The Blazor page then rendered a blank read-only endpoint, `Application managed`, `Runtime PDP: Not configured`, and a disabled continuation action.
+
+**Root Cause**: All setup-secret reads shared one five-request IP window, so duplicate status and journey reads exhausted the authorization-configuration request. `AuthorizationProviderConfiguration.razor` caught that failure and kept rendering its empty initial DTO, turning unavailable authority into fabricated provider state.
+
+**Resolution**: Setup-secret GET partitions now use the matched ASP.NET route pattern plus IP, while mutations retain their shared authority/IP partition. The page hides provider controls when authoritative configuration is unavailable. Focused HTTP tests cover route isolation, trailing-slash canonicalization, mutation sharing, and authority separation; the component test covers fail-closed rendering. The Release build and all focused tests pass.
+
+**Why This Matters for Future Work**: A low setup-secret limit must bound attacks without allowing unrelated read routes to deny the operator's next authoritative read. UI load failures must remain visibly unavailable and must never fall through to a default provider DTO.
+
+**References**:
+- `src/Explore.API/Extensions/RateLimitingExtensions.cs:413`
+- `src/Explore.Blazor.Client/Pages/Onboarding/AuthorizationProviderConfiguration.razor:53`
+- `tests/Event.API.IntegrationTests/Features/SetupSecretRateLimitMetadataTests.cs:88`
+- `tests/Explore.Blazor.Client.Tests/Pages/Onboarding/AuthorizationProviderConfigurationTests.cs:81`
+- `docs/internal/API.md:781`
+- `docs/internal/TROUBLESHOOTING.md:561`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the operational rule is already documented and regression-tested)
+
+**Promoted → `docs/internal/API.md` §SetupSecret and `docs/internal/TROUBLESHOOTING.md` §429 / 504 Responses** (2026-09-21)
+
+---
+
+[2026-09-21 Europe/Brussels] — Secret readiness and execution must share one resolver
+
+**Context**: While repairing Cerbos authorization onboarding, the UI reported deployment Admin API credentials as configured but automatic policy publishing rejected the instance target.
+
+**Symptom / Observation**: `AuthorizationProviderConfigurationService` returned both credential flags as configured, while `CerbosPolicyPackageService` returned “Policy package publishing skipped because no safe Cerbos Admin API target is configured.” The Cerbos gRPC PDP remained reachable.
+
+**Root Cause**: Readiness used the canonical instance-scoped `ISecretResolver` bindings, but package publishing read unrelated `CerbosAdminApiSettings` credential fields. Infisical values therefore proved readiness without reaching the execution path.
+
+**Resolution**: Instance package publishing now resolves the same two `SecretDefinitionRegistry.Keys.Cerbos` bindings, while one-time credentials remain request-scoped overrides. The obsolete option-bound credential fields were removed. Focused tests prove resolved credentials are used and an unavailable secret authority fails closed without an HTTP request.
+
+**Why This Matters for Future Work**: Provider readiness metadata and provider execution must consume the same canonical secret keys through the same authority boundary. Never infer executable capability from one resolver while the worker reads another configuration surface.
+
+**References**:
+- `src/Explore.Infrastructure/Services/AuthorizationProviderConfigurationService.cs:94`
+- `src/Explore.Infrastructure/Services/CerbosPolicyPackageService.cs:531`
+- `src/Explore.Blazor.Client/Pages/Onboarding/AuthorizationProviderConfiguration.razor:492`
+- `tests/Explore.Infrastructure.Tests/Infrastructure/CerbosPolicyPackageServiceTests.cs:277`
+- `docs/internal/CONFIGURATION.md:1268`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the invariant is documented and guarded by focused tests)
+
+---
+
+[2026-09-21 Europe/Brussels] — Public origin is not a listening address or tenant base domain
+
+Single-instance onboarding had an optional hidden URL field but a mandatory host
+preflight check. Profile persistence also reduced the URL to a hostname, losing
+ports and path prefixes. The flow now captures the effective BFF request origin
+after trusted proxy handling and retains it across circuit navigation. It is saved
+internally only during authorized setup; there is no URL field, confirmation or
+generic address launch blocker. Inferred addresses never populate tenant-routing
+hostnames. Only enabling subdomain routing requires an explicit base domain.
+Deployment URL overrides govern reads and writes and participate in the journey
+generation; otherwise stale approval could survive a change of deployment origin.
+The setup catalogue independently marked the override required and was updated
+alongside runtime readiness. Background email uses the override or established
+address, preserving prefixes and capability-specific HTTPS requirements. SMTP
+address lookup occurs before the durable handoff fence so lookup failure cannot
+turn unsent email into an unknown delivery.
+
+An intermediate ownership flag on the shared profile DTO caused a generated-client
+null boolean to fail strict API body binding. Removing response metadata from the
+writable contract fixes Finish setup without weakening JSON validation; a
+generated-client-to-API serialization test now guards the boundary.
+
+Verification: 225 targeted application, validator, component, BFF, HTTP authority,
+email/recovery, setup-catalogue and architecture tests passed. Independent security,
+availability and UI review findings were resolved. No live Aspire restart or
+browser onboarding completion was performed.
+
+References: `InstanceOnboardingGenerationReader`,
+`InstanceOnboardingProfileSettingHelpers`, `OnboardingRequestOriginResolver`, and
+`docs/internal/CONFIGURATION.md#guided-setup-configuration-boundary`.
+
+---

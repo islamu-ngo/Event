@@ -345,6 +345,37 @@ public sealed class KeycloakOperationRepairTests
     }
 
     [Test]
+    public async Task ReadBackIdentityDrift_AfterAcceptedUpdate_RemainsUnknown()
+    {
+        JsonObject existing = AudienceMapper(
+            id: "mapper-42",
+            name: "operator-owned-audience",
+            audience: "event-api",
+            accessToken: false);
+        var handler = new SemanticKeycloakHandler([existing])
+        {
+            RenameAfterMutation = true
+        };
+        KeycloakChangeStep approved = PlanAudienceUpdate(
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false,
+                name: "operator-owned-audience"));
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    approved,
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.OutcomeUnknown);
+        await Assert.That(handler.MutationCount).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task ReconcileCompletedUpdate_ReportsVerifiedWithoutMutation()
     {
         JsonObject applied = AudienceMapper(
@@ -605,6 +636,8 @@ public sealed class KeycloakOperationRepairTests
 
         public bool AcceptMutationThenServerError { get; init; }
 
+        public bool RenameAfterMutation { get; init; }
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -688,6 +721,11 @@ public sealed class KeycloakOperationRepairTests
 
                 Mappers[index] = payload;
                 MutationCount++;
+                if (RenameAfterMutation)
+                {
+                    Mappers[index]["name"] = "renamed-after-write";
+                }
+
                 if (AcceptMutationThenTimeout)
                 {
                     throw new TaskCanceledException(

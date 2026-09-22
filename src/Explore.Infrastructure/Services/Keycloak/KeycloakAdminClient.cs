@@ -360,7 +360,7 @@ public sealed class KeycloakAdminClient(
                 string.Equals(mapper.ProtocolMapper, "oidc-sub-mapper", StringComparison.Ordinal);
             bool mappedSubject =
                 string.Equals(Value(config, "claim.name"), "sub", StringComparison.Ordinal)
-                && accessToken;
+                && (accessToken || idToken);
             if (nativeSubject || mappedSubject)
             {
                 destination.Add(new KeycloakEffectiveMapperSnapshot(

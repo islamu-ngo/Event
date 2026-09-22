@@ -98,7 +98,7 @@ public sealed class KeycloakAdminClientTests
     }
 
     [Test]
-    public async Task InspectAsync_ConflictingSubjectProducerNeverQualifiesAsNativeSubject()
+    public async Task InspectAsync_IdTokenOnlySubjectProducerIsConflicting()
     {
         var handler = new OrderedHandler(
             Expect(HttpMethod.Get, "/realms/operators/.well-known/openid-configuration", """
@@ -122,7 +122,8 @@ public sealed class KeycloakAdminClientTests
                   "config": {
                     "claim.name": "sub",
                     "user.attribute": "department",
-                    "access.token.claim": "true"
+                    "access.token.claim": "false",
+                    "id.token.claim": "true"
                   }
                 }]
                 """),

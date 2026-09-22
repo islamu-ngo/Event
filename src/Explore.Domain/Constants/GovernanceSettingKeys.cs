@@ -140,6 +140,7 @@ public static class GovernanceSettingKeys
 
     public static class Domains
     {
+        public const string PublicBaseUrl = "domains.public_base_url";
         public const string InstanceBaseDomain = "domains.instance_base_domain";
         public const string AdminHost = "domains.admin_host";
         public const string AllowTenantCustomDomain = "domains.allow_tenant_custom_domain";

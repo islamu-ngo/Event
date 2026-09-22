@@ -9,6 +9,14 @@ public sealed class EnvironmentCatalogueInvariantTests
     private readonly string _repositoryRoot = EnvironmentMachineConfiguration.RepositoryRoot();
 
     [Test]
+    public async Task PublicUrlOverride_IsOptionalForSingleInstanceSetup()
+    {
+        var definition = CanonicalEnvironmentCatalogue.Catalogue.Lookup("PUBLIC_BASE_URL")!;
+        await Assert.That(definition.Requirement).IsEqualTo(EnvironmentVariableRequirement.Optional);
+        await Assert.That(definition.SafeDefault).IsNull();
+    }
+
+    [Test]
     public async Task FinalPackageFreeCatalogueOwnersAndMachineCatalogueExist()
     {
         string[] missing = _runtime.MissingCataloguePrerequisites(_repositoryRoot);

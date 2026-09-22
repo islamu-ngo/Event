@@ -9,6 +9,7 @@ using Explore.API.Controllers;
 using Explore.API.Extensions;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantSettings;
@@ -72,7 +73,7 @@ public class InstanceOnboardingControllerTests
         await Assert.That(after.RootElement.GetProperty("generation").GetString())
             .IsNotEqualTo(snapshot.GetProperty("generation").GetString());
         await Assert.That(after.RootElement.GetProperty("preflight").GetProperty("blockingChecks").EnumerateArray()
-            .Single(check => check.GetProperty("code").GetString() == "canonical_host").GetProperty("status").GetString()).IsEqualTo("Pass");
+            .Any(check => check.GetProperty("code").GetString() == "canonical_host")).IsFalse();
     }
 
     [Test]
@@ -126,7 +127,7 @@ public class InstanceOnboardingControllerTests
     [Test]
     public async Task SaveProfile_WithActiveSetupAuthority_PersistsOnlyExistingNonSecretProfileSettings()
     {
-        using var factory = CreateFactoryWithSetupSecret();
+        using var factory = CreateFactoryWithSetupSecret(new Dictionary<string, string?> { ["PublicBaseUrl"] = "" });
         using var client = factory.CreateClient();
         var userId = Guid.CreateVersion7();
         var profile = new SelfHostOnboardingProfileDto
@@ -164,13 +165,13 @@ public class InstanceOnboardingControllerTests
         var settings = await dbContext.SystemSettings
             .Where(setting => setting.SettingKey == GovernanceSettingKeys.Branding.DisplayName
                 || setting.SettingKey == GovernanceSettingKeys.Branding.SupportEmail
-                || setting.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain
+                || setting.SettingKey == GovernanceSettingKeys.Domains.PublicBaseUrl
                 || setting.SettingKey == GovernanceSettingKeys.Localization.DefaultLanguage)
             .ToDictionaryAsync(setting => setting.SettingKey, setting => setting.Value);
 
         await Assert.That(settings[GovernanceSettingKeys.Branding.DisplayName]).IsEqualTo(JsonSerializer.Serialize("Community Events"));
         await Assert.That(settings[GovernanceSettingKeys.Branding.SupportEmail]).IsEqualTo(JsonSerializer.Serialize("support@example.org"));
-        await Assert.That(settings[GovernanceSettingKeys.Domains.InstanceBaseDomain]).IsEqualTo(JsonSerializer.Serialize("events.example.org"));
+        await Assert.That(settings[GovernanceSettingKeys.Domains.PublicBaseUrl]).IsEqualTo(JsonSerializer.Serialize("https://Events.Example.Org/onboarding"));
         await Assert.That(settings[GovernanceSettingKeys.Localization.DefaultLanguage]).IsEqualTo(JsonSerializer.Serialize("en"));
         await Assert.That(settings.Count).IsEqualTo(4);
         var fromAddress = await dbContext.SystemSettings
@@ -535,11 +536,12 @@ public class InstanceOnboardingControllerTests
     }
 
     [Test]
-    public async Task Complete_WhenPreflightHasBlockers_ShouldReturnBadRequest()
+    public async Task Journey_WithoutConfiguredPublicAddress_IsReadyAndDoesNotPersistAddress()
     {
         using var factory = CreateFactoryWithSetupSecret(new Dictionary<string, string?>
         {
             ["Authentication:Provider"] = "local",
+            ["Authorization:Provider"] = "local",
             ["PublicBaseUrl"] = string.Empty,
             ["App:PublicBaseUrl"] = string.Empty,
             ["ASPNETCORE_URLS"] = string.Empty
@@ -555,29 +557,15 @@ public class InstanceOnboardingControllerTests
         using var journey = JsonDocument.Parse(await preflightResponse.Content.ReadAsStringAsync());
         var preflight = journey.RootElement.GetProperty("preflight").Deserialize<OnboardingPreflightDto>(TestJsonOptions.Default);
         await Assert.That(preflight).IsNotNull();
-        await Assert.That(preflight!.IsReadyToLaunch).IsFalse();
-        await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "canonical_host").Status)
-            .IsEqualTo(OnboardingPreflightCheckStatus.Fail);
+        await Assert.That(preflight!.IsReadyToLaunch).IsTrue()
+            .Because(string.Join(",", preflight.BlockingChecks.Where(check => check.Status != OnboardingPreflightCheckStatus.Pass).Select(check => check.Code)));
+        await Assert.That(preflight.BlockingChecks.Any(check => check.Code == "canonical_host")).IsFalse();
         await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "auth_config").Status)
             .IsEqualTo(OnboardingPreflightCheckStatus.Pass);
 
-        using var request = CreateInstanceAdminRequest(
-            HttpMethod.Post,
-            $"{BaseUrl}/complete",
-            userId,
-            CreateValidOnboardingRequest(),
-            includeSetupSecret: true);
-
-        var response = await client.SendAsync(request);
-
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
-
-        var problemDetails = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
-        await Assert.That(problemDetails).IsNotNull();
-        await Assert.That(problemDetails!.Status).IsEqualTo(StatusCodes.Status400BadRequest);
-        await Assert.That(problemDetails.Errors.ContainsKey("instanceOnboarding")).IsTrue();
-
         using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<ISystemSettingRepository>();
+        await Assert.That(await settings.GetByKey(GovernanceSettingKeys.Domains.PublicBaseUrl)).IsNull();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         await Assert.That(await dbContext.InstanceBootstrapStates.AnyAsync()).IsFalse();
         await Assert.That(await dbContext.PlatformUserRoles.AnyAsync(role => role.UserId == userId)).IsFalse();

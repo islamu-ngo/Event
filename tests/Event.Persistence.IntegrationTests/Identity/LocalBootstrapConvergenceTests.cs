@@ -412,7 +412,7 @@ public sealed class LocalBootstrapConvergenceTests
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 deployment, new RuntimeMetadataRefresh(),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
-                GenerationReader(scope), OperatorOptions);
+                GenerationReader(scope), Configuration, OperatorOptions);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
                 new RuntimeAuthenticationProviderDispatcher(
@@ -427,7 +427,7 @@ public sealed class LocalBootstrapConvergenceTests
             return new InstanceOnboardingGenerationReader(
                 new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
                 scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>(),
-                new InstanceBootstrapStateRepository(application));
+                new InstanceBootstrapStateRepository(application), Configuration);
         }
 
         internal async Task AssertCompletedAsync(Guid? expectedSubject = null)

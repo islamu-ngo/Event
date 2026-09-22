@@ -32,6 +32,131 @@ namespace Event.Application.UnitTests.Features.InstanceOnboarding;
 public sealed class InstanceOnboardingCompletionOperationTests
 {
     [Test]
+    public async Task InvalidDeploymentAddress_DisablesBackgroundLinksWithoutBlockingProfileSave()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.HostConfiguration["PUBLIC_BASE_URL"] = "ftp://invalid.example.test";
+        var response = await scenario.SaveProfile.ExecuteAsync(new() { Profile = new()
+        {
+            SiteName = "Community", CanonicalUrl = "https://request.example.test/community"
+        } }, CancellationToken.None);
+
+        await Assert.That(response.IsSuccess).IsTrue();
+        var address = await Explore.Application.Configuration.PublicAddressResolver.ResolveAsync(
+            scenario.HostConfiguration, scenario.SystemSettings, CancellationToken.None);
+        await Assert.That(address).IsNull();
+    }
+
+    [Test]
+    [Arguments(null, "https://established.example.test:9443/community", "https://established.example.test:9443/community/")]
+    [Arguments("https://configured.example.test/prefix", "https://established.example.test", "https://configured.example.test/prefix/")]
+    [Arguments("ftp://invalid.example.test", "https://established.example.test", null)]
+    [Arguments(null, null, null)]
+    public async Task BackgroundAddress_UsesOnlyOverrideOrAuthorizedSetupState(string? configured, string? established, string? expected)
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.HostConfiguration["PublicBaseUrl"] = "";
+        scenario.HostConfiguration["PUBLIC_BASE_URL"] = configured;
+        scenario.HostConfiguration["ASPNETCORE_URLS"] = "http://0.0.0.0:8080";
+        if (established is not null) scenario.ChangeSetting(GovernanceSettingKeys.Domains.PublicBaseUrl, established);
+
+        var address = await Explore.Application.Configuration.PublicAddressResolver.ResolveAsync(
+            scenario.HostConfiguration, scenario.SystemSettings, CancellationToken.None);
+
+        await Assert.That(address?.AbsoluteUri).IsEqualTo(expected);
+        await Assert.That(scenario.CommittedWrites).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(false, false, false, false)]
+    [Arguments(true, false, false, false)]
+    [Arguments(true, true, false, true)]
+    [Arguments(true, true, true, false)]
+    public async Task EmailAddressWarning_IsCapabilitySpecificAndNeverBlocksLaunch(bool smtp, bool enabled, bool established, bool warning)
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.HostConfiguration["PublicBaseUrl"] = "";
+        if (smtp) scenario.ChangeSetting(GovernanceSettingKeys.Email.SmtpHost, "smtp.example.test");
+        if (enabled) scenario.ChangeSetting(GovernanceSettingKeys.Email.DeliveryEnabled, "true");
+        if (established) scenario.ChangeSetting(GovernanceSettingKeys.Domains.PublicBaseUrl, "https://events.example.test");
+
+        var preflight = await scenario.Preflight.QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(preflight.WarningChecks.Any(check => check.Code == "email_public_address")).IsEqualTo(warning);
+        await Assert.That(preflight.BlockingChecks.Any(check => check.Code is "canonical_host" or "email_public_address")).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    public async Task OnlySubdomainRoutingRequiresAnExplicitBaseDomain(bool subdomain, bool valid)
+    {
+        var validator = new Explore.Application.DTOs.Onboarding.Validators.ResolverConfigurationDtoValidator();
+        var result = await validator.ValidateAsync(new ResolverConfigurationDto
+        {
+            HeaderEnabled = true, PathEnabled = true, PathPrefix = "/t", SubdomainEnabled = subdomain
+        });
+        await Assert.That(result.IsValid).IsEqualTo(valid);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task Journey_ResolvesPublicAddressInternally(bool configured)
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.HostConfiguration["PublicBaseUrl"] = configured ? "https://platform.example.test" : "";
+
+        var journey = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(journey.Profile!.CanonicalUrl).IsEqualTo(configured ? "https://platform.example.test" : null);
+    }
+
+    [Test]
+    public async Task InteractiveCompletion_FencesChangedDeploymentOrigin()
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        var command = await scenario.InteractiveCommandAsync();
+        scenario.HostConfiguration["PUBLIC_BASE_URL"] = "https://changed.example.test";
+        var handler = new CompleteInstanceOnboardingCommandHandler(
+            scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() => handler.ExecuteAsync(command, CancellationToken.None));
+        await Assert.That(scenario.CommittedWrites).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ProfileWrites_DeploymentUrlOverridesSubmittedDomain(bool complete)
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.HostConfiguration["PUBLIC_BASE_URL"] = "https://platform.example.test:9443/community";
+        var profile = new SelfHostOnboardingProfileDto { SiteName = "Public site", CanonicalUrl = "https://other.example.test" };
+        if (complete)
+        {
+            var command = await scenario.InteractiveCommandAsync();
+            var handler = new CompleteInstanceOnboardingCommandHandler(
+                scenario.BootstrapRepository, scenario.UserRepository, scenario.DeploymentModeProvider, scenario.Operation);
+            var response = await handler.ExecuteAsync(command with { Settings = command.Settings with { SiteProfile = profile } }, CancellationToken.None);
+            await Assert.That(response.IsSuccess).IsTrue();
+        }
+        else
+        {
+            var response = await scenario.SaveProfile.ExecuteAsync(new() { Profile = profile }, CancellationToken.None);
+            await Assert.That(response.IsSuccess).IsTrue();
+        }
+
+        // Remove the override to verify what was actually persisted, not just the deployment projection.
+        scenario.HostConfiguration["PUBLIC_BASE_URL"] = "";
+        scenario.HostConfiguration["PublicBaseUrl"] = "";
+        var snapshot = await scenario.GenerationReader.ReadSnapshotAsync(CancellationToken.None);
+        await Assert.That(snapshot.Profile.CanonicalUrl).IsEqualTo("https://platform.example.test:9443/community");
+        var domain = await scenario.SystemSettings.GetByKey(GovernanceSettingKeys.Domains.InstanceBaseDomain);
+        await Assert.That(domain).IsNull();
+    }
+
+    [Test]
     public async Task ConfiguredCompletion_CommitsRolesTenantSettingsAndBootstrapAsOneStateChange()
     {
         var scenario = new OnboardingCompletionScenario();
@@ -139,12 +264,32 @@ public sealed class InstanceOnboardingCompletionOperationTests
     }
 
     [Test]
+    [Arguments(DeploymentMode.SingleTenant, "")]
+    [Arguments(DeploymentMode.MultiTenant, "")]
+    [Arguments(DeploymentMode.MultiTenant, "https://events.example.test")]
+    public async Task Journey_DoesNotRequirePublicAddressForLaunch(
+        DeploymentMode mode, string publicUrl)
+    {
+        var scenario = new OnboardingCompletionScenario(interactive: true);
+        scenario.DeploymentModeProvider.Mode = mode;
+        scenario.HostConfiguration["PublicBaseUrl"] = "";
+        scenario.HostConfiguration["PUBLIC_BASE_URL"] = publicUrl;
+        scenario.HostConfiguration["ASPNETCORE_URLS"] = "http://0.0.0.0:8080";
+
+        var preflight = await scenario.Preflight.QueryAsync(new(), CancellationToken.None);
+
+        await Assert.That(preflight.BlockingChecks.Any(check => check.Code == "canonical_host")).IsFalse();
+        await Assert.That(preflight.WarningChecks.Any(check => check.Code == "dns_wildcard_tenant")).IsFalse();
+    }
+
+    [Test]
     public async Task Journey_ReusesDurableProfileWithoutAdditionalSettingQueries()
     {
         var scenario = new OnboardingCompletionScenario(interactive: true);
         scenario.ChangeSetting(GovernanceSettingKeys.Branding.DisplayName, "Snapshot site");
         scenario.ChangeSetting(GovernanceSettingKeys.Branding.SupportEmail, "support@example.test");
-        scenario.ChangeSetting(GovernanceSettingKeys.Domains.InstanceBaseDomain, "https://example.test");
+        scenario.HostConfiguration["PublicBaseUrl"] = "";
+        scenario.ChangeSetting(GovernanceSettingKeys.Domains.PublicBaseUrl, "https://example.test:9443/events");
         scenario.ChangeSetting(GovernanceSettingKeys.Localization.DefaultLanguage, "fr");
 
         var journey = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
@@ -152,14 +297,13 @@ public sealed class InstanceOnboardingCompletionOperationTests
         await Assert.That(journey.State).IsEqualTo("Available");
         await Assert.That(journey.Profile!.SiteName).IsEqualTo("Snapshot site");
         await Assert.That(journey.Profile.SupportEmail).IsEqualTo("support@example.test");
-        await Assert.That(journey.Profile.CanonicalUrl).IsEqualTo("https://example.test");
+        await Assert.That(journey.Profile.CanonicalUrl).IsEqualTo("https://example.test:9443/events");
         await Assert.That(journey.Profile.Locale).IsEqualTo("fr");
         await Assert.That(scenario.FullSettingsReads).IsEqualTo(2);
         await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Branding.DisplayName);
         await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Branding.SupportEmail);
         await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Localization.DefaultLanguage);
-        // Preflight still independently checks the canonical host.
-        await Assert.That(scenario.SettingKeysRead.Count(key => key == GovernanceSettingKeys.Domains.InstanceBaseDomain)).IsEqualTo(1);
+        await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Domains.InstanceBaseDomain);
     }
 
     [Test]
@@ -592,7 +736,6 @@ internal sealed class OnboardingCompletionScenario
                 SettingKeysRead.Add(key);
                 return _settings.SingleOrDefault(setting => setting.SettingKey == key);
             });
-        GenerationReader = new InstanceOnboardingGenerationReader(systemSettings, DeploymentModeProvider, BootstrapRepository);
         var smtp = Substitute.For<ISmtpConfigResolver>();
         smtp.ResolveAsync(Arg.Any<CancellationToken>()).Returns(_ =>
         {
@@ -626,14 +769,19 @@ internal sealed class OnboardingCompletionScenario
         });
         var dispatcher = Substitute.For<IAuthenticationProviderDispatcher>();
         dispatcher.GetActivePrimaryProviderAsync(Arg.Any<CancellationToken>()).Returns(providerKind);
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        HostConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["PublicBaseUrl"] = "https://example.test",
             ["Keycloak:Authority"] = "https://identity.example.test",
             ["Keycloak:ClientId"] = "event"
         }).Build();
+        GenerationReader = new InstanceOnboardingGenerationReader(systemSettings, DeploymentModeProvider, BootstrapRepository, HostConfiguration);
+        SystemSettings = systemSettings;
+        SaveProfile = new SaveInstanceOnboardingProfileCommandHandler(BootstrapRepository, systemSettings,
+            setupSecret, audit, _unitOfWork, HostConfiguration);
         var preflight = new GetOnboardingPreflightQueryHandler(BootstrapRepository, DeploymentModeProvider,
-            setupSecret, tenants, systemSettings, config, dispatcher, smtpConfigResolver: smtp);
+            setupSecret, tenants, systemSettings, HostConfiguration, dispatcher, smtpConfigResolver: smtp);
+        Preflight = preflight;
         Journey = new GetInstanceOnboardingJourneyQueryHandler(status, preflight,
             Substitute.For<IQueryHandler<GetInstanceOperatorIdentityQuery, InstanceOperatorIdentityDocumentDto>>(),
             authentication, authorization, GenerationReader,
@@ -657,10 +805,14 @@ internal sealed class OnboardingCompletionScenario
             jwt,
             NullLogger<InstanceOnboardingCompletionOperation>.Instance,
             _unitOfWork,
-            GenerationReader);
+            GenerationReader, HostConfiguration);
     }
 
     public CompleteInstanceOnboardingRequest Configuration { get; set; } = Settings();
+    public IConfiguration HostConfiguration { get; }
+    public ISystemSettingRepository SystemSettings { get; }
+    public SaveInstanceOnboardingProfileCommandHandler SaveProfile { get; }
+    public GetOnboardingPreflightQueryHandler Preflight { get; }
     public Tenant? ExistingTenant { get; set; }
     public TenantCreationRequest? CreatedTenant { get; private set; }
     public Guid UserId { get; }
@@ -954,8 +1106,9 @@ internal sealed class OnboardingCompletionScenario
 
     internal sealed class EffectDeploymentModeProvider(List<string> events) : IDeploymentModeProvider
     {
+        public DeploymentMode Mode { get; set; } = DeploymentMode.SingleTenant;
         public Task<DeploymentMode> GetCurrentModeAsync(CancellationToken ct = default) => Task.FromResult(DeploymentMode.SingleTenant);
-        public Task<DeploymentMode> GetConfiguredOnboardingModeAsync(CancellationToken ct = default) => Task.FromResult(DeploymentMode.SingleTenant);
+        public Task<DeploymentMode> GetConfiguredOnboardingModeAsync(CancellationToken ct = default) => Task.FromResult(Mode);
         public Task<bool> IsSingleTenantAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Task InvalidateCacheAsync() { events.Add("deployment-cache"); return Task.CompletedTask; }
     }

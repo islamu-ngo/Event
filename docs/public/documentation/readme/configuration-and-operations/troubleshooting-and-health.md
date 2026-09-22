@@ -12,11 +12,26 @@ This guide provides fast diagnostic procedures and step-by-step recovery recipes
 
 ## Setup Readiness
 
-The setup overview refreshes one server journey snapshot. Save the site profile
-before refreshing readiness so its canonical host is evaluated from persisted
-settings. A deployment-managed provider is not ready merely because deployment
+The setup overview refreshes one server journey snapshot. Open the application,
+configure authentication and authorization, enter the site name, and finish setup.
+There is no URL field or address confirmation. Authorized setup establishes the
+address internally from the BFF request, including HTTPS, port and path prefix.
+Behind a proxy, preserve the public Host and configure trusted forwarded headers,
+or set `PUBLIC_BASE_URL` and restart. Anonymous requests never establish a permanent
+address. Subdomain routing requires an explicit base domain when enabled;
+path-based multi-tenancy does not.
+
+If email delivery is enabled but secure public links cannot be constructed, setup
+shows a non-blocking warning to configure `PUBLIC_BASE_URL`. Background email uses
+this override or the established address; recovery links still require HTTPS.
+A deployment-managed provider is not ready merely because deployment
 selected it: pending, failed and restart-required states require the displayed
 repair action. Setup never silently selects a replacement provider.
+
+If Finish setup reports both “The settings field is required” and an invalid-body
+error, this can be a JSON contract mismatch rather than a missing form field.
+Update and restart the API and BFF together, then reload setup. Response-only URL
+ownership metadata is no longer included in the submitted site profile.
 
 If the snapshot is unavailable, contradictory or changed while being read, repair
 the selected source and refresh; do not proceed using an older screen's actions.

@@ -4,13 +4,19 @@ using Explore.Application.Models;
 using Explore.Infrastructure.Services.Registration;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
+using Explore.Application.Contracts.Persistence;
+using Explore.Domain;
+using Explore.Domain.Constants;
+using System.Text.Json;
 
 namespace Explore.Infrastructure.Tests.Registration;
 
 public sealed class AdmissionRecoveryEmailDeliveryChannelTests
 {
     [Test]
-    public async Task DeliveryUsesConfiguredSameOriginLinkAndIntentIdempotency()
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task DeliveryUsesConfiguredOrEstablishedAddressAndPreservesPathPrefix(bool configured)
     {
         EmailMessage? observed = null;
         IEmailService email = Substitute.For<IEmailService>();
@@ -21,10 +27,14 @@ public sealed class AdmissionRecoveryEmailDeliveryChannelTests
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["PublicBaseUrl"] = "https://events.example.test"
+                ["PublicBaseUrl"] = configured ? "https://events.example.test:9443/community" : ""
             })
             .Build();
-        var channel = new AdmissionRecoveryEmailDeliveryChannel(email, configuration);
+        var settings = Substitute.For<ISystemSettingRepository>();
+        settings.GetByKey(GovernanceSettingKeys.Domains.PublicBaseUrl, Arg.Any<CancellationToken>())
+            .Returns(new SystemSetting { SettingKey = GovernanceSettingKeys.Domains.PublicBaseUrl,
+                Value = JsonSerializer.Serialize("https://events.example.test:9443/community") });
+        var channel = new AdmissionRecoveryEmailDeliveryChannel(email, configuration, settings);
         Guid intentId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000471");
         Guid requestId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000472");
         const string capability = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -43,8 +53,8 @@ public sealed class AdmissionRecoveryEmailDeliveryChannelTests
         var uri = new Uri(link);
         await Assert.That(result.Outcome).IsEqualTo(AdmissionRecoveryDirectDeliveryOutcome.Accepted);
         await Assert.That(uri.GetLeftPart(UriPartial.Authority))
-            .IsEqualTo("https://events.example.test");
-        await Assert.That(uri.AbsolutePath).IsEqualTo("/tickets/recovery");
+            .IsEqualTo("https://events.example.test:9443");
+        await Assert.That(uri.AbsolutePath).IsEqualTo("/community/tickets/recovery");
         await Assert.That(uri.Query).IsEmpty();
         await Assert.That(uri.Fragment).IsEqualTo($"#capability={capability}");
         await Assert.That(link[..link.IndexOf('#')]).DoesNotContain(capability);
@@ -62,7 +72,7 @@ public sealed class AdmissionRecoveryEmailDeliveryChannelTests
                 ["PublicBaseUrl"] = "http://events.example.test"
             })
             .Build();
-        var channel = new AdmissionRecoveryEmailDeliveryChannel(email, configuration);
+        var channel = new AdmissionRecoveryEmailDeliveryChannel(email, configuration, Substitute.For<ISystemSettingRepository>());
 
         AdmissionRecoveryDirectDeliveryResult result = await channel.DeliverAsync(
             new AdmissionRecoveryDirectDeliveryRequest(

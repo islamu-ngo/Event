@@ -22,6 +22,7 @@ using Explore.Domain.ValueObjects;
 using Explore.Application.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.InstanceOnboarding.Services;
 
@@ -45,6 +46,7 @@ public sealed class InstanceOnboardingCompletionOperation(
     ILogger<InstanceOnboardingCompletionOperation> logger,
     IUnitOfWork unitOfWork,
     IInstanceOnboardingGenerationReader generationReader,
+    IConfiguration configuration,
     IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null)
 {
     private static readonly JsonSerializerOptions IdentitySerializerOptions = new(JsonSerializerDefaults.Web);
@@ -635,6 +637,7 @@ public sealed class InstanceOnboardingCompletionOperation(
         await InstanceOnboardingProfileSettingHelpers.PersistAsync(
             systemSettingRepository,
             siteProfile,
+            configuration,
             cancellationToken);
         if (singleTenant)
         {

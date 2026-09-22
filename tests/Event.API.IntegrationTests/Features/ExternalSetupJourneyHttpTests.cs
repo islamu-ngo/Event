@@ -120,6 +120,15 @@ public sealed class ExternalSetupJourneyHttpTests
         {
             await Assert.That(body.RootElement.TryGetProperty("profile", out _)).IsFalse();
         }
+        if (authority is "missing" or "forged" or "expired")
+        {
+            using var rejected = await client.PatchAsJsonAsync("/api/instanceonboarding/profile",
+                new SelfHostOnboardingProfileDto { SiteName = "Rejected", CanonicalUrl = "https://untrusted.example.test" }, cancellationToken);
+            await Assert.That(rejected.IsSuccessStatusCode).IsFalse();
+            using var scope = configured.Services.CreateScope();
+            var settings = scope.ServiceProvider.GetRequiredService<Explore.Application.Contracts.Persistence.ISystemSettingRepository>();
+            await Assert.That(await settings.GetByKey(Explore.Domain.Constants.GovernanceSettingKeys.Domains.PublicBaseUrl, cancellationToken)).IsNull();
+        }
         accessor.HttpContext = null;
     }
 }

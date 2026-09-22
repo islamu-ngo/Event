@@ -3,6 +3,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Microsoft.Extensions.Configuration;
+using Explore.Application.Configuration;
 
 namespace Explore.Application.Features.InstanceOnboarding.Common;
 
@@ -25,8 +27,11 @@ internal static class InstanceOnboardingProfileSettingHelpers
     internal static async Task PersistAsync(
         ISystemSettingRepository systemSettingRepository,
         SelfHostOnboardingProfileDto profile,
+        IConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        var configuredUrl = PublicAddressResolver.ReadOverride(configuration);
+        var canonicalUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : profile.CanonicalUrl;
         await UpsertAsync(
             systemSettingRepository,
             GovernanceSettingKeys.Branding.DisplayName,
@@ -45,17 +50,13 @@ internal static class InstanceOnboardingProfileSettingHelpers
             "Public support contact for the instance site",
             cancellationToken);
 
-        var canonicalHost = NormalizeCanonicalHost(profile.CanonicalUrl);
-        if (!string.IsNullOrWhiteSpace(canonicalHost))
+        if (PublicAddressResolver.IsValid(canonicalUrl))
         {
             await UpsertAsync(
                 systemSettingRepository,
-                GovernanceSettingKeys.Domains.InstanceBaseDomain,
-                JsonSerializer.Serialize(canonicalHost),
-                "Domains",
-                1,
-                "Instance base domain used for tenant subdomain generation",
-                cancellationToken);
+                GovernanceSettingKeys.Domains.PublicBaseUrl,
+                JsonSerializer.Serialize(canonicalUrl),
+                "Domains", 2, "Public address established during authorized setup", cancellationToken);
         }
 
         await UpsertAsync(
@@ -66,16 +67,6 @@ internal static class InstanceOnboardingProfileSettingHelpers
             1,
             "Default language code (ISO 639-1) for the instance",
             cancellationToken);
-    }
-
-    private static string? NormalizeCanonicalHost(string? canonicalUrl)
-    {
-        if (!Uri.TryCreate(canonicalUrl, UriKind.Absolute, out var uri))
-        {
-            return null;
-        }
-
-        return uri.Host.Trim().ToLowerInvariant();
     }
 
     private static Task UpsertAsync(

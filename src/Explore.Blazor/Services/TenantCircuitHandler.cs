@@ -16,8 +16,11 @@ public class TenantCircuitHandler : CircuitHandler
     public TenantCircuitHandler(
         ITenantRouteContextAccessor tenantRouteContextAccessor,
         NavigationManager navigationManager,
-        IBffResolverConfigurationProvider resolverConfigurationProvider)
+        IBffResolverConfigurationProvider resolverConfigurationProvider,
+        Explore.Blazor.Client.Models.OnboardingRequestOrigin requestOrigin)
     {
+        // Resolve and retain the scoped request snapshot while the circuit's initial HTTP context exists.
+        _ = requestOrigin;
         _tenantRouteContextAccessor = tenantRouteContextAccessor;
         _navigationManager = navigationManager;
         _resolverConfigurationProvider = resolverConfigurationProvider;

@@ -7,6 +7,7 @@ using Explore.Application.Settings;
 using Explore.Infrastructure.Mail;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
+using Explore.Application.Configuration;
 
 namespace Explore.Infrastructure.Authentication;
 
@@ -18,11 +19,14 @@ public sealed class LocalIdentityLifecycleDeliveryProcessor(
     EmailDeliveryCapabilityResolver capability,
     ILocalIdentityLifecycleSmtpTransport transport,
     IConfiguration configuration,
+    ISystemSettingRepository systemSettings,
     IOptions<EmailDispatchProcessorSettings> processorOptions)
 {
     public async Task DrainAsync(CancellationToken cancellationToken)
     {
-        if (ResolveCallbackUri() is not { } callbackUri) return;
+        var origin = await PublicAddressResolver.ResolveAsync(configuration, systemSettings, cancellationToken);
+        if (origin is not { Scheme: "https" }) return;
+        var callbackUri = new Uri(origin, "auth/local-account-recovery");
         var pending = await deliveries.ReadPendingAsync(32, cancellationToken);
         foreach (var pointer in pending)
         {
@@ -58,11 +62,4 @@ public sealed class LocalIdentityLifecycleDeliveryProcessor(
         }
     }
 
-    private Uri? ResolveCallbackUri()
-    {
-        string? value = configuration["PublicBaseUrl"] ?? configuration["App:PublicBaseUrl"] ?? configuration["Application:PublicBaseUrl"];
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps
-            || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)) return null;
-        return new Uri(uri.AbsoluteUri.TrimEnd('/') + "/auth/local-account-recovery");
-    }
 }

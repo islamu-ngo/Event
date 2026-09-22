@@ -1,4 +1,5 @@
 using FluentValidation;
+using Explore.Application.Configuration;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;
 
@@ -18,8 +19,8 @@ public sealed class SelfHostOnboardingProfileDtoValidator : AbstractValidator<Se
             .When(x => !string.IsNullOrWhiteSpace(x.SupportEmail));
 
         RuleFor(x => x.CanonicalUrl)
-            .Must(BeAbsoluteHttpUrl)
-            .WithMessage("CanonicalUrl must be an absolute http or https URL.")
+            .Must(PublicAddressResolver.IsValid)
+            .WithMessage("CanonicalUrl must be an absolute http or https URL without credentials, query or fragment.")
             .When(x => !string.IsNullOrWhiteSpace(x.CanonicalUrl));
 
         RuleFor(x => x.Locale)
@@ -40,17 +41,6 @@ public sealed class SelfHostOnboardingProfileDtoValidator : AbstractValidator<Se
             .MaximumLength(500)
             .WithMessage("Purpose must not exceed 500 characters.")
             .When(x => x.Purpose is not null);
-    }
-
-    private static bool BeAbsoluteHttpUrl(string? value)
-    {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
-        {
-            return false;
-        }
-
-        return string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool BeValidTimeZone(string? value)

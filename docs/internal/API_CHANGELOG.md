@@ -5,6 +5,22 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-21
 
+- **Internal public-address establishment.** Setup has no URL field, confirmation
+  or canonical-host launch blocker. Authorized setup establishes the effective BFF
+  address internally, preserving scheme, port and path base; background email links
+  use deployment overrides or this established address. Subdomain routing requires
+  its own explicit base domain; path-based tenancy does not. Response-only ownership
+  flags are absent from writable profiles, fixing generated-client null binding on
+  Finish setup. Listening addresses are never used as public addresses.
+
+- **Setup-read availability under rate limiting.** Setup-secret GET requests now
+  use IP-and-route fixed-window partitions, while setup mutations retain the
+  shared IP partition and the existing five-per-60-second bound. Repeated status
+  or journey reads can no longer starve the authoritative authorization-provider
+  configuration read and make the onboarding UI display unavailable provider
+  state. Routes, payloads, setup-secret validation, write limits, and OpenAPI are
+  unchanged.
+
 - **Canonical operator form metadata.** Authenticated
   `GET /api/operator-identity-metadata` (`GetOperatorIdentityFormOptions`) returns
   value-free operator-kind codes, runtime country/region display choices, shared

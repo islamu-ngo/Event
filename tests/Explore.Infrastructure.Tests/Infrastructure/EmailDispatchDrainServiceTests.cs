@@ -388,6 +388,32 @@ public sealed class EmailDispatchDrainServiceTests
     }
 
     [Test]
+    public async Task PublicAddressReadFailure_DoesNotConsumeDeliveryAttemptBeforeSmtp()
+    {
+        var fixture = new Fixture();
+        var dispatch = CreateDispatch(EmailDispatchStatus.Pending);
+        ConfigureAcceptedSend(fixture, dispatch);
+        fixture.Configuration["PublicBaseUrl"] = "";
+        fixture.SystemSettings.GetByKey(GovernanceSettingKeys.Domains.PublicBaseUrl, Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<SystemSetting?>(new InvalidOperationException("Address store unavailable")));
+        var sent = new List<EmailMessage>();
+        fixture.EmailService.SendAsync(Arg.Do<EmailMessage>(sent.Add), Arg.Any<CancellationToken>())
+            .Returns(EmailResult.Ok());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.ProcessSingleAsync(
+            dispatch.TenantId, dispatch.PublishEventId, "address-test", CancellationToken.None));
+        await Assert.That(dispatch.AttemptCount).IsEqualTo(0);
+        await Assert.That(sent).IsEmpty();
+
+        fixture.Configuration["PUBLIC_BASE_URL"] = "https://established.example.test/community";
+        dispatch.Status = EmailDispatchStatus.Pending;
+        var result = await fixture.Service.ProcessSingleAsync(
+            dispatch.TenantId, dispatch.PublishEventId, "address-test", CancellationToken.None);
+        await Assert.That(result.Outcome).IsEqualTo(EmailDispatchDrainOutcome.Sent);
+        await Assert.That(sent.Count).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task ProcessSingleAsyncAddsUnsubscribeHeadersAndFooterWhenPublicBaseUrlIsConfigured()
     {
         var fixture = new Fixture();
@@ -1084,6 +1110,7 @@ public sealed class EmailDispatchDrainServiceTests
             services.AddSingleton(UnsubscribeTokenService);
             services.AddSingleton(TenantAccessor);
             services.AddSingleton<IConfiguration>(Configuration);
+            services.AddSingleton(SystemSettings);
             ServiceProvider = services.BuildServiceProvider();
 
             var meterFactory = Substitute.For<IMeterFactory>();
@@ -1098,6 +1125,7 @@ public sealed class EmailDispatchDrainServiceTests
         }
 
         public IEmailDispatchOutboxRepository Repository { get; }
+        public ISystemSettingRepository SystemSettings { get; } = Substitute.For<ISystemSettingRepository>();
 
         public IEmailService EmailService { get; }
 

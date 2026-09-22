@@ -26,6 +26,12 @@
 
 ## 1. Headless Instance Onboarding Invariant
 
+Interactive setup establishes the effective BFF request address internally during
+authorized save/completion, without a URL field or confirmation. `PUBLIC_BASE_URL`
+overrides automatic resolution for deployment-specific needs. An explicit base
+domain is required when enabling subdomain routing, not for path-based tenancy.
+Listening addresses are not public origins. See [the configuration boundary](CONFIGURATION.md#guided-setup-configuration-boundary).
+
 You can bring an instance up without touching the interactive setup screens.
 Set `INSTANCE_BOOTSTRAP_MODE=ConfiguredAdministrator` plus the provider key
 (`local`, `keycloak`, or `atproto`), the exact subject and a positive

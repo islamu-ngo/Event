@@ -2,12 +2,15 @@ using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Microsoft.Extensions.Configuration;
+using Explore.Application.Configuration;
+using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Infrastructure.Services.Registration;
 
 public sealed class AdmissionRecoveryEmailDeliveryChannel(
     IEmailService emailService,
     IConfiguration configuration,
+    ISystemSettingRepository systemSettings,
     TimeProvider? timeProvider = null) :
     IAdmissionRecoveryDirectDeliveryChannel
 {
@@ -25,21 +28,15 @@ public sealed class AdmissionRecoveryEmailDeliveryChannel(
         }
 
         string idempotencyKey = request.DeliveryIntentId.ToString("N");
-        string baseUrl = (
-            configuration["PublicBaseUrl"] ??
-            configuration["App:PublicBaseUrl"] ??
-            configuration["Application:PublicBaseUrl"] ??
-            string.Empty).TrimEnd('/');
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? origin) ||
-            origin.Scheme != Uri.UriSchemeHttps ||
-            !string.IsNullOrEmpty(origin.UserInfo))
+        var origin = await PublicAddressResolver.ResolveAsync(configuration, systemSettings, cancellationToken);
+        if (origin is not { Scheme: "https" })
         {
             return new AdmissionRecoveryDirectDeliveryResult(
                 AdmissionRecoveryDirectDeliveryOutcome.Ambiguous);
         }
 
         string recoveryUrl =
-            $"{origin.GetLeftPart(UriPartial.Authority)}/tickets/recovery" +
+            new Uri(origin, "tickets/recovery").AbsoluteUri +
             $"#capability={Uri.EscapeDataString(request.Capability)}";
         if (request.DisclosureUntilUtc is { } deadline && (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime >= deadline)
             return new AdmissionRecoveryDirectDeliveryResult(AdmissionRecoveryDirectDeliveryOutcome.RetentionExpired);

@@ -94,6 +94,7 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             Processor = new(Lifecycle, Deliveries, MutationLock, settings, capabilities, transport,
                 new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(
                     new Dictionary<string, string?> { ["PublicBaseUrl"] = "https://instance.test" }).Build(),
+                new SystemSettingRepository(Application, MutationLock),
                 Options.Create(new EmailDispatchProcessorSettings()));
             Router = new(new UserExternalLoginRepository(Application), [new LocalIdentityLifecycleEmailService(Lifecycle, Deliveries)]);
         }

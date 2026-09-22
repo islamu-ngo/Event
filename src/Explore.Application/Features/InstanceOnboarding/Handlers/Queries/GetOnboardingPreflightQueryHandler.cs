@@ -3,6 +3,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Configuration;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Models.Storage;
 using Explore.Domain.Constants;
@@ -43,7 +44,6 @@ public sealed class GetOnboardingPreflightQueryHandler(
         AddDeploymentModeCheck(result, deploymentMode);
         await AddDefaultTenantCheckAsync(result, deploymentMode, onboardingCompleted);
         await AddAuthConfigurationCheckAsync(result, cancellationToken);
-        await AddCanonicalHostCheckAsync(result);
         await AddDnsChecklistWarningsAsync(result, deploymentMode);
         await AddOperationalWarningsAsync(result, cancellationToken);
 
@@ -142,40 +142,16 @@ public sealed class GetOnboardingPreflightQueryHandler(
                 : "Configure Keycloak, AT Protocol, or Google SSO before completing onboarding.");
     }
 
-    private async Task AddCanonicalHostCheckAsync(OnboardingPreflightDto result)
-    {
-        var configuredHost = configuration["PublicBaseUrl"]
-            ?? configuration["App:PublicBaseUrl"]
-            ?? configuration["ASPNETCORE_URLS"];
-        var storedDomain = await HasSettingValueAsync(GovernanceSettingKeys.Domains.InstanceBaseDomain);
-
-        AddBlocking(
-            result,
-            "canonical_host",
-            "Canonical host",
-            !string.IsNullOrWhiteSpace(configuredHost) || storedDomain
-                ? OnboardingPreflightCheckStatus.Pass
-                : OnboardingPreflightCheckStatus.Fail,
-            !string.IsNullOrWhiteSpace(configuredHost) || storedDomain
-                ? "Canonical host/domain is available from configuration or Site Profile settings."
-                : "Canonical host/domain is not configured.",
-            !string.IsNullOrWhiteSpace(configuredHost) || storedDomain
-                ? null
-                : "Set the canonical URL in Site Profile or provide a public base URL configuration before launch.");
-    }
-
     private async Task AddDnsChecklistWarningsAsync(OnboardingPreflightDto result, DeploymentMode deploymentMode)
     {
-        if (deploymentMode != DeploymentMode.MultiTenant)
+        if (deploymentMode != DeploymentMode.MultiTenant
+            || !await HasEnabledSettingAsync(GovernanceSettingKeys.Routing.ResolverSubdomainEnabled))
         {
             return;
         }
 
-        var configuredPublicHost = HostFromValue(configuration["PublicBaseUrl"])
-            ?? HostFromValue(configuration["App:PublicBaseUrl"])
-            ?? HostFromValue(configuration["ASPNETCORE_URLS"]);
         var instanceBaseDomain = await GetSettingValueAsync(GovernanceSettingKeys.Domains.InstanceBaseDomain);
-        var publicHost = configuredPublicHost ?? NormalizeHost(instanceBaseDomain);
+        var publicHost = NormalizeHost(instanceBaseDomain);
         var adminHost = HostFromValue(configuration["ControlPlane:PublicOrigin"])
             ?? HostFromValue(configuration["Bff:PublicOrigin"])
             ?? HostFromValue(configuration["CONTROL_PLANE_PUBLIC_ORIGIN"])
@@ -187,7 +163,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
             "dns_public_platform",
             "Public platform DNS",
             string.IsNullOrWhiteSpace(publicHost)
-                ? "Public platform host is not configured yet; add the canonical URL in Site Profile before creating DNS records."
+                ? "Subdomain routing is enabled without a base domain; configure its explicit domain in tenant routing settings."
                 : $"Point the public platform host {publicHost} at the Blazor/BFF entry point before launch.",
             "Create an A/AAAA or CNAME record at your edge provider, then verify TLS termination and forwarded headers.");
 
@@ -226,6 +202,13 @@ public sealed class GetOnboardingPreflightQueryHandler(
         if (!await IsSmtpConfiguredAsync(cancellationToken))
         {
             AddWarning(result, "smtp", "SMTP", "SMTP is not configured; email delivery features may be unavailable after launch.");
+        }
+        else if (await HasEnabledSettingAsync(GovernanceSettingKeys.Email.DeliveryEnabled)
+            && await PublicAddressResolver.ResolveAsync(configuration, systemSettingRepository, cancellationToken) is not { Scheme: "https" })
+        {
+            AddWarning(result, "email_public_address", "Public email links",
+                "Cannot construct secure public email links; configure PUBLIC_BASE_URL with your public HTTPS address.",
+                "This does not block launch. An HTTPS address established during authorized setup can also be used.");
         }
 
         await AddObjectStorageWarningAsync(result, cancellationToken);
@@ -363,7 +346,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
             RequirementCategory = "RequiredNow",
             RemediationAuthority = code is "database_reachable" or "deployment_mode" or SetupSecretCheck ? "Deployment" : "SetupOperator",
             RestartRequired = status == OnboardingPreflightCheckStatus.Fail && code == SetupSecretCheck,
-            ActionRelation = code switch { "canonical_host" => "save-profile", "auth_config" => "manage-authentication", _ => "refresh" },
+            ActionRelation = code == "auth_config" ? "manage-authentication" : "refresh",
             Message = message,
             Detail = detail
         });

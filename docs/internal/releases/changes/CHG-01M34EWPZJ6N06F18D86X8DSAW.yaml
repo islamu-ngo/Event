@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M34EWPZJ6N06F18D86X8DSAW
+Title: "Trusted setup public address"
+Type: feat
+Scope: self-hosting
+Summary: "Authorized setup establishes the public address used by background links."
+Group: onboarding-public-address
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Interactive setup no longer accepts a user-confirmed public URL or blocks launch on a canonical host; deployment overrides and authorized request origins now establish the address.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Only trusted BFF requests with setup authority can establish a durable public address; listening addresses and raw forwarding headers are never trusted sources.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: PUBLIC_BASE_URL is optional and overrides the address established by authorized setup for background links and reverse-proxy deployments.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Writable onboarding profiles no longer contain response-only URL-ownership metadata, avoiding generated-client invalid-body submissions.
+  Operator:
+    Reference: docs/internal/SELF_HOSTING.md
+    Disposition: documented
+    Detail: Operators must preserve public forwarded headers or configure PUBLIC_BASE_URL; subdomain routing retains its separate explicit base-domain setting.

@@ -94,6 +94,14 @@ For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Gen
 
 ### Canonical Instance Onboarding Journey
 
+The profile's internal `canonicalUrl` preserves scheme, port and path base. The
+InteractiveServer setup component supplies it from the effective BFF request, with
+no URL form field. Persistence still requires authorized setup. `PUBLIC_BASE_URL`
+overrides automatic resolution and participates in the journey generation. There
+is no generic address launch gate; subdomain routing requires an explicit base
+domain when that capability is enabled. Response-only ownership flags are absent
+from the writable profile contract.
+
 `GET /api/instanceonboarding/journey` requires active setup authority or instance
 administrator authority and returns a private, no-store HAL snapshot. Declarative
 `[Authorize]` admits the exact setup-secret authentication scheme or a normal

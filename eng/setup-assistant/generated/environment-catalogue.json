@@ -12,7 +12,7 @@
       "key": "PUBLIC_BASE_URL",
       "category": "platform",
       "sensitivity": "public",
-      "requirement": "required",
+      "requirement": "optional",
       "order": 0,
       "hasSafeDefault": false,
       "validatorId": "absolute-uri",

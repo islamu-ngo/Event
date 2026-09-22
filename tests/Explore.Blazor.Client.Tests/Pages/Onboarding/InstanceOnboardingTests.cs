@@ -7,6 +7,7 @@ using Explore.Blazor.Client.Pages.Onboarding.Components;
 using Explore.Blazor.Client.Routing.ControlPlane;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Forms;
+using MudBlazor;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;
 
@@ -32,6 +33,7 @@ public class InstanceOnboardingTests : IDisposable
         _ctx.Services.AddSingleton(_instanceOnboardingService);
         _ctx.Services.AddSingleton(_userService);
         _ctx.Services.AddSingleton(Substitute.For<ILogger<InstanceOnboarding>>());
+        _ctx.Services.AddSingleton(new Explore.Blazor.Client.Models.OnboardingRequestOrigin("https://events.example.test:9443/community"));
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(new OkHttpHandler())
@@ -67,6 +69,36 @@ public class InstanceOnboardingTests : IDisposable
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    [Arguments("SingleTenant")]
+    [Arguments("MultiTenant")]
+    public async Task PublicAddress_IsSavedInternallyWithoutAFormField(string mode)
+    {
+        SelfHostOnboardingProfileDto? submitted = null;
+        _instanceOnboardingService.SaveProfileAsync(Arg.Any<SelfHostOnboardingProfileDto>(), Arg.Any<CancellationToken>())
+            .Returns(call => { submitted = call.Arg<SelfHostOnboardingProfileDto>(); return new BaseCommandResponseOfGuid { Success = true }; });
+        var cut = RenderForDeploymentMode(mode);
+        await Assert.That(cut.FindComponents<MudTextField<string>>().Any(component => component.Instance.Label.Contains("URL"))).IsFalse();
+        await FindButton(cut, "Save profile and refresh readiness").ClickAsync(new MouseEventArgs());
+        await Assert.That(submitted!.CanonicalUrl).IsEqualTo("https://events.example.test:9443/community");
+    }
+
+    [Test]
+    [Arguments("SingleTenant")]
+    [Arguments("MultiTenant")]
+    public async Task PublicUrl_ServerProfileOverridesDetectedOrigin(string mode)
+    {
+        SelfHostOnboardingProfileDto? submitted = null;
+        _instanceOnboardingService.SaveProfileAsync(Arg.Any<SelfHostOnboardingProfileDto>(), Arg.Any<CancellationToken>())
+            .Returns(call => { submitted = call.Arg<SelfHostOnboardingProfileDto>(); return new BaseCommandResponseOfGuid { Success = true }; });
+        var cut = RenderForDeploymentMode(mode);
+        _journey!.Profile = new() { SiteName = "Configured", CanonicalUrl = "https://public.example.test" };
+        await cut.Find("button[aria-label='Refresh setup status']").ClickAsync(new MouseEventArgs());
+
+        await FindButton(cut, "Save profile and refresh readiness").ClickAsync(new MouseEventArgs());
+        await Assert.That(submitted!.CanonicalUrl).IsEqualTo("https://public.example.test");
+    }
 
     [Test]
     public async Task GuidedWizard_DisclosesAdvancedDetailsAndPreservesProviderState()
@@ -611,6 +643,7 @@ public class InstanceOnboardingTests : IDisposable
                 _links = JsonSerializer.Deserialize<Dictionary<string, HalLink>>(((JsonElement)status.AdditionalProperties["_links"]).GetRawText())
             } : null;
         if (_journey is not null) _journey._links!["update-operator-identity"] = new() { Href = "/api/instance-operator-identity", Method = "PUT" };
+        if (_journey is not null) _journey._links!["save-profile"] = new() { Href = "/api/instanceonboarding/profile", Method = "PATCH" };
         _instanceOnboardingService.GetJourneyAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult(_journey));
 
         SetupBffJsModule(syncOk, syncFailureStatus);

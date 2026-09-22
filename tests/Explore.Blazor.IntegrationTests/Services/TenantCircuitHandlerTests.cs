@@ -10,6 +10,33 @@ namespace Explore.Blazor.IntegrationTests.Services;
 public class TenantCircuitHandlerTests
 {
     [Test]
+    public async Task CircuitNavigation_RetainsRequestOriginAfterHttpContextIsGone()
+    {
+        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+        accessor.HttpContext.Request.Scheme = "https";
+        accessor.HttpContext.Request.Host = new HostString("public.example", 9443);
+        accessor.HttpContext.Request.PathBase = "/community";
+        var navigation = new TestNavigationManager("https://public.example:9443/community/", "https://public.example:9443/community/setup");
+        var services = new ServiceCollection();
+        services.AddSingleton<IHttpContextAccessor>(accessor);
+        services.AddSingleton<NavigationManager>(navigation);
+        services.AddSingleton<ITenantRouteContextAccessor>(new TenantRouteContextAccessor(accessor));
+        services.AddSingleton(CreateConfigurationProvider());
+        services.AddScoped(provider => OnboardingRequestOriginResolver.Resolve(provider.GetRequiredService<IHttpContextAccessor>().HttpContext));
+        services.AddScoped<TenantCircuitHandler>();
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var handler = scope.ServiceProvider.GetRequiredService<TenantCircuitHandler>();
+        await handler.OnCircuitOpenedAsync(null!, CancellationToken.None);
+
+        accessor.HttpContext = null;
+        navigation.NavigateTo("/community/onboarding/instance");
+
+        await Assert.That(scope.ServiceProvider.GetRequiredService<Explore.Blazor.Client.Models.OnboardingRequestOrigin>().Url)
+            .IsEqualTo("https://public.example:9443/community");
+    }
+
+    [Test]
     public async Task CircuitActivity_WithTenantRoute_ForwardsSlugAcrossHandlerScope()
     {
         var routeAccessor = new TenantRouteContextAccessor(new HttpContextAccessor());
@@ -17,7 +44,7 @@ public class TenantCircuitHandlerTests
             "https://event.test/",
             "https://event.test/t/acme/admin/tenant/settings");
         var configurationProvider = CreateConfigurationProvider();
-        var handler = new TenantCircuitHandler(routeAccessor, navigationManager, configurationProvider);
+        var handler = new TenantCircuitHandler(routeAccessor, navigationManager, configurationProvider, new(null));
 
         await handler.OnCircuitOpenedAsync(null!, CancellationToken.None);
 
@@ -43,7 +70,7 @@ public class TenantCircuitHandlerTests
             "https://event.test/",
             "https://event.test/t/acme/admin/tenant/settings");
         var configurationProvider = CreateConfigurationProvider();
-        var handler = new TenantCircuitHandler(routeAccessor, navigationManager, configurationProvider);
+        var handler = new TenantCircuitHandler(routeAccessor, navigationManager, configurationProvider, new(null));
 
         await handler.OnCircuitOpenedAsync(null!, CancellationToken.None);
         navigationManager.NavigateTo("/admin/instance/settings");
@@ -59,7 +86,7 @@ public class TenantCircuitHandlerTests
             "https://event.test/",
             "https://event.test/community/acme/settings");
         var configurationProvider = CreateConfigurationProvider("/community");
-        var handler = new TenantCircuitHandler(routeAccessor, navigationManager, configurationProvider);
+        var handler = new TenantCircuitHandler(routeAccessor, navigationManager, configurationProvider, new(null));
 
         await handler.OnCircuitOpenedAsync(null!, CancellationToken.None);
 

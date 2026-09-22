@@ -23,6 +23,7 @@
 @inject IBffAuthApi BffAuthApi
 @inject IAccessibilityAnnouncerService Announcer
 @inject ITranslationService Translation
+@inject Explore.Blazor.Client.Models.OnboardingRequestOrigin RequestOrigin
 
 <PageTitle>@T("page_title", "Site profile and launch")</PageTitle>
 
@@ -177,13 +178,6 @@
                                       Placeholder="@T("profile.support_email_placeholder", "support@example.org")" />
                         <ValidationMessage For="@(() => _siteProfile.SupportEmail)" />
 
-                        <MudTextField T="string"
-                                      Label="@T("profile.canonical_url_label", "Canonical URL (optional)")"
-                                      Variant="Variant.Outlined"
-                                      For="@(() => _siteProfile.CanonicalUrl)"
-                                      @bind-Value="_siteProfile.CanonicalUrl"
-                                      Placeholder="@T("profile.canonical_url_placeholder", "https://events.example.org")" />
-                        <ValidationMessage For="@(() => _siteProfile.CanonicalUrl)" />
 
                         <MudTextField T="string"
                                       Label="@T("profile.purpose_label", "Purpose (optional)")"
@@ -818,6 +812,8 @@
         _siteProfile.Locale = profile.Locale;
         if (Uri.TryCreate(profile.CanonicalUrl, UriKind.Absolute, out _))
             _siteProfile.CanonicalUrl = profile.CanonicalUrl;
+        else if (string.IsNullOrWhiteSpace(_siteProfile.CanonicalUrl))
+            _siteProfile.CanonicalUrl = RequestOrigin.Url;
     }
 
     private async Task SaveProfileAsync()

@@ -10,6 +10,20 @@ This document owns configuration architecture, source anchors and invariants.
 
 ## Guided Setup Configuration Boundary
 
+Onboarding has no public URL field, confirmation, or generic address launch gate.
+`OnboardingRequestOriginResolver` captures the effective BFF scheme, host, port and
+path base after trusted forwarded-header processing, retaining it across circuit
+navigation. Only authorized profile save/completion establishes
+`domains.public_base_url`; anonymous requests never persist it. Raw forwarding
+headers and `ASPNETCORE_URLS` are never origin sources. `PublicAddressResolver`
+uses deployment `PUBLIC_BASE_URL` before the established address for background
+email links; HTTPS requirements remain capability-specific. An invalid explicit
+override fails closed for those links, not launch. SMTP-enabled installations
+without a secure address receive a non-blocking email-link warning.
+Setup never derives `domains.instance_base_domain` from the public address.
+`ResolverConfigurationDtoValidator` requires that explicit domain only when
+subdomain routing is enabled; path-based multi-tenancy does not require it.
+
 The guided administrator checklist introduces no environment keys, configuration
 store or provider fallback. Existing journey/preflight projections remain the
 source of requirement categories and remediation authority. Value-free operator
@@ -761,9 +775,12 @@ volume.
 
 ### Public URL Configuration
 
-`PublicBaseUrl` is the preferred static key for the instance's externally reachable HTTPS base URL. The fallback lookup order is `PublicBaseUrl`, then `App:PublicBaseUrl`, then `Application:PublicBaseUrl`.
+For background email links, `PublicAddressResolver` reads the first nonblank value
+from `PUBLIC_BASE_URL`, `PublicBaseUrl`, `App:PublicBaseUrl`, and
+`Application:PublicBaseUrl`, then the address established by authorized setup.
+Invalid explicit configuration never falls back to a different address.
 
-The value must be an absolute `http` or `https` URL. Public deployments should use `https`. It is used by public URL builders and by the email dispatch drain when creating absolute unsubscribe URLs for `List-Unsubscribe` headers and visible unsubscribe footers. If no valid public base URL is configured, categorized email can still send when preferences allow it, but the dispatch path omits unsubscribe URLs because relative links are not valid in email headers.
+The value must be an absolute `http` or `https` URL. Public deployments should use `https`. It is used by public URL builders and by the email dispatch drain when creating absolute unsubscribe URLs for `List-Unsubscribe` headers and visible unsubscribe footers. If no valid address is available from configuration or authorized setup, categorized email can still send when preferences allow it, but the dispatch path omits unsubscribe URLs because relative links are not valid in email headers. Local-account and ticket-recovery email retain their HTTPS requirement and preserve application path prefixes.
 
 Payment Checkout requires HTTPS with no user info, query, or fragment. A normalized application subpath is supported, for example `https://events.example.org/events`; runtime normalization adds one trailing slash and preserves `/events` in Stripe callbacks and BFF navigation. Missing or invalid configuration defers new Checkout dispatch with `checkout_return_origin_invalid`; it does not block free-order finalization or payment reconciliation.
 

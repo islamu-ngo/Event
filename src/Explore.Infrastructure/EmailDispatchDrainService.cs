@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Explore.Application.Configuration;
 
 namespace Explore.Infrastructure;
 
@@ -313,6 +314,9 @@ public sealed class EmailDispatchDrainService(
 
         try
         {
+            var preferenceCategory = ResolvePreferenceCategory(dispatch.Kind);
+            var origin = preferenceCategory is null ? null : await PublicAddressResolver.ResolveAsync(configuration,
+                scope.ServiceProvider.GetRequiredService<ISystemSettingRepository>(), cancellationToken);
             var eligibility = await eligibilityEvaluator.EvaluateAndBeginProviderHandoffAsync(
                 new EmailDispatchEligibilityRequest(
                     TenantId: dispatch.TenantId,
@@ -351,8 +355,7 @@ public sealed class EmailDispatchDrainService(
             dispatch.RecipientEmail = eligibility.RecipientEmail
                 ?? throw new InvalidOperationException("Eligible email dispatch is missing its current authorized destination.");
             providerHandoffStarted = true;
-            var preferenceCategory = ResolvePreferenceCategory(dispatch.Kind);
-            var message = BuildEmailMessage(dispatch, unsubscribeTokenService, configuration, preferenceCategory, now);
+            var message = BuildEmailMessage(dispatch, unsubscribeTokenService, origin, preferenceCategory, now);
 
             var result = await emailService.SendAsync(message, cancellationToken);
             var completedAt = DateTime.UtcNow;
@@ -554,7 +557,7 @@ public sealed class EmailDispatchDrainService(
     private static EmailMessage BuildEmailMessage(
         EmailDispatchOutbox dispatch,
         IEmailUnsubscribeTokenService unsubscribeTokenService,
-        IConfiguration configuration,
+        Uri? publicAddress,
         string? preferenceCategory,
         DateTime issuedAt)
     {
@@ -566,7 +569,7 @@ public sealed class EmailDispatchDrainService(
 
         var plainTextBody = dispatch.PlainTextBody;
         var htmlBody = dispatch.HtmlBody;
-        var unsubscribeUrl = BuildUnsubscribeUrl(dispatch, preferenceCategory, unsubscribeTokenService, configuration, issuedAt);
+        var unsubscribeUrl = BuildUnsubscribeUrl(dispatch, preferenceCategory, unsubscribeTokenService, publicAddress, issuedAt);
         if (unsubscribeUrl is not null)
         {
             headers["List-Unsubscribe"] = $"<{unsubscribeUrl}>";
@@ -590,7 +593,7 @@ public sealed class EmailDispatchDrainService(
         EmailDispatchOutbox dispatch,
         string? preferenceCategory,
         IEmailUnsubscribeTokenService unsubscribeTokenService,
-        IConfiguration configuration,
+        Uri? publicAddress,
         DateTime issuedAt)
     {
         if (preferenceCategory is null)
@@ -598,7 +601,7 @@ public sealed class EmailDispatchDrainService(
             return null;
         }
 
-        var publicBaseUrl = ResolvePublicBaseUrl(configuration);
+        var publicBaseUrl = publicAddress?.AbsoluteUri.TrimEnd('/');
         if (publicBaseUrl is null)
         {
             return null;
@@ -615,21 +618,6 @@ public sealed class EmailDispatchDrainService(
         }
 
         return $"{publicBaseUrl}/api/email/unsubscribe?token={Uri.EscapeDataString(token)}";
-    }
-
-    private static string? ResolvePublicBaseUrl(IConfiguration configuration)
-    {
-        var configured = configuration["PublicBaseUrl"]
-            ?? configuration["App:PublicBaseUrl"]
-            ?? configuration["Application:PublicBaseUrl"];
-        if (string.IsNullOrWhiteSpace(configured)
-            || !Uri.TryCreate(configured.Trim(), UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-        {
-            return null;
-        }
-
-        return uri.ToString().TrimEnd('/');
     }
 
     private static string AppendPlainTextUnsubscribe(string? body, string unsubscribeUrl)

@@ -7,11 +7,36 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Explore.Blazor.Services;
 
 namespace Explore.Blazor.IntegrationTests.Middleware;
 
 public sealed class ForwardedHeadersSecurityTests
 {
+    [Test]
+    [Arguments(false, "http://event.example:8080/community")]
+    [Arguments(true, "https://event.example:8080/community")]
+    public async Task OnboardingOrigin_UsesEffectiveRequestNotRawForwardedHeaders(bool trusted, string expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse(trusted ? "10.20.30.40" : "203.0.113.10");
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("event.example", 8080);
+        context.Request.PathBase = "/community";
+        context.Request.Headers["X-Forwarded-Proto"] = "https";
+        context.Request.Headers["X-Forwarded-Host"] = "attacker.example";
+        var options = new ForwardedHeadersOptions();
+        new ForwardedHeadersTrustOptions { KnownProxies = ["10.20.30.40"] }.ApplyTo(
+            options, ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+        var middleware = new ForwardedHeadersMiddleware(_ => Task.CompletedTask,
+            NullLoggerFactory.Instance, Options.Create(options));
+
+        await middleware.Invoke(context);
+
+        await Assert.That(OnboardingRequestOriginResolver.Resolve(context).Url).IsEqualTo(expected);
+        await Assert.That(OnboardingRequestOriginResolver.Resolve(null).Url).IsNull();
+    }
+
     [Test]
     public async Task DirectClientForwardedForDoesNotChangeRemoteIpAddress()
     {

@@ -45,7 +45,7 @@ are unchanged; no database migration is required for this removal.
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | **Baseline** | `Production` | Runtime mode: `Production`, `Staging`, `Development`, or `Testing`. |
-| `PUBLIC_BASE_URL` | **Baseline** | `http://localhost:7002` | Fully-qualified public HTTPS URL of your application (e.g., `https://events.example.org`). |
+| `PUBLIC_BASE_URL` | Optional | Empty | Overrides the address established automatically during authorized setup. Use the public HTTPS address when background links or reverse-proxy deployments need an explicit override (e.g., `https://events.example.org`). Subdomain routing has a separate base-domain setting. |
 | `API_HTTP_PORT` | **Baseline** | `7039` | Internal HTTP port for `Explore.API`. |
 | `UI_HTTP_PORT` | **Baseline** | `7002` | Internal HTTP port for `Explore.Blazor` (BFF). |
 | `KEYCLOAK_HTTP_PORT` | **Baseline** | `8080` | Internal HTTP port binding for Keycloak container. |
@@ -365,7 +365,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 
 | Variable | Category | Sensitivity | Default | Requirement | Restart |
 |---|---|---|---|---|---|
-| `PUBLIC_BASE_URL` | platform | public | None | required | process |
+| `PUBLIC_BASE_URL` | platform | public | None | optional | process |
 | `API_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `UI_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `KEYCLOAK_HTTP_PORT` | identity | public | None | optional | process |

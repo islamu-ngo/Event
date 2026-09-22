@@ -8,6 +8,8 @@ using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
+using Microsoft.Extensions.Configuration;
+using Explore.Application.Configuration;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 
@@ -16,7 +18,8 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
     ISystemSettingRepository systemSettingRepository,
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger instanceBootstrapAuditLogger,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IConfiguration configuration)
     : ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -34,7 +37,12 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
         }
 
         var validator = new SelfHostOnboardingProfileDtoValidator();
-        var validation = await validator.ValidateAsync(request.Profile, cancellationToken);
+        var configuredUrl = PublicAddressResolver.ReadOverride(configuration);
+        var profile = InstanceOnboardingProfileSettingHelpers.Normalize(request.Profile) with
+        {
+            CanonicalUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : request.Profile.CanonicalUrl
+        };
+        var validation = await validator.ValidateAsync(profile, cancellationToken);
         if (!validation.IsValid)
         {
             return BaseCommandResponse.Validation<Guid>(
@@ -42,14 +50,13 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
                 "Invalid onboarding profile.");
         }
 
-        var profile = InstanceOnboardingProfileSettingHelpers.Normalize(request.Profile);
         var response = await unitOfWork.ExecuteBootstrapConvergenceAsync(async transactionToken =>
         {
             var current = await instanceBootstrapStateRepository.GetCurrentForUpdate(transactionToken);
             if (current?.Status == InstanceBootstrapStatus.Completed
                 || !await setupSecretProvider.IsSetupModeActiveAsync(transactionToken))
                 return BaseCommandResponse.Validation<Guid>(["Setup mode is no longer active."], "Setup mode is no longer active.");
-            await InstanceOnboardingProfileSettingHelpers.PersistAsync(systemSettingRepository, profile, transactionToken);
+            await InstanceOnboardingProfileSettingHelpers.PersistAsync(systemSettingRepository, profile, configuration, transactionToken);
             return BaseCommandResponse.Success(current?.Id ?? Guid.Empty, "Instance onboarding profile saved successfully.");
         }, cancellationToken);
         if (!response.IsSuccess) return response;

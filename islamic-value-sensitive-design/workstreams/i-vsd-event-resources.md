@@ -3,7 +3,7 @@
 
 # Governed Event Resources — I-VSD Planning Assessment
 
-Last Updated: 2026-09-06
+Last Updated: 2026-09-22
 
 ## Review Metadata
 
@@ -11,15 +11,15 @@ Last Updated: 2026-09-06
 - Subject: first-class event materials, live audience eligibility and protected delivery
 - Workstream: event-resources
 - Report kind: planning-assessment
-- Report status: stale
-- Disposition: changes-required
-- Evidence cutoff: 2026-09-06
-- Reviewed input revision: SHA-256 `720dce47956918ba30e835758360af6c54947e62d61a4483a93dc0a404fac414` (`event-resources-evidence-v1`)
-- Supersedes: none. This is a planning assessment of the [standalone consultancy](i-vsd-event-resource-consultancy-report.md), not a rewrite of its historical evidence.
+- Report status: current
+- Disposition: plan-aligned
+- Evidence cutoff: 2026-09-22
+- Reviewed input: 2026-09-22 plan-review revision of `dev/active/event-resources/{event-resources-plan,event-resources-tasks,event-resources-context}.md` at repository source revision `0dca286c6e3d8d8d95fac2e78c8a7b29c4b2374a`
+- Supersedes: none. This is a planning assessment of the [standalone consultancy](../consultations/i-vsd-event-resource-consultancy-report.md), not a rewrite of its historical evidence.
 
 ## Scope
 
-This assessment consumes the shared current-repository evidence packet and the proposed [implementation plan](../dev/active/event-resources/event-resources-plan.md), [tasks](../dev/active/event-resources/event-resources-tasks.md), and [context](../dev/active/event-resources/event-resources-context.md). It traces all fifteen consultancy findings/mitigations to implementation scenarios, bounded deferrals or review gates.
+This assessment consumes the shared current-repository evidence packet and the proposed [implementation plan](../../dev/active/event-resources/event-resources-plan.md), [tasks](../../dev/active/event-resources/event-resources-tasks.md), and [context](../../dev/active/event-resources/event-resources-context.md). It traces all fifteen consultancy findings/mitigations to implementation scenarios, bounded deferrals or review gates.
 
 The baseline supports governed stored documents and external HTTPS destinations, live authenticated subject entitlements and explicitly public resources, independent metadata disclosure, schedule-relative timing, private file delivery, native governance, and a viable local standalone deployment. It does not include guest/dependent grants, scanner/provider adapters, identified attendee-access analytics, individualized certificate generation, arbitrary expressions, active embeds, presigned resource URLs or automatic resource federation/template cloning.
 
@@ -40,14 +40,14 @@ All IDs preserve their identity from the consultancy. The lifecycle below is **a
 | IVSD-F003 / IVSD-M003 | High; Trust, Justice, Non-Harm; technical/governance | Subjects/admins; distinct resource identity and bounded admin authority | Current resolver/provider/HAL seams exist; the similarly named Event assembler is not a resource capability | Security, 4.1–4.3/5.2; threat/evidence review before release |
 | IVSD-F004 / IVSD-M004 | High; Justice, Rights of People; technical | Participants, purchasers, speakers; exact current entitlement | LinkedUserId, HolderSubjectUserId, SubjectUserId and Actor assignments exist; purchaser is not participant | Domain/security, 4.1–4.2/6.2; guest/guardian rights need their own threat model |
 | IVSD-F005 / IVSD-M005 | High; Modesty, Non-Harm, Truthfulness; design/privacy | Prospective/entitled attendees; discoverability versus content | Separate purpose-specific location disclosure is precedent; plan requires intentionally authored safe public title | API/UI, 2.2/5.1–5.2/8.1; sensitive content policy remains provider-owned |
-| IVSD-F006 / IVSD-M006 | High; Trust, Non-Harm; technical/operations | Consumers and destination providers; response-time disclosure | BFF opaque upload sessions and HAL exist; ordinary resource DTOs must exclude destinations/keys | Storage/API/BFF, 6.2/7.2/9.1; external recipient resharing cannot be prevented |
+| IVSD-F006 / IVSD-M006 | High; Trust, Non-Harm; technical/operations | Consumers and destination providers; response-time disclosure | BFF opaque upload sessions and HAL exist; ordinary resource DTOs must exclude destinations/keys | Storage/API/BFF, 6.2/7.2/8.1–8.2; external recipient resharing cannot be prevented |
 | IVSD-F007 / IVSD-M007 | High; Trust, Excellence; technical | Uploaders/attendees; storage ownership and alternative access paths | PrivateOwner currently authorizes uploader; resource-owned rows need explicit generic-route denial | Storage, 3.2/6.1–6.2; retained registration/moderation evidence is a separate owner |
 | IVSD-F008 / IVSD-M008 | High; Non-Harm, Truthfulness; technical/operations | File recipients and operators; release of unscanned content | No malware scanner; signature inspection can allow unknown MIME without a signature rule; public sample bucket is unsuitable | Security/operator, 4.3/6.1–6.3; instance opt-in is explicit, default remains deny |
 | IVSD-F009 / IVSD-M009 | Medium; Promise-Keeping, Justice; domain/design | Attendees/speakers; schedule and cancellation effects | Public session discovery currently accepts only Published; completed-session recordings need resource-specific eligibility | Domain, 2.1–2.2/4.2; no scheduler substitutes for request-time time checks |
 | IVSD-F010 / IVSD-M010 | High; Justice, Trust; governance | Tenant/instance operators and organizers; non-widening controls | Native hierarchy, locks, coordinated writes and manifest exist; SingleTenant bypass/caches cannot weaken security ceilings | Settings/security, 4.3/8.2; source review proves every mutation/import path is bounded |
-| IVSD-F011 / IVSD-M011 | Medium; Avoiding Spying, Rights of People; privacy/operations | Attendees/managers; audit necessity and retention | Generic audit supports old/new snapshots, which are inappropriate for resource secrets; current access history is absent | Privacy, 3.2/5.1/6.3; identified access audit is deferred pending purpose/retention review |
-| IVSD-F012 / IVSD-M012 | High; Trust, Promise-Keeping; strategic/technical | Small self-hosters and multi-provider operators; viable durable floor | Standalone default root mismatch remains; five primary providers exist; database keyring is already registered in production API | Hosting/persistence, 1.1–1.2/3.2/9.1; restore/provider evidence required before claiming readiness |
-| IVSD-F013 / IVSD-M013 | Medium; Justice, Rights of People, Non-Harm; design/governance | Disabled users, rights holders, affected nonusers; metadata/alternatives/reporting/projection | Existing reporting/parent moderation and explicit template/federation seams are reused; no resource-specific behavior exists | UI/moderation/privacy, 6.3/8.1/9.2–9.3; scholarly authority only if contested content is adjudicated |
+| IVSD-F011 / IVSD-M011 | Medium; Avoiding Spying, Rights of People; privacy/operations | Attendees/managers; audit necessity and retention | Generic audit supports old/new snapshots, which are inappropriate for resource secrets; current access history is absent | Privacy, 3.2/5.1–5.3/6.3; audit expiry ships before audit-producing routes, identified access audit remains deferred |
+| IVSD-F012 / IVSD-M012 | High; Trust, Promise-Keeping; strategic/technical | Small self-hosters and multi-provider operators; viable durable floor | Standalone default root mismatch remains; five primary providers exist; database keyring is already registered in production API | Hosting/persistence, 1.1–1.2/3.2/8.1–8.3; restore/provider evidence required before claiming readiness |
+| IVSD-F013 / IVSD-M013 | Medium; Justice, Rights of People, Non-Harm; design/governance | Disabled users, rights holders, affected nonusers; metadata/alternatives/reporting/projection | Existing reporting/parent moderation and explicit template/federation seams are reused; no resource-specific behavior exists | UI/moderation/privacy, 6.3/8.1–8.3; scholarly authority only if contested content is adjudicated |
 | IVSD-F014 / IVSD-M014 | High; Trust, Non-Harm; security/operations | Organizers, attendees, backup operators; persistent destination confidentiality | API already persists keys; retained expired keys still decrypt; all destinations will use dedicated tenant/resource purposes | Crypto/hosting, 7.1–7.2; full DB compromise is not defeated by keys stored unwrapped in that same DB |
 | IVSD-F015 / IVSD-M015 | High; Truthfulness, Non-Harm; security/design | Attendees/incident responders; promises about revocation | Arbitrary redirects have no platform-enforceable downstream TTL; no resource presigning is planned | Security/product, 4.2/6.2/7.2; future TTL providers require measured provider guarantees |
 
@@ -63,9 +63,9 @@ All IDs preserve their identity from the consultancy. The lifecycle below is **a
 
 ## Recommendations
 
-**CTO rewrite notice, 2026-09-06:** the previous binding below is historical. The revised plan changes the revocation boundary, audience cursor disclosure, audit-row expiry and delivery/transport sequencing, and adds S35–S42. Findings IVSD-F003/F005/F006/F007/F009/F010/F011/F012/F013/F015 and their mitigations require planning-mode revalidation. No prior `plan-aligned` statement or earlier self-review approves the rewrite. See the [revised implementation plan](../dev/active/event-resources/event-resources-plan.md) and [context](../dev/active/event-resources/event-resources-context.md) where CTO audit findings and source-free research evidence were directly merged into the triad. Preserve IDs and historical evidence; do not mark current by replacing hashes alone.
+**Plan-review revalidation, 2026-09-22:** the prior stale binding was substantively re-evaluated, not refreshed by metadata alone. The current plan preserves all fifteen finding/mitigation identities while refining S35–S42, native CQS authority, provider-input freezing, disclosure status behavior, audit-retention sequencing, delivery-track independence and HAL-only UI proof. Hidden/nonexistent/cross-tenant resources remain indistinguishable 404; intentionally disclosed known metadata uses 401 for anonymous authentication-required access and 403 for authenticated ineligibility. Denial produces bounded aggregate telemetry only, never identified attendee access history or a content-bearing audit event.
 
-The previous recommendation was to proceed to user review of the bounded plan. Retain fail-closed defaults; implement security controls before delivery. The current recommendation is revalidation against the changed provider promises, followed by fresh technical review. Scope approval and deployment opt-in remain distinct.
+The recommendation is **plan-aligned** for technical implementation planning with fail-closed defaults and security controls before each delivery type. This does not authorize implementation, deployment opt-in, religious/legal certification, or an unscanned-file exception on any installation.
 
 The selected design is repository-native: rich entities, typed relational rules, Application resolution of live facts, entity-returning repositories, existing authorization/PDP abstractions, same-origin streaming, encrypted write-only destinations, native settings, and BFF/HAL consumption. The plan does not require new runtime packages.
 
@@ -119,7 +119,7 @@ These are deployment/future-feature ownership gates. They do not claim that a se
 
 ## Evidence Reviewed
 
-Repository HEAD: `506e0bf7585c9906bbb1f79d5cbd49090f043741` on `develop`, tracking up to date. The source consultancy's current file SHA-256 is `05faaf7af7b67ff9db6e0f1bf43d62bf787c2db05c3c5a3f2fb2e8dc7ff35aef`; its internal historical evidence digest is not the hash of the current file.
+Repository source revision inspected for this review: `0dca286c6e3d8d8d95fac2e78c8a7b29c4b2374a`. The source consultancy's current file SHA-256 is `05faaf7af7b67ff9db6e0f1bf43d62bf787c2db05c3c5a3f2fb2e8dc7ff35aef`; its internal historical evidence digest is not the hash of the current file.
 
 The main agent reviewed the following source manifest after graph-first discovery. Concatenate GNU `sha256sum` output for these paths in this exact order and hash the concatenation to reproduce the evidence revision; no plan/report file includes its own digest.
 
@@ -182,28 +182,29 @@ Available: current repository source, policy, tests, docs, local workstream cont
 ## Planning Handoff
 
 - Workstream: event-resources
-- Status: stale
-- Reviewed input revision: SHA-256 `720dce47956918ba30e835758360af6c54947e62d61a4483a93dc0a404fac414` (`event-resources-evidence-v1`)
+- Status: current
+- Reviewed input: 2026-09-22 plan-review triad revision at repository source `0dca286c6e3d8d8d95fac2e78c8a7b29c4b2374a`
 - Findings and mitigations: IVSD-F001→IVSD-M001 through IVSD-F015→IVSD-M015, same identities as the source consultancy
-- Required mappings: plan §9 maps every pair to S01–S34 and tasks 1.1–9.3. Deferred features have named persistent backlog targets in tasks.
-- Escalations: user scope review before implementation approval; actual security/provider/restore evidence before delivery; separate privacy/provider/scholarly gates only for their named future claims/features
-- Previous completed-triad binding: historical SHA-256 values below; these do not bind the CTO rewrite
+- Required mappings: plan §9 maps every pair to S01–S42 and tasks 1.1–8.3. Deferred features have named persistent backlog targets in tasks.
+- Escalations: explicit execution request before implementation; actual security/provider/restore evidence before delivery; separate privacy/provider/scholarly gates only for their named future claims/features
+- Current completed-triad binding: SHA-256 values below bind the 2026-09-22 plan-review revision
 - Refresh triggers: changes to default audience/disclosure, scanner/unscanned policy, audit identity/retention, ownership, revocation timing, secret/key authority, guest/dependent access, export/import, federation/templates, provider integrations, or a material CTO rewrite
 
 | Reviewed artifact | SHA-256 |
 | --- | --- |
-| `dev/active/event-resources/event-resources-plan.md` | `50d32d77863ef53e253d86204ec850974b2d402eab03c0a18bbc9ce6a191c700` |
-| `dev/active/event-resources/event-resources-tasks.md` | `df5816ee8fd60d68e06a77b1de7b709dc62dbe497642b07eb67cccbeb6ff22cd` |
-| `dev/active/event-resources/event-resources-context.md` | `b671827dbad731988d32aa633947c673ee84527fda1cdd47509fb145e7ac2c51` |
+| `dev/active/event-resources/event-resources-plan.md` | `a5309071e0d42ea72e14cf2fe405074db6919405e5ab482cd5726541bbfa6591` |
+| `dev/active/event-resources/event-resources-tasks.md` | `77ac58154a50d79d2b510446f30804285d72b8356cf1e3c94a66f8c9a65cc379` |
+| `dev/active/event-resources/event-resources-context.md` | `45b64431848997a6538ab2a18a402d21a5f29a467da447a8cd80f9a7c09a7792` |
 
-These hashes bind the reviewed draft, not execution status forever. Status-only task/context updates do not change provider responsibilities; a material design change requires the refresh workflow above. Local Markdown links resolve, all four artifacts carry two ABOUTME lines, whitespace checks report no errors, and all fifteen consultancy pairs map to the completed draft's 34 scenarios and 22 implementation tasks. Product builds/tests were not run during planning.
+These hashes bind the reviewed plan, not execution status forever. Status-only task/context updates do not change provider responsibilities; a material design change requires the refresh workflow above. Local Markdown links resolve, all four artifacts carry the required documentation headers, and all fifteen consultancy pairs map to 42 scenarios and 21 implementation tasks. Product builds/tests were not run during planning.
 
 ## Review Lifecycle
 
 | Date | Previous state | New state | Trigger | Evidence |
 | --- | --- | --- | --- | --- |
-| 2026-09-06 | None | Draft | Implementation-plan request; source report mapped to current repository behavior | Shared evidence manifest and proposed triad |
-| 2026-09-06 | Draft | Current / plan-aligned | Completed-triad mapping and integrity review; five independent review findings corrected and rechecked | 34 scenarios, 22 implementation tasks, nine phases and all fifteen finding/mitigation pairs; exact content binding below |
-| 2026-09-06 | Current / plan-aligned | Stale / changes-required | User-requested CTO rewrite changes revocation/discovery/retention promises and mitigation sequencing | Revised plan S35–S42, D5/D8/D9 and six PR boundaries; fresh planning-mode revalidation required |
+| 2026-09-06 | None | Draft | Historical implementation-plan request; source report mapped to then-current repository behavior | Historical shared evidence manifest and proposed triad |
+| 2026-09-06 | Draft | Current / plan-aligned | Historical completed-triad mapping and integrity review | Historical revision: 34 scenarios, 22 implementation tasks, nine phases and all fifteen finding/mitigation pairs |
+| 2026-09-06 | Current / plan-aligned | Stale / changes-required | Historical user-requested CTO rewrite changed revocation/discovery/retention promises and mitigation sequencing | Historical revision: S35–S42, D5/D8/D9 and six PR boundaries; planning-mode revalidation was required |
+| 2026-09-22 | Stale / changes-required | Current / plan-aligned | Senior CTO rebase against native CQS and current authorization/storage/release seams; security and architecture findings applied | 42 scenarios, 21 implementation tasks, eight phases/seven PRs, current §9 mapping and corrected artifact links |
 
 All accepted findings remain unimplemented until their scenarios have actual evidence. Plan alignment is a mapping decision, not a declaration that mitigations are complete.

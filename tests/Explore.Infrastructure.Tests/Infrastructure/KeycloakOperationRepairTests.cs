@@ -110,6 +110,28 @@ public sealed class KeycloakOperationRepairTests
     }
 
     [Test]
+    public async Task CreateAudienceMapper_WhenDifferentNamedEquivalentAppears_Fails()
+    {
+        JsonObject external = AudienceMapper(
+            id: "external-audience",
+            name: "operator-owned-audience",
+            audience: "event-api");
+        var handler = new SemanticKeycloakHandler([external]);
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    PlanAudienceCreate(),
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
+        await Assert.That(result.ProviderResourceId).IsNull();
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task ChangedMapperUuid_FailsWithoutMutation()
     {
         JsonObject existing = AudienceMapper(

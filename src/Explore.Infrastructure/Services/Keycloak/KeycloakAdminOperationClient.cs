@@ -209,7 +209,11 @@ public sealed class KeycloakAdminOperationClient(
 
         if (request.Step.Kind == KeycloakStep.CreateMapper)
         {
-            if (semanticallyEffective.Length == 1)
+            if (semanticallyEffective.Length == 1
+                && string.Equals(
+                    StringValue(semanticallyEffective[0], "name"),
+                    request.MapperName,
+                    StringComparison.Ordinal))
             {
                 JsonObject existing = semanticallyEffective[0];
                 KeycloakEffectiveMapperSnapshot projection =
@@ -226,7 +230,7 @@ public sealed class KeycloakAdminOperationClient(
                         KeycloakOperationService.MapperFingerprint(projection)));
             }
 
-            if (semanticallyEffective.Length > 1 || sameName.Length > 0)
+            if (semanticallyEffective.Length > 0 || sameName.Length > 0)
             {
                 return Conflict("keycloak_mapper_collision");
             }

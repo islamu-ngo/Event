@@ -7,6 +7,7 @@ using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Onboarding;
 using Explore.Application.Services;
 using Explore.Domain.Enums;
+using Explore.Domain.Keycloak;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Refit;
@@ -23,6 +24,7 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
+    private static readonly KeycloakOperationPolicy OperationPolicy = new();
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IKeycloakRealmDesiredStateBuilder _desiredStateBuilder;
@@ -99,6 +101,13 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!OperationPolicy.IsAllowedOnExistingRealm(KeycloakChangeKind.UpdateRealm))
+        {
+            return Failure(
+                request,
+                "keycloak_reviewed_operation_required",
+                "Legacy Keycloak bootstrap is disabled. Inspect the target and create a reviewed operation before any provider change.");
+        }
 
         if (!TryNormalizeBaseUri(request.KeycloakBaseUrl, _options.AllowLocalUrls, out var baseUri, out var failureCode))
         {
@@ -531,6 +540,30 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!OperationPolicy.IsAllowedOnExistingRealm(KeycloakChangeKind.UpdateRealm))
+        {
+            return new KeycloakRealmSyncPlanDto
+            {
+                Status = "blocked",
+                Message = "Legacy realm synchronization is disabled. Create and approve a narrow mapper operation instead.",
+                Authority = configuration.KeycloakAuthority,
+                ClientId = configuration.KeycloakClientId,
+                ApiClientId = request.ApiClientId,
+                DestructiveOperationsSupported = false,
+                Operations =
+                [
+                    SyncOperation(
+                        "keycloak-reviewed-operation-required",
+                        "safety",
+                        "realm",
+                        "Keycloak",
+                        "none",
+                        "blocked",
+                        "Realm-wide synchronization is outside the supported mutation boundary.",
+                        "Inspect the provider and review a narrow mapper or create-only operation.")
+                ]
+            };
+        }
 
         var previewRequest = new KeycloakRealmSyncPreviewRequestDto
         {
@@ -690,6 +723,18 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!OperationPolicy.IsAllowedOnExistingRealm(KeycloakChangeKind.RotateClientSecret))
+        {
+            return new KeycloakClientSecretRotationResultDto
+            {
+                Status = "operator-action-required",
+                Message = "Keycloak client-secret rotation is deployment-owned.",
+                ClientId = configuration.KeycloakClientId,
+                SecretOwnershipMode = "deployment-managed",
+                RequiresRestart = true,
+                OperatorInstructions = "Rotate the credential in the selected deployment authority and Keycloak, restart affected replicas, then inspect the connection. Event did not contact Keycloak or store a secret."
+            };
+        }
 
         var clientId = string.IsNullOrWhiteSpace(request.ClientId)
             ? configuration.KeycloakClientId
@@ -1744,7 +1789,6 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         }
 
         AddClientRepresentationChecks(clientRepresentation, checks);
-        await AddOfflineAccessChecksAsync(api, realm, blazorLookup.ClientUuid, accessToken, checks, cancellationToken);
         await AddApiClientCheckAsync(api, realm, apiClientId, accessToken, checks, cancellationToken);
     }
 
@@ -1759,10 +1803,6 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
             ? DoctorCheck("keycloak_standard_flow_enabled", "Authorization code flow", "healthy", "The Blazor client has standard authorization code flow enabled.")
             : DoctorCheck("keycloak_standard_flow_disabled", "Authorization code flow", "needs-repair", "The Blazor client does not have standard authorization code flow enabled.", "Enable Standard flow on the Blazor OIDC client."));
 
-        var refreshTokensEnabled = HasRefreshTokenSettings(clientRepresentation);
-        checks.Add(refreshTokensEnabled
-            ? DoctorCheck("keycloak_refresh_tokens_enabled", "Refresh token settings", "healthy", "The Blazor client includes offline_access scope and refresh-token settings.")
-            : DoctorCheck("keycloak_refresh_tokens_missing", "Refresh token settings", "needs-repair", "The Blazor client is missing offline_access scope or refresh-token settings.", "Assign offline_access as a client scope and set use.refresh.tokens=true."));
     }
 
     private static async Task AddOfflineAccessChecksAsync(
@@ -1949,7 +1989,6 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         }
 
         await AddBlazorClientSyncOperationsAsync(api, realm, blazorClientId, request, accessToken, operations, cancellationToken);
-        await AddOfflineAccessSyncOperationsAsync(api, realm, blazorClientId, accessToken, operations, cancellationToken);
         await AddApiClientSyncOperationsAsync(api, realm, request.ApiClientId, accessToken, operations, cancellationToken);
     }
 

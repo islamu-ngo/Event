@@ -416,7 +416,7 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/atproto/ATPROTO_SESSION_JWT_PRIVATE_JWKS` | `auth.atproto.session_jwt_private_jwks`; consumed by API first-party session JWT signing/validation |
 | `/keycloak/REALM_NAME` | `Keycloak:RealmName` |
 | `/keycloak/KEYCLOAK_CLIENT_ID` | Nonsecret browser/BFF client metadata mapped to `Keycloak:ClientId` for API onboarding detection. |
-| `/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Blazor BFF `Keycloak:ClientSecret` and Compose `keycloak-init` client-secret sync input |
+| `/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Deployment-owned Blazor BFF runtime credential resolved through the selected authority; Event never persists or rotates it |
 | `/keycloak/KEYCLOAK_API_CLIENT_SECRET` | Optional legacy/future Compose `keycloak-init` sync input for deployments that intentionally make the API resource-server client confidential; not needed by the current bearer-only API audience client |
 | `/keycloak/KEYCLOAK_SMTP_*` | Optional Compose `keycloak-init` realm SMTP bootstrap. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak SMTP settings; set host/port/from to apply deployment-managed SMTP. |
 | `/api/CONTROL_PLANE_REGISTRATION_CREDENTIALS` | `management.control_plane_registration_credentials` | Directional managed control-plane registration credentials. This key is instance-only and its binding stores only deployment-owned source metadata. |
@@ -485,13 +485,26 @@ when the selected topology requires it but it is absent. AppHost forwards the
 deployment value as a secret parameter to `keycloak-init`, the API, and the BFF;
 it never generates, persists, or renders a replacement value.
 
-External-Keycloak setup bootstrap accepts a one-time Keycloak admin or service-account username/password through the setup UI. Treat that credential as operator input for a single setup request, not as a platform-managed secret. ISLAMU must not save it to appsettings, environment variables, Infisical paths, database governance settings, logs, traces, screenshots, or support bundles. After a successful bootstrap, only the runtime Keycloak OIDC values and BFF client secrets are stored according to the normal authentication secret ownership model.
+External-Keycloak privileged inspection accepts a one-time Keycloak administrator
+username/password through the advanced setup or administration form. Treat that
+credential as operator input for exactly one foreground request, not as a
+platform-managed secret. Event must not read `KEYCLOAK_ADMIN*`, Infisical
+administrator entries, User Secrets or application configuration to satisfy an
+empty form, and must not save the input to appsettings, environment variables,
+Infisical paths, database governance settings, logs, traces, screenshots or
+support bundles.
 
 Paid-event hosted onboarding never returns payment platform secrets, provider account identifiers, or connection identifiers to the browser. `Payments:OrganizerDirect:ProviderCode` and `ConnectPlatformId` are server configuration, not secret values, but are still omitted from browser readiness contracts.
 
 Keycloak onboarding and administrator reads always redact the runtime client secret. They may expose only configured/source/editability metadata plus nonsecret authority and client ID. Secret values remain in the selected deployment authority; database rows contain only binding metadata, and setup writes do not persist a replacement value.
 
-Keycloak configuration writes and secret rotation derive ownership/configured state from authoritative server-side configuration instead of trusting client-supplied ownership metadata. A new confidential BFF client requires a secret; a blank write is valid only when the server already resolves an effective secret that was redacted from the browser read. Deployment-managed rotation returns operator action guidance and never writes a replacement to application storage.
+Keycloak runtime connection resolution reads the endpoint, realm, BFF client ID
+and BFF client secret from the selected deployment authority once for the
+request. There is no database-secret reader, source fallback or
+application-managed rotation branch. Rotate an existing client credential in
+the deployment authority and Keycloak under an operator-controlled maintenance
+window, restart affected replicas, and then re-inspect. Event never writes the
+replacement to application storage.
 
 ### Onboarding And Setup Credentials
 

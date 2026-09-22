@@ -21,17 +21,15 @@ public class KeycloakRealmDesiredStateBuilderTests
         });
 
         await Assert.That(desiredState.DestructiveOperationsSupported).IsFalse();
-        await Assert.That(desiredState.RequiredRealmRoles).Contains("offline_access");
-        await Assert.That(desiredState.ClientScopes.Single(scope => scope.Name == "offline_access").RealmRoleMappings).Contains("offline_access");
-        await Assert.That(desiredState.RoleComposites.Single(composite => composite.RoleName == "default-roles-islamu").CompositeRoleNames).Contains("offline_access");
+        await Assert.That(desiredState.RequiredRealmRoles).IsEmpty();
+        await Assert.That(desiredState.ClientScopes).IsEmpty();
+        await Assert.That(desiredState.RoleComposites).IsEmpty();
 
         var blazorClient = desiredState.Clients.Single(client => client.ClientId == "islamu-event-blazor");
         await Assert.That(blazorClient.ClientKind).IsEqualTo("blazor-confidential");
         await Assert.That(blazorClient.RedirectUris).Contains("https://event.example.com/signin-oidc");
         await Assert.That(blazorClient.WebOrigins).Contains("https://event.example.com");
-        await Assert.That(blazorClient.OptionalClientScopes).Contains("offline_access");
-        var subjectMapper = blazorClient.ProtocolMappers.Single(mapper => mapper.MapperType == "oidc-sub-mapper");
-        await Assert.That(subjectMapper.AddToAccessToken && subjectMapper.AddToIdToken).IsTrue();
+        await Assert.That(blazorClient.OptionalClientScopes).IsEmpty();
 
         var apiClient = desiredState.Clients.Single(client => client.ClientId == "islamu-event-api");
         await Assert.That(apiClient.ClientKind).IsEqualTo("api-bearer");

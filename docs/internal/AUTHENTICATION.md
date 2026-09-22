@@ -39,6 +39,31 @@ realm contract includes this mapper. Repair does not rewrite existing bearer
 tokens: a fresh provider sign-in is required. Setup authority never supplies an
 account subject or bypasses native account synchronization.
 
+## Keycloak Connection And Inspection Boundary
+
+Runtime Keycloak authority, realm, BFF client ID and BFF client secret resolve
+from the deployment's one selected secret authority. Application database
+settings are not a fallback for the client secret, and an unavailable,
+unauthorized, invalid or unconfigured binding keeps its distinct fail-closed
+state. The BFF and API use the same effective tuple; conflicting BFF and API
+client IDs are invalid.
+
+Normal connection checks use public OIDC discovery and perform no administrative
+write. Privileged inspection is a separate foreground request. It accepts only
+the administrator username and password freshly submitted in that request;
+environment, Infisical and User Secrets values for Keycloak administrator
+credentials are never consulted. The request uses a bounded HttpClient with
+redirects and cookies disabled, verified TLS, and explicit
+Development/Testing-only loopback HTTP.
+
+Existing realms are outside broad reconciliation authority. Inspection may
+recognize effective native, directly assigned or inherited subject and audience
+mappers, but it does not change realm settings, roles, shared client scopes,
+users, sessions, existing-client type/flow settings or client secrets.
+`offline_access` is optional and is not a repair prerequisite. Legacy bootstrap,
+realm-sync apply and client-secret rotation calls fail before provider mutation;
+the reviewed operation workflow is the only future mutation path.
+
 ## Clean Architecture Flow
 
 Local HTTP requests enter through `LocalAuthController` or the antiforgery-protected BFF endpoints. Controllers create immutable Local authentication commands and dispatch through MediatR:

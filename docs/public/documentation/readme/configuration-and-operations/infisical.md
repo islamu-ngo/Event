@@ -330,7 +330,7 @@ Required only when `AUTHORIZATION_PROVIDER=cerbos`.
 | `CERBOS_POSTGRES_PASSWORD` | Database password for Cerbos PostgreSQL container. |
 | `CERBOS_POSTGRES_DB` | Database name for Cerbos PostgreSQL container. |
 
-The browser never receives these values; it sees only configured/ownership metadata.
+The API resolves the Admin API credentials directly from the selected secret authority during policy sync; the browser receives only configured/ownership metadata. If the API restarts during unfinished onboarding, a protected onboarding page returns to `/setup` so the operator can re-enter the setup secret and resume the original page.
 
 ### `/mcp`
 

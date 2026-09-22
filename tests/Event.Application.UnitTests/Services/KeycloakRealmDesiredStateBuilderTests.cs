@@ -30,6 +30,8 @@ public class KeycloakRealmDesiredStateBuilderTests
         await Assert.That(blazorClient.RedirectUris).Contains("https://event.example.com/signin-oidc");
         await Assert.That(blazorClient.WebOrigins).Contains("https://event.example.com");
         await Assert.That(blazorClient.OptionalClientScopes).Contains("offline_access");
+        var subjectMapper = blazorClient.ProtocolMappers.Single(mapper => mapper.MapperType == "oidc-sub-mapper");
+        await Assert.That(subjectMapper.AddToAccessToken && subjectMapper.AddToIdToken).IsTrue();
 
         var apiClient = desiredState.Clients.Single(client => client.ClientId == "islamu-event-api");
         await Assert.That(apiClient.ClientKind).IsEqualTo("api-bearer");

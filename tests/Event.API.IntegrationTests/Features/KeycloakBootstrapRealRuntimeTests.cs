@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
+using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Onboarding;
@@ -49,6 +52,29 @@ public sealed class KeycloakBootstrapRealRuntimeTests
 
         try
         {
+            // Degrade only this disposable provider, proving repair changes newly issued tokens.
+            using var admin = new HttpClient { BaseAddress = new Uri(_keycloak.KeycloakBaseUrl) };
+            using var adminTokenResponse = await admin.PostAsync("/realms/master/protocol/openid-connect/token",
+                new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["grant_type"] = "password", ["client_id"] = "admin-cli",
+                    ["username"] = "admin", ["password"] = _keycloak.BootstrapAdminPassword
+                }));
+            adminTokenResponse.EnsureSuccessStatusCode();
+            var adminToken = await adminTokenResponse.Content.ReadFromJsonAsync<JsonObject>();
+            admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken!["access_token"]!.GetValue<string>());
+            var clients = await admin.GetFromJsonAsync<JsonArray>(
+                $"/admin/realms/{KeycloakContainerFixture.RealmName}/clients?clientId={KeycloakContainerFixture.TestClientId}");
+            var clientPath = $"/admin/realms/{KeycloakContainerFixture.RealmName}/clients/{clients!.Single()!["id"]!.GetValue<string>()}";
+            var mappers = await admin.GetFromJsonAsync<JsonArray>($"{clientPath}/protocol-mappers/models");
+            var subjectMapper = mappers!.Single(mapper => mapper!["protocolMapper"]!.GetValue<string>() == "oidc-sub-mapper")!;
+            subjectMapper["config"]!["access.token.claim"] = "false";
+            using var disableResponse = await admin.PutAsJsonAsync(
+                $"{clientPath}/protocol-mappers/models/{subjectMapper["id"]!.GetValue<string>()}", subjectMapper);
+            disableResponse.EnsureSuccessStatusCode();
+            var subjectlessToken = await _keycloak.TokenClient.GetUserTokenAsync(CancellationToken.None);
+            await Assert.That(new JwtSecurityTokenHandler().ReadJwtToken(subjectlessToken).Claims.Any(claim => claim.Type == "sub")).IsFalse();
+
             var response = await SendBootstrapRequestAsync(client, payload);
 
             await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -62,6 +88,7 @@ public sealed class KeycloakBootstrapRealRuntimeTests
             var token = await rotatedTokenClient.GetUserTokenAsync(CancellationToken.None);
             await Assert.That(token).IsNotNull();
             await Assert.That(token).IsNotEmpty();
+            await Assert.That(new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.Any(claim => claim.Type == "sub" && !string.IsNullOrWhiteSpace(claim.Value))).IsTrue();
 
             var offlineAccessToken = await rotatedTokenClient.GetUserTokenWithOfflineAccessAsync(CancellationToken.None);
             await Assert.That(offlineAccessToken).IsNotNull();

@@ -216,6 +216,12 @@ When `AUTHORIZATION_PROVIDER=cerbos` is selected, ISLAMU Event enforces **fail-c
 
 ---
 
+Setup wizard reads are rate-limited per route. Refreshing status or readiness
+cannot consume the authorization-provider configuration route's budget, while
+setup mutations remain on a stricter shared budget. If a custom setup client
+receives `429`, honor `Retry-After`; do not replace the missing authoritative
+response with locally inferred provider state.
+
 ### Recipe 6: Lost Setup Secret Recovery
 
 During first-run setup, the protected BFF session can read branding and save the

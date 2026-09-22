@@ -1297,7 +1297,8 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
                && ContainsAllStringValues(clientRepresentation["redirectUris"], redirectUris)
                && ContainsAllStringValues(clientRepresentation["webOrigins"], webOrigins)
                && HasPostLogoutRedirectSettings(clientRepresentation, redirectUris)
-               && HasAudienceMapper(clientRepresentation, apiClientId);
+               && HasAudienceMapper(clientRepresentation, apiClientId)
+               && HasSubjectMapper(clientRepresentation);
     }
 
     private static bool ContainsAllStringValues(JsonNode? currentValuesNode, IReadOnlyList<string>? desiredValues)
@@ -1336,6 +1337,52 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
                           && string.Equals(config?["included.client.audience"]?.GetValue<string>(), apiClientId, StringComparison.Ordinal)
                           && string.Equals(config?["access.token.claim"]?.GetValue<string>(), "true", StringComparison.OrdinalIgnoreCase);
                });
+    }
+
+    private static bool HasSubjectMapper(JsonObject representation) =>
+        representation["protocolMappers"] is JsonArray mappers
+        && mappers.OfType<JsonObject>().Any(mapper =>
+            mapper["protocol"]?.GetValue<string>() == "openid-connect"
+            && mapper["protocolMapper"]?.GetValue<string>() == "oidc-sub-mapper"
+            && mapper["config"]?["access.token.claim"]?.GetValue<string>() == "true"
+            && mapper["config"]?["id.token.claim"]?.GetValue<string>() == "true");
+
+    private static void EnsureSubjectMapper(JsonObject representation)
+    {
+        if (HasSubjectMapper(representation))
+            return;
+
+        var mappers = representation["protocolMappers"] as JsonArray;
+        if (mappers is null)
+        {
+            mappers = [];
+            representation["protocolMappers"] = mappers;
+        }
+
+        var mapper = mappers.OfType<JsonObject>().FirstOrDefault(candidate =>
+            candidate["protocolMapper"]?.GetValue<string>() == "oidc-sub-mapper");
+        if (mapper is null)
+        {
+            mapper = new JsonObject
+            {
+                ["name"] = mappers.OfType<JsonObject>().Any(candidate => candidate["name"]?.GetValue<string>() == "provider-subject")
+                    ? $"provider-subject-{Guid.CreateVersion7():N}"
+                    : "provider-subject",
+                ["protocolMapper"] = "oidc-sub-mapper"
+            };
+            mappers.Add(mapper);
+        }
+
+        mapper["protocol"] = "openid-connect";
+        var config = mapper["config"] as JsonObject;
+        if (config is null)
+        {
+            config = [];
+            mapper["config"] = config;
+        }
+        config["access.token.claim"] = "true";
+        config["id.token.claim"] = "true";
+        config["introspection.token.claim"] = "true";
     }
 
     private static bool ContainsScope(JsonNode? scopesNode, string expectedScope)
@@ -1525,6 +1572,7 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         AddMissingStringValues(clientRepresentation, "webOrigins", webOrigins ?? []);
         EnsurePostLogoutRedirectSettings(clientRepresentation, redirectUris);
         EnsureAudienceMapper(clientRepresentation, apiClientId);
+        EnsureSubjectMapper(clientRepresentation);
     }
 
     private static void EnsurePostLogoutRedirectSettings(
@@ -1702,6 +1750,10 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
 
     private static void AddClientRepresentationChecks(JsonObject clientRepresentation, List<KeycloakRealmDoctorCheckDto> checks)
     {
+        checks.Add(HasSubjectMapper(clientRepresentation)
+            ? DoctorCheck("keycloak_subject_mapper", "Provider account subject", "healthy", "The Blazor client includes the native account subject in access and ID tokens.")
+            : DoctorCheck("keycloak_subject_mapper", "Provider account subject", "needs-repair", "The Blazor client is missing its native Subject mapper or token inclusion is disabled.", "Run additive realm sync to enable the Subject mapper, then sign in again to obtain new tokens."));
+
         var standardFlowEnabled = clientRepresentation["standardFlowEnabled"]?.GetValue<bool>() == true;
         checks.Add(standardFlowEnabled
             ? DoctorCheck("keycloak_standard_flow_enabled", "Authorization code flow", "healthy", "The Blazor client has standard authorization code flow enabled.")
@@ -1959,6 +2011,17 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
                 "Blazor client representation cannot be read.",
                 "The temporary admin needs permission to view client details."));
             return;
+        }
+
+        if (!HasSubjectMapper(representation))
+        {
+            operations.Add(SyncOperation(
+                "keycloak-blazor-subject-mapper", "client", "client", blazorClientId,
+                "update", "planned",
+                "Enable the native Subject mapper on the Blazor client.",
+                "API account synchronization requires the provider account subject in access tokens.",
+                ["Include the native subject in access and ID tokens; sign in again after repair"],
+                requiresBackupBeforeApply: true));
         }
 
         if (representation["standardFlowEnabled"]?.GetValue<bool>() != true)
@@ -2296,6 +2359,12 @@ public sealed class KeycloakBootstrapService : IKeycloakBootstrapService
         }
 
         var changes = new List<string>();
+        if (!HasSubjectMapper(representation))
+        {
+            EnsureSubjectMapper(representation);
+            changes.Add("Enabled the native Subject mapper; sign in again to obtain new tokens");
+        }
+
         if (representation["standardFlowEnabled"]?.GetValue<bool>() != true)
         {
             representation["standardFlowEnabled"] = true;

@@ -6,7 +6,9 @@ using System.Text;
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
+using Explore.Domain.Secrets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Refit;
@@ -37,6 +39,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
     private readonly CerbosPolicyPackageOptions _options;
     private readonly CerbosAdminApiSettings _adminApiSettings;
     private readonly ICerbosConfigResolver _cerbosConfigResolver;
+    private readonly ISecretResolver _secretResolver;
     private readonly CerbosAdminEndpointValidator _adminEndpointValidator;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CerbosPolicyPackageService> _logger;
@@ -45,6 +48,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         IOptions<CerbosPolicyPackageOptions> options,
         IOptions<CerbosAdminApiSettings> adminApiSettings,
         ICerbosConfigResolver cerbosConfigResolver,
+        ISecretResolver secretResolver,
         CerbosAdminEndpointValidator adminEndpointValidator,
         IHttpClientFactory httpClientFactory,
         ILogger<CerbosPolicyPackageService> logger)
@@ -52,6 +56,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         _options = options.Value;
         _adminApiSettings = adminApiSettings.Value;
         _cerbosConfigResolver = cerbosConfigResolver;
+        _secretResolver = secretResolver;
         _adminEndpointValidator = adminEndpointValidator;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
@@ -146,7 +151,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             var packageRoot = ResolvePolicyRoot();
             manifest = await BuildManifestAsync(cancellationToken);
             var targetResolution = instanceTargetOnly
-                ? ResolveInstanceAdminApiTarget(oneTimeCredentials)
+                ? await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken)
                 : await ResolveAdminApiTargetAsync(oneTimeCredentials, cancellationToken);
             if (!targetResolution.Succeeded || targetResolution.Target is null)
             {
@@ -154,11 +159,13 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                     Succeeded: false,
                     PackageId: manifest.PackageId,
                     ContentHash: manifest.ContentHash,
-                    Message: "Policy package publishing skipped because no safe Cerbos Admin API target is configured.",
+                    Message: targetResolution.IssueCode == PolicyPackageIssueCode.AdminApiUnavailable
+                        ? "Policy package publishing skipped because the Cerbos credential authority is unavailable."
+                        : "Policy package publishing skipped because no safe Cerbos Admin API target is configured.",
                     PublishedAt: DateTimeOffset.UtcNow,
                     Warnings: targetResolution.Warnings)
                 {
-                    IssueCode = PolicyPackageIssueCode.AdminApiNotConfigured
+                    IssueCode = targetResolution.IssueCode
                 };
             }
 
@@ -296,12 +303,17 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
 
         if (!targetResolution.Succeeded || targetResolution.Target is null)
         {
+            var statusUnknown = targetResolution.IssueCode == PolicyPackageIssueCode.AdminApiUnavailable;
             return new PolicyPackageStatusResult(
                 PackageId: manifest.PackageId,
                 ContentHash: manifest.ContentHash,
                 CheckedAt: DateTimeOffset.UtcNow,
-                IssueCode: PolicyPackageIssueCode.AdminApiNotConfigured,
-                Message: "No safe Cerbos Admin API target is configured for authorization policy package publishing.",
+                IssueCode: statusUnknown
+                    ? PolicyPackageIssueCode.PackageStatusUnknown
+                    : PolicyPackageIssueCode.AdminApiNotConfigured,
+                Message: statusUnknown
+                    ? "Cerbos Admin API credential status is temporarily unavailable."
+                    : "No safe Cerbos Admin API target is configured for authorization policy package publishing.",
                 Warnings: targetResolution.Warnings);
         }
 
@@ -520,11 +532,12 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 Source: AdminApiTargetSource.Byo));
         }
 
-        return ResolveInstanceAdminApiTarget(oneTimeCredentials);
+        return await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken);
     }
 
-    private AdminApiTargetResolution ResolveInstanceAdminApiTarget(
-        PolicyPackageAdminCredentials? oneTimeCredentials = null)
+    private async Task<AdminApiTargetResolution> ResolveInstanceAdminApiTargetAsync(
+        PolicyPackageAdminCredentials? oneTimeCredentials,
+        CancellationToken cancellationToken)
     {
         if (_adminApiSettings.Endpoints.Count == 0)
             return AdminApiTargetResolution.Failed("Configure Cerbos:AdminApi:Endpoints before publishing the policy package.");
@@ -538,8 +551,33 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             endpoints.Add(endpoint);
         }
 
-        var username = oneTimeCredentials?.Username ?? _adminApiSettings.AdminUsername;
-        var password = oneTimeCredentials?.Password ?? _adminApiSettings.AdminPassword;
+        var username = oneTimeCredentials?.Username;
+        var password = oneTimeCredentials?.Password;
+        if (oneTimeCredentials is null)
+        {
+            var usernameResolution = await _secretResolver.ResolveAsync(
+                SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername,
+                null,
+                cancellationToken);
+            var passwordResolution = await _secretResolver.ResolveAsync(
+                SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword,
+                null,
+                cancellationToken);
+            if (usernameResolution.Status is SecretResolutionStatus.Unavailable
+                    or SecretResolutionStatus.Unauthorized
+                    or SecretResolutionStatus.Invalid
+                || passwordResolution.Status is SecretResolutionStatus.Unavailable
+                    or SecretResolutionStatus.Unauthorized
+                    or SecretResolutionStatus.Invalid)
+            {
+                return AdminApiTargetResolution.Failed(
+                    "Configured Cerbos Admin API credentials could not be resolved from the selected secret authority.",
+                    PolicyPackageIssueCode.AdminApiUnavailable);
+            }
+
+            username = usernameResolution.Value;
+            password = passwordResolution.Value;
+        }
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
             return AdminApiTargetResolution.Failed(
@@ -999,11 +1037,16 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
     private sealed record AdminApiTargetResolution(
         bool Succeeded,
         AdminApiTarget? Target,
-        IReadOnlyList<string> Warnings)
+        IReadOnlyList<string> Warnings,
+        PolicyPackageIssueCode IssueCode)
     {
-        public static AdminApiTargetResolution Success(AdminApiTarget target) => new(true, target, []);
+        public static AdminApiTargetResolution Success(AdminApiTarget target) =>
+            new(true, target, [], PolicyPackageIssueCode.None);
 
-        public static AdminApiTargetResolution Failed(string warning) => new(false, null, [warning]);
+        public static AdminApiTargetResolution Failed(
+            string warning,
+            PolicyPackageIssueCode issueCode = PolicyPackageIssueCode.AdminApiNotConfigured) =>
+            new(false, null, [warning], issueCode);
     }
 
     private sealed class CerbosAdminApiException(PolicyPackageIssueCode issueCode, string message)

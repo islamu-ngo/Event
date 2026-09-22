@@ -115,7 +115,7 @@ acceptable enforcement seam.
 | `global` | IP | 200 tokens | Refill 40/10s |
 | `authenticated` | User ID | 200 requests | 60s sliding |
 | `write` | User ID | 30 requests | 60s fixed |
-| `setup_secret` | IP | 5 requests | 60s fixed |
+| `setup_secret` | IP + route for GET; shared IP for mutations | 5 requests per partition | 60s fixed |
 | `public_transactional` | Effective remote IP | 10 requests | 60s fixed, queue 0 |
 
 All disabled in `Testing` environment.

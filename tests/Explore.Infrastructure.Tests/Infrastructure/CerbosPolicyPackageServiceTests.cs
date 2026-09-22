@@ -5,7 +5,10 @@ using System.Text;
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;
+using Explore.Domain.Enums;
+using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -269,6 +272,79 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         var credentials = Encoding.UTF8.GetString(
             Convert.FromBase64String(handler.Requests[0].Authorization?.Parameter ?? string.Empty));
         await Assert.That(credentials).IsEqualTo("one-time-admin:one-time-password");
+    }
+
+    [Test]
+    public async Task PublishInstanceAsync_WithDeploymentSecretBindings_UsesResolvedCredentials()
+    {
+        var policiesRoot = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+
+        var secretResolver = Substitute.For<ISecretResolver>();
+        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, "bound-admin");
+        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, "bound-password");
+        var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var service = CreateService(
+            policiesRoot,
+            handler: handler,
+            secretResolver: secretResolver,
+            adminUsername: string.Empty,
+            adminPassword: string.Empty);
+
+        var result = await service.PublishInstanceAsync();
+
+        await Assert.That(result.Succeeded).IsTrue();
+        var credentials = Encoding.UTF8.GetString(
+            Convert.FromBase64String(handler.Requests[0].Authorization?.Parameter ?? string.Empty));
+        await Assert.That(credentials).IsEqualTo("bound-admin:bound-password");
+    }
+
+    [Test]
+    public async Task PublishInstanceAsync_WhenDeploymentSecretAuthorityIsUnavailable_FailsClosed()
+    {
+        var policiesRoot = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+
+        var secretResolver = Substitute.For<ISecretResolver>();
+        secretResolver.ResolveAsync(Arg.Any<string>(), null, Arg.Any<CancellationToken>())
+            .Returns(SecretResolutionResult.Unavailable);
+        var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var service = CreateService(policiesRoot, handler: handler, secretResolver: secretResolver);
+
+        var result = await service.PublishInstanceAsync();
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiUnavailable);
+        await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task GetStatusAsync_WhenDeploymentSecretAuthorityRecovers_RetriesWithoutReconfiguration()
+    {
+        var policiesRoot = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+
+        var secretResolver = Substitute.For<ISecretResolver>();
+        secretResolver.ResolveAsync(Arg.Any<string>(), null, Arg.Any<CancellationToken>())
+            .Returns(SecretResolutionResult.Unavailable);
+        var handler = StoreHandler("{\"policyIds\":[\"resource.islamuevent_event.vdefault\"]}");
+        var service = CreateService(policiesRoot, handler: handler, secretResolver: secretResolver);
+
+        var unavailable = await service.GetStatusAsync();
+
+        await Assert.That(unavailable.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageStatusUnknown);
+        await Assert.That(string.Join(' ', unavailable.Warnings)).DoesNotContain("Configure Cerbos Admin API credentials");
+        await Assert.That(handler.Requests).IsEmpty();
+
+        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, "bound-admin");
+        ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, "bound-password");
+
+        _ = await service.GetStatusAsync();
+
+        await Assert.That(handler.Requests).IsNotEmpty();
     }
 
     [Test]
@@ -720,6 +796,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         RecordingMessageHandler? handler = null,
         CerbosConfiguration? resolvedConfiguration = null,
         ICerbosConfigResolver? configResolver = null,
+        ISecretResolver? secretResolver = null,
         string adminUsername = "admin",
         string adminPassword = "secret")
     {
@@ -732,9 +809,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         });
         var adminOptions = Options.Create(new CerbosAdminApiSettings
         {
-            Endpoints = ["https://cerbos.example"],
-            AdminUsername = adminUsername,
-            AdminPassword = adminPassword
+            Endpoints = ["https://cerbos.example"]
         });
 
         handler ??= new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
@@ -745,15 +820,34 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             Mode = CerbosMode.Instance,
             IsInstanceDefault = true
         });
+        if (secretResolver is null)
+        {
+            secretResolver = Substitute.For<ISecretResolver>();
+            if (!string.IsNullOrEmpty(adminUsername))
+                ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminUsername, adminUsername);
+            if (!string.IsNullOrEmpty(adminPassword))
+                ConfigureResolvedSecret(secretResolver, SecretDefinitionRegistry.Keys.Cerbos.CustomAdminPassword, adminPassword);
+        }
 
         return new CerbosPolicyPackageService(
             options,
             adminOptions,
             configResolver,
+            secretResolver,
             new CerbosAdminEndpointValidator(options),
             new StaticHttpClientFactory(new HttpClient(handler)),
             Substitute.For<ILogger<CerbosPolicyPackageService>>());
     }
+
+    private static void ConfigureResolvedSecret(ISecretResolver resolver, string key, string value) =>
+        resolver.ResolveAsync(key, null, Arg.Any<CancellationToken>()).Returns(
+            SecretResolutionResult.Resolved(new ResolvedSecret(
+                key,
+                value,
+                SecretSourceType.Infisical,
+                SecretScope.Instance,
+                null,
+                DateTimeOffset.UtcNow)));
 
     private static string CreatePolicyYaml(string resourceKind)
     {

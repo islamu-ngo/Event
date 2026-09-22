@@ -45,7 +45,17 @@ public class EventKeycloakIdentityContractContributor : IKeycloakIdentityContrac
             ServiceAccountsEnabled = false,
             RedirectUris = request.BlazorRedirectUris,
             WebOrigins = request.BlazorWebOrigins,
-            OptionalClientScopes = ["offline_access"]
+            OptionalClientScopes = ["offline_access"],
+            ProtocolMappers =
+            [
+                new KeycloakProtocolMapperDesiredStateDto
+                {
+                    Name = "provider-subject",
+                    MapperType = "oidc-sub-mapper",
+                    AddToAccessToken = true,
+                    AddToIdToken = true
+                }
+            ]
         };
 
     private static KeycloakClientDesiredStateDto? BuildApiClient(KeycloakRealmDesiredStateBuildRequestDto request)

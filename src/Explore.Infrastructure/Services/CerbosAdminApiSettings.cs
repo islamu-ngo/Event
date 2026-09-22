@@ -14,13 +14,4 @@ public class CerbosAdminApiSettings
     /// </summary>
     public List<string> Endpoints { get; set; } = [];
 
-    /// <summary>
-    /// Admin API username for Basic Auth.
-    /// </summary>
-    public string AdminUsername { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Admin API password for Basic Auth.
-    /// </summary>
-    public string AdminPassword { get; set; } = string.Empty;
 }

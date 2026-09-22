@@ -282,7 +282,8 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IAdmissionCredentialDirectDeliveryChannel>(provider => new AdmissionEmailCredentialDeliveryChannel(
             provider.GetRequiredService<IEmailService>(), provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<IAdmissionRecoveryDirectDeliveryChannel>(provider => new AdmissionRecoveryEmailDeliveryChannel(
-            provider.GetRequiredService<IEmailService>(), provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<TimeProvider>()));
+            provider.GetRequiredService<IEmailService>(), provider.GetRequiredService<IConfiguration>(),
+            provider.GetRequiredService<Explore.Application.Contracts.Persistence.ISystemSettingRepository>(), provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IGooglePubSubOidcTokenValidator, GooglePubSubOidcTokenValidator>();
         services.AddScoped<RegistrationProviderSubscriptionLifecycleService>();
         services.AddHttpClient(FormbricksRegistrationProviderAdapter.HttpClientName, client =>

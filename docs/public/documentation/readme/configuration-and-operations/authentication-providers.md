@@ -63,9 +63,12 @@ IDs are not substitutes.
 
 The supplied realm exports include Keycloak's built-in **Subject** mapper
 (`oidc-sub-mapper`) on the `islamu-event-blazor` client, with inclusion enabled for
-access tokens, ID tokens and introspection. For an already imported realm, apply
-that mapper in Keycloak and sign in again to obtain new tokens; replacing the
-export file does not update an existing realm. Keep the existing API audience
+access tokens, ID tokens and introspection. Automatic Keycloak setup also checks
+and repairs this mapper. For an already imported realm, use the realm doctor's
+Subject mapper check and additive realm sync (after confirming your backup), or
+enable the native Subject mapper directly in Keycloak. Then sign out and sign in
+again to obtain new tokens; restarting Event or replacing the export file alone
+does not repair an existing realm or change issued tokens. Keep the existing API audience
 mapper and email-verification mapping. Do not add a hard-coded subject or mark an
 email verified to work around sign-in failures.
 

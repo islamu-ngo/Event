@@ -30,8 +30,14 @@ The shipped Keycloak realms explicitly attach Keycloak's built-in
 in issued access tokens. This is independent of ID-token subject issuance.
 Subjectless access tokens remain rejected by native API account synchronization;
 there is no BFF subject synthesis or SID fallback. Existing imported realms need
-the same provider mapper applied by their operator; replacing the export file
-does not update an already imported realm.
+the same provider mapper applied; replacing the export file does not update an
+already imported realm. `KeycloakBootstrapService` checks this requirement even
+when the client secret already matches. Its doctor and additive sync share the
+same native-mapper check and repair missing or disabled access/ID-token inclusion
+on the BFF client, preserving mapper IDs and unrelated configuration. The desired
+realm contract includes this mapper. Repair does not rewrite existing bearer
+tokens: a fresh provider sign-in is required. Setup authority never supplies an
+account subject or bypasses native account synchronization.
 
 ## Clean Architecture Flow
 

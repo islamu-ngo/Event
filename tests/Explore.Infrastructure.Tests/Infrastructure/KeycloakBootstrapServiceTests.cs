@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Onboarding;
 using Explore.Domain.Enums;
@@ -166,7 +167,11 @@ public sealed class KeycloakBootstrapServiceTests
     }
 
     [Test]
-    public async Task BootstrapAsync_PatchExistingRealmWhenSecretAlreadyMatchesAndRefreshSettingsPresent_DoesNotMutateClient()
+    [Arguments("ready")]
+    [Arguments("missing")]
+    [Arguments("disabled")]
+    [Arguments("name-collision")]
+    public async Task BootstrapAsync_PatchExistingRealmRepairsSubjectOnlyWhenNeeded(string subjectMapperState)
     {
         var request = CreateRequest(mode: KeycloakBootstrapMode.PatchExistingRealm) with
         {
@@ -186,21 +191,24 @@ public sealed class KeycloakBootstrapServiceTests
                 "islamu-event-blazor",
                 "runtime-blazor-secret",
                 includeRefreshTokenSettings: true,
-                includeAudienceMapper: true))),
+                includeAudienceMapper: true,
+                subjectMapperState: subjectMapperState))),
             ExpectOfflineAccessRole(),
             ExpectDefaultRole(),
             ExpectDefaultRoleCompositeUpdate(),
             ExpectOfflineAccessScopeLookup(),
             ExpectOfflineAccessRole(),
-            ExpectOfflineAccessScopeMappingUpdate());
+            ExpectOfflineAccessScopeMappingUpdate(),
+            Expect(HttpMethod.Put, "/auth/admin/realms/ISLAMU/clients/blazor-uuid", _ => new HttpResponseMessage(HttpStatusCode.NoContent)));
         var service = CreateService(handler);
 
         var result = await service.BootstrapAsync(request, CancellationToken.None);
 
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.BlazorClientUpdated).IsTrue();
-        await Assert.That(handler.Requests.Count).IsEqualTo(10);
-        await Assert.That(handler.Requests.Any(x => x.Method == HttpMethod.Put)).IsFalse();
+        await Assert.That(handler.Requests.Count).IsEqualTo(subjectMapperState == "ready" ? 10 : 11);
+        if (subjectMapperState != "ready")
+            await AssertSubjectMapperAsync(handler.Requests.Last().Body);
         await Assert.That(handler.Requests.Any(x => x.RequestUri?.AbsolutePath.Contains("optional-client-scopes", StringComparison.Ordinal) == true)).IsFalse();
     }
 
@@ -363,7 +371,11 @@ public sealed class KeycloakBootstrapServiceTests
     }
 
     [Test]
-    public async Task DiagnoseRealmAsync_WithTemporaryAdminCredentials_UsesReadOnlyAdminApiAndRedactsSecrets()
+    [Arguments("ready")]
+    [Arguments("missing")]
+    [Arguments("disabled")]
+    [Arguments("name-collision")]
+    public async Task DiagnoseRealmAsync_WithTemporaryAdminCredentials_UsesReadOnlyAdminApiAndRedactsSecrets(string subjectMapperState)
     {
         var configuration = CreateConfiguration();
         var request = new KeycloakRealmDoctorRequestDto
@@ -385,7 +397,8 @@ public sealed class KeycloakBootstrapServiceTests
             Expect(HttpMethod.Get, "/auth/admin/realms/ISLAMU/clients/blazor-uuid", _ => JsonResponse(ClientRepresentationJson(
                 "blazor-uuid",
                 "islamu-event-blazor",
-                includeRefreshTokenSettings: true))),
+                includeRefreshTokenSettings: true,
+                subjectMapperState: subjectMapperState))),
             ExpectOfflineAccessRole(),
             ExpectDefaultRole(),
             Expect(HttpMethod.Get, "/auth/admin/realms/ISLAMU/roles-by-id/default-role-uuid/composites/realm", _ => JsonResponse("""
@@ -406,8 +419,9 @@ public sealed class KeycloakBootstrapServiceTests
 
         var result = await service.DiagnoseRealmAsync(configuration, request, CancellationToken.None);
 
-        await Assert.That(result.OverallStatus).IsEqualTo("healthy");
-        await Assert.That(result.Checks.All(check => check.Status == "healthy")).IsTrue();
+        await Assert.That(result.OverallStatus).IsEqualTo(subjectMapperState == "ready" ? "healthy" : "needs-repair");
+        await Assert.That(result.Checks.Single(check => check.Code == "keycloak_subject_mapper").Status)
+            .IsEqualTo(subjectMapperState == "ready" ? "healthy" : "needs-repair");
         await Assert.That(handler.Requests.Count).IsEqualTo(13);
         await Assert.That(handler.Requests.Skip(2).All(x => x.Method == HttpMethod.Get)).IsTrue();
         await Assert.That(handler.Requests.Skip(2).All(x => x.Authorization?.Scheme == "Bearer")).IsTrue();
@@ -461,7 +475,8 @@ public sealed class KeycloakBootstrapServiceTests
             Expect(HttpMethod.Get, "/auth/admin/realms/ISLAMU/clients/blazor-uuid", _ => JsonResponse(ClientRepresentationJson(
                 "blazor-uuid",
                 "islamu-event-blazor",
-                includeRefreshTokenSettings: false))),
+                includeRefreshTokenSettings: false,
+                subjectMapperState: "missing"))),
             ExpectOfflineAccessRole(),
             ExpectDefaultRole(),
             Expect(HttpMethod.Get, "/auth/admin/realms/ISLAMU/roles-by-id/default-role-uuid/composites/realm", _ => JsonResponse("[]")),
@@ -479,6 +494,7 @@ public sealed class KeycloakBootstrapServiceTests
 
         await Assert.That(result.Status).IsEqualTo("changes-planned");
         await Assert.That(result.RequiresBackupBeforeApply).IsTrue();
+        await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-blazor-subject-mapper")).IsTrue();
         await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-blazor-refresh-token-settings")).IsTrue();
         await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-default-role-offline-access-add")).IsTrue();
         await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-api-client-add")).IsTrue();
@@ -506,7 +522,10 @@ public sealed class KeycloakBootstrapServiceTests
     }
 
     [Test]
-    public async Task ApplyRealmSyncAsync_WithTemporaryAdminCredentials_AppliesOnlyAdditiveAdminApiChangesAndRedactsSecrets()
+    [Arguments("missing")]
+    [Arguments("disabled")]
+    [Arguments("name-collision")]
+    public async Task ApplyRealmSyncAsync_WithTemporaryAdminCredentials_AppliesOnlyAdditiveAdminApiChangesAndRedactsSecrets(string subjectMapperState)
     {
         var configuration = CreateConfiguration();
         var request = new KeycloakRealmSyncApplyRequestDto
@@ -528,7 +547,8 @@ public sealed class KeycloakBootstrapServiceTests
             Expect(HttpMethod.Get, "/auth/admin/realms/ISLAMU/clients/blazor-uuid", _ => JsonResponse(ClientRepresentationJson(
                 "blazor-uuid",
                 "islamu-event-blazor",
-                includeRefreshTokenSettings: false))),
+                includeRefreshTokenSettings: false,
+                subjectMapperState: subjectMapperState))),
             Expect(HttpMethod.Put, "/auth/admin/realms/ISLAMU/clients/blazor-uuid", _ => new HttpResponseMessage(HttpStatusCode.NoContent)),
             ExpectOfflineAccessRole(),
             ExpectDefaultRole(),
@@ -552,6 +572,7 @@ public sealed class KeycloakBootstrapServiceTests
         var result = await service.ApplyRealmSyncAsync(configuration, request, CancellationToken.None);
 
         await Assert.That(result.Status).IsEqualTo("applied");
+        await AssertSubjectMapperAsync(handler.Requests[5].Body);
         await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-blazor-client-update" && operation.Status == "applied")).IsTrue();
         await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-default-role-offline-access-add" && operation.Status == "applied")).IsTrue();
         await Assert.That(result.Operations.Any(operation => operation.OperationId == "keycloak-api-client-add" && operation.Status == "applied")).IsTrue();
@@ -734,7 +755,8 @@ public sealed class KeycloakBootstrapServiceTests
         string clientId,
         string? secret = null,
         bool includeRefreshTokenSettings = false,
-        bool includeAudienceMapper = false)
+        bool includeAudienceMapper = false,
+        string subjectMapperState = "ready")
     {
         var secretJson = secret is null
             ? string.Empty
@@ -769,7 +791,7 @@ public sealed class KeycloakBootstrapServiceTests
                 """
             : string.Empty;
 
-        return """
+        var representation = JsonNode.Parse("""
             {
               "id": "{0}",
               "clientId": "{1}",
@@ -783,7 +805,40 @@ public sealed class KeycloakBootstrapServiceTests
             .Replace("{1}", clientId, StringComparison.Ordinal)
             .Replace("{2}", secretJson, StringComparison.Ordinal)
             .Replace("{3}", refreshTokenSettingsJson, StringComparison.Ordinal)
-            .Replace("{4}", audienceMapperJson, StringComparison.Ordinal);
+            .Replace("{4}", audienceMapperJson, StringComparison.Ordinal))!.AsObject();
+        var mappers = representation["protocolMappers"] as JsonArray ?? new JsonArray();
+        if (representation["protocolMappers"] is null) representation["protocolMappers"] = mappers;
+        if (subjectMapperState != "missing")
+            mappers.Add(new JsonObject
+            {
+                ["id"] = "operator-subject-mapper",
+                ["name"] = subjectMapperState == "name-collision" ? "provider-subject" : "operator-subject",
+                ["protocol"] = "openid-connect",
+                ["protocolMapper"] = subjectMapperState == "name-collision" ? "oidc-usermodel-attribute-mapper" : "oidc-sub-mapper",
+                ["config"] = new JsonObject
+                {
+                    ["access.token.claim"] = subjectMapperState == "ready" ? "true" : "false",
+                    ["id.token.claim"] = "true",
+                    ["introspection.token.claim"] = "true",
+                    ["claim.name"] = "operator-claim"
+                }
+            });
+        return representation.ToJsonString();
+    }
+
+    private static async Task AssertSubjectMapperAsync(string? body)
+    {
+        var mappers = JsonNode.Parse(body!)!["protocolMappers"]!.AsArray();
+        var subject = mappers.Single(mapper => mapper!["protocolMapper"]!.GetValue<string>() == "oidc-sub-mapper")!;
+        await Assert.That(subject["config"]!["access.token.claim"]!.GetValue<string>()).IsEqualTo("true");
+        await Assert.That(subject["config"]!["id.token.claim"]!.GetValue<string>()).IsEqualTo("true");
+        if (subject["id"] is not null)
+        {
+            await Assert.That(subject["id"]!.GetValue<string>()).IsEqualTo("operator-subject-mapper");
+            await Assert.That(subject["name"]!.GetValue<string>()).IsEqualTo("operator-subject");
+            await Assert.That(subject["config"]!["claim.name"]!.GetValue<string>()).IsEqualTo("operator-claim");
+        }
+        await Assert.That(mappers.Select(mapper => mapper!["name"]!.GetValue<string>()).Distinct().Count()).IsEqualTo(mappers.Count);
     }
 
     private sealed class StaticHttpClientFactory : IHttpClientFactory

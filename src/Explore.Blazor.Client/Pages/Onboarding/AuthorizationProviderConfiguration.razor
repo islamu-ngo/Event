@@ -50,7 +50,7 @@
                     }
                 </div>
 
-                @if (IsDeploymentProvider)
+                @if (!_configurationUnavailable && IsDeploymentProvider)
                 {
                     <section class="authz-page__section" aria-labelledby="deployment-authorization-heading">
                         <MudText Typo="Typo.h5" HtmlTag="h2" id="deployment-authorization-heading">
@@ -64,7 +64,7 @@
                         </MudAlert>
                     </section>
                 }
-                else
+                else if (!_configurationUnavailable)
                 {
                     <section class="authz-page__section" aria-labelledby="provider-choice-heading">
                         <MudText Typo="Typo.h5" HtmlTag="h2" id="provider-choice-heading">Authorization provider</MudText>
@@ -97,7 +97,7 @@
                     </section>
                 }
 
-                @if (ShowCerbosConfiguration)
+                @if (!_configurationUnavailable && ShowCerbosConfiguration)
                 {
                     <section class="authz-page__section" aria-labelledby="cerbos-connection-heading">
                         <MudText Typo="Typo.h5" HtmlTag="h2" id="cerbos-connection-heading">Cerbos connection</MudText>
@@ -234,7 +234,9 @@
                     </section>
                 }
 
-                <footer class="authz-page__footer">
+                @if (!_configurationUnavailable)
+                {
+                    <footer class="authz-page__footer">
                         <AppButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large"
                                    FullWidth="true"
                                    Disabled="@(!CanPrimaryAction)"
@@ -257,7 +259,8 @@
                                 Test the runtime PDP endpoint before continuing with Cerbos.
                             </MudText>
                         }
-                </footer>
+                    </footer>
+                }
             }
         </div>
         </div>
@@ -284,6 +287,7 @@
     private bool _isLoading = true;
     private FormSubmitState _submitState = new();
     private bool _isVerifying;
+    private bool _configurationUnavailable;
     private string? _errorMessage;
     private string? _successMessage;
     private bool _shouldLoadConfiguration = true;
@@ -476,6 +480,7 @@
         try
         {
             _model = await InstanceOnboardingService.GetAuthorizationProviderConfigurationAsync();
+            _configurationUnavailable = false;
             ApplyProviderDefault();
 
             if (IsDeploymentProvider && !NeedsDeploymentRemediation)
@@ -484,13 +489,19 @@
                 return;
             }
         }
+        catch (ApiException ex) when (ex.StatusCode is 401 or 403 or 410)
+        {
+            _configurationUnavailable = true;
+            var returnUrl = $"/{Navigation.ToBaseRelativePath(Navigation.Uri)}";
+            Navigation.NavigateTo($"/setup?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+        }
         catch (Exception ex)
         {
             Logger.LogError(
                 "Failed to load authorization provider configuration. FailureType={FailureType}",
                 ex.GetType().Name);
+            _configurationUnavailable = true;
             _errorMessage = "Could not load authorization provider configuration. Please refresh and try again.";
-            _model = new AuthorizationProviderConfigurationDto();
         }
         finally
         {

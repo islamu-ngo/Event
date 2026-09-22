@@ -63,30 +63,68 @@ public sealed class SetupSecretRateLimitMetadataTests
     }
 
     [Test]
-    public async Task AuthorizeRequiredSetupRequest_DoesNotShareAllowAnonymousAttemptBudget()
+    public async Task AuthorizeRequiredSetupMutation_DoesNotShareAllowAnonymousAttemptBudget()
     {
         await using var host = await SetupRateLimitedApi.StartAsync();
 
         for (var i = 0; i < 2; i++)
         {
-            using var anonymousRequest = CreateAuthenticatedRequest("/setup-anonymous");
+            using var anonymousRequest = CreateAuthenticatedRequest(HttpMethod.Post, "/setup-anonymous");
             using var anonymousResponse = await host.Client.SendAsync(anonymousRequest);
             await Assert.That(anonymousResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         }
 
-        using var request = CreateAuthenticatedRequest("/setup-authenticated");
+        using var request = CreateAuthenticatedRequest(HttpMethod.Post, "/setup-authenticated");
         using var response = await host.Client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        using var throttledAnonymousRequest = CreateAuthenticatedRequest("/setup-anonymous");
+        using var throttledAnonymousRequest = CreateAuthenticatedRequest(HttpMethod.Post, "/setup-anonymous");
         using var throttledAnonymousResponse = await host.Client.SendAsync(throttledAnonymousRequest);
         await Assert.That(throttledAnonymousResponse.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
     }
 
-    private static HttpRequestMessage CreateAuthenticatedRequest(string path)
+    [Test]
+    public async Task SetupSecretReadRoutes_HaveIndependentBudgets_WhileEachRemainsBounded()
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        await using var host = await SetupRateLimitedApi.StartAsync();
+
+        for (var i = 0; i < 2; i++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/setup-anonymous");
+            using var response = await host.Client.SendAsync(request);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+
+        using var otherReadRequest = new HttpRequestMessage(HttpMethod.Get, "/setup-anonymous-second");
+        using var otherReadResponse = await host.Client.SendAsync(otherReadRequest);
+        await Assert.That(otherReadResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+
+        using var throttledRequest = new HttpRequestMessage(HttpMethod.Get, "/setup-anonymous/");
+        using var throttledResponse = await host.Client.SendAsync(throttledRequest);
+        await Assert.That(throttledResponse.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
+    }
+
+    [Test]
+    public async Task SetupSecretMutations_ShareOneBudgetAcrossRoutes()
+    {
+        await using var host = await SetupRateLimitedApi.StartAsync();
+
+        foreach (var path in new[] { "/setup-anonymous", "/setup-anonymous-second" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path);
+            using var response = await host.Client.SendAsync(request);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+
+        using var throttledRequest = new HttpRequestMessage(HttpMethod.Post, "/setup-anonymous");
+        using var throttledResponse = await host.Client.SendAsync(throttledRequest);
+        await Assert.That(throttledResponse.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
+    }
+
+    private static HttpRequestMessage CreateAuthenticatedRequest(HttpMethod method, string path)
+    {
+        var request = new HttpRequestMessage(method, path);
         request.Headers.Add("X-Test-User", "onboarding-admin");
         return request;
     }
@@ -282,7 +320,19 @@ public sealed class SetupSecretRateLimitMetadataTests
             app.MapGet("/setup-anonymous", () => Results.Ok())
                 .WithMetadata(new SetupSecretRequiredAttribute(), new AllowAnonymousAttribute())
                 .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy);
+            app.MapGet("/setup-anonymous-second", () => Results.Ok())
+                .WithMetadata(new SetupSecretRequiredAttribute(), new AllowAnonymousAttribute())
+                .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy);
+            app.MapPost("/setup-anonymous", () => Results.Ok())
+                .WithMetadata(new SetupSecretRequiredAttribute(), new AllowAnonymousAttribute())
+                .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy);
+            app.MapPost("/setup-anonymous-second", () => Results.Ok())
+                .WithMetadata(new SetupSecretRequiredAttribute(), new AllowAnonymousAttribute())
+                .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy);
             app.MapGet("/setup-authenticated", () => Results.Ok())
+                .WithMetadata(new SetupSecretRequiredAttribute(), new AuthorizeAttribute())
+                .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy);
+            app.MapPost("/setup-authenticated", () => Results.Ok())
                 .WithMetadata(new SetupSecretRequiredAttribute(), new AuthorizeAttribute())
                 .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy);
 

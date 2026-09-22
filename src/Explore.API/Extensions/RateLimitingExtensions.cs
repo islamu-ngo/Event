@@ -15,6 +15,7 @@ using ISLAMU.Wire.Contracts.SetupLive;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 
 namespace Explore.API.Extensions;
 
@@ -412,12 +413,17 @@ public static partial class RateLimitingExtensions
             {
                 var ip = ResolveClientIp(httpContext)?.ToString() ?? "unknown";
                 var metadata = httpContext.GetEndpoint()?.Metadata;
-                var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+                var authority = httpContext.User.Identity?.IsAuthenticated == true
                     && metadata?.GetMetadata<SetupSecretRequiredAttribute>() is not null
                     && metadata.GetMetadata<IAuthorizeData>() is not null
                     && metadata.GetMetadata<IAllowAnonymous>() is null
                         ? $"setup-authenticated:{ip}"
                         : $"setup:{ip}";
+                var routeIdentity = (httpContext.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
+                                    ?? httpContext.Request.Path.Value;
+                var partitionKey = HttpMethods.IsGet(httpContext.Request.Method)
+                    ? $"{authority}:{routeIdentity?.ToLowerInvariant()}"
+                    : authority;
 
                 return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ =>
                     new FixedWindowRateLimiterOptions

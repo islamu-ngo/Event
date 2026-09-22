@@ -2128,8 +2128,8 @@ Runtime authorization checks use the PDP gRPC endpoint. Package sync/status uses
 | Key | Type | Description |
 |---|---|---|
 | `Endpoint` / `Endpoints` | `string` / `List<string>` | Instance Admin API target(s) for package upload/status/reload. |
-| `AdminUsername` | `string` | Basic Auth username; secret-bearing and redacted from reads/logs. |
-| `AdminPassword` | `string` | Basic Auth password; secret-bearing and redacted from reads/logs. Docker Compose uses `CERBOS_ADMIN_PASSWORD` for `cerbosctl` and `CERBOS_ADMIN_PASSWORD_HASH` for the Cerbos server config. |
+| `CERBOS_ADMIN_USERNAME` / `CERBOS_ADMIN_PASSWORD` | secret bindings | Instance-scoped credentials resolved through `ISecretResolver`; they are never projected into `CerbosAdminApiSettings`, reads, or logs. Docker Compose also uses `CERBOS_ADMIN_PASSWORD` for `cerbosctl`. |
+| `CERBOS_ADMIN_PASSWORD_HASH` | deployment secret | Verifier consumed by the Cerbos server itself; it is not a package-publishing credential. |
 | `Cerbos:PolicyPackagePath` | `string` | API-local path to bundled or mounted `cerbos/policies`; use `CERBOS__POLICYPACKAGEPATH=/app/cerbos/policies` in containers. |
 | BYO custom Admin API endpoint/credentials | tenant governance/secret settings | Optional per-tenant package target, preserved even when the tenant custom PDP endpoint is blank. |
 

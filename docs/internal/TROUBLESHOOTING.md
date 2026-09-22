@@ -561,6 +561,7 @@ The instance control plane exposes warning codes with operator remediation text.
 `429`:
 - triggered by API rate limiting policies (`Global`, `Authenticated`, `Write`, `PublicIngestion`, `SetupSecret`, `AnalyticsRelay`, `AiAssistant`, `EventOpenGraphImage`).
 - inspect `Retry-After`, `X-RateLimit-Limit`, and `X-RateLimit-Remaining` headers and caller behavior.
+- setup-secret GET budgets are isolated by normalized route, so repeated status or journey refreshes do not block a different provider-configuration read; mutations still share one IP-keyed setup budget.
 - Open Graph saturation appears as `429` from `/api/event/public/{slugCode}/og-image` with rate-limit headers. `Retry-After` may be absent because concurrency rejection has no fixed retry period.
 - If sustained render load justifies more parallel work, raise `RateLimiting:EventOpenGraphImage:ConcurrencyLimit` carefully while watching API CPU and memory. Each API process applies its own limit.
 

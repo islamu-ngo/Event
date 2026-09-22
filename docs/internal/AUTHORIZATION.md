@@ -359,7 +359,7 @@ User profile updates use the `islamuevent_user` resource with the target domain 
 
 Operators can synchronize the bundled policy package directly through the instance administration UI or API:
 
-- **Deployment credentials mode**: When `Cerbos:AdminApi:AdminUsername` and `Cerbos:AdminApi:AdminPassword` are present in environment variables or Infisical, onboarding/admin sync uses them automatically by default, keeping the one-time override form collapsed.
+- **Deployment credentials mode**: The instance-scoped `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` secret bindings are resolved through `ISecretResolver`; onboarding/admin sync uses them automatically and keeps the one-time override form collapsed without projecting plaintext into `IConfiguration`.
 - **One-time credential override**: If deployment credentials are missing or the operator explicitly wishes to supply temporary credentials, the UI provides a one-time username/password form. A complete username/password pair overrides deployment credentials for that single request and is held only in memory during the request. Partial pairs fail validation immediately.
 - **Credential security boundary**: One-time values are never written to `SystemSetting`, database rows, response bodies, logs, traces, or background jobs.
 - **Timeout and additive upload**: Admin HTTP API calls enforce a strict 10-second timeout. Policy and schema uploads are additive; they do not perform destructive deletions of existing policies.

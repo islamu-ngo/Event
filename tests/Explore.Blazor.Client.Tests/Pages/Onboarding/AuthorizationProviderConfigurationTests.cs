@@ -89,11 +89,42 @@ public class AuthorizationProviderConfigurationTests : IDisposable
         cut.WaitForAssertion(() =>
         {
             if (!cut.Markup.Contains("Could not load authorization provider configuration", StringComparison.OrdinalIgnoreCase)
+                || cut.FindAll("input[type=radio]").Count != 0
                 || cut.FindAll("button").Any(button =>
-                    button.TextContent.Contains("Continue with Local RBAC", StringComparison.OrdinalIgnoreCase)))
+                    button.TextContent.Contains("Continue with Local RBAC", StringComparison.OrdinalIgnoreCase)
+                    || button.TextContent.Contains("Continue with Cerbos", StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidOperationException("Expected a fail-closed load error without an editable Local fallback.");
+                throw new InvalidOperationException("Expected a fail-closed load error without fabricated provider controls.");
             }
+        });
+    }
+
+    [Test]
+    [Arguments(401)]
+    [Arguments(403)]
+    [Arguments(410)]
+    public async Task Load_WhenSetupAuthorityIsRejected_RedirectsToSetup(int statusCode)
+    {
+        SetupIncompleteOnboardingStatus();
+        _instanceOnboardingService.GetAuthorizationProviderConfigurationAsync()
+            .Returns<Task<AuthorizationProviderConfigurationDto>>(_ => throw new ApiException(
+                "Forbidden",
+                statusCode,
+                null,
+                new Dictionary<string, IEnumerable<string>>(),
+                null));
+        _nav.NavigateTo("/onboarding/authz-provider");
+
+        var cut = _ctx.RenderMudComponent<AuthorizationProviderConfiguration>();
+
+        cut.WaitForAssertion(() =>
+        {
+            if (!_nav.Uri.Contains("/setup?returnUrl=%2Fonboarding%2Fauthz-provider", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Expected setup-secret entry, got '{_nav.Uri}'.");
+            if (cut.FindAll("input[type=radio]").Count != 0
+                || cut.FindAll(".authz-page__footer").Count != 0
+                || cut.Markup.Contains("Cerbos connection", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Expected provider controls to remain hidden while redirecting.");
         });
     }
 

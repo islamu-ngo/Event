@@ -789,8 +789,10 @@ Configured in `RateLimitingExtensions.cs`. All settings are configurable via `ap
 
 ### SetupSecret (Fixed Window)
 - **Policy**: `setup_secret` — for instance bootstrap endpoints.
-- **Mechanism**: Fixed window per IP address.
-- **Defaults**: 5 requests per 60-second window.
+- **Mechanism**: Fixed window per IP address. GET requests include the normalized
+  route in the partition so status, journey, and provider-configuration reads
+  cannot exhaust one another; setup mutations retain one shared IP partition.
+- **Defaults**: 5 requests per partition per 60-second window.
 
 ### AnalyticsRelay (Fixed Window)
 - **Policy**: `AnalyticsRelay` — for anonymous browser analytics relay traffic.

@@ -113,7 +113,12 @@ public sealed class KeycloakOperationService
                 snapshot.EffectiveMappers
                     .Where(mapper =>
                         mapper.Semantic == semantic
-                        && mapper.Origin == KeycloakMapperOrigin.Direct)
+                        && mapper.Origin == KeycloakMapperOrigin.Direct
+                        && (semantic != KeycloakMapperSemantic.Audience
+                            || string.Equals(
+                                mapper.Audience,
+                                snapshot.ApiClientId,
+                                StringComparison.Ordinal)))
                     .ToArray();
             if (directCandidates.Length > 1)
             {
@@ -140,7 +145,8 @@ public sealed class KeycloakOperationService
                     : MapperFingerprint(existing),
                 desiredFingerprint: DesiredMapperFingerprint(
                     snapshot,
-                    semantic)));
+                    semantic),
+                bindingFingerprint: BindingFingerprint(snapshot)));
         }
 
         return steps.Count == 0 ? null : new KeycloakChangeSet(steps);
@@ -194,6 +200,7 @@ public sealed class KeycloakOperationService
                 nameof(KeycloakOperation),
                 context.OperationId);
         Guid expectedStamp = operation.ConcurrencyStamp;
+        EnsureContextBinding(context, operation);
         try
         {
             operation.AuthorizeApply(
@@ -435,13 +442,7 @@ public sealed class KeycloakOperationService
         KeycloakOperation operation,
         KeycloakChangeStep step)
     {
-        KeycloakMapperSemantic semantic = step.StepId switch
-        {
-            "mapper:subject" => KeycloakMapperSemantic.Subject,
-            "mapper:audience" => KeycloakMapperSemantic.Audience,
-            _ => throw new InvalidOperationException(
-                "The approved mapper semantic is not supported.")
-        };
+        KeycloakMapperSemantic semantic = StepSemantic(step);
         var snapshot = new KeycloakInspectionSnapshot(
             operation.Target.Realm,
             operation.Target.Client,
@@ -483,10 +484,35 @@ public sealed class KeycloakOperationService
                 operation.Digest,
                 StringComparison.Ordinal))
         {
-            throw new InvalidOperationException(
+            throw new KeycloakOperationConflictException(
                 "The reconciliation authority no longer matches the receipt.");
         }
+
+        var currentProjection = new KeycloakInspectionSnapshot(
+            operation.Target.Realm,
+            operation.Target.Client,
+            context.ApiClientId,
+            realmExists: true);
+        if (operation.ChangeSet.Steps.Any(step =>
+                !string.Equals(
+                    step.BindingFingerprint,
+                    BindingFingerprint(currentProjection),
+                    StringComparison.Ordinal)))
+        {
+            throw new KeycloakOperationConflictException(
+                "The current Keycloak target no longer matches the reviewed approval.");
+        }
     }
+
+    private static KeycloakMapperSemantic StepSemantic(
+        KeycloakChangeStep step) =>
+        step.StepId switch
+        {
+            "mapper:subject" => KeycloakMapperSemantic.Subject,
+            "mapper:audience" => KeycloakMapperSemantic.Audience,
+            _ => throw new KeycloakOperationConflictException(
+                "The approved mapper semantic is not supported.")
+        };
 
     private IKeycloakOperationRepository RequireRepository() =>
         _repository
@@ -524,6 +550,12 @@ public sealed class KeycloakOperationService
                 ? $"{semantic}||True|True"
                 : $"{semantic}|{snapshot.ApiClientId}|True|False");
 
+    public static string BindingFingerprint(
+        KeycloakInspectionSnapshot snapshot) =>
+        Hash(
+            $"{snapshot.Realm}|{snapshot.BlazorClientId}|"
+            + $"{snapshot.ApiClientId}");
+
     public static string ComputeDigest(KeycloakChangeSet changeSet)
     {
         ArgumentNullException.ThrowIfNull(changeSet);
@@ -532,7 +564,8 @@ public sealed class KeycloakOperationService
             changeSet.Steps.Select(step =>
                 $"{step.StepId}|{step.Kind}|{step.ResourceKind}|"
                 + $"{step.TargetId}|{step.Precondition}|"
-                + $"{step.ExpectedFingerprint}|{step.DesiredFingerprint}"));
+                + $"{step.ExpectedFingerprint}|{step.DesiredFingerprint}|"
+                + $"{step.BindingFingerprint}"));
         return Hash(projection);
     }
 

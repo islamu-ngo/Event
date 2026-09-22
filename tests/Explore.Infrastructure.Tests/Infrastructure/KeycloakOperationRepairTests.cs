@@ -5,6 +5,9 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Domain.Keycloak;
 using Explore.Infrastructure.Services.Keycloak;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
@@ -40,13 +43,17 @@ public sealed class KeycloakOperationRepairTests
         JsonObject existing = AudienceMapper(
             id: "mapper-42",
             name: "operator-owned-audience",
-            audience: "old-api");
+            audience: "event-api",
+            accessToken: false);
         existing["unknownRoot"] = "preserve-root";
         ((JsonObject)existing["config"]!)["unknown.config"] =
             "preserve-config";
         var handler = new SemanticKeycloakHandler([existing]);
         KeycloakEffectiveMapperSnapshot drifted =
-            ProjectAudience("mapper-42", "old-api");
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false);
         KeycloakChangeStep step = PlanAudienceUpdate(drifted);
 
         KeycloakMapperOperationResult result =
@@ -101,10 +108,14 @@ public sealed class KeycloakOperationRepairTests
         JsonObject existing = AudienceMapper(
             id: "new-uuid",
             name: "event-api-audience",
-            audience: "old-api");
+            audience: "event-api",
+            accessToken: false);
         var handler = new SemanticKeycloakHandler([existing]);
         KeycloakChangeStep staleStep = PlanAudienceUpdate(
-            ProjectAudience("old-uuid", "old-api"));
+            ProjectAudience(
+                "old-uuid",
+                "event-api",
+                accessToken: false));
 
         KeycloakMapperOperationResult result =
             await CreateClient(handler).ApplyApprovedMapperAsync(
@@ -124,10 +135,15 @@ public sealed class KeycloakOperationRepairTests
         JsonObject externallyEdited = AudienceMapper(
             id: "mapper-42",
             name: "event-api-audience",
-            audience: "external-api");
+            audience: "event-api",
+            accessToken: false,
+            idToken: true);
         var handler = new SemanticKeycloakHandler([externallyEdited]);
         KeycloakChangeStep approved = PlanAudienceUpdate(
-            ProjectAudience("mapper-42", "old-api"));
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false));
 
         KeycloakMapperOperationResult result =
             await CreateClient(handler).ApplyApprovedMapperAsync(
@@ -162,19 +178,128 @@ public sealed class KeycloakOperationRepairTests
         await Assert.That(handler.Mappers).HasCount().EqualTo(1);
     }
 
-    private static KeycloakAdminOperationClient CreateClient(
-        HttpMessageHandler handler) =>
-        new(new HttpClient(handler)
+    [Test]
+    public async Task AcceptedThenServerError_ReturnsOutcomeUnknown()
+    {
+        var handler = new SemanticKeycloakHandler([])
         {
-            Timeout = TimeSpan.FromSeconds(5),
-            MaxResponseContentBufferSize = 1024 * 1024
-        });
+            AcceptMutationThenServerError = true
+        };
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    PlanSubjectCreate(),
+                    KeycloakMapperSemantic.Subject),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.OutcomeUnknown);
+        await Assert.That(handler.MutationCount).IsEqualTo(1);
+        await Assert.That(handler.Mappers).HasCount().EqualTo(1);
+    }
+
+    [Test]
+    public async Task ReconcileCompletedUpdate_ReportsVerifiedWithoutMutation()
+    {
+        JsonObject applied = AudienceMapper(
+            id: "mapper-42",
+            name: "operator-owned-audience",
+            audience: "event-api");
+        var handler = new SemanticKeycloakHandler([applied]);
+        KeycloakChangeStep approved = PlanAudienceUpdate(
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false));
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).InspectApprovedMapperAsync(
+                CreateRequest(
+                    approved,
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Verified);
+        await Assert.That(result.ProviderResourceId)
+            .IsEqualTo("mapper-42");
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ProductionLoopbackHttp_IsRejectedBeforeCredentialForwarding()
+    {
+        var handler = new SemanticKeycloakHandler([]);
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    PlanSubjectCreate(),
+                    KeycloakMapperSemantic.Subject,
+                    new Uri(
+                        "http://127.0.0.1:8080/auth/realms/operators")),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.FailedBeforeWrite);
+        await Assert.That(handler.RequestCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task TestingLoopbackHttp_RequiresExplicitOptIn()
+    {
+        var handler = new SemanticKeycloakHandler([]);
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(
+                    handler,
+                    Environments.Development,
+                    allowLoopbackHttp: true)
+                .ApplyApprovedMapperAsync(
+                    CreateRequest(
+                        PlanSubjectCreate(),
+                        KeycloakMapperSemantic.Subject,
+                        new Uri(
+                            "http://127.0.0.1:8080/auth/realms/operators")),
+                    CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Applied);
+        await Assert.That(handler.MutationCount).IsEqualTo(1);
+    }
+
+    private static KeycloakAdminOperationClient CreateClient(
+        HttpMessageHandler handler,
+        string environmentName = "Production",
+        bool allowLoopbackHttp = false)
+    {
+        IHostEnvironment environment =
+            Substitute.For<IHostEnvironment>();
+        environment.EnvironmentName.Returns(environmentName);
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Keycloak:AllowDevelopmentLoopbackHttp"] =
+                    allowLoopbackHttp.ToString()
+            })
+            .Build();
+        return new KeycloakAdminOperationClient(
+            new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(5),
+                MaxResponseContentBufferSize = 1024 * 1024
+            },
+            environment,
+            configuration);
+    }
 
     private static KeycloakMapperOperationRequest CreateRequest(
         KeycloakChangeStep step,
-        KeycloakMapperSemantic semantic) =>
+        KeycloakMapperSemantic semantic,
+        Uri? authority = null) =>
         new(
-            new Uri(
+            authority ?? new Uri(
                 "https://identity.example.test/auth/realms/operators"),
             "operators",
             "event-bff",
@@ -248,20 +373,24 @@ public sealed class KeycloakOperationRepairTests
 
     private static KeycloakEffectiveMapperSnapshot ProjectAudience(
         string id,
-        string audience) =>
+        string audience,
+        bool accessToken = true,
+        bool idToken = false) =>
         new(
             id,
             KeycloakMapperSemantic.Audience,
             KeycloakMapperOrigin.Direct,
             audience,
-            AddsToAccessToken: true,
-            AddsToIdToken: false,
+            AddsToAccessToken: accessToken,
+            AddsToIdToken: idToken,
             IsEffective: true);
 
     private static JsonObject AudienceMapper(
         string id,
         string name,
-        string audience) =>
+        string audience,
+        bool accessToken = true,
+        bool idToken = false) =>
         new()
         {
             ["id"] = id,
@@ -271,8 +400,10 @@ public sealed class KeycloakOperationRepairTests
             ["config"] = new JsonObject
             {
                 ["included.client.audience"] = audience,
-                ["access.token.claim"] = "true",
-                ["id.token.claim"] = "false",
+                ["access.token.claim"] =
+                    accessToken ? "true" : "false",
+                ["id.token.claim"] =
+                    idToken ? "true" : "false",
                 ["introspection.token.claim"] = "true"
             }
         };
@@ -286,14 +417,19 @@ public sealed class KeycloakOperationRepairTests
 
         public int MutationCount { get; private set; }
 
+        public int RequestCount { get; private set; }
+
         public bool ForbiddenMutationObserved { get; private set; }
 
         public bool AcceptMutationThenTimeout { get; init; }
+
+        public bool AcceptMutationThenServerError { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            RequestCount++;
             string path = request.RequestUri!.AbsolutePath;
             if (request.Method == HttpMethod.Post
                 && path.EndsWith(
@@ -343,6 +479,12 @@ public sealed class KeycloakOperationRepairTests
                         "Provider accepted the mapper before the response was lost.");
                 }
 
+                if (AcceptMutationThenServerError)
+                {
+                    return new HttpResponseMessage(
+                        HttpStatusCode.InternalServerError);
+                }
+
                 return new HttpResponseMessage(HttpStatusCode.Created);
             }
 
@@ -370,6 +512,12 @@ public sealed class KeycloakOperationRepairTests
                 {
                     throw new TaskCanceledException(
                         "Provider accepted the mapper before the response was lost.");
+                }
+
+                if (AcceptMutationThenServerError)
+                {
+                    return new HttpResponseMessage(
+                        HttpStatusCode.InternalServerError);
                 }
 
                 return new HttpResponseMessage(HttpStatusCode.NoContent);

@@ -57,14 +57,14 @@ public sealed class KeycloakOperationExecutionTests
     }
 
     [Test]
-    public async Task Plan_WhenDirectAudienceDrifts_BindsExactMapperAndFingerprint()
+    public async Task Plan_WhenTargetAudienceFlagsDrift_BindsExactMapperAndFingerprint()
     {
         KeycloakEffectiveMapperSnapshot drifted = Mapper(
             "mapper-42",
             KeycloakMapperSemantic.Audience,
             KeycloakMapperOrigin.Direct,
-            audience: "wrong-api",
-            accessToken: true,
+            audience: "event-api",
+            accessToken: false,
             idToken: false);
         KeycloakInspectionSnapshot snapshot = Snapshot(
         [
@@ -88,6 +88,37 @@ public sealed class KeycloakOperationExecutionTests
             .IsEqualTo(KeycloakStepPrecondition.MustMatchFingerprint);
         await Assert.That(step.ExpectedFingerprint)
             .IsEqualTo(KeycloakOperationService.MapperFingerprint(drifted));
+    }
+
+    [Test]
+    public async Task Plan_WhenDifferentAudienceExists_CreatesWithoutEditingIt()
+    {
+        KeycloakEffectiveMapperSnapshot unrelated = Mapper(
+            "mapper-42",
+            KeycloakMapperSemantic.Audience,
+            KeycloakMapperOrigin.Direct,
+            audience: "operator-api",
+            accessToken: true,
+            idToken: false);
+        KeycloakInspectionSnapshot snapshot = Snapshot(
+        [
+            Mapper(
+                "native-subject",
+                KeycloakMapperSemantic.Subject,
+                KeycloakMapperOrigin.Native,
+                audience: null,
+                accessToken: true,
+                idToken: true),
+            unrelated
+        ]);
+
+        KeycloakChangeStep step =
+            new KeycloakOperationService().Plan(snapshot)!.Steps.Single();
+
+        await Assert.That(step.Kind).IsEqualTo(KeycloakStep.CreateMapper);
+        await Assert.That(step.TargetId).IsNotEqualTo(unrelated.ProviderId);
+        await Assert.That(step.Precondition)
+            .IsEqualTo(KeycloakStepPrecondition.MustBeAbsent);
     }
 
     [Test]
@@ -256,6 +287,30 @@ public sealed class KeycloakOperationExecutionTests
             .IsEqualTo(KeycloakOperationState.Applying);
         await Assert.That(harness.Repository.PersistedOutcomeCount)
             .IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Apply_WhenApiAudienceChanges_FailsBeforeProviderAccess()
+    {
+        TestHarness harness = await TestHarness.CreateAsync(
+            twoSteps: false);
+        var changedContext = new KeycloakOperationApplyContext(
+            harness.Operation.Id,
+            harness.Context.Actor,
+            harness.Context.SetupGeneration,
+            harness.Context.Target,
+            harness.Context.Digest,
+            "changed-api",
+            harness.Context.AdministratorUsername,
+            harness.Context.AdministratorPassword,
+            harness.Context.NowUtc);
+
+        await Assert.ThrowsAsync<KeycloakOperationConflictException>(() =>
+            harness.Service.ApplyAsync(changedContext));
+
+        await Assert.That(harness.Admin.ApplyCount).IsEqualTo(0);
+        await Assert.That(harness.Repository.PersistedState)
+            .IsEqualTo(KeycloakOperationState.Previewed);
     }
 
     [Test]

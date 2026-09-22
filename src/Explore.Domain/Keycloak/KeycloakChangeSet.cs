@@ -32,7 +32,8 @@ public sealed record KeycloakChangeStep
         string targetId,
         KeycloakStepPrecondition precondition,
         string? expectedFingerprint,
-        string desiredFingerprint)
+        string desiredFingerprint,
+        string bindingFingerprint)
     {
         StepId = Required(stepId, nameof(stepId));
         Kind = kind;
@@ -43,6 +44,9 @@ public sealed record KeycloakChangeStep
         DesiredFingerprint = Required(
             desiredFingerprint,
             nameof(desiredFingerprint));
+        BindingFingerprint = Required(
+            bindingFingerprint,
+            nameof(bindingFingerprint));
 
         if (!Enum.IsDefined(kind)
             || !Enum.IsDefined(resourceKind)
@@ -70,6 +74,8 @@ public sealed record KeycloakChangeStep
     public string? ExpectedFingerprint { get; }
 
     public string DesiredFingerprint { get; }
+
+    public string BindingFingerprint { get; }
 
     private static string Required(string value, string parameterName)
     {

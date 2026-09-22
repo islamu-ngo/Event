@@ -66,7 +66,8 @@ public sealed class KeycloakOperationProviderTests
                     "event-bff:audience",
                     KeycloakStepPrecondition.MustMatchFingerprint,
                     "expected-fingerprint",
-                    "desired-fingerprint")
+                    "desired-fingerprint",
+                    "binding-fingerprint")
             ]),
             new KeycloakTarget(
                 InstanceId,

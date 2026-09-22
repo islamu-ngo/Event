@@ -467,7 +467,8 @@ public sealed class KeycloakOperationPersistenceTests
             kind is KeycloakStep.UpdateMapper
                 ? "expected-fingerprint"
                 : null,
-            "desired-fingerprint");
+            "desired-fingerprint",
+            "binding-fingerprint");
 
     private static KeycloakTarget Target(
         Guid instanceId,

@@ -6,10 +6,15 @@ using System.Text.Json.Nodes;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Domain.Keycloak;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Explore.Infrastructure.Services.Keycloak;
 
-public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
+public sealed class KeycloakAdminOperationClient(
+    HttpClient httpClient,
+    IHostEnvironment hostEnvironment,
+    IConfiguration configuration)
     : IKeycloakAdminOperationClient
 {
     private const int MaximumResponseBytes = 1024 * 1024;
@@ -81,7 +86,10 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
             mapperCollection,
             accessToken,
             cancellationToken);
-        MapperMatch match = MatchMapper(request, mappers);
+        MapperMatch match = MatchMapper(
+            request,
+            mappers,
+            allowWrite);
         if (match.Result is not null)
         {
             return match.Result;
@@ -123,6 +131,13 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
                 cancellationToken);
             if (!mutationResponse.IsSuccessStatusCode)
             {
+                if ((int)mutationResponse.StatusCode >= 500
+                    || mutationResponse.StatusCode
+                        == HttpStatusCode.RequestTimeout)
+                {
+                    return Unknown(match.ProviderResourceId);
+                }
+
                 return Failed("keycloak_mapper_write_rejected");
             }
         }
@@ -173,7 +188,8 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
 
     private static MapperMatch MatchMapper(
         KeycloakMapperOperationRequest request,
-        IReadOnlyCollection<JsonObject> mappers)
+        IReadOnlyCollection<JsonObject> mappers,
+        bool allowWrite)
     {
         JsonObject[] sameName = mappers
             .Where(mapper => string.Equals(
@@ -196,7 +212,9 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
                     existing,
                     ProviderResourceId(existing),
                     new KeycloakMapperOperationResult(
-                        KeycloakStepOutcomeKind.NoChange,
+                        allowWrite
+                            ? KeycloakStepOutcomeKind.NoChange
+                            : KeycloakStepOutcomeKind.Verified,
                         "keycloak_mapper_already_effective",
                         ProviderResourceId(existing),
                         KeycloakOperationService.MapperFingerprint(projection)));
@@ -225,24 +243,26 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
             ProjectMapper(byId, KeycloakMapperOrigin.Direct);
         string currentFingerprint =
             KeycloakOperationService.MapperFingerprint(current);
-        if (!string.Equals(
-                request.Step.ExpectedFingerprint,
-                currentFingerprint,
-                StringComparison.Ordinal))
-        {
-            return Conflict("keycloak_mapper_precondition_failed");
-        }
-
         if (IsDesiredMapper(request, byId))
         {
             return new MapperMatch(
                 byId,
                 ProviderResourceId(byId),
                 new KeycloakMapperOperationResult(
-                    KeycloakStepOutcomeKind.NoChange,
+                    allowWrite
+                        ? KeycloakStepOutcomeKind.NoChange
+                        : KeycloakStepOutcomeKind.Verified,
                     "keycloak_mapper_already_effective",
                     ProviderResourceId(byId),
                     currentFingerprint));
+        }
+
+        if (!string.Equals(
+                request.Step.ExpectedFingerprint,
+                currentFingerprint,
+                StringComparison.Ordinal))
+        {
+            return Conflict("keycloak_mapper_precondition_failed");
         }
 
         return new MapperMatch(
@@ -432,15 +452,22 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
             cancellationToken)
         ?? [];
 
-    private static bool TryGetServerBase(
+    private bool TryGetServerBase(
         KeycloakMapperOperationRequest request,
         out Uri? serverBase)
     {
         serverBase = null;
+        bool secure = request.Authority.Scheme == Uri.UriSchemeHttps;
+        bool allowedLoopbackHttp =
+            request.Authority.Scheme == Uri.UriSchemeHttp
+            && request.Authority.IsLoopback
+            && configuration.GetValue(
+                "Keycloak:AllowDevelopmentLoopbackHttp",
+                false)
+            && (hostEnvironment.IsDevelopment()
+                || hostEnvironment.IsEnvironment("Testing"));
         if (!request.Authority.IsAbsoluteUri
-            || (request.Authority.Scheme != Uri.UriSchemeHttps
-                && !(request.Authority.Scheme == Uri.UriSchemeHttp
-                     && request.Authority.IsLoopback))
+            || (!secure && !allowedLoopbackHttp)
             || !string.IsNullOrEmpty(request.Authority.UserInfo)
             || !string.IsNullOrEmpty(request.Authority.Query)
             || !string.IsNullOrEmpty(request.Authority.Fragment))

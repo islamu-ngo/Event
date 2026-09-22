@@ -339,7 +339,7 @@ public sealed class KeycloakOperationHttpTests
                 new KeycloakInspectionSnapshot(
                     "operators",
                     "event-bff",
-                    "event-api",
+                    "islamu-event-api",
                     realmExists: true,
                     effectiveMappers:
                     [

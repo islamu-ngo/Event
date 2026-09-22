@@ -539,6 +539,14 @@ public sealed class KeycloakOperationService
     public static string MapperFingerprint(
         KeycloakEffectiveMapperSnapshot mapper) =>
         Hash(
+            $"{mapper.ProviderId}|{mapper.Name}|{mapper.Protocol}|"
+            + $"{mapper.MapperType}|{mapper.ClaimName}|"
+            + $"{mapper.Semantic}|{mapper.Audience}|"
+            + $"{mapper.AddsToAccessToken}|{mapper.AddsToIdToken}");
+
+    public static string MapperSemanticFingerprint(
+        KeycloakEffectiveMapperSnapshot mapper) =>
+        Hash(
             $"{mapper.Semantic}|{mapper.Audience}|"
             + $"{mapper.AddsToAccessToken}|{mapper.AddsToIdToken}");
 

@@ -371,7 +371,11 @@ public sealed class KeycloakAdminClient(
                     AddsToAccessToken: accessToken,
                     AddsToIdToken: idToken,
                     IsEffective: isEffective && nativeSubject && accessToken,
-                    IsConflicting: isEffective && mappedSubject && !nativeSubject));
+                    IsConflicting: isEffective && mappedSubject && !nativeSubject,
+                    Name: mapper.Name,
+                    Protocol: mapper.Protocol,
+                    MapperType: mapper.ProtocolMapper,
+                    ClaimName: Value(config, "claim.name")));
             }
 
             if (string.Equals(
@@ -387,7 +391,11 @@ public sealed class KeycloakAdminClient(
                     audience,
                     accessToken,
                     idToken,
-                    IsEffective: isEffective && accessToken));
+                    IsEffective: isEffective && accessToken,
+                    Name: mapper.Name,
+                    Protocol: mapper.Protocol,
+                    MapperType: mapper.ProtocolMapper,
+                    ClaimName: Value(config, "claim.name")));
             }
         }
     }
@@ -446,6 +454,7 @@ public sealed class KeycloakAdminClient(
     private sealed record MapperRepresentation(
         string? Id,
         string? Name,
+        string? Protocol,
         string? ProtocolMapper,
         IReadOnlyDictionary<string, string>? Config);
 }

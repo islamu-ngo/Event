@@ -85,6 +85,7 @@ public static class ApplicationServicesRegistration
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddSingleton(TimeProvider.System);
         PrivacyErasureDurabilityOptions erasureDurability =
             PrivacyErasureDurabilityOptions.FromConfiguration(configuration);
         services.AddOptions<PrivacyErasureDurabilityOptions>()
@@ -277,6 +278,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
         services.AddScoped<KeycloakConnectionResolver>();
+        services.AddScoped<KeycloakOperationService>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();
         services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
         services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();

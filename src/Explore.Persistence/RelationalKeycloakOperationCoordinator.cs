@@ -54,8 +54,7 @@ public sealed class RelationalKeycloakOperationCoordinator(
             cancellationToken);
         if (hasOverlap)
         {
-            throw new InvalidOperationException(
-                "An unresolved Keycloak operation overlaps this realm.");
+            throw new KeycloakOperationOverlapException();
         }
 
         return await action(cancellationToken);

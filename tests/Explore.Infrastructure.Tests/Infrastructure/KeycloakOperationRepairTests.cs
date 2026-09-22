@@ -44,7 +44,8 @@ public sealed class KeycloakOperationRepairTests
             id: "mapper-42",
             name: "operator-owned-audience",
             audience: "event-api",
-            accessToken: false);
+            accessToken: false,
+            introspectionToken: false);
         existing["unknownRoot"] = "preserve-root";
         ((JsonObject)existing["config"]!)["unknown.config"] =
             "preserve-config";
@@ -77,6 +78,11 @@ public sealed class KeycloakOperationRepairTests
                 ["included.client.audience"]!
                 .GetValue<string>())
             .IsEqualTo("event-api");
+        await Assert.That(
+                ((JsonObject)updated["config"]!)
+                ["introspection.token.claim"]!
+                .GetValue<string>())
+            .IsEqualTo("false");
         await Assert.That(handler.ForbiddenMutationObserved).IsFalse();
     }
 
@@ -390,7 +396,8 @@ public sealed class KeycloakOperationRepairTests
         string name,
         string audience,
         bool accessToken = true,
-        bool idToken = false) =>
+        bool idToken = false,
+        bool introspectionToken = true) =>
         new()
         {
             ["id"] = id,
@@ -404,7 +411,8 @@ public sealed class KeycloakOperationRepairTests
                     accessToken ? "true" : "false",
                 ["id.token.claim"] =
                     idToken ? "true" : "false",
-                ["introspection.token.claim"] = "true"
+                ["introspection.token.claim"] =
+                    introspectionToken ? "true" : "false"
             }
         };
 

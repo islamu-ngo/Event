@@ -40,10 +40,22 @@ Exact content downloads at `/api/storageobject/{id}/content` use the stored obje
 
 ## 3. Disaster Recovery & Backup Integrity
 
+Standalone defaults to `/app/data/storage`, so the `/app/data` persistent volume
+retains local uploads with the default database and its Data Protection keys.
+Explicit root overrides take precedence and need their own persistent mount and
+backup when outside that volume. Before replacing an older container that used
+the relative `storage-data/local` default, stop writes, preserve and verify its
+bytes, and reconcile the copied root before reopening traffic. Follow the
+[Standalone relocation procedure](../self-hosting/docker-standalone.md#relocating-uploads-from-an-earlier-default);
+changing a root setting never migrates existing files.
+
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):
 * Restoring a database without the corresponding storage volume causes broken image links.
 * Restoring a storage volume without the database leaves orphaned, unreferenced files.
 * [Configuration Manifests](../configuration-and-operations/configuration-manifests.md) deliberately exclude binary media and do not replace storage volume backups.
+* Retain required Data Protection keys and the selected secret authority with the
+  protected data. Preserve newer privacy-erasure authority independently rather
+  than rolling it back with an older primary database.
 
 ---
 

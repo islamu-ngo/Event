@@ -3,6 +3,23 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-22
+
+- **Breaking: reviewed Keycloak operator operations.**
+  Keycloak repairs use approved operation receipts instead of unrestricted bootstrap or sync requests.
+  The seven private, no-store routes are `GET /api/instance/keycloak/connection`,
+  `POST /api/instance/keycloak/inspect`, `POST /api/instance/keycloak/plans`,
+  `GET /api/instance/keycloak/operations/{id}`, and `POST`
+  `/api/instance/keycloak/operations/{id}/apply`, `/reconcile`, and `/cancel`.
+  Every request requires current setup or instance-administrator authority.
+  Receipts expire after 15 minutes and are bound to their verified administrator
+  creator or server-derived setup generation. Inspect and apply accept advanced
+  administrator credentials only for the submitted request; no receipt includes
+  credentials. Receipt reads remain private, reconciliation only inspects provider
+  state, and the service performs neither automatic mutating retry nor rollback.
+  These routes and their credential-bearing requests bypass generic idempotency
+  response storage, so a prior response cannot replay current authority.
+
 ## 2026-09-21
 
 - **Internal public-address establishment.** Setup has no URL field, confirmation

@@ -59536,6 +59536,439 @@
         "x-endpoint-class": "Authenticated"
       }
     },
+    "/api/instance/keycloak/connection": {
+      "get": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Get Effective Keycloak Connection",
+        "operationId": "GetInstanceKeycloakConnection",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakConnectionDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakConnectionDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/instance/keycloak/inspect": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Inspect Keycloak Configuration",
+        "operationId": "InspectInstanceKeycloak",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakInspectionDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakInspectionDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/plans": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Plan Keycloak Operation",
+        "operationId": "PlanInstanceKeycloak",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}": {
+      "get": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Get Keycloak Operation",
+        "operationId": "GetInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}/apply": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Apply Keycloak Operation",
+        "operationId": "ApplyInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}/reconcile": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Reconcile Keycloak Operation",
+        "operationId": "ReconcileInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}/cancel": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Cancel Keycloak Operation",
+        "operationId": "CancelInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
     "/api/instance/settings/smtp": {
       "get": {
         "tags": [
@@ -141076,6 +141509,186 @@
           }
         }
       },
+      "HalResourceOfKeycloakConnectionDto": {
+        "required": [
+          "status",
+          "authority",
+          "realm",
+          "clientId",
+          "available"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfKeycloakInspectionDto": {
+        "required": [
+          "status",
+          "reasonCode",
+          "authority",
+          "realm",
+          "clientId",
+          "findings"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfKeycloakOperationDto": {
+        "required": [
+          "id",
+          "state",
+          "digest",
+          "createdAtUtc",
+          "expiresAtUtc",
+          "settledAtUtc",
+          "isCancellationRequested",
+          "steps",
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settledAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isCancellationRequested": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KeycloakStepOutcomeDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfLocalCredentialIssueDto": {
         "type": "object",
         "properties": {
@@ -153300,6 +153913,161 @@
           }
         }
       },
+      "KeycloakConnectionDto": {
+        "required": [
+          "status",
+          "authority",
+          "realm",
+          "clientId",
+          "available"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "KeycloakInspectionDto": {
+        "required": [
+          "status",
+          "reasonCode",
+          "authority",
+          "realm",
+          "clientId",
+          "findings"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "KeycloakOperationDto": {
+        "required": [
+          "id",
+          "state",
+          "digest",
+          "createdAtUtc",
+          "expiresAtUtc",
+          "settledAtUtc",
+          "isCancellationRequested",
+          "steps",
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settledAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isCancellationRequested": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KeycloakStepOutcomeDto"
+            }
+          }
+        }
+      },
+      "KeycloakOperationInput": {
+        "type": "object",
+        "properties": {
+          "administratorUsername": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "administratorPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "KeycloakProtocolMapperDesiredStateDto": {
         "type": "object",
         "properties": {
@@ -153620,6 +154388,35 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "KeycloakStepOutcomeDto": {
+        "required": [
+          "stepId",
+          "outcome",
+          "providerResourceId",
+          "observedFingerprint"
+        ],
+        "type": "object",
+        "properties": {
+          "stepId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "providerResourceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "observedFingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -180421,6 +181218,9 @@
     },
     {
       "name": "InstanceGovernanceSettings"
+    },
+    {
+      "name": "InstanceKeycloakOperations"
     },
     {
       "name": "InstanceMessagingSettings"

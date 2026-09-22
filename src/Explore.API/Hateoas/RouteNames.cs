@@ -6,6 +6,13 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string GetInstanceKeycloakConnection = nameof(GetInstanceKeycloakConnection);
+    public const string InspectInstanceKeycloak = nameof(InspectInstanceKeycloak);
+    public const string PlanInstanceKeycloak = nameof(PlanInstanceKeycloak);
+    public const string GetInstanceKeycloakOperation = nameof(GetInstanceKeycloakOperation);
+    public const string ApplyInstanceKeycloakOperation = nameof(ApplyInstanceKeycloakOperation);
+    public const string ReconcileInstanceKeycloakOperation = nameof(ReconcileInstanceKeycloakOperation);
+    public const string CancelInstanceKeycloakOperation = nameof(CancelInstanceKeycloakOperation);
     public const string LoginLocalIdentity = nameof(LoginLocalIdentity);
     public const string RequestLocalEmailVerification = nameof(RequestLocalEmailVerification);
     public const string ConfirmLocalEmail = nameof(ConfirmLocalEmail);

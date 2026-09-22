@@ -565,6 +565,12 @@ public static class InfrastructureServicesRegistration
             client.MaxResponseContentBufferSize = 1024 * 1024;
         })
             .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
+        services.AddHttpClient<IKeycloakAdminOperationClient, KeycloakAdminOperationClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.MaxResponseContentBufferSize = 1024 * 1024;
+        })
+            .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
         services.AddScoped<IKeycloakBootstrapService, KeycloakBootstrapService>();
         services.Configure<KeycloakLifecycleEmailOptions>(configuration.GetSection(KeycloakLifecycleEmailOptions.SectionName));
         services.AddHttpClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName, client =>

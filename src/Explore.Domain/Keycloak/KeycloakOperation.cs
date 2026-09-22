@@ -102,6 +102,18 @@ public sealed class KeycloakOperation
         Touch();
     }
 
+    public void SettleFromStepOutcomes(DateTimeOffset settledAtUtc)
+    {
+        if (State is not (KeycloakOperationState.Applying or KeycloakOperationState.OutcomeUnknown))
+        {
+            throw new InvalidOperationException("Only an active operation can be settled from step outcomes.");
+        }
+
+        KeycloakOperationState derivedState = DeriveSettledState();
+        State = derivedState;
+        SettleAt(ValidSettlementTime(settledAtUtc));
+    }
+
     public void MarkVerified(DateTimeOffset settledAtUtc) =>
         SettleApplying(KeycloakOperationState.Verified, settledAtUtc);
 

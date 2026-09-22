@@ -78,6 +78,13 @@ the captured provider identity and never creates, adopts by name, retries or
 rolls back. Proposal expiry blocks a new apply, while an already uncertain write
 remains recoverable through fresh current-authority read-only reconciliation.
 
+The setup and instance-administration surfaces share one
+`KeycloakOperatorPanel`. It renders connection, inspection, planning, apply,
+reconcile and cancel controls strictly from HAL links. Administrator
+credentials are write-only foreground inputs cleared after every attempt;
+Apply additionally requires review of the receipt steps and an explicit
+confirmation phrase.
+
 ## Clean Architecture Flow
 
 Local HTTP requests enter through `LocalAuthController` or the antiforgery-protected BFF endpoints. Controllers create immutable Local authentication commands and dispatch through MediatR:

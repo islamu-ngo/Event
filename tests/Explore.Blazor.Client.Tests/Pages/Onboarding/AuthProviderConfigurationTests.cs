@@ -1,4 +1,5 @@
 using Bunit.TestDoubles;
+using Explore.Blazor.Client.Components.Onboarding;
 using Explore.Blazor.Client.Pages.Onboarding;
 using Explore.Blazor.Client.Pages.Onboarding.Components;
 using Explore.Blazor.Client.Tests.Common;
@@ -49,6 +50,38 @@ public sealed class AuthProviderConfigurationTests : IDisposable
             "At least one authentication provider must be enabled");
         await Assert.That(cut.FindAll("h1")).Count().IsEqualTo(1);
         await Assert.That(cut.FindComponent<OnboardingWorkspace>()).IsNotNull();
+    }
+
+    [Test]
+    public async Task KeycloakSetupUsesSharedOperatorPanel()
+    {
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(
+            new AuthProviderConfigurationDto
+            {
+                PrimaryProviderId = 1,
+                PrimaryProviderCode = "KEYCLOAK",
+                KeycloakAuthority =
+                    "https://identity.example.test/realms/operators",
+                KeycloakClientId = "event-bff"
+            });
+        _onboarding.GetKeycloakConnectionAsync(
+                Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfKeycloakConnectionDto
+            {
+                Status = "resolved",
+                Available = true,
+                CredentialOwnership = "deployment-managed",
+                CredentialStatus = "resolved",
+                OperatorGuidance = "reinspect",
+                _links = new Dictionary<string, HalLink>()
+            });
+
+        var cut =
+            _context.RenderMudComponent<AuthProviderConfiguration>();
+
+        await Assert.That(
+                cut.FindComponents<KeycloakOperatorPanel>())
+            .HasCount().EqualTo(1);
     }
 
     [Test]

@@ -1,4 +1,5 @@
 @using Explore.Blazor.Client.Contracts.Interop
+@using Explore.Blazor.Client.Components.Onboarding
 @using Explore.Blazor.Client.Services
 @using MudBlazor
 
@@ -127,6 +128,14 @@
                                 @PublicSignupUrlWarning(Model.KeycloakPublicSignupUrl)
                             }
                         </section>
+
+                        @if (IsKeycloakPrimary
+                            && OnboardingService is not null)
+                        {
+                            <KeycloakOperatorPanel
+                                Service="@OnboardingService"
+                                HeadingId="admin-keycloak-operator-heading" />
+                        }
 
                         @if (!IsSingleTenant)
                         {

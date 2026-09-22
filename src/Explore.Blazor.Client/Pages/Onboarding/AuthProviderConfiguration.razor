@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @layout SetupLayout
 @using Explore.Blazor.Client.Components.Forms
+@using Explore.Blazor.Client.Components.Onboarding
 @using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Explore.Blazor.Client.Pages.Onboarding.Components
@@ -209,6 +210,12 @@
                                             @PublicSignupUrlWarning(_model.KeycloakPublicSignupUrl)
                                         }
                                     </section>
+                                    @if (IsKeycloakPrimary)
+                                    {
+                                        <KeycloakOperatorPanel
+                                            Service="@InstanceOnboardingService"
+                                            HeadingId="setup-keycloak-operator-heading" />
+                                    }
                             </MudStack>
                         </div>
                     </details>

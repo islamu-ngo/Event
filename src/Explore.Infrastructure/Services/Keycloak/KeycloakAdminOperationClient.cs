@@ -394,7 +394,14 @@ public sealed class KeycloakAdminOperationClient(
                 : string.Equals(
                     ProviderResourceId(mapper),
                     request.Step.TargetId,
-                    StringComparison.Ordinal)));
+                    StringComparison.Ordinal)
+                  && string.Equals(
+                      request.Step.ExpectedIdentityFingerprint,
+                      KeycloakOperationService.MapperIdentityFingerprint(
+                          ProjectMapper(
+                              mapper,
+                              KeycloakMapperOrigin.Direct)),
+                      StringComparison.Ordinal)));
 
     private static KeycloakEffectiveMapperSnapshot ProjectMapper(
         JsonObject mapper,

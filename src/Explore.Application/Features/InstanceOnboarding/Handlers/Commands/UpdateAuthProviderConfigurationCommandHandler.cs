@@ -92,7 +92,7 @@ public class UpdateAuthProviderConfigurationCommandHandler :
             LockPrimaryProvider = patch.LockPrimaryProvider,
             KeycloakAuthority = patch.KeycloakAuthority,
             KeycloakClientId = patch.KeycloakClientId,
-            KeycloakClientSecret = patch.KeycloakClientSecret,
+            KeycloakClientSecret = string.Empty,
             KeycloakDetectedFromEnvironment = currentConfiguration.KeycloakDetectedFromEnvironment,
             KeycloakClientSecretOwnership = currentConfiguration.KeycloakClientSecretOwnership,
             AtprotoLoginEnabled = patch.AtprotoLoginEnabled,

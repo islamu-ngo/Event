@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
-using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Domain.Keycloak;
 using Explore.Infrastructure.Services.Keycloak;
@@ -474,7 +474,7 @@ public sealed class KeycloakOperationRepairTests
         await Assert.That(handler.MutationCount).IsEqualTo(1);
     }
 
-    private static KeycloakAdminOperationClient CreateClient(
+    private static KeycloakAdminClient CreateClient(
         HttpMessageHandler handler,
         string environmentName = "Production",
         bool allowLoopbackHttp = false)
@@ -489,7 +489,7 @@ public sealed class KeycloakOperationRepairTests
                     allowLoopbackHttp.ToString()
             })
             .Build();
-        return new KeycloakAdminOperationClient(
+        return new KeycloakAdminClient(
             new HttpClient(handler)
             {
                 Timeout = TimeSpan.FromSeconds(5),

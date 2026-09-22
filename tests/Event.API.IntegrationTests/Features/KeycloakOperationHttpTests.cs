@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
@@ -38,6 +37,12 @@ public sealed class KeycloakOperationHttpTests
         await Assert.That(body).Contains("\"_links\"");
         await Assert.That(body).Contains("\"inspect\"");
         await Assert.That(body).Contains("\"plan\"");
+        await Assert.That(body).Contains("deployment-managed");
+        await Assert.That(body)
+            .Contains(
+                "rotate_in_deployment_authority_restart_and_reinspect");
+        await Assert.That(body).DoesNotContain("\"rotate\"");
+        await Assert.That(body).DoesNotContain("clientSecret");
     }
 
     [Test]
@@ -68,19 +73,102 @@ public sealed class KeycloakOperationHttpTests
     }
 
     [Test]
+    public async Task PlanCreateRealm_UsesServerBindingAndClosedCreateSteps()
+    {
+        await using var factory = new KeycloakOperationFactory();
+        factory.Inspection.Snapshot = new KeycloakInspectionSnapshot(
+            "operators",
+            "event-bff",
+            "islamu-event-api",
+            realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                0,
+                ProviderId: null,
+                Shape: null),
+            apiClient: new(
+                "islamu-event-api",
+                0,
+                ProviderId: null,
+                Shape: null));
+        using HttpClient client = factory.CreateClient();
+        Authenticate(client);
+
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/instance/keycloak/plans",
+            PlanCredentials("CreateRealm"));
+        string body = await response.Content.ReadAsStringAsync();
+
+        await Assert.That(response.StatusCode)
+            .IsEqualTo(HttpStatusCode.OK)
+            .Because(body);
+        await Assert.That(body).Contains("realm:create");
+        await Assert.That(body).Contains("client:bff");
+        await Assert.That(body).Contains("client:api");
+        await Assert.That(body).DoesNotContain("runtime-secret");
+        await Assert.That(factory.Repository.Operation!.State)
+            .IsEqualTo(KeycloakOperationState.Previewed);
+    }
+
+    [Test]
+    public async Task PlanCreateRealm_ThenApplyAcrossRequests_KeepsBinding()
+    {
+        await using var factory = new KeycloakOperationFactory();
+        factory.Inspection.Snapshot = new KeycloakInspectionSnapshot(
+            "operators",
+            "event-bff",
+            "islamu-event-api",
+            realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                0,
+                ProviderId: null,
+                Shape: null),
+            apiClient: new(
+                "islamu-event-api",
+                0,
+                ProviderId: null,
+                Shape: null));
+        using HttpClient client = factory.CreateClient();
+        Authenticate(client);
+
+        using HttpResponseMessage planResponse =
+            await client.PostAsJsonAsync(
+                "/api/instance/keycloak/plans",
+                PlanCredentials("CreateRealm"));
+        using JsonDocument plan = JsonDocument.Parse(
+            await planResponse.Content.ReadAsStringAsync());
+        Guid operationId =
+            plan.RootElement.GetProperty("id").GetGuid();
+
+        using HttpResponseMessage applyResponse =
+            await client.PostAsJsonAsync(
+                $"/api/instance/keycloak/operations/{operationId:D}/apply",
+                Credentials());
+        string body =
+            await applyResponse.Content.ReadAsStringAsync();
+
+        await Assert.That(applyResponse.StatusCode)
+            .IsEqualTo(HttpStatusCode.OK)
+            .Because(body);
+        await Assert.That(body)
+            .DoesNotContain("keycloak_operation_binding_changed");
+        await Assert.That(factory.AdminClient.ApplyCount)
+            .IsEqualTo(1);
+    }
+
+    [Test]
     public async Task Apply_UsesPersistedReceiptAndPublishesReconcileAffordance()
     {
         await using var factory = new KeycloakOperationFactory();
         using HttpClient client = factory.CreateClient();
         Authenticate(client);
-        object credentials = new
-        {
-            administratorUsername = $"admin-{Guid.CreateVersion7():N}",
-            administratorPassword = $"password-{Guid.CreateVersion7():N}"
-        };
+        object credentials = Credentials();
         using HttpResponseMessage planResponse = await client.PostAsJsonAsync(
             "/api/instance/keycloak/plans",
-            credentials);
+            PlanCredentials());
         using JsonDocument plan = JsonDocument.Parse(
             await planResponse.Content.ReadAsStringAsync());
         Guid operationId = plan.RootElement.GetProperty("id").GetGuid();
@@ -108,9 +196,10 @@ public sealed class KeycloakOperationHttpTests
         using HttpClient client = factory.CreateClient();
         Authenticate(client);
         object credentials = Credentials();
+        object planCredentials = PlanCredentials();
         using HttpResponseMessage planResponse = await client.PostAsJsonAsync(
             "/api/instance/keycloak/plans",
-            credentials);
+            planCredentials);
         using JsonDocument plan = JsonDocument.Parse(
             await planResponse.Content.ReadAsStringAsync());
         Guid operationId = plan.RootElement.GetProperty("id").GetGuid();
@@ -138,9 +227,10 @@ public sealed class KeycloakOperationHttpTests
         using HttpClient client = factory.CreateClient();
         Authenticate(client);
         object credentials = Credentials();
+        object planCredentials = PlanCredentials();
         using HttpResponseMessage planResponse = await client.PostAsJsonAsync(
             "/api/instance/keycloak/plans",
-            credentials);
+            planCredentials);
         using JsonDocument plan = JsonDocument.Parse(
             await planResponse.Content.ReadAsStringAsync());
         Guid operationId = plan.RootElement.GetProperty("id").GetGuid();
@@ -167,9 +257,10 @@ public sealed class KeycloakOperationHttpTests
         using HttpClient client = factory.CreateClient();
         Authenticate(client);
         object credentials = Credentials();
+        object planCredentials = PlanCredentials();
         using HttpResponseMessage planResponse = await client.PostAsJsonAsync(
             "/api/instance/keycloak/plans",
-            credentials);
+            planCredentials);
         using JsonDocument plan = JsonDocument.Parse(
             await planResponse.Content.ReadAsStringAsync());
         Guid operationId = plan.RootElement.GetProperty("id").GetGuid();
@@ -199,9 +290,39 @@ public sealed class KeycloakOperationHttpTests
         await Assert.That(receiptBody).DoesNotContain("\"cancel\"");
     }
 
+    [Test]
+    [Arguments("/api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap")]
+    [Arguments("/api/instance/settings/auth-provider/keycloak/doctor")]
+    [Arguments("/api/instance/settings/auth-provider/keycloak/sync-preview")]
+    [Arguments("/api/instance/settings/auth-provider/keycloak/sync-apply")]
+    [Arguments("/api/instance/settings/auth-provider/keycloak/client-secret/rotate")]
+    public async Task LegacyMutationRoutes_AreRemoved(string path)
+    {
+        await using var factory = new KeycloakOperationFactory();
+        using HttpClient client = factory.CreateClient();
+        Authenticate(client);
+
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            path,
+            new { });
+
+        await Assert.That(response.StatusCode)
+            .IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(factory.AdminClient.ApplyCount).IsEqualTo(0);
+    }
+
     private static object Credentials() =>
         new
         {
+            administratorUsername = $"admin-{Guid.CreateVersion7():N}",
+            administratorPassword = $"password-{Guid.CreateVersion7():N}"
+        };
+
+    private static object PlanCredentials(
+        string intent = "RepairClient") =>
+        new
+        {
+            intent,
             administratorUsername = $"admin-{Guid.CreateVersion7():N}",
             administratorPassword = $"password-{Guid.CreateVersion7():N}"
         };
@@ -213,6 +334,7 @@ public sealed class KeycloakOperationHttpTests
         public FixedAuthority Authority { get; } = new();
         public UnknownOutcomeAdminClient AdminClient { get; } = new();
         public FixedTimeProvider Clock { get; } = new();
+        public FixedInspectionClient Inspection { get; } = new();
 
         protected override void ConfigureWebHost(
             IWebHostBuilder builder)
@@ -236,16 +358,15 @@ public sealed class KeycloakOperationHttpTests
                     new FixedSecretResolver());
                 services.RemoveAll<IKeycloakAdminClient>();
                 services.AddSingleton<IKeycloakAdminClient>(
-                    new FixedInspectionClient());
+                    new CombinedAdminClient(
+                        Inspection,
+                        AdminClient));
                 services.RemoveAll<IKeycloakOperationRepository>();
                 services.AddSingleton<IKeycloakOperationRepository>(
                     Repository);
                 services.RemoveAll<IKeycloakOperationCoordinator>();
                 services.AddSingleton<IKeycloakOperationCoordinator>(
                     new InMemoryCoordinator(Repository));
-                services.RemoveAll<IKeycloakAdminOperationClient>();
-                services.AddSingleton<IKeycloakAdminOperationClient>(
-                    AdminClient);
                 services.RemoveAll<TimeProvider>();
                 services.AddSingleton<TimeProvider>(
                     Clock);
@@ -329,29 +450,32 @@ public sealed class KeycloakOperationHttpTests
             Task.CompletedTask;
     }
 
-    private sealed class FixedInspectionClient : IKeycloakAdminClient
+    private sealed class FixedInspectionClient
     {
+        public KeycloakInspectionSnapshot Snapshot { get; set; } =
+            new(
+                "operators",
+                "event-bff",
+                "islamu-event-api",
+                realmExists: true,
+                effectiveMappers:
+                [
+                    new KeycloakEffectiveMapperSnapshot(
+                        "native-subject",
+                        KeycloakMapperSemantic.Subject,
+                        KeycloakMapperOrigin.Native,
+                        Audience: null,
+                        AddsToAccessToken: true,
+                        AddsToIdToken: true,
+                        IsEffective: true)
+                ]);
+
         public Task<KeycloakAdminInspectionResult> InspectAsync(
             KeycloakAdminInspectionRequest request,
             CancellationToken cancellationToken) =>
             Task.FromResult(KeycloakAdminInspectionResult.Success(
                 KeycloakInspectionStatus.Inspected,
-                new KeycloakInspectionSnapshot(
-                    "operators",
-                    "event-bff",
-                    "islamu-event-api",
-                    realmExists: true,
-                    effectiveMappers:
-                    [
-                        new KeycloakEffectiveMapperSnapshot(
-                            "native-subject",
-                            KeycloakMapperSemantic.Subject,
-                            KeycloakMapperOrigin.Native,
-                            Audience: null,
-                            AddsToAccessToken: true,
-                            AddsToIdToken: true,
-                            IsEffective: true)
-                    ])));
+                Snapshot));
     }
 
     public sealed class InMemoryOperationRepository
@@ -437,8 +561,50 @@ public sealed class KeycloakOperationHttpTests
         }
     }
 
+    private sealed class CombinedAdminClient(
+        FixedInspectionClient inspection,
+        UnknownOutcomeAdminClient operations)
+        : IKeycloakAdminClient
+    {
+        public Task<KeycloakAdminInspectionResult> InspectAsync(
+            KeycloakAdminInspectionRequest request,
+            CancellationToken cancellationToken) =>
+            inspection.InspectAsync(request, cancellationToken);
+
+        public Task<KeycloakMapperOperationResult>
+            ApplyApprovedMapperAsync(
+                KeycloakMapperOperationRequest request,
+                CancellationToken cancellationToken) =>
+            operations.ApplyApprovedMapperAsync(
+                request,
+                cancellationToken);
+
+        public Task<KeycloakMapperOperationResult>
+            InspectApprovedMapperAsync(
+                KeycloakMapperOperationRequest request,
+                CancellationToken cancellationToken) =>
+            operations.InspectApprovedMapperAsync(
+                request,
+                cancellationToken);
+
+        public Task<KeycloakProvisioningOperationResult>
+            ApplyApprovedProvisioningAsync(
+                KeycloakProvisioningOperationRequest request,
+                CancellationToken cancellationToken) =>
+            operations.ApplyApprovedProvisioningAsync(
+                request,
+                cancellationToken);
+
+        public Task<KeycloakProvisioningOperationResult>
+            InspectApprovedProvisioningAsync(
+                KeycloakProvisioningOperationRequest request,
+                CancellationToken cancellationToken) =>
+            operations.InspectApprovedProvisioningAsync(
+                request,
+                cancellationToken);
+    }
+
     private sealed class UnknownOutcomeAdminClient
-        : IKeycloakAdminOperationClient
     {
         public int ApplyCount { get; private set; }
 
@@ -460,6 +626,26 @@ public sealed class KeycloakOperationHttpTests
             Task.FromResult(new KeycloakMapperOperationResult(
                 KeycloakStepOutcomeKind.Verified,
                 "keycloak_mapper_verified"));
+
+        public Task<KeycloakProvisioningOperationResult>
+            ApplyApprovedProvisioningAsync(
+                KeycloakProvisioningOperationRequest request,
+                CancellationToken cancellationToken)
+        {
+            ApplyCount++;
+            return Task.FromResult(new KeycloakProvisioningOperationResult(
+                KeycloakStepOutcomeKind.OutcomeUnknown,
+                "keycloak_resource_outcome_unknown"));
+        }
+
+        public Task<KeycloakProvisioningOperationResult>
+            InspectApprovedProvisioningAsync(
+                KeycloakProvisioningOperationRequest request,
+                CancellationToken cancellationToken) =>
+            Task.FromResult(new KeycloakProvisioningOperationResult(
+                KeycloakStepOutcomeKind.Verified,
+                "keycloak_resource_verified",
+                request.ProviderResourceId));
     }
 
     private sealed class FixedTimeProvider : TimeProvider

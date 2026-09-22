@@ -21,11 +21,11 @@ public interface IInfisicalClientFactory
 public interface IInfisicalClient
 {
     /// <summary>
-    /// Reads a single secret at the given environment + folder path + name. Returns the raw plaintext
-    /// value, or <c>null</c> when the secret is absent. Transient errors should surface as exceptions
-    /// so the <c>InfisicalSecretSource</c> can log and translate them to a <c>null</c> result.
+    /// Reads one secret plus its provider-owned id/version revision. The
+    /// revision must be value-free and change when the provider secret
+    /// changes. Returns <c>null</c> when the secret is absent.
     /// </summary>
-    Task<string?> GetSecretAsync(
+    Task<SecretProviderValue?> GetSecretAsync(
         string environment,
         string folderPath,
         string secretName,
@@ -38,3 +38,8 @@ public interface IInfisicalClient
         ReadOnlyMemory<byte> secretValue,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>Plaintext provider value paired with value-free version metadata.</summary>
+public sealed record SecretProviderValue(
+    string Value,
+    string Revision);

@@ -36,7 +36,7 @@ public sealed class ProviderCredentialHttpBoundaryTests
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private const string InternalPath = "/api/instanceonboarding/auth-provider-configuration/internal";
 
-    public enum Route { Bootstrap, SetupPolicySync, Doctor, Preview, Apply, Rotate, SettingsPolicySync }
+    public enum Route { SetupPolicySync, SettingsPolicySync }
     public enum Outcome { Success, Validation, ProviderRejection }
     public enum Caller { Anonymous, TenantAdmin, RevokedAdmin, CompletedSetup, ForgedSetup, SetupOnly }
 
@@ -287,22 +287,18 @@ public sealed class ProviderCredentialHttpBoundaryTests
         await AssertPrivateAsync(response);
     }
 
-    private static bool IsSetup(Route route) => route is Route.Bootstrap or Route.SetupPolicySync;
+    private static bool IsSetup(Route route) =>
+        route == Route.SetupPolicySync;
     private static string Path(Route route) => route switch
     {
-        Route.Bootstrap => "/api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap",
         Route.SetupPolicySync => "/api/instanceonboarding/authz-provider-configuration/sync",
-        Route.Doctor => "/api/instance/settings/auth-provider/keycloak/doctor",
-        Route.Preview => "/api/instance/settings/auth-provider/keycloak/sync-preview",
-        Route.Apply => "/api/instance/settings/auth-provider/keycloak/sync-apply",
-        Route.Rotate => "/api/instance/settings/auth-provider/keycloak/client-secret/rotate",
         Route.SettingsPolicySync => "/api/instance/settings/authz-provider/sync",
         _ => throw new ArgumentOutOfRangeException(nameof(route))
     };
     private static HttpStatusCode ExpectedOutcome(Route route, Outcome outcome) => outcome switch
     {
         Outcome.Validation => HttpStatusCode.BadRequest,
-        Outcome.ProviderRejection when route is Route.Bootstrap or Route.SetupPolicySync or Route.SettingsPolicySync => HttpStatusCode.BadRequest,
+        Outcome.ProviderRejection => HttpStatusCode.BadRequest,
         _ => HttpStatusCode.OK
     };
     private static string Canary() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -350,21 +346,8 @@ public sealed class ProviderCredentialHttpBoundaryTests
             string password = Canary();
             _bodies = new()
             {
-                [Route.Bootstrap] = new KeycloakBootstrapRequestDto
-                {
-                    KeycloakBaseUrl = "https://provider.test", Realm = "boundary", BlazorClientId = "boundary-bff",
-                    BlazorClientSecret = Canary(), BootstrapAdminUsername = username, BootstrapAdminPassword = password
-                },
                 [Route.SetupPolicySync] = new AuthorizationPolicyPackageSyncRequestDto { AdminUsername = username, AdminPassword = password },
-                [Route.SettingsPolicySync] = new AuthorizationPolicyPackageSyncRequestDto { AdminUsername = username, AdminPassword = password },
-                [Route.Doctor] = new KeycloakRealmDoctorRequestDto { UseTemporaryAdminCredentials = true, BootstrapAdminUsername = username, BootstrapAdminPassword = password },
-                [Route.Preview] = new KeycloakRealmSyncPreviewRequestDto { UseTemporaryAdminCredentials = true, BootstrapAdminUsername = username, BootstrapAdminPassword = password },
-                [Route.Apply] = new KeycloakRealmSyncApplyRequestDto { BackupConfirmed = true, BootstrapAdminUsername = username, BootstrapAdminPassword = password },
-                [Route.Rotate] = new KeycloakClientSecretRotationRequestDto
-                {
-                    ConfirmApplicationManagedSecret = true, ClientId = "boundary-bff", NewClientSecret = Canary(),
-                    BootstrapAdminUsername = username, BootstrapAdminPassword = password
-                }
+                [Route.SettingsPolicySync] = new AuthorizationPolicyPackageSyncRequestDto { AdminUsername = username, AdminPassword = password }
             };
         }
 
@@ -382,8 +365,6 @@ public sealed class ProviderCredentialHttpBoundaryTests
             };
             WebApplicationFactory<Program> host = root.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IKeycloakBootstrapService>();
-                services.AddSingleton<IKeycloakBootstrapService>(provider);
                 services.RemoveAll<IPolicyPackageService>();
                 services.AddSingleton<IPolicyPackageService>(provider);
                 // Only configuration storage/provider I/O is substituted. Authority, native
@@ -557,7 +538,7 @@ public sealed class ProviderCredentialHttpBoundaryTests
         }
     }
 
-    private sealed class ProviderBoundary : IKeycloakBootstrapService, IPolicyPackageService
+    private sealed class ProviderBoundary : IPolicyPackageService
     {
         private int _calls;
         public int Calls => Volatile.Read(ref _calls);
@@ -573,31 +554,6 @@ public sealed class ProviderCredentialHttpBoundaryTests
             if (call == 1) FirstEntered.TrySetResult();
             if (call == 2) SecondEntered.TrySetResult();
             if (Block) await Release.Task.WaitAsync(Deadline, cancellationToken);
-        }
-        public async Task<KeycloakBootstrapResultDto> BootstrapAsync(KeycloakBootstrapRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Success = !Reject, Message = Message, FailureCode = Reject ? "keycloak_bootstrap_failed" : null };
-        }
-        public async Task<KeycloakRealmDoctorResultDto> DiagnoseRealmAsync(AuthProviderConfigurationDto configuration, KeycloakRealmDoctorRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { OverallStatus = Reject ? "blocked" : "healthy", Message = Message };
-        }
-        public async Task<KeycloakRealmSyncPlanDto> PreviewRealmSyncAsync(AuthProviderConfigurationDto configuration, KeycloakRealmSyncPreviewRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Status = Reject ? "blocked" : "ready", Message = Message };
-        }
-        public async Task<KeycloakRealmSyncPlanDto> ApplyRealmSyncAsync(AuthProviderConfigurationDto configuration, KeycloakRealmSyncApplyRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Status = Reject ? "blocked" : "applied", Message = Message };
-        }
-        public async Task<KeycloakClientSecretRotationResultDto> RotateClientSecretAsync(AuthProviderConfigurationDto configuration, KeycloakClientSecretRotationRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Status = Reject ? "blocked" : "rotated", Message = Message };
         }
         public async Task<PolicyPackagePublishResult> PublishAsync(CancellationToken cancellationToken = default, PolicyPackageAdminCredentials? oneTimeCredentials = null)
         {

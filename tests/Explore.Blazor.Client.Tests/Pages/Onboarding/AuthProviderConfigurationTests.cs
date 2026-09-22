@@ -101,65 +101,6 @@ public sealed class AuthProviderConfigurationTests : IDisposable
     }
 
     [Test]
-    public async Task KeycloakBootstrapAppliesVisitorFieldsToReloadedCompleteConfiguration()
-    {
-        var initial = new AuthProviderConfigurationDto
-        {
-            PrimaryProviderId = 1,
-            PrimaryProviderCode = "KEYCLOAK",
-            KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
-            KeycloakPublicSignupUrl = "https://identity.example.test/registrations",
-            GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied,
-            GooglePublicSignupUrl = "https://accounts.example.test/enroll"
-        };
-        var canonical = new AuthProviderConfigurationDto
-        {
-            PrimaryProviderId = 1,
-            PrimaryProviderCode = "KEYCLOAK",
-            KeycloakAuthority = "https://identity.example.test/realms/events",
-            KeycloakClientId = "event-bff",
-            AtprotoLoginEnabled = true,
-            GoogleSsoEnabled = false
-        };
-        AuthProviderConfigurationDto? captured = null;
-        _onboarding.GetAuthProviderConfigurationAsync().Returns(initial, canonical);
-        _onboarding.BootstrapKeycloakRealmAsync(Arg.Any<KeycloakBootstrapRequestDto>())
-            .Returns(new BaseCommandResponseOfGuid { Success = true });
-        _onboarding.UpdateAuthProviderConfigurationAsAdminAsync(
-                Arg.Do<AuthProviderConfigurationDto>(configuration => captured = configuration))
-            .Returns(new BaseCommandResponseOfGuid { Success = true });
-        var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
-        string clientSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        string adminSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-
-        await cut.Find("[data-testid='keycloak-bootstrap-mode']").ClickAsync(new MouseEventArgs());
-        foreach (var value in new Dictionary<string, string>
-        {
-            ["keycloak-bootstrap-base-url"] = "https://identity.example.test",
-            ["keycloak-bootstrap-realm"] = "events",
-            ["keycloak-bootstrap-client-id"] = "event-bff",
-            ["keycloak-bootstrap-client-secret"] = clientSecret,
-            ["keycloak-bootstrap-admin-username"] = "bootstrap-admin",
-            ["keycloak-bootstrap-admin-password"] = adminSecret
-        })
-        {
-            await cut.Find($"[data-testid='{value.Key}']")
-                .InputAsync(new ChangeEventArgs { Value = value.Value });
-        }
-
-        await cut.Find("button[data-testid='save-auth-provider-configuration']")
-            .ClickAsync(new MouseEventArgs());
-
-        await Assert.That(captured).IsNotNull();
-        await Assert.That(captured!.KeycloakClientId).IsEqualTo("event-bff");
-        await Assert.That(captured.AtprotoLoginEnabled).IsTrue();
-        await Assert.That(captured.KeycloakPublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Allowed);
-        await Assert.That(captured.KeycloakPublicSignupUrl).IsEqualTo("https://identity.example.test/registrations");
-        await Assert.That(captured.GooglePublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Denied);
-        await Assert.That(captured.GooglePublicSignupUrl).IsEqualTo("https://accounts.example.test/enroll");
-    }
-
-    [Test]
     public async Task VisitorPolicyConflictReloadsCanonicalProviderConfiguration()
     {
         var attempted = new AuthProviderConfigurationDto

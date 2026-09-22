@@ -1,10 +1,6 @@
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Onboarding;
-using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
-using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Features.InstanceOnboarding.Services;
-using Explore.Application.Services;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Microsoft.Extensions.Configuration;
@@ -13,51 +9,6 @@ namespace Event.Application.UnitTests.Features.InstanceOnboarding;
 
 public sealed class KeycloakConnectionInspectionTests
 {
-    [Test]
-    public async Task Doctor_RejectsBrowserAudienceOverrideBeforeProviderInspection()
-    {
-        var handler = new RunKeycloakRealmDoctorQueryHandler(
-            CreateRuntimeConnectionResolver(),
-            new RejectingAdminClient());
-
-        KeycloakRealmDoctorResultDto result = await handler.QueryAsync(
-            new RunKeycloakRealmDoctorQuery
-            {
-                Request = new KeycloakRealmDoctorRequestDto
-                {
-                    ApiClientId = "event-bff"
-                }
-            },
-            CancellationToken.None);
-
-        await Assert.That(result.OverallStatus).IsEqualTo("blocked");
-        await Assert.That(result.Checks.Single().Code)
-            .IsEqualTo("keycloak_target_conflict");
-    }
-
-    [Test]
-    public async Task Preview_RejectsBrowserAudienceOverrideBeforeProviderInspection()
-    {
-        var handler = new PreviewKeycloakRealmSyncQueryHandler(
-            CreateRuntimeConnectionResolver(),
-            new RejectingAdminClient(),
-            KeycloakRealmDesiredStateBuilder.CreateDefault());
-
-        KeycloakRealmSyncPlanDto result = await handler.QueryAsync(
-            new PreviewKeycloakRealmSyncQuery
-            {
-                Request = new KeycloakRealmSyncPreviewRequestDto
-                {
-                    ApiClientId = string.Empty
-                }
-            },
-            CancellationToken.None);
-
-        await Assert.That(result.Status).IsEqualTo("blocked");
-        await Assert.That(result.Diagnostics.Single().Code)
-            .IsEqualTo("keycloak_target_conflict");
-    }
-
     [Test]
     public async Task RuntimeConnection_UsesOnlySelectedAuthorityValues()
     {
@@ -89,6 +40,72 @@ public sealed class KeycloakConnectionInspectionTests
         await Assert.That(result.ApiClientId).IsEqualTo("event-api");
         await Assert.That(result.ClientSecret).IsEqualTo(secretCanary);
         await Assert.That(result.ToString()).DoesNotContain(secretCanary);
+    }
+
+    [Test]
+    public async Task RuntimeConnection_UsesStableProcessBindingRevision()
+    {
+        string secretCanary = $"runtime-{Guid.CreateVersion7():N}";
+        var resolver = new KeycloakConnectionResolver(
+            new RuntimeSecretResolver(
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [SecretDefinitionRegistry.Keys.Keycloak.Endpoint] =
+                        "https://identity.example.test",
+                    [SecretDefinitionRegistry.Keys.Keycloak.Realm] =
+                        "operators",
+                    [SecretDefinitionRegistry.Keys.Keycloak.ClientId] =
+                        "event-bff",
+                    [SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret] =
+                        secretCanary
+                }));
+
+        KeycloakConnectionResolution first =
+            await resolver.ResolveRuntimeAsync();
+        KeycloakConnectionResolution second =
+            await resolver.ResolveRuntimeAsync();
+
+        await Assert.That(first.CredentialBindingRevision)
+            .IsEqualTo(second.CredentialBindingRevision);
+        await Assert.That(first.CredentialBindingRevision)
+            .DoesNotContain(secretCanary);
+    }
+
+    [Test]
+    public async Task RuntimeConnection_ChangesWithProviderBindingRevision()
+    {
+        var values = new Dictionary<string, string>(
+            StringComparer.Ordinal)
+        {
+            [SecretDefinitionRegistry.Keys.Keycloak.Endpoint] =
+                "https://identity.example.test",
+            [SecretDefinitionRegistry.Keys.Keycloak.Realm] =
+                "operators",
+            [SecretDefinitionRegistry.Keys.Keycloak.ClientId] =
+                "event-bff",
+            [SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret] =
+                $"runtime-{Guid.CreateVersion7():N}"
+        };
+        var processRevision =
+            new KeycloakCredentialBindingRevision();
+        var firstResolver = new KeycloakConnectionResolver(
+            new RuntimeSecretResolver(
+                values,
+                bindingRevision: "provider-id:41"),
+            bindingRevision: processRevision);
+        var secondResolver = new KeycloakConnectionResolver(
+            new RuntimeSecretResolver(
+                values,
+                bindingRevision: "provider-id:42"),
+            bindingRevision: processRevision);
+
+        KeycloakConnectionResolution first =
+            await firstResolver.ResolveRuntimeAsync();
+        KeycloakConnectionResolution second =
+            await secondResolver.ResolveRuntimeAsync();
+
+        await Assert.That(first.CredentialBindingRevision)
+            .IsNotEqualTo(second.CredentialBindingRevision);
     }
 
     [Test]
@@ -258,8 +275,11 @@ public sealed class KeycloakConnectionInspectionTests
 
     private sealed class RuntimeSecretResolver(
         IReadOnlyDictionary<string, string> values,
-        SecretResolutionResult? missingResult = null) : ISecretResolver
+        SecretResolutionResult? missingResult = null,
+        string bindingRevision = "") : ISecretResolver
     {
+        private long _resolutionSequence;
+
         public Task<SecretResolutionResult> ResolveAsync(
             string settingKey,
             Guid? tenantId,
@@ -277,7 +297,10 @@ public sealed class KeycloakConnectionInspectionTests
                     SecretSourceType.EnvironmentVariable,
                     SecretScope.Instance,
                     ScopeId: null,
-                    DateTimeOffset.UtcNow)));
+                    DateTimeOffset.UnixEpoch.AddTicks(
+                        Interlocked.Increment(
+                            ref _resolutionSequence)),
+                    bindingRevision)));
         }
 
         public Task<SecretResolutionResult> ResolveQualifiedAsync(
@@ -300,14 +323,5 @@ public sealed class KeycloakConnectionInspectionTests
             Guid? scopeId,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
-    }
-
-    private sealed class RejectingAdminClient : IKeycloakAdminClient
-    {
-        public Task<KeycloakAdminInspectionResult> InspectAsync(
-            KeycloakAdminInspectionRequest request,
-            CancellationToken cancellationToken) =>
-            throw new InvalidOperationException(
-                "Conflicting browser target reached provider inspection.");
     }
 }

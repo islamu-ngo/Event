@@ -1221,7 +1221,6 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
         .WithEnvironment("Keycloak__Audience", keycloakApiClientId)
         .WithEnvironment("Keycloak__ValidAudiences__0", keycloakApiClientId)
         .WithEnvironment("Keycloak__ValidAudiences__1", keycloakBlazorClientId)
-        .WithEnvironment("KeycloakBootstrap__AllowLocalUrls", "true")
         .WithEnvironment("AUTHORIZATION_PROVIDER", authorizationProvider)
         .WithEnvironment("Cerbos__GrpcEndpoint", cerbosGrpcEndpoint)
         .WithEnvironment("CERBOS_GRPC_ENDPOINT", cerbosGrpcEndpoint)

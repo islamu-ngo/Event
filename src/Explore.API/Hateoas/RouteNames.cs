@@ -1180,10 +1180,6 @@ public static class RouteNames
     public const string UpdateInstanceAnalyticsGovernanceSettings = nameof(UpdateInstanceAnalyticsGovernanceSettings);
     public const string GetInstanceAuthProviderConfiguration = nameof(GetInstanceAuthProviderConfiguration);
     public const string UpdateInstanceAuthProviderConfiguration = nameof(UpdateInstanceAuthProviderConfiguration);
-    public const string RunInstanceKeycloakRealmDoctor = nameof(RunInstanceKeycloakRealmDoctor);
-    public const string PreviewInstanceKeycloakRealmSync = nameof(PreviewInstanceKeycloakRealmSync);
-    public const string ApplyInstanceKeycloakRealmSync = nameof(ApplyInstanceKeycloakRealmSync);
-    public const string RotateInstanceKeycloakClientSecret = nameof(RotateInstanceKeycloakClientSecret);
     public const string GetInstanceAuthProviderConfigurationStatus = nameof(GetInstanceAuthProviderConfigurationStatus);
     public const string GetInstanceAuthorizationProviderConfiguration = nameof(GetInstanceAuthorizationProviderConfiguration);
     public const string UpdateInstanceAuthorizationProviderConfiguration = nameof(UpdateInstanceAuthorizationProviderConfiguration);
@@ -1210,7 +1206,6 @@ public static class RouteNames
     public const string ValidateInstanceSetupSecret = nameof(ValidateInstanceSetupSecret);
     public const string GetInstanceOnboardingAuthProviderConfiguration = nameof(GetInstanceOnboardingAuthProviderConfiguration);
     public const string GetInstanceOnboardingAuthProviderConfigurationInternal = nameof(GetInstanceOnboardingAuthProviderConfigurationInternal);
-    public const string BootstrapInstanceOnboardingKeycloakRealm = nameof(BootstrapInstanceOnboardingKeycloakRealm);
     public const string GetInstanceOnboardingAuthorizationProviderConfigurationInternal = nameof(GetInstanceOnboardingAuthorizationProviderConfigurationInternal);
     public const string VerifyInstanceOnboardingAuthorizationProviderEndpoint = nameof(VerifyInstanceOnboardingAuthorizationProviderEndpoint);
     public const string SyncInstanceOnboardingAuthorizationPolicyPackage = nameof(SyncInstanceOnboardingAuthorizationPolicyPackage);

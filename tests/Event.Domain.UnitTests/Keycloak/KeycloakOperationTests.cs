@@ -208,6 +208,74 @@ public sealed class KeycloakOperationTests
     }
 
     [Test]
+    public async Task ChangeSet_RejectsCreateClientBeforeRealmAndDuplicateClientIds()
+    {
+        Assert.Throws<ArgumentException>(() => new KeycloakChangeSet(
+        [
+            Step(KeycloakStep.CreateClient, "client:first"),
+            Step(KeycloakStep.CreateRealm, "realm")
+        ]));
+
+        KeycloakChangeStep first = new(
+            "client:bff",
+            KeycloakStep.CreateClient,
+            KeycloakResourceKind.Client,
+            "event-bff",
+            KeycloakStepPrecondition.MustBeAbsent,
+            null,
+            null,
+            "desired",
+            "binding",
+            KeycloakDesiredProjection.ConfidentialClient(
+                "event-bff", ["https://event.test/signin-oidc"], ["https://event.test"]));
+        KeycloakChangeStep duplicate = new(
+            "client:api",
+            KeycloakStep.CreateClient,
+            KeycloakResourceKind.Client,
+            "EVENT-BFF",
+            KeycloakStepPrecondition.MustBeAbsent,
+            null,
+            null,
+            "desired",
+            "binding",
+            KeycloakDesiredProjection.BearerOnlyClient("EVENT-BFF"));
+
+        Assert.Throws<ArgumentException>(() => new KeycloakChangeSet([first, duplicate]));
+        await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task ChangeStep_RejectsStructuralMutationEscapes()
+    {
+        Assert.Throws<ArgumentException>(() => new KeycloakChangeStep(
+            "realm",
+            KeycloakStep.CreateRealm,
+            KeycloakResourceKind.Realm,
+            "operators",
+            KeycloakStepPrecondition.MustMatchFingerprint,
+            "existing",
+            "identity",
+            "desired",
+            "binding",
+            KeycloakDesiredProjection.Realm(
+                "operators",
+                "11111111-1111-7111-8111-111111111111")));
+
+        Assert.Throws<ArgumentException>(() => new KeycloakChangeStep(
+            "client:api",
+            KeycloakStep.CreateClient,
+            KeycloakResourceKind.Client,
+            "event-api",
+            KeycloakStepPrecondition.MustBeAbsent,
+            null,
+            null,
+            "desired",
+            "binding",
+            KeycloakDesiredProjection.ConfidentialClient("event-api", [], [])));
+        await Task.CompletedTask;
+    }
+
+    [Test]
     public async Task ChangeSet_RejectsDuplicateMutationSteps()
     {
         Assert.Throws<ArgumentException>(() =>
@@ -457,9 +525,16 @@ public sealed class KeycloakOperationTests
 
     private static KeycloakChangeStep Step(
         KeycloakStep kind,
-        string stepId = "step-1") =>
+        string? stepId = null) =>
         new(
-            stepId,
+            stepId ?? kind switch
+            {
+                KeycloakStep.CreateRealm => "realm:create",
+                KeycloakStep.CreateClient => "client:bff",
+                KeycloakStep.CreateMapper
+                    or KeycloakStep.UpdateMapper => "mapper:audience",
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            },
             kind,
             kind == KeycloakStep.CreateRealm
                 ? KeycloakResourceKind.Realm
@@ -483,5 +558,24 @@ public sealed class KeycloakOperationTests
                 ? "expected-identity-fingerprint"
                 : null,
             "desired-fingerprint",
-            "binding-fingerprint");
+            "binding-fingerprint",
+            kind switch
+            {
+                KeycloakStep.CreateRealm =>
+                    KeycloakDesiredProjection.Realm(
+                        "operators",
+                        "11111111-1111-7111-8111-111111111111"),
+                KeycloakStep.CreateClient =>
+                    KeycloakDesiredProjection.ConfidentialClient(
+                        "event-bff",
+                        [],
+                        []),
+                KeycloakStep.CreateMapper
+                    or KeycloakStep.UpdateMapper =>
+                    KeycloakDesiredProjection.Mapper(
+                        "event-bff:audience",
+                        KeycloakMapperSemantic.Audience,
+                        "event-api"),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            });
 }

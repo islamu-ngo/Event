@@ -52,17 +52,12 @@ public interface IInstanceOnboardingService
     Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsync();
     Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsAdminAsync();
     Task<HalResourceOfKeycloakConnectionDto> GetKeycloakConnectionAsync(CancellationToken cancellationToken = default);
-    Task<HalResourceOfKeycloakInspectionDto> InspectKeycloakAsync(KeycloakOperationInput input, CancellationToken cancellationToken = default);
-    Task<HalResourceOfKeycloakOperationDto> PlanKeycloakOperationAsync(KeycloakOperationInput input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakInspectionDto> InspectKeycloakAsync(KeycloakInspectionCredentials input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> PlanKeycloakOperationAsync(KeycloakOperationPlanInput input, CancellationToken cancellationToken = default);
     Task<HalResourceOfKeycloakOperationDto> GetKeycloakOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
-    Task<HalResourceOfKeycloakOperationDto> ApplyKeycloakOperationAsync(Guid operationId, KeycloakOperationInput input, CancellationToken cancellationToken = default);
-    Task<HalResourceOfKeycloakOperationDto> ReconcileKeycloakOperationAsync(Guid operationId, KeycloakOperationInput input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> ApplyKeycloakOperationAsync(Guid operationId, KeycloakOperationCredentials input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> ReconcileKeycloakOperationAsync(Guid operationId, KeycloakOperationCredentials input, CancellationToken cancellationToken = default);
     Task<HalResourceOfKeycloakOperationDto> CancelKeycloakOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
-    Task<BaseCommandResponseOfGuid> BootstrapKeycloakRealmAsync(KeycloakBootstrapRequestDto request);
-    Task<KeycloakRealmDoctorResultDto> RunKeycloakRealmDoctorAsync(KeycloakRealmDoctorRequestDto request);
-    Task<KeycloakRealmSyncPlanDto> PreviewKeycloakRealmSyncAsync(KeycloakRealmSyncPreviewRequestDto request);
-    Task<KeycloakRealmSyncPlanDto> ApplyKeycloakRealmSyncAsync(KeycloakRealmSyncApplyRequestDto request);
-    Task<KeycloakClientSecretRotationResultDto> RotateKeycloakClientSecretAsync(KeycloakClientSecretRotationRequestDto request);
     Task<BaseCommandResponseOfGuid> UpdateAuthProviderConfigurationAsAdminAsync(AuthProviderConfigurationDto config);
     Task<bool> IsAuthProviderConfiguredAsync();
     Task<bool?> GetAuthProviderConfiguredStateAsync();
@@ -389,14 +384,14 @@ public sealed class InstanceOnboardingService(
             cancellationToken: cancellationToken);
 
     public Task<HalResourceOfKeycloakInspectionDto> InspectKeycloakAsync(
-        KeycloakOperationInput input,
+        KeycloakInspectionCredentials input,
         CancellationToken cancellationToken = default) =>
         keycloakOperationsClient.InspectInstanceKeycloakAsync(
             input,
             cancellationToken: cancellationToken);
 
     public Task<HalResourceOfKeycloakOperationDto> PlanKeycloakOperationAsync(
-        KeycloakOperationInput input,
+        KeycloakOperationPlanInput input,
         CancellationToken cancellationToken = default) =>
         keycloakOperationsClient.PlanInstanceKeycloakAsync(
             input,
@@ -411,7 +406,7 @@ public sealed class InstanceOnboardingService(
 
     public Task<HalResourceOfKeycloakOperationDto> ApplyKeycloakOperationAsync(
         Guid operationId,
-        KeycloakOperationInput input,
+        KeycloakOperationCredentials input,
         CancellationToken cancellationToken = default) =>
         keycloakOperationsClient.ApplyInstanceKeycloakOperationAsync(
             operationId,
@@ -420,7 +415,7 @@ public sealed class InstanceOnboardingService(
 
     public Task<HalResourceOfKeycloakOperationDto> ReconcileKeycloakOperationAsync(
         Guid operationId,
-        KeycloakOperationInput input,
+        KeycloakOperationCredentials input,
         CancellationToken cancellationToken = default) =>
         keycloakOperationsClient.ReconcileInstanceKeycloakOperationAsync(
             operationId,
@@ -433,39 +428,6 @@ public sealed class InstanceOnboardingService(
         keycloakOperationsClient.CancelInstanceKeycloakOperationAsync(
             operationId,
             cancellationToken: cancellationToken);
-
-    public async Task<BaseCommandResponseOfGuid> BootstrapKeycloakRealmAsync(KeycloakBootstrapRequestDto request)
-    {
-        ApplyKeycloakBootstrapBrowserDefaults(request);
-        var result = await SendCommandAsync(
-            ct => onboardingClient.BootstrapInstanceOnboardingKeycloakRealmAsync(request, cancellationToken: ct));
-        if (result.Success == true)
-        {
-            await RefreshAuthSchemesAsync();
-        }
-
-        return result;
-    }
-
-    public Task<KeycloakRealmDoctorResultDto> RunKeycloakRealmDoctorAsync(KeycloakRealmDoctorRequestDto request) =>
-        GetSettingsAsync(
-            ct => authenticationClient.RunInstanceKeycloakRealmDoctorAsync(request, cancellationToken: ct),
-            () => BlockedDoctor("Keycloak diagnostics failed. Check admin access and retry."));
-
-    public Task<KeycloakRealmSyncPlanDto> PreviewKeycloakRealmSyncAsync(KeycloakRealmSyncPreviewRequestDto request) =>
-        GetSettingsAsync(
-            ct => authenticationClient.PreviewInstanceKeycloakRealmSyncAsync(request, cancellationToken: ct),
-            () => BlockedPlan("Keycloak sync preview failed. Check admin access and retry."));
-
-    public Task<KeycloakRealmSyncPlanDto> ApplyKeycloakRealmSyncAsync(KeycloakRealmSyncApplyRequestDto request) =>
-        GetSettingsAsync(
-            ct => authenticationClient.ApplyInstanceKeycloakRealmSyncAsync(request, cancellationToken: ct),
-            () => BlockedPlan("Keycloak sync apply failed. Check admin access and retry."));
-
-    public Task<KeycloakClientSecretRotationResultDto> RotateKeycloakClientSecretAsync(KeycloakClientSecretRotationRequestDto request) =>
-        GetSettingsAsync(
-            ct => authenticationClient.RotateInstanceKeycloakClientSecretAsync(request, cancellationToken: ct),
-            () => BlockedRotation("Keycloak client-secret rotation failed. Check admin access and retry."));
 
     public Task<BaseCommandResponseOfGuid> UpdateAuthProviderConfigurationAsAdminAsync(AuthProviderConfigurationDto config) =>
         SendCommandAsync(ct => authenticationClient.UpdateInstanceAuthProviderConfigurationAsync(ToPatch(config), cancellationToken: ct));
@@ -596,18 +558,6 @@ public sealed class InstanceOnboardingService(
 
     public Task<BaseCommandResponseOfGuid> UpdateFooterGovernanceSettingsAsync(FooterGovernanceSettingsDto settings) =>
         SendCommandAsync(ct => governanceClient.UpdateFooterGovernanceSettingsAsync(ToPatch(settings), cancellationToken: ct));
-
-    private void ApplyKeycloakBootstrapBrowserDefaults(KeycloakBootstrapRequestDto request)
-    {
-        if (!Uri.TryCreate(navigation.BaseUri, UriKind.Absolute, out var baseUri))
-        {
-            return;
-        }
-
-        var origin = $"{baseUri.Scheme}://{baseUri.Host}{(baseUri.IsDefaultPort ? string.Empty : $":{baseUri.Port}")}";
-        request.BlazorRedirectUris = MergeBootstrapValues(request.BlazorRedirectUris, $"{origin.TrimEnd('/')}/*");
-        request.BlazorWebOrigins = MergeBootstrapValues(request.BlazorWebOrigins, "+");
-    }
 
     private async Task<T?> GetOptionalAsync<T>(
         Func<CancellationToken, Task<T>> apiCall,
@@ -850,7 +800,6 @@ public sealed class InstanceOnboardingService(
                 LockPrimaryProvider = config.LockPrimaryProvider,
                 KeycloakAuthority = config.KeycloakAuthority,
                 KeycloakClientId = config.KeycloakClientId,
-                KeycloakClientSecret = config.KeycloakClientSecret,
                 AtprotoLoginEnabled = config.AtprotoLoginEnabled,
                 AtprotoPublicUrl = config.AtprotoPublicUrl,
                 GoogleSsoEnabled = config.GoogleSsoEnabled,
@@ -921,56 +870,4 @@ public sealed class InstanceOnboardingService(
     private static OptionalUpdateOfPosthogPersonProfiles? Optional(PosthogPersonProfiles? value) =>
         value.HasValue ? new() { HasValue = true, Value = value } : null;
 
-    private static ICollection<string> MergeBootstrapValues(ICollection<string>? currentValues, string requiredValue) =>
-        (currentValues ?? [])
-            .Append(requiredValue)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-    private static KeycloakRealmDoctorResultDto BlockedDoctor(string message) => new()
-    {
-        OverallStatus = "blocked",
-        Message = message,
-        Checks = [new KeycloakRealmDoctorCheckDto
-        {
-            Code = "keycloak_doctor_failed",
-            Name = "Keycloak diagnostics",
-            Status = "blocked",
-            Message = message
-        }]
-    };
-
-    private static KeycloakRealmSyncPlanDto BlockedPlan(string message) => new()
-    {
-        Status = "blocked",
-        Message = message,
-        Operations = [new KeycloakRealmSyncOperationDto
-        {
-            OperationId = "keycloak_sync_failed",
-            Category = "inspection",
-            TargetType = "realm",
-            Target = "Keycloak",
-            Action = "none",
-            Status = "blocked",
-            Summary = message,
-            Reason = "The sync operation could not be completed safely."
-        }]
-    };
-
-    private static KeycloakClientSecretRotationResultDto BlockedRotation(string message) => new()
-    {
-        Status = "blocked",
-        Message = message,
-        Operations = [new KeycloakRealmSyncOperationDto
-        {
-            OperationId = "keycloak_client_secret_rotation_failed",
-            Category = "client-secret",
-            TargetType = "client",
-            Action = "update",
-            Status = "blocked",
-            Summary = message,
-            Reason = "The client-secret rotation could not be completed safely."
-        }]
-    };
 }

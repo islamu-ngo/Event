@@ -9,11 +9,22 @@ using Microsoft.Extensions.Hosting;
 
 namespace Explore.Infrastructure.Services.Keycloak;
 
-public sealed class KeycloakAdminClient(
-    HttpClient httpClient,
-    IHostEnvironment hostEnvironment,
-    IConfiguration configuration) : IKeycloakAdminClient
+public sealed partial class KeycloakAdminClient : IKeycloakAdminClient
 {
+    private readonly HttpClient httpClient;
+    private readonly IHostEnvironment hostEnvironment;
+    private readonly IConfiguration configuration;
+
+    public KeycloakAdminClient(
+        HttpClient httpClient,
+        IHostEnvironment hostEnvironment,
+        IConfiguration configuration)
+    {
+        this.httpClient = httpClient;
+        this.hostEnvironment = hostEnvironment;
+        this.configuration = configuration;
+    }
+
     private const int MaximumResponseBytes = 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -41,7 +52,11 @@ public sealed class KeycloakAdminClient(
                     UriKind.Absolute),
                 HttpCompletionOption.ResponseHeadersRead,
                 requestToken);
-            if (!discoveryResponse.IsSuccessStatusCode)
+            bool realmDiscoveryMissing =
+                discoveryResponse.StatusCode == HttpStatusCode.NotFound;
+            if (!discoveryResponse.IsSuccessStatusCode
+                && !(realmDiscoveryMissing
+                    && request.HasAdministratorCredentials))
             {
                 return KeycloakAdminInspectionResult.Failure(
                     discoveryResponse.StatusCode == HttpStatusCode.NotFound
@@ -51,16 +66,23 @@ public sealed class KeycloakAdminClient(
                         ? "keycloak_discovery_not_found"
                         : "keycloak_discovery_unavailable");
             }
-            DiscoveryDocument? discovery = await ReadBoundedJsonAsync<DiscoveryDocument>(
-                discoveryResponse.Content,
-                requestToken);
-            if (discovery?.Issuer is null
-                || !Uri.TryCreate(discovery.Issuer, UriKind.Absolute, out Uri? issuer)
-                || !SameIssuer(issuer, request.Authority))
+            if (discoveryResponse.IsSuccessStatusCode)
             {
-                return KeycloakAdminInspectionResult.Failure(
-                    KeycloakInspectionStatus.InvalidResponse,
-                    "keycloak_discovery_issuer_invalid");
+                DiscoveryDocument? discovery =
+                    await ReadBoundedJsonAsync<DiscoveryDocument>(
+                        discoveryResponse.Content,
+                        requestToken);
+                if (discovery?.Issuer is null
+                    || !Uri.TryCreate(
+                        discovery.Issuer,
+                        UriKind.Absolute,
+                        out Uri? issuer)
+                    || !SameIssuer(issuer, request.Authority))
+                {
+                    return KeycloakAdminInspectionResult.Failure(
+                        KeycloakInspectionStatus.InvalidResponse,
+                        "keycloak_discovery_issuer_invalid");
+                }
             }
 
             var publicSnapshot = new KeycloakInspectionSnapshot(
@@ -87,27 +109,61 @@ public sealed class KeycloakAdminClient(
                     "keycloak_admin_unauthorized");
             }
 
-            ClientRepresentation? client = await FindClientAsync(
+            bool realmExists = await RealmExistsAsync(
                 serverBase!,
                 request.Realm,
-                request.BlazorClientId,
                 accessToken,
                 requestToken);
-            if (client?.Id is null)
+            if (!realmExists)
             {
                 return KeycloakAdminInspectionResult.Success(
                     KeycloakInspectionStatus.Inspected,
-                    publicSnapshot);
+                    new KeycloakInspectionSnapshot(
+                        request.Realm,
+                        request.BlazorClientId,
+                        request.ApiClientId,
+                        realmExists: false,
+                        blazorClient: new(
+                            request.BlazorClientId,
+                            0,
+                            ProviderId: null,
+                            Shape: null),
+                        apiClient: string.IsNullOrWhiteSpace(
+                            request.ApiClientId)
+                            ? null
+                            : new(
+                                request.ApiClientId,
+                                0,
+                                ProviderId: null,
+                                Shape: null)));
             }
 
-            IReadOnlyList<KeycloakEffectiveMapperSnapshot> mappers =
-                await ReadEffectiveMappersAsync(
+            KeycloakClientInspectionSnapshot blazorClient =
+                await InspectClientAsync(
                     serverBase!,
                     request.Realm,
-                    client.Id,
+                    request.BlazorClientId,
+                    accessToken,
+                    requestToken);
+            KeycloakClientInspectionSnapshot? apiClient =
+                string.IsNullOrWhiteSpace(request.ApiClientId)
+                    ? null
+                    : await InspectClientAsync(
+                        serverBase!,
+                        request.Realm,
+                        request.ApiClientId,
+                        accessToken,
+                        requestToken);
+            IReadOnlyList<KeycloakEffectiveMapperSnapshot> mappers =
+                blazorClient.IsUnambiguous
+                    ? await ReadEffectiveMappersAsync(
+                    serverBase!,
+                    request.Realm,
+                    blazorClient.ProviderId!,
                     accessToken,
                     request.RequestedScopes,
-                    requestToken);
+                    requestToken)
+                    : [];
             return KeycloakAdminInspectionResult.Success(
                 KeycloakInspectionStatus.Inspected,
                 new KeycloakInspectionSnapshot(
@@ -115,7 +171,9 @@ public sealed class KeycloakAdminClient(
                     request.BlazorClientId,
                     request.ApiClientId,
                     realmExists: true,
-                    mappers));
+                    mappers,
+                    blazorClient,
+                    apiClient));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -239,7 +297,36 @@ public sealed class KeycloakAdminClient(
         return payload?.AccessToken;
     }
 
-    private async Task<ClientRepresentation?> FindClientAsync(
+    private async Task<bool> RealmExistsAsync(
+        Uri serverBase,
+        string realm,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            BuildUri(
+                serverBase,
+                $"/admin/realms/{Uri.EscapeDataString(realm)}"));
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer",
+                accessToken);
+        using HttpResponseMessage response = await httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
+    private async Task<KeycloakClientInspectionSnapshot>
+        InspectClientAsync(
         Uri serverBase,
         string realm,
         string clientId,
@@ -252,8 +339,27 @@ public sealed class KeycloakAdminClient(
         IReadOnlyList<ClientRepresentation> clients =
             await GetJsonAsync<ClientRepresentation[]>(uri, accessToken, cancellationToken)
             ?? [];
-        return clients.SingleOrDefault(client =>
-            string.Equals(client.ClientId, clientId, StringComparison.Ordinal));
+        ClientRepresentation[] exact = clients
+            .Where(client => string.Equals(
+                client.ClientId,
+                clientId,
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        ClientRepresentation? client =
+            exact.Length == 1 ? exact[0] : null;
+        return new KeycloakClientInspectionSnapshot(
+            clientId,
+            exact.Length,
+            client?.Id,
+            client is null
+                ? null
+                : new KeycloakClientShape(
+                    client.Enabled ?? false,
+                    client.BearerOnly ?? false,
+                    client.PublicClient ?? false,
+                    client.StandardFlowEnabled ?? false,
+                    client.DirectAccessGrantsEnabled ?? false,
+                    client.ServiceAccountsEnabled ?? false));
     }
 
     private async Task<IReadOnlyList<KeycloakEffectiveMapperSnapshot>> ReadEffectiveMappersAsync(
@@ -447,7 +553,15 @@ public sealed class KeycloakAdminClient(
 
     private sealed record DiscoveryDocument(string? Issuer);
 
-    private sealed record ClientRepresentation(string? Id, string? ClientId);
+    private sealed record ClientRepresentation(
+        string? Id,
+        string? ClientId,
+        bool? Enabled,
+        bool? PublicClient,
+        bool? BearerOnly,
+        bool? StandardFlowEnabled,
+        bool? DirectAccessGrantsEnabled,
+        bool? ServiceAccountsEnabled);
 
     private sealed record ClientScopeRepresentation(string? Id, string? Name);
 

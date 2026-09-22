@@ -23,6 +23,99 @@ public enum KeycloakStepPrecondition
     MustMatchFingerprint
 }
 
+public enum KeycloakDesiredKind
+{
+    Realm,
+    ConfidentialBffClient,
+    BearerOnlyApiClient,
+    SubjectMapper,
+    AudienceMapper
+}
+
+/// <summary>Closed, nonsecret provider projection approved by an operator.</summary>
+public sealed record KeycloakDesiredProjection
+{
+    public KeycloakDesiredProjection(
+        KeycloakDesiredKind kind,
+        string resourceName,
+        IReadOnlyList<string>? redirectUris = null,
+        IReadOnlyList<string>? webOrigins = null,
+        string? audience = null,
+        string? providerResourceId = null)
+    {
+        Kind = kind;
+        ResourceName = Required(resourceName);
+        RedirectUris = (redirectUris ?? []).ToArray();
+        WebOrigins = (webOrigins ?? []).ToArray();
+        Audience = string.IsNullOrWhiteSpace(audience) ? null : audience.Trim();
+        string? normalizedProviderResourceId =
+            string.IsNullOrWhiteSpace(providerResourceId)
+                ? null
+                : providerResourceId.Trim();
+        Guid parsedProviderResourceId = Guid.Empty;
+        if (kind == KeycloakDesiredKind.Realm
+            && (!Guid.TryParse(
+                    normalizedProviderResourceId,
+                    out parsedProviderResourceId)
+                || parsedProviderResourceId == Guid.Empty))
+        {
+            throw new ArgumentException(
+                "A realm projection requires a provider UUID.");
+        }
+
+        if (kind != KeycloakDesiredKind.Realm
+            && normalizedProviderResourceId is not null)
+        {
+            throw new ArgumentException(
+                "Only a realm projection may carry a provider resource ID.");
+        }
+
+        ProviderResourceId = kind == KeycloakDesiredKind.Realm
+            ? parsedProviderResourceId.ToString("D")
+            : null;
+    }
+
+    public KeycloakDesiredKind Kind { get; }
+    public string ResourceName { get; }
+    public IReadOnlyList<string> RedirectUris { get; }
+    public IReadOnlyList<string> WebOrigins { get; }
+    public string? Audience { get; }
+    public string? ProviderResourceId { get; }
+
+    public static KeycloakDesiredProjection Realm(
+        string realm,
+        string providerResourceId) =>
+        new(
+            KeycloakDesiredKind.Realm,
+            realm,
+            providerResourceId: providerResourceId);
+
+    public static KeycloakDesiredProjection ConfidentialClient(
+        string clientId,
+        IReadOnlyList<string> redirectUris,
+        IReadOnlyList<string> webOrigins) =>
+        new(KeycloakDesiredKind.ConfidentialBffClient, clientId, redirectUris, webOrigins);
+
+    public static KeycloakDesiredProjection BearerOnlyClient(string clientId) =>
+        new(KeycloakDesiredKind.BearerOnlyApiClient, clientId);
+
+    public static KeycloakDesiredProjection Mapper(
+        string name,
+        KeycloakMapperSemantic semantic,
+        string? audience = null) =>
+        new(
+            semantic == KeycloakMapperSemantic.Subject
+                ? KeycloakDesiredKind.SubjectMapper
+                : KeycloakDesiredKind.AudienceMapper,
+            name,
+            audience: audience);
+
+    private static string Required(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("A desired resource name is required.")
+            : value.Trim();
+}
+
 public sealed record KeycloakChangeStep
 {
     public KeycloakChangeStep(
@@ -34,7 +127,8 @@ public sealed record KeycloakChangeStep
         string? expectedFingerprint,
         string? expectedIdentityFingerprint,
         string desiredFingerprint,
-        string bindingFingerprint)
+        string bindingFingerprint,
+        KeycloakDesiredProjection desired)
     {
         StepId = Required(stepId, nameof(stepId));
         Kind = kind;
@@ -50,6 +144,8 @@ public sealed record KeycloakChangeStep
         BindingFingerprint = Required(
             bindingFingerprint,
             nameof(bindingFingerprint));
+        Desired = desired
+            ?? throw new ArgumentNullException(nameof(desired));
 
         if (!Enum.IsDefined(kind)
             || !Enum.IsDefined(resourceKind)
@@ -59,7 +155,8 @@ public sealed record KeycloakChangeStep
                     || ExpectedIdentityFingerprint is not null))
             || (precondition == KeycloakStepPrecondition.MustMatchFingerprint
                 && (ExpectedFingerprint is null
-                    || ExpectedIdentityFingerprint is null)))
+                    || ExpectedIdentityFingerprint is null))
+            || !IsStructurallyValid(kind, resourceKind, precondition, StepId, TargetId, Desired))
         {
             throw new ArgumentException(
                 "The step projection or precondition is invalid.");
@@ -83,6 +180,45 @@ public sealed record KeycloakChangeStep
     public string DesiredFingerprint { get; }
 
     public string BindingFingerprint { get; }
+
+    public KeycloakDesiredProjection Desired { get; }
+
+    private static bool IsStructurallyValid(
+        KeycloakStep kind,
+        KeycloakResourceKind resourceKind,
+        KeycloakStepPrecondition precondition,
+        string stepId,
+        string targetId,
+        KeycloakDesiredProjection desired) =>
+        kind switch
+        {
+            KeycloakStep.CreateRealm => resourceKind == KeycloakResourceKind.Realm
+                && precondition == KeycloakStepPrecondition.MustBeAbsent
+                && desired.Kind == KeycloakDesiredKind.Realm,
+            KeycloakStep.CreateClient => resourceKind == KeycloakResourceKind.Client
+                && precondition == KeycloakStepPrecondition.MustBeAbsent
+                && desired.ResourceName == targetId
+                && desired.Kind is (
+                    KeycloakDesiredKind.ConfidentialBffClient
+                    or KeycloakDesiredKind.BearerOnlyApiClient)
+                && (!stepId.Equals("client:api", StringComparison.Ordinal)
+                    || desired.Kind
+                        == KeycloakDesiredKind.BearerOnlyApiClient)
+                && (!stepId.Equals("client:bff", StringComparison.Ordinal)
+                    || desired.Kind
+                        == KeycloakDesiredKind.ConfidentialBffClient),
+            KeycloakStep.CreateMapper => resourceKind == KeycloakResourceKind.ProtocolMapper
+                && precondition == KeycloakStepPrecondition.MustBeAbsent
+                && desired.Kind is (
+                    KeycloakDesiredKind.SubjectMapper
+                    or KeycloakDesiredKind.AudienceMapper),
+            KeycloakStep.UpdateMapper => resourceKind == KeycloakResourceKind.ProtocolMapper
+                && precondition == KeycloakStepPrecondition.MustMatchFingerprint
+                && desired.Kind is (
+                    KeycloakDesiredKind.SubjectMapper
+                    or KeycloakDesiredKind.AudienceMapper),
+            _ => false
+        };
 
     private static string Required(string value, string parameterName)
     {
@@ -110,7 +246,13 @@ public sealed record KeycloakChangeSet
         if (_steps.Length == 0
             || _steps.Select(step => step.StepId)
                 .Distinct(StringComparer.Ordinal)
-                .Count() != _steps.Length)
+                .Count() != _steps.Length
+            || (_steps.Any(step => step.Kind == KeycloakStep.CreateRealm)
+                && _steps[0].Kind != KeycloakStep.CreateRealm)
+            || _steps.Where(step => step.Kind == KeycloakStep.CreateClient)
+                .Select(step => step.TargetId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count() != _steps.Count(step => step.Kind == KeycloakStep.CreateClient))
         {
             throw new ArgumentException(
                 "Steps must be non-empty with unique identifiers.",

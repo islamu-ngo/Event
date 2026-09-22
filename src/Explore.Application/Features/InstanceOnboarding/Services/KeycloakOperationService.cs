@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Domain.Keycloak;
 
 namespace Explore.Application.Features.InstanceOnboarding.Services;
@@ -17,6 +18,9 @@ public sealed class KeycloakOperationApplyContext
         KeycloakTarget target,
         string digest,
         string? apiClientId,
+        Uri? publicOrigin,
+        string? credentialBindingRevision,
+        string? runtimeClientSecret,
         string administratorUsername,
         string administratorPassword,
         DateTimeOffset nowUtc)
@@ -35,6 +39,9 @@ public sealed class KeycloakOperationApplyContext
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Digest = Required(digest, nameof(digest));
         ApiClientId = apiClientId;
+        PublicOrigin = publicOrigin;
+        CredentialBindingRevision = credentialBindingRevision;
+        RuntimeClientSecret = runtimeClientSecret;
         AdministratorUsername = Required(
             administratorUsername,
             nameof(administratorUsername));
@@ -50,6 +57,9 @@ public sealed class KeycloakOperationApplyContext
     public KeycloakTarget Target { get; }
     public string Digest { get; }
     public string? ApiClientId { get; }
+    public Uri? PublicOrigin { get; }
+    public string? CredentialBindingRevision { get; }
+    public string? RuntimeClientSecret { get; }
     public string AdministratorUsername { get; }
     public string AdministratorPassword { get; }
     public DateTimeOffset NowUtc { get; }
@@ -74,7 +84,7 @@ public sealed class KeycloakOperationService
     private readonly KeycloakOperationPolicy _policy = new();
     private readonly IKeycloakOperationRepository? _repository;
     private readonly IKeycloakOperationCoordinator? _coordinator;
-    private readonly IKeycloakAdminOperationClient? _adminClient;
+    private readonly IKeycloakAdminClient? _adminClient;
 
     public KeycloakOperationService()
     {
@@ -83,23 +93,84 @@ public sealed class KeycloakOperationService
     public KeycloakOperationService(
         IKeycloakOperationRepository repository,
         IKeycloakOperationCoordinator coordinator,
-        IKeycloakAdminOperationClient adminClient)
+        IKeycloakAdminClient adminClient)
     {
         _repository = repository;
         _coordinator = coordinator;
         _adminClient = adminClient;
     }
 
-    public KeycloakChangeSet? Plan(KeycloakInspectionSnapshot snapshot)
+    public KeycloakChangeSet? Plan(KeycloakInspectionSnapshot snapshot) =>
+        Plan(snapshot, KeycloakOperationIntent.RepairClient, publicOrigin: null);
+
+    public KeycloakChangeSet? Plan(
+        KeycloakInspectionSnapshot snapshot,
+        KeycloakOperationIntent intent,
+        Uri? publicOrigin,
+        string? credentialBindingRevision = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        if (_policy.HasConflictingClientIds(snapshot))
+        if (!Enum.IsDefined(intent) || _policy.HasConflictingClientIds(snapshot))
         {
-            throw new InvalidOperationException(
-                "keycloak_client_id_collision");
+            throw new InvalidOperationException("keycloak_client_id_collision");
         }
 
         var steps = new List<KeycloakChangeStep>();
+        bool provisioning = intent is not KeycloakOperationIntent.RepairClient;
+        Uri? approvedPublicOrigin = provisioning
+            ? RequirePublicOrigin(publicOrigin)
+            : null;
+        if (provisioning
+            && string.IsNullOrWhiteSpace(credentialBindingRevision))
+        {
+            throw new InvalidOperationException(
+                "keycloak_credential_binding_revision_unavailable");
+        }
+
+        switch (intent)
+        {
+            case KeycloakOperationIntent.CreateRealm:
+                if (snapshot.RealmExists)
+                {
+                    throw new InvalidOperationException("keycloak_realm_exists");
+                }
+                RequireAbsentClients(snapshot);
+                steps.Add(CreateRealmStep(
+                    snapshot,
+                    approvedPublicOrigin!,
+                    credentialBindingRevision!));
+                AddCreateClientSteps(
+                    steps,
+                    snapshot,
+                    approvedPublicOrigin!,
+                    credentialBindingRevision!);
+                break;
+            case KeycloakOperationIntent.CreateClients:
+                if (!snapshot.RealmExists)
+                {
+                    throw new InvalidOperationException("keycloak_realm_absent");
+                }
+                RequireAbsentClients(snapshot);
+                AddCreateClientSteps(
+                    steps,
+                    snapshot,
+                    approvedPublicOrigin!,
+                    credentialBindingRevision!);
+                break;
+            case KeycloakOperationIntent.RepairClient:
+                if (!snapshot.RealmExists || !snapshot.BlazorClient.IsUnambiguous)
+                {
+                    throw new InvalidOperationException("keycloak_client_absent_or_ambiguous");
+                }
+                KeycloakClientShape shape = snapshot.BlazorClient.Shape
+                    ?? throw new InvalidOperationException("keycloak_client_shape_unknown");
+                if (shape.BearerOnly || shape.PublicClient || !shape.StandardFlowEnabled)
+                {
+                    throw new InvalidOperationException("keycloak_client_incompatible");
+                }
+                break;
+        }
+
         foreach (KeycloakMapperSemantic semantic
                  in _policy.GetRequiredMapperRepairs(snapshot))
         {
@@ -149,7 +220,16 @@ public sealed class KeycloakOperationService
                 desiredFingerprint: DesiredMapperFingerprint(
                     snapshot,
                     semantic),
-                bindingFingerprint: BindingFingerprint(snapshot)));
+                bindingFingerprint: BindingFingerprint(
+                    snapshot,
+                    approvedPublicOrigin,
+                    provisioning ? credentialBindingRevision : null),
+                desired: KeycloakDesiredProjection.Mapper(
+                    mapperName,
+                    semantic,
+                    semantic == KeycloakMapperSemantic.Audience
+                        ? snapshot.ApiClientId
+                        : null)));
         }
 
         return steps.Count == 0 ? null : new KeycloakChangeSet(steps);
@@ -163,10 +243,17 @@ public sealed class KeycloakOperationService
         long setupGeneration,
         DateTimeOffset createdAtUtc,
         DateTimeOffset expiresAtUtc,
+        KeycloakOperationIntent intent = KeycloakOperationIntent.RepairClient,
+        Uri? publicOrigin = null,
+        string? credentialBindingRevision = null,
         CancellationToken cancellationToken = default)
     {
         IKeycloakOperationRepository repository = RequireRepository();
-        KeycloakChangeSet? changeSet = Plan(snapshot);
+        KeycloakChangeSet? changeSet = Plan(
+            snapshot,
+            intent,
+            publicOrigin,
+            credentialBindingRevision);
         if (changeSet is null)
         {
             return null;
@@ -266,7 +353,7 @@ public sealed class KeycloakOperationService
     {
         ArgumentNullException.ThrowIfNull(context);
         IKeycloakOperationRepository repository = RequireRepository();
-        IKeycloakAdminOperationClient adminClient = RequireAdminClient();
+        IKeycloakAdminClient adminClient = RequireAdminClient();
         KeycloakOperation operation =
             await repository.GetAsync(
                 context.OperationId,
@@ -295,11 +382,27 @@ public sealed class KeycloakOperationService
                 continue;
             }
 
-            KeycloakMapperOperationResult inspection =
-                await adminClient.InspectApprovedMapperAsync(
-                    BuildMapperRequest(context, operation, step),
-                    cancellationToken);
-            var outcome = ToOutcome(step, inspection);
+            KeycloakStepOutcome outcome;
+            if (IsMapperStep(step))
+            {
+                KeycloakMapperOperationResult inspection =
+                    await adminClient.InspectApprovedMapperAsync(
+                        BuildMapperRequest(context, operation, step),
+                        cancellationToken);
+                outcome = ToOutcome(step, inspection);
+            }
+            else
+            {
+                KeycloakProvisioningOperationResult inspection =
+                    await adminClient.InspectApprovedProvisioningAsync(
+                        BuildProvisioningRequest(
+                            context,
+                            operation,
+                            step,
+                            existing?.ProviderResourceId),
+                        cancellationToken);
+                outcome = ToOutcome(step, inspection);
+            }
             Guid expectedStamp = operation.ConcurrencyStamp;
             if (existing is null)
             {
@@ -331,7 +434,7 @@ public sealed class KeycloakOperationService
         CancellationToken cancellationToken)
     {
         IKeycloakOperationRepository repository = RequireRepository();
-        IKeycloakAdminOperationClient adminClient = RequireAdminClient();
+        IKeycloakAdminClient adminClient = RequireAdminClient();
         KeycloakOperation operation =
             (await repository.GetAsync(operationId, cancellationToken))!;
 
@@ -353,18 +456,35 @@ public sealed class KeycloakOperationService
                     cancellationToken))!;
             }
 
-            KeycloakMapperOperationResult result =
-                await adminClient.ApplyApprovedMapperAsync(
-                    BuildMapperRequest(context, operation, step),
-                    cancellationToken);
+            KeycloakStepOutcome result;
+            if (IsMapperStep(step))
+            {
+                result = ToOutcome(
+                    step,
+                    await adminClient.ApplyApprovedMapperAsync(
+                        BuildMapperRequest(context, operation, step),
+                        cancellationToken));
+            }
+            else
+            {
+                result = ToOutcome(
+                    step,
+                    await adminClient.ApplyApprovedProvisioningAsync(
+                        BuildProvisioningRequest(
+                            context,
+                            operation,
+                            step,
+                            providerResourceId: null),
+                        cancellationToken));
+            }
 
             // Refresh after remote I/O so cancellation/concurrent state is observed.
             operation = (await repository.GetAsync(
                 operationId,
                 cancellationToken))!;
             Guid expectedStamp = operation.ConcurrencyStamp;
-            operation.RecordStepOutcome(ToOutcome(step, result));
-            if (result.Outcome == KeycloakStepOutcomeKind.OutcomeUnknown)
+            operation.RecordStepOutcome(result);
+            if (result.Kind == KeycloakStepOutcomeKind.OutcomeUnknown)
             {
                 operation.MarkOutcomeUnknown();
                 await repository.SaveAsync(
@@ -378,7 +498,7 @@ public sealed class KeycloakOperationService
                 operation,
                 expectedStamp,
                 cancellationToken);
-            if (result.Outcome is KeycloakStepOutcomeKind.Conflict
+            if (result.Kind is KeycloakStepOutcomeKind.Conflict
                 or KeycloakStepOutcomeKind.FailedBeforeWrite)
             {
                 await SettleRemainingStepsAsync(
@@ -472,6 +592,36 @@ public sealed class KeycloakOperationService
             result.ProviderResourceId,
             result.ObservedFingerprint);
 
+    private static KeycloakProvisioningOperationRequest
+        BuildProvisioningRequest(
+            KeycloakOperationApplyContext context,
+            KeycloakOperation operation,
+            KeycloakChangeStep step,
+            string? providerResourceId) =>
+        new(
+            new Uri(operation.Target.Authority, UriKind.Absolute),
+            operation.Target.Realm,
+            operation.Target.Client,
+            context.ApiClientId,
+            step,
+            context.RuntimeClientSecret,
+            context.AdministratorUsername,
+            context.AdministratorPassword,
+            providerResourceId);
+
+    private static bool IsMapperStep(KeycloakChangeStep step) =>
+        step.Kind is KeycloakStep.CreateMapper
+            or KeycloakStep.UpdateMapper;
+
+    private static KeycloakStepOutcome ToOutcome(
+        KeycloakChangeStep step,
+        KeycloakProvisioningOperationResult result) =>
+        new(
+            step.StepId,
+            result.Outcome,
+            result.ProviderResourceId,
+            result.ObservedFingerprint);
+
     private static void EnsureContextBinding(
         KeycloakOperationApplyContext context,
         KeycloakOperation operation)
@@ -496,10 +646,17 @@ public sealed class KeycloakOperationService
             operation.Target.Client,
             context.ApiClientId,
             realmExists: true);
+        bool provisioning = operation.ChangeSet.Steps.Any(step =>
+            step.Kind is KeycloakStep.CreateRealm
+                or KeycloakStep.CreateClient);
+        string currentBindingFingerprint = BindingFingerprint(
+            currentProjection,
+            provisioning ? context.PublicOrigin : null,
+            provisioning ? context.CredentialBindingRevision : null);
         if (operation.ChangeSet.Steps.Any(step =>
                 !string.Equals(
                     step.BindingFingerprint,
-                    BindingFingerprint(currentProjection),
+                    currentBindingFingerprint,
                     StringComparison.Ordinal)))
         {
             throw new KeycloakOperationConflictException(
@@ -527,7 +684,7 @@ public sealed class KeycloakOperationService
         ?? throw new InvalidOperationException(
             "Execution services are not configured.");
 
-    private IKeycloakAdminOperationClient RequireAdminClient() =>
+    private IKeycloakAdminClient RequireAdminClient() =>
         _adminClient
         ?? throw new InvalidOperationException(
             "Execution services are not configured.");
@@ -568,10 +725,96 @@ public sealed class KeycloakOperationService
                 : $"{semantic}|{snapshot.ApiClientId}|True|False");
 
     public static string BindingFingerprint(
-        KeycloakInspectionSnapshot snapshot) =>
+        KeycloakInspectionSnapshot snapshot,
+        Uri? publicOrigin = null,
+        string? credentialBindingRevision = null) =>
         Hash(
             $"{snapshot.Realm}|{snapshot.BlazorClientId}|"
-            + $"{snapshot.ApiClientId}");
+            + $"{snapshot.ApiClientId}|{publicOrigin?.AbsoluteUri}|"
+            + $"{credentialBindingRevision}");
+
+    private static void RequireAbsentClients(KeycloakInspectionSnapshot snapshot)
+    {
+        if (!snapshot.BlazorClient.IsProvenAbsent
+            || (snapshot.ApiClient is not null && !snapshot.ApiClient.IsProvenAbsent))
+        {
+            throw new InvalidOperationException("keycloak_client_exists_or_ambiguous");
+        }
+    }
+
+    private static Uri RequirePublicOrigin(Uri? origin)
+    {
+        if (origin is null
+            || !origin.IsAbsoluteUri
+            || origin.Scheme != Uri.UriSchemeHttps
+            || !string.IsNullOrEmpty(origin.UserInfo)
+            || !string.IsNullOrEmpty(origin.Query)
+            || !string.IsNullOrEmpty(origin.Fragment))
+        {
+            throw new InvalidOperationException("keycloak_public_origin_invalid");
+        }
+
+        return new Uri(origin.AbsoluteUri.TrimEnd('/') + "/", UriKind.Absolute);
+    }
+
+    private static KeycloakChangeStep CreateRealmStep(
+        KeycloakInspectionSnapshot snapshot,
+        Uri publicOrigin,
+        string credentialBindingRevision)
+    {
+        var desired = KeycloakDesiredProjection.Realm(
+            snapshot.Realm,
+            Guid.CreateVersion7().ToString("D"));
+        return new KeycloakChangeStep(
+            "realm:create",
+            KeycloakStep.CreateRealm,
+            KeycloakResourceKind.Realm,
+            snapshot.Realm,
+            KeycloakStepPrecondition.MustBeAbsent,
+            null,
+            null,
+            DesiredProvisioningFingerprint(desired),
+            BindingFingerprint(
+                snapshot,
+                publicOrigin,
+                credentialBindingRevision),
+            desired);
+    }
+
+    private static void AddCreateClientSteps(
+        ICollection<KeycloakChangeStep> steps,
+        KeycloakInspectionSnapshot snapshot,
+        Uri publicOrigin,
+        string credentialBindingRevision)
+    {
+        string origin = publicOrigin.GetLeftPart(UriPartial.Authority);
+        var bff = KeycloakDesiredProjection.ConfidentialClient(
+            snapshot.BlazorClientId,
+            [new Uri(publicOrigin, "signin-oidc").AbsoluteUri],
+            [origin]);
+        steps.Add(new KeycloakChangeStep(
+            "client:bff", KeycloakStep.CreateClient, KeycloakResourceKind.Client,
+            snapshot.BlazorClientId, KeycloakStepPrecondition.MustBeAbsent,
+            null, null, DesiredProvisioningFingerprint(bff),
+            BindingFingerprint(
+                snapshot,
+                publicOrigin,
+                credentialBindingRevision),
+            bff));
+        if (!string.IsNullOrWhiteSpace(snapshot.ApiClientId))
+        {
+            KeycloakDesiredProjection api = KeycloakDesiredProjection.BearerOnlyClient(snapshot.ApiClientId);
+            steps.Add(new KeycloakChangeStep(
+                "client:api", KeycloakStep.CreateClient, KeycloakResourceKind.Client,
+                snapshot.ApiClientId, KeycloakStepPrecondition.MustBeAbsent,
+                null, null, DesiredProvisioningFingerprint(api),
+                BindingFingerprint(
+                    snapshot,
+                    publicOrigin,
+                    credentialBindingRevision),
+                api));
+        }
+    }
 
     public static string ComputeDigest(KeycloakChangeSet changeSet)
     {
@@ -584,9 +827,24 @@ public sealed class KeycloakOperationService
                 + $"{step.ExpectedFingerprint}|"
                 + $"{step.ExpectedIdentityFingerprint}|"
                 + $"{step.DesiredFingerprint}|"
-                + $"{step.BindingFingerprint}"));
+                + $"{step.BindingFingerprint}|"
+                + $"{DesiredProjectionValue(step.Desired)}"));
         return Hash(projection);
     }
+
+    public static string DesiredProvisioningFingerprint(
+        KeycloakDesiredProjection desired) =>
+        Hash(DesiredProjectionValue(desired));
+
+    private static string DesiredProjectionValue(
+        KeycloakDesiredProjection? desired) =>
+        desired is null
+            ? string.Empty
+            : $"{desired.Kind}|{desired.ResourceName}|"
+              + $"{string.Join(',', desired.RedirectUris)}|"
+              + $"{string.Join(',', desired.WebOrigins)}|"
+              + $"{desired.Audience}|"
+              + $"{desired.ProviderResourceId}";
 
     private static string Hash(string value) =>
         Convert.ToHexString(

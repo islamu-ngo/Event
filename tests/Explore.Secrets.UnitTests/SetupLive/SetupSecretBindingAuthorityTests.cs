@@ -867,14 +867,14 @@ public sealed class SetupSecretBindingAuthorityTests
         public bool WriteResult { get; init; } = true;
         public Exception? WriteException { get; init; }
 
-        public Task<string?> GetSecretAsync(
+        public Task<SecretProviderValue?> GetSecretAsync(
             string environment,
             string folderPath,
             string secretName,
             CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref _readCount);
-            return Task.FromResult<string?>(null);
+            return Task.FromResult<SecretProviderValue?>(null);
         }
 
         public Task<bool> WriteSecretAsync(

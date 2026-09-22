@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Domain.Keycloak;
 using Microsoft.Extensions.Configuration;
@@ -11,16 +11,8 @@ using Microsoft.Extensions.Hosting;
 
 namespace Explore.Infrastructure.Services.Keycloak;
 
-public sealed class KeycloakAdminOperationClient(
-    HttpClient httpClient,
-    IHostEnvironment hostEnvironment,
-    IConfiguration configuration)
-    : IKeycloakAdminOperationClient
+public sealed partial class KeycloakAdminClient
 {
-    private const int MaximumResponseBytes = 1024 * 1024;
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     public Task<KeycloakMapperOperationResult> ApplyApprovedMapperAsync(
         KeycloakMapperOperationRequest request,
         CancellationToken cancellationToken) =>
@@ -31,12 +23,282 @@ public sealed class KeycloakAdminOperationClient(
         CancellationToken cancellationToken) =>
         ExecuteMapperAsync(request, allowWrite: false, cancellationToken);
 
+    public Task<KeycloakProvisioningOperationResult>
+        ApplyApprovedProvisioningAsync(
+            KeycloakProvisioningOperationRequest request,
+            CancellationToken cancellationToken) =>
+        ExecuteProvisioningAsync(
+            request,
+            allowWrite: true,
+            cancellationToken);
+
+    public Task<KeycloakProvisioningOperationResult>
+        InspectApprovedProvisioningAsync(
+            KeycloakProvisioningOperationRequest request,
+            CancellationToken cancellationToken) =>
+        ExecuteProvisioningAsync(
+            request,
+            allowWrite: false,
+            cancellationToken);
+
+    private async Task<KeycloakProvisioningOperationResult>
+        ExecuteProvisioningAsync(
+            KeycloakProvisioningOperationRequest request,
+            bool allowWrite,
+            CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!TryGetServerBase(
+                request.Authority,
+                request.Realm,
+                out Uri? serverBase)
+            || request.Step.Desired is null
+            || request.Step.Kind is not (
+                KeycloakStep.CreateRealm
+                or KeycloakStep.CreateClient))
+        {
+            return ProvisioningFailed("keycloak_target_invalid");
+        }
+
+        string? accessToken = await RequestAccessTokenAsync(
+            serverBase!,
+            request.AdministratorUsername,
+            request.AdministratorPassword,
+            cancellationToken);
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return ProvisioningFailed(
+                "keycloak_administrator_unauthorized");
+        }
+
+        return request.Step.Kind == KeycloakStep.CreateRealm
+            ? await ExecuteRealmCreateAsync(
+                request,
+                serverBase!,
+                accessToken,
+                allowWrite,
+                cancellationToken)
+            : await ExecuteClientCreateAsync(
+                request,
+                serverBase!,
+                accessToken,
+                allowWrite,
+                cancellationToken);
+    }
+
+    private async Task<KeycloakProvisioningOperationResult>
+        ExecuteRealmCreateAsync(
+            KeycloakProvisioningOperationRequest request,
+            Uri serverBase,
+            string accessToken,
+            bool allowWrite,
+            CancellationToken cancellationToken)
+    {
+        Uri resourceUri = BuildUri(
+            serverBase,
+            $"/admin/realms/{Uri.EscapeDataString(request.Realm)}");
+        (HttpStatusCode Status, JsonObject? Resource) existing =
+            await GetObjectResponseAsync(
+                resourceUri,
+                accessToken,
+                cancellationToken);
+        if (!allowWrite)
+        {
+            if (request.ProviderResourceId is null)
+            {
+                return ProvisioningUnknown();
+            }
+
+            return existing.Status == HttpStatusCode.OK
+                && existing.Resource is not null
+                && string.Equals(
+                    StringValue(existing.Resource, "id"),
+                    request.ProviderResourceId,
+                    StringComparison.Ordinal)
+                && string.Equals(
+                    request.Step.Desired!.ProviderResourceId,
+                    request.ProviderResourceId,
+                    StringComparison.Ordinal)
+                && MatchesDesiredRealm(
+                    request.Step.Desired,
+                    existing.Resource)
+                ? ProvisioningVerified(
+                    request.ProviderResourceId,
+                    request.Step.DesiredFingerprint)
+                : ProvisioningConflict(
+                    "keycloak_realm_reconciliation_conflict");
+        }
+
+        if (existing.Status != HttpStatusCode.NotFound)
+        {
+            return existing.Status == HttpStatusCode.OK
+                ? ProvisioningConflict("keycloak_realm_already_exists")
+                : ProvisioningFailed("keycloak_realm_preflight_failed");
+        }
+
+        var payload = new JsonObject
+        {
+            ["id"] = request.Step.Desired!.ProviderResourceId,
+            ["realm"] = request.Step.Desired!.ResourceName,
+            ["enabled"] = true
+        };
+        KeycloakProvisioningOperationResult send =
+            await SendCreateAsync(
+                BuildUri(serverBase, "/admin/realms"),
+                payload,
+                accessToken,
+                providerResourceId:
+                    request.Step.Desired.ProviderResourceId,
+                cancellationToken);
+        if (send.Outcome != KeycloakStepOutcomeKind.Applied)
+        {
+            return send;
+        }
+
+        try
+        {
+            (HttpStatusCode Status, JsonObject? Resource) verified =
+                await GetObjectResponseAsync(
+                    resourceUri,
+                    accessToken,
+                    cancellationToken);
+            if (verified.Status != HttpStatusCode.OK
+                || verified.Resource is null
+                || !MatchesDesiredRealm(
+                    request.Step.Desired,
+                    verified.Resource))
+            {
+                return ProvisioningUnknown();
+            }
+
+            string? providerResourceId =
+                StringValue(verified.Resource, "id");
+            return !string.Equals(
+                    providerResourceId,
+                    request.Step.Desired.ProviderResourceId,
+                    StringComparison.Ordinal)
+                ? ProvisioningUnknown()
+                : ProvisioningApplied(
+                    request.Step.Desired.ProviderResourceId,
+                    request.Step.DesiredFingerprint);
+        }
+        catch (HttpRequestException)
+        {
+            return ProvisioningUnknown();
+        }
+    }
+
+    private async Task<KeycloakProvisioningOperationResult>
+        ExecuteClientCreateAsync(
+            KeycloakProvisioningOperationRequest request,
+            Uri serverBase,
+            string accessToken,
+            bool allowWrite,
+            CancellationToken cancellationToken)
+    {
+        KeycloakDesiredProjection desired = request.Step.Desired!;
+        if (desired.Kind
+                == KeycloakDesiredKind.ConfidentialBffClient
+            && string.IsNullOrEmpty(request.RuntimeClientSecret))
+        {
+            return ProvisioningFailed(
+                "keycloak_runtime_client_secret_unavailable");
+        }
+
+        if (!allowWrite)
+        {
+            if (request.ProviderResourceId is null)
+            {
+                return ProvisioningUnknown();
+            }
+
+            (HttpStatusCode Status, JsonObject? Resource) observed =
+                await GetObjectResponseAsync(
+                    BuildUri(
+                        serverBase,
+                        $"/admin/realms/{Uri.EscapeDataString(request.Realm)}"
+                        + $"/clients/{Uri.EscapeDataString(request.ProviderResourceId)}"),
+                    accessToken,
+                    cancellationToken);
+            return observed.Status == HttpStatusCode.OK
+                && observed.Resource is not null
+                && MatchesDesiredClient(desired, observed.Resource)
+                ? ProvisioningVerified(
+                    request.ProviderResourceId,
+                    request.Step.DesiredFingerprint)
+                : ProvisioningConflict(
+                    "keycloak_client_reconciliation_conflict");
+        }
+
+        JsonObject[] candidates = await GetObjectsAsync(
+            BuildUri(
+                serverBase,
+                $"/admin/realms/{Uri.EscapeDataString(request.Realm)}"
+                + $"/clients?clientId={Uri.EscapeDataString(desired.ResourceName)}"),
+            accessToken,
+            cancellationToken);
+        if (candidates.Any(candidate =>
+                string.Equals(
+                    StringValue(candidate, "clientId"),
+                    desired.ResourceName,
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            return ProvisioningConflict("keycloak_client_already_exists");
+        }
+
+        JsonObject payload = BuildClientPayload(
+            desired,
+            request.RuntimeClientSecret);
+        KeycloakProvisioningOperationResult send =
+            await SendCreateAsync(
+                BuildUri(
+                    serverBase,
+                    $"/admin/realms/{Uri.EscapeDataString(request.Realm)}/clients"),
+                payload,
+                accessToken,
+                providerResourceId: null,
+                cancellationToken);
+        if (send.Outcome != KeycloakStepOutcomeKind.Applied
+            || send.ProviderResourceId is null)
+        {
+            return send.Outcome == KeycloakStepOutcomeKind.Applied
+                ? ProvisioningUnknown()
+                : send;
+        }
+
+        try
+        {
+            (HttpStatusCode Status, JsonObject? Resource) verified =
+                await GetObjectResponseAsync(
+                    BuildUri(
+                        serverBase,
+                        $"/admin/realms/{Uri.EscapeDataString(request.Realm)}"
+                        + $"/clients/{Uri.EscapeDataString(send.ProviderResourceId)}"),
+                    accessToken,
+                    cancellationToken);
+            return verified.Status == HttpStatusCode.OK
+                && verified.Resource is not null
+                && MatchesDesiredClient(desired, verified.Resource)
+                ? ProvisioningApplied(
+                    send.ProviderResourceId,
+                    request.Step.DesiredFingerprint)
+                : ProvisioningUnknown(send.ProviderResourceId);
+        }
+        catch (HttpRequestException)
+        {
+            return ProvisioningUnknown(send.ProviderResourceId);
+        }
+    }
+
     private async Task<KeycloakMapperOperationResult> ExecuteMapperAsync(
         KeycloakMapperOperationRequest request,
         bool allowWrite,
         CancellationToken cancellationToken)
     {
-        if (!TryGetServerBase(request, out Uri? serverBase)
+        if (!TryGetServerBase(
+                request.Authority,
+                request.Realm,
+                out Uri? serverBase)
             || request.Step.Kind is not (
                 KeycloakStep.CreateMapper or KeycloakStep.UpdateMapper))
         {
@@ -435,49 +697,220 @@ public sealed class KeycloakAdminOperationClient(
             ClaimName: claimName);
     }
 
-    private async Task<string?> RequestAccessTokenAsync(
-        Uri serverBase,
-        string username,
-        string password,
-        CancellationToken cancellationToken)
+    private async Task<KeycloakProvisioningOperationResult>
+        SendCreateAsync(
+            Uri uri,
+            JsonObject payload,
+            string accessToken,
+            string? providerResourceId,
+            CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            BuildUri(
-                serverBase,
-                "/realms/master/protocol/openid-connect/token"))
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri)
         {
-            Content = new FormUrlEncodedContent(
-            [
-                new("grant_type", "password"),
-                new("client_id", "admin-cli"),
-                new("username", username),
-                new("password", password)
-            ])
+            Content = JsonContent.Create(payload, options: JsonOptions)
         };
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
+        try
+        {
+            using HttpResponseMessage response =
+                await httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
+            string? createdId = providerResourceId
+                ?? ResourceIdFromLocation(response.Headers.Location);
+            if (response.StatusCode == HttpStatusCode.Conflict)
+            {
+                return ProvisioningConflict(
+                    "keycloak_resource_already_exists");
+            }
+
+            if ((int)response.StatusCode >= 500
+                || response.StatusCode == HttpStatusCode.RequestTimeout)
+            {
+                return ProvisioningUnknown(createdId);
+            }
+
+            return response.IsSuccessStatusCode
+                ? new KeycloakProvisioningOperationResult(
+                    KeycloakStepOutcomeKind.Applied,
+                    "keycloak_resource_create_accepted",
+                    createdId)
+                : ProvisioningFailed(
+                    "keycloak_resource_create_rejected");
+        }
+        catch (OperationCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            return ProvisioningUnknown(providerResourceId);
+        }
+        catch (HttpRequestException)
+        {
+            return ProvisioningUnknown(providerResourceId);
+        }
+    }
+
+    private async Task<(HttpStatusCode Status, JsonObject? Resource)>
+        GetObjectResponseAsync(
+            Uri uri,
+            string accessToken,
+            CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", accessToken);
         using HttpResponseMessage response = await httpClient.SendAsync(
             request,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
-        if (response.StatusCode is HttpStatusCode.Unauthorized
-            or HttpStatusCode.Forbidden)
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            return (response.StatusCode, null);
+        }
+
+        await response.Content.LoadIntoBufferAsync(
+            MaximumResponseBytes,
+            cancellationToken);
+        JsonObject? resource =
+            await response.Content.ReadFromJsonAsync<JsonObject>(
+                JsonOptions,
+                cancellationToken);
+        return (response.StatusCode, resource);
+    }
+
+    private static JsonObject BuildClientPayload(
+        KeycloakDesiredProjection desired,
+        string? runtimeClientSecret)
+    {
+        bool confidential =
+            desired.Kind == KeycloakDesiredKind.ConfidentialBffClient;
+        var payload = new JsonObject
+        {
+            ["clientId"] = desired.ResourceName,
+            ["name"] = desired.ResourceName,
+            ["enabled"] = true,
+            ["publicClient"] = false,
+            ["bearerOnly"] = !confidential,
+            ["standardFlowEnabled"] = confidential,
+            ["directAccessGrantsEnabled"] = false,
+            ["serviceAccountsEnabled"] = false,
+            ["redirectUris"] = new JsonArray(
+                desired.RedirectUris
+                    .Select(uri => JsonValue.Create(uri))
+                    .ToArray()),
+            ["webOrigins"] = new JsonArray(
+                desired.WebOrigins
+                    .Select(origin => JsonValue.Create(origin))
+                    .ToArray())
+        };
+        if (confidential)
+        {
+            payload["secret"] = runtimeClientSecret;
+        }
+
+        return payload;
+    }
+
+    private static bool MatchesDesiredRealm(
+        KeycloakDesiredProjection desired,
+        JsonObject resource) =>
+        desired.Kind == KeycloakDesiredKind.Realm
+        && string.Equals(
+            StringValue(resource, "realm"),
+            desired.ResourceName,
+            StringComparison.Ordinal)
+        && BoolValue(resource, "enabled");
+
+    private static bool MatchesDesiredClient(
+        KeycloakDesiredProjection desired,
+        JsonObject resource)
+    {
+        bool confidential =
+            desired.Kind == KeycloakDesiredKind.ConfidentialBffClient;
+        return desired.Kind is KeycloakDesiredKind.ConfidentialBffClient
+                or KeycloakDesiredKind.BearerOnlyApiClient
+            && string.Equals(
+                StringValue(resource, "clientId"),
+                desired.ResourceName,
+                StringComparison.Ordinal)
+            && BoolValue(resource, "enabled")
+            && !BoolValue(resource, "publicClient")
+            && BoolValue(resource, "bearerOnly") == !confidential
+            && BoolValue(resource, "standardFlowEnabled") == confidential
+            && !BoolValue(resource, "directAccessGrantsEnabled")
+            && !BoolValue(resource, "serviceAccountsEnabled")
+            && JsonStrings(resource, "redirectUris")
+                .SequenceEqual(
+                    desired.RedirectUris,
+                    StringComparer.Ordinal)
+            && JsonStrings(resource, "webOrigins")
+                .SequenceEqual(
+                    desired.WebOrigins,
+                    StringComparer.Ordinal);
+    }
+
+    private static string? ResourceIdFromLocation(Uri? location)
+    {
+        if (location is null)
         {
             return null;
         }
 
-        response.EnsureSuccessStatusCode();
-        await response.Content.LoadIntoBufferAsync(
-            MaximumResponseBytes,
-            cancellationToken);
-        using JsonDocument payload = await JsonDocument.ParseAsync(
-            await response.Content.ReadAsStreamAsync(cancellationToken),
-            cancellationToken: cancellationToken);
-        return payload.RootElement.TryGetProperty(
-            "access_token",
-            out JsonElement token)
-            ? token.GetString()
-            : null;
+        string segment = location.IsAbsoluteUri
+            ? location.Segments[^1]
+            : location.OriginalString.Split(
+                '/',
+                StringSplitOptions.RemoveEmptyEntries)[^1];
+        return Uri.UnescapeDataString(segment.Trim('/'));
     }
+
+    private static bool BoolValue(JsonObject source, string key) =>
+        source[key] is JsonValue value
+        && value.TryGetValue(out bool result)
+        && result;
+
+    private static IReadOnlyList<string> JsonStrings(
+        JsonObject source,
+        string key) =>
+        source[key] is JsonArray values
+            ? values
+                .Select(value => value?.GetValue<string>() ?? string.Empty)
+                .ToArray()
+            : [];
+
+    private static KeycloakProvisioningOperationResult ProvisioningApplied(
+        string providerResourceId,
+        string fingerprint) =>
+        new(
+            KeycloakStepOutcomeKind.Applied,
+            "keycloak_resource_verified",
+            providerResourceId,
+            fingerprint);
+
+    private static KeycloakProvisioningOperationResult ProvisioningVerified(
+        string providerResourceId,
+        string fingerprint) =>
+        new(
+            KeycloakStepOutcomeKind.Verified,
+            "keycloak_resource_verified",
+            providerResourceId,
+            fingerprint);
+
+    private static KeycloakProvisioningOperationResult ProvisioningConflict(
+        string reasonCode) =>
+        new(KeycloakStepOutcomeKind.Conflict, reasonCode);
+
+    private static KeycloakProvisioningOperationResult ProvisioningFailed(
+        string reasonCode) =>
+        new(KeycloakStepOutcomeKind.FailedBeforeWrite, reasonCode);
+
+    private static KeycloakProvisioningOperationResult ProvisioningUnknown(
+        string? providerResourceId = null) =>
+        new(
+            KeycloakStepOutcomeKind.OutcomeUnknown,
+            "keycloak_resource_outcome_unknown",
+            providerResourceId);
 
     private async Task<T?> GetAsync<T>(
         Uri uri,
@@ -511,68 +944,52 @@ public sealed class KeycloakAdminOperationClient(
         ?? [];
 
     private bool TryGetServerBase(
-        KeycloakMapperOperationRequest request,
+        Uri authority,
+        string realm,
         out Uri? serverBase)
     {
         serverBase = null;
-        bool secure = request.Authority.Scheme == Uri.UriSchemeHttps;
+        bool secure = authority.Scheme == Uri.UriSchemeHttps;
         bool allowedLoopbackHttp =
-            request.Authority.Scheme == Uri.UriSchemeHttp
-            && request.Authority.IsLoopback
+            authority.Scheme == Uri.UriSchemeHttp
+            && authority.IsLoopback
             && configuration.GetValue(
                 "Keycloak:AllowDevelopmentLoopbackHttp",
                 false)
             && (hostEnvironment.IsDevelopment()
                 || hostEnvironment.IsEnvironment("Testing"));
-        if (!request.Authority.IsAbsoluteUri
+        if (!authority.IsAbsoluteUri
             || (!secure && !allowedLoopbackHttp)
-            || !string.IsNullOrEmpty(request.Authority.UserInfo)
-            || !string.IsNullOrEmpty(request.Authority.Query)
-            || !string.IsNullOrEmpty(request.Authority.Fragment))
+            || !string.IsNullOrEmpty(authority.UserInfo)
+            || !string.IsNullOrEmpty(authority.Query)
+            || !string.IsNullOrEmpty(authority.Fragment))
         {
             return false;
         }
 
         const string marker = "/realms/";
-        int markerIndex = request.Authority.AbsolutePath.LastIndexOf(
+        int markerIndex = authority.AbsolutePath.LastIndexOf(
             marker,
             StringComparison.OrdinalIgnoreCase);
         if (markerIndex < 0
             || !string.Equals(
                 Uri.UnescapeDataString(
-                    request.Authority.AbsolutePath[
+                    authority.AbsolutePath[
                         (markerIndex + marker.Length)..].Trim('/')),
-                request.Realm,
+                realm,
                 StringComparison.Ordinal))
         {
             return false;
         }
 
-        var builder = new UriBuilder(request.Authority)
+        var builder = new UriBuilder(authority)
         {
-            Path = request.Authority.AbsolutePath[..markerIndex].TrimEnd('/'),
+            Path = authority.AbsolutePath[..markerIndex].TrimEnd('/'),
             Query = string.Empty,
             Fragment = string.Empty
         };
         serverBase = builder.Uri;
         return true;
-    }
-
-    private static Uri BuildUri(Uri serverBase, string relativePath)
-    {
-        int queryIndex = relativePath.IndexOf('?', StringComparison.Ordinal);
-        string path = queryIndex < 0
-            ? relativePath
-            : relativePath[..queryIndex];
-        string query = queryIndex < 0
-            ? string.Empty
-            : relativePath[(queryIndex + 1)..];
-        return new UriBuilder(serverBase)
-        {
-            Path = $"{serverBase.AbsolutePath.TrimEnd('/')}/{path.TrimStart('/')}",
-            Query = query,
-            Fragment = string.Empty
-        }.Uri;
     }
 
     private static string? StringValue(JsonObject source, string key) =>

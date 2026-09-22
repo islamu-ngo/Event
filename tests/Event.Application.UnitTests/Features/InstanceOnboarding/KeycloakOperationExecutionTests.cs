@@ -1,8 +1,8 @@
 using Explore.Application.Features.InstanceOnboarding.Services;
-using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Domain.Keycloak;
 
 namespace Event.Application.UnitTests.Features.InstanceOnboarding;
@@ -139,6 +139,26 @@ public sealed class KeycloakOperationExecutionTests
     }
 
     [Test]
+    public async Task RealmFingerprint_BindsPlannedProviderUuid()
+    {
+        KeycloakDesiredProjection first =
+            KeycloakDesiredProjection.Realm(
+                "operators",
+                "11111111-1111-7111-8111-111111111111");
+        KeycloakDesiredProjection second =
+            KeycloakDesiredProjection.Realm(
+                "operators",
+                "22222222-2222-7222-8222-222222222222");
+
+        await Assert.That(
+                KeycloakOperationService
+                    .DesiredProvisioningFingerprint(first))
+            .IsNotEqualTo(
+                KeycloakOperationService
+                    .DesiredProvisioningFingerprint(second));
+    }
+
+    [Test]
     public async Task Plan_WhenClientIdsConflict_RejectsBeforeCreatingSteps()
     {
         var snapshot = new KeycloakInspectionSnapshot(
@@ -151,6 +171,185 @@ public sealed class KeycloakOperationExecutionTests
         Assert.Throws<InvalidOperationException>(() =>
             new KeycloakOperationService().Plan(snapshot));
         await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task PlanCreateRealm_RequiresProvenAbsenceAndOrdersCreateOnlySteps()
+    {
+        var snapshot = new KeycloakInspectionSnapshot(
+            "operators", "event-bff", "event-api", realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new("event-bff", 0, null, null),
+            apiClient: new("event-api", 0, null, null));
+
+        KeycloakChangeSet plan = new KeycloakOperationService().Plan(
+            snapshot,
+            KeycloakOperationIntent.CreateRealm,
+            new Uri("https://event.example.test/"),
+            "revision-1")!;
+
+        await Assert.That(plan.Steps.Select(step => step.Kind)).IsEquivalentTo(
+        [
+            KeycloakStep.CreateRealm,
+            KeycloakStep.CreateClient,
+            KeycloakStep.CreateClient,
+            KeycloakStep.CreateMapper,
+            KeycloakStep.CreateMapper
+        ]);
+        await Assert.That(plan.Steps[1].Desired.RedirectUris.Single())
+            .IsEqualTo("https://event.example.test/signin-oidc");
+        await Assert.That(plan.Steps[2].Desired.Kind)
+            .IsEqualTo(KeycloakDesiredKind.BearerOnlyApiClient);
+    }
+
+    [Test]
+    public async Task PlanCreateClients_RejectsMixedExistingAndAbsentClients()
+    {
+        var snapshot = new KeycloakInspectionSnapshot(
+            "operators", "event-bff", "event-api", realmExists: true,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                1,
+                "bff-uuid",
+                new(true, false, false, true, false, false)),
+            apiClient: new("event-api", 0, null, null));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            new KeycloakOperationService().Plan(
+                snapshot,
+                KeycloakOperationIntent.CreateClients,
+                new Uri("https://event.example.test/"),
+                "revision-1"));
+        await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task CreateRealm_AcceptedThenTimeout_StopsRemainingResources()
+    {
+        var repository = new RecordingRepository();
+        var coordinator = new RecordingCoordinator();
+        var admin = new RecordingAdminClient(null, null);
+        admin.ProvisioningApplyResults.Enqueue(
+            new KeycloakProvisioningOperationResult(
+                KeycloakStepOutcomeKind.OutcomeUnknown,
+                "keycloak_resource_outcome_unknown"));
+        var service = new KeycloakOperationService(
+            repository,
+            coordinator,
+            admin);
+        var snapshot = new KeycloakInspectionSnapshot(
+            "operators",
+            "event-bff",
+            "event-api",
+            realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                0,
+                ProviderId: null,
+                Shape: null),
+            apiClient: new(
+                "event-api",
+                0,
+                ProviderId: null,
+                Shape: null));
+        Uri origin = new("https://event.example.test/");
+        KeycloakOperation operation =
+            (await service.CreateAsync(
+                Guid.Parse("77777777-7777-7777-8777-777777777777"),
+                new Uri(
+                    "https://identity.example.test/realms/operators"),
+                snapshot,
+                "actor",
+                7,
+                Now,
+                Now.AddMinutes(15),
+                KeycloakOperationIntent.CreateRealm,
+                origin,
+                "revision-1"))!;
+        var context = new KeycloakOperationApplyContext(
+            operation.Id,
+            "actor",
+            7,
+            operation.Target,
+            operation.Digest,
+            "event-api",
+            origin,
+            "revision-1",
+            "runtime-secret-canary",
+            "admin",
+            "password",
+            Now.AddMinutes(1));
+
+        KeycloakOperation result = await service.ApplyAsync(context);
+
+        await Assert.That(result.State)
+            .IsEqualTo(KeycloakOperationState.OutcomeUnknown);
+        await Assert.That(admin.ApplyCount).IsEqualTo(1);
+        await Assert.That(result.StepOutcomes.Items).HasCount().EqualTo(1);
+    }
+
+    [Test]
+    public async Task CreateRealm_WhenCredentialBindingChanges_FailsBeforeProvider()
+    {
+        var repository = new RecordingRepository();
+        var coordinator = new RecordingCoordinator();
+        var admin = new RecordingAdminClient(null, null);
+        var service = new KeycloakOperationService(
+            repository,
+            coordinator,
+            admin);
+        var snapshot = new KeycloakInspectionSnapshot(
+            "operators",
+            "event-bff",
+            "event-api",
+            realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                0,
+                ProviderId: null,
+                Shape: null),
+            apiClient: new(
+                "event-api",
+                0,
+                ProviderId: null,
+                Shape: null));
+        Uri origin = new("https://event.example.test/");
+        KeycloakOperation operation =
+            (await service.CreateAsync(
+                Guid.Parse("77777777-7777-7777-8777-777777777777"),
+                new Uri(
+                    "https://identity.example.test/realms/operators"),
+                snapshot,
+                "actor",
+                7,
+                Now,
+                Now.AddMinutes(15),
+                KeycloakOperationIntent.CreateRealm,
+                origin,
+                "revision-1"))!;
+        var changedContext = new KeycloakOperationApplyContext(
+            operation.Id,
+            "actor",
+            7,
+            operation.Target,
+            operation.Digest,
+            "event-api",
+            origin,
+            "revision-2",
+            "runtime-secret-canary",
+            "admin",
+            "password",
+            Now.AddMinutes(1));
+
+        await Assert.ThrowsAsync<KeycloakOperationConflictException>(() =>
+            service.ApplyAsync(changedContext));
+
+        await Assert.That(admin.ApplyCount).IsEqualTo(0);
+        await Assert.That(repository.PersistedState)
+            .IsEqualTo(KeycloakOperationState.Previewed);
     }
 
     [Test]
@@ -301,6 +500,9 @@ public sealed class KeycloakOperationExecutionTests
             harness.Context.Target,
             harness.Context.Digest,
             "changed-api",
+            harness.Context.PublicOrigin,
+            harness.Context.CredentialBindingRevision,
+            harness.Context.RuntimeClientSecret,
             harness.Context.AdministratorUsername,
             harness.Context.AdministratorPassword,
             harness.Context.NowUtc);
@@ -391,6 +593,9 @@ public sealed class KeycloakOperationExecutionTests
             harness.Context.Target,
             harness.Context.Digest,
             harness.Context.ApiClientId,
+            harness.Context.PublicOrigin,
+            harness.Context.CredentialBindingRevision,
+            harness.Context.RuntimeClientSecret,
             harness.Context.AdministratorUsername,
             harness.Context.AdministratorPassword,
             harness.Operation.ExpiresAtUtc.AddMinutes(1));
@@ -508,6 +713,9 @@ public sealed class KeycloakOperationExecutionTests
                 operation.Target,
                 operation.Digest,
                 "event-api",
+                null,
+                null,
+                null,
                 $"admin-{Guid.CreateVersion7():N}",
                 $"password-{Guid.CreateVersion7():N}",
                 Now.AddMinutes(3));
@@ -615,7 +823,7 @@ public sealed class KeycloakOperationExecutionTests
     private sealed class RecordingAdminClient(
         IEnumerable<KeycloakMapperOperationResult>? applyResults,
         IEnumerable<KeycloakMapperOperationResult>? inspectResults)
-        : IKeycloakAdminOperationClient
+        : IKeycloakAdminClient
     {
         private readonly Queue<KeycloakMapperOperationResult> _apply =
             new(applyResults ?? []);
@@ -624,8 +832,16 @@ public sealed class KeycloakOperationExecutionTests
 
         public int ApplyCount { get; private set; }
         public int InspectCount { get; private set; }
+        public Queue<KeycloakProvisioningOperationResult>
+            ProvisioningApplyResults { get; } = new();
         public Func<CancellationToken, Task<KeycloakMapperOperationResult>>?
             OnApply { get; set; }
+
+        public Task<KeycloakAdminInspectionResult> InspectAsync(
+            KeycloakAdminInspectionRequest request,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException(
+                "Unexpected provider inspection.");
 
         public async Task<KeycloakMapperOperationResult>
             ApplyApprovedMapperAsync(
@@ -653,6 +869,34 @@ public sealed class KeycloakOperationExecutionTests
                 _inspect.Count > 0
                     ? _inspect.Dequeue()
                     : Result(KeycloakStepOutcomeKind.Verified));
+        }
+
+        public Task<KeycloakProvisioningOperationResult>
+            ApplyApprovedProvisioningAsync(
+                KeycloakProvisioningOperationRequest request,
+                CancellationToken cancellationToken)
+        {
+            ApplyCount++;
+            return Task.FromResult(
+                ProvisioningApplyResults.Count > 0
+                    ? ProvisioningApplyResults.Dequeue()
+                    : new KeycloakProvisioningOperationResult(
+                        KeycloakStepOutcomeKind.Applied,
+                        "applied",
+                        request.ProviderResourceId));
+        }
+
+        public Task<KeycloakProvisioningOperationResult>
+            InspectApprovedProvisioningAsync(
+                KeycloakProvisioningOperationRequest request,
+                CancellationToken cancellationToken)
+        {
+            InspectCount++;
+            return Task.FromResult(
+                new KeycloakProvisioningOperationResult(
+                    KeycloakStepOutcomeKind.Verified,
+                    "verified",
+                    request.ProviderResourceId));
         }
     }
 }

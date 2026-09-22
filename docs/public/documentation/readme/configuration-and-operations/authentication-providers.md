@@ -94,6 +94,31 @@ without creating duplicates. Ordinary browser refresh does not require
 `offline_access`; missing offline-token policy is not treated as a launch
 failure. Unsupported prerequisites are shown as manual Keycloak steps.
 
+### Create-only provisioning and credential rotation
+
+Event can create a realm or client only when an advanced inspection proves the
+resource absent. You must explicitly choose **Create realm**, **Create clients**
+or **Repair client** and review the generated receipt before Apply. Existing
+realms and clients are never adopted, replaced or synchronized. Realm/client
+name races stop with a conflict, and an interrupted create remains **outcome
+unknown** until read-only reconciliation verifies the captured provider ID.
+
+For a new confidential BFF client, Event reads the runtime secret from the
+selected deployment authority and sends it directly to Keycloak for that
+one-time create. The API client is bearer-only and receives no secret. The
+browser never submits or receives the runtime client secret.
+
+Rotate an existing BFF client secret outside Event:
+
+1. Update Keycloak and the selected Infisical/environment secret together.
+2. Restart every affected API and BFF replica.
+3. Run connection and advanced inspection again.
+4. Complete a fresh user sign-in.
+
+Event does not rotate, persist, copy, retry or roll back provider credentials.
+The retired bootstrap, realm-sync and client-secret rotation routes have no
+compatibility aliases.
+
 ### Approved operations and interrupted requests
 
 Before Event sends an approved Keycloak change, it stores a credential-free

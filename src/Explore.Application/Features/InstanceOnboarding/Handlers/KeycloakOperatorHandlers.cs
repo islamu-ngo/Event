@@ -14,10 +14,21 @@ namespace Explore.Application.Features.InstanceOnboarding.Handlers;
 
 internal static class KeycloakOperatorHandlerSupport
 {
-    public static void Validate(KeycloakOperationInput input)
+    public static void Validate(KeycloakInspectionCredentials input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var validator = new KeycloakOperationInputValidator();
+        var validator = new KeycloakInspectionCredentialsValidator();
+        var result = validator.Validate(input);
+        if (!result.IsValid)
+        {
+            throw new ValidationException(result.Errors);
+        }
+    }
+
+    public static void Validate(KeycloakOperationCredentials input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var validator = new KeycloakOperationCredentialsValidator();
         var result = validator.Validate(input);
         if (!result.IsValid)
         {
@@ -73,7 +84,7 @@ internal static class KeycloakOperatorHandlerSupport
 
     public static KeycloakOperationApplyContext ApplyContext(
         KeycloakOperation operation,
-        KeycloakOperationInput input,
+        KeycloakOperationCredentials input,
         KeycloakOperatorAuthority authority,
         KeycloakConnectionResolution binding,
         DateTimeOffset nowUtc) =>
@@ -84,6 +95,9 @@ internal static class KeycloakOperatorHandlerSupport
             Target(authority, binding),
             operation.Digest,
             binding.ApiClientId,
+            binding.PublicOrigin,
+            binding.CredentialBindingRevision,
+            binding.ClientSecret,
             input.AdministratorUsername!,
             input.AdministratorPassword!,
             nowUtc);
@@ -106,7 +120,12 @@ public sealed class GetKeycloakConnectionQueryHandler(
             result.Authority?.GetLeftPart(UriPartial.Authority),
             result.Realm,
             result.BlazorClientId,
-            result.Status == KeycloakConnectionStatus.Resolved);
+            result.Status == KeycloakConnectionStatus.Resolved,
+            CredentialOwnership: "deployment-managed",
+            CredentialStatus: result.Status.ToString().ToLowerInvariant(),
+            RequiresCoordinatedRestart: true,
+            OperatorGuidance:
+                "rotate_in_deployment_authority_restart_and_reinspect");
     }
 }
 
@@ -175,7 +194,11 @@ public sealed class PlanKeycloakOperationCommandHandler(
     {
         KeycloakOperatorAuthority current =
             await authority.RequireAsync(cancellationToken);
-        KeycloakOperatorHandlerSupport.Validate(request.Input);
+        var validation = new KeycloakOperationPlanInputValidator().Validate(request.Input);
+        if (!validation.IsValid)
+        {
+            throw new ValidationException(validation.Errors);
+        }
         KeycloakConnectionResolution binding =
             await resolver.ResolveRuntimeAsync(cancellationToken);
         if (binding.Status != KeycloakConnectionStatus.Resolved)
@@ -210,6 +233,9 @@ public sealed class PlanKeycloakOperationCommandHandler(
             current.SetupGeneration,
             now,
             now.AddMinutes(15),
+            request.Input.Intent!.Value,
+            binding.PublicOrigin,
+            binding.CredentialBindingRevision,
             cancellationToken);
         return operation is null
             ? new KeycloakOperationDto(

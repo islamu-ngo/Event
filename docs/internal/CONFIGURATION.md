@@ -341,11 +341,26 @@ The three application composition roots (`Explore.API`, `Explore.Blazor`, and `E
 
 The API compatibility layer maps `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_BLAZOR_CLIENT_ID` to `Keycloak:ClientId`. It maps the server-only `KEYCLOAK_BLAZOR_CLIENT_SECRET` or `Keycloak:BlazorClientSecret` value to `Keycloak:ClientSecret`. Existing canonical `Keycloak:*` values retain precedence because compatibility aliases only fill missing keys. `Keycloak:Audience` identifies the API audience and is never used as the browser client ID.
 
-Onboarding treats Keycloak deployment metadata as usable only when both the effective authority and client ID are nonblank. In application-managed mode, a complete enabled stored tuple wins; otherwise a complete deployment tuple is a bootstrap fallback and is reported as detected and configured. When authority and client ID are explicitly deployment-managed, the deployment tuple is authoritative and stored values for those fields are ignored. Partial deployment metadata fails closed and does not report Keycloak as configured.
+The deployment tuple is the only runtime authority. Endpoint, realm, BFF client
+ID, optional API audience and BFF client secret must resolve together from the
+selected environment, Infisical, or Development/Testing User Secrets authority.
+Application database settings are not a fallback, and partial metadata fails
+closed. `PublicBaseUrl` is also required before Event can propose creation of an
+absent realm or client; the server derives the exact `/signin-oidc` redirect and
+web origin from that trusted HTTPS origin.
 
-Public setup reads, administrator configuration reads, status responses, and control-plane summaries expose only sanitized authority, client ID, enabled/detected state, and secret ownership metadata. They always return an empty `KeycloakClientSecret`. The effective secret is available only to trusted server-side paths such as BFF refresh and realm synchronization.
+Public and administrator reads expose only sanitized binding and
+deployment-owned credential status. They never return the BFF client secret,
+secret source coordinates, or a secret-derived fingerprint. A create receipt
+binds the in-process resolution generation so a refreshed or changed secret
+binding requires a new plan before any provider write.
 
-The browser BFF is a confidential OIDC client. A new Keycloak configuration therefore requires a client secret. Blank secret input is accepted only when the server's authoritative ownership metadata says an effective secret is already configured and the browser value is merely redacted; save and update handlers derive that state from `IAuthProviderConfigurationService` and never trust request ownership metadata.
+Event can create a proven-absent confidential BFF client once and seeds it from
+the resolved runtime secret. A bearer-only API client never receives a secret.
+Existing realms and clients are never adopted, replaced, PUT, or rotated.
+Secret rotation remains an external operator action: update Keycloak and the
+selected deployment authority together, restart affected replicas, run
+inspection, then perform a fresh sign-in.
 
 ## Deployment CI/CD Secrets
 
@@ -1625,14 +1640,24 @@ Important behavior:
 - `Keycloak:ClientSecret` is explicitly overridden when `KEYCLOAK_BLAZOR_CLIENT_SECRET` (Infisical) is present.
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` map to `Google:ClientId` and `Google:ClientSecret`.
 
-Compose-managed Keycloak adds one bootstrap-specific rule: `docker/keycloak/keycloak-init.sh` writes `KEYCLOAK_BLAZOR_CLIENT_SECRET` into the imported `islamu-event-blazor` client before API/Blazor startup is allowed to complete. Neither checked-in realm export contains a production client secret. Compose fails closed when the BFF secret is absent; local Aspire instead creates a persisted secret parameter when no deployment value is configured and injects it consistently into Keycloak, API, and Blazor. `KEYCLOAK_API_CLIENT_SECRET` is a legacy/future optional sync input only; the checked-in realm export treats `islamu-event-api` as a bearer-only audience target with no static client secret, and the current API bearer-token validation path does not consume an API client secret. The Keycloak admin username/password are used only by the one-shot Compose init job and must not be stored as runtime application settings.
+Compose-managed Keycloak adds one bootstrap-specific rule: `docker/keycloak/keycloak-init.sh` writes `KEYCLOAK_BLAZOR_CLIENT_SECRET` into the imported `islamu-event-blazor` client before API/Blazor startup is allowed to complete. Neither checked-in realm export contains a production client secret. Compose fails closed when the BFF secret is absent; local Aspire instead creates a persisted secret parameter when no deployment value is configured and injects it consistently into Keycloak, API, and Blazor. The `islamu-event-api` client is bearer-only, has no static client secret, and the API validation path never consumes one. The Keycloak admin username/password are used only by the one-shot Compose init job and must not be stored as runtime application settings.
 
 The managed-realm synchronizer replaces the BFF client callback allow-list with exact login, logout, and web-origin values. Compose uses its exact localhost defaults; local Aspire derives the same localhost/admin-localhost URI set from the allocated Blazor HTTP/HTTPS ports, including isolated dynamic ports. Nonblank `KEYCLOAK_BLAZOR_REDIRECT_URIS`, `KEYCLOAK_BLAZOR_WEB_ORIGINS`, and `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` values override that Aspire derivation. Reverse-proxied deployments must supply exact public values in those formats. Wildcards and the `+` web-origin shortcut are not repository defaults.
 - `Keycloak:RequireHttpsMetadata` is set to `true` when Keycloak input is mapped.
 
-External-Keycloak onboarding uses a different secret boundary. The setup UI can send a one-time Keycloak bootstrap username/password to `POST /api/InstanceOnboarding/auth-provider-configuration/keycloak-bootstrap` through the BFF. That credential is request-scoped input for the Infrastructure Keycloak Admin API adapter; it is not a configuration key, not a governance setting, not a secret-provider key, and not persisted by ISLAMU. Successful bootstrap persists only the normal runtime Keycloak auth-provider configuration: authority, Blazor client ID, and Blazor client secret.
+External-Keycloak administration uses the private
+`/api/instance/keycloak` operation workflow. Inspection and apply accept a
+fresh administrator username/password only for that request. The credential is
+not a configuration key, governance setting, secret-provider key, browser
+session value, or receipt field. Setup-secret authority is forwarded only to
+the exact seven operator routes while setup remains incomplete.
 
-External bootstrap URL safety is enforced before network calls. Keycloak base URLs must be absolute HTTP/HTTPS URLs without embedded user info, query string, or fragment. Literal localhost, loopback, link-local, unspecified, and multicast IP hosts are rejected by the Infrastructure adapter; self-hosted/internal DNS hostnames remain allowed so operators can use private Keycloak service names intentionally.
+The adapter derives its target from the resolved runtime authority; the browser
+does not submit a base URL, realm, callback list, web origin, client secret, or
+API audience override. The server validates the authority and trusted
+`PublicBaseUrl` before network calls. Existing resources are read-only except
+for exact approved mapper repair; realm and client provisioning require a
+fresh absence proof and never adopt by name.
 
 ## Embedded Control Plane Configuration
 

@@ -50,21 +50,25 @@ public sealed class InfisicalSecretSource : ISecretSource
 
         try
         {
-            var value = await client.GetSecretAsync(
+            SecretProviderValue? value =
+                await client.GetSecretAsync(
                 binding.InfisicalEnvironment,
                 binding.InfisicalPath,
                 binding.InfisicalKey,
                 cancellationToken).ConfigureAwait(false);
 
-            return string.IsNullOrEmpty(value)
+            return value is null
+                || string.IsNullOrEmpty(value.Value)
+                || string.IsNullOrWhiteSpace(value.Revision)
                 ? SecretResolutionResult.Unconfigured
                 : SecretResolutionResult.Resolved(new ResolvedSecret(
                     binding.SettingKey,
-                    value,
+                    value.Value,
                     binding.SourceType,
                     binding.Scope,
                     binding.ScopeId,
-                    DateTime.UtcNow));
+                    DateTime.UtcNow,
+                    $"infisical:{binding.Id:N}:{value.Revision}"));
         }
         catch (OperationCanceledException)
         {

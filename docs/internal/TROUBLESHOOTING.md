@@ -297,53 +297,70 @@ Checks:
 3. Rerun `docker compose run --rm keycloak-init` after changing or rotating `KEYCLOAK_BLAZOR_CLIENT_SECRET`.
 4. For disposable Compose development, generate a value with `openssl rand -hex 32`; no default-secret escape hatch exists. Local Aspire generates its own persisted secret parameter when deployment configuration is absent.
 5. If the client is missing, verify `docker/keycloak/realm-export.json` imported successfully and that `KEYCLOAK_REALM` matches the imported realm name. Existing Keycloak realms are not overwritten by startup import; reset the disposable Keycloak database volume before expecting realm-export changes to apply.
-6. For external Keycloak setup, rerun `/onboarding/auth-provider` bootstrap mode with the same Blazor client ID and the intended runtime client secret. The setup flow updates existing clients by `clientId`; it does not require manually editing the Keycloak UI when the bootstrap credential has client-secret update permission.
+6. For external Keycloak, run the private operator connection check and
+   inspection. Existing client secrets are deployment-owned and are never
+   updated from the browser or adopted by client name.
 
-### External Keycloak bootstrap fails before contacting Keycloak
-
-Symptoms:
-- setup page reports a bad Keycloak URL or unsafe host.
-- API returns a safe failure code such as `keycloak_invalid_url` or `keycloak_unsafe_host`.
-
-Checks:
-1. Use an absolute `http://` or `https://` Keycloak base URL with no embedded username/password, query string, or fragment.
-2. Do not use `localhost`, loopback, link-local, unspecified, or multicast IP literals from the setup form. Use the operator-facing Keycloak DNS name instead.
-3. For Compose-managed local Keycloak, prefer the Compose `keycloak-init` service instead of the external bootstrap UI path.
-
-### External Keycloak bootstrap authentication or permission failure
+### External Keycloak operation fails before contacting Keycloak
 
 Symptoms:
-- setup returns `keycloak_auth_failed`, `keycloak_realm_check_failed`, `keycloak_realm_create_failed`, `keycloak_client_create_failed`, or `keycloak_client_secret_update_failed`.
-- Keycloak logs show Admin API `401`, `403`, or rejected client operations.
+- the operator panel reports an unavailable or invalid runtime connection;
+- plan creation is blocked before administrator authentication.
 
 Checks:
-1. Confirm the one-time bootstrap username/password or service-account secret is valid in Keycloak.
-2. Confirm the credential can read the target realm, create the realm when using create mode, list clients, create clients, and update client secrets.
-3. If using patch-existing mode, verify the realm already exists. Missing realms return `keycloak_realm_not_found`; switch to create mode only if the operator intends ISLAMU to create the realm.
-4. If client creation fails with a conflict, rerun bootstrap after confirming the existing client ID is correct. The adapter locates clients by `clientId` before creation and treats existing realms as safe to patch.
-5. Do not paste raw Keycloak Admin API response bodies, access tokens, admin passwords, client secrets, or setup secrets into issue reports. Use the safe failure code and Keycloak status code instead.
+1. Repair the endpoint, realm, BFF client ID and secret in the selected
+   deployment authority; the browser cannot override them.
+2. Confirm `PublicBaseUrl` is an absolute HTTPS origin before requesting
+   create-only realm or client provisioning.
+3. Restart affected API/BFF replicas after changing runtime credentials, then
+   rerun connection and inspection.
 
-### External Keycloak bootstrap succeeds but login still fails
+### Keycloak operation authentication or permission failure
+
+Symptoms:
+- inspection or apply returns a safe authentication/provider failure;
+- Keycloak logs show Admin API `401`, `403`, or rejected create/mapper writes.
 
 Checks:
-1. Confirm the Keycloak authority saved by setup is `<base-url>/realms/<realm>` and is reachable from both API and Blazor BFF.
+1. Re-enter a current administrator username/password; it is request-scoped
+   and never loaded from deployment configuration.
+2. Grant only the read/create/mapper permission needed by the reviewed plan.
+   Event never requests user, role, session, client-secret rotation, or broad
+   realm synchronization authority.
+3. A realm/client name conflict is not repairable by retry or adoption. Inspect
+   the existing resource and either configure it manually or choose a different
+   deployment target.
+4. Do not paste raw Admin API bodies, tokens, passwords, client secrets, or
+   setup secrets into issue reports. Use receipt state and safe reason codes.
+
+### Approved Keycloak provisioning succeeds but login still fails
+
+Checks:
+1. Confirm the deployment authority resolves to
+   `<base-url>/realms/<realm>` and is reachable from API and Blazor BFF.
 2. Confirm reverse-proxy public origin matches the Blazor client redirect URIs and web origins in Keycloak.
-3. Trigger `/bff/auth/refresh-schemes` or restart the Blazor BFF if testing outside the setup UI. The onboarding UI calls the refresh path after successful bootstrap.
-4. If `KEYCLOAK_BLAZOR_CLIENT_SECRET` is also configured as deployment-managed, confirm the saved application-managed value is not being overridden by deployment config.
+3. Restart or refresh the BFF authentication schemes after provisioning.
+4. Confirm Keycloak and the selected deployment authority contain the same
+   confidential BFF secret; Event stores no application-managed copy.
 
-### Post-onboarding Keycloak doctor or sync reports drift
+### Keycloak inspection or operation reports drift
 
 Symptoms:
-- the admin auth-provider panel reports missing `offline_access`, missing API audience mapper, missing redirect/web origin entries, or blocked sync operations.
-- sync apply is unavailable or returns a blocked plan.
+- the operator panel reports missing/conflicting subject or audience mappers;
+- a receipt is conflicted, outcome unknown, or no longer offers Apply.
 
 Checks:
-1. Run the read-only realm doctor first. Basic mode should verify saved runtime config and OIDC discovery without admin credentials.
-2. For drift-aware inspection, enter a temporary Keycloak admin or service-account credential with permission to read realm clients, scopes, roles, protocol mappers, and client settings. ISLAMU uses it only for the active request.
-3. Review the sync preview before applying. The plan must be additive; it should not propose deleting a realm, user, group, unrelated client, redirect origin, or operator-managed customization.
-4. Before sync apply, confirm a current Keycloak database backup. Apply blocks without backup confirmation and temporary admin credentials.
-5. For client-secret rotation, check whether the secret is application-managed or deployment-managed. Deployment-managed secrets must be rotated in environment variables, Infisical, or the owning secret provider rather than overwritten from the app UI.
-6. Do not paste temporary admin credentials, Keycloak access tokens, client secrets, raw Admin API response bodies, or screenshots containing secrets into support tickets. Use the safe finding/operation codes from the doctor or sync plan.
+1. Run connection, then advanced read-only inspection with fresh credentials.
+2. Create a new `RepairClient`, `CreateClients`, or `CreateRealm` plan only
+   when the matching HAL affordance is present.
+3. Review every exact step before Apply. Existing realm/client settings,
+   unrelated mappers, roles, users, sessions, and secrets remain manual.
+4. If the outcome is unknown, never click Apply again. Use Reconcile; it reads
+   only the receipt's captured immutable provider ID.
+5. Rotate client secrets in Keycloak and the selected deployment authority,
+   restart replicas, reinspect, and verify a fresh sign-in.
+6. Keep raw credentials, tokens, provider bodies, and secret-bearing
+   screenshots out of support artifacts.
 
 ## Setup Secret Failures
 

@@ -39,7 +39,7 @@ public sealed class KeycloakOperationRepairTests
     {
         JsonObject existing = AudienceMapper(
             id: "mapper-42",
-            name: "event-api-audience",
+            name: "operator-owned-audience",
             audience: "old-api");
         existing["unknownRoot"] = "preserve-root";
         ((JsonObject)existing["config"]!)["unknown.config"] =
@@ -59,6 +59,8 @@ public sealed class KeycloakOperationRepairTests
             .IsEqualTo(KeycloakStepOutcomeKind.Applied);
         await Assert.That(updated["unknownRoot"]!.GetValue<string>())
             .IsEqualTo("preserve-root");
+        await Assert.That(updated["name"]!.GetValue<string>())
+            .IsEqualTo("operator-owned-audience");
         await Assert.That(
                 ((JsonObject)updated["config"]!)["unknown.config"]!
                 .GetValue<string>())

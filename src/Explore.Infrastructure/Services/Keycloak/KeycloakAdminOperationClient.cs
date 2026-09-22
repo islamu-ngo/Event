@@ -266,9 +266,6 @@ public sealed class KeycloakAdminOperationClient(HttpClient httpClient)
         KeycloakMapperOperationRequest request)
     {
         var merged = (JsonObject)source.DeepClone();
-        merged["name"] = request.MapperName;
-        merged["protocol"] = "openid-connect";
-        merged["protocolMapper"] = MapperType(request.Semantic);
         JsonObject config = merged["config"] as JsonObject ?? [];
         foreach ((string key, JsonNode? value) in DesiredConfig(request))
         {

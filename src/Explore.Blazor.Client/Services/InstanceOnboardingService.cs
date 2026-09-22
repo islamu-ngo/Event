@@ -51,6 +51,13 @@ public interface IInstanceOnboardingService
 
     Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsync();
     Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsAdminAsync();
+    Task<HalResourceOfKeycloakConnectionDto> GetKeycloakConnectionAsync(CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakInspectionDto> InspectKeycloakAsync(KeycloakOperationInput input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> PlanKeycloakOperationAsync(KeycloakOperationInput input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> GetKeycloakOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> ApplyKeycloakOperationAsync(Guid operationId, KeycloakOperationInput input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> ReconcileKeycloakOperationAsync(Guid operationId, KeycloakOperationInput input, CancellationToken cancellationToken = default);
+    Task<HalResourceOfKeycloakOperationDto> CancelKeycloakOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
     Task<BaseCommandResponseOfGuid> BootstrapKeycloakRealmAsync(KeycloakBootstrapRequestDto request);
     Task<KeycloakRealmDoctorResultDto> RunKeycloakRealmDoctorAsync(KeycloakRealmDoctorRequestDto request);
     Task<KeycloakRealmSyncPlanDto> PreviewKeycloakRealmSyncAsync(KeycloakRealmSyncPreviewRequestDto request);
@@ -80,6 +87,7 @@ public interface IInstanceOnboardingService
 
 public sealed class InstanceOnboardingService(
     IInstanceAuthenticationSettingsClient authenticationClient,
+    IInstanceKeycloakOperationsClient keycloakOperationsClient,
     IInstanceAuthorizationSettingsClient authorizationClient,
     IInstanceGovernanceSettingsClient governanceClient,
     IInstanceMessagingSettingsClient messagingClient,
@@ -374,6 +382,57 @@ public sealed class InstanceOnboardingService(
 
     public Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsAdminAsync() =>
         GetSettingsAsync(ct => authenticationClient.GetInstanceAuthProviderConfigurationAsync(cancellationToken: ct), () => new());
+
+    public Task<HalResourceOfKeycloakConnectionDto> GetKeycloakConnectionAsync(
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.GetInstanceKeycloakConnectionAsync(
+            cancellationToken: cancellationToken);
+
+    public Task<HalResourceOfKeycloakInspectionDto> InspectKeycloakAsync(
+        KeycloakOperationInput input,
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.InspectInstanceKeycloakAsync(
+            input,
+            cancellationToken: cancellationToken);
+
+    public Task<HalResourceOfKeycloakOperationDto> PlanKeycloakOperationAsync(
+        KeycloakOperationInput input,
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.PlanInstanceKeycloakAsync(
+            input,
+            cancellationToken: cancellationToken);
+
+    public Task<HalResourceOfKeycloakOperationDto> GetKeycloakOperationAsync(
+        Guid operationId,
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.GetInstanceKeycloakOperationAsync(
+            operationId,
+            cancellationToken: cancellationToken);
+
+    public Task<HalResourceOfKeycloakOperationDto> ApplyKeycloakOperationAsync(
+        Guid operationId,
+        KeycloakOperationInput input,
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.ApplyInstanceKeycloakOperationAsync(
+            operationId,
+            input,
+            cancellationToken: cancellationToken);
+
+    public Task<HalResourceOfKeycloakOperationDto> ReconcileKeycloakOperationAsync(
+        Guid operationId,
+        KeycloakOperationInput input,
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.ReconcileInstanceKeycloakOperationAsync(
+            operationId,
+            input,
+            cancellationToken: cancellationToken);
+
+    public Task<HalResourceOfKeycloakOperationDto> CancelKeycloakOperationAsync(
+        Guid operationId,
+        CancellationToken cancellationToken = default) =>
+        keycloakOperationsClient.CancelInstanceKeycloakOperationAsync(
+            operationId,
+            cancellationToken: cancellationToken);
 
     public async Task<BaseCommandResponseOfGuid> BootstrapKeycloakRealmAsync(KeycloakBootstrapRequestDto request)
     {

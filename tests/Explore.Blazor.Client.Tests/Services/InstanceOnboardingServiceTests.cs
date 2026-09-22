@@ -34,6 +34,7 @@ public class InstanceOnboardingServiceTests
         _bffAuthApi = RestService.For<IBffAuthApi>(authClient);
         _service = new InstanceOnboardingService(
             new InstanceAuthenticationSettingsClient(client),
+            new InstanceKeycloakOperationsClient(client),
             new InstanceAuthorizationSettingsClient(client),
             new InstanceGovernanceSettingsClient(client),
             new InstanceMessagingSettingsClient(client),

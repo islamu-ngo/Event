@@ -20,6 +20,7 @@ public sealed class SetupSecretAuthenticationHandler(
     private const string AuthProviderPath = "/api/instance/settings/auth-provider";
     private const string AuthorizationProviderPath = "/api/instance/settings/authz-provider";
     private const string OperatorIdentityPath = "/api/instance-operator-identity";
+    private const string KeycloakOperationsPath = "/api/instance/keycloak";
     private bool _setupModeInactive;
 
     internal static bool SupportsRequest(HttpRequest request)
@@ -36,7 +37,11 @@ public sealed class SetupSecretAuthenticationHandler(
            || HttpMethods.IsGet(request.Method)
                && string.Equals(request.Path.Value, "/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsPatch(request.Method)
-               && string.Equals(request.Path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase);
+               && string.Equals(request.Path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase)
+           || (HttpMethods.IsGet(request.Method) || HttpMethods.IsPost(request.Method))
+               && request.Path.StartsWithSegments(
+                   KeycloakOperationsPath,
+                   StringComparison.OrdinalIgnoreCase);
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

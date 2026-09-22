@@ -98,14 +98,23 @@ failure. Unsupported prerequisites are shown as manual Keycloak steps.
 
 Before Event sends an approved Keycloak change, it stores a credential-free
 operation receipt. The receipt binds the exact instance, authority, realm,
-client targets, reviewed change digest and current setup or administrator
-authority. A changed target or approval cannot reuse it.
+client targets, reviewed change digest and either the verified administrator who
+created it or the server-derived setup generation. It expires after 15 minutes;
+a changed target, approval, setup generation, or administrator cannot reuse it.
+
+The operator API has seven private, no-store routes under
+`/api/instance/keycloak`: connection, inspect, plans, receipt read, apply,
+reconcile, and cancel. Each request requires current setup or instance
+administrator authority. Inspect and apply prompt for administrator credentials
+only in the advanced form for that request. They are never saved in a browser
+session or receipt, and the receipt contains no credentials, tokens, or provider
+response body. These routes do not use generic idempotency response replay.
 
 If the response is lost, Event reports **outcome unknown** and blocks another
 operation for that realm. Do not click Apply again or repeat the change
 manually. Run read-only reconciliation first. Cancellation can prevent work
 that has not been sent; after transmission it records your request but cannot
-undo Keycloak.
+undo Keycloak. Event never automatically retries or rolls back a provider write.
 
 Back up the application database together with Keycloak before an approved
 change. Settled receipts are retained for at least 30 days. Unresolved receipts

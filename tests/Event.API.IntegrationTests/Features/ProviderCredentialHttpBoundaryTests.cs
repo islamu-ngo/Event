@@ -245,6 +245,48 @@ public sealed class ProviderCredentialHttpBoundaryTests
         await AssertPrivateAsync(response);
     }
 
+    [Test]
+    [Arguments("GET", "/api/instance/keycloak/connection", false, HttpStatusCode.OK)]
+    [Arguments("POST", "/api/instance/keycloak/inspect", true, HttpStatusCode.BadRequest)]
+    [Arguments("POST", "/api/instance/keycloak/plans", true, HttpStatusCode.BadRequest)]
+    [Arguments("GET", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222", false, HttpStatusCode.NotFound)]
+    [Arguments("POST", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222/apply", true, HttpStatusCode.BadRequest)]
+    [Arguments("POST", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222/reconcile", true, HttpStatusCode.BadRequest)]
+    [Arguments("POST", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222/cancel", false, HttpStatusCode.NotFound)]
+    public async Task KeycloakOperationRoutes_AcceptCurrentSetupAuthorityAndRemainPrivate(
+        string method,
+        string path,
+        bool malformedBody,
+        HttpStatusCode expected)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var request = new HttpRequestMessage(
+            new HttpMethod(method),
+            path);
+        request.Headers.TryAddWithoutValidation("Authorization", string.Empty);
+        request.Headers.Add("X-Setup-Secret", fixture.Setup.Secret);
+        request.Headers.Add("Idempotency-Key", new string('k', 129));
+        if (malformedBody)
+        {
+            request.Content = new StringContent(
+                "{",
+                Encoding.UTF8,
+                "application/json");
+        }
+
+        using HttpResponseMessage response =
+            await fixture.Client.SendAsync(request);
+        string body = await response.Content.ReadAsStringAsync();
+
+        await Assert.That(response.StatusCode)
+            .IsEqualTo(expected)
+            .Because(body);
+        await Assert.That(response.Headers.Contains("X-Idempotency-Replay"))
+            .IsFalse();
+        await Assert.That(await fixture.RecordCountAsync()).IsEqualTo(0);
+        await AssertPrivateAsync(response);
+    }
+
     private static bool IsSetup(Route route) => route is Route.Bootstrap or Route.SetupPolicySync;
     private static string Path(Route route) => route switch
     {

@@ -5,6 +5,14 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-22
 
+- **Reviewed Keycloak operator experience.**
+  Initial setup and instance authentication settings now share one HAL-driven
+  operator panel for connection, inspection, planning, apply, reconciliation
+  and cancellation. The panel clears request credentials after every attempt,
+  requires explicit receipt confirmation before Apply, suppresses replay after
+  an ambiguous response, and gives step-level partial/unknown-outcome recovery
+  guidance.
+
 - **Breaking: create-only Keycloak provisioning and deployment-owned credentials.**
   Legacy Keycloak bootstrap, realm-wide sync and application-managed secret
   rotation routes are removed; runtime credentials remain deployment-owned.

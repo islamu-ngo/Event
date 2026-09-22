@@ -135,6 +135,12 @@ only in the advanced form for that request. They are never saved in a browser
 session or receipt, and the receipt contains no credentials, tokens, or provider
 response body. These routes do not use generic idempotency response replay.
 
+The same operator panel appears during setup and in instance authentication
+settings. Buttons are shown only when the server includes the matching HAL
+affordance. Applying requires reviewing the receipt and typing the explicit
+confirmation phrase; credentials and confirmation are cleared after every
+attempt.
+
 If the response is lost, Event reports **outcome unknown** and blocks another
 operation for that realm. Do not click Apply again or repeat the change
 manually. Run read-only reconciliation first. Cancellation can prevent work

@@ -202,7 +202,62 @@ public sealed class KeycloakOperationRepairTests
             ProjectAudience(
                 "mapper-42",
                 "event-api",
-                accessToken: false));
+                accessToken: false,
+                name: "operator-owned-audience"));
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    approved,
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ExternalMapperRenameAtDesiredState_FailsBeforeWrite()
+    {
+        JsonObject externallyRenamed = AudienceMapper(
+            id: "mapper-42",
+            name: "renamed-after-preview",
+            audience: "event-api");
+        var handler = new SemanticKeycloakHandler([externallyRenamed]);
+        KeycloakChangeStep approved = PlanAudienceUpdate(
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false,
+                name: "operator-owned-audience"));
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).ApplyApprovedMapperAsync(
+                CreateRequest(
+                    approved,
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ExternalDesiredStateBeforeApply_RequiresNewApproval()
+    {
+        JsonObject externallyCompleted = AudienceMapper(
+            id: "mapper-42",
+            name: "operator-owned-audience",
+            audience: "event-api");
+        var handler = new SemanticKeycloakHandler([externallyCompleted]);
+        KeycloakChangeStep approved = PlanAudienceUpdate(
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false,
+                name: "operator-owned-audience"));
 
         KeycloakMapperOperationResult result =
             await CreateClient(handler).ApplyApprovedMapperAsync(
@@ -301,7 +356,8 @@ public sealed class KeycloakOperationRepairTests
             ProjectAudience(
                 "mapper-42",
                 "event-api",
-                accessToken: false));
+                accessToken: false,
+                name: "operator-owned-audience"));
 
         KeycloakMapperOperationResult result =
             await CreateClient(handler).InspectApprovedMapperAsync(
@@ -314,6 +370,34 @@ public sealed class KeycloakOperationRepairTests
             .IsEqualTo(KeycloakStepOutcomeKind.Verified);
         await Assert.That(result.ProviderResourceId)
             .IsEqualTo("mapper-42");
+        await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ReconcileCompletedUpdate_WhenMapperRenamed_ReportsConflict()
+    {
+        JsonObject appliedButRenamed = AudienceMapper(
+            id: "mapper-42",
+            name: "renamed-after-preview",
+            audience: "event-api");
+        var handler = new SemanticKeycloakHandler(
+            [appliedButRenamed]);
+        KeycloakChangeStep approved = PlanAudienceUpdate(
+            ProjectAudience(
+                "mapper-42",
+                "event-api",
+                accessToken: false,
+                name: "operator-owned-audience"));
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler).InspectApprovedMapperAsync(
+                CreateRequest(
+                    approved,
+                    KeycloakMapperSemantic.Audience),
+                CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
         await Assert.That(handler.MutationCount).IsEqualTo(0);
     }
 

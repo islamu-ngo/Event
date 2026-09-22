@@ -143,6 +143,9 @@ public sealed class KeycloakOperationService
                 expectedFingerprint: existing is null
                     ? null
                     : MapperFingerprint(existing),
+                expectedIdentityFingerprint: existing is null
+                    ? null
+                    : MapperIdentityFingerprint(existing),
                 desiredFingerprint: DesiredMapperFingerprint(
                     snapshot,
                     semantic),
@@ -550,6 +553,12 @@ public sealed class KeycloakOperationService
             $"{mapper.Semantic}|{mapper.Audience}|"
             + $"{mapper.AddsToAccessToken}|{mapper.AddsToIdToken}");
 
+    public static string MapperIdentityFingerprint(
+        KeycloakEffectiveMapperSnapshot mapper) =>
+        Hash(
+            $"{mapper.ProviderId}|{mapper.Name}|{mapper.Protocol}|"
+            + $"{mapper.MapperType}|{mapper.ClaimName}");
+
     public static string DesiredMapperFingerprint(
         KeycloakInspectionSnapshot snapshot,
         KeycloakMapperSemantic semantic) =>
@@ -572,7 +581,9 @@ public sealed class KeycloakOperationService
             changeSet.Steps.Select(step =>
                 $"{step.StepId}|{step.Kind}|{step.ResourceKind}|"
                 + $"{step.TargetId}|{step.Precondition}|"
-                + $"{step.ExpectedFingerprint}|{step.DesiredFingerprint}|"
+                + $"{step.ExpectedFingerprint}|"
+                + $"{step.ExpectedIdentityFingerprint}|"
+                + $"{step.DesiredFingerprint}|"
                 + $"{step.BindingFingerprint}"));
         return Hash(projection);
     }

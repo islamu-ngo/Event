@@ -14,6 +14,8 @@ public sealed class BffAccessTokenAssessmentServiceTests
         var result = service.Assess(null);
 
         await Assert.That(result.IsUsable).IsFalse();
+        await Assert.That(result.RequiresAccountSynchronization)
+            .IsFalse();
         await Assert.That(result.Reason).IsEqualTo("missing_access_token");
     }
 
@@ -26,6 +28,8 @@ public sealed class BffAccessTokenAssessmentServiceTests
         var result = service.Assess(token);
 
         await Assert.That(result.IsUsable).IsTrue();
+        await Assert.That(result.RequiresAccountSynchronization)
+            .IsTrue();
         await Assert.That(result.Reason).IsEqualTo("valid_access_token");
     }
 
@@ -38,6 +42,8 @@ public sealed class BffAccessTokenAssessmentServiceTests
         var result = service.Assess(token);
 
         await Assert.That(result.IsUsable).IsFalse();
+        await Assert.That(result.RequiresAccountSynchronization)
+            .IsFalse();
         await Assert.That(result.Reason).IsEqualTo("expired_access_token");
     }
 

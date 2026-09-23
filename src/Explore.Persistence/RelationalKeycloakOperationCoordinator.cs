@@ -60,6 +60,22 @@ public sealed class RelationalKeycloakOperationCoordinator(
         return await action(cancellationToken);
     }
 
+    public async Task<T> ExecuteReconciliationAsync<T>(
+        KeycloakOperation operation,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        string lockKey =
+            $"explore:keycloak-operation:{operation.Target.InstanceId:D}:"
+            + $"{operation.Target.AuthorityKey}:{operation.Target.Realm}";
+        await using IAsyncDisposable lease =
+            await RelationalNamedLock.AcquireSessionAsync(
+                db,
+                lockKey,
+                cancellationToken);
+        return await action(cancellationToken);
+    }
+
     public async Task RequestCancellationAsync(
         Guid operationId,
         DateTimeOffset requestedAtUtc,

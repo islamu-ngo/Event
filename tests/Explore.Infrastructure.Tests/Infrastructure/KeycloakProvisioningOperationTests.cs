@@ -117,6 +117,17 @@ public sealed class KeycloakProvisioningOperationTests
         await Assert.That(handler.LastMutation!["secret"]!
                 .GetValue<string>())
             .IsEqualTo(canary);
+        string providerId =
+            handler.LastMutation["id"]!.GetValue<string>();
+        await Assert.That(Guid.TryParse(
+                providerId,
+                out _))
+            .IsTrue();
+        await Assert.That(result.ProviderResourceId)
+            .IsEqualTo(providerId);
+        await Assert.That(
+                request.Step.Desired.ProviderResourceId)
+            .IsEqualTo(providerId);
         await Assert.That(result.ToString()).DoesNotContain(canary);
         await Assert.That(request.ToString()).DoesNotContain(canary);
         await AssertForbiddenEndpointsAbsent(handler);
@@ -158,6 +169,37 @@ public sealed class KeycloakProvisioningOperationTests
         await Assert.That(result.Outcome)
             .IsEqualTo(KeycloakStepOutcomeKind.OutcomeUnknown);
         await Assert.That(handler.MutationPaths).HasCount().EqualTo(1);
+    }
+
+    [Test]
+    public async Task CreateAcceptedThenCallerCancels_ReturnsPlannedUnknown()
+    {
+        using var callerCancellation =
+            new CancellationTokenSource();
+        var handler = new ProvisioningHandler
+        {
+            CancelCallerAfterAccept =
+                callerCancellation
+        };
+        KeycloakProvisioningOperationRequest request =
+            Request(
+                BffStep(),
+                "runtime-secret-canary");
+
+        KeycloakProvisioningOperationResult result =
+            await CreateClient(handler)
+                .ApplyApprovedProvisioningAsync(
+                    request,
+                    callerCancellation.Token);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(
+                KeycloakStepOutcomeKind.OutcomeUnknown);
+        await Assert.That(result.ProviderResourceId)
+            .IsEqualTo(
+                request.Step.Desired.ProviderResourceId);
+        await Assert.That(handler.MutationPaths)
+            .HasCount().EqualTo(1);
     }
 
     [Test]
@@ -311,6 +353,8 @@ public sealed class KeycloakProvisioningOperationTests
         public string RealmId { get; init; } =
             "11111111-1111-7111-8111-111111111111";
         public bool TimeoutAfterAccept { get; init; }
+        public CancellationTokenSource?
+            CancelCallerAfterAccept { get; init; }
         public JsonObject? ExactClient { get; init; }
         public JsonObject? LastMutation { get; private set; }
         public List<string> MutationPaths { get; } = [];
@@ -380,6 +424,13 @@ public sealed class KeycloakProvisioningOperationTests
                 LastMutation = JsonNode.Parse(
                     await request.Content!.ReadAsStringAsync(
                         cancellationToken))!.AsObject();
+                if (CancelCallerAfterAccept is not null)
+                {
+                    CancelCallerAfterAccept.Cancel();
+                    throw new TaskCanceledException(
+                        "Provider accepted before caller cancellation.");
+                }
+
                 if (TimeoutAfterAccept)
                 {
                     throw new TaskCanceledException(

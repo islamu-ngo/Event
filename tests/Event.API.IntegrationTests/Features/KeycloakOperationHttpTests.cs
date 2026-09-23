@@ -73,6 +73,53 @@ public sealed class KeycloakOperationHttpTests
     }
 
     [Test]
+    public async Task Inspect_AbsentRealm_OffersExplicitPlanning()
+    {
+        await using var factory =
+            new KeycloakOperationFactory();
+        factory.Inspection.Snapshot =
+            new KeycloakInspectionSnapshot(
+                "operators",
+                "event-bff",
+                "islamu-event-api",
+                realmExists: false,
+                effectiveMappers: [],
+                blazorClient: new(
+                    "event-bff",
+                    0,
+                    ProviderId: null,
+                    Shape: null),
+                apiClient: new(
+                    "islamu-event-api",
+                    0,
+                    ProviderId: null,
+                    Shape: null));
+        using HttpClient client = factory.CreateClient();
+        Authenticate(client);
+
+        using HttpResponseMessage response =
+            await client.PostAsJsonAsync(
+                "/api/instance/keycloak/inspect",
+                new
+                {
+                    administratorUsername = "admin",
+                    administratorPassword = "password"
+                });
+        string body =
+            await response.Content.ReadAsStringAsync();
+
+        await Assert.That(response.StatusCode)
+            .IsEqualTo(HttpStatusCode.OK)
+            .Because(body);
+        await Assert.That(body)
+            .Contains("realm:create");
+        await Assert.That(body)
+            .Contains("\"plan\"");
+        await Assert.That(factory.Repository.Operation)
+            .IsNull();
+    }
+
+    [Test]
     public async Task PlanCreateRealm_UsesServerBindingAndClosedCreateSteps()
     {
         await using var factory = new KeycloakOperationFactory();
@@ -544,6 +591,12 @@ public sealed class KeycloakOperationHttpTests
                 ? throw new InvalidOperationException(
                     "Intent was not persisted before provider execution.")
                 : action(cancellationToken);
+
+        public Task<T> ExecuteReconciliationAsync<T>(
+            KeycloakOperation operation,
+            Func<CancellationToken, Task<T>> action,
+            CancellationToken cancellationToken = default) =>
+            action(cancellationToken);
 
         public Task RequestCancellationAsync(
             Guid operationId,

@@ -150,6 +150,20 @@ The minimum operational deployment is the single `Event.Standalone` container:
 
 For external container dependencies and third-party license boundaries, consult [CI_CD_GOVERNANCE.md](CI_CD_GOVERNANCE.md#standalone-and-optional-service-license-boundary).
 
+### Keycloak Preparation Boundary
+
+Bundled Compose/AppHost Keycloak is infrastructure only: Event does not mount
+the sample realm, import it, or run a privileged initializer. A fresh provider
+database reaches interactive setup before target-realm discovery succeeds.
+Operators establish the native Keycloak administrator, configure Event's
+deployment-owned runtime binding, and use fresh foreground credentials to
+inspect and explicitly create absent resources.
+
+Restarts preserve the provider database/realm IDs and perform no mutation.
+Before an approved write, back up Keycloak and the application database
+together. Existing realm settings, users, MFA, memberships, foreign clients and
+secrets remain provider-owned.
+
 ### Bounded SQLite Operational Profile
 
 The public [Standalone recipe](../public/documentation/readme/self-hosting/docker-standalone.md#bounded-sqlite-processing-profile)

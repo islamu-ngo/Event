@@ -5,7 +5,7 @@ Title: make Keycloak provisioning create-only
 Type: feat
 Scope: onboarding
 Summary: Replace broad Keycloak lifecycle endpoints with reviewed create-only operations and deployment-owned credential guidance.
-Group: keycloak-operator-safety
+Group: keycloak-operator-onboarding
 Supersedes: []
 Impacts:
   Breaking:

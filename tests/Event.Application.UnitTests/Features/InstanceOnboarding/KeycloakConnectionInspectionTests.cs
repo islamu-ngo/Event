@@ -43,6 +43,80 @@ public sealed class KeycloakConnectionInspectionTests
     }
 
     [Test]
+    public async Task RuntimeConnection_AllowsLoopbackHttpPublicOrigin()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Keycloak:Audience"] = "event-api",
+                    ["PublicBaseUrl"] =
+                        "http://localhost:7002"
+                })
+            .Build();
+        var resolver = new KeycloakConnectionResolver(
+            new RuntimeSecretResolver(
+                new Dictionary<string, string>(
+                    StringComparer.Ordinal)
+                {
+                    [SecretDefinitionRegistry.Keys.Keycloak.Endpoint] =
+                        "http://keycloak:8080",
+                    [SecretDefinitionRegistry.Keys.Keycloak.Realm] =
+                        "operators",
+                    [SecretDefinitionRegistry.Keys.Keycloak.ClientId] =
+                        "event-bff",
+                    [SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret] =
+                        $"runtime-{Guid.CreateVersion7():N}"
+                }),
+            configuration);
+
+        KeycloakConnectionResolution result =
+            await resolver.ResolveRuntimeAsync();
+
+        await Assert.That(result.Status)
+            .IsEqualTo(
+                KeycloakConnectionStatus.Resolved);
+        await Assert.That(result.PublicOrigin!.AbsoluteUri)
+            .IsEqualTo("http://localhost:7002/");
+    }
+
+    [Test]
+    public async Task RuntimeConnection_RejectsExternalHttpPublicOrigin()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Keycloak:Audience"] = "event-api",
+                    ["PublicBaseUrl"] =
+                        "http://event.example.test"
+                })
+            .Build();
+        var resolver = new KeycloakConnectionResolver(
+            new RuntimeSecretResolver(
+                new Dictionary<string, string>(
+                    StringComparer.Ordinal)
+                {
+                    [SecretDefinitionRegistry.Keys.Keycloak.Endpoint] =
+                        "https://identity.example.test",
+                    [SecretDefinitionRegistry.Keys.Keycloak.Realm] =
+                        "operators",
+                    [SecretDefinitionRegistry.Keys.Keycloak.ClientId] =
+                        "event-bff",
+                    [SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret] =
+                        $"runtime-{Guid.CreateVersion7():N}"
+                }),
+            configuration);
+
+        KeycloakConnectionResolution result =
+            await resolver.ResolveRuntimeAsync();
+
+        await Assert.That(result.Status)
+            .IsEqualTo(
+                KeycloakConnectionStatus.Invalid);
+    }
+
+    [Test]
     public async Task RuntimeConnection_UsesStableProcessBindingRevision()
     {
         string secretCanary = $"runtime-{Guid.CreateVersion7():N}";
@@ -238,7 +312,9 @@ public sealed class KeycloakConnectionInspectionTests
             Guid? tenantId,
             CancellationToken cancellationToken = default)
         {
-            string value = settingKey == SecretDefinitionRegistry.Keys.Keycloak.AdminUsername
+            string value = settingKey.Contains(
+                "username",
+                StringComparison.OrdinalIgnoreCase)
                 ? usernameCanary
                 : passwordCanary;
             return Task.FromResult(SecretResolutionResult.Resolved(

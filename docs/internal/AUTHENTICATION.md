@@ -54,7 +54,13 @@ the administrator username and password freshly submitted in that request;
 environment, Infisical and User Secrets values for Keycloak administrator
 credentials are never consulted. The request uses a bounded HttpClient with
 redirects and cookies disabled, verified TLS, and explicit
-Development/Testing-only loopback HTTP.
+Development/Testing-only loopback HTTP. The bundled Compose and Aspire
+topologies additionally bind privileged REST traffic to their exact generated
+Keycloak origin on the private orchestration network. That managed-local
+exception is configured by the topology itself, is not inferred from
+operator-supplied endpoints, and rejects every other plaintext host, port or
+base path. Browser-facing local callback generation accepts HTTP only for an
+exact loopback origin; non-loopback deployments require HTTPS.
 
 Existing realms are outside broad reconciliation authority. Inspection may
 recognize effective native, directly assigned or inherited subject and audience
@@ -84,6 +90,15 @@ reconcile and cancel controls strictly from HAL links. Administrator
 credentials are write-only foreground inputs cleared after every attempt;
 Apply additionally requires review of the receipt steps and an explicit
 confirmation phrase.
+
+API, BFF and AppHost startup never call the Keycloak Admin API or import the
+repository sample realm. Managed-local Keycloak starts with its persistent
+database; absent realm/client creation occurs only through the setup-time
+operator receipt workflow.
+
+Provider users, credentials, MFA and realm roles are manual Keycloak
+prerequisites. Event never creates a first provider user; setup binds platform
+authority only after the operator establishes and authenticates that identity.
 
 ## Clean Architecture Flow
 

@@ -168,23 +168,35 @@ public sealed partial class KeycloakAdminClient
                     request.Step.Desired,
                     verified.Resource))
             {
-                return ProvisioningUnknown();
+                return ProvisioningUnknown(
+                    request.Step.Desired.ProviderResourceId);
             }
 
             string? providerResourceId =
                 StringValue(verified.Resource, "id");
-            return !string.Equals(
+            if (string.IsNullOrWhiteSpace(providerResourceId)
+                || !string.Equals(
                     providerResourceId,
                     request.Step.Desired.ProviderResourceId,
-                    StringComparison.Ordinal)
-                ? ProvisioningUnknown()
-                : ProvisioningApplied(
-                    request.Step.Desired.ProviderResourceId,
-                    request.Step.DesiredFingerprint);
+                    StringComparison.Ordinal))
+            {
+                return ProvisioningUnknown(
+                    request.Step.Desired.ProviderResourceId);
+            }
+
+            return ProvisioningApplied(
+                providerResourceId,
+                request.Step.DesiredFingerprint);
+        }
+        catch (OperationCanceledException)
+        {
+            return ProvisioningUnknown(
+                request.Step.Desired.ProviderResourceId);
         }
         catch (HttpRequestException)
         {
-            return ProvisioningUnknown();
+            return ProvisioningUnknown(
+                request.Step.Desired.ProviderResourceId);
         }
     }
 
@@ -222,6 +234,10 @@ public sealed partial class KeycloakAdminClient
                     cancellationToken);
             return observed.Status == HttpStatusCode.OK
                 && observed.Resource is not null
+                && string.Equals(
+                    StringValue(observed.Resource, "id"),
+                    desired.ProviderResourceId,
+                    StringComparison.Ordinal)
                 && MatchesDesiredClient(desired, observed.Resource)
                 ? ProvisioningVerified(
                     request.ProviderResourceId,
@@ -256,7 +272,8 @@ public sealed partial class KeycloakAdminClient
                     $"/admin/realms/{Uri.EscapeDataString(request.Realm)}/clients"),
                 payload,
                 accessToken,
-                providerResourceId: null,
+                providerResourceId:
+                    desired.ProviderResourceId,
                 cancellationToken);
         if (send.Outcome != KeycloakStepOutcomeKind.Applied
             || send.ProviderResourceId is null)
@@ -278,11 +295,20 @@ public sealed partial class KeycloakAdminClient
                     cancellationToken);
             return verified.Status == HttpStatusCode.OK
                 && verified.Resource is not null
+                && string.Equals(
+                    StringValue(verified.Resource, "id"),
+                    desired.ProviderResourceId,
+                    StringComparison.Ordinal)
                 && MatchesDesiredClient(desired, verified.Resource)
                 ? ProvisioningApplied(
                     send.ProviderResourceId,
                     request.Step.DesiredFingerprint)
                 : ProvisioningUnknown(send.ProviderResourceId);
+        }
+        catch (OperationCanceledException)
+        {
+            return ProvisioningUnknown(
+                send.ProviderResourceId);
         }
         catch (HttpRequestException)
         {
@@ -359,12 +385,20 @@ public sealed partial class KeycloakAdminClient
 
         if (!allowWrite)
         {
-            return Failed("keycloak_mapper_not_effective");
+            return request.Step.Kind
+                == KeycloakStep.CreateMapper
+                ? Unknown(
+                    request.Step.Desired.ProviderResourceId)
+                : Failed("keycloak_mapper_not_effective");
         }
 
         JsonObject payload = request.Step.Kind == KeycloakStep.CreateMapper
             ? CreateMapperPayload(request)
             : MergeMapperPayload(match.Mapper!, request);
+        string? mutationProviderId =
+            request.Step.Kind == KeycloakStep.CreateMapper
+                ? request.Step.Desired.ProviderResourceId
+                : match.ProviderResourceId;
         cancellationToken.ThrowIfCancellationRequested();
 
         HttpResponseMessage? mutationResponse = null;
@@ -397,7 +431,7 @@ public sealed partial class KeycloakAdminClient
                     || mutationResponse.StatusCode
                         == HttpStatusCode.RequestTimeout)
                 {
-                    return Unknown(match.ProviderResourceId);
+                    return Unknown(mutationProviderId);
                 }
 
                 return Failed("keycloak_mapper_write_rejected");
@@ -405,11 +439,11 @@ public sealed partial class KeycloakAdminClient
         }
         catch (OperationCanceledException)
         {
-            return Unknown(match.ProviderResourceId);
+            return Unknown(mutationProviderId);
         }
         catch (HttpRequestException)
         {
-            return Unknown(match.ProviderResourceId);
+            return Unknown(mutationProviderId);
         }
         finally
         {
@@ -426,17 +460,17 @@ public sealed partial class KeycloakAdminClient
         }
         catch (OperationCanceledException)
         {
-            return Unknown(match.ProviderResourceId);
+            return Unknown(mutationProviderId);
         }
         catch (HttpRequestException)
         {
-            return Unknown(match.ProviderResourceId);
+            return Unknown(mutationProviderId);
         }
 
         JsonObject? applied = FindVerifiedMapper(request, verified);
         if (applied is null)
         {
-            return Unknown(match.ProviderResourceId);
+            return Unknown(mutationProviderId);
         }
 
         KeycloakEffectiveMapperSnapshot projection =
@@ -471,24 +505,38 @@ public sealed partial class KeycloakAdminClient
 
         if (request.Step.Kind == KeycloakStep.CreateMapper)
         {
-            if (semanticallyEffective.Length == 1
-                && string.Equals(
-                    StringValue(semanticallyEffective[0], "name"),
-                    request.MapperName,
-                    StringComparison.Ordinal))
+            JsonObject? byPlannedId =
+                mappers.SingleOrDefault(mapper =>
+                    string.Equals(
+                        ProviderResourceId(mapper),
+                        request.Step.Desired.ProviderResourceId,
+                        StringComparison.Ordinal));
+            if (byPlannedId is not null)
             {
-                JsonObject existing = semanticallyEffective[0];
+                if (allowWrite
+                    || !string.Equals(
+                        StringValue(byPlannedId, "name"),
+                        request.MapperName,
+                        StringComparison.Ordinal)
+                    || !IsDesiredMapper(
+                        request,
+                        byPlannedId))
+                {
+                    return Conflict(
+                        "keycloak_mapper_collision");
+                }
+
                 KeycloakEffectiveMapperSnapshot projection =
-                    ProjectMapper(existing, KeycloakMapperOrigin.Direct);
+                    ProjectMapper(
+                        byPlannedId,
+                        KeycloakMapperOrigin.Direct);
                 return new MapperMatch(
-                    existing,
-                    ProviderResourceId(existing),
+                    byPlannedId,
+                    ProviderResourceId(byPlannedId),
                     new KeycloakMapperOperationResult(
-                        allowWrite
-                            ? KeycloakStepOutcomeKind.NoChange
-                            : KeycloakStepOutcomeKind.Verified,
-                        "keycloak_mapper_already_effective",
-                        ProviderResourceId(existing),
+                        KeycloakStepOutcomeKind.Verified,
+                        "keycloak_mapper_verified",
+                        ProviderResourceId(byPlannedId),
                         KeycloakOperationService.MapperFingerprint(projection)));
             }
 
@@ -566,6 +614,7 @@ public sealed partial class KeycloakAdminClient
         KeycloakMapperOperationRequest request) =>
         new()
         {
+            ["id"] = request.Step.Desired.ProviderResourceId,
             ["name"] = request.MapperName,
             ["protocol"] = "openid-connect",
             ["protocolMapper"] = MapperType(request.Semantic),
@@ -650,9 +699,13 @@ public sealed partial class KeycloakAdminClient
             IsDesiredMapper(request, mapper)
             && (request.Step.Kind == KeycloakStep.CreateMapper
                 ? string.Equals(
-                    StringValue(mapper, "name"),
-                    request.MapperName,
+                    ProviderResourceId(mapper),
+                    request.Step.Desired.ProviderResourceId,
                     StringComparison.Ordinal)
+                  && string.Equals(
+                      StringValue(mapper, "name"),
+                      request.MapperName,
+                      StringComparison.Ordinal)
                 : string.Equals(
                     ProviderResourceId(mapper),
                     request.Step.TargetId,
@@ -711,6 +764,7 @@ public sealed partial class KeycloakAdminClient
         };
         request.Headers.Authorization =
             new AuthenticationHeaderValue("Bearer", accessToken);
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             using HttpResponseMessage response =
@@ -741,7 +795,6 @@ public sealed partial class KeycloakAdminClient
                     "keycloak_resource_create_rejected");
         }
         catch (OperationCanceledException)
-            when (!cancellationToken.IsCancellationRequested)
         {
             return ProvisioningUnknown(providerResourceId);
         }
@@ -787,6 +840,7 @@ public sealed partial class KeycloakAdminClient
             desired.Kind == KeycloakDesiredKind.ConfidentialBffClient;
         var payload = new JsonObject
         {
+            ["id"] = desired.ProviderResourceId,
             ["clientId"] = desired.ResourceName,
             ["name"] = desired.ResourceName,
             ["enabled"] = true,
@@ -949,17 +1003,8 @@ public sealed partial class KeycloakAdminClient
         out Uri? serverBase)
     {
         serverBase = null;
-        bool secure = authority.Scheme == Uri.UriSchemeHttps;
-        bool allowedLoopbackHttp =
-            authority.Scheme == Uri.UriSchemeHttp
-            && authority.IsLoopback
-            && configuration.GetValue(
-                "Keycloak:AllowDevelopmentLoopbackHttp",
-                false)
-            && (hostEnvironment.IsDevelopment()
-                || hostEnvironment.IsEnvironment("Testing"));
         if (!authority.IsAbsoluteUri
-            || (!secure && !allowedLoopbackHttp)
+            || !IsAllowedAdminAuthority(authority)
             || !string.IsNullOrEmpty(authority.UserInfo)
             || !string.IsNullOrEmpty(authority.Query)
             || !string.IsNullOrEmpty(authority.Fragment))

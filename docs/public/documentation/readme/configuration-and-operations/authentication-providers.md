@@ -119,6 +119,16 @@ Event does not rotate, persist, copy, retry or roll back provider credentials.
 The retired bootstrap, realm-sync and client-secret rotation routes have no
 compatibility aliases.
 
+Event never creates Keycloak users, passwords, MFA enrollment or realm roles.
+After provisioning an absent realm/client, create the first identity in
+Keycloak through the provider's native administration flow, then complete the
+Event setup flow to bind the platform administrator.
+
+Starting or restarting Event never reconciles an existing Keycloak realm. A
+new managed-local Keycloak database starts without the sample realm; provision
+absent resources through the same explicit inspection and receipt workflow.
+Do not delete or reimport an existing realm to apply Event configuration.
+
 ### Approved operations and interrupted requests
 
 Before Event sends an approved Keycloak change, it stores a credential-free

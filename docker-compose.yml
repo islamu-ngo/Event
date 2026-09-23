@@ -408,7 +408,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.1.2
     restart: unless-stopped
-    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    command: ["start-dev", "--http-port=8080"]
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_DATABASE:-keycloak}
@@ -423,10 +423,6 @@ services:
       KC_METRICS_ENABLED: "true"
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
-    volumes:
-      # Repository-owned realm export. Keycloak imports JSON files from this
-      # directory on startup; existing realms are not overwritten automatically.
-      - ./docker/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
       - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
     healthcheck:
@@ -439,40 +435,6 @@ services:
       keycloak-db:
         condition: service_healthy
 
-  keycloak-init:
-    image: quay.io/keycloak/keycloak:26.1.2
-    restart: "no"
-    depends_on:
-      keycloak:
-        condition: service_healthy
-    environment:
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-ISLAMU}
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
-      KEYCLOAK_BLAZOR_CLIENT_ID: ${KEYCLOAK_BLAZOR_CLIENT_ID:-islamu-event-blazor}
-      KEYCLOAK_BLAZOR_CLIENT_SECRET: ${KEYCLOAK_BLAZOR_CLIENT_SECRET:-}
-      KEYCLOAK_API_CLIENT_ID: islamu-event-api
-      KEYCLOAK_API_CLIENT_SECRET: ${KEYCLOAK_API_CLIENT_SECRET:-}
-      KEYCLOAK_BLAZOR_REDIRECT_URIS: ${KEYCLOAK_BLAZOR_REDIRECT_URIS:-}
-      KEYCLOAK_BLAZOR_WEB_ORIGINS: ${KEYCLOAK_BLAZOR_WEB_ORIGINS:-}
-      KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS: ${KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS:-}
-      KEYCLOAK_SMTP_HOST: ${KEYCLOAK_SMTP_HOST:-}
-      KEYCLOAK_SMTP_PORT: ${KEYCLOAK_SMTP_PORT:-}
-      KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-}
-      KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-}
-      KEYCLOAK_SMTP_AUTH: ${KEYCLOAK_SMTP_AUTH:-false}
-      KEYCLOAK_SMTP_SSL: ${KEYCLOAK_SMTP_SSL:-false}
-      KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-false}
-      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-}
-      KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME: ${KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME:-}
-      KEYCLOAK_SMTP_ENVELOPE_FROM: ${KEYCLOAK_SMTP_ENVELOPE_FROM:-}
-      KEYCLOAK_SMTP_USER: ${KEYCLOAK_SMTP_USER:-}
-      KEYCLOAK_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-}
-    volumes:
-      - ./docker/keycloak/keycloak-init.sh:/opt/keycloak/bin/keycloak-init.sh:ro
-    entrypoint: ["/bin/bash", "/opt/keycloak/bin/keycloak-init.sh"]
-
   islamu-event-api:
     build:
       context: .
@@ -481,7 +443,10 @@ services:
       <<: [*keycloak-env, *authentication-selection-env, *local-identity-runtime-env, *s3-env, *local-storage-env, *secrets-env, *database-env, *database-runtime-env, *privacy-erasure-runtime-env, *api-runtime-env, *instance-operator-identity-env, *payment-operations-env, *payment-api-env, *ai-env, *geocoding-env, *mcp-env, *smtp-env, *email-dispatch-rabbitmq-env, *web-push-env, *reporting-env, *webhooks-env, *listmonk-env]
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: Production
+      KEYCLOAK_ENDPOINT: ${KEYCLOAK_ENDPOINT:-http://keycloak:8080}
       Keycloak__MetadataAddress: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}/realms/${KEYCLOAK_REALM:-ISLAMU}/.well-known/openid-configuration
+      Keycloak__AllowManagedLocalHttp: "true"
+      Keycloak__ManagedLocalHttpOrigin: http://keycloak:8080
       Keycloak__Authority: ${KEYCLOAK_ENDPOINT:-http://keycloak.localhost:8080}/realms/${KEYCLOAK_REALM:-ISLAMU}
       ConnectionStrings__cache: ${REDIS_CONNECTION_STRING:-redis:6379}
       AUTHORIZATION_PROVIDER: ${AUTHORIZATION_PROVIDER:-}
@@ -525,8 +490,6 @@ services:
         required: false
       keycloak:
         condition: service_healthy
-      keycloak-init:
-        condition: service_completed_successfully
       minio:
         condition: service_healthy
         required: false
@@ -569,8 +532,6 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-      keycloak-init:
-        condition: service_completed_successfully
       minio:
         condition: service_healthy
         required: false

@@ -5,6 +5,13 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-22
 
+- **Breaking: retired Keycloak startup reconciliation.**
+  AppHost and Docker Compose no longer launch `keycloak-init` or accept
+  callback/API-secret synchronization variables. They also no longer mount or
+  automatically import the sample realm. New and existing deployments use the
+  explicit, reviewed operator workflow; provider volumes and existing realms
+  remain untouched.
+
 - **Reviewed Keycloak operator experience.**
   Initial setup and instance authentication settings now share one HAL-driven
   operator panel for connection, inspection, planning, apply, reconciliation

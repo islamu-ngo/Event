@@ -278,7 +278,9 @@ public sealed class KeycloakConnectionResolver(
     {
         publicOrigin = null;
         if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out Uri? parsed)
-            || parsed.Scheme != Uri.UriSchemeHttps
+            || (parsed.Scheme != Uri.UriSchemeHttps
+                && !(parsed.Scheme == Uri.UriSchemeHttp
+                    && parsed.IsLoopback))
             || !string.IsNullOrEmpty(parsed.UserInfo)
             || !string.IsNullOrEmpty(parsed.Query)
             || !string.IsNullOrEmpty(parsed.Fragment))

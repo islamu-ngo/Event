@@ -228,8 +228,11 @@ Check:
 Checks:
 
 1. Run `aspire describe explore-blazor --format Table` and compare its browser-facing origin with the `redirect_uri` shown by Keycloak. Isolated Aspire runs intentionally use generated ports.
-2. Confirm `keycloak-init` completed after the current AppHost launch. Local initialization reconciles exact login, origin, and logout values from the allocated Blazor HTTP/HTTPS ports; no Keycloak volume reset is required.
-3. If a nonblank `KEYCLOAK_BLAZOR_REDIRECT_URIS`, `KEYCLOAK_BLAZOR_WEB_ORIGINS`, or `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` override is configured, it intentionally wins. Update all three exact allow-lists together; do not introduce wildcards or the `+` origin shortcut.
+2. A normal AppHost launch does not rewrite an existing Keycloak client. The
+   checked-in sample realm is not imported automatically.
+3. For an isolated dynamic origin, use a disposable realm/client created from
+   the trusted `PublicBaseUrl`, or configure the exact callback manually in
+   Keycloak. Do not add wildcards or the `+` origin shortcut.
 
 ### AT Protocol provider is unavailable or OAuth fails closed
 
@@ -292,12 +295,18 @@ Cause:
 - the Blazor BFF confidential client secret does not match the `islamu-event-blazor` client secret stored in Keycloak.
 
 Checks:
-1. Confirm `KEYCLOAK_BLAZOR_CLIENT_SECRET` is set for the Compose environment. The realm export intentionally contains no confidential client secret.
-2. Check `docker compose logs keycloak-init` for successful redacted sync messages. The log must not include raw secret values.
-3. Rerun `docker compose run --rm keycloak-init` after changing or rotating `KEYCLOAK_BLAZOR_CLIENT_SECRET`.
-4. For disposable Compose development, generate a value with `openssl rand -hex 32`; no default-secret escape hatch exists. Local Aspire generates its own persisted secret parameter when deployment configuration is absent.
-5. If the client is missing, verify `docker/keycloak/realm-export.json` imported successfully and that `KEYCLOAK_REALM` matches the imported realm name. Existing Keycloak realms are not overwritten by startup import; reset the disposable Keycloak database volume before expecting realm-export changes to apply.
-6. For external Keycloak, run the private operator connection check and
+1. Confirm `KEYCLOAK_BLAZOR_CLIENT_SECRET` is set for API and BFF and has the
+   same value as the confidential client in Keycloak.
+2. On a new local installation, use the setup operator panel to inspect and
+   explicitly create the absent realm/client before attempting OIDC login.
+3. Existing realms are not overwritten at startup. Rotate the client secret in
+   Keycloak and the selected deployment authority together, restart affected
+   replicas, then reinspect and verify a fresh sign-in.
+4. For disposable local development, generate a value with
+   `openssl rand -hex 32`; no default-secret escape hatch exists. A volume reset
+   is destructive, does not import the sample realm, and is appropriate only
+   when all Keycloak data is disposable.
+5. For external Keycloak, run the private operator connection check and
    inspection. Existing client secrets are deployment-owned and are never
    updated from the browser or adopted by client name.
 

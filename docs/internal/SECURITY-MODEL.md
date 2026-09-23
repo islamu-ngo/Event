@@ -133,6 +133,12 @@ update the local receipt outcome but cannot retry, resume, or roll back a provid
 write. A submitted call with an unknown outcome remains blocked for explicit
 inspect-only reconciliation.
 
+Application startup has no Keycloak administrative authority, mounts no sample
+realm, and launches no import/reconciliation worker. A fresh managed-local
+provider reaches setup before realm discovery succeeds. Every Event-initiated
+write requires the foreground authority, receipt state and exact provider
+preconditions above.
+
 When AT Protocol is primary, a verified DID may JIT-create a passwordless
 `User`, personal `Actor`, and global `UserExternalLogin`. This creates no role.
 Interactive administrator authority remains setup-secret-bound and configured

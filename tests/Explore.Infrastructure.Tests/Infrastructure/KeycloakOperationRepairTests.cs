@@ -33,6 +33,17 @@ public sealed class KeycloakOperationRepairTests
         await Assert.That(handler.Mappers.Single()["protocolMapper"]!
                 .GetValue<string>())
             .IsEqualTo("oidc-sub-mapper");
+        string providerId = handler.Mappers.Single()["id"]!
+            .GetValue<string>();
+        await Assert.That(Guid.TryParse(
+                providerId,
+                out _))
+            .IsTrue();
+        await Assert.That(result.ProviderResourceId)
+            .IsEqualTo(providerId);
+        await Assert.That(
+                request.Step.Desired.ProviderResourceId)
+            .IsEqualTo(providerId);
         await Assert.That(request.ToString())
             .DoesNotContain(request.AdministratorPassword);
     }
@@ -107,6 +118,31 @@ public sealed class KeycloakOperationRepairTests
         await Assert.That(result.Outcome)
             .IsEqualTo(KeycloakStepOutcomeKind.Conflict);
         await Assert.That(handler.MutationCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task SameNameDesiredMapperWithDifferentId_IsNotAdopted()
+    {
+        JsonObject collision = AudienceMapper(
+            id: "operator-mapper-id",
+            name: "event-api-audience",
+            audience: "event-api");
+        var handler = new SemanticKeycloakHandler(
+            [collision]);
+
+        KeycloakMapperOperationResult result =
+            await CreateClient(handler)
+                .ApplyApprovedMapperAsync(
+                    CreateRequest(
+                        PlanAudienceCreate(),
+                        KeycloakMapperSemantic.Audience),
+                    CancellationToken.None);
+
+        await Assert.That(result.Outcome)
+            .IsEqualTo(
+                KeycloakStepOutcomeKind.Conflict);
+        await Assert.That(handler.MutationCount)
+            .IsEqualTo(0);
     }
 
     [Test]
@@ -683,7 +719,6 @@ public sealed class KeycloakOperationRepairTests
                 JsonObject payload = await ReadPayloadAsync(
                     request,
                     cancellationToken);
-                payload["id"] = "mapper-new";
                 Mappers.Add(payload);
                 MutationCount++;
                 if (AcceptMutationThenTimeout)

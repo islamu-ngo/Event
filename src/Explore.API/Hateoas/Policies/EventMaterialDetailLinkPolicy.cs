@@ -33,12 +33,18 @@ public sealed class EventMaterialDetailLinkPolicy(ITenantContext tenantContext)
             if (dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.StoredFile)
                 yield return Resource(LinkDefinition.Action("upload-file", RouteNames.CreateEventResourceUploadSession,
                     HttpMethods.Post, new { id = dto.Id }), dto, AuthorizationActions.EventResources.Update);
+            if (dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.ExternalLink)
+                yield return Resource(LinkDefinition.Action("configure-destination",
+                    RouteNames.SetEventResourceDestination, HttpMethods.Put, new { id = dto.Id }),
+                    dto, AuthorizationActions.EventResources.Update);
         }
         if (dto.PublicationState is EventResourcePublicationStateEnum.Draft or EventResourcePublicationStateEnum.Withdrawn)
         {
             yield return Resource(LinkDefinition.Action(LinkRelations.Archive, RouteNames.ArchiveEventResource,
                 HttpMethods.Post, new { id = dto.Id }), dto, AuthorizationActions.EventResources.Archive);
-            if (dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.StoredFile && dto.File is not null)
+            if ((dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.StoredFile && dto.File is not null)
+                || (dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.ExternalLink
+                    && dto.ExternalDestinationSafeOrigin is not null))
                 yield return Resource(LinkDefinition.Action(LinkRelations.Publish, RouteNames.PublishEventResource,
                     HttpMethods.Post, new { id = dto.Id }), dto, AuthorizationActions.EventResources.Publish);
         }

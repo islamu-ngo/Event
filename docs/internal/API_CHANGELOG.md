@@ -5,6 +5,17 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Protected external resource destinations.** An authenticated,
+  idempotency-revalidated `PUT /api/eventresource/{id}/destination` accepts a
+  full, strictly validated HTTPS link but never reads it back. Only the safe
+  allowed origin and a tenant/resource/version-bound Data Protection envelope
+  persist. After a freshly authorized final header check,
+  `GET /api/eventresource/{id}/access` returns an empty 302 with the destination
+  in `Location`, private/no-store caching and no-referrer policy. Audience and
+  management DTOs gain only the safe origin; eligible HAL has a same-origin
+  `access` action. Invalid keys, tightened policy, withdrawal and tampering
+  return no Location. See [protected destinations](EVENT_RESOURCES.md#protected-external-destinations).
+
 - **Portable resource metadata.** A private/no-store export query uses exact
   parent and per-resource `export` authority with version-bound final checks.
   The explicit bounded projection preserves semantic metadata, audience rules

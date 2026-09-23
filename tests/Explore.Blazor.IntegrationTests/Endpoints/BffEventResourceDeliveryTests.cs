@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Event.Web.BffHosting.Security;
@@ -188,6 +189,103 @@ public sealed class BffEventResourceDeliveryTests : IAsyncDisposable
         using var denied = await client.SendAsync(later);
         await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await Assert.That(await denied.Content.ReadAsByteArrayAsync()).IsEmpty();
+    }
+
+    [Test]
+    public async Task ExternalAccessRedirectIsBrowserNavigationNotAServerSideFetch()
+    {
+        Guid resourceId = Guid.CreateVersion7();
+        string marker = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        var externalArrival = new TaskCompletionSource<IReadOnlyDictionary<string, string>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var landingArrival = new TaskCompletionSource<IReadOnlyDictionary<string, string>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var externalBuilder = WebApplication.CreateBuilder();
+        externalBuilder.WebHost.UseUrls("http://127.0.0.1:0");
+        await using var external = externalBuilder.Build();
+        external.MapGet($"/visit/{marker}", (HttpContext context) =>
+        {
+            externalArrival.TrySetResult(context.Request.Headers.ToDictionary(
+                header => header.Key, header => header.Value.ToString(), StringComparer.OrdinalIgnoreCase));
+            context.Response.Headers.Location = $"/landed/{marker}";
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            return Task.CompletedTask;
+        });
+        external.MapGet($"/landed/{marker}", (HttpContext context) =>
+        {
+            landingArrival.TrySetResult(context.Request.Headers.ToDictionary(
+                header => header.Key, header => header.Value.ToString(), StringComparer.OrdinalIgnoreCase));
+            return Results.Text(marker);
+        });
+        await external.StartAsync();
+        string externalAddress = external.Services.GetRequiredService<IServer>().Features
+            .Get<IServerAddressesFeature>()!.Addresses.Single();
+        string destination = $"{externalAddress}/visit/{marker}";
+
+        var upstreamBuilder = WebApplication.CreateBuilder();
+        upstreamBuilder.WebHost.UseUrls("http://127.0.0.1:0");
+        await using var upstream = upstreamBuilder.Build();
+        upstream.MapGet($"/api/eventresource/{resourceId:D}/access", (HttpContext context) =>
+        {
+            context.Response.Headers.Location = destination;
+            context.Response.Headers.CacheControl = "private, no-store";
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            return Task.CompletedTask;
+        });
+        await upstream.StartAsync();
+        string apiAddress = upstream.Services.GetRequiredService<IServer>().Features
+            .Get<IServerAddressesFeature>()!.Addresses.Single();
+        using var factory = new BlazorBffWebApplicationFactory().WithWebHostBuilder(builder =>
+            builder.UseSetting("ExploreApi:BaseUrl", apiAddress));
+        using var browser = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = false
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/eventresource/{resourceId:D}/access");
+        AddSession(request, _authHeader);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Convert.ToHexString(RandomNumberGenerator.GetBytes(24)));
+        request.Headers.Add("Cookie", $"browser-{marker}=secret");
+        request.Headers.Add(EventBffHeaderNames.TenantSlug, marker);
+        request.Headers.Add(EventBffHeaderNames.TenantId, Guid.CreateVersion7().ToString("D"));
+        request.Headers.Add(EventBffHeaderNames.SetupSecret, marker);
+        request.Headers.Add(EventBffHeaderNames.SupportAccessMode, "Read");
+        request.Headers.Add("X-CSRF-TOKEN", marker);
+        request.Headers.Add("X-API-Key", marker);
+        request.Headers.Add("X-Control-Plane-Key", marker);
+        request.Headers.Add("X-Correlation-ID", marker);
+        request.Headers.Add("X-Forwarded-Host", marker + ".invalid");
+
+        using var redirect = await browser.SendAsync(request).WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(redirect.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+        await Assert.That(redirect.Headers.Location!.AbsoluteUri).IsEqualTo(destination);
+        await Assert.That(redirect.Headers.CacheControl!.NoStore).IsTrue();
+        await Assert.That(redirect.Headers.GetValues("Referrer-Policy").Single()).IsEqualTo("no-referrer");
+        await Assert.That(await redirect.Content.ReadAsStringAsync()).DoesNotContain(marker);
+        await Assert.That(externalArrival.Task.IsCompleted).IsFalse();
+
+        // A fresh browser navigation follows Location without copying BFF request headers.
+        using var navigation = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+        using var firstHop = await navigation.GetAsync(redirect.Headers.Location)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+        var headers = await externalArrival.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(firstHop.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+        await Assert.That(firstHop.Headers.Location!.OriginalString).IsEqualTo($"/landed/{marker}");
+        string[] forbiddenHeaders = ["Authorization", "Cookie", TestAuthHandler.AuthHeaderName,
+            EventBffHeaderNames.TenantSlug, EventBffHeaderNames.TenantId,
+            EventBffHeaderNames.SetupSecret, EventBffHeaderNames.SupportAccessMode,
+            "X-CSRF-TOKEN", "X-API-Key", "X-Control-Plane-Key", "X-Correlation-ID",
+            "X-Forwarded-Host", "X-Forwarded-For", "Forwarded"];
+        foreach (string forbidden in forbiddenHeaders)
+            await Assert.That(headers.ContainsKey(forbidden)).IsFalse();
+        using var landed = await navigation.GetAsync(new Uri(new Uri(destination), firstHop.Headers.Location))
+            .WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.That(landed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await landed.Content.ReadAsStringAsync()).IsEqualTo(marker);
+        var landingHeaders = await landingArrival.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        foreach (string forbidden in forbiddenHeaders)
+            await Assert.That(landingHeaders.ContainsKey(forbidden)).IsFalse();
     }
 
     [Test]

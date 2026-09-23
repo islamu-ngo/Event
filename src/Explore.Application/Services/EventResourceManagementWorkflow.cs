@@ -6,6 +6,7 @@ using Explore.Application.DTOs.EventResource;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventResources;
 using Explore.Application.Responses;
+using Explore.Application.Validation;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -67,9 +68,10 @@ public sealed partial class EventResourceManagementWorkflow(
             draft, cancellationToken);
 
     public Task<BaseCommandResponse<Guid>> ChangeStateAsync(Guid resourceId, Guid expectedVersion,
-        EventResourceManagementAction action, CancellationToken cancellationToken) => action switch
+        EventResourceManagementAction action, CancellationToken cancellationToken,
+        IEventResourceDestinationProtector? destinationProtector = null) => action switch
         {
-            EventResourceManagementAction.Publish => MutateAsync(resourceId, expectedVersion, "publish", EventResourceAuditAction.Publish, null, cancellationToken),
+            EventResourceManagementAction.Publish => MutateAsync(resourceId, expectedVersion, "publish", EventResourceAuditAction.Publish, null, cancellationToken, destinationProtector),
             EventResourceManagementAction.Unpublish => MutateAsync(resourceId, expectedVersion, "unpublish", EventResourceAuditAction.Withdraw, null, cancellationToken),
             EventResourceManagementAction.Archive => MutateAsync(resourceId, expectedVersion, "archive", EventResourceAuditAction.Archive, null, cancellationToken),
             EventResourceManagementAction.Delete => MutateAsync(resourceId, expectedVersion, "delete", EventResourceAuditAction.Delete, null, cancellationToken),
@@ -78,13 +80,39 @@ public sealed partial class EventResourceManagementWorkflow(
         };
 
     private async Task<BaseCommandResponse<Guid>> MutateAsync(Guid resourceId, Guid expectedVersion,
-        string action, EventResourceAuditAction auditAction, EventResourceDraftDto? draft, CancellationToken cancellationToken)
+        string action, EventResourceAuditAction auditAction, EventResourceDraftDto? draft, CancellationToken cancellationToken,
+        IEventResourceDestinationProtector? destinationProtector = null)
     {
         var request = Request(resourceId, action);
         await using var authorized = await authority.AuthorizeAsync(request, EmptyPreparation, cancellationToken);
         if (authorized.Lease is not { } lease) return Failure(authorized.Outcome, resourceId, cancellationToken);
         var policy = lease.Snapshot.Facts.Access.GovernancePolicy;
         if (policy is null) return Failure(EventResourceAuthorityOutcome.Unavailable, resourceId, cancellationToken);
+        if (action == "publish" && lease.Snapshot.Facts.Policy is
+            { EventResourceDeliveryTypeId: (int)EventResourceDeliveryTypeEnum.ExternalLink })
+        {
+            if (destinationProtector is null)
+                return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
+            var external = await resources.GetByIdAsync(request.TenantId,
+                lease.Snapshot.Facts.Access.Parent.EventId, resourceId, cancellationToken);
+            if (external is not { ExternalDestinationCiphertext: { } ciphertext,
+                ExternalDestinationProtectionVersion: { } version }
+                || external.ConcurrencyStamp != expectedVersion)
+                return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
+            try
+            {
+                string raw = destinationProtector.Unprotect(ciphertext, request.TenantId, resourceId, version);
+                if (!EventResourceDestinationValidator.TryValidate(raw, policy,
+                        out string? validated, out string? origin)
+                    || !string.Equals(validated, raw, StringComparison.Ordinal)
+                    || !string.Equals(origin, external.ExternalDestinationSafeOrigin, StringComparison.Ordinal))
+                    return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
+            }
+            catch (Exception)
+            {
+                return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
+            }
+        }
         var eventId = lease.Snapshot.Facts.Access.Parent.EventId;
         var now = clock.GetUtcNow().UtcDateTime;
         if (action == "publish" && lease.Snapshot.Facts.Policy?.PublicationStateId == (int)EventResourcePublicationStateEnum.Withdrawn)
@@ -101,7 +129,9 @@ public sealed partial class EventResourceManagementWorkflow(
                 if (resource.ConcurrencyStamp != expectedVersion || resource.IsDeleted
                     || resource.PublicationStateId == (int)EventResourcePublicationStateEnum.Archived && action != "delete")
                     return BaseCommandResponse.Conflict(resourceId);
-                if (action == "publish" && resource.EventResourceDeliveryTypeId != (int)EventResourceDeliveryTypeEnum.StoredFile)
+                if (action == "publish" && resource.EventResourceDeliveryTypeId is not
+                    ((int)EventResourceDeliveryTypeEnum.StoredFile) and not
+                    ((int)EventResourceDeliveryTypeEnum.ExternalLink))
                     return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
                 EventResourceAudienceRule[]? rules = null;
                 if (draft is not null)

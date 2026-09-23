@@ -48,11 +48,46 @@ P5.A drafts carry only semantic metadata, audience rules, availability intent,
 and a governed delivery *type* placeholder. They accept no storage reference,
 external destination, encryption material, file input, or other delivery
 payload. Delivery is configured through its separate operation. `publish`
-rejects incomplete or disallowed files and every external-link placeholder;
+rejects incomplete or disallowed files and unconfigured external-link placeholders;
 it must not be treated as a way to publish a placeholder.
 Archiving is terminal and never publishes content. It is available from draft
 or withdrawn state; deletion remains permitted for an archived resource when
 the current HAL action is granted.
+
+### Protected external destinations
+
+`PUT /api/eventresource/{id}/destination` accepts a raw link only as
+write-only, idempotency-revalidated input from a current resource manager. It
+validates absolute HTTPS without userinfo, literal IP or recognized local
+hosts, deceptive IDN authority, control/format characters or hostname suffix
+matching. The canonical origin must be in the **current intersected** instance
+and tenant allow-list; no origin is enabled by default. Only the normalized
+origin and a Data Protection envelope are stored. Draft, audit, export,
+federation and ordinary audience DTOs never contain raw links or ciphertext.
+The manager and an eligible reader can see the safe origin to warn before
+navigation; teasers omit it completely. Arbitrarily seeded envelopes must
+decrypt and revalidate against that same origin or publication fails.
+
+`EventResourceDestinationProtector` uses the API's existing database-backed
+Data Protection keyring and stable `islamu-event` application identity. Its
+purpose chain binds the external-destination operation, version, tenant and
+resource; another tenant, resource or version cannot decrypt a copied
+envelope. Combined hosting reasserts this API database keyring after optional
+BFF Redis registration when the API key context is registered; no-database
+test/OpenAPI hosts keep their existing BFF key authority. The BFF must not
+replace production destination-key authority.
+Current authority is checked before unprotecting, and a fresh
+single-use header gate precedes the controlled 302. The response carries the
+destination only in `Location`, with `Cache-Control: no-store` and
+`Referrer-Policy: no-referrer`; the API and BFF never fetch or follow it.
+Unavailable keys, tampering, withdrawal and policy changes emit no Location.
+Only the **initial** origin is constrained: neither DNS resolution nor later
+browser/provider redirects are confined by server-side validation.
+
+Keep retired key material available until dependent resources are withdrawn
+or replaced. A backup containing both encrypted rows and unwrapped
+Data Protection key XML is not confidential against full backup compromise;
+use the deployment's existing key-wrapping authority where configured.
 
 The audit page contains only a closed action/outcome/reason, timestamp, and
 retained responsible-manager identity. A successful mutation writes that

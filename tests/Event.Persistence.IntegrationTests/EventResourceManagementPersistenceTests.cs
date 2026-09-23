@@ -124,10 +124,11 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         AudienceRules = [new(EventResourceAudienceKindEnum.Public)]
     };
 
-    private static EventResourceGovernancePolicy Policy(int retention = 30, int capacity = 500) =>
+    private static EventResourceGovernancePolicy Policy(int retention = 30, int capacity = 500,
+        string[]? origins = null) =>
         EventResourceGovernancePolicy.Create(Enum.GetValues<EventResourceDeliveryTypeEnum>(),
             Enum.GetValues<EventResourceAudienceKindEnum>(), [EventResourceGovernancePolicy.PdfMediaType],
-            10_485_760, false, [], retention, capacity, long.MaxValue);
+            10_485_760, false, origins ?? [], retention, capacity, long.MaxValue);
 
     private sealed class Clock : TimeProvider { public override DateTimeOffset GetUtcNow() => new(Now); }
     private sealed class AuditWriteException : InvalidOperationException;

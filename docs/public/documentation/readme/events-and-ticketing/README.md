@@ -85,6 +85,31 @@ visible to the reader. File download and external-link navigation remain
 separate capabilities; these metadata routes do not publish drafts or grant
 delivery.
 
+## Protected external destinations
+
+An authorized manager follows `configure-destination` on an external-link
+resource and sends a complete HTTPS URL with the resource's current version
+and an `Idempotency-Key`. The URL is write-only: refresh the management detail
+to see the configured safe origin, not the full path/query, token or stored
+envelope. An instance administrator must explicitly allow the exact HTTPS
+origin; a tenant may narrow but cannot widen that policy. IP addresses, local
+hosts, deceptive IDN authorities, userinfo and malformed links are rejected
+without echoing the submitted URL. Publish only after configuration; replace
+or withdraw a link to revoke access.
+
+Eligible readers see only the safe origin and a same-origin `access` HAL link.
+Show that origin and a warning that navigation leaves this service before the
+reader follows the link. It returns a temporary 302 with no-store/no-referrer
+and puts the complete destination **only** in `Location`; neither the API nor
+the BFF follows the external URL. No metadata, audit, export or teaser
+contains the full destination or its ciphertext. Expired grants, withdrawn
+resources, tightened policy or unavailable encryption keys produce no
+Location. Origin validation applies only to the initial redirect: the
+external site's DNS address and subsequent browser/provider redirects are
+outside the platform's control. A link cannot be recalled from a third-party
+service; withdraw/replace it here and rotate the third-party credential when
+responding to an incident.
+
 ## Uploading and downloading resource files
 
 Follow the management representation's `upload-file` action to reserve a file

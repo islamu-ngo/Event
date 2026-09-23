@@ -87,11 +87,13 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
             EventResourceDisclosureModeEnum.Teaser);
         await SaveAsync(resource);
         await using var context = database.CreateContext();
-        var workflow = Workflow(context, scope.TenantAId, subject);
+        var workflow = Workflow(context, scope.TenantAId, subject,
+            origins: ["https://resources.example.test"]);
         var detail = await new GetEventResourceAudienceDetailQueryHandler(workflow).QueryAsync(new(resource.Id));
         await Assert.That(detail.Failure).IsEqualTo(EventResourceAudienceFailure.None);
         await Assert.That(detail.Value!.Title).IsEqualTo(resource.Title);
         await Assert.That(detail.Value.IsTeaser).IsFalse();
+        await Assert.That(detail.Value.ExternalDestinationSafeOrigin).IsEqualTo("https://resources.example.test");
         var before = resource.ConcurrencyStamp;
         await using (var writer = database.CreateIndependentContext())
         {
@@ -105,6 +107,7 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         await Assert.That(teaser.Failure).IsEqualTo(EventResourceAudienceFailure.None);
         await Assert.That(teaser.Value!.Title).IsEqualTo(resource.PublicTitle);
         await Assert.That(teaser.Value.IsTeaser).IsTrue();
+        await Assert.That(teaser.Value.ExternalDestinationSafeOrigin).IsNull();
         await Assert.That(teaser.Value.Description).IsNull();
         await Assert.That(teaser.Value.AccessibilityNote).IsNull();
         await Assert.That(teaser.Value.LanguageCode).IsNull();

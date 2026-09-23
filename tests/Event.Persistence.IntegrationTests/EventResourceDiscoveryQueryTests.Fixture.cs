@@ -71,14 +71,14 @@ public sealed partial class EventResourceDiscoveryQueryTests
     }
 
     private EventResourceAudienceWorkflow Workflow(ExploreDbContext context, Guid tenantId, Guid? subject,
-        Provider? provider = null, bool isMachine = false)
+        Provider? provider = null, bool isMachine = false, string[]? origins = null)
     {
         var repository = new EventResourceRepository(context);
         var unit = new EfCoreUnitOfWork(context);
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(tenantId, Arg.Any<CancellationToken>()).Returns(EventResourceGovernancePolicy.Create(
             Enum.GetValues<EventResourceDeliveryTypeEnum>(), Enum.GetValues<EventResourceAudienceKindEnum>(),
-            [EventResourceGovernancePolicy.PdfMediaType], 10_485_760, false, [], 30, 500, long.MaxValue));
+            [EventResourceGovernancePolicy.PdfMediaType], 10_485_760, false, origins ?? [], 30, 500, long.MaxValue));
         var routes = Substitute.For<IEventResourceProviderSnapshotReader>();
         routes.ReadAsync(tenantId, Arg.Any<CancellationToken>()).Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var tenant = Substitute.For<ITenantContext>(); tenant.TenantId.Returns(tenantId);

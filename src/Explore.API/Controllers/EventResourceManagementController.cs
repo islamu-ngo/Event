@@ -38,6 +38,7 @@ namespace Explore.API.Controllers;
 public sealed class EventResourceManagementController(
     ICommandHandler<CreateEventResourceCommand, BaseCommandResponse<Guid>> create,
     ICommandHandler<UpdateEventResourceCommand, BaseCommandResponse<Guid>> update,
+    ICommandHandler<SetEventResourceDestinationCommand, BaseCommandResponse<Guid>> destination,
     ICommandHandler<PublishEventResourceCommand, BaseCommandResponse<Guid>> publish,
     ICommandHandler<UnpublishEventResourceCommand, BaseCommandResponse<Guid>> unpublish,
     ICommandHandler<ArchiveEventResourceCommand, BaseCommandResponse<Guid>> archive,
@@ -126,6 +127,18 @@ public sealed class EventResourceManagementController(
         Guid id, [FromBody] UpdateEventResourceRequestDto body, CancellationToken cancellationToken)
     {
         var result = await update.ExecuteAsync(new(id, body.ExpectedVersion, body.Draft), cancellationToken);
+        return Failures.Map(this, result, () => Ok(result));
+    }
+
+    [HttpPut("eventresource/{id:guid}/destination", Name = RouteNames.SetEventResourceDestination)]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [RequireIdempotencyKey]
+    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> SetDestination(
+        Guid id, [FromBody] EventResourceDestinationWriteDto input, CancellationToken cancellationToken)
+    {
+        var result = await destination.ExecuteAsync(
+            new(id, input.ExpectedVersion, input.Destination), cancellationToken);
         return Failures.Map(this, result, () => Ok(result));
     }
 

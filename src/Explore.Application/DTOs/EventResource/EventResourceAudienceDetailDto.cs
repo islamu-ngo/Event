@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventResource;
@@ -8,7 +9,9 @@ public sealed record EventResourceAudienceDetailDto(
     bool IsTeaser, string Availability, string Requirements,
     string? Description = null, string? LanguageCode = null,
     string? AccessibilityNote = null, Guid? AccessibleAlternativeEventResourceId = null,
-    EventResourceFileMetadataDto? File = null)
+    EventResourceFileMetadataDto? File = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? ExternalDestinationSafeOrigin = null)
 {
     public override string ToString() => nameof(EventResourceAudienceDetailDto);
 }

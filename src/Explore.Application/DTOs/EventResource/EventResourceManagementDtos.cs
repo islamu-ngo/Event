@@ -60,7 +60,8 @@ public sealed record EventResourceDraftDto
 
 public sealed record EventResourceManagementDto(Guid Id, Guid EventId, Guid Version,
     EventResourcePublicationStateEnum PublicationState, EventResourceDraftDto Draft,
-    DateTime CreatedAt, DateTime? UpdatedAt, EventResourceFileMetadataDto? File = null)
+    DateTime CreatedAt, DateTime? UpdatedAt, EventResourceFileMetadataDto? File = null,
+    string? ExternalDestinationSafeOrigin = null)
 {
     public override string ToString() => nameof(EventResourceManagementDto);
 }

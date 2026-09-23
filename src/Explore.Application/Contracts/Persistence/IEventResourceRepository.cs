@@ -6,6 +6,12 @@ namespace Explore.Application.Contracts.Persistence;
 public interface IEventResourceRepository
 {
     Task AddAsync(EventResource resource, CancellationToken cancellationToken);
+    Task SaveChangesAsync(CancellationToken cancellationToken);
+    Task<EventResource?> GetReplayIdentityAsync(Guid tenantId, Guid resourceId, CancellationToken cancellationToken);
+    Task<int> CountActiveAsync(Guid tenantId, Guid eventId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EventResource>> ListManagementAsync(Guid tenantId, Guid eventId, int skip, int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EventTicketType>> GetAudienceTicketTypesAsync(Guid tenantId, Guid eventId, IReadOnlyCollection<Guid> ticketTypeIds, CancellationToken cancellationToken);
+    Task<IReadOnlyList<EventResourceAuditEntry>> GetUnexpiredAuditEntriesAsync(Guid tenantId, Guid resourceId, DateTime cutoffUtc, int limit, CancellationToken cancellationToken);
     void Update(EventResource resource);
     Task AddAuditEntryAsync(EventResourceAuditEntry entry, CancellationToken cancellationToken);
     Task<EventResource?> GetByIdAsync(Guid tenantId, Guid eventId, Guid resourceId, CancellationToken cancellationToken);

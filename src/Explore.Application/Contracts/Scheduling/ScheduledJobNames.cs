@@ -17,6 +17,7 @@ public static class ScheduledJobNames
     public const string IdempotencyCleanup = "idempotency-cleanup";
     public const string AtprotoTransientCleanup = "atproto-transient-cleanup";
     public const string AiRetentionCleanup = "ai-retention-cleanup";
+    public const string EventResourceAuditRetentionCleanup = "event-resource-audit-retention-cleanup";
     public const string EmailDispatchRetentionCleanup = "email-dispatch-retention-cleanup";
     public const string WebhookRetentionCleanup = "webhook-retention-cleanup";
     public const string PrivacyErasureCredentialCleanup = "privacy-erasure-credential-cleanup";
@@ -62,6 +63,7 @@ public static class ScheduledJobNames
         IdempotencyCleanup,
         AtprotoTransientCleanup,
         AiRetentionCleanup,
+        EventResourceAuditRetentionCleanup,
         EmailDispatchRetentionCleanup,
         WebhookRetentionCleanup,
         PrivacyErasureCredentialCleanup,

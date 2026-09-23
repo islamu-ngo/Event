@@ -50,13 +50,13 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
 
         Guid tenantId = first.TenantId;
         EventResourceGovernancePolicy? governancePolicy = await governance.ReadAsync(tenantId, cancellationToken);
-        Guid[] resourceIds = requests.Where(request => request.Action != "create" && request.ResourceId != Guid.Empty)
+        Guid[] resourceIds = requests.Where(request => !request.TargetsParentEvent && request.ResourceId != Guid.Empty)
             .Select(request => request.ResourceId).Distinct().ToArray();
         IReadOnlyList<EventResource> resourceRows = await resources.GetAuthorityResourcesAsync(
             tenantId, resourceIds, cancellationToken);
         Dictionary<Guid, EventResource> resourcesById = resourceRows.ToDictionary(value => value.Id);
 
-        Guid[] eventIds = requests.Select(request => request.Action == "create"
+        Guid[] eventIds = requests.Select(request => request.TargetsParentEvent
                 ? request.ResourceId
                 : resourcesById.GetValueOrDefault(request.ResourceId)?.EventId ?? Guid.Empty)
             .Where(id => id != Guid.Empty).Distinct().ToArray();
@@ -86,9 +86,10 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         {
             EventResourceAuthorityRequest request = requests[index];
             if (request.ResourceId == Guid.Empty || request.SubjectUserId == Guid.Empty) continue;
+            if (request.IsEventCollection && request.Action is not ("view-management" or "export")) continue;
 
-            EventResource? resource = request.Action == "create" ? null : resourcesById.GetValueOrDefault(request.ResourceId);
-            if (request.Action != "create" && resource is null || resource?.IsDeleted == true) continue;
+            EventResource? resource = request.TargetsParentEvent ? null : resourcesById.GetValueOrDefault(request.ResourceId);
+            if (!request.TargetsParentEvent && resource is null || resource?.IsDeleted == true) continue;
             Guid eventId = resource?.EventId ?? request.ResourceId;
             if (!eventsById.TryGetValue(eventId, out Event? parentEvent) || parentEvent.IsDeleted) continue;
 
@@ -118,7 +119,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             EventResourceManagementFacts management = new(
                 new EventResourceTimedAuthority(organizer), new EventResourceTimedAuthority(subject.TenantMember),
                 new EventResourceTimedAuthority(subject.CanModerate),
-                grants, managementCeiling: resource is not null || governancePolicy is
+                grants, managementCeiling: resource is not null || request.IsEventCollection || governancePolicy is
                 {
                     MaxActiveResources: > 0, EnabledDeliveryTypes.Count: > 0, EnabledAudiences.Count: > 0
                 }, publicationCeiling: governancePolicy is not null);

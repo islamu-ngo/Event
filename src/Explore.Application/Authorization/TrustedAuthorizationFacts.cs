@@ -34,6 +34,9 @@ public sealed record TenantScopedAuthorizationFacts(Guid TenantId) : IAuthorizat
 /// </summary>
 public sealed record EventResourceTargetAuthorizationFacts(Guid TenantId, Guid ResourceId) : IAuthorizationFacts;
 
+/// <summary>Identifier-only parent target for resource management collections and metadata export.</summary>
+public sealed record EventResourceCollectionAuthorizationFacts(Guid TenantId, Guid EventId) : IAuthorizationFacts;
+
 /// <summary>Facts for hierarchical tenant settings, including document identity and instance lock state.</summary>
 public sealed record TenantSettingAuthorizationFacts(
     Guid TenantId,

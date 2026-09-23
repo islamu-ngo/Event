@@ -1,7 +1,9 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Exceptions;
 using Explore.Application.Specifications.EventResources;
 using Explore.Domain;
+using Explore.Persistence.Database;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
@@ -68,10 +70,77 @@ public sealed class EventResourceRepository : IEventResourceRepository
         Guid tenantId,
         Guid eventId,
         Guid resourceId,
-        CancellationToken cancellationToken) =>
-        ResourceGraph(_dbContext.EventResources)
+        CancellationToken cancellationToken)
+    {
+        // A prior successful operation in this scope must not supply stale mutation state.
+        foreach (var entry in _dbContext.ChangeTracker.Entries<EventResourceAudienceRule>()
+            .Where(entry => entry.Entity.EventResourceId == resourceId).ToArray())
+            entry.State = EntityState.Detached;
+        foreach (var entry in _dbContext.ChangeTracker.Entries<EventResource>()
+            .Where(entry => entry.Entity.Id == resourceId).ToArray())
+            entry.State = EntityState.Detached;
+        return ResourceGraph(_dbContext.EventResources)
             .SingleOrDefaultAsync(resource => resource.TenantId == tenantId
                 && resource.EventId == eventId && resource.Id == resourceId, cancellationToken);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (RegistrationUniqueConflictClassifier.IsExpectedConflict(exception,
+            [RelationalConstraintDescriptorResolver.PrimaryKey<EventResource>(_dbContext)]))
+        {
+            // Resolve caller-chosen identity collisions without reading another tenant's resource.
+            // Only the resource primary key is translated; audit and lineage failures still roll back and propagate.
+            throw new ConcurrencyConflictException(ConcurrencyConflictException.ConcurrentUpdate,
+                "The resource identity is already in use.", nameof(EventResource), innerException: exception);
+        }
+    }
+
+    public Task<EventResource?> GetReplayIdentityAsync(Guid tenantId, Guid resourceId, CancellationToken cancellationToken) =>
+        _dbContext.EventResources.IncludeDeleted().AsNoTracking()
+            .SingleOrDefaultAsync(resource => resource.TenantId == tenantId && resource.Id == resourceId, cancellationToken);
+
+    public Task<int> CountActiveAsync(Guid tenantId, Guid eventId, CancellationToken cancellationToken) =>
+        _dbContext.EventResources.AsNoTracking()
+            .Where(resource => resource.TenantId == tenantId && resource.EventId == eventId
+                && resource.PublicationStateId != (int)Explore.Domain.Enums.EventResourcePublicationStateEnum.Archived)
+            .Take(MaximumCandidateCount).CountAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<EventResource>> ListManagementAsync(Guid tenantId, Guid eventId,
+        int skip, int limit, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        int bound = RequireLimit(limit, 100);
+        return await ResourceGraph(_dbContext.EventResources.AsNoTrackingWithIdentityResolution()
+            .Where(resource => resource.TenantId == tenantId && resource.EventId == eventId)
+            .OrderBy(resource => resource.SortOrder).ThenBy(resource => resource.Id).Skip(skip).Take(bound))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<EventTicketType>> GetAudienceTicketTypesAsync(Guid tenantId, Guid eventId,
+        IReadOnlyCollection<Guid> ticketTypeIds, CancellationToken cancellationToken)
+    {
+        Guid[] ids = NormalizeIds(ticketTypeIds, MaximumCandidateCount);
+        return ids.Length == 0 ? [] : await _dbContext.EventTicketTypes.AsNoTracking()
+            .Where(type => type.TenantId == tenantId && ids.Contains(type.Id)
+                && _dbContext.EventTicketCatalogVersions.Any(catalog => catalog.TenantId == tenantId
+                    && catalog.EventId == eventId && catalog.Id == type.CatalogId))
+            .Take(ids.Length).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<EventResourceAuditEntry>> GetUnexpiredAuditEntriesAsync(Guid tenantId,
+        Guid resourceId, DateTime cutoffUtc, int limit, CancellationToken cancellationToken)
+    {
+        int bound = RequireLimit(limit, MaximumAuditCount);
+        return await _dbContext.EventResourceAuditEntries.AsNoTracking()
+            .Where(entry => entry.TenantId == tenantId && entry.EventResourceId == resourceId && entry.Timestamp > cutoffUtc)
+            .OrderByDescending(entry => entry.Timestamp).ThenByDescending(entry => entry.Id)
+            .Take(bound).ToListAsync(cancellationToken);
+    }
 
     public Task<Event?> GetAuthorityEventAsync(
         Guid tenantId,

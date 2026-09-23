@@ -6,6 +6,11 @@ namespace Explore.Application.Hateoas;
 /// </summary>
 public static class LinkRelations
 {
+    public const string CreateResource = "create-resource";
+    public const string ViewAudit = "view-audit";
+    public const string Unpublish = "unpublish";
+    public const string Moderate = "moderate";
+
     public const string VisitorSignupPrefix = "signup:";
     public const string LocalIdentities = "local-identities";
     public const string CreateLocalIdentity = "create-local-identity";

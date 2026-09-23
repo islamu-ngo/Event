@@ -329,6 +329,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<AtprotoPdsDeliveryProcessor>();
         services.AddScoped<IModuleCapabilityService, ModuleCapabilityService>();
         services.AddScoped<IEventResourceGovernancePolicyReader, EventResourceGovernancePolicyReader>();
+        services.AddScoped<EventResourceAuditRetentionService>();
+        services.AddScoped<EventResourceManagementWorkflow>();
         services.AddScoped<SettingUpsertService>();
         services.AddScoped<ManagedTenantProvisioningPreflight>();
         services.AddScoped<ManagedTenantProvisioningCapacityReader>();

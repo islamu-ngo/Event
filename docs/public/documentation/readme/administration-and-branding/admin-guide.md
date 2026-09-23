@@ -136,6 +136,12 @@ withdrawn or deleted by their authorized managers; a disabled policy does not
 trap them in an unmanageable state. Enabling a delivery type does not bypass
 audience eligibility, provider authorization or file safety checks.
 
+Resource-management audit cleanup runs hourly through the platform scheduler,
+including when resource delivery is disabled. It removes complete expired rows;
+retention zero removes existing rows on the next sweep. Subject erasure clears
+manager attribution without deleting shared event resources. Keep the scheduler
+enabled while retained audit data remains.
+
 ### Resource-policy deployment activation (operator API)
 
 Remote event-resource policies use a deployment-level activation fence. This

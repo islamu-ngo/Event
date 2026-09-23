@@ -5,6 +5,17 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Governed resource draft management.** Native resource commands and queries
+  expose private/no-store management detail, event collections, and bounded
+  audit reads. Client-retained UUIDv7 create IDs, required idempotency keys with
+  replay revalidation, and expected versions protect mutation intent. After
+  asynchronous HAL assembly, a final version-bound native authority check
+  guards metadata disclosure. Semantic drafts accept no delivery references
+  and expose no publication, access, or download affordance. Resource mutation
+  and minimal audit commit atomically; hourly retention deletes complete rows,
+  retention zero suppresses collection, and subject erasure clears attribution.
+  See [draft management](EVENT_RESOURCES.md#p5a-draft-management-api).
+
 - **Native resource governance.** The `event_resources.*` setting family is
   available through native settings and configuration manifests. Tenant writes
   cannot widen instance ceilings or set the instance-only unscanned-document

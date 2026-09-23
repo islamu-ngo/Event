@@ -31,7 +31,7 @@ public sealed class EventResourceAuthorizationFacts
         ParentModeration = parentModeration;
     }
 
-    /// <summary>Creation resolves its existing parent Event, never a fabricated persisted resource.</summary>
+    /// <summary>Parent-event operations resolve the existing Event, never a fabricated persisted resource.</summary>
     public EventResourceAuthorizationFacts(EventResourceParentFacts parent, Guid parentVersion,
         Guid? subjectUserId, bool isMachineCaller, EventResourceManagementFacts management,
         EventResourceGovernancePolicy? governancePolicy)
@@ -45,8 +45,12 @@ public sealed class EventResourceAuthorizationFacts
     internal EventResourceEvaluation Evaluate(EventResourceAuthorityRequest request,
         EventResourceProviderSnapshot? route, DateTimeOffset now)
     {
-        bool creating = Policy is null;
-        if (creating != (request.Action == "create") || request.ResourceId != ResourceId
+        bool parentTarget = Policy is null;
+        bool creating = request.Action == "create";
+        if (parentTarget != request.TargetsParentEvent
+            || request.IsEventCollection && request.Action is not ("view-management" or "export")
+            || request.ExpectedResourceVersion is { } expectedVersion && ResourceVersion != expectedVersion
+            || request.ResourceId != ResourceId
             || request.TenantId != (Policy?.TenantId ?? Access.Parent.TenantId)
             || Access.TenantId != request.TenantId || Access.SubjectUserId != request.SubjectUserId
             || Access.IsMachineCaller != request.IsMachineCaller || string.IsNullOrWhiteSpace(AttachmentGeneration))
@@ -66,7 +70,7 @@ public sealed class EventResourceAuthorizationFacts
         bool moderate = !publicOnly && Management.Moderation.IsEffectiveAt(now);
         bool management = Management.ManagementCeiling && Policy?.IsDeleted != true
             && !Access.Parent.EventDeleted && Access.Parent.TenantId == request.TenantId
-            && (creating || Access.Parent.EventId == Policy!.EventId);
+            && (parentTarget || Access.Parent.EventId == Policy!.EventId);
         bool publication = Policy is not null && management && Management.PublicationCeiling && Access.PayloadSafetySatisfied
             && EventResourceAccessRules.IsGovernanceEligible(Policy, Access.GovernancePolicy)
             && Policy.HasPublishablePayload && EventResourceAccessRules.IsParentEligible(Policy, Access.Parent)

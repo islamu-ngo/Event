@@ -19,6 +19,7 @@ using Explore.Application.DTOs.CustomPropertyGovernance;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.DTOs.Event;
+using Explore.Application.DTOs.EventResource;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.DTOs.EventDay;
@@ -88,6 +89,7 @@ public static class HateoasAssemblerRegistration
         // Event
         services.AddHalResourceWithAssembler<EventDto, EventListDto, EventDetailLinkPolicy, EventCollectionLinkPolicy, EventResourceAssembler>();
         services.AddHalResource<EventTeamMemberDto, EventTeamMemberDetailLinkPolicy, EventTeamMemberCollectionLinkPolicy>();
+        services.AddHalResource<EventResourceManagementDto, EventMaterialDetailLinkPolicy, EventMaterialCollectionLinkPolicy>();
         services.AddScoped<EventTicketCatalogManagementLinkPolicy>();
         services.AddHalResourceWithAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementLinkPolicy, EventTicketCatalogManagementCollectionLinkPolicy, EventTicketCatalogManagementResourceAssembler>();
         services.AddHalResource<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightLinkPolicy, PaidEventPublicationPreflightCollectionLinkPolicy>();

@@ -38,6 +38,16 @@ internal static class OpenApiStringEnumSchemaCatalog
 {
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(EventResourceKindEnum),
+        typeof(EventResourceDeliveryTypeEnum),
+        typeof(EventResourceDisclosureModeEnum),
+        typeof(EventResourcePublicationStateEnum),
+        typeof(EventResourceAudienceKindEnum),
+        typeof(EventResourceAvailabilityAnchorEnum),
+        typeof(EventResourceAuditAction),
+        typeof(EventResourceAuditOutcome),
+        typeof(EventResourceAuditReason),
+        typeof(AdmissionTargetTypeEnum),
         typeof(VisitorAccessMode),
         typeof(PublicOnboardingPolicy),
         typeof(AuthenticationProviderKind),
@@ -63,6 +73,16 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(EventResourceKindEnum),
+        typeof(EventResourceDeliveryTypeEnum),
+        typeof(EventResourceDisclosureModeEnum),
+        typeof(EventResourcePublicationStateEnum),
+        typeof(EventResourceAudienceKindEnum),
+        typeof(EventResourceAvailabilityAnchorEnum),
+        typeof(EventResourceAuditAction),
+        typeof(EventResourceAuditOutcome),
+        typeof(EventResourceAuditReason),
+        typeof(AdmissionTargetTypeEnum),
         typeof(VisitorAccessMode),
         typeof(PublicOnboardingPolicy),
         typeof(AuthenticationProviderKind),

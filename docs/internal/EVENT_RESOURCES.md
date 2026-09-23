@@ -1,12 +1,83 @@
 ---
-title: Event resource persistence
-status: implemented-foundation
+title: Governed event resources
+status: implemented-draft-management
 last_updated: 2026-09-23
 ---
 
-# Event Resource Persistence
+# Governed Event Resources
 
-`EventResource` is an independent tenant/event-owned aggregate for governed event materials. This persistence phase does not expose management or delivery APIs; later authority and transport phases consume the entity-first repository.
+`EventResource` is an independent tenant/event-owned aggregate for governed event materials. P5.A exposes private management of semantic drafts; it does not expose delivery or attendee discovery.
+
+## P5.A draft-management API
+
+This is an organizer-management contract, not a public material catalogue. The
+authenticated, private/no-store routes are:
+
+| Purpose | Route |
+| --- | --- |
+| Read one management representation | `GET /api/eventresource/{id}/management` |
+| List an event's management representations | `GET /api/event/{eventId}/resources/management?page=&pageSize=` |
+| Read the bounded management audit | `GET /api/eventresource/{id}/audit?limit=` |
+| Create a draft | `POST /api/event/{eventId}/resources` |
+| Update draft semantics | `PUT /api/eventresource/{id}` |
+| Archive, delete, or the reserved state routes | `POST /api/eventresource/{id}/archive`, `DELETE /api/eventresource/{id}`, `POST /api/eventresource/{id}/publish`, `POST /api/eventresource/{id}/unpublish`, `POST /api/eventresource/{id}/moderate` |
+
+Every management representation is private/no-store, including its HAL form and
+audit result. Organizer clients follow only the server-authored HAL links; a
+link is an affordance for the current decision, not a durable permission. The
+management detail and collection expose `self`, collection, audit, create,
+edit, archive, delete, unpublish, and moderation relations only when applicable
+and authorized. They deliberately expose no delivery, access, download, or
+publish affordance.
+
+Management pages contain only the requested page number/size, authorized HAL
+items and collection actions. They expose no total count, total pages or
+count-derived navigation: parent management authority does not authorize counts
+of provider-denied resources on other pages. Each read loads at most 100 rows,
+including archived history, without materializing the entire event inventory.
+
+Create bodies contain a client-retained UUIDv7 `resourceId`; it is the replay
+identity and is not server-derived tenant or subject authority. Update and state
+requests supply the representation's `version` as `expectedVersion`; stale
+versions conflict, and unauthorized or missing targets are not exposed. Every mutation requires an
+`Idempotency-Key`. `RequireIdempotencyKey` and `RevalidateIdempotencyReplay` are
+both active: a replay does not reuse an old authorization result, and there is
+no suppression bypass for this controller.
+
+P5.A drafts carry only semantic metadata, audience rules, availability intent,
+and a governed delivery *type* placeholder. They accept no storage reference,
+external destination, encryption material, file input, or other delivery
+payload. `publish` remains a reserved route and rejects incomplete drafts in
+this phase; it must not be treated as a way to publish a placeholder.
+Archiving is terminal and never publishes content. It is available from draft
+or withdrawn state; deletion remains permitted for an archived resource when
+the current HAL action is granted.
+
+The audit page contains only a closed action/outcome/reason, timestamp, and
+retained responsible-manager identity. A successful mutation writes that
+minimal audit entry in the same serializable transaction as the resource
+change. With retention zero no new entry is written and the hourly cleanup
+purges existing entries; otherwise it removes expired complete rows. Subject
+erasure clears manager attribution without deleting the shared resource. The
+current retention configuration and operational limits remain in the existing
+[event-resource governance guide](../public/documentation/readme/administration-and-branding/admin-guide.md#event-resource-governance), rather than being duplicated here.
+
+### Native implementation boundary
+
+The public contract above intentionally omits implementation mechanics. Native
+CQS uses closed `ICommand`/`IQuery` requests and handlers rather than generic
+CRUD: create, update, publish, unpublish, archive, delete, moderate, detail,
+management list, and audit each retain their explicit result/failure boundary.
+The authority orchestrator takes serializable A and B snapshots around provider
+I/O; B compares the frozen route and complete provider inputs, including the
+resource version. Mutations recheck current authority inside their own
+serializable transaction, including execution-strategy replay, before the state
+and audit change commit.
+
+HAL assembly is asynchronous. Management metadata receives a final
+version-bound authorization check after that assembly; this is a decision
+boundary, not a guarantee that authority remains fresh through response
+completion.
 
 ## Relational ownership
 

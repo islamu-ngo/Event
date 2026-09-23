@@ -256,6 +256,35 @@ public sealed class QuartzSchedulerCompositionTests
     }
 
     [Test]
+    public async Task ResourceAuditRetentionIsOwnedAndScheduledWithoutTenantPayloads()
+    {
+        await using ServiceProvider provider = BuildSchedulerProvider(new Dictionary<string, string?>());
+        var manifest = provider.GetRequiredService<QuartzRecurringJobManifest>();
+        IScheduler scheduler = await provider.GetRequiredService<ISchedulerFactory>().GetScheduler();
+        var key = new JobKey("event-resource-audit-retention-cleanup", QuartzSchedulerKeys.RecurringGroup);
+        try
+        {
+            await Assert.That(manifest.Owned).Contains(key);
+            await Assert.That(manifest.Desired).Contains(key);
+            await Assert.That(ScheduledJobNames.All).Contains(key.Name);
+            var job = await scheduler.GetJobDetail(key);
+            await Assert.That(job).IsNotNull();
+            await Assert.That(job!.ConcurrentExecutionDisallowed).IsTrue();
+            await Assert.That(job.JobDataMap.Count).IsEqualTo(0);
+            var triggers = await scheduler.GetTriggersOfJob(key);
+            await Assert.That(triggers.Count).IsEqualTo(1);
+            var trigger = triggers.Single() as ISimpleTrigger;
+            await Assert.That(trigger).IsNotNull();
+            await Assert.That(trigger!.RepeatInterval).IsEqualTo(TimeSpan.FromHours(1));
+            await Assert.That(trigger.JobDataMap.Count).IsEqualTo(0);
+        }
+        finally
+        {
+            await scheduler.Shutdown(false);
+        }
+    }
+
+    [Test]
     [Arguments(true)]
     [Arguments(false)]
     public async Task TransientCleanupRemainsScheduledWhenAtprotoLoginIsDisabled(bool atprotoEnabled)

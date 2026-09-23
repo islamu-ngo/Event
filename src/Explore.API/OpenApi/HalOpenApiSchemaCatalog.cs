@@ -12,6 +12,13 @@ internal static class HalOpenApiSchemaCatalog
         // Event DTOs
         typeof(Explore.Application.DTOs.Event.EventDto),
         typeof(Explore.Application.DTOs.Event.EventListDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceManagementDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceManagementCollectionDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceDraftDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAudienceDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceTimeIntentDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAuditDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAuditPageDto),
         typeof(Explore.Application.DTOs.EventSeries.EventSeriesDto),
         typeof(Explore.Application.DTOs.EventSeries.EventSeriesListDto),
         typeof(Explore.Application.DTOs.Event.EventPublicActionDto),
@@ -299,6 +306,7 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfEventResourceManagementDto"] = typeof(Explore.Application.DTOs.EventResource.EventResourceManagementDto),
         ["HalResourceOfVisitorAccessCapabilityDto"] = typeof(Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto),
         ["HalResourceOfVisitorSignupDestinationDto"] = typeof(Explore.Application.DTOs.PublicExperience.VisitorSignupDestinationDto),
         ["HalResourceOfPublicExperienceSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.PublicExperienceSettingsDto),
@@ -503,6 +511,7 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, string> CollectionEmbeddedItemResourceMappings { get; } = new Dictionary<string, string>
     {
+        ["HalCollectionEmbeddedOfEventResourceManagementDto"] = "HalResourceOfEventResourceManagementDto",
         ["HalCollectionEmbeddedOfLocalIdentitySummary"] = "HalResourceOfLocalIdentitySummary",
         ["HalCollectionEmbeddedOfSetupSecretBindingReadinessItem"] =
             "HalResourceOfSetupSecretBindingReadinessItem",

@@ -64,6 +64,28 @@ public class EventResourceAuthorityOrchestratorTests
     }
 
     [Test]
+    public async Task NativeCollectionResolutionRejectsCrossTenantOrResourceMutationTargets()
+    {
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(Tenant);
+        var resolver = new AuthorizationResourceContextResolver(tenantContext: tenant);
+        var facts = new EventResourceCollectionAuthorizationFacts(Tenant, EventId);
+        var context = await resolver.ResolveAsync(new object(), ResourceKinds.EventResource, "view-management",
+            EventId.ToString("D"), facts, default);
+        await Assert.That(context.Facts).IsEqualTo(facts);
+        await Assert.That(async () =>
+        {
+            await resolver.ResolveAsync(new object(), ResourceKinds.EventResource, "update",
+                EventId.ToString("D"), facts, default);
+        }).Throws<Explore.Application.Exceptions.AuthorizationException>();
+        await Assert.That(async () =>
+        {
+            await resolver.ResolveAsync(new object(), ResourceKinds.EventResource, "view-management",
+                EventId.ToString("D"), facts with { TenantId = Guid.CreateVersion7() }, default);
+        }).Throws<Explore.Application.Exceptions.AuthorizationException>();
+    }
+
+    [Test]
     [Arguments(EventResourceAudienceKindEnum.Public, EventResourceAuthorityOutcome.Unavailable)]
     [Arguments(EventResourceAudienceKindEnum.AuthenticatedTenantMember, EventResourceAuthorityOutcome.NotFound)]
     public async Task Unbound_provider_route_cannot_reveal_a_private_resource(
@@ -89,6 +111,37 @@ public class EventResourceAuthorityOrchestratorTests
             Task.FromResult<IEventResourcePrivatePreparation>(preparation));
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
         await Assert.That(preparation.Disposed).IsTrue();
+    }
+
+    [Test]
+    public async Task NativeMutationUsesCallerCancellationWithoutInventingAContentDeadline()
+    {
+        var f = new Fixture();
+        f.Facts = f.Capture(management: Management([new("event:update", new(true))]));
+        using var cancellation = new CancellationTokenSource();
+        await using var result = await f.Service.AuthorizeAsync(
+            f.Request with { Action = "update", DeadlineUtc = null },
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation("generation-1")),
+            cancellation.Token);
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        cancellation.Cancel();
+        var outcome = await f.UnitOfWork.ExecuteSerializableAsync(token =>
+            f.Service.RecheckMutationAsync(result.Lease!, f.Resource.ConcurrencyStamp, token));
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Cancelled);
+    }
+
+    [Test]
+    public async Task ContentPreparationStillRequiresAnExplicitDeadline()
+    {
+        var f = new Fixture();
+        bool prepared = false;
+        await using var result = await f.Service.AuthorizeAsync(f.Request with { DeadlineUtc = null }, (_, _) =>
+        {
+            prepared = true;
+            return Task.FromResult<IEventResourcePrivatePreparation>(new Preparation("generation-1"));
+        });
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Expired);
+        await Assert.That(prepared).IsFalse();
     }
 
     [Test]
@@ -609,6 +662,68 @@ public class EventResourceAuthorityOrchestratorTests
         var revoked = await f.UnitOfWork.ExecuteSerializableAsync(ct =>
             f.Service.RecheckMutationAsync(lease!, f.Resource.ConcurrencyStamp, ct));
         await Assert.That(revoked).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+    }
+
+    [Test]
+    public async Task PreparedMetadataCannotBorrowAuthorityForADifferentResourceVersion()
+    {
+        var f = new Fixture();
+        f.Facts = f.Capture(management: Management([new("event:update", new(true))]));
+        var decisions = await f.Service.AuthorizeCapabilitiesAsync(
+            [f.Request with { Action = "view-management", ExpectedResourceVersion = Guid.CreateVersion7() }]);
+        await Assert.That(decisions.Single()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(f.Inputs).IsEmpty();
+    }
+
+    [Test]
+    public async Task NativeCollectionCapabilityRetainsItsExactParentEventTarget()
+    {
+        var f = new Fixture();
+        f.Facts = new(f.Access.Parent, Tenant, Subject, false,
+            Management([new("event:update", new(true))]), f.Access.GovernancePolicy);
+        var request = new AuthorizationRequest(ResourceKinds.EventResource, EventId.ToString("D"), "view-management",
+            Facts: new EventResourceCollectionAuthorizationFacts(Tenant, EventId));
+        var decision = (await f.NativeAuthorizer().AuthorizeBatchAsync([request], default)).Single();
+        await Assert.That(decision.IsAllowed).IsTrue();
+        await Assert.That(f.Inputs.Single().Resource.Id).IsEqualTo(EventId);
+        await Assert.That(f.Inputs.Single().Resource.IsCreation).IsFalse();
+    }
+
+    [Test]
+    public async Task ManagementCollectionUsesParentAuthorityWithoutRequiringCreationOrDelivery()
+    {
+        var f = new Fixture();
+        var defaults = f.Access.GovernancePolicy!;
+        var disabled = EventResourceGovernancePolicy.Create([], [], defaults.PermittedFileTypes,
+            defaults.MaxUploadBytes, false, [], defaults.AuditRetentionDays, 0, long.MaxValue);
+        f.Request = f.Request with
+        {
+            ResourceId = EventId, Action = "view-management", IsEventCollection = true, DeadlineUtc = null
+        };
+        f.Facts = new(f.Access.Parent, Tenant, Subject, false,
+            Management([new("event:update", new(true))]), disabled);
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation("parent")));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        await Assert.That(f.Inputs.Single().Action).IsEqualTo("view-management");
+        await Assert.That(f.Inputs.Single().Resource.IsCreation).IsFalse();
+        await Assert.That(f.Inputs.Single().Resource.Id).IsEqualTo(EventId);
+        await Assert.That(f.Inputs.Single().Resource.CanAccess).IsFalse();
+    }
+
+    [Test]
+    [Arguments("download")]
+    [Arguments("update")]
+    public async Task ParentCollectionTargetCannotSubstituteForAResourceOperation(string action)
+    {
+        var f = new Fixture();
+        f.Request = f.Request with { ResourceId = EventId, Action = action, IsEventCollection = true };
+        f.Facts = new(f.Access.Parent, Tenant, Subject, false,
+            Management([new("event:update", new(true))]), f.Access.GovernancePolicy);
+        await using var result = await f.Service.AuthorizeAsync(f.Request,
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation("parent")));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(f.Inputs).IsEmpty();
     }
 
     [Test]

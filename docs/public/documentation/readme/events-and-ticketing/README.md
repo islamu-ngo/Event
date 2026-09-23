@@ -26,6 +26,41 @@ Before publishing a paid or controlled-entry event, verify module policy, regist
 
 Deleting a session, session group, or agenda item removes that item's venue and room references together. It does not delete the shared venue or another scheduled item's location assignment.
 
+## Organizer resource drafts (API)
+
+Authorized organizers manage event-resource drafts through private, no-store
+API representations. Use the HAL links returned by `GET
+/api/event/{eventId}/resources/management` or `GET
+/api/eventresource/{id}/management`; do not retain an action URL as a standing
+permission. The collection may offer create, and an item may offer edit,
+archive, delete, audit, unpublish, or moderation according to current authority.
+
+Management lists accept `page` and `pageSize` (at most 100). They do not return
+global totals or count-derived navigation, because other resources may be
+undisclosed. An empty page does not reveal whether other pages contain resources.
+
+Create with `POST /api/event/{eventId}/resources` and a client-generated UUIDv7
+`resourceId`. Retain that ID when retrying. Send an `Idempotency-Key` on every
+write; replayed requests are authorized again, so a prior success does not
+bypass a revoked or changed organizer role. Updates and state changes use the
+current resource `version` as `expectedVersion`; refresh the representation
+after a conflict.
+
+These are semantic drafts only: title, description, kind, disclosure choice,
+audience rules, timing intent, and a delivery-type placeholder. Do not send a
+file, external destination, download/access instruction, or other delivery
+data. Publishing is not available in this phase, even though a reserved API
+route exists. Archiving is terminal and does not publish anything; an archived
+draft can still be deleted when its HAL action is present.
+
+The optional audit read is private and contains only the retained management
+action, outcome, reason, time, and manager attribution. Retention zero collects
+no new management audit entries and removes existing ones; expiry cleanup and
+subject-erasure attribution clearing do not remove the shared draft. Administrators
+set the governing limits through the existing
+[event-resource governance](../administration-and-branding/admin-guide.md#event-resource-governance)
+workflow.
+
 ---
 
 ## Related Guides & Next Steps

@@ -6,6 +6,17 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string GetEventResourceManagementDetail = nameof(GetEventResourceManagementDetail);
+    public const string ListEventResourceManagement = nameof(ListEventResourceManagement);
+    public const string GetEventResourceAudit = nameof(GetEventResourceAudit);
+    public const string CreateEventResource = nameof(CreateEventResource);
+    public const string UpdateEventResource = nameof(UpdateEventResource);
+    public const string PublishEventResource = nameof(PublishEventResource);
+    public const string UnpublishEventResource = nameof(UnpublishEventResource);
+    public const string ArchiveEventResource = nameof(ArchiveEventResource);
+    public const string DeleteEventResource = nameof(DeleteEventResource);
+    public const string ModerateEventResource = nameof(ModerateEventResource);
+
     public const string GetEventResourceProviderBindings = nameof(GetEventResourceProviderBindings);
     public const string BindEventResourceProvider = nameof(BindEventResourceProvider);
     public const string BeginEventResourceProviderOperation = nameof(BeginEventResourceProviderOperation);

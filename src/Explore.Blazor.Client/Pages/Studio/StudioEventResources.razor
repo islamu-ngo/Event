@@ -1,0 +1,255 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Contracts.Services
+@using Explore.Blazor.Client.Components.Event
+@using Explore.Blazor.Client.Contracts.Interop
+@inject IEventResourceService Resources
+@inject ITranslationService Translation
+@inject IBrowserActionInterop BrowserActions
+
+<div class="studio-resources" dir="@(Translation.CurrentLanguage == "ar" ? "rtl" : null)">
+    @if (_loading) { <p role="status">@T("loading", "Loading resources…")</p> }
+    else if (_error is not null) { <p role="alert">@_error</p> }
+    else
+    {
+        <div class="studio-resources__actions">
+            @if (Has(_collection?._links, "create-resource"))
+            { <button type="button" data-testid="resource-create-resource" @onclick="BeginCreate">@T("create", "New resource")</button> }
+            @if (Has(_collection?._links, "export"))
+            { <button type="button" data-testid="resource-export" @onclick="ExportAsync">@T("export", "Export metadata")</button> }
+        </div>
+        @if (_editing)
+        {
+            <form class="studio-resources__form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <h3>@(_target is null ? T("create", "New resource") : T("edit", "Edit resource"))</h3>
+                <label for="resource-title">@T("title", "Title")</label>
+                <input id="resource-title" required maxlength="200" @bind="_draft.Title" />
+                <label for="resource-description">@T("description", "Description")</label>
+                <textarea id="resource-description" @bind="_draft.Description"></textarea>
+                <label for="resource-public-title">@T("publicTitle", "Public teaser title")</label>
+                <input id="resource-public-title" @bind="_draft.PublicTitle" />
+                <label for="resource-kind">@T("kind", "Kind")</label>
+                <select id="resource-kind" @bind="_draft.Kind">@foreach (var kind in Enum.GetValues<EventResourceKindEnum>()) { <option value="@kind">@kind</option> }</select>
+                <label for="resource-disclosure">@T("disclosure", "Disclosure")</label>
+                <select id="resource-disclosure" @bind="_draft.DisclosureMode">@foreach (var mode in Enum.GetValues<EventResourceDisclosureModeEnum>()) { <option value="@mode">@mode</option> }</select>
+                <label for="resource-delivery">@T("delivery", "Delivery")</label>
+                <select id="resource-delivery" @bind="_draft.DeliveryType" disabled="@(_target is not null)">@foreach (var type in Enum.GetValues<EventResourceDeliveryTypeEnum>()) { <option value="@type">@type</option> }</select>
+                @if (_target is null)
+                {
+                    <label for="resource-audience">@T("audience", "Audience")</label>
+                    <select id="resource-audience" required @bind="_audienceKind">
+                        <option value="">@T("chooseAudience", "Choose an audience")</option>
+                        <option value="@EventResourceAudienceKindEnum.Public">@T("public", "Public")</option>
+                        <option value="@EventResourceAudienceKindEnum.AuthenticatedTenantMember">@T("tenantMembers", "Authenticated tenant members")</option>
+                        <option value="@EventResourceAudienceKindEnum.AnyEventSessionSpeaker">@T("speakers", "Event speakers")</option>
+                        <option value="@EventResourceAudienceKindEnum.Organizer">@T("organizers", "Organizers")</option>
+                    </select>
+                }
+                <label for="resource-language">@T("language", "Language code")</label>
+                <input id="resource-language" @bind="_draft.LanguageCode" />
+                <label for="resource-accessibility">@T("accessibility", "Accessibility note")</label>
+                <textarea id="resource-accessibility" @bind="_draft.AccessibilityNote"></textarea>
+                <label for="resource-notes">@T("notes", "Private organizer notes")</label>
+                <textarea id="resource-notes" @bind="_draft.SensitiveNotes"></textarea>
+                <div class="studio-resources__actions"><button type="submit" disabled="@_busy">@T("save", "Save")</button><button type="button" @onclick="Cancel">@T("cancel", "Cancel")</button></div>
+            </form>
+        }
+        @if (_destinationTarget is { } destinationTarget)
+        {
+            <form class="studio-resources__form" @onsubmit="SaveDestinationAsync" @onsubmit:preventDefault>
+                <h3>@T("destination", "Set external destination")</h3>
+                <p>@T("writeOnly", "The full URL is write-only and cannot be retrieved after saving. Existing destination is not shown.")</p>
+                <label for="resource-destination">@T("destinationUrl", "HTTPS destination URL")</label>
+                <input id="resource-destination" type="url" required pattern="https://.*" autocomplete="off" @bind="_destination" />
+                <div class="studio-resources__actions"><button type="submit" disabled="@_busy">@T("save", "Save")</button><button type="button" @onclick="Cancel">@T("cancel", "Cancel")</button></div>
+            </form>
+        }
+        @if (_audit is not null)
+        { <section aria-label="@T("audit", "Audit history")"><h3>@T("audit", "Audit history")</h3><ul>@foreach (var entry in _audit.Items) { <li>@entry.Timestamp: @entry.Action - @entry.Outcome</li> }</ul></section> }
+        @if (_exportPage is not null)
+        {
+            <section aria-label="@T("export", "Export metadata")">
+                <h3>@T("export", "Export metadata")</h3>
+                <p role="status">@T("exportReady", "Authorized metadata export loaded.")</p>
+                <pre class="studio-resources__export">@System.Text.Json.JsonSerializer.Serialize(_exportPage)</pre>
+            </section>
+        }
+        @if (_status is not null) { <p role="status">@_status</p> }
+        @if (_collection?._embedded.Items.Count == 0) { <p>@T("empty", "No resources yet.")</p> }
+        <div class="studio-resources__list">
+            @foreach (var item in _items)
+            {
+                <article class="studio-resources__card" @key="item.Id">
+                    <h3 data-testid="studio-resource-title">@item.Draft.Title</h3>
+                    <p>@item.PublicationState · @item.Draft.Kind</p>
+                    @if (item.File is { } file) { <p>@file.FileName · @file.SafetyState</p> }
+                    @if (item.ExternalDestinationSafeOrigin is { } origin) { <p>@T("origin", "Destination origin"): @origin</p> }
+                    <div class="studio-resources__actions">
+                        @if (Has(item._links, "edit")) { <button type="button" data-testid="resource-edit" @onclick="() => BeginEdit(item)">@T("edit", "Edit")</button> }
+                        @if (Has(item._links, "configure-destination")) { <button type="button" data-testid="resource-configure-destination" @onclick="() => BeginDestination(item)">@T("destination", "Set external destination")</button> }
+                        @foreach (var action in new[] { "publish", "unpublish", "archive", "moderate" })
+                        {
+                            if (Has(item._links, action))
+                            { <button type="button" data-testid="@($"resource-{action}")" disabled="@_busy" @onclick="() => MutateAsync(item, action)">@T(action, action)</button> }
+                        }
+                        @if (Has(item._links, "delete"))
+                        { <button type="button" data-testid="resource-delete" disabled="@_busy" @onclick="() => _confirmDeleteId = item.Id">@T("delete", "Delete")</button> }
+                        @if (Has(item._links, "view-audit")) { <button type="button" data-testid="resource-view-audit" @onclick="() => AuditAsync(item)">@T("audit", "Audit history")</button> }
+                    </div>
+                    @if (_confirmDeleteId == item.Id)
+                    {
+                        <div class="studio-resources__confirmation" role="group" aria-label="@T("confirmDelete", "Confirm resource deletion")">
+                            <p id="@($"resource-delete-warning-{item.Id:N}")">@T("confirmDelete", "Confirm resource deletion")</p>
+                            <button type="button" data-testid="resource-confirm-delete" aria-describedby="@($"resource-delete-warning-{item.Id:N}")" disabled="@_busy" @onclick="() => ConfirmDeleteAsync(item)">@T("confirmDelete", "Confirm resource deletion")</button>
+                            <button type="button" @onclick="() => _confirmDeleteId = null">@T("cancel", "Cancel")</button>
+                        </div>
+                    }
+                </article>
+            }
+        </div>
+        @if (_items.Count == _collection?.PageSize && _items.Count > 0)
+        { <button type="button" @onclick="NextAsync">@T("more", "Next page")</button> }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid EventId { get; set; }
+    private EventResourceManagementCollectionDto? _collection;
+    private readonly List<HalResourceOfEventResourceManagementDto> _items = [];
+    private EventResourceAuditPageDto? _audit;
+    private EventResourceMetadataExportPageDto? _exportPage;
+    private HalResourceOfEventResourceManagementDto? _target, _destinationTarget;
+    private EventResourceDraftDto _draft = new();
+    private EventResourceAudienceKindEnum? _audienceKind;
+    private string _destination = "";
+    private string? _error, _status;
+    private bool _editing, _busy, _loading = true;
+    private Guid _loadedEvent;
+    private Guid? _confirmDeleteId;
+    private int _page = 1;
+    private string T(string key, string fallback) => Translation.T($"event.resources.{key}", fallback);
+    private static bool Has(IDictionary<string, HalLink>? links, string relation) => links?.ContainsKey(relation) == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedEvent == EventId) return;
+        _loadedEvent = EventId;
+        _page = 1;
+        _audit = null;
+        _exportPage = null;
+        Cancel();
+        await ReloadAsync();
+    }
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _items.Clear();
+        try
+        {
+            _collection = await Resources.ManagementAsync(EventId, _page);
+            foreach (var embedded in _collection._embedded.Items)
+            {
+                var detail = await Resources.ManagementDetailAsync(embedded.Id);
+                if (detail.EventId == EventId) _items.Add(detail);
+            }
+        }
+        catch (ApiException) { _collection = null; _error = T("unavailable", "Resources are unavailable. Please try again."); }
+        finally { _loading = false; }
+    }
+    private async Task NextAsync() { _page++; await ReloadAsync(); }
+    private void BeginCreate() { _target = null; _draft = new() { Availability = new EventResourceTimeIntentDto() }; _audienceKind = null; _editing = true; _destinationTarget = null; }
+    private void BeginEdit(HalResourceOfEventResourceManagementDto item)
+    {
+        _target = item;
+        _audienceKind = null;
+        var d = item.Draft;
+        _draft = new EventResourceDraftDto { Title = d.Title, PublicTitle = d.PublicTitle, Description = d.Description,
+            SensitiveNotes = d.SensitiveNotes, Kind = d.Kind, DisclosureMode = d.DisclosureMode,
+            DeliveryType = d.DeliveryType, EventSessionId = d.EventSessionId, LanguageCode = d.LanguageCode,
+            AccessibilityNote = d.AccessibilityNote, SortOrder = d.SortOrder,
+            AccessibleAlternativeEventResourceId = d.AccessibleAlternativeEventResourceId,
+            Availability = d.Availability, AudienceRules = d.AudienceRules };
+        _editing = true; _destinationTarget = null;
+    }
+    private void BeginDestination(HalResourceOfEventResourceManagementDto item) { _destination = ""; _destinationTarget = item; _editing = false; }
+    private void Cancel() { _editing = false; _destinationTarget = null; _confirmDeleteId = null; _destination = ""; _error = null; }
+    private async Task SaveAsync()
+    {
+        if (_busy || !_editing || string.IsNullOrWhiteSpace(_draft.Title) || (_target is null && _audienceKind is null)) return;
+        await ExecuteAsync(async () =>
+        {
+            if (_target is null)
+            {
+                var currentCollection = await Resources.ManagementAsync(EventId, _page);
+                if (!Has(currentCollection._links, "create-resource")) { _status = T("denied", "The action is no longer available. Resource list refreshed."); return; }
+                _draft.AudienceRules = [new EventResourceAudienceDto { Kind = _audienceKind!.Value }];
+                await Resources.CreateAsync(EventId, new CreateEventResourceRequestDto { ResourceId = Guid.CreateVersion7(), Draft = _draft });
+            }
+            else
+            {
+                var current = await Resources.ManagementDetailAsync(_target.Id);
+                if (!Has(current._links, "edit") || current.Version != _target.Version) { _status = T("denied", "The action is no longer available. Resource list refreshed."); return; }
+                await Resources.UpdateAsync(current.Id, new UpdateEventResourceRequestDto { ExpectedVersion = current.Version, Draft = _draft });
+            }
+            Cancel();
+        });
+    }
+    private async Task SaveDestinationAsync()
+    {
+        if (_busy || _destinationTarget is not { } target || !Uri.TryCreate(_destination, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) return;
+        await ExecuteAsync(async () =>
+        {
+            var current = await Resources.ManagementDetailAsync(target.Id);
+            if (!Has(current._links, "configure-destination") || current.Version != target.Version) { _status = T("denied", "The action is no longer available. Resource list refreshed."); return; }
+            await Resources.DestinationAsync(current.Id, new EventResourceDestinationWriteDto { ExpectedVersion = current.Version, Destination = _destination });
+            Cancel();
+        });
+    }
+    private async Task MutateAsync(HalResourceOfEventResourceManagementDto item, string relation)
+    {
+        if (_busy || !Has(item._links, relation)) return;
+        await ExecuteAsync(async () =>
+        {
+            var current = await Resources.ManagementDetailAsync(item.Id);
+            if (current.EventId == EventId && current.Version == item.Version && Has(current._links, relation))
+                await Resources.MutateAsync(current.Id, relation, current.Version);
+            else _status = T("denied", "The action is no longer available. Resource list refreshed.");
+        });
+    }
+    private Task ConfirmDeleteAsync(HalResourceOfEventResourceManagementDto item) => MutateAsync(item, "delete");
+    private async Task AuditAsync(HalResourceOfEventResourceManagementDto item)
+    {
+        var current = await Resources.ManagementDetailAsync(item.Id);
+        if (current.EventId == EventId && Has(current._links, "view-audit"))
+        {
+            try { _audit = await Resources.AuditAsync(current.Id); }
+            catch (ApiException) { _error = T("unavailable", "Resources are unavailable. Please try again."); }
+        }
+    }
+    private async Task ExportAsync()
+    {
+        if (!Has(_collection?._links, "export")) return;
+        try
+        {
+            var currentCollection = await Resources.ManagementAsync(EventId, _page);
+            if (Has(currentCollection._links, "export"))
+            {
+                _exportPage = await Resources.ExportAsync(EventId);
+                var json = System.Text.Json.JsonSerializer.Serialize(_exportPage);
+                var content = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+                if (!await BrowserActions.DownloadBase64FileAsync(content, $"event-resources-{EventId:D}.json", "application/json"))
+                    _status = T("exportReady", "Authorized metadata export loaded.");
+            }
+            else { _exportPage = null; await ReloadAsync(); }
+        }
+        catch (ApiException) { _error = T("unavailable", "Resources are unavailable. Please try again."); }
+    }
+    private async Task ExecuteAsync(Func<Task> command)
+    {
+        _busy = true;
+        _status = null;
+        try { await command(); _status ??= T("updated", "Resource list refreshed."); }
+        catch (ApiException) { _status = T("denied", "The action is no longer available. Resource list refreshed."); }
+        finally { _busy = false; await ReloadAsync(); }
+    }
+}

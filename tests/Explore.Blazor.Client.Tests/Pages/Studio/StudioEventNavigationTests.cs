@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell.Workspaces;
+using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Pages.Studio;
 using Explore.Blazor.Client.Services;
 
@@ -12,18 +13,42 @@ public sealed class StudioEventNavigationTests : IDisposable
     private readonly IEventService _eventService;
     private readonly IEventTicketingService _ticketingService;
     private readonly IEventPromotionService _promotionService;
+    private readonly IEventResourceService _resources;
 
     public StudioEventNavigationTests()
     {
         _eventService = _ctx.AddMockService<IEventService>();
         _ticketingService = _ctx.AddMockService<IEventTicketingService>();
         _promotionService = _ctx.AddMockService<IEventPromotionService>();
+        _resources = _ctx.AddMockService<IEventResourceService>();
+        _resources.AudienceAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(ResourcePage(false));
         _ticketingService.GetCatalogAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((EventTicketCatalogState?)null);
         _ctx.Services.AddScoped<StudioEventContextState>();
     }
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Render_ResourceNavigationRequiresCollectionManageRelation(bool advertised)
+    {
+        var resource = CreateEvent("edit");
+        _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);
+        _resources.AudienceAsync(resource.Id.Value, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(ResourcePage(advertised));
+
+        var cut = _ctx.RenderMudComponent<StudioEventNavigation>(parameters => parameters
+            .Add(component => component.EventId, resource.Id.Value));
+
+        cut.WaitForElement("[data-testid='studio-event-navigation']");
+        if (advertised)
+            cut.WaitForElement("[data-event-section='resources']");
+        else
+            await Assert.That(cut.FindAll("[data-event-section='resources']")).IsEmpty();
+    }
 
     [Test]
     [Arguments("edit", "Details")]
@@ -200,6 +225,15 @@ public sealed class StudioEventNavigationTests : IDisposable
         SetRelations(resource, relations);
         return resource;
     }
+
+    private static EventResourceAudiencePageResource ResourcePage(bool canManage) => new()
+    {
+        _links = canManage
+            ? new Dictionary<string, HalLink> { ["manage-resources"] = new()
+                { Href = "/api/eventresource/event/manage", Method = "GET" } }
+            : new Dictionary<string, HalLink>(),
+        _embedded = new HalCollectionEmbeddedOfEventResourceAudienceDetailDto()
+    };
 
     private static void SetRelations(EventDto resource, params string[] relations)
     {

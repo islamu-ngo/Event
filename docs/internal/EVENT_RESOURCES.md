@@ -89,6 +89,24 @@ or replaced. A backup containing both encrypted rows and unwrapped
 Data Protection key XML is not confidential against full backup compromise;
 use the deployment's existing key-wrapping authority where configured.
 
+### Browser resource affordances
+
+`EventResources` and `StudioEventResources` use the scoped
+`IEventResourceService` over generated per-tag clients, never component-side
+role checks or destination readback. The attendee surface loads audience
+collection and fresh item details; only a root-relative, exact `download`,
+`access` or `accessible-alternative` HAL relation produces a delivery anchor.
+The safe origin is plain text, not a preview/fetch target. The Studio
+navigation obtains `manage-resources` from the fresh audience collection,
+including for a private event whose public parent `resources` link is absent.
+Collection `create-resource`/`export` and each item's management relations
+gate distinct controls. A mutation rereads the item/version and relation,
+uses a generated client with a new idempotency key, and refreshes after a
+denial without reflecting server error details. The external-destination
+form clears its URL after submission and shows only safe-origin metadata.
+Blazor components rely on the service and server authority independently:
+HAL hides an affordance; it does not grant a write.
+
 The audit page contains only a closed action/outcome/reason, timestamp, and
 retained responsible-manager identity. A successful mutation writes that
 minimal audit entry in the same serializable transaction as the resource

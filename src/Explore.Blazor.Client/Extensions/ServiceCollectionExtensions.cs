@@ -85,6 +85,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantReportingIntakePolicyService, TenantReportingIntakePolicyService>();
         services.AddScoped<ITenantShellSettingsService, TenantShellSettingsService>();
         services.AddScoped<IEventService, EventService>();
+        services.AddScoped<IEventResourceService, EventResourceService>();
         services.AddScoped<IEventSessionService, EventSessionService>();
         services.AddScoped<IEventOrganizerClaimService, EventOrganizerClaimService>();
         services.AddScoped<IEventModerationService, EventModerationService>();

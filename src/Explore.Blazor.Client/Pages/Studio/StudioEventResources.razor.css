@@ -1,0 +1,10 @@
+.studio-resources { color: var(--isl-color-text); }
+.studio-resources__list { display: grid; gap: var(--isl-space-4); margin-block: var(--isl-space-4); }
+.studio-resources__card, .studio-resources__form { padding: var(--isl-space-4); border: 1px solid var(--isl-color-border); border-radius: var(--isl-radius-card); background: var(--isl-color-surface); overflow-wrap: anywhere; }
+.studio-resources__form { display: grid; gap: var(--isl-space-2); margin-block: var(--isl-space-4); }
+.studio-resources__form input, .studio-resources__form select, .studio-resources__form textarea { padding: var(--isl-space-2); border: 1px solid var(--isl-color-border); border-radius: var(--isl-radius-input); background: var(--isl-color-surface); color: var(--isl-color-text); }
+.studio-resources__export { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow: auto; padding: var(--isl-space-4); border: 1px solid var(--isl-color-border); }
+.studio-resources__actions { display: flex; flex-wrap: wrap; gap: var(--isl-space-2); margin-block: var(--isl-space-2); }
+.studio-resources__confirmation { border-inline-start: var(--isl-focus-ring-width) solid var(--isl-color-warning); padding-inline-start: var(--isl-space-3); }
+.studio-resources button { min-height: 44px; padding-inline: var(--isl-space-3); border: 1px solid var(--isl-color-primary); border-radius: var(--isl-radius-button); background: var(--isl-color-surface); color: var(--isl-color-primary); cursor: pointer; }
+.studio-resources button:focus-visible, .studio-resources input:focus-visible, .studio-resources textarea:focus-visible, .studio-resources select:focus-visible { outline: var(--isl-focus-ring-width) solid var(--isl-color-primary); outline-offset: 2px; }

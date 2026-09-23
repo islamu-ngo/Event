@@ -1,9 +1,12 @@
 @using Explore.Blazor.Client.Pages.Studio
 @using Explore.Blazor.Client.Contracts.Services.Events
+@using Explore.Blazor.Client.Contracts.Services
+@using Explore.Blazor.Client.Components.Event
 @implements IDisposable
 @inject StudioEventContextState EventContext
 @inject IEventTicketingService Ticketing
 @inject IEventPromotionService Promotions
+@inject IEventResourceService Resources
 
 <nav class="studio-event-navigation" aria-label="Event management navigation" data-testid="studio-event-navigation">
     <MudNavMenu Dense="false" Class="studio-event-navigation__menu px-2">
@@ -55,6 +58,12 @@
             {
                 <MudNavLink Href="@($"{StudioRoute}/orders")" Icon="@Icons.Material.Outlined.ReceiptLong" Match="NavLinkMatch.All" data-event-section="orders">
                     Orders
+                </MudNavLink>
+            }
+            @if (_resourceNavigationHref is not null)
+            {
+                <MudNavLink Href="@_resourceNavigationHref" Icon="@Icons.Material.Outlined.Description" Match="NavLinkMatch.All" data-event-section="resources">
+                    Resources
                 </MudNavLink>
             }
             @if (_promotionNavigationAvailable)
@@ -123,6 +132,8 @@
     private CancellationTokenSource? _promotionRequest;
     private long _promotionLoadGeneration;
     private bool _promotionNavigationAvailable;
+    private string? _resourceNavigationHref;
+    private long _resourceNavigationGeneration;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -130,6 +141,23 @@
         EventContext.Changed += OnContextChanged;
         await EventContext.LoadAsync(EventId);
         await LoadPromotionNavigationAsync();
+        await LoadResourceNavigationAsync();
+    }
+
+    private async Task LoadResourceNavigationAsync()
+    {
+        var generation = ++_resourceNavigationGeneration;
+        var eventId = EventId;
+        _resourceNavigationHref = null;
+        if (Resource is null) return;
+        try
+        {
+            var page = await Resources.AudienceAsync(eventId);
+            if (generation == _resourceNavigationGeneration && EventId == eventId && Resource?.Id == eventId)
+                _resourceNavigationHref = EventResources.Href(page._links, "manage-resources") is not null
+                    ? $"{StudioRoute}/resources" : null;
+        }
+        catch (Explore.Blazor.Client.Clients.ApiException) { }
     }
 
     private static bool HasScheduleRelation(EventDto resource) =>
@@ -181,6 +209,7 @@
     private void OnContextChanged() => _ = InvokeAsync(async () =>
     {
         await LoadPromotionNavigationAsync();
+        await LoadResourceNavigationAsync();
         StateHasChanged();
     });
 
@@ -188,6 +217,7 @@
     {
         EventContext.Changed -= OnContextChanged;
         ++_promotionLoadGeneration;
+        ++_resourceNavigationGeneration;
         _promotionRequest?.Cancel();
         _promotionRequest?.Dispose();
         GC.SuppressFinalize(this);

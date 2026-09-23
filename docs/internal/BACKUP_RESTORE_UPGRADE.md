@@ -243,6 +243,12 @@ receipt against Keycloak before allowing another operation. A missing receipt
 must not be reconstructed from provider state and a restored receipt must not
 be replayed automatically.
 
+Normal startup and restore never import the repository sample realm or run a
+Keycloak reconciler. Preserve the restored provider volume and immutable realm,
+client and mapper IDs. If a fresh installation has no target realm, complete
+setup-time inspection and explicitly provision absent resources; do not make a
+sample import or provider-volume reset part of recovery.
+
 Downgrading across the receipt migration is a checked stop. The registered
 provider migration SQL generators install a temporary enforced constraint
 immediately before the generated table drop. Existing or newly inserted

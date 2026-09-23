@@ -12,6 +12,35 @@ public sealed class KeycloakOperationTests
     private static readonly DateTimeOffset Settled = Created.AddMinutes(2);
 
     [Test]
+    public async Task DesiredProjection_CollectionsAreImmutableSnapshots()
+    {
+        string[] redirects =
+            ["https://event.example.test/signin"];
+        string[] origins =
+            ["https://event.example.test"];
+        KeycloakDesiredProjection projection =
+            KeycloakDesiredProjection.ConfidentialClient(
+                "event-bff",
+                redirects,
+                origins);
+
+        redirects[0] = "https://attacker.example.test/signin";
+        origins[0] = "https://attacker.example.test";
+
+        await Assert.That(projection.RedirectUris.Single())
+            .IsEqualTo(
+                "https://event.example.test/signin");
+        await Assert.That(projection.WebOrigins.Single())
+            .IsEqualTo(
+                "https://event.example.test");
+        Assert.Throws<InvalidCastException>(() =>
+            _ = (string[])projection.RedirectUris);
+        Assert.Throws<NotSupportedException>(() =>
+            ((IList<string>)projection.RedirectUris)[0] =
+                "https://attacker.example.test/signin");
+    }
+
+    [Test]
     public async Task AuthorizeApply_WithExactApprovalBinding_EntersApplying()
     {
         KeycloakOperation operation = CreateOperation();
@@ -575,7 +604,10 @@ public sealed class KeycloakOperationTests
                     KeycloakDesiredProjection.Mapper(
                         "event-bff:audience",
                         KeycloakMapperSemantic.Audience,
-                        "event-api"),
+                        "event-api",
+                        kind == KeycloakStep.CreateMapper
+                            ? "33333333-3333-7333-8333-333333333333"
+                            : null),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind))
             });
 }

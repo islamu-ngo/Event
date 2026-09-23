@@ -334,6 +334,70 @@ public sealed class KeycloakOperationPersistenceTests
     }
 
     [Test]
+    public async Task Coordinator_SerializesApplyAndReconciliation()
+    {
+        await using TestDatabase database =
+            await TestDatabase.CreateAsync();
+        KeycloakOperation operation =
+            CreateApplyingOperation(
+                InstanceId,
+                Now,
+                client: "event-bff");
+        await using ExploreDbContext applyContext =
+            database.CreateContext();
+        var applyRepository =
+            new KeycloakOperationRepository(applyContext);
+        await applyRepository.AddAsync(operation);
+        var applyCoordinator =
+            new RelationalKeycloakOperationCoordinator(
+                applyContext,
+                applyRepository,
+                database);
+        var applyEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseApply = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<int> applyTask = applyCoordinator.ExecuteAsync(
+            operation,
+            async _ =>
+            {
+                applyEntered.SetResult();
+                await releaseApply.Task;
+                return 1;
+            });
+        await applyEntered.Task.WaitAsync(
+            TimeSpan.FromSeconds(5));
+
+        await using ExploreDbContext reconcileContext =
+            database.CreateContext();
+        var reconcileRepository =
+            new KeycloakOperationRepository(
+                reconcileContext);
+        var reconcileCoordinator =
+            new RelationalKeycloakOperationCoordinator(
+                reconcileContext,
+                reconcileRepository,
+                database);
+        Task<int> reconcileTask =
+            reconcileCoordinator
+                .ExecuteReconciliationAsync(
+                    operation,
+                    _ => Task.FromResult(2));
+
+        await Assert.That(reconcileTask.IsCompleted)
+            .IsFalse();
+        releaseApply.SetResult();
+        await Assert.That(
+                await applyTask.WaitAsync(
+                    TimeSpan.FromSeconds(5)))
+            .IsEqualTo(1);
+        await Assert.That(
+                await reconcileTask.WaitAsync(
+                    TimeSpan.FromSeconds(5)))
+            .IsEqualTo(2);
+    }
+
+    [Test]
     public async Task Coordinator_RejectsProviderSendWithoutPersistedIntent()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
@@ -488,7 +552,10 @@ public sealed class KeycloakOperationPersistenceTests
                     KeycloakDesiredProjection.Mapper(
                         $"{client}:audience",
                         KeycloakMapperSemantic.Audience,
-                        "event-api"),
+                        "event-api",
+                        kind == KeycloakStep.CreateMapper
+                            ? "33333333-3333-7333-8333-333333333333"
+                            : null),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind))
             });
 

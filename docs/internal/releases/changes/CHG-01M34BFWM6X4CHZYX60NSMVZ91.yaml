@@ -5,13 +5,13 @@ Title: require approved receipts for Keycloak repairs
 Type: feat
 Scope: onboarding
 Summary: Replace broad Keycloak bootstrap and sync repair requests with private, receipt-bound operator operations.
-Group: keycloak-operator-safety
+Group: keycloak-operator-onboarding
 Supersedes: []
 Impacts:
   Breaking:
     Reference: docs/internal/API_CHANGELOG.md
     Disposition: documented
-    Detail: Keycloak repairs use approved operation receipts instead of unrestricted bootstrap or sync requests.
+    Detail: Keycloak repairs use approved operation receipts instead of broad bootstrap or sync requests.
   Security:
     Reference: docs/internal/SECURITY-MODEL.md
     Disposition: documented

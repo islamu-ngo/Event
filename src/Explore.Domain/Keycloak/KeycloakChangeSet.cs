@@ -45,8 +45,10 @@ public sealed record KeycloakDesiredProjection
     {
         Kind = kind;
         ResourceName = Required(resourceName);
-        RedirectUris = (redirectUris ?? []).ToArray();
-        WebOrigins = (webOrigins ?? []).ToArray();
+        RedirectUris = new ReadOnlyCollection<string>(
+            (redirectUris ?? []).ToArray());
+        WebOrigins = new ReadOnlyCollection<string>(
+            (webOrigins ?? []).ToArray());
         Audience = string.IsNullOrWhiteSpace(audience) ? null : audience.Trim();
         string? normalizedProviderResourceId =
             string.IsNullOrWhiteSpace(providerResourceId)
@@ -63,16 +65,9 @@ public sealed record KeycloakDesiredProjection
                 "A realm projection requires a provider UUID.");
         }
 
-        if (kind != KeycloakDesiredKind.Realm
-            && normalizedProviderResourceId is not null)
-        {
-            throw new ArgumentException(
-                "Only a realm projection may carry a provider resource ID.");
-        }
-
         ProviderResourceId = kind == KeycloakDesiredKind.Realm
             ? parsedProviderResourceId.ToString("D")
-            : null;
+            : normalizedProviderResourceId;
     }
 
     public KeycloakDesiredKind Kind { get; }
@@ -93,22 +88,39 @@ public sealed record KeycloakDesiredProjection
     public static KeycloakDesiredProjection ConfidentialClient(
         string clientId,
         IReadOnlyList<string> redirectUris,
-        IReadOnlyList<string> webOrigins) =>
-        new(KeycloakDesiredKind.ConfidentialBffClient, clientId, redirectUris, webOrigins);
+        IReadOnlyList<string> webOrigins,
+        string? providerResourceId = null) =>
+        new(
+            KeycloakDesiredKind.ConfidentialBffClient,
+            clientId,
+            redirectUris,
+            webOrigins,
+            providerResourceId:
+                providerResourceId
+                ?? Guid.CreateVersion7().ToString("D"));
 
-    public static KeycloakDesiredProjection BearerOnlyClient(string clientId) =>
-        new(KeycloakDesiredKind.BearerOnlyApiClient, clientId);
+    public static KeycloakDesiredProjection BearerOnlyClient(
+        string clientId,
+        string? providerResourceId = null) =>
+        new(
+            KeycloakDesiredKind.BearerOnlyApiClient,
+            clientId,
+            providerResourceId:
+                providerResourceId
+                ?? Guid.CreateVersion7().ToString("D"));
 
     public static KeycloakDesiredProjection Mapper(
         string name,
         KeycloakMapperSemantic semantic,
-        string? audience = null) =>
+        string? audience = null,
+        string? providerResourceId = null) =>
         new(
             semantic == KeycloakMapperSemantic.Subject
                 ? KeycloakDesiredKind.SubjectMapper
                 : KeycloakDesiredKind.AudienceMapper,
             name,
-            audience: audience);
+            audience: audience,
+            providerResourceId: providerResourceId);
 
     private static string Required(string value) =>
         string.IsNullOrWhiteSpace(value)
@@ -198,6 +210,9 @@ public sealed record KeycloakChangeStep
             KeycloakStep.CreateClient => resourceKind == KeycloakResourceKind.Client
                 && precondition == KeycloakStepPrecondition.MustBeAbsent
                 && desired.ResourceName == targetId
+                && Guid.TryParse(
+                    desired.ProviderResourceId,
+                    out _)
                 && desired.Kind is (
                     KeycloakDesiredKind.ConfidentialBffClient
                     or KeycloakDesiredKind.BearerOnlyApiClient)
@@ -209,6 +224,9 @@ public sealed record KeycloakChangeStep
                         == KeycloakDesiredKind.ConfidentialBffClient),
             KeycloakStep.CreateMapper => resourceKind == KeycloakResourceKind.ProtocolMapper
                 && precondition == KeycloakStepPrecondition.MustBeAbsent
+                && Guid.TryParse(
+                    desired.ProviderResourceId,
+                    out _)
                 && desired.Kind is (
                     KeycloakDesiredKind.SubjectMapper
                     or KeycloakDesiredKind.AudienceMapper),

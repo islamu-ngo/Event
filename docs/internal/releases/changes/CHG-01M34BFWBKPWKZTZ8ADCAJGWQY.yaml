@@ -5,7 +5,7 @@ Title: preserve operator-owned Keycloak configuration during setup
 Type: fix
 Scope: access
 Summary: Resolve Keycloak runtime credentials from the selected deployment authority, keep administrator input request-scoped, and make inspection read-only.
-Group: keycloak-operator-safety
+Group: keycloak-operator-access
 Supersedes: []
 Impacts:
   Breaking:

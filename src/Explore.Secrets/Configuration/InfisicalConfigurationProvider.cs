@@ -482,28 +482,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
             };
         }
 
-        // 7. Keycloak SMTP (/keycloak/smtp) -> Keycloak bootstrap environment names
-        if (normalizedPath.Equals("keycloak/smtp", StringComparison.OrdinalIgnoreCase))
-        {
-            return secretKey.ToUpperInvariant() switch
-            {
-                "KEYCLOAK_SMTP_HOST" => "KEYCLOAK_SMTP_HOST",
-                "KEYCLOAK_SMTP_PORT" => "KEYCLOAK_SMTP_PORT",
-                "KEYCLOAK_SMTP_FROM" => "KEYCLOAK_SMTP_FROM",
-                "KEYCLOAK_SMTP_FROM_DISPLAY_NAME" => "KEYCLOAK_SMTP_FROM_DISPLAY_NAME",
-                "KEYCLOAK_SMTP_AUTH" => "KEYCLOAK_SMTP_AUTH",
-                "KEYCLOAK_SMTP_SSL" => "KEYCLOAK_SMTP_SSL",
-                "KEYCLOAK_SMTP_STARTTLS" => "KEYCLOAK_SMTP_STARTTLS",
-                "KEYCLOAK_SMTP_REPLY_TO" => "KEYCLOAK_SMTP_REPLY_TO",
-                "KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME" => "KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME",
-                "KEYCLOAK_SMTP_ENVELOPE_FROM" => "KEYCLOAK_SMTP_ENVELOPE_FROM",
-                "KEYCLOAK_SMTP_USER" => "KEYCLOAK_SMTP_USER",
-                "KEYCLOAK_SMTP_PASSWORD" => "KEYCLOAK_SMTP_PASSWORD",
-                _ => null
-            };
-        }
-
-        // 8. Web Push (/api/webpush or /api/web-push) -> WebPush:*
+        // 7. Web Push (/api/webpush or /api/web-push) -> WebPush:*
         if (normalizedPath.Equals("api/webpush", StringComparison.OrdinalIgnoreCase)
             || normalizedPath.Equals("api/web-push", StringComparison.OrdinalIgnoreCase))
         {

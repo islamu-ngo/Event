@@ -434,8 +434,6 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/keycloak/REALM_NAME` | `Keycloak:RealmName` |
 | `/keycloak/KEYCLOAK_CLIENT_ID` | Nonsecret browser/BFF client metadata mapped to `Keycloak:ClientId` for API onboarding detection. |
 | `/keycloak/KEYCLOAK_BLAZOR_CLIENT_SECRET` | Deployment-owned Blazor BFF runtime credential resolved through the selected authority; Event never persists or rotates it |
-| `/keycloak/KEYCLOAK_API_CLIENT_SECRET` | Optional legacy/future Compose `keycloak-init` sync input for deployments that intentionally make the API resource-server client confidential; not needed by the current bearer-only API audience client |
-| `/keycloak/KEYCLOAK_SMTP_*` | Optional Compose `keycloak-init` realm SMTP bootstrap. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak SMTP settings; set host/port/from to apply deployment-managed SMTP. |
 | `/api/CONTROL_PLANE_REGISTRATION_CREDENTIALS` | `management.control_plane_registration_credentials` | Directional managed control-plane registration credentials. This key is instance-only and its binding stores only deployment-owned source metadata. |
 | `/api` or `/cerbos` + `AUTHORIZATION_PROVIDER` | Non-secret `Authorization:Provider` deployment intent. Blank keeps manual Local-first onboarding; `local` or `cerbos` makes the provider deployment-owned and skips the choice page. |
 | root or AI path + `AI_TOOL_PROPOSALS_ENABLED` | `AiProvider:ToolProposalsEnabled` |
@@ -493,14 +491,17 @@ The three ATProto rows use the same uppercase name as their default environment-
 
 Stripe secrets are instance-scoped, server-only, and optional while paid events are disabled. `Payments:Stripe:Mode=Test` requires a platform key beginning `sk_test_`; `Live` requires `sk_live_`. The Connect endpoint uses only the dedicated webhook binding, never the platform key or an outgoing-webhook secret. Rotate platform and endpoint secrets deliberately with the matching Stripe mode and endpoint configuration; retain no secret value in logs, support artifacts, browser DTOs, OpenAPI, or the DBML reference.
 
-Compose Keycloak bootstrap consumes `KEYCLOAK_ADMIN` and `KEYCLOAK_ADMIN_PASSWORD` only inside the one-shot `keycloak-init` container. Those credentials are not application runtime secrets and must not be stored in governance settings or copied into support artifacts. The init logs redact client secret values.
+Keycloak itself consumes `KEYCLOAK_ADMIN` and `KEYCLOAK_ADMIN_PASSWORD` to
+create its initial administrator. Event never reads them as application
+runtime secrets; do not store them in governance settings or copy them into
+support artifacts.
 
-The checked-in Keycloak realm exports never contain the confidential Blazor
-BFF client secret. Compose and local Aspire read
-`KEYCLOAK_BLAZOR_CLIENT_SECRET` from the deployment environment and fail closed
-when the selected topology requires it but it is absent. AppHost forwards the
-deployment value as a secret parameter to `keycloak-init`, the API, and the BFF;
-it never generates, persists, or renders a replacement value.
+The checked-in Keycloak realm export contains no client secret and is not
+mounted or imported by normal Compose/AppHost startup. Compose and local Aspire
+pass the deployment value to API and BFF only. If an operator approves creation
+of an absent confidential client, the API resolves that value for the one
+foreground Admin REST request. AppHost never generates, persists or renders a
+replacement value.
 
 External-Keycloak privileged inspection accepts a one-time Keycloak administrator
 username/password through the advanced setup or administration form. Treat that

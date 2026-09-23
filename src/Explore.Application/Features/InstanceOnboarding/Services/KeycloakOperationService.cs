@@ -81,6 +81,12 @@ public sealed class KeycloakOperationApplyContext
 
 public sealed class KeycloakOperationService
 {
+    public const string CreateRealmStepId = "realm:create";
+
+    private static readonly TimeSpan OutcomePersistenceTimeout =
+        TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan OperationCoordinationTimeout =
+        TimeSpan.FromSeconds(30);
     private readonly KeycloakOperationPolicy _policy = new();
     private readonly IKeycloakOperationRepository? _repository;
     private readonly IKeycloakOperationCoordinator? _coordinator;
@@ -200,6 +206,17 @@ public sealed class KeycloakOperationService
             KeycloakEffectiveMapperSnapshot? existing =
                 directCandidates.SingleOrDefault();
             string mapperName = MapperName(snapshot, semantic);
+            string? plannedProviderId = existing is null
+                ? Guid.CreateVersion7().ToString("D")
+                : null;
+            KeycloakDesiredProjection desired =
+                KeycloakDesiredProjection.Mapper(
+                    mapperName,
+                    semantic,
+                    semantic == KeycloakMapperSemantic.Audience
+                        ? snapshot.ApiClientId
+                        : null,
+                    plannedProviderId);
             steps.Add(new KeycloakChangeStep(
                 stepId: $"mapper:{semantic.ToString().ToLowerInvariant()}",
                 kind: existing is null
@@ -207,7 +224,7 @@ public sealed class KeycloakOperationService
                     : KeycloakStep.UpdateMapper,
                 resourceKind: KeycloakResourceKind.ProtocolMapper,
                 targetId: existing?.ProviderId
-                    ?? $"{snapshot.BlazorClientId}:{mapperName}",
+                    ?? plannedProviderId!,
                 precondition: existing is null
                     ? KeycloakStepPrecondition.MustBeAbsent
                     : KeycloakStepPrecondition.MustMatchFingerprint,
@@ -224,12 +241,7 @@ public sealed class KeycloakOperationService
                     snapshot,
                     approvedPublicOrigin,
                     provisioning ? credentialBindingRevision : null),
-                desired: KeycloakDesiredProjection.Mapper(
-                    mapperName,
-                    semantic,
-                    semantic == KeycloakMapperSemantic.Audience
-                        ? snapshot.ApiClientId
-                        : null)));
+                desired: desired));
         }
 
         return steps.Count == 0 ? null : new KeycloakChangeSet(steps);
@@ -322,28 +334,36 @@ public sealed class KeycloakOperationService
             expectedStamp,
             cancellationToken);
 
+        using var coordinationCancellation =
+            new CancellationTokenSource(
+                OperationCoordinationTimeout);
+        bool executionStarted = false;
         try
         {
             return await coordinator.ExecuteAsync(
                 operation,
-                token => ExecuteStepsAsync(operation.Id, context, token),
-                cancellationToken);
+                _ =>
+                {
+                    executionStarted = true;
+                    return ExecuteStepsAsync(
+                        operation.Id,
+                        context,
+                        cancellationToken);
+                },
+                coordinationCancellation.Token);
         }
         catch (KeycloakOperationOverlapException)
         {
-            KeycloakOperation blocked =
-                (await repository.GetAsync(
-                    operation.Id,
-                    cancellationToken))!;
-            await SettleRemainingStepsAsync(
-                blocked,
-                currentStepId: null,
-                KeycloakStepOutcomeKind.FailedBeforeWrite,
-                context.NowUtc,
-                cancellationToken);
-            return (await repository.GetAsync(
+            return await SettleFailedBeforeWriteAsync(
                 operation.Id,
-                cancellationToken))!;
+                context.NowUtc);
+        }
+        catch (OperationCanceledException)
+            when (!executionStarted)
+        {
+            return await SettleFailedBeforeWriteAsync(
+                operation.Id,
+                context.NowUtc);
         }
     }
 
@@ -353,7 +373,8 @@ public sealed class KeycloakOperationService
     {
         ArgumentNullException.ThrowIfNull(context);
         IKeycloakOperationRepository repository = RequireRepository();
-        IKeycloakAdminClient adminClient = RequireAdminClient();
+        IKeycloakOperationCoordinator coordinator =
+            RequireCoordinator();
         KeycloakOperation operation =
             await repository.GetAsync(
                 context.OperationId,
@@ -368,7 +389,37 @@ public sealed class KeycloakOperationService
             return operation;
         }
         EnsureContextBinding(context, operation);
+        return await coordinator.ExecuteReconciliationAsync(
+            operation,
+            token => ReconcileUnderLockAsync(
+                context,
+                token),
+            cancellationToken);
+    }
 
+    private async Task<KeycloakOperation>
+        ReconcileUnderLockAsync(
+            KeycloakOperationApplyContext context,
+            CancellationToken cancellationToken)
+    {
+        IKeycloakOperationRepository repository =
+            RequireRepository();
+        IKeycloakAdminClient adminClient = RequireAdminClient();
+        KeycloakOperation operation =
+            await repository.GetAsync(
+                context.OperationId,
+                cancellationToken)
+            ?? throw new NotFoundException(
+                nameof(KeycloakOperation),
+                context.OperationId);
+        if (operation.State is not (
+                KeycloakOperationState.Applying
+                or KeycloakOperationState.OutcomeUnknown))
+        {
+            return operation;
+        }
+
+        EnsureContextBinding(context, operation);
         foreach (KeycloakChangeStep step in operation.ChangeSet.Steps)
         {
             KeycloakStepOutcome? existing = operation.StepOutcomes.Items
@@ -399,14 +450,43 @@ public sealed class KeycloakOperationService
                             context,
                             operation,
                             step,
-                            existing?.ProviderResourceId),
+                            existing?.ProviderResourceId
+                                ?? step.Desired?.ProviderResourceId),
                         cancellationToken);
                 outcome = ToOutcome(step, inspection);
             }
             Guid expectedStamp = operation.ConcurrencyStamp;
+            if (existing is not null
+                && operation.State
+                    == KeycloakOperationState.Applying)
+            {
+                operation.MarkOutcomeUnknown();
+            }
+
+            if (existing is not null
+                && outcome.Kind
+                    == KeycloakStepOutcomeKind.OutcomeUnknown)
+            {
+                if (operation.ConcurrencyStamp
+                    != expectedStamp)
+                {
+                    await repository.SaveAsync(
+                        operation,
+                        expectedStamp,
+                        cancellationToken);
+                }
+
+                return operation;
+            }
+
             if (existing is null)
             {
                 operation.RecordStepOutcome(outcome);
+                if (outcome.Kind
+                    == KeycloakStepOutcomeKind.OutcomeUnknown)
+                {
+                    operation.MarkOutcomeUnknown();
+                }
             }
             else
             {
@@ -417,6 +497,11 @@ public sealed class KeycloakOperationService
                 operation,
                 expectedStamp,
                 cancellationToken);
+            if (outcome.Kind
+                == KeycloakStepOutcomeKind.OutcomeUnknown)
+            {
+                return operation;
+            }
         }
 
         Guid settlementStamp = operation.ConcurrencyStamp;
@@ -435,14 +520,56 @@ public sealed class KeycloakOperationService
     {
         IKeycloakOperationRepository repository = RequireRepository();
         IKeycloakAdminClient adminClient = RequireAdminClient();
-        KeycloakOperation operation =
-            (await repository.GetAsync(operationId, cancellationToken))!;
-
-        foreach (KeycloakChangeStep step in operation.ChangeSet.Steps)
+        KeycloakOperation operation;
+        IReadOnlyList<KeycloakChangeStep> steps;
+        using (var initialPersistence =
+            new CancellationTokenSource(
+                OutcomePersistenceTimeout))
         {
+            CancellationToken persistenceToken =
+                initialPersistence.Token;
             operation = (await repository.GetAsync(
                 operationId,
-                cancellationToken))!;
+                persistenceToken))!;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await SettleRemainingStepsAsync(
+                    operation,
+                    currentStepId: null,
+                    KeycloakStepOutcomeKind.FailedBeforeWrite,
+                    context.NowUtc,
+                    persistenceToken);
+                return (await repository.GetAsync(
+                    operationId,
+                    persistenceToken))!;
+            }
+
+            steps = operation.ChangeSet.Steps;
+        }
+
+        foreach (KeycloakChangeStep step in steps)
+        {
+            using var statePersistence =
+                new CancellationTokenSource(
+                    OutcomePersistenceTimeout);
+            CancellationToken stateToken =
+                statePersistence.Token;
+            operation = (await repository.GetAsync(
+                operationId,
+                stateToken))!;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await SettleRemainingStepsAsync(
+                    operation,
+                    currentStepId: null,
+                    KeycloakStepOutcomeKind.FailedBeforeWrite,
+                    context.NowUtc,
+                    stateToken);
+                return (await repository.GetAsync(
+                    operationId,
+                    stateToken))!;
+            }
+
             if (operation.IsCancellationRequested)
             {
                 await SettleRemainingStepsAsync(
@@ -450,38 +577,69 @@ public sealed class KeycloakOperationService
                     currentStepId: null,
                     KeycloakStepOutcomeKind.SkippedCancelled,
                     context.NowUtc,
-                    cancellationToken);
+                    stateToken);
                 return (await repository.GetAsync(
                     operationId,
-                    cancellationToken))!;
+                    stateToken))!;
             }
 
             KeycloakStepOutcome result;
-            if (IsMapperStep(step))
+            try
             {
-                result = ToOutcome(
-                    step,
-                    await adminClient.ApplyApprovedMapperAsync(
-                        BuildMapperRequest(context, operation, step),
-                        cancellationToken));
+                if (IsMapperStep(step))
+                {
+                    result = ToOutcome(
+                        step,
+                        await adminClient.ApplyApprovedMapperAsync(
+                            BuildMapperRequest(
+                                context,
+                                operation,
+                                step),
+                            cancellationToken));
+                }
+                else
+                {
+                    result = ToOutcome(
+                        step,
+                        await adminClient
+                            .ApplyApprovedProvisioningAsync(
+                                BuildProvisioningRequest(
+                                    context,
+                                    operation,
+                                    step,
+                                    providerResourceId: null),
+                                cancellationToken));
+                }
             }
-            else
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
             {
-                result = ToOutcome(
-                    step,
-                    await adminClient.ApplyApprovedProvisioningAsync(
-                        BuildProvisioningRequest(
-                            context,
-                            operation,
-                            step,
-                            providerResourceId: null),
-                        cancellationToken));
+                using var cancelledPersistence =
+                    new CancellationTokenSource(
+                        OutcomePersistenceTimeout);
+                operation = (await repository.GetAsync(
+                    operationId,
+                    cancelledPersistence.Token))!;
+                await SettleRemainingStepsAsync(
+                    operation,
+                    currentStepId: null,
+                    KeycloakStepOutcomeKind.FailedBeforeWrite,
+                    context.NowUtc,
+                    cancelledPersistence.Token);
+                return (await repository.GetAsync(
+                    operationId,
+                    cancelledPersistence.Token))!;
             }
 
             // Refresh after remote I/O so cancellation/concurrent state is observed.
+            using var outcomePersistence =
+                new CancellationTokenSource(
+                    OutcomePersistenceTimeout);
+            CancellationToken persistenceToken =
+                outcomePersistence.Token;
             operation = (await repository.GetAsync(
                 operationId,
-                cancellationToken))!;
+                persistenceToken))!;
             Guid expectedStamp = operation.ConcurrencyStamp;
             operation.RecordStepOutcome(result);
             if (result.Kind == KeycloakStepOutcomeKind.OutcomeUnknown)
@@ -490,14 +648,14 @@ public sealed class KeycloakOperationService
                 await repository.SaveAsync(
                     operation,
                     expectedStamp,
-                    cancellationToken);
+                    persistenceToken);
                 return operation;
             }
 
             await repository.SaveAsync(
                 operation,
                 expectedStamp,
-                cancellationToken);
+                persistenceToken);
             if (result.Kind is KeycloakStepOutcomeKind.Conflict
                 or KeycloakStepOutcomeKind.FailedBeforeWrite)
             {
@@ -506,22 +664,40 @@ public sealed class KeycloakOperationService
                     step.StepId,
                     KeycloakStepOutcomeKind.FailedBeforeWrite,
                     context.NowUtc,
-                    cancellationToken);
+                    persistenceToken);
                 return (await repository.GetAsync(
                     operationId,
-                    cancellationToken))!;
+                    persistenceToken))!;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await SettleRemainingStepsAsync(
+                    operation,
+                    step.StepId,
+                    KeycloakStepOutcomeKind.FailedBeforeWrite,
+                    context.NowUtc,
+                    persistenceToken);
+                return (await repository.GetAsync(
+                    operationId,
+                    persistenceToken))!;
             }
         }
 
+        using var settlementPersistence =
+            new CancellationTokenSource(
+                OutcomePersistenceTimeout);
+        CancellationToken settlementToken =
+            settlementPersistence.Token;
         operation = (await repository.GetAsync(
             operationId,
-            cancellationToken))!;
+            settlementToken))!;
         Guid settlementStamp = operation.ConcurrencyStamp;
         operation.SettleFromStepOutcomes(context.NowUtc);
         await repository.SaveAsync(
             operation,
             settlementStamp,
-            cancellationToken);
+            settlementToken);
         return operation;
     }
 
@@ -558,6 +734,31 @@ public sealed class KeycloakOperationService
             operation,
             expectedStamp,
             cancellationToken);
+    }
+
+    private async Task<KeycloakOperation>
+        SettleFailedBeforeWriteAsync(
+            Guid operationId,
+            DateTimeOffset settledAtUtc)
+    {
+        IKeycloakOperationRepository repository =
+            RequireRepository();
+        using var persistence =
+            new CancellationTokenSource(
+                OutcomePersistenceTimeout);
+        KeycloakOperation operation =
+            (await repository.GetAsync(
+                operationId,
+                persistence.Token))!;
+        await SettleRemainingStepsAsync(
+            operation,
+            currentStepId: null,
+            KeycloakStepOutcomeKind.FailedBeforeWrite,
+            settledAtUtc,
+            persistence.Token);
+        return (await repository.GetAsync(
+            operationId,
+            persistence.Token))!;
     }
 
     private static KeycloakMapperOperationRequest BuildMapperRequest(
@@ -607,7 +808,8 @@ public sealed class KeycloakOperationService
             context.RuntimeClientSecret,
             context.AdministratorUsername,
             context.AdministratorPassword,
-            providerResourceId);
+            providerResourceId
+            ?? step.Desired.ProviderResourceId);
 
     private static bool IsMapperStep(KeycloakChangeStep step) =>
         step.Kind is KeycloakStep.CreateMapper
@@ -634,6 +836,10 @@ public sealed class KeycloakOperationService
             || context.Target != operation.Target
             || !string.Equals(
                 context.Digest.Trim(),
+                operation.Digest,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                ComputeDigest(operation.ChangeSet),
                 operation.Digest,
                 StringComparison.Ordinal))
         {
@@ -746,7 +952,9 @@ public sealed class KeycloakOperationService
     {
         if (origin is null
             || !origin.IsAbsoluteUri
-            || origin.Scheme != Uri.UriSchemeHttps
+            || (origin.Scheme != Uri.UriSchemeHttps
+                && !(origin.Scheme == Uri.UriSchemeHttp
+                    && origin.IsLoopback))
             || !string.IsNullOrEmpty(origin.UserInfo)
             || !string.IsNullOrEmpty(origin.Query)
             || !string.IsNullOrEmpty(origin.Fragment))
@@ -766,7 +974,7 @@ public sealed class KeycloakOperationService
             snapshot.Realm,
             Guid.CreateVersion7().ToString("D"));
         return new KeycloakChangeStep(
-            "realm:create",
+            CreateRealmStepId,
             KeycloakStep.CreateRealm,
             KeycloakResourceKind.Realm,
             snapshot.Realm,
@@ -791,7 +999,8 @@ public sealed class KeycloakOperationService
         var bff = KeycloakDesiredProjection.ConfidentialClient(
             snapshot.BlazorClientId,
             [new Uri(publicOrigin, "signin-oidc").AbsoluteUri],
-            [origin]);
+            [origin],
+            Guid.CreateVersion7().ToString("D"));
         steps.Add(new KeycloakChangeStep(
             "client:bff", KeycloakStep.CreateClient, KeycloakResourceKind.Client,
             snapshot.BlazorClientId, KeycloakStepPrecondition.MustBeAbsent,
@@ -803,7 +1012,10 @@ public sealed class KeycloakOperationService
             bff));
         if (!string.IsNullOrWhiteSpace(snapshot.ApiClientId))
         {
-            KeycloakDesiredProjection api = KeycloakDesiredProjection.BearerOnlyClient(snapshot.ApiClientId);
+            KeycloakDesiredProjection api =
+                KeycloakDesiredProjection.BearerOnlyClient(
+                    snapshot.ApiClientId,
+                    Guid.CreateVersion7().ToString("D"));
             steps.Add(new KeycloakChangeStep(
                 "client:api", KeycloakStep.CreateClient, KeycloakResourceKind.Client,
                 snapshot.ApiClientId, KeycloakStepPrecondition.MustBeAbsent,

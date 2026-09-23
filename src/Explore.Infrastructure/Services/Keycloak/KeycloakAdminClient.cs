@@ -226,13 +226,7 @@ public sealed partial class KeycloakAdminClient : IKeycloakAdminClient
     {
         serverBase = null;
         Uri authority = request.Authority;
-        bool secure = authority.Scheme == Uri.UriSchemeHttps;
-        bool allowedLoopbackHttp =
-            authority.Scheme == Uri.UriSchemeHttp
-            && authority.IsLoopback
-            && configuration.GetValue("Keycloak:AllowDevelopmentLoopbackHttp", false)
-            && (hostEnvironment.IsDevelopment() || hostEnvironment.IsEnvironment("Testing"));
-        if ((!secure && !allowedLoopbackHttp)
+        if (!IsAllowedAdminAuthority(authority)
             || !string.IsNullOrEmpty(authority.UserInfo)
             || !string.IsNullOrEmpty(authority.Query)
             || !string.IsNullOrEmpty(authority.Fragment)
@@ -266,6 +260,64 @@ public sealed partial class KeycloakAdminClient : IKeycloakAdminClient
         };
         serverBase = builder.Uri;
         return true;
+    }
+
+    private bool IsAllowedAdminAuthority(Uri authority)
+    {
+        if (authority.Scheme == Uri.UriSchemeHttps)
+        {
+            return true;
+        }
+
+        bool allowedLoopbackHttp =
+            authority.Scheme == Uri.UriSchemeHttp
+            && authority.IsLoopback
+            && configuration.GetValue(
+                "Keycloak:AllowDevelopmentLoopbackHttp",
+                false)
+            && (hostEnvironment.IsDevelopment()
+                || hostEnvironment.IsEnvironment("Testing"));
+        if (allowedLoopbackHttp)
+        {
+            return true;
+        }
+
+        if (authority.Scheme != Uri.UriSchemeHttp
+            || !configuration.GetValue(
+                "Keycloak:AllowManagedLocalHttp",
+                false)
+            || !Uri.TryCreate(
+                configuration[
+                    "Keycloak:ManagedLocalHttpOrigin"],
+                UriKind.Absolute,
+                out Uri? allowedOrigin)
+            || allowedOrigin.Scheme != Uri.UriSchemeHttp
+            || !string.IsNullOrEmpty(allowedOrigin.UserInfo)
+            || !string.IsNullOrEmpty(allowedOrigin.Query)
+            || !string.IsNullOrEmpty(allowedOrigin.Fragment))
+        {
+            return false;
+        }
+
+        const string marker = "/realms/";
+        int markerIndex = authority.AbsolutePath.LastIndexOf(
+            marker,
+            StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 0)
+        {
+            return false;
+        }
+
+        return string.Equals(
+                authority.Host,
+                allowedOrigin.Host,
+                StringComparison.OrdinalIgnoreCase)
+            && authority.Port == allowedOrigin.Port
+            && string.Equals(
+                authority.AbsolutePath[..markerIndex]
+                    .TrimEnd('/'),
+                allowedOrigin.AbsolutePath.TrimEnd('/'),
+                StringComparison.Ordinal);
     }
 
     private async Task<string?> RequestAccessTokenAsync(

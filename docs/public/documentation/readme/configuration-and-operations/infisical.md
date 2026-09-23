@@ -205,33 +205,8 @@ Required only when `AUTHENTICATION_PROVIDER=keycloak`.
 | `KEYCLOAK_REALM` | Realm name. |
 | `KEYCLOAK_CLIENT_ID` | Browser/BFF client metadata used for onboarding detection (alias: `KEYCLOAK_BLAZOR_CLIENT_ID`). |
 | `KEYCLOAK_BLAZOR_CLIENT_SECRET` | Confidential client secret for the Blazor BFF. |
-| `KEYCLOAK_API_CLIENT_SECRET` | Optional; only for deployments that make the API resource-server client confidential. |
-| `KEYCLOAK_ADMIN_USERNAME` | Keycloak administrator username used by bootstrap sync (alias: `KEYCLOAK_ADMIN`). |
-| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak administrator password used by bootstrap sync. |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | `true` (default) or `false`; enforce HTTPS metadata validation for OIDC endpoints. |
-| `KEYCLOAK_BLAZOR_REDIRECT_URIS` | Optional comma-separated allowed redirect URIs. |
-| `KEYCLOAK_BLAZOR_WEB_ORIGINS` | Optional allowed CORS web origins. |
-| `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` | Optional allowed post-logout redirect URIs. |
 `KEYCLOAK_DB_DATABASE`, `KEYCLOAK_DB_USERNAME`, and `KEYCLOAK_DB_PASSWORD` are backend provisioning inputs, not BFF-readable `/keycloak` entries. Inject them only into their owning container/provisioning environment; database keys in frontend folders fail closed.
-
-### `/keycloak/smtp`
-
-Optional Keycloak realm SMTP settings for account emails. These are separate from ISLAMU Event's `/smtp` delivery. Leave `KEYCLOAK_SMTP_HOST` blank to preserve existing Keycloak settings.
-
-| Key | Purpose |
-|---|---|
-| `KEYCLOAK_SMTP_HOST` | Optional realm SMTP host for Keycloak verification emails. |
-| `KEYCLOAK_SMTP_PORT` | Optional realm SMTP port. |
-| `KEYCLOAK_SMTP_FROM` | Optional realm sender address. |
-| `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | Optional realm sender display name. |
-| `KEYCLOAK_SMTP_AUTH` | `true` or `false`; requires authentication for Keycloak SMTP. |
-| `KEYCLOAK_SMTP_USER` | Optional authentication username. |
-| `KEYCLOAK_SMTP_PASSWORD` | Optional authentication password. |
-| `KEYCLOAK_SMTP_SSL` | `true` or `false`; enables SSL. |
-| `KEYCLOAK_SMTP_STARTTLS` | `true` or `false`; enables STARTTLS. |
-| `KEYCLOAK_SMTP_REPLY_TO` | Optional reply-to address. |
-| `KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME` | Optional reply-to display name. |
-| `KEYCLOAK_SMTP_ENVELOPE_FROM` | Optional envelope-from address. |
 
 ### `/database`
 

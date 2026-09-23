@@ -1640,9 +1640,20 @@ Important behavior:
 - `Keycloak:ClientSecret` is explicitly overridden when `KEYCLOAK_BLAZOR_CLIENT_SECRET` (Infisical) is present.
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` map to `Google:ClientId` and `Google:ClientSecret`.
 
-Compose-managed Keycloak adds one bootstrap-specific rule: `docker/keycloak/keycloak-init.sh` writes `KEYCLOAK_BLAZOR_CLIENT_SECRET` into the imported `islamu-event-blazor` client before API/Blazor startup is allowed to complete. Neither checked-in realm export contains a production client secret. Compose fails closed when the BFF secret is absent; local Aspire instead creates a persisted secret parameter when no deployment value is configured and injects it consistently into Keycloak, API, and Blazor. The `islamu-event-api` client is bearer-only, has no static client secret, and the API validation path never consumes one. The Keycloak admin username/password are used only by the one-shot Compose init job and must not be stored as runtime application settings.
+Compose and local Aspire pass `KEYCLOAK_BLAZOR_CLIENT_SECRET` only to the API
+and BFF runtime. Bundled Keycloak starts without importing or reconciling the
+repository sample realm. During setup, an operator can explicitly create an
+absent realm and clients; the BFF secret flows directly from the selected
+authority to that reviewed Admin REST create request. The `islamu-event-api`
+client remains bearer-only and has no API client secret.
 
-The managed-realm synchronizer replaces the BFF client callback allow-list with exact login, logout, and web-origin values. Compose uses its exact localhost defaults; local Aspire derives the same localhost/admin-localhost URI set from the allocated Blazor HTTP/HTTPS ports, including isolated dynamic ports. Nonblank `KEYCLOAK_BLAZOR_REDIRECT_URIS`, `KEYCLOAK_BLAZOR_WEB_ORIGINS`, and `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` values override that Aspire derivation. Reverse-proxied deployments must supply exact public values in those formats. Wildcards and the `+` web-origin shortcut are not repository defaults.
+New absent clients derive exact login, logout and web-origin values from trusted
+`PublicBaseUrl`. Existing deployments retain their operator-owned callbacks.
+The sample realm export is inert reference material, and the retired callback
+override variables, sample-import hook and startup reconciliation job have no
+replacements. Keycloak bootstrap-admin credentials belong to the Keycloak
+process; advanced operation credentials are fresh form input, never Event
+deployment settings.
 - `Keycloak:RequireHttpsMetadata` is set to `true` when Keycloak input is mapped.
 
 External-Keycloak administration uses the private

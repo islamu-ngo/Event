@@ -13,6 +13,11 @@ public interface IKeycloakOperationCoordinator
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default);
 
+    Task<T> ExecuteReconciliationAsync<T>(
+        KeycloakOperation operation,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
     Task RequestCancellationAsync(
         Guid operationId,
         DateTimeOffset requestedAtUtc,

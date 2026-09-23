@@ -134,8 +134,6 @@ onboarding and switching behavior.
 | `KEYCLOAK_ADMIN` | **Baseline** | `admin` | Initial Keycloak administrative user. |
 | `KEYCLOAK_ADMIN_PASSWORD` | **Baseline (Secret)** | None | Password for initial Keycloak administrative user. |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | Advanced | `true` | Enforce HTTPS metadata validation for OIDC endpoints. Set `false` only in local dev without TLS. |
-| `KEYCLOAK_BLAZOR_REDIRECT_URIS` | Advanced | None | Comma-separated list of allowed redirect URIs if overriding default discovery. |
-| `KEYCLOAK_BLAZOR_WEB_ORIGINS` | Advanced | None | Allowed CORS web origins for Keycloak client. |
 
 ---
 
@@ -403,7 +401,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `KEYCLOAK_DB_USERNAME` | integration | public | None | optional | deployment |
 | `KEYCLOAK_DB_PASSWORD` | integration | secret | None (secret) | optional | deployment |
 | `KEYCLOAK_ADMIN` | integration | public | None | optional | deployment |
-| `KEYCLOAK_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | deployment |
+| `KEYCLOAK_ADMIN_PASSWORD` | integration | sensitive | None | optional | deployment |
 | `LOCAL_STORAGE_ROOT_PATH` | storage | public | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
 | `ERASURE_DATABASE_TOPOLOGY` | platform | public | None | optional | process |
@@ -460,22 +458,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `INFISICAL_CLIENT_SECRET` | security | sensitive | None | optional | process |
 | `INFISICAL_ENV` | security | public | None | optional | process |
 | `DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | false | defaulted | process |
-| `KEYCLOAK_API_CLIENT_SECRET` | identity | secret | None (secret) | required | process |
-| `KEYCLOAK_BLAZOR_REDIRECT_URIS` | identity | public | None | optional | process |
-| `KEYCLOAK_BLAZOR_WEB_ORIGINS` | identity | public | None | optional | process |
-| `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_HOST` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_PORT` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_FROM` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_AUTH` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_SSL` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_STARTTLS` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_REPLY_TO` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_ENVELOPE_FROM` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_USER` | identity | public | None | optional | process |
-| `KEYCLOAK_SMTP_PASSWORD` | identity | sensitive | None | optional | process |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | identity | public | None | optional | process |
 | `IDENTITY_DATABASE_PROVIDER` | integration | public | None | optional | process |
 | `IDENTITY_DATABASE_CONNECTION_STRING` | integration | secret | None (secret) | optional | process |
@@ -719,7 +701,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `REDIS_CONNECTION_STRING` | integration | sensitive | None | optional | deployment |
 | `SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY` | security | secret | None (secret) | optional | process |
 | `KEYCLOAK_CLIENT_ID` | identity | secret | None (secret) | optional | process |
-| `KEYCLOAK_ADMIN_USERNAME` | identity | secret | None (secret) | optional | process |
 | `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | platform | secret | None (secret) | optional | process |
 | `ATPROTO_SESSION_ENCRYPTION_KEYRING` | platform | secret | None (secret) | optional | process |
 | `ATPROTO_SESSION_JWT_PRIVATE_JWKS` | platform | secret | None (secret) | optional | process |

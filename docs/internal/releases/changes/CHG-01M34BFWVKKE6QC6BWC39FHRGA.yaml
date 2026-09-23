@@ -5,7 +5,7 @@ Title: add reviewed Keycloak operator experience
 Type: feat
 Scope: onboarding
 Summary: Explain and verify each approved Keycloak change before applying it through one shared operator panel.
-Group: keycloak-operator-safety
+Group: keycloak-operator-onboarding
 Supersedes: []
 Impacts:
   Breaking:

@@ -225,6 +225,37 @@ public sealed class KeycloakOperationExecutionTests
     }
 
     [Test]
+    public async Task PlanCreateRealm_AllowsLoopbackHttpPublicOrigin()
+    {
+        var snapshot = new KeycloakInspectionSnapshot(
+            "operators",
+            "event-bff",
+            "event-api",
+            realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                0,
+                ProviderId: null,
+                Shape: null),
+            apiClient: new(
+                "event-api",
+                0,
+                ProviderId: null,
+                Shape: null));
+
+        KeycloakChangeSet plan =
+            new KeycloakOperationService().Plan(
+                snapshot,
+                KeycloakOperationIntent.CreateRealm,
+                new Uri("http://localhost:7002/"),
+                "revision-1");
+
+        await Assert.That(plan.Steps.Count)
+            .IsGreaterThan(0);
+    }
+
+    [Test]
     public async Task CreateRealm_AcceptedThenTimeout_StopsRemainingResources()
     {
         var repository = new RecordingRepository();
@@ -288,6 +319,89 @@ public sealed class KeycloakOperationExecutionTests
             .IsEqualTo(KeycloakOperationState.OutcomeUnknown);
         await Assert.That(admin.ApplyCount).IsEqualTo(1);
         await Assert.That(result.StepOutcomes.Items).HasCount().EqualTo(1);
+    }
+
+    [Test]
+    public async Task Reconcile_CreateApplyingWithoutOutcome_UsesPlannedIds()
+    {
+        var repository = new RecordingRepository();
+        var coordinator = new RecordingCoordinator();
+        var admin = new RecordingAdminClient(null, null);
+        var service = new KeycloakOperationService(
+            repository,
+            coordinator,
+            admin);
+        var snapshot = new KeycloakInspectionSnapshot(
+            "operators",
+            "event-bff",
+            "event-api",
+            realmExists: false,
+            effectiveMappers: [],
+            blazorClient: new(
+                "event-bff",
+                0,
+                ProviderId: null,
+                Shape: null),
+            apiClient: new(
+                "event-api",
+                0,
+                ProviderId: null,
+                Shape: null));
+        Uri origin = new("https://event.example.test/");
+        KeycloakOperation operation =
+            (await service.CreateAsync(
+                Guid.Parse(
+                    "77777777-7777-7777-8777-777777777777"),
+                new Uri(
+                    "https://identity.example.test/realms/operators"),
+                snapshot,
+                "actor",
+                7,
+                Now,
+                Now.AddMinutes(15),
+                KeycloakOperationIntent.CreateRealm,
+                origin,
+                "revision-1"))!;
+        Guid expectedStamp = operation.ConcurrencyStamp;
+        operation.AuthorizeApply(
+            "actor",
+            7,
+            operation.Target,
+            operation.Digest,
+            Now.AddMinutes(1));
+        await repository.SaveAsync(
+            operation,
+            expectedStamp);
+        var context = new KeycloakOperationApplyContext(
+            operation.Id,
+            "actor",
+            7,
+            operation.Target,
+            operation.Digest,
+            "event-api",
+            origin,
+            "revision-1",
+            "runtime-secret-canary",
+            "admin",
+            "password",
+            Now.AddMinutes(2));
+        string[] plannedIds = operation.ChangeSet.Steps
+            .Where(step => step.Kind is
+                KeycloakStep.CreateRealm
+                or KeycloakStep.CreateClient)
+            .Select(step =>
+                step.Desired!.ProviderResourceId!)
+            .ToArray();
+
+        KeycloakOperation result =
+            await service.ReconcileAsync(context);
+
+        await Assert.That(result.State)
+            .IsEqualTo(KeycloakOperationState.Verified);
+        await Assert.That(admin.ApplyCount).IsEqualTo(0);
+        await Assert.That(
+                admin.InspectedProvisioningProviderIds)
+            .IsEquivalentTo(plannedIds);
     }
 
     [Test]
@@ -404,6 +518,73 @@ public sealed class KeycloakOperationExecutionTests
             .IsEqualTo(KeycloakOperationState.OutcomeUnknown);
         await Assert.That(result.SettledAtUtc).IsNull();
         await Assert.That(harness.Admin.ApplyCount).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Apply_CallerCancelledAfterSend_PersistsUnknown()
+    {
+        TestHarness harness =
+            await TestHarness.CreateAsync(twoSteps: false);
+        using var callerCancellation =
+            new CancellationTokenSource();
+        harness.Admin.OnApply = _ =>
+        {
+            callerCancellation.Cancel();
+            return Task.FromResult(
+                Result(
+                    KeycloakStepOutcomeKind.OutcomeUnknown));
+        };
+
+        KeycloakOperation result =
+            await harness.Service.ApplyAsync(
+                harness.Context,
+                callerCancellation.Token);
+
+        await Assert.That(result.State)
+            .IsEqualTo(
+                KeycloakOperationState.OutcomeUnknown);
+        await Assert.That(harness.Repository.PersistedState)
+            .IsEqualTo(
+                KeycloakOperationState.OutcomeUnknown);
+        await Assert.That(
+                harness.Repository.PersistedOutcomeCount)
+            .IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Apply_CallerCancelledBeforeSend_SettlesWithoutProvider()
+    {
+        TestHarness harness =
+            await TestHarness.CreateAsync(twoSteps: false);
+        using var callerCancellation =
+            new CancellationTokenSource();
+        harness.Coordinator
+            .HonorCancellationBeforeAction = true;
+        harness.Repository.OnSaved = operation =>
+        {
+            if (operation.State
+                == KeycloakOperationState.Applying)
+            {
+                callerCancellation.Cancel();
+            }
+        };
+
+        KeycloakOperation result =
+            await harness.Service.ApplyAsync(
+                harness.Context,
+                callerCancellation.Token);
+
+        await Assert.That(result.State)
+            .IsEqualTo(
+                KeycloakOperationState.FailedBeforeWrite);
+        await Assert.That(harness.Admin.ApplyCount)
+            .IsEqualTo(0);
+        await Assert.That(
+                result.StepOutcomes.Items.Any(
+                    outcome => outcome.Kind
+                        != KeycloakStepOutcomeKind
+                            .FailedBeforeWrite))
+            .IsFalse();
     }
 
     [Test]
@@ -561,6 +742,50 @@ public sealed class KeycloakOperationExecutionTests
             .IsEqualTo(KeycloakOperationState.Verified);
         await Assert.That(harness.Admin.ApplyCount).IsEqualTo(0);
         await Assert.That(harness.Admin.InspectCount).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Reconcile_ApplyingUnknownReadback_RemainsRetryable()
+    {
+        TestHarness harness = await TestHarness.CreateAsync(
+            twoSteps: false,
+            inspectResults:
+            [
+                Result(
+                    KeycloakStepOutcomeKind.OutcomeUnknown),
+                Result(
+                    KeycloakStepOutcomeKind.OutcomeUnknown)
+            ]);
+        Guid expectedStamp =
+            harness.Operation.ConcurrencyStamp;
+        harness.Operation.AuthorizeApply(
+            harness.Context.Actor,
+            harness.Context.SetupGeneration,
+            harness.Context.Target,
+            harness.Context.Digest,
+            harness.Context.NowUtc);
+        await harness.Repository.SaveAsync(
+            harness.Operation,
+            expectedStamp);
+
+        KeycloakOperation first =
+            await harness.Service.ReconcileAsync(
+                harness.Context);
+        KeycloakOperation second =
+            await harness.Service.ReconcileAsync(
+                harness.Context);
+
+        await Assert.That(first.State)
+            .IsEqualTo(
+                KeycloakOperationState.OutcomeUnknown);
+        await Assert.That(second.State)
+            .IsEqualTo(
+                KeycloakOperationState.OutcomeUnknown);
+        await Assert.That(second.SettledAtUtc).IsNull();
+        await Assert.That(harness.Admin.ApplyCount)
+            .IsEqualTo(0);
+        await Assert.That(harness.Admin.InspectCount)
+            .IsEqualTo(2);
     }
 
     [Test]
@@ -737,15 +962,20 @@ public sealed class KeycloakOperationExecutionTests
 
         public int? FailOnSaveAttempt { get; set; }
 
+        public Action<KeycloakOperation>? OnSaved { get; set; }
+
         public KeycloakOperationState? PersistedState { get; private set; }
 
         public int PersistedOutcomeCount { get; private set; }
 
         public Task<KeycloakOperation?> GetAsync(
             Guid id,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(
                 _operation?.Id == id ? _operation : null);
+        }
 
         public Task AddAsync(
             KeycloakOperation operation,
@@ -763,6 +993,7 @@ public sealed class KeycloakOperationExecutionTests
             Guid expectedConcurrencyStamp,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _saveAttempts++;
             if (FailOnSaveAttempt == _saveAttempts)
             {
@@ -780,6 +1011,7 @@ public sealed class KeycloakOperationExecutionTests
             _persistedStamp = operation.ConcurrencyStamp;
             PersistedState = operation.State;
             PersistedOutcomeCount = operation.StepOutcomes.Items.Count;
+            OnSaved?.Invoke(operation);
             return Task.CompletedTask;
         }
 
@@ -804,14 +1036,31 @@ public sealed class KeycloakOperationExecutionTests
     private sealed class RecordingCoordinator : IKeycloakOperationCoordinator
     {
         public bool ThrowOverlap { get; set; }
+        public bool HonorCancellationBeforeAction { get; set; }
 
-        public Task<T> ExecuteAsync<T>(
+        public async Task<T> ExecuteAsync<T>(
+            KeycloakOperation operation,
+            Func<CancellationToken, Task<T>> action,
+            CancellationToken cancellationToken = default)
+        {
+            if (ThrowOverlap)
+            {
+                throw new KeycloakOperationOverlapException();
+            }
+
+            if (HonorCancellationBeforeAction)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return await action(cancellationToken);
+        }
+
+        public Task<T> ExecuteReconciliationAsync<T>(
             KeycloakOperation operation,
             Func<CancellationToken, Task<T>> action,
             CancellationToken cancellationToken = default) =>
-            ThrowOverlap
-                ? throw new KeycloakOperationOverlapException()
-                : action(cancellationToken);
+            action(cancellationToken);
 
         public Task RequestCancellationAsync(
             Guid operationId,
@@ -834,6 +1083,8 @@ public sealed class KeycloakOperationExecutionTests
         public int InspectCount { get; private set; }
         public Queue<KeycloakProvisioningOperationResult>
             ProvisioningApplyResults { get; } = new();
+        public List<string?>
+            InspectedProvisioningProviderIds { get; } = [];
         public Func<CancellationToken, Task<KeycloakMapperOperationResult>>?
             OnApply { get; set; }
 
@@ -892,6 +1143,8 @@ public sealed class KeycloakOperationExecutionTests
                 CancellationToken cancellationToken)
         {
             InspectCount++;
+            InspectedProvisioningProviderIds.Add(
+                request.ProviderResourceId);
             return Task.FromResult(
                 new KeycloakProvisioningOperationResult(
                     KeycloakStepOutcomeKind.Verified,

@@ -268,6 +268,64 @@ public sealed class KeycloakAdminClientTests
     }
 
     [Test]
+    public async Task InspectAsync_AllowsExactManagedLocalHttpOrigin()
+    {
+        var handler = new OrderedHandler(
+            Expect(
+                HttpMethod.Get,
+                "/realms/operators/.well-known/openid-configuration",
+                """
+                {
+                  "issuer": "http://keycloak:8080/realms/operators"
+                }
+                """));
+        var client = CreateClient(
+            handler,
+            managedLocalOrigin: "http://keycloak:8080");
+
+        KeycloakAdminInspectionResult result =
+            await client.InspectAsync(
+                new KeycloakAdminInspectionRequest(
+                    new Uri(
+                        "http://keycloak:8080/realms/operators"),
+                    "operators",
+                    "event-bff",
+                    "event-api"),
+                CancellationToken.None);
+
+        await Assert.That(result.Status)
+            .IsEqualTo(
+                KeycloakInspectionStatus.PublicOnly);
+        await Assert.That(handler.AllRequestsConsumed).IsTrue();
+    }
+
+    [Test]
+    public async Task InspectAsync_RejectsDifferentManagedLocalHttpOrigin()
+    {
+        var handler = new RejectingHandler();
+        var client = CreateClient(
+            handler,
+            managedLocalOrigin: "http://keycloak:8080");
+
+        KeycloakAdminInspectionResult result =
+            await client.InspectAsync(
+                new KeycloakAdminInspectionRequest(
+                    new Uri(
+                        "http://identity:8080/realms/operators"),
+                    "operators",
+                    "event-bff",
+                    "event-api",
+                    $"admin-{Guid.CreateVersion7():N}",
+                    $"password-{Guid.CreateVersion7():N}"),
+                CancellationToken.None);
+
+        await Assert.That(result.Status)
+            .IsEqualTo(
+                KeycloakInspectionStatus.InvalidTarget);
+        await Assert.That(handler.WasCalled).IsFalse();
+    }
+
+    [Test]
     public async Task InspectAsync_WithAdminCredentials_ProvesRealmAbsence()
     {
         var handler = new OrderedHandler(
@@ -309,6 +367,7 @@ public sealed class KeycloakAdminClientTests
     private static KeycloakAdminClient CreateClient(
         HttpMessageHandler handler,
         bool allowLoopbackHttp = false,
+        string? managedLocalOrigin = null,
         int? requestTimeoutMilliseconds = null)
     {
         IHostEnvironment environment = Substitute.For<IHostEnvironment>();
@@ -318,6 +377,13 @@ public sealed class KeycloakAdminClientTests
             ["Keycloak:AllowDevelopmentLoopbackHttp"] =
                 allowLoopbackHttp.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
+        if (managedLocalOrigin is not null)
+        {
+            values["Keycloak:AllowManagedLocalHttp"] = "true";
+            values["Keycloak:ManagedLocalHttpOrigin"] =
+                managedLocalOrigin;
+        }
+
         if (requestTimeoutMilliseconds.HasValue)
         {
             values["Keycloak:AdminRequestTimeoutMilliseconds"] =

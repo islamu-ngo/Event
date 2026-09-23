@@ -166,10 +166,12 @@ public sealed class InspectKeycloakOperationQueryHandler(
             cancellationToken);
         IReadOnlyList<string> findings = result.Snapshot is null
             ? []
-            : operationService.Plan(result.Snapshot)?.Steps
-                .Select(step => step.StepId)
-                .ToArray()
-              ?? [];
+            : result.Snapshot.RealmExists
+                ? operationService.Plan(result.Snapshot)?.Steps
+                    .Select(step => step.StepId)
+                    .ToArray()
+                  ?? []
+                : [KeycloakOperationService.CreateRealmStepId];
         return new KeycloakInspectionDto(
             result.Status.ToString().ToLowerInvariant(),
             result.ReasonCode,

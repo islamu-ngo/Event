@@ -5,7 +5,7 @@ Title: retain uncertain Keycloak operations for safe reconciliation
 Type: fix
 Scope: access
 Summary: Persist credential-free Keycloak operation intent before transmission and block replay until read-only reconciliation settles uncertain outcomes.
-Group: keycloak-operator-safety
+Group: keycloak-operator-access
 Supersedes: []
 Impacts:
   Breaking:
@@ -19,7 +19,7 @@ Impacts:
   Migration:
     Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
     Disposition: documented
-    Detail: Additive provider migrations create the KeycloakOperationReceipts table; retained environments use forward fixes and refuse destructive downgrade while receipts exist.
+    Detail: Additive provider migrations create the KeycloakOperationReceipts table; retained environments use forward fixes and refuse destructive downgrade while unresolved receipts exist.
   Configuration:
     Reference: docs/internal/CONFIGURATION.md
     Disposition: not-applicable

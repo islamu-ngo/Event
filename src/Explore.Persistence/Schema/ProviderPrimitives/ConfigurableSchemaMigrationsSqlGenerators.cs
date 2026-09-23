@@ -26,6 +26,10 @@ internal sealed class ConfigurableNpgsqlMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = KeycloakReceiptDropGuard.Prepare(
+            operations,
+            Dependencies.SqlGenerationHelper,
+            sqlite: false);
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -46,6 +50,10 @@ internal sealed class ConfigurableSqlServerMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = KeycloakReceiptDropGuard.Prepare(
+            operations,
+            Dependencies.SqlGenerationHelper,
+            sqlite: false);
         ConfigurableSchemaMigrationOperations.Rewrite(operations, Dependencies.CurrentContext.Context);
         return ConfigurableSchemaMigrationOperations.RewriteCommands(
             base.Generate(operations, model, options),
@@ -67,6 +75,10 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
                 operations,
                 Dependencies.CurrentContext.Context);
+        executableOperations = KeycloakReceiptDropGuard.Prepare(
+            executableOperations,
+            Dependencies.SqlGenerationHelper,
+            sqlite: true);
         executableOperations =
             ConfigurableSchemaMigrationOperations.RemoveRedundantForeignKeyDrops(executableOperations);
         IReadOnlyList<MigrationCommand> commands =
@@ -96,6 +108,10 @@ internal sealed class ConfigurableMySqlMigrationsSqlGenerator(
         operations = ConfigurableSchemaMigrationOperations.PrepareInstanceBootstrapLifecycleBackfill(
             operations,
             Dependencies.CurrentContext.Context);
+        operations = KeycloakReceiptDropGuard.Prepare(
+            operations,
+            Dependencies.SqlGenerationHelper,
+            sqlite: false);
         return ConfigurableSchemaMigrationOperations.AppendPromotionCodeBackfill(
             base.Generate(operations, model, sqlOptions),
             operations,

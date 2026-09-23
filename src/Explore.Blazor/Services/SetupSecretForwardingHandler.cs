@@ -64,6 +64,11 @@ public class SetupSecretForwardingHandler : DelegatingHandler
             return true;
         }
 
+        if (IsKeycloakOperatorRequest(method, path))
+        {
+            return true;
+        }
+
         const string onboardingBasePath = "/api/InstanceOnboarding/";
 
         if (!path.StartsWith(onboardingBasePath, StringComparison.OrdinalIgnoreCase))
@@ -83,4 +88,54 @@ public class SetupSecretForwardingHandler : DelegatingHandler
     private static bool MatchesEndpointFamily(string endpoint, string root) =>
         endpoint.Equals(root, StringComparison.OrdinalIgnoreCase)
         || endpoint.StartsWith($"{root}/", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsKeycloakOperatorRequest(
+        string method,
+        string path)
+    {
+        if (HttpMethods.IsGet(method)
+            && path.Equals(
+                "/api/instance/keycloak/connection",
+                StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPost(method)
+            && (path.Equals(
+                    "/api/instance/keycloak/inspect",
+                    StringComparison.OrdinalIgnoreCase)
+                || path.Equals(
+                    "/api/instance/keycloak/plans",
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        const string prefix =
+            "/api/instance/keycloak/operations/";
+        if (!path.StartsWith(
+                prefix,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] segments = path[prefix.Length..]
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 1)
+        {
+            return HttpMethods.IsGet(method)
+                && Guid.TryParse(segments[0], out _);
+        }
+
+        return segments.Length == 2
+            && HttpMethods.IsPost(method)
+            && Guid.TryParse(segments[0], out _)
+            && (segments[1].Equals(
+                    "apply",
+                    StringComparison.OrdinalIgnoreCase)
+                || segments[1].Equals(
+                    "reconcile",
+                    StringComparison.OrdinalIgnoreCase)
+                || segments[1].Equals(
+                    "cancel",
+                    StringComparison.OrdinalIgnoreCase));
+    }
 }

@@ -85,6 +85,7 @@ public static class ApplicationServicesRegistration
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddSingleton(TimeProvider.System);
         PrivacyErasureDurabilityOptions erasureDurability =
             PrivacyErasureDurabilityOptions.FromConfiguration(configuration);
         services.AddOptions<PrivacyErasureDurabilityOptions>()
@@ -276,12 +277,13 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IInstanceOnboardingGenerationReader, InstanceOnboardingGenerationReader>();
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
+        services.AddSingleton<KeycloakCredentialBindingRevision>();
+        services.AddScoped<KeycloakConnectionResolver>();
+        services.AddScoped<KeycloakOperationService>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();
         services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
         services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();
-        services.AddScoped<IKeycloakIdentityContractContributor, EventKeycloakIdentityContractContributor>();
         services.AddScoped<IAccountAuthorityLifecycleEmailService, DefaultAccountAuthorityLifecycleEmailService>();
-        services.AddScoped<IKeycloakRealmDesiredStateBuilder, KeycloakRealmDesiredStateBuilder>();
         services.AddScoped<IAnalyticsGovernanceService, AnalyticsGovernanceService>();
         services.AddScoped<
             IPaidEventPolicyMutationBoundary,

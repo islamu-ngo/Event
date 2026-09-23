@@ -100,7 +100,6 @@ public sealed record AuthProviderConfigurationWriteDto
     public bool LockPrimaryProvider { get; init; }
     public string KeycloakAuthority { get; init; } = string.Empty;
     public string KeycloakClientId { get; init; } = string.Empty;
-    public string KeycloakClientSecret { get; init; } = string.Empty;
     public bool AtprotoLoginEnabled { get; init; }
     public string AtprotoPublicUrl { get; init; } = string.Empty;
     public bool GoogleSsoEnabled { get; init; }

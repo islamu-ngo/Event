@@ -551,7 +551,19 @@ Secret and connection priority:
   Secrets are unsupported and cannot supply or override them. Select
   `SECRET_PROVIDER=Environment` for environment-only local debugging.
 
-Keycloak local infrastructure imports the repository realm export from `docker/keycloak/realm-export.json`. Aspire mounts that file into `/opt/keycloak/data/import/realm-export.json` and starts Keycloak with `--import-realm`; Docker Compose mounts the same file and then runs `keycloak-init` to synchronize the confidential Blazor client secret plus managed realm/client security settings. The export contains no client secret. Aspire sets `KC_HTTP_RELATIVE_PATH=/auth`, so its management readiness probe is `/auth/health/ready`. Keycloak skips startup import when the realm already exists in the persistent database; `keycloak-init` repairs the managed policy/client fields, while a disposable database reset is still required for unrelated export-only changes.
+Bundled Keycloak starts with its persistent provider database and no automatic
+sample realm import. `docker/keycloak/realm-export.json` is inert reference
+material, not a startup mount. A fresh installation reaches setup while realm
+discovery is unavailable; the advanced operator workflow creates an absent
+realm/clients explicitly. Aspire sets `KC_HTTP_RELATIVE_PATH=/auth`, so its
+management readiness probe remains `/auth/health/ready`.
+
+For an existing realm, run connection and read-only inspection, then create a
+reviewed receipt for the exact HAL-authorized change. Before Apply, back up the
+application database and Keycloak together. If a response is lost, preserve
+both backups, do not replay, and reconcile the captured provider ID. Rotate the
+BFF secret directly in Keycloak and the selected deployment authority, restart
+affected replicas, reinspect and verify a fresh sign-in.
 
 Startup dependencies are explicit:
 

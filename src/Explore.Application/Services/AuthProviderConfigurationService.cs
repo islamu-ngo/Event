@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Models;
 using Explore.Domain.Settings;
 using Explore.Domain;
@@ -21,6 +22,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly KeycloakConnectionResolver _keycloakConnectionResolver;
     private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
     public AuthProviderConfigurationService(
@@ -29,6 +31,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         IUnitOfWork unitOfWork,
         ISettingMutationLock mutationLock,
         IVisitorAccessSettingsWriter visitorSettings,
+        KeycloakConnectionResolver keycloakConnectionResolver,
         IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
         _systemSettingRepository = systemSettingRepository;
@@ -36,6 +39,7 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         _unitOfWork = unitOfWork;
         _mutationLock = mutationLock;
         _visitorSettings = visitorSettings;
+        _keycloakConnectionResolver = keycloakConnectionResolver;
         _notificationHandlers = notificationHandlers;
     }
 
@@ -95,20 +99,30 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
 
     public async Task<AuthProviderConfigurationDto> ReadConfigurationAsync()
     {
+        KeycloakConnectionResolution connection =
+            await _keycloakConnectionResolver.ResolveRuntimeAsync();
+        return await ReadConfigurationCoreAsync(connection);
+    }
+
+    private async Task<AuthProviderConfigurationDto> ReadConfigurationCoreAsync(
+        KeycloakConnectionResolution connection)
+    {
         var primaryProviderSetting = await _systemSettingRepository.GetByKey(
             GovernanceSettingKeys.Authentication.PrimaryProviderId);
         AuthenticationProviderKind primaryProvider = ResolvePrimaryProvider(primaryProviderSetting);
         var keycloak = await ResolveKeycloakConfigurationAsync(primaryProvider);
+        if (connection.Status == KeycloakConnectionStatus.Resolved)
+        {
+            keycloak = (
+                primaryProvider == AuthenticationProviderKind.Keycloak,
+                connection.Authority!.AbsoluteUri.TrimEnd('/'),
+                connection.BlazorClientId!,
+                true);
+        }
         var atprotoLoginEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled);
         var atprotoPublicUrl = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.AtprotoPublicUrl);
         var googleSsoEnabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleSsoEnabled);
         var googleClientId = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GoogleClientId);
-        var keycloakSecret = await _systemSettingRepository.GetByKey(InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret);
-
-        var keycloakSecretDeploymentManaged = IsKeycloakClientSecretDeploymentManaged();
-        var storedKeycloakSecretConfigured = !string.IsNullOrWhiteSpace(DeserializeString(keycloakSecret?.Value, string.Empty));
-        var configuredKeycloakSecretConfigured = !string.IsNullOrWhiteSpace(ReadConfiguredKeycloakClientSecret());
-
         return new AuthProviderConfigurationDto
         {
             PrimaryProviderId = (int)primaryProvider,
@@ -121,15 +135,11 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             KeycloakClientSecret = string.Empty, // Never return secrets on read
             KeycloakDetectedFromEnvironment = keycloak.DetectedFromEnvironment,
             KeycloakClientSecretOwnership = CreateOwnershipMetadata(
-                keycloakSecretDeploymentManaged,
-                configured: keycloakSecretDeploymentManaged
-                    ? configuredKeycloakSecretConfigured
-                    : storedKeycloakSecretConfigured || configuredKeycloakSecretConfigured,
-                bootstrapAvailable: !keycloakSecretDeploymentManaged
-                    && !storedKeycloakSecretConfigured
-                    && configuredKeycloakSecretConfigured,
-                applicationManagedDescription: "Keycloak client secret can be rotated and stored by the platform. Deployment values only seed runtime configuration until an application-managed secret is saved.",
-                deploymentManagedDescription: "Keycloak client secret is deployment-managed. Rotate it in the deployment secret provider and update the matching Keycloak client outside the Admin UI."),
+                deploymentManaged: true,
+                configured: connection.Status == KeycloakConnectionStatus.Resolved,
+                bootstrapAvailable: false,
+                applicationManagedDescription: "Keycloak runtime credentials must be bound through the selected deployment secret authority.",
+                deploymentManagedDescription: "Keycloak client credentials are deployment-owned. Event never stores or rotates an existing client secret."),
             AtprotoLoginEnabled = primaryProvider == AuthenticationProviderKind.Atproto
                                   || DeserializeBoolean(atprotoLoginEnabled?.Value, false),
             AtprotoPublicUrl = DeserializeString(atprotoPublicUrl?.Value, string.Empty),
@@ -225,20 +235,6 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 cancellationToken);
         }
 
-        if (!string.IsNullOrEmpty(configuration.KeycloakClientSecret)
-            && !IsKeycloakClientSecretDeploymentManaged())
-        {
-            await UpsertSettingAsync(
-                InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret,
-                JsonSerializer.Serialize(configuration.KeycloakClientSecret),
-                SettingValueType.String,
-                true,
-                "Authentication",
-                4,
-                "Keycloak OIDC client secret",
-                cancellationToken);
-        }
-
         await UpsertSettingAsync(
             GovernanceSettingKeys.Authentication.AtprotoLoginEnabled,
             JsonSerializer.Serialize(atprotoLoginEnabled),
@@ -330,18 +326,19 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
 
     public async Task<AuthProviderConfigurationDto> ReadConfigurationWithSecretsAsync()
     {
-        var dto = await ReadConfigurationAsync();
-
-        var keycloakSecret = await _systemSettingRepository.GetByKey(InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret);
+        KeycloakConnectionResolution connection =
+            await _keycloakConnectionResolver.ResolveRuntimeAsync();
+        var dto = await ReadConfigurationCoreAsync(connection);
         var googleSecret = await _systemSettingRepository.GetByKey(InfrastructureSecretSettingKeys.Authentication.GoogleClientSecret);
-
-        var storedKeycloakSecret = DeserializeString(keycloakSecret?.Value, string.Empty);
-        var configuredKeycloakSecret = ReadConfiguredKeycloakClientSecret();
-        dto.KeycloakClientSecret = IsKeycloakClientSecretDeploymentManaged()
-            ? configuredKeycloakSecret
-            : string.IsNullOrWhiteSpace(storedKeycloakSecret)
-                ? configuredKeycloakSecret
-                : storedKeycloakSecret;
+        if (connection.Status == KeycloakConnectionStatus.Resolved)
+        {
+            dto = dto with
+            {
+                KeycloakAuthority = connection.Authority!.AbsoluteUri.TrimEnd('/'),
+                KeycloakClientId = connection.BlazorClientId!
+            };
+            dto.KeycloakClientSecret = connection.ClientSecret!;
+        }
         dto.GoogleClientSecret = DeserializeString(googleSecret?.Value, string.Empty);
 
         return dto;

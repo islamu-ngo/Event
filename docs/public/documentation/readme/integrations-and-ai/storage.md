@@ -28,6 +28,31 @@ Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-an
 > [!TIP]
 > To evaluate self-hosted S3 locally, launch Docker Compose with the `storage` profile (`docker compose --profile storage up -d`) to start a co-located **MinIO** container (see [Docker Compose Profiles](../self-hosting/docker-compose.md#optional-service-profiles)).
 
+### Private Bucket Requirement
+
+S3-compatible buckets must deny anonymous object access. The optional Compose
+MinIO initializer now enforces a private policy for both new and existing sample
+buckets. This is a breaking change for deployments that linked directly to sample
+bucket objects: those anonymous URLs no longer work.
+
+After upgrading an existing Compose deployment, preserve the `minio_data` volume
+and run:
+
+```bash
+docker compose --profile storage run --rm minio-init
+```
+
+The command keeps existing objects and reapplies the private posture; do not
+delete or recreate the bucket. External S3-compatible providers need the
+equivalent private bucket policy configured through their own administration
+surface.
+
+Public images remain available through the application-managed
+`/api/storageobject/{id}/public` URL. The application checks the stored metadata,
+lifecycle, image type, and public-image visibility before reading private provider
+bytes. Authenticated files likewise use their ID-based application content route,
+not a raw bucket URL or object key.
+
 ---
 
 ## Organization Evidence PDF Uploads
@@ -52,6 +77,7 @@ changing a root setting never migrates existing files.
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):
 * Restoring a database without the corresponding storage volume causes broken image links.
 * Restoring a storage volume without the database leaves orphaned, unreferenced files.
+* After restoring the Compose MinIO volume, rerun `minio-init` before reopening traffic so the existing bucket is private.
 * [Configuration Manifests](../configuration-and-operations/configuration-manifests.md) deliberately exclude binary media and do not replace storage volume backups.
 * Retain required Data Protection keys and the selected secret authority with the
   protected data. Preserve newer privacy-erasure authority independently rather

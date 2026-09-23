@@ -22,7 +22,7 @@ Storage is moving to a local-first, provider-neutral model. New upload/read flow
 | Admin settings | Instance admins can read/update provider policy, quotas, max-upload ceilings, delegation lock, usage, and redacted optional S3 settings through instance settings endpoints. Provider test and usage recalculation actions are API-backed. Tenant admins read effective tenant policy, usage, lock state, and redacted optional S3 overrides through `GET /api/tenant/settings/storage`, then patch supplied `policy` or `s3` leaves through `PATCH /api/tenant/settings/storage`. Writes are accepted only when instance delegation is unlocked and values stay within instance ceilings and allowed providers. |
 | Blazor client boundary | Browser uploads use BFF upload sessions and proxy streaming. The browser never receives or submits a provider destination URL. Public image/content display resolves from `StorageObject.Id` or existing `/api/storageobject/...` API paths, not raw provider object keys. |
 | Blazor admin UI | Instance and tenant storage dashboards consume service models mapped from HAL settings resources. The tenant dashboard autosaves isolated `policy` and `s3` patches only when `_links.edit` is present. Action buttons are driven by `_links` and read-only state, not client-side role checks. |
-| Local self-hosting | Docker Compose mounts a durable `local_storage_data` volume for local-first storage by default. MinIO remains optional through the `storage` profile for instances that select S3-compatible storage. |
+| Local self-hosting | Docker Compose mounts a durable `local_storage_data` volume for local-first storage by default. MinIO remains optional through the `storage` profile for instances that select S3-compatible storage. Its initializer creates or repairs the sample bucket with anonymous access disabled. |
 | Reconciliation | API hosts a dry-run-first reconciliation worker that checks metadata/object drift, reports missing backing objects and local orphan files, and performs quarantine/delete mutations only when explicit policy flags are enabled. |
 | Moderation image deletion | Heavy event redaction marks referenced event image metadata as `delete_requested` with the owning event resource id, commits the redaction, then deletes provider objects through `IFileStorageProvider`. Failures leave metadata retryable and do not log object keys, filenames, paths, endpoints, buckets, or raw provider errors. |
 
@@ -45,6 +45,23 @@ Environment authority reads canonical `STORAGE_S3_ACCESS_KEY_ID` and
 Neither path maps credentials into .NET configuration or governance settings.
 `Storage__Local__*` keys are deployment/runtime configuration only and must not
 contain tenant-controlled paths.
+
+### Private S3 Bucket Posture
+
+The optional Compose MinIO initializer enforces `private` anonymous policy after
+creating the sample bucket, including when the bucket already exists. Upgrading
+from an earlier Compose file is a breaking deployment change: direct anonymous
+object URLs stop working. Reapply the initializer to the existing bucket with
+`docker compose --profile storage run --rm minio-init`; do not delete or recreate
+the bucket or its volume. Operators using an external S3-compatible provider must
+enforce the equivalent private bucket policy themselves.
+
+Private provider posture does not remove application-mediated public images.
+Clients continue to use the metadata-backed
+`/api/storageobject/{id}/public` route, where the application validates active,
+safe-raster, public-image metadata before opening provider bytes. General content
+continues through its authenticated ID-bound application route. Provider object
+keys and bucket URLs are not public delivery contracts.
 
 ### Tenant Settings PATCH Contract
 
@@ -130,6 +147,7 @@ Object storage is always part of the backup set when users can upload files.
 - Standalone stores local bytes at `/app/data/storage` by default alongside its primary database, which includes Data Protection keys. Capture these as coordinated backup units with the selected secret authority; preserve newer privacy-erasure authority independently of any primary rollback. An overridden root needs its own durable mount and backup.
 - Back up Aspire development object data from `storage-data/aspire-local` when preserving a local developer environment matters.
 - Back up optional S3-compatible object data from `minio_data` when the Compose `storage` profile is enabled, or from the external provider bucket when S3-compatible storage is selected.
+- After restoring or adopting an existing sample bucket, rerun `minio-init` to enforce private anonymous policy before reopening application traffic.
 - Back up storage secrets and environment configuration with the same release manifest as the database backup.
 - Restore object storage before reopening user traffic, then verify representative object metadata resolves to actual objects.
 - During rollback, verify the application version still understands the stored `StorageObject` metadata and key layout.
@@ -184,6 +202,7 @@ Operational evidence for this path must remain bounded. Logs and metrics may inc
 | Settings update appears ignored | Wait for the resolver cache window or trigger the settings path that invalidates `S3ConfigResolver`; cache invalidation is tenant-scoped when a tenant id is available. |
 | Tenant storage settings are read-only | Instance policy has locked tenant storage delegation through `governance.lock_tenant_storage`; an instance administrator must unlock delegation before tenant overrides can be saved. |
 | Optional MinIO unavailable | Confirm Docker Compose was started with `--profile storage` and that bucket initialization completed. Local-first storage does not require MinIO. |
+| Existing sample-bucket objects remain anonymously readable | Run `docker compose --profile storage run --rm minio-init` with the deployment's configured storage credentials. The idempotent initializer preserves objects and removes anonymous bucket access. |
 | Tenant override confusion | Check `governance.lock_tenant_storage` and whether the runtime is single-tenant or multi-tenant. |
 
 The `storage` readiness check and admin connection test both resolve the currently selected `IFileStorageProvider` and return provider-neutral status snapshots. Local mode validates the deployment-managed data root is writable without requiring S3. S3-compatible mode reports unavailable status only when selected and incomplete or unreachable. Readiness payloads expose bounded provider/status/failure-code fields, not filesystem paths, endpoints, bucket names, object keys, access keys, or secrets. Usage recalculation rebuilds used/quarantined object totals from metadata while preserving active reserved-byte counters.

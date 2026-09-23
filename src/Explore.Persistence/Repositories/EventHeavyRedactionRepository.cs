@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Moderation;
 using Explore.Domain;
+using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -74,6 +75,22 @@ public sealed class EventHeavyRedactionRepository(ExploreDbContext dbContext) : 
                 .Where(storageObject => imageObjectIds.Contains(storageObject.Id))
                 .ToListAsync(cancellationToken);
 
+        var resources = await dbContext.EventResources
+            .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .Where(resource => resource.TenantId == @event.TenantId && resource.EventId == eventId)
+            .ToArrayAsync(cancellationToken);
+        Guid[] resourceIds = resources.Select(resource => resource.Id).ToArray();
+        var resourceStorageObjects = resourceIds.Length == 0
+            ? []
+            : await dbContext.StorageObjects
+                .Where(storage => storage.TenantId == @event.TenantId
+                    && storage.Purpose == StorageObjectPurposes.EventResource
+                    && storage.OwningResourceKind == StorageOwningResourceKinds.EventResource
+                    && storage.OwningResourceId.HasValue && resourceIds.Contains(storage.OwningResourceId.Value)
+                    && !dbContext.OrganizationTenantEvidence.Any(evidence =>
+                        evidence.TenantId == storage.TenantId && evidence.DocumentStorageObjectId == storage.Id))
+                .ToArrayAsync(cancellationToken);
+
         return new EventHeavyRedactionGraph(
             @event,
             @event.Sessions.ToArray(),
@@ -85,7 +102,9 @@ public sealed class EventHeavyRedactionRepository(ExploreDbContext dbContext) : 
             eventCustomPropertyProjections,
             sessionCustomPropertyDefinitions,
             sessionCustomPropertyProjections,
-            imageStorageObjects);
+            imageStorageObjects,
+            resources,
+            resourceStorageObjects);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>

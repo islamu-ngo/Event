@@ -43,6 +43,7 @@ public sealed partial class EventResourceContentTests
         byte[] bytes = "%PDF-1.7\nresource test document\n%%EOF"u8.ToArray();
         string objectKey = $"tenants/{PlatformDefaults.DefaultTenantId:N}/{Guid.CreateVersion7():N}.pdf";
         string checksum = Convert.ToHexString(SHA256.HashData(bytes));
+        var binding = StorageProviderBinding.Local(Path.GetFullPath("resource-content-test-storage"));
         await using (var db = factory.CreateDatabase())
         {
             var user = await db.Users.SingleAsync(row => row.Pii!.Email == credentials.Identifier);
@@ -82,6 +83,7 @@ public sealed partial class EventResourceContentTests
                 FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
                 Uri = $"/api/eventresource/{resourceId}/content",
                 ObjectKey = objectKey, Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
                 FullName = "handout.pdf", SafeDisplayName = "handout.pdf", Extension = "pdf",
                 ContentType = EventResourceGovernancePolicy.PdfMediaType, Size = bytes.Length, Sha256Checksum = checksum,
                 Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
@@ -89,7 +91,7 @@ public sealed partial class EventResourceContentTests
                 LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = userId
             };
             storage.RecordEventResourceInspection(storageId, checksum);
-            db.StorageObjects.Add(storage);
+            db.AddRange(binding, storage);
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
                 new EventResourceMetadata
                 {
@@ -144,12 +146,9 @@ public sealed partial class EventResourceContentTests
                 }),
                 EventResourceGovernancePolicy.PdfMediaType, bytes.Length, null);
         });
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
-            services.RemoveAll<IFileStorageProviderResolver>();
-            services.AddSingleton(resolver);
+            ConfigureStorageProviders(services, binding.Id, provider);
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(clock);
             services.Configure<MvcOptions>(options =>

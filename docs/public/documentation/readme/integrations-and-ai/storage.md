@@ -65,6 +65,40 @@ the default policy denies unscanned publication and access. See the
 [resource upload and download guide](../events-and-ticketing/README.md#uploading-and-downloading-resource-files)
 for the separate workflow and instance-only opt-in.
 
+### Resource Deletion and Provider Recovery
+
+Deleting a resource or applying heavy parent moderation denies new access
+before physical cleanup. Ordinary withdrawal remains reversible and keeps its
+files. Erasing an uploader removes personal attribution, not shared organizer
+materials; unfinished uploads transfer their cleanup responsibility before
+their metadata disappears. Independently retained organization evidence is
+not deleted by the ordinary resource cleanup path when parent moderation
+withdraws the associated resource.
+
+Resource cleanup uses the existing storage reconciliation schedule and its
+`Enabled`/`DryRun` controls. The default dry-run does not delete bytes. When
+enabled for mutation, committed resource deletions do not depend on the
+separate quarantined-file deletion switch or its grace period. Failed cleanup
+retains a private retry record; audit expiry and parent removal cannot discard
+that responsibility.
+
+Each upload records its original storage target and external secret references.
+Changing the current local root, S3 bucket, endpoint or credential binding does
+not redirect existing files or pending cleanup. Keep the original namespace and
+secret references available. Credentials may rotate at the retained reference,
+but removing that reference or changing its selected authority can prevent
+reads and cleanup. For local disk relocation, preserve the captured absolute
+mount path; changing a setting alone does not move a bound resource.
+
+An interrupted producer can remain pending even if no object is currently
+visible. Expiry or cancellation does not prove that an in-flight write cannot
+finish later. A late acknowledged write settles its retained cleanup record.
+For a lost acknowledgement or unknown version, retain the record and reconcile
+the original producer and exact provider version; do not clear it merely because
+a timeout elapsed. Missing mounts/buckets and S3 delete markers are not proof
+that the required bytes were removed. Restore the original target/reference
+before retrying an availability failure.
+
 ## Organization Evidence PDF Uploads
 
 With local authorization, an organization administrator can reserve an evidence PDF upload for a pending, active organization participation. Only the account that reserved that tenant-local session can finalize its bytes; tenant-administrator status alone does not transfer ownership. Losing the organization role after reservation does not itself revoke the session. Cancellation, expiry, content validation, quota enforcement and privacy-erasure fences remain authoritative. Retrying a completed upload returns the same stored document without another write.

@@ -11,6 +11,8 @@ public class StorageObject : ITenantEntity, IAuditableEntity, ISoftDeletable, IC
 
     public required string Uri { get; set; }
     public string? ObjectKey { get; set; }
+    public Guid? StorageProviderBindingId { get; set; }
+    public string? ProviderVersionId { get; set; }
     public required string Provider { get; set; }
     public required string FullName { get; set; }
     public required string SafeDisplayName { get; set; }

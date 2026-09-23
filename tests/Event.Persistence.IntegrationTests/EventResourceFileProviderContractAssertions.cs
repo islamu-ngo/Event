@@ -202,6 +202,66 @@ internal static class EventResourceFileProviderContractAssertions
         await Assert.That(opens).IsEqualTo(1);
     }
 
+    internal static async Task AssertExactBoundVersionAsync(Func<ExploreDbContext> contextFactory, bool mutateDuringOpen,
+        bool mutateBinding = false)
+    {
+        var seed = await SeedPublishedFileAsync(contextFactory, EventResourceAudienceKindEnum.Public);
+        await SetUnscannedPolicyAsync(contextFactory, allowed: true);
+        Guid objectId;
+        await using (var setup = contextFactory())
+        {
+            objectId = (await setup.EventResources.SingleAsync(value => value.Id == seed.ResourceId)).StorageObjectId!.Value;
+            await setup.StorageObjects.Where(value => value.Id == objectId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ProviderVersionId, "exact-version"));
+        }
+        using var opened = new TrackingStream(Pdf);
+        await using var context = contextFactory();
+        var service = ContentService(context, seed, _ => throw new InvalidOperationException("Version-aware open is required."),
+            async (input, ct) =>
+            {
+                // Behavior depends on selecting the bound version, not on invocation counts.
+                if (input.ProviderVersionId != "exact-version")
+                    return new FileStorageReadResult(new MemoryStream([]), "application/pdf", 0, null, "current-version");
+                if (mutateDuringOpen)
+                {
+                    await using var mutation = contextFactory();
+                    if (mutateBinding)
+                    {
+                        var otherBinding = StorageProviderBinding.Local(Path.GetFullPath("other-storage-target"));
+                        mutation.Set<StorageProviderBinding>().Add(otherBinding);
+                        await mutation.SaveChangesAsync(ct);
+                        await mutation.StorageObjects.Where(value => value.Id == objectId)
+                            .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.StorageProviderBindingId, otherBinding.Id), ct);
+                    }
+                    else
+                        await mutation.StorageObjects.Where(value => value.Id == objectId)
+                            .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ProviderVersionId, "new-version"), ct);
+                }
+                return new FileStorageReadResult(opened, "application/pdf", Pdf.Length, null, "exact-version");
+            });
+        await using var result = await service.PrepareAsync(seed.ResourceId, new DateTimeOffset(Now.AddMinutes(1)), default);
+        if (mutateDuringOpen)
+        {
+            await Assert.That(result.Lease).IsNull();
+            await Assert.That(opened.WasDisposed).IsTrue();
+        }
+        else
+        {
+            await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+            var header = await Authority(context).CompleteHeadersAsync(result.Lease!, default);
+            await Assert.That(header.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+            await using var preparation = (EventResourcePreparedContent)header.Preparation!;
+            var content = preparation.TakeContent();
+            await using (content.Content)
+            {
+                using var buffer = new MemoryStream();
+                await content.Content.CopyToAsync(buffer);
+                await Assert.That(buffer.ToArray().SequenceEqual(Pdf)).IsTrue();
+            }
+        }
+        await SetUnscannedPolicyAsync(contextFactory, allowed: false);
+    }
+
     private static async Task<PublishedFile> SeedPublishedFileAsync(
         Func<ExploreDbContext> contextFactory, EventResourceAudienceKindEnum audience)
     {
@@ -234,8 +294,11 @@ internal static class EventResourceFileProviderContractAssertions
                 Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = subjectId,
                 User = subject, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
             });
+        var binding = StorageProviderBinding.Local(Path.GetFullPath("provider-contract-storage"));
+        context.Set<StorageProviderBinding>().Add(binding);
         var storage = new StorageObject
         {
+            StorageProviderBindingId = binding.Id,
             Id = storageId, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!, Uri = $"/api/storageobject/{storageId}/content", Provider = StorageProviders.Local,
             ObjectKey = $"provider-contract/{storageId:N}.pdf", FullName = "provider-contract.pdf",
@@ -319,24 +382,33 @@ internal static class EventResourceFileProviderContractAssertions
             return new FileStorageWriteResult(StorageProviders.Local, input.ObjectKey!, bytes.Length, input.ContentType,
                 Convert.ToHexStringLower(SHA256.HashData(bytes)));
         });
-        var providers = Substitute.For<IFileStorageProviderResolver>();
-        providers.GetRequired(StorageProviders.Local).Returns(provider);
+        var providers = Substitute.For<IStorageProviderBindingService>();
+        providers.CaptureAsync(StorageProviders.Local, seed.TenantId, Arg.Any<CancellationToken>()).Returns(async _ =>
+        {
+            var binding = StorageProviderBinding.Local(Path.GetFullPath("provider-contract-storage"));
+            await context.Set<StorageProviderBinding>().AddAsync(binding);
+            return binding;
+        });
+        providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
         var authority = new EventResourceAuthorityOrchestrator(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
             routes, authorization, new ContractClock());
         return new(repository, new StorageUploadSessionRepository(context), new StorageObjectRepository(context),
             new StorageUsageCounterRepository(context), new PrivacyErasureStateRepository(context), storagePolicy,
-            providers, unit, authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new ContractClock());
+            providers, unit, new EventResourceStorageLifecycleService(new EventResourceStorageLifecycleRepository(context),
+                unit, new ContractClock()), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new ContractClock());
     }
 
     private static EventResourceContentService ContentService(ExploreDbContext context, PublishedFile seed,
-        Func<CancellationToken, Task<FileStorageReadResult>> open)
+        Func<CancellationToken, Task<FileStorageReadResult>> open,
+        Func<FileStorageReadInput, CancellationToken, Task<FileStorageReadResult>>? versionedOpen = null)
     {
         var provider = Substitute.For<IFileStorageProvider>();
         provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
-            .Returns(call => open(call.ArgAt<CancellationToken>(1)));
-        var providers = Substitute.For<IFileStorageProviderResolver>();
-        providers.GetRequired(StorageProviders.Local).Returns(provider);
+            .Returns(call => versionedOpen is null ? open(call.ArgAt<CancellationToken>(1))
+                : versionedOpen(call.ArgAt<FileStorageReadInput>(0), call.ArgAt<CancellationToken>(1)));
+        var providers = Substitute.For<IStorageProviderBindingService>();
+        providers.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
         var tenant = Substitute.For<ITenantContext>();
         tenant.TenantId.Returns(seed.TenantId);
         var user = Substitute.For<ICurrentUserService>();
@@ -409,22 +481,36 @@ internal static class EventResourceFileProviderContractAssertions
 }
 
 [NotInParallel("PrimaryDatabaseProviderBehaviorContract")]
-[ClassDataSource<EventResourcePersistenceTests.TestDatabase>(Shared = SharedType.PerClass)]
+[ClassDataSource<EventResourceFileUploadTests.Database>(Shared = SharedType.PerClass)]
 public sealed class CanonicalSqliteEventResourceFileProviderContractTests(
-    EventResourcePersistenceTests.TestDatabase database)
+    EventResourceFileUploadTests.Database database)
 {
     [Test]
     public Task EventResourceRevocationPrecedesFinalSnapshot() =>
         EventResourceFileProviderContractAssertions.AssertRevocationPrecedesFinalSnapshotAsync(
-            () => database.CreateIndependentContext());
+            () => database.CreateContext());
 
     [Test]
     public Task EventResourceAttachmentHasOneOwner() =>
         EventResourceFileProviderContractAssertions.AssertAttachmentHasOneOwnerAsync(
-            () => database.CreateIndependentContext());
+            () => database.CreateContext());
 
     [Test]
     public Task EventResourcePolicyTighteningDeniesNewAccess() =>
         EventResourceFileProviderContractAssertions.AssertPolicyTighteningDeniesNewAccessAsync(
-            () => database.CreateIndependentContext());
+            () => database.CreateContext());
+
+    [Test]
+    public Task ExactBoundVersionIsOpened() => EventResourceFileProviderContractAssertions.AssertExactBoundVersionAsync(
+        () => database.CreateContext(), mutateDuringOpen: false);
+
+    [Test]
+    public Task ChangedVersionBeforeFinalAuthorityGateDisposesPreparedContent() =>
+        EventResourceFileProviderContractAssertions.AssertExactBoundVersionAsync(
+            () => database.CreateContext(), mutateDuringOpen: true);
+
+    [Test]
+    public Task ChangedBindingBeforeFinalAuthorityGateDisposesPreparedContent() =>
+        EventResourceFileProviderContractAssertions.AssertExactBoundVersionAsync(
+            () => database.CreateContext(), mutateDuringOpen: true, mutateBinding: true);
 }

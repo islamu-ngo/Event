@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
@@ -18,7 +20,10 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
 
 namespace Event.API.IntegrationTests.Features;
 
@@ -26,11 +31,14 @@ namespace Event.API.IntegrationTests.Features;
 public sealed class EventResourceUploadHttpTests
 {
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task ResourceManagerFinalizesThroughGenericTransportWithoutGenericRolesAndReplayCannotBypassRevocation(bool publishFile)
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    public async Task ResourceManagerFinalizesThroughGenericTransportWithoutGenericRolesAndReplayCannotBypassRevocation(
+        bool publishFile, bool providerFailure)
     {
-        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        using var capturedLogs = new UploadFailureLogs();
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(logCapture: capturedLogs);
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
         Guid eventId = Guid.CreateVersion7(), resourceId = Guid.CreateVersion7(), userId, version;
         await using (var db = factory.CreateDatabase())
@@ -74,11 +82,14 @@ public sealed class EventResourceUploadHttpTests
             version = resource.ConcurrencyStamp;
         }
         var written = new Dictionary<string, byte[]>();
+        string diagnostic = Guid.CreateVersion7().ToString("N");
         var provider = Substitute.For<IFileStorageProvider>();
         provider.Provider.Returns(StorageProviders.Local);
         provider.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             var input = call.Arg<FileStorageWriteInput>()!;
+            if (providerFailure)
+                throw new HttpRequestException($"S3 write failed at https://private-store.example.test/{input.ObjectKey}?signature={diagnostic}");
             using var buffer = new MemoryStream();
             await input.Content.CopyToAsync(buffer, call.Arg<CancellationToken>());
             byte[] value = buffer.ToArray();
@@ -94,10 +105,29 @@ public sealed class EventResourceUploadHttpTests
         });
         var resolver = Substitute.For<IFileStorageProviderResolver>();
         resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        using var traces = new UploadFailureTraces();
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
+            if (providerFailure)
+                services.AddOpenTelemetry().WithTracing(tracing =>
+                    tracing.AddProcessor(new SimpleActivityExportProcessor(traces)));
             services.RemoveAll<IFileStorageProviderResolver>();
             services.AddSingleton(resolver);
+            services.RemoveAll<IStorageProviderBindingService>();
+            services.AddScoped<IStorageProviderBindingService>(scope =>
+            {
+                var database = scope.GetRequiredService<Explore.Persistence.ExploreDbContext>();
+                var bindings = Substitute.For<IStorageProviderBindingService>();
+                bindings.CaptureAsync(StorageProviders.Local, PlatformDefaults.DefaultTenantId,
+                    Arg.Any<CancellationToken>()).Returns(async call =>
+                {
+                    var binding = StorageProviderBinding.Local(Path.GetFullPath("resource-upload-test-storage"));
+                    await database.StorageProviderBindings.AddAsync(binding, call.Arg<CancellationToken>());
+                    return binding;
+                });
+                bindings.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(provider);
+                return bindings;
+            });
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -151,6 +181,22 @@ public sealed class EventResourceUploadHttpTests
             request.Content.Headers.ContentType = new MediaTypeHeaderValue(EventResourceGovernancePolicy.PdfMediaType);
             request.Headers.Add("Idempotency-Key", replayKey);
             return await client.SendAsync(request);
+        }
+        if (providerFailure)
+        {
+            using var unavailable = await FinalizeAsync();
+            await Assert.That(unavailable.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+            await Assert.That(await unavailable.Content.ReadAsStringAsync()).DoesNotContain(diagnostic);
+            await Assert.That(string.Join('\n', capturedLogs.Entries)).DoesNotContain(diagnostic);
+            await traces.Observed.WaitAsync(TimeSpan.FromSeconds(10));
+            await Assert.That(string.Join('\n', traces.Entries)).DoesNotContain(diagnostic);
+            await Assert.That(string.Join('\n', traces.Entries)).DoesNotContain(session.Id.ToString("D"));
+            await using var pending = factory.CreateDatabase();
+            pending.EnableTenantFilterBypass("Verify opaque provider failure preserves original cleanup identity.");
+            var cleanup = await pending.StorageObjectDeletionTombstones.SingleAsync(item =>
+                item.TenantId == PlatformDefaults.DefaultTenantId);
+            await Assert.That(cleanup.State).IsEqualTo(StorageObjectDeletionState.AwaitingProducer);
+            return;
         }
         using (var first = await FinalizeAsync())
         {
@@ -245,5 +291,54 @@ public sealed class EventResourceUploadHttpTests
         using var deniedReplay = await FinalizeAsync();
         await Assert.That(deniedReplay.IsSuccessStatusCode).IsFalse();
         await Assert.That(written.Count).IsEqualTo(1);
+    }
+
+    private sealed class UploadFailureLogs : ILoggerProvider
+    {
+        public ConcurrentQueue<string> Entries { get; } = new();
+        public ILogger CreateLogger(string categoryName) => new Capture(this);
+        public void Dispose() { }
+
+        private sealed class Capture(UploadFailureLogs owner) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel logLevel) => true;
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+                Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                owner.Entries.Enqueue(formatter(state, exception));
+                if (exception is not null) owner.Entries.Enqueue(exception.ToString());
+            }
+        }
+    }
+
+    private sealed class UploadFailureTraces : BaseExporter<Activity>
+    {
+        private readonly TaskCompletionSource _observed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ConcurrentQueue<string> Entries { get; } = new();
+        public Task Observed => _observed.Task;
+
+        public override ExportResult Export(in Batch<Activity> batch)
+        {
+            foreach (var activity in batch)
+            {
+                if (!activity.Source.Name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal)
+                    || !activity.TagObjects.Any(tag => tag.Key is "url.path" or "http.route"
+                        && tag.Value?.ToString()?.Contains("/upload-sessions/", StringComparison.OrdinalIgnoreCase) == true
+                        && tag.Value.ToString()!.EndsWith("/content", StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                Entries.Enqueue(activity.DisplayName);
+                foreach (var tag in activity.TagObjects)
+                    Entries.Enqueue($"{tag.Key}={tag.Value}");
+                foreach (var activityEvent in activity.Events)
+                {
+                    Entries.Enqueue(activityEvent.Name);
+                    foreach (var tag in activityEvent.Tags)
+                        Entries.Enqueue($"{tag.Key}={tag.Value}");
+                }
+                _observed.TrySetResult();
+            }
+            return ExportResult.Success;
+        }
     }
 }

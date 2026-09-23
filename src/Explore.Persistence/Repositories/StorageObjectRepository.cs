@@ -24,14 +24,18 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
         GenericAccessQuery().FirstOrDefaultAsync(storageObject => storageObject.Id == id, cancellationToken);
 
     private IQueryable<StorageObject> GenericAccessQuery() =>
-        _dbContext.StorageObjects.AsNoTracking()
+        WithoutResourceOwnership(_dbContext.StorageObjects.AsNoTracking());
+
+    private IQueryable<StorageObject> WithoutResourceOwnership(IQueryable<StorageObject> query) =>
+        query
             .Where(storageObject =>
                 storageObject.Purpose != StorageObjectPurposes.EventResource &&
                 storageObject.OwningResourceKind != StorageOwningResourceKinds.EventResource &&
                 !_dbContext.EventResources
                     .IgnoreQueryFilters(new[] { QueryFilterNames.SoftDelete })
                     .Any(resource => resource.TenantId == storageObject.TenantId &&
-                        resource.StorageObjectId == storageObject.Id));
+                        resource.StorageObjectId == storageObject.Id) &&
+                !_dbContext.StorageObjectDeletionTombstones.Any(work => work.Id == storageObject.Id));
 
     public async Task<List<StorageObject>> GetFilesWithDetails()
     {
@@ -130,8 +134,8 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
             return [];
         }
 
-        return await _dbContext.StorageObjects
-            .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration)
+        return await WithoutResourceOwnership(_dbContext.StorageObjects
+            .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration))
             .Where(storageObject =>
                 !storageObject.IsDeleted &&
                 storageObject.TenantId == tenantId &&
@@ -167,6 +171,9 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
                 storageObject.ObjectKey != null &&
                 objectKeys.Contains(storageObject.ObjectKey))
             .Select(storageObject => storageObject.ObjectKey!)
+            .Union(_dbContext.StorageObjectDeletionTombstones.AsNoTracking()
+                .Where(work => work.Provider == provider && objectKeys.Contains(work.ObjectKey))
+                .Select(work => work.ObjectKey))
             .ToListAsync(cancellationToken);
     }
 
@@ -237,8 +244,8 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
 
     private IQueryable<StorageObject> BaseReconciliationQuery()
     {
-        return _dbContext.StorageObjects
-            .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration)
+        return WithoutResourceOwnership(_dbContext.StorageObjects
+            .IgnoreTenantFilter(TenantFilterBypassReasons.InstanceStorageAdministration))
             .Where(storageObject =>
                 !storageObject.IsDeleted &&
                 !_dbContext.OrganizationTenantEvidence

@@ -30,16 +30,14 @@ public sealed partial class EventResourceContentTests
         int split = seed.Bytes.Length / 2;
         await pipe.Writer.WriteAsync(seed.Bytes.AsMemory(0, split), deadline.Token);
         var provider = Substitute.For<IFileStorageProvider>();
+        provider.Provider.Returns(StorageProviders.Local);
         provider.OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>())
             .Returns(new FileStorageReadResult(stream, EventResourceGovernancePolicy.PdfMediaType, seed.Bytes.Length, null));
-        var resolver = Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(provider);
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEventResourceAuthorizationProvider>();
             services.AddSingleton<IEventResourceAuthorizationProvider>(new AlwaysAllowProvider());
-            services.RemoveAll<IFileStorageProviderResolver>();
-            services.AddSingleton(resolver);
+            ConfigureStorageProviders(services, seed.BindingId, provider);
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {

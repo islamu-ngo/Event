@@ -30041,6 +30041,11 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("provider");
 
+                    b.Property<string>("ProviderVersionId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("provider_version_id");
+
                     b.Property<string>("Purpose")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -30079,6 +30084,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("size");
 
+                    b.Property<Guid?>("StorageProviderBindingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("storage_provider_binding_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("tenant_id");
@@ -30115,6 +30124,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.HasIndex("FileTypeId")
                         .HasDatabaseName("ix_storage_objects_file_type_id");
 
+                    b.HasIndex("StorageProviderBindingId")
+                        .HasDatabaseName("ix_storage_objects_storage_provider_binding_id");
+
                     b.HasIndex("Provider", "ObjectKey")
                         .IsUnique()
                         .HasDatabaseName("ix_storage_objects_provider_object_key")
@@ -30148,6 +30160,118 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                             t.HasCheckConstraint("ck_storage_objects_visibility", "visibility IN ('public_image', 'authenticated_tenant', 'private_owner')");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageObjectDeletionTombstone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("lease_expires_at_utc");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("ProviderBindingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("provider_binding_id");
+
+                    b.Property<string>("ProviderObjectVersion")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("provider_object_version");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_storage_object_deletion_tombstones");
+
+                    b.HasIndex("ProviderBindingId")
+                        .HasDatabaseName("ix_storage_object_deletion_tombstones_provider_binding_id");
+
+                    b.HasIndex("State", "LeaseExpiresAtUtc", "Id")
+                        .HasDatabaseName("ix_storage_object_deletion_tombstones_state_lease_expires_at_utc_id");
+
+                    b.HasIndex("State", "NextAttemptAtUtc", "Id")
+                        .HasDatabaseName("ix_storage_object_deletion_tombstones_state_next_attempt_at_utc_id");
+
+                    b.ToTable("storage_object_deletion_tombstones", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_storage_deletion_identity", "id <> '00000000-0000-0000-0000-000000000000' AND tenant_id <> '00000000-0000-0000-0000-000000000000' AND concurrency_stamp <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_storage_deletion_provider", "provider IN ('local', 's3_compatible') AND object_key <> ''");
+
+                            t.HasCheckConstraint("ck_storage_deletion_state", "(state = 1 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL) OR (state = 2 AND next_attempt_at_utc IS NOT NULL AND lease_expires_at_utc IS NULL) OR (state = 3 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NOT NULL) OR (state = 4 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BucketName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("bucket_name");
+
+                    b.Property<string>("Endpoint")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<bool>("ForcePathStyle")
+                        .HasColumnType("bit")
+                        .HasColumnName("force_path_style");
+
+                    b.Property<string>("LocalRootPath")
+                        .HasMaxLength(4096)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("local_root_path");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("region");
+
+                    b.HasKey("Id")
+                        .HasName("pk_storage_provider_bindings");
+
+                    b.ToTable("storage_provider_bindings", "islamu_event");
                 });
 
             modelBuilder.Entity("Explore.Domain.StorageUploadSession", b =>
@@ -30252,11 +30376,20 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nvarchar(64)")
                         .HasColumnName("policy_version");
 
+                    b.Property<bool>("ProducerSettled")
+                        .HasColumnType("bit")
+                        .HasColumnName("producer_settled");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("provider");
+
+                    b.Property<string>("ProviderVersionId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("provider_version_id");
 
                     b.Property<string>("Purpose")
                         .IsRequired()
@@ -30295,6 +30428,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("storage_object_id");
 
+                    b.Property<Guid?>("StorageProviderBindingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("storage_provider_binding_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("tenant_id");
@@ -30323,6 +30460,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_storage_upload_sessions");
+
+                    b.HasIndex("StorageProviderBindingId")
+                        .HasDatabaseName("ix_storage_upload_sessions_storage_provider_binding_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_storage_upload_sessions_user_id");
@@ -47156,6 +47296,12 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_storage_objects_file_types_file_type_id");
 
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("StorageProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_storage_objects_storage_provider_bindings_storage_provider_binding_id");
+
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -47170,8 +47316,189 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Explore.Domain.StorageObjectDeletionTombstone", b =>
+                {
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storage_object_deletion_tombstones_storage_provider_bindings_provider_binding_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
+                {
+                    b.OwnsOne("Explore.Domain.Secrets.RetainedSecretReference", "AccessKeyReference", b1 =>
+                        {
+                            b1.Property<Guid>("StorageProviderBindingId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Authority")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("nvarchar(32)")
+                                .HasColumnName("access_key_reference_authority");
+
+                            b1.Property<string>("AuthorityEndpoint")
+                                .HasMaxLength(2048)
+                                .HasColumnType("nvarchar(2048)")
+                                .HasColumnName("access_key_reference_authority_endpoint");
+
+                            b1.Property<string>("AuthorityProject")
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("access_key_reference_authority_project");
+
+                            b1.Property<Guid?>("BindingId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("access_key_reference_binding_id");
+
+                            b1.Property<string>("EnvironmentVariableName")
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("access_key_reference_environment_variable_name");
+
+                            b1.Property<string>("InfisicalEnvironment")
+                                .HasMaxLength(64)
+                                .HasColumnType("nvarchar(64)")
+                                .HasColumnName("access_key_reference_infisical_environment");
+
+                            b1.Property<string>("InfisicalKey")
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("access_key_reference_infisical_key");
+
+                            b1.Property<string>("InfisicalPath")
+                                .HasMaxLength(512)
+                                .HasColumnType("nvarchar(512)")
+                                .HasColumnName("access_key_reference_infisical_path");
+
+                            b1.Property<string>("Qualifier")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("access_key_reference_qualifier");
+
+                            b1.Property<int>("Scope")
+                                .HasColumnType("int")
+                                .HasColumnName("access_key_reference_scope");
+
+                            b1.Property<Guid?>("ScopeId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("access_key_reference_scope_id");
+
+                            b1.Property<string>("SettingKey")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("access_key_reference_setting_key");
+
+                            b1.Property<int>("SourceType")
+                                .HasColumnType("int")
+                                .HasColumnName("access_key_reference_source_type");
+
+                            b1.HasKey("StorageProviderBindingId");
+
+                            b1.ToTable("storage_provider_bindings", "islamu_event");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StorageProviderBindingId")
+                                .HasConstraintName("fk_storage_provider_bindings_storage_provider_bindings_id");
+                        });
+
+                    b.OwnsOne("Explore.Domain.Secrets.RetainedSecretReference", "SecretKeyReference", b1 =>
+                        {
+                            b1.Property<Guid>("StorageProviderBindingId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Authority")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("nvarchar(32)")
+                                .HasColumnName("secret_key_reference_authority");
+
+                            b1.Property<string>("AuthorityEndpoint")
+                                .HasMaxLength(2048)
+                                .HasColumnType("nvarchar(2048)")
+                                .HasColumnName("secret_key_reference_authority_endpoint");
+
+                            b1.Property<string>("AuthorityProject")
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("secret_key_reference_authority_project");
+
+                            b1.Property<Guid?>("BindingId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("secret_key_reference_binding_id");
+
+                            b1.Property<string>("EnvironmentVariableName")
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("secret_key_reference_environment_variable_name");
+
+                            b1.Property<string>("InfisicalEnvironment")
+                                .HasMaxLength(64)
+                                .HasColumnType("nvarchar(64)")
+                                .HasColumnName("secret_key_reference_infisical_environment");
+
+                            b1.Property<string>("InfisicalKey")
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("secret_key_reference_infisical_key");
+
+                            b1.Property<string>("InfisicalPath")
+                                .HasMaxLength(512)
+                                .HasColumnType("nvarchar(512)")
+                                .HasColumnName("secret_key_reference_infisical_path");
+
+                            b1.Property<string>("Qualifier")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("secret_key_reference_qualifier");
+
+                            b1.Property<int>("Scope")
+                                .HasColumnType("int")
+                                .HasColumnName("secret_key_reference_scope");
+
+                            b1.Property<Guid?>("ScopeId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("secret_key_reference_scope_id");
+
+                            b1.Property<string>("SettingKey")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("secret_key_reference_setting_key");
+
+                            b1.Property<int>("SourceType")
+                                .HasColumnType("int")
+                                .HasColumnName("secret_key_reference_source_type");
+
+                            b1.HasKey("StorageProviderBindingId");
+
+                            b1.ToTable("storage_provider_bindings", "islamu_event");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StorageProviderBindingId")
+                                .HasConstraintName("fk_storage_provider_bindings_storage_provider_bindings_id");
+                        });
+
+                    b.Navigation("AccessKeyReference");
+
+                    b.Navigation("SecretKeyReference");
+                });
+
             modelBuilder.Entity("Explore.Domain.StorageUploadSession", b =>
                 {
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("StorageProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_storage_upload_sessions_storage_provider_bindings_storage_provider_binding_id");
+
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")

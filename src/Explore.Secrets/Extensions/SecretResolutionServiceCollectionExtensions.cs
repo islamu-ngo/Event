@@ -46,6 +46,8 @@ public static class SecretResolutionServiceCollectionExtensions
 
         // ---- Resolver --------------------------------------------------------
         services.TryAddScoped<ISecretResolver, SecretResolver>();
+        services.TryAddScoped<IRetainedSecretResolver>(provider =>
+            (IRetainedSecretResolver)provider.GetRequiredService<ISecretResolver>());
         services.TryAddScoped<ISetupSecretBindingWriter, SetupSecretBindingWriter>();
         services.TryAddScoped<ISetupSecretBindingReadinessReader>(provider =>
             (ISetupSecretBindingReadinessReader)provider.GetRequiredService<

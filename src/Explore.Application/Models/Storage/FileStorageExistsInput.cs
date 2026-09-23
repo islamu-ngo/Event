@@ -1,3 +1,3 @@
 namespace Explore.Application.Models.Storage;
 
-public sealed record FileStorageExistsInput(string ObjectKey);
+public sealed record FileStorageExistsInput(string ObjectKey, string? ProviderVersionId = null);

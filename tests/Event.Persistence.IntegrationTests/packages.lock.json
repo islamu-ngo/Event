@@ -606,6 +606,20 @@
           "System.ClientModel": "1.14.0"
         }
       },
+      "OpenTelemetry.Api": {
+        "type": "Transitive",
+        "resolved": "1.17.0",
+        "contentHash": "mSBxzomZgHIJu9CyVNqyDu/n2JHEtqVgfcCD1Br0cV5iLYogjZOMqhlVLt99PEp+0KGBNUR3GXgeOdN2GR3F9g=="
+      },
+      "OpenTelemetry.Api.ProviderBuilderExtensions": {
+        "type": "Transitive",
+        "resolved": "1.17.0",
+        "contentHash": "Xgc3Qf9B9TFMFpx6exTdGqMWuYIT2miNzkdMPutVvT9YuMFaEovXWke1Gb6z8NxYaQbbGF38vYLuSg1JCeui5Q==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0",
+          "OpenTelemetry.Api": "1.17.0"
+        }
+      },
       "Polly.Core": {
         "type": "Transitive",
         "resolved": "8.7.0",
@@ -888,6 +902,7 @@
           "Net.Codecrete.QrCodeGenerator": "[3.1.0, )",
           "Npgsql": "[10.0.3, )",
           "OpenFeature": "[2.14.0, )",
+          "OpenTelemetry": "[1.17.0, )",
           "Polly": "[8.7.0, )",
           "RabbitMQ.Client": "[7.2.1, )",
           "Refit.HttpClientFactory": "[14.0.1, )",
@@ -1453,6 +1468,18 @@
         "contentHash": "q1za5ZaY1j8geLy4/VlCqOtyCc0kMdFp9TXTMGLD6tTSsZWQCQScyrCYgRDX5eGGcQm5F7Mi+plNW5MeIDQ02A==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
+        }
+      },
+      "OpenTelemetry": {
+        "type": "CentralTransitive",
+        "requested": "[1.17.0, )",
+        "resolved": "1.17.0",
+        "contentHash": "rMLOTftlMlTm7+MSrvXDHnJRjVkROFNKXHZrYjOsX+LankaFG7QSflx7qRRGjoqZoirohnxmJQ7GEb9occO4Gg==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.EnvironmentVariables": "10.0.0",
+          "Microsoft.Extensions.Diagnostics.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Logging.Configuration": "10.0.0",
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "1.17.0"
         }
       },
       "Polly": {

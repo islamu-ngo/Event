@@ -48,7 +48,9 @@ public sealed class EventHeavyRedactionApplicatorTests
             [eventProjection],
             [sessionDefinition],
             [sessionProjection],
-            [image]);
+            [image],
+            [],
+            []);
 
         var result = EventHeavyRedactionApplicator.Apply(graph, moderatorUserId, redactedAt);
 
@@ -99,6 +101,25 @@ public sealed class EventHeavyRedactionApplicatorTests
         await Assert.That(image.OwningResourceKind).IsEqualTo(ResourceKinds.Event);
         await Assert.That(image.OwningResourceId).IsEqualTo(@event.Id);
         await Assert.That(image.UpdatedBy).IsEqualTo(moderatorUserId);
+    }
+
+    [Test]
+    public async Task ImageAliasCannotRewritePrivateResourceDeletionOwnership()
+    {
+        var storage = CreateStorageObject();
+        Guid resourceId = Guid.CreateVersion7();
+        storage.Purpose = StorageObjectPurposes.EventResource;
+        storage.OwningResourceKind = StorageOwningResourceKinds.EventResource;
+        storage.OwningResourceId = resourceId;
+        var parent = CreateEvent(storage.Id);
+        var graph = new EventHeavyRedactionGraph(
+            parent, [], [], [], [], [], [], [], [], [], [storage], [], [storage]);
+        var summary = EventHeavyRedactionApplicator.Apply(graph, Guid.CreateVersion7(), DateTimeOffset.UtcNow);
+        await Assert.That(parent.FeaturedImageId).IsNull();
+        await Assert.That(storage.OwningResourceKind).IsEqualTo(StorageOwningResourceKinds.EventResource);
+        await Assert.That(storage.OwningResourceId).IsEqualTo(resourceId);
+        await Assert.That(storage.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
+        await Assert.That(summary.DeleteRequestedImageObjectCount).IsEqualTo(0);
     }
 
     private static Explore.Domain.Event CreateEvent(Guid imageId) => new(EventStatusEnum.Published)

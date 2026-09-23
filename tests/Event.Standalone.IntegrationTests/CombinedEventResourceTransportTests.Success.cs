@@ -18,7 +18,11 @@ namespace Event.Standalone.IntegrationTests;
 public sealed partial class CombinedEventResourceTransportTests
 {
     [Test]
-    public async Task NativeCombinedCookieUploadAndPrivateDeliveryUseRealSqliteAndLocalBytes()
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task NativeCombinedCookieUploadAndPrivateDeliveryUseRealSqliteAndLocalBytes(
+        bool heavyModeration, bool retainedEvidence)
     {
         using var deployment = new NativeEmailOptionalStandaloneFixture();
         await using var host = deployment.CreateHost();
@@ -175,8 +179,77 @@ public sealed partial class CombinedEventResourceTransportTests
             await Assert.That(response.Headers.GetValues("Referrer-Policy").Single()).IsEqualTo("no-referrer");
             await Assert.That(response.Content.Headers.ContentDisposition!.DispositionType).IsEqualTo("attachment");
         }
-        await using (var scope = host.Services.CreateAsyncScope())
+        if (heavyModeration)
         {
+            Guid storageId;
+            long usedBefore;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+                db.EnableTenantFilterBypass("Inspect one resource before native heavy moderation.");
+                storageId = (await db.EventResources.SingleAsync(row => row.Id == resourceId)).StorageObjectId!.Value;
+                usedBefore = (await db.StorageUsageCounters.SingleAsync(row =>
+                    row.TenantId == PlatformDefaults.DefaultTenantId && row.Provider == StorageProviders.Local)).UsedBytes;
+                if (retainedEvidence)
+                {
+                    var organizationId = Guid.CreateVersion7();
+                    var participation = new OrganizationTenant
+                    {
+                        Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId,
+                        Tenant = null!, OrganizationId = organizationId,
+                        Organization = new Organization
+                        {
+                            Id = organizationId,
+                            Pii = new OrganizationPii
+                            {
+                                OrganizationId = organizationId, FullName = "Independent evidence holder"
+                            }
+                        },
+                        ApprovalStatusId = (int)ApprovalStatusEnum.Pending,
+                        ApprovalStatus = null!
+                    };
+                    db.Add(OrganizationTenantEvidence.CreatePending(participation,
+                        await db.StorageObjects.SingleAsync(row => row.Id == storageId)));
+                    await db.SaveChangesAsync();
+                }
+                // Subject erasure may already have removed finalized uploader attribution.
+                await db.StorageUploadSessions.Where(row => row.OwningResourceId == resourceId
+                    && row.Status == StorageUploadSessionStates.Finalized).ExecuteDeleteAsync();
+            }
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/Event/{eventId}/moderation/heavy")
+            {
+                Content = JsonContent.Create(new { reasonCode = "heavy_redaction" })
+            };
+            request.Headers.Add("Idempotency-Key", Guid.CreateVersion7().ToString("N"));
+            using var response = await client.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            await using var verification = host.Services.CreateAsyncScope();
+            var database = verification.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            database.EnableTenantFilterBypass("Verify atomic resource retirement after native parent moderation.");
+            var retired = await database.EventResources.IgnoreQueryFilters().SingleAsync(row => row.Id == resourceId);
+            await Assert.That(retired.IsDeleted).IsTrue();
+            await Assert.That(retired.StorageObjectId).IsNull();
+            await Assert.That(await database.StorageObjects.IgnoreQueryFilters().AnyAsync(row => row.Id == storageId))
+                .IsEqualTo(retainedEvidence);
+            await Assert.That(await database.OrganizationTenantEvidence.IgnoreQueryFilters().AnyAsync(row =>
+                row.DocumentStorageObjectId == storageId)).IsEqualTo(retainedEvidence);
+            await Assert.That(await database.StorageObjectDeletionTombstones.AnyAsync(row => row.Id == storageId))
+                .IsEqualTo(!retainedEvidence);
+            if (retainedEvidence)
+            {
+                var source = await database.StorageObjects.IgnoreQueryFilters().SingleAsync(row => row.Id == storageId);
+                var binding = await database.StorageProviderBindings.SingleAsync(row =>
+                    row.Id == source.StorageProviderBindingId);
+                await Assert.That(File.Exists(Path.Combine(binding.LocalRootPath!,
+                    source.ObjectKey!.Replace('/', Path.DirectorySeparatorChar)))).IsTrue();
+            }
+            await Assert.That((await database.StorageUsageCounters.SingleAsync(row =>
+                row.TenantId == PlatformDefaults.DefaultTenantId && row.Provider == StorageProviders.Local)).UsedBytes)
+                .IsEqualTo(usedBefore - (retainedEvidence ? 0 : bytes.Length));
+        }
+        else
+        {
+            await using var scope = host.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             db.EnableTenantFilterBypass("Combined resource transport revokes one exact tenant membership.");
             await db.TenantUsers.Where(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == deployment.Subject)

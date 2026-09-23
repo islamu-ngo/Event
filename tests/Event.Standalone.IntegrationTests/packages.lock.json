@@ -1376,6 +1376,7 @@
           "Net.Codecrete.QrCodeGenerator": "[3.1.0, )",
           "Npgsql": "[10.0.3, )",
           "OpenFeature": "[2.14.0, )",
+          "OpenTelemetry": "[1.17.0, )",
           "Polly": "[8.7.0, )",
           "RabbitMQ.Client": "[7.2.1, )",
           "Refit.HttpClientFactory": "[14.0.1, )",

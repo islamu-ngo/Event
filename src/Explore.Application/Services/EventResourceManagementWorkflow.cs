@@ -18,7 +18,7 @@ namespace Explore.Application.Services;
 /// </summary>
 public sealed partial class EventResourceManagementWorkflow(
     IEventResourceRepository resources, IUnitOfWork unitOfWork,
-    EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
+    EventResourceStorageLifecycleService lifecycle, EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
     ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock)
 {
     public async Task<BaseCommandResponse<Guid>> CreateAsync(Guid eventId, Guid resourceId,
@@ -113,8 +113,6 @@ public sealed partial class EventResourceManagementWorkflow(
                     rules = BuildRules(draft, request.TenantId, eventId, resourceId);
                     if (!await ValidLineageAsync(draft, rules, request.TenantId, eventId, resourceId, ct)) return Invalid();
                 }
-                if (action == "delete" && resource.StorageObjectId.HasValue)
-                    return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.Unavailable);
                 outcome = await authority.RecheckMutationAsync(lease, expectedVersion, ct);
                 if (outcome != EventResourceAuthorityOutcome.Allowed) return Failure(outcome, resourceId, ct);
                 if (action is "unpublish" or "moderate" && resource.PublicationStateId != (int)EventResourcePublicationStateEnum.Published
@@ -138,7 +136,10 @@ public sealed partial class EventResourceManagementWorkflow(
                     case "unpublish":
                     case "moderate": resource.Withdraw(expectedVersion, request.SubjectUserId!.Value, now); break;
                     case "archive": resource.Archive(expectedVersion, request.SubjectUserId!.Value, now); break;
-                    case "delete": resource.Delete(expectedVersion, request.SubjectUserId!.Value, now); break;
+                    case "delete":
+                        resource.Delete(expectedVersion, request.SubjectUserId!.Value, now);
+                        await lifecycle.RetireAsync(request.TenantId, [resource.Id], [], now, ct);
+                        break;
                     default: throw new InvalidOperationException("Unsupported resource mutation.");
                 }
                 resources.Update(resource);

@@ -8,7 +8,7 @@ namespace Explore.Application.Services;
 public sealed class EventResourceContentService(
     EventResourceAuthorityOrchestrator authority,
     IEventResourceRepository resources,
-    IFileStorageProviderResolver providers,
+    IStorageProviderBindingService providers,
     ITenantContext tenant,
     ICurrentUserService user,
     IMachinePrincipalAccessor machine)
@@ -29,11 +29,12 @@ public sealed class EventResourceContentService(
                 || EventResourceFileSafety.Generation(storage) != facts.AttachmentGeneration)
                 throw new InvalidOperationException("Resource file is unavailable.");
 
-            var opened = await providers.GetRequired(storage.Provider)
-                .OpenReadAsync(new(storage.ObjectKey!, storage.ContentType), ct);
+            var provider = await providers.ResolveAsync(storage.StorageProviderBindingId!.Value, ct);
+            var opened = await provider.OpenReadAsync(new(storage.ObjectKey!, storage.ContentType, storage.ProviderVersionId), ct);
             try
             {
-                if (!opened.Content.CanRead || opened.Length != storage.Size)
+                if (!opened.Content.CanRead || opened.Length != storage.Size
+                    || opened.ProviderVersionId != storage.ProviderVersionId)
                     throw new InvalidOperationException("Resource file is unavailable.");
                 string name = storage.SafeDisplayName.Trim();
                 if (name.Length is 0 or > 255 || name is "." or ".." || name.Any(char.IsControl)

@@ -5,4 +5,5 @@ public sealed record FileStorageWriteResult(
     string ObjectKey,
     long SizeBytes,
     string ContentType,
-    string? Sha256Checksum);
+    string? Sha256Checksum,
+    string? ProviderVersionId = null);

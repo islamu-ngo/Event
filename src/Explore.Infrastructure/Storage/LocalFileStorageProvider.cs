@@ -18,13 +18,16 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
 
     private readonly LocalFileStorageOptions _options;
     private readonly ILogger<LocalFileStorageProvider> _logger;
+    private readonly bool _boundTarget;
 
     public LocalFileStorageProvider(
         IOptions<LocalFileStorageOptions> options,
-        ILogger<LocalFileStorageProvider> logger)
+        ILogger<LocalFileStorageProvider> logger,
+        bool boundTarget = false)
     {
         _options = options.Value;
         _logger = logger;
+        _boundTarget = boundTarget;
     }
 
     public string Provider => StorageProviders.Local;
@@ -132,8 +135,10 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         ArgumentNullException.ThrowIfNull(input);
         cancellationToken.ThrowIfCancellationRequested();
 
+        RejectVersion(input.ProviderVersionId);
+        EnsureRootAccessible();
         var path = ResolveObjectPath(input.ObjectKey);
-        return Task.FromResult(File.Exists(path));
+        return Task.FromResult(ObjectExists(path));
     }
 
     public Task<FileStorageReadResult> OpenReadAsync(
@@ -143,12 +148,9 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         ArgumentNullException.ThrowIfNull(input);
         cancellationToken.ThrowIfCancellationRequested();
 
+        RejectVersion(input.ProviderVersionId);
+        EnsureRootAccessible();
         var path = ResolveObjectPath(input.ObjectKey);
-        if (!File.Exists(path))
-        {
-            throw new FileNotFoundException("Stored file was not found.", input.ObjectKey);
-        }
-
         var fileInfo = new FileInfo(path);
         var stream = new FileStream(
             path,
@@ -172,10 +174,12 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
         ArgumentNullException.ThrowIfNull(input);
         cancellationToken.ThrowIfCancellationRequested();
 
+        RejectVersion(input.ProviderVersionId);
+        EnsureRootAccessible();
         var path = ResolveObjectPath(input.ObjectKey);
         var deleted = false;
 
-        if (File.Exists(path))
+        if (ObjectExists(path))
         {
             File.Delete(path);
             deleted = true;
@@ -359,15 +363,32 @@ public sealed class LocalFileStorageProvider : IFileStorageInventoryProvider
                fileName.Contains(".tmp-", StringComparison.Ordinal);
     }
 
-    private string ResolveRootPath()
-    {
-        var root = Path.GetFullPath(_options.RootPath);
-        if (_options.CreateRootIfMissing)
-        {
-            Directory.CreateDirectory(root);
-        }
+    private string ResolveRootPath() => Path.GetFullPath(_options.RootPath);
 
-        return root;
+    private void EnsureRootAccessible()
+    {
+        // Unlike Exists(), enumeration reports missing roots and permission/I/O failures.
+        using var entries = Directory.EnumerateFileSystemEntries(ResolveRootPath()).GetEnumerator();
+        _ = entries.MoveNext();
+    }
+
+    private static bool ObjectExists(string path)
+    {
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            if ((attributes & FileAttributes.Directory) != 0)
+                throw new IOException("Storage object is not a file.");
+            return true;
+        }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+    }
+
+    private static void RejectVersion(string? versionId)
+    {
+        if (versionId is not null)
+            throw new InvalidOperationException("Local storage does not support provider versions.");
     }
 
     private static string BuildObjectKey(Guid tenantId, string? extension)

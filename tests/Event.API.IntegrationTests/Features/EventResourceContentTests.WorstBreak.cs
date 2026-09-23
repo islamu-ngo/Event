@@ -48,14 +48,11 @@ public sealed partial class EventResourceContentTests
                     disposal.TrySetResult();
                 }), EventResourceGovernancePolicy.PdfMediaType, seed.Bytes.Length, null);
             });
-        var resolver = NSubstitute.Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(storageProvider);
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEventResourceAuthorizationProvider>();
             services.AddSingleton<IEventResourceAuthorizationProvider>(providerBarrier);
-            services.RemoveAll<IFileStorageProviderResolver>();
-            services.AddSingleton(resolver);
+            ConfigureStorageProviders(services, seed.BindingId, storageProvider);
             services.RemoveAll<ITenantContext>();
             services.AddSingleton(tenant);
         }));
@@ -154,14 +151,11 @@ public sealed partial class EventResourceContentTests
                 return new FileStorageReadResult(new MemoryStream(seed.Bytes),
                     EventResourceGovernancePolicy.PdfMediaType, seed.Bytes.Length, null);
             });
-        var resolver = NSubstitute.Substitute.For<IFileStorageProviderResolver>();
-        resolver.GetRequired(StorageProviders.Local).Returns(storageProvider);
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEventResourceAuthorizationProvider>();
             services.AddSingleton<IEventResourceAuthorizationProvider>(new AlwaysAllowProvider());
-            services.RemoveAll<IFileStorageProviderResolver>();
-            services.AddSingleton(resolver);
+            ConfigureStorageProviders(services, seed.BindingId, storageProvider);
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -241,12 +235,14 @@ public sealed partial class EventResourceContentTests
         order.TransitionTo(RegistrationOrderStatusEnum.AwaitingRequirements, DateTime.UtcNow);
         order.TransitionTo(RegistrationOrderStatusEnum.ReadyForCheckout, DateTime.UtcNow);
         order.TransitionTo(RegistrationOrderStatusEnum.Confirmed, DateTime.UtcNow);
+        var binding = StorageProviderBinding.Local(Path.GetFullPath("resource-content-test-storage"));
         var storage = new StorageObject
         {
             Id = storageId, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
             FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
             Uri = $"/api/eventresource/{resourceId}/content", ObjectKey = objectKey,
             Provider = StorageProviders.Local, FullName = "retained.pdf", SafeDisplayName = "retained.pdf",
+            StorageProviderBindingId = binding.Id,
             Extension = "pdf", ContentType = EventResourceGovernancePolicy.PdfMediaType,
             Size = bytes.Length, Sha256Checksum = Convert.ToHexString(SHA256.HashData(bytes)),
             Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
@@ -266,7 +262,7 @@ public sealed partial class EventResourceContentTests
         resource.Publish(new(PlatformDefaults.DefaultTenantId, eventId, null, EventStatusEnum.Published,
             false, true, null, false, new(session.StartTime, session.EndTime, null, null)), true,
             resource.ConcurrencyStamp, user.Id, DateTime.UtcNow);
-        db.AddRange(parent, catalog, order, storage, resource, new EventRegistration
+        db.AddRange(parent, catalog, order, binding, storage, resource, new EventRegistration
         {
             Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
             EventId = eventId, Event = parent, EventSessionId = sessionId, EventSession = session,
@@ -275,7 +271,7 @@ public sealed partial class EventResourceContentTests
             CoverageEstablishedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.CreateVersion7()
         });
         await db.SaveChangesAsync();
-        return new(credentials, resourceId, storageId, orderId, otherTenantId, objectKey, title, bytes);
+        return new(credentials, resourceId, storageId, binding.Id, orderId, otherTenantId, objectKey, title, bytes);
     }
 
     private static async Task AuthenticateAsync(HttpClient client,
@@ -325,7 +321,19 @@ public sealed partial class EventResourceContentTests
                 Enumerable.Repeat(EventResourceProviderDecision.Allow, inputs.Count).ToArray());
     }
 
+    private static void ConfigureStorageProviders(IServiceCollection services, Guid bindingId, IFileStorageProvider provider)
+    {
+        var resolver = Substitute.For<IFileStorageProviderResolver>();
+        resolver.GetRequired(StorageProviders.Local).Returns(provider);
+        var bindings = Substitute.For<IStorageProviderBindingService>();
+        bindings.ResolveAsync(bindingId, Arg.Any<CancellationToken>()).Returns(provider);
+        services.RemoveAll<IFileStorageProviderResolver>();
+        services.AddSingleton(resolver);
+        services.RemoveAll<IStorageProviderBindingService>();
+        services.AddSingleton(bindings);
+    }
+
     private sealed record ParticipantResourceSeed(
         Explore.Application.Features.Authentication.Local.Models.LocalAuthRequestDto Credentials,
-        Guid ResourceId, Guid StorageId, Guid OrderId, Guid OtherTenantId, string ObjectKey, string ProtectedTitle, byte[] Bytes);
+        Guid ResourceId, Guid StorageId, Guid BindingId, Guid OrderId, Guid OtherTenantId, string ObjectKey, string ProtectedTitle, byte[] Bytes);
 }

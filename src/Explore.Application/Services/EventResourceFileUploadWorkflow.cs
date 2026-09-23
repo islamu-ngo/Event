@@ -26,7 +26,8 @@ public sealed class EventResourceFileUploadWorkflow(
     IEventResourceRepository resources, IStorageUploadSessionRepository sessions,
     IStorageObjectRepository objects, IStorageUsageCounterRepository counters,
     IPrivacyErasureStateRepository privacy, IStoragePolicyResolver storagePolicy,
-    IFileStorageProviderResolver providers, IUnitOfWork unitOfWork,
+    IStorageProviderBindingService providers, IUnitOfWork unitOfWork,
+    EventResourceStorageLifecycleService lifecycle,
     EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
     ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock)
 {
@@ -123,38 +124,50 @@ public sealed class EventResourceFileUploadWorkflow(
                 if (await FencedAsync(ct)) return Fail("privacy_erasure_fenced");
                 if (current.Status != StorageUploadSessionStates.Reserved) return Fail(FailureCodes.StorageUploadSessionInvalidState);
                 if (current.ExpiresAt <= clock.GetUtcNow().UtcDateTime) return Fail(FailureCodes.StorageUploadSessionExpired);
+                var binding = await providers.CaptureAsync(current.Provider, current.TenantId, ct);
+                current.StorageProviderBindingId = binding.Id;
                 current.ReserveObjectKey($"tenants/{current.TenantId:N}/uploads/{current.Id:N}.{current.Extension}");
                 current.MarkUploading(clock.GetUtcNow().UtcDateTime);
                 var stagedObject = NewStagedObject(current);
                 await objects.Create(stagedObject);
                 current.StageEventResourceObject(stagedObject.Id);
                 await sessions.Update(current);
+                session = current;
                 return Success(current, policy, null);
             }, cancellationToken);
             if (!staged.IsSuccess) return staged;
         }
         catch (ConcurrencyConflictException) { return Fail(FailureCodes.ConcurrencyConflict); }
 
-        // Fresh detached session now contains the durable provider key and staged object identity.
-        session = (await sessions.GetForAuthorizationAsync(session.Id, cancellationToken))!;
+        // Capture before I/O: retirement may remove both source rows while this write is in flight.
+        var producer = new EventResourceProducerIdentity(session.TenantId, session.Id, session.StorageObjectId!.Value,
+            session.Provider, session.StorageProviderBindingId!.Value, session.ObjectKey!);
         FileStorageWriteResult write;
         try
         {
-            write = await providers.GetRequired(session.Provider).WriteAsync(new FileStorageWriteInput(
+            var provider = await providers.ResolveAsync(producer.BindingId, cancellationToken);
+            write = await provider.WriteAsync(new FileStorageWriteInput(
                 session.TenantId, inspected, session.ContentType, session.SafeDisplayName, session.Extension,
                 session.ExpectedSizeBytes, session.ExpectedSizeBytes, session.ObjectKey), cancellationToken);
         }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException or UnauthorizedAccessException or ArgumentException)
+        catch (OperationCanceledException)
         {
-            return await CloseFailedAsync(session.Id, FailureCodes.StorageUploadWriteFailed, cancellationToken);
+            await CloseFailedAsync(session.Id, FailureCodes.StorageUploadWriteFailed, CancellationToken.None);
+            throw;
         }
+        catch (Exception)
+        {
+            // External provider errors are untrusted; never export their target or object key.
+            return await CloseFailedAsync(session.Id, FailureCodes.StorageUploadWriteFailed, CancellationToken.None);
+        }
+        if (write.Provider == producer.Provider && write.ObjectKey == producer.ObjectKey)
+            await lifecycle.RecordProducerSettlementAsync(producer, write.ProviderVersionId, CancellationToken.None);
         if (write.Provider != session.Provider || write.ObjectKey != session.ObjectKey || write.SizeBytes != session.ExpectedSizeBytes
             || !string.Equals(write.ContentType, session.ContentType, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(write.Sha256Checksum, checksum, StringComparison.OrdinalIgnoreCase))
             return await CloseFailedAsync(session.Id, FailureCodes.StorageUploadWriteFailed, cancellationToken);
 
-        // Do not catch database failure as a provider failure. The committed staging row remains
-        // delete-requested and the existing reconciler can act on it even without provider inventory.
+        // A required-success-audit failure cannot roll back the independently committed acknowledgement.
         try
         {
             return await unitOfWork.ExecuteSerializableAsync(async ct =>
@@ -164,7 +177,9 @@ public sealed class EventResourceFileUploadWorkflow(
                 var outcome = await authority.RecheckMutationAsync(lease, current!.ExpectedResourceVersion!.Value, ct);
                 if (outcome != EventResourceAuthorityOutcome.Allowed) return await FailUploadingAsync(current, Denied(outcome).FailureCode!, ct);
                 if (await FencedAsync(ct)) return await FailUploadingAsync(current, "privacy_erasure_fenced", ct);
-                if (current.Status != StorageUploadSessionStates.Uploading || current.StorageObjectId != session.StorageObjectId)
+                if (current.Status != StorageUploadSessionStates.Uploading || current.StorageObjectId != producer.ObjectId
+                    || !current.ProducerSettled || current.StorageProviderBindingId != producer.BindingId
+                    || current.ObjectKey != producer.ObjectKey || current.ProviderVersionId != write.ProviderVersionId)
                     return Fail(FailureCodes.StorageUploadSessionInvalidState);
                 if (current.ExpiresAt <= clock.GetUtcNow().UtcDateTime)
                     return await FailUploadingAsync(current, FailureCodes.StorageUploadSessionExpired, ct);
@@ -177,7 +192,7 @@ public sealed class EventResourceFileUploadWorkflow(
                     || resource.PublicationStateId == (int)EventResourcePublicationStateEnum.Archived
                     || resource.EventResourceDeliveryTypeId != (int)EventResourceDeliveryTypeEnum.StoredFile)
                     return await FailUploadingAsync(current, FailureCodes.ConcurrencyConflict, ct);
-                var stagedObject = await resources.GetStorageObjectAsync(current.TenantId, current.StorageObjectId!.Value, ct);
+                var stagedObject = await lifecycle.FenceActivationAsync(current, ct);
                 if (stagedObject is null || stagedObject.IsDeleted || stagedObject.LifecycleState != StorageObjectLifecycleStates.DeleteRequested
                     || stagedObject.OwningResourceId != resource.Id || stagedObject.ObjectKey != current.ObjectKey
                     || stagedObject.OwningResourceKind != StorageOwningResourceKinds.EventResource
@@ -209,8 +224,7 @@ public sealed class EventResourceFileUploadWorkflow(
                 resources.Update(resource);
                 if (previous is not null)
                 {
-                    previous.RequestDelete();
-                    await objects.Update(previous);
+                    await lifecycle.RetireAsync(current.TenantId, [], [previous.Id], now, ct);
                 }
                 counter.FinalizeReservation(current.ReservedBytes);
                 await counters.Update(counter);
@@ -249,7 +263,9 @@ public sealed class EventResourceFileUploadWorkflow(
                 var counter = await counters.GetByTenantAndProviderAsync(current.TenantId, current.Provider, ct);
                 if (current.Status is StorageUploadSessionStates.Reserved or StorageUploadSessionStates.Uploading)
                 {
-                    if (counter is not null) { counter.ReleaseReservation(current.ReservedBytes); await counters.Update(counter); }
+                    if (current.StorageObjectId is { } stagedId)
+                        await lifecycle.RetireAsync(current.TenantId, [], [stagedId], clock.GetUtcNow().UtcDateTime, ct);
+                    else if (counter is not null) { counter.ReleaseReservation(current.ReservedBytes); await counters.Update(counter); }
                     current.Cancel(clock.GetUtcNow().UtcDateTime);
                     await sessions.Update(current);
                 }
@@ -272,6 +288,8 @@ public sealed class EventResourceFileUploadWorkflow(
         var attached = await resources.GetStorageObjectAsync(current.TenantId, current.StorageObjectId!.Value, ct);
         if (attached is null || attached.IsDeleted || attached.LifecycleState != StorageObjectLifecycleStates.Active
             || attached.OwningResourceId != current.OwningResourceId || attached.OwningResourceKind != StorageOwningResourceKinds.EventResource
+            || !current.ProducerSettled || attached.StorageProviderBindingId != current.StorageProviderBindingId
+            || attached.ProviderVersionId != current.ProviderVersionId
             || !attached.HasBoundDocumentInspection || attached.Sha256Checksum != current.Sha256Checksum)
             return Fail(FailureCodes.ConcurrencyConflict);
         return Success(current, policy, await counters.GetByTenantAndProviderAsync(current.TenantId, current.Provider, ct));
@@ -288,8 +306,7 @@ public sealed class EventResourceFileUploadWorkflow(
     {
         if (session.Status == StorageUploadSessionStates.Uploading)
         {
-            var counter = await counters.GetByTenantAndProviderAsync(session.TenantId, session.Provider, ct);
-            if (counter is not null) { counter.ReleaseReservation(session.ReservedBytes); await counters.Update(counter); }
+            await lifecycle.RetireAsync(session.TenantId, [], [session.StorageObjectId!.Value], clock.GetUtcNow().UtcDateTime, ct);
             session.Fail(code, null, clock.GetUtcNow().UtcDateTime);
             await sessions.Update(session);
         }
@@ -346,6 +363,7 @@ public sealed class EventResourceFileUploadWorkflow(
         {
             Id = id, TenantId = session.TenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
             Uri = $"/api/storageobject/{id}/content", Provider = session.Provider, ObjectKey = session.ObjectKey,
+            StorageProviderBindingId = session.StorageProviderBindingId,
             FullName = session.SafeDisplayName, SafeDisplayName = session.SafeDisplayName, Extension = session.Extension!,
             ContentType = session.ContentType, Size = session.ExpectedSizeBytes, Purpose = StorageObjectPurposes.EventResource,
             Visibility = StorageObjectVisibilities.PrivateOwner, OwningResourceKind = StorageOwningResourceKinds.EventResource,

@@ -31,7 +31,7 @@ using Microsoft.Extensions.Options;
 /// <para>Results are cached in-process for <see cref="CacheTtl"/>. Writes to the
 /// binding invalidate the cache via <see cref="InvalidateAsync"/>.</para>
 /// </remarks>
-public sealed class SecretResolver : ISecretResolver
+public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
 {
     /// <summary>In-memory cache TTL (resolved values live here, not the binding itself).</summary>
     public static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
@@ -43,6 +43,8 @@ public sealed class SecretResolver : ISecretResolver
     private readonly ILogger<SecretResolver> _logger;
     private readonly SecretProviderType _provider;
     private readonly string _infisicalEnvironment;
+    private readonly string? _authorityEndpoint;
+    private readonly string? _authorityProject;
     private readonly ConcurrentDictionary<string, string> _cacheKeys = new(StringComparer.Ordinal);
 
     public SecretResolver(
@@ -66,9 +68,35 @@ public sealed class SecretResolver : ISecretResolver
         _logger = logger;
         _provider = options.Value.Provider;
         _infisicalEnvironment = options.Value.Infisical.Environment;
+        _authorityEndpoint = _provider == SecretProviderType.Infisical ? options.Value.Infisical.Url : null;
+        _authorityProject = _provider == SecretProviderType.Infisical ? options.Value.Infisical.ProjectId : null;
 
         // Index sources by SourceType. Duplicate types = bug => throw at startup.
         _sources = sources.ToFrozenDictionary(s => s.SourceType);
+    }
+
+    public async Task<RetainedSecretReference> CaptureAsync(
+        string settingKey, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var binding = await ResolveBindingAsync(settingKey, tenantId, cancellationToken).ConfigureAwait(false);
+        if (binding is null || SelectedSourceType() != binding.SourceType)
+            throw new InvalidOperationException("storage_secret_unavailable");
+        return RetainedSecretReference.Capture(binding, _provider.ToString(), _authorityEndpoint, _authorityProject);
+    }
+
+    public async Task<SecretResolutionResult> ResolveAsync(
+        RetainedSecretReference reference, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        if (!string.Equals(reference.Authority, _provider.ToString(), StringComparison.Ordinal)
+            || !string.Equals(reference.AuthorityEndpoint, _authorityEndpoint, StringComparison.Ordinal)
+            || !string.Equals(reference.AuthorityProject, _authorityProject, StringComparison.Ordinal)
+            || reference.SourceType != SelectedSourceType())
+            return SecretResolutionResult.Invalid;
+
+        // Retained references deliberately bypass the mutable binding cache and hierarchy.
+        // A current binding with the same ID may now name a different external secret.
+        return await ResolveBoundBindingAsync(reference.ToBinding(), cancellationToken, useCache: false).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -246,7 +274,8 @@ public sealed class SecretResolver : ISecretResolver
 
     private async Task<SecretResolutionResult> ResolveBoundBindingAsync(
         SecretBinding binding,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool useCache = true)
     {
         var selectedSource = SelectedSourceType();
         if (selectedSource != binding.SourceType)
@@ -258,7 +287,7 @@ public sealed class SecretResolver : ISecretResolver
 
         var logicalCacheKey = BuildCacheKey(binding.SettingKey, binding.Scope, binding.ScopeId, binding.Qualifier);
         var cacheKey = $"{logicalCacheKey}::{binding.SourceType}::{binding.Id:N}";
-        if (_cache.TryGetValue<ResolvedSecret>(cacheKey, out var cached) && cached is not null)
+        if (useCache && _cache.TryGetValue<ResolvedSecret>(cacheKey, out var cached) && cached is not null)
         {
             _metrics.RecordCacheHit();
             return SecretResolutionResult.Resolved(cached);
@@ -301,6 +330,12 @@ public sealed class SecretResolver : ISecretResolver
                 _metrics.RecordError(binding.SourceType, result.Status);
             }
 
+            return result;
+        }
+
+        if (!useCache)
+        {
+            _metrics.RecordSuccess(binding.SourceType);
             return result;
         }
 

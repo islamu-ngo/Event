@@ -14,6 +14,9 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
 
         builder.Property(e => e.Uri).HasMaxLength(1000).IsRequired();
         builder.Property(e => e.ObjectKey).HasMaxLength(1024);
+        builder.Property(e => e.ProviderVersionId).HasMaxLength(1024);
+        builder.HasOne<StorageProviderBinding>().WithMany()
+            .HasForeignKey(e => e.StorageProviderBindingId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(e => e.Provider).HasMaxLength(50).IsRequired();
         builder.Property(e => e.FullName).HasMaxLength(500).IsRequired();
         builder.Property(e => e.SafeDisplayName).HasMaxLength(500).IsRequired();

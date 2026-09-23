@@ -191,9 +191,21 @@ The reconciliation worker compares `StorageObject` metadata with provider backin
 - local provider inventory reports files that are present on disk but absent from metadata, then optionally moves them under the provider quarantine area;
 - delete-eligible quarantined or delete-requested metadata can be physically deleted from the selected provider and then soft-deleted in metadata.
 
+These generic loops exclude event-resource purpose, ownership, retained
+attachment references and deletion tombstones. The same job separately invokes
+the fenced resource lifecycle worker; it never treats upload staging as an
+ordinary deletion request. Tombstone keys remain known to inventory after
+source metadata is removed. Resource retirement, unknown-producer handling and
+immutable target recovery are specified in
+[Event Resources](EVENT_RESOURCES.md#retirement-and-producer-settlement).
+
 The local provider intentionally skips temporary files and existing quarantine files during inventory. Metrics, logs, and health data expose only bounded categories/counts; they do not include object keys, filenames, filesystem paths, tenant IDs, user IDs, endpoints, bucket names, access keys, or secrets.
 
 ## Heavy Moderation Image Deletion
+
+Resource files use the separate transactional retirement path, even when a
+malformed image reference aliases one. Image redaction must not rewrite their
+owner to `event` or send them to the unfenced image deletion service.
 
 Heavy event moderation uses the same provider-neutral delete boundary as normal storage cleanup, but it does not wait for the dry-run-first reconciliation schedule. The event redaction transaction clears event/session/day image foreign keys and marks the affected `StorageObject` rows as `delete_requested` with `OwningResourceKind=event` and the redacted event id. After commit, `StorageObjectDeletionService` loads those rows for the tenant/event, calls the selected `IFileStorageProvider.DeleteAsync`, then soft-deletes the storage metadata when the provider delete succeeds or when metadata has no object key.
 

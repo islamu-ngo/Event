@@ -23,6 +23,9 @@ public class StorageUploadSessionConfiguration : IEntityTypeConfiguration<Storag
         builder.Property(e => e.OwningResourceKind).HasMaxLength(100);
         builder.Property(e => e.Status).HasMaxLength(50).IsRequired();
         builder.Property(e => e.ObjectKey).HasMaxLength(1024);
+        builder.Property(e => e.ProviderVersionId).HasMaxLength(1024);
+        builder.HasOne<StorageProviderBinding>().WithMany()
+            .HasForeignKey(e => e.StorageProviderBindingId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(e => e.Sha256Checksum).HasColumnName("sha256_checksum").HasMaxLength(64);
         builder.Property(e => e.IdempotencyKey).HasMaxLength(128);
         builder.Property(e => e.FailureCode).HasMaxLength(100);

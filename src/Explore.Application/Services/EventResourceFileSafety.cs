@@ -13,6 +13,7 @@ internal static class EventResourceFileSafety
         IsOwned(storage, tenantId, resourceId)
         && storage.LifecycleState == StorageObjectLifecycleStates.Active
         && storage.Provider is StorageProviders.Local or StorageProviders.S3Compatible
+        && storage.StorageProviderBindingId is { } bindingId && bindingId != Guid.Empty
         && !string.IsNullOrWhiteSpace(storage.ObjectKey)
         && storage.HasBoundDocumentInspection
         && policy is { AllowUnscannedDocuments: true }
@@ -38,6 +39,7 @@ internal static class EventResourceFileSafety
     internal static string Generation(StorageObject storage) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|',
             storage.Id, storage.ConcurrencyStamp, storage.Provider, storage.ObjectKey,
+            storage.StorageProviderBindingId, storage.ProviderVersionId,
             storage.TenantId, storage.IsDeleted, storage.LifecycleState, storage.Purpose,
             storage.Visibility, storage.OwningResourceKind, storage.OwningResourceId,
             storage.Sha256Checksum, storage.Size, storage.ContentType, storage.Extension, storage.SafeDisplayName,

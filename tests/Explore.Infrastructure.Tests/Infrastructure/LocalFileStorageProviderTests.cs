@@ -11,6 +11,37 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 public sealed class LocalFileStorageProviderTests
 {
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task BoundWriteInitializesItsCapturedRootButAbsenceChecksNeverRecreateIt(bool rootExists)
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"resource-first-write-{Guid.CreateVersion7():N}");
+        var provider = new LocalFileStorageProvider(
+            Options.Create(new LocalFileStorageOptions { RootPath = root, CreateRootIfMissing = false }),
+            NullLogger<LocalFileStorageProvider>.Instance, boundTarget: true);
+        try
+        {
+            if (rootExists) Directory.CreateDirectory(root);
+            byte[] bytes = "bound resource"u8.ToArray();
+            Guid tenantId = Guid.CreateVersion7();
+            string key = $"tenants/{tenantId:N}/uploads/{Guid.CreateVersion7():N}.pdf";
+            using var content = new MemoryStream(bytes);
+            var written = await provider.WriteAsync(new(tenantId, content, "application/pdf", "file.pdf", "pdf",
+                bytes.Length, bytes.Length, key), default);
+            await Assert.That(written.ObjectKey).IsEqualTo(key);
+            await Assert.That(await File.ReadAllBytesAsync(provider.ResolveObjectPath(key))).IsEquivalentTo(bytes);
+            Directory.Delete(root, recursive: true);
+            await Assert.ThrowsAsync<DirectoryNotFoundException>(() => provider.ExistsAsync(new(key), default));
+            await Assert.ThrowsAsync<DirectoryNotFoundException>(() => provider.DeleteAsync(new(key), default));
+            await Assert.That(Directory.Exists(root)).IsFalse();
+        }
+        finally
+        {
+            DeleteRootIfExists(root);
+        }
+    }
+
+    [Test]
     public async Task WriteAsync_GeneratesTenantScopedObjectKeyAndChecksum()
     {
         var provider = CreateProvider(out var root);
@@ -137,12 +168,13 @@ public sealed class LocalFileStorageProviderTests
     }
 
     [Test]
-    public async Task ExistsAsync_ReturnsFalseWhenObjectIsMissing()
+    public async Task ExistsAsync_ReturnsFalseWhenObjectIsMissingFromReachableRoot()
     {
         var provider = CreateProvider(out var root);
 
         try
         {
+            Directory.CreateDirectory(root);
             var exists = await provider.ExistsAsync(
                 new FileStorageExistsInput("tenants/missing/2026/06/02/missing.txt"),
                 CancellationToken.None);

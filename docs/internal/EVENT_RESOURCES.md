@@ -205,8 +205,59 @@ API middleware alone cannot sanitize a different host's client spans.
 The forward `BindEventResourceFiles` migrations add explicit inspection binding
 and upload version facts, private-owner constraints and the tenant-qualified
 session/object relationship. Their PostgreSQL, SQLite, SQL Server and MySQL
-histories are generated artifacts. Byte cleanup and parent-erasure recovery
-are a separate lifecycle integration; intake evidence is not a cleanup gate.
+histories are generated artifacts.
+
+### Retirement and producer settlement
+
+`EventResourceStorageLifecycleRepository` serializes activation, producer
+acknowledgement and retirement through a conditional source-row fence. Uploads
+commit an immutable `StorageProviderBinding` before provider writes. Successful
+receipts commit independently of attachment and required-success audit; a late
+receipt may settle a matching tombstone after source removal, never recreate a
+resource. Content reads use the captured binding and exact object version, which
+also participate in delivery generation checks.
+Provider resolution/write failures return a closed storage-upload failure without
+logging or serializing untrusted provider exception text. Without a confirmed
+write receipt, the staged object's producer remains unsettled and its deletion
+authority stays non-executable until an exact later acknowledgement.
+
+Retirement transfers deletion authority and settles logical quota once in the
+native caller transaction. Heavy moderation retires before overwriting the
+storage lifecycle, then saves redaction/detachment and removes transferred
+sources. This ordering does not depend on finalized sessions remaining after
+subject erasure. Erasure preserves shared live materials; only the erased
+subject's exact detached staging objects enter retirement. Evidence-backed
+objects and their upload sessions are excluded from both ordinary retirement
+and source handoff; parent moderation withdraws their resource affordance
+without deleting the independently retained evidence. Expiry conditionally
+fences the observed Uploading session before retiring its staged object, so a
+concurrent finalization invalidates the entire transaction.
+
+`StorageObjectDeletionTombstone` retains identifiers, the machine key, binding
+and version, state, claim stamp and scheduling times, without tenant/resource/
+user foreign keys or content/attribution. `AwaitingProducer` is not executable:
+expiry, cancellation and elapsed time cannot prove producer settlement.
+`Ready` work needs a conditional lease before external deletion. Absence and
+retry updates require the matching unexpired fence; a stale worker cannot
+complete newer work. Audit-row expiry remains independent.
+
+The existing storage reconciliation job invokes
+`EventResourceStorageCleanupService`. Its bounded transactional passes retire
+expired resource reservations and remove transferred metadata, including
+unknown-producer sources. Claims and terminal purge require source rows to be
+absent. Provider I/O stays outside transactions; deletion acknowledgements alone
+are insufficient without confirmed absence. Generic reconciliation, image
+deletion and inventory cannot take over resource-owned or tombstoned keys.
+Dry-run performs no mutation. No second scheduler or outbox is introduced.
+
+Bindings retain original non-secret target coordinates and external secret
+references, not credential values or a fallback to current provider settings.
+S3 operations address exact versions; delete markers, unavailable buckets and
+missing/inaccessible local roots do not establish absence. Unknown receipts or
+versions remain pending for operator reconciliation; see the
+[operator recovery guidance](../public/documentation/readme/integrations-and-ai/storage.md#resource-deletion-and-provider-recovery).
+Only a bound local write may initialize its captured root for the first upload;
+read, inventory validation and cleanup cannot recreate a missing old root.
 
 ## Relational ownership
 

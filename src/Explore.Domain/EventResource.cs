@@ -235,6 +235,30 @@ public sealed class EventResource : ITenantEntity, IAuditableEntity, ISoftDeleta
         return detached;
     }
 
+    /// <summary>Irreversibly removes delivery and private content with a heavy-redacted parent.</summary>
+    public void ApplyParentModeration(string redactedText, Guid? moderatorUserId, DateTime occurredAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(redactedText) || moderatorUserId == Guid.Empty
+            || occurredAtUtc == default || occurredAtUtc.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("Parent moderation requires safe replacement text and a UTC timestamp.");
+        Title = redactedText;
+        PublicTitle = redactedText;
+        Description = null;
+        SensitiveNotes = null;
+        AccessibilityNote = null;
+        AccessibleAlternativeEventResourceId = null;
+        StorageObjectId = null;
+        ExternalDestinationCiphertext = null;
+        ExternalDestinationProtectionVersion = null;
+        ExternalDestinationSafeOrigin = null;
+        PublicationStateId = (int)EventResourcePublicationStateEnum.Withdrawn;
+        IsDeleted = true;
+        DeletedAt = occurredAtUtc;
+        DeletedBy = moderatorUserId;
+        UpdatedAt = occurredAtUtc;
+        UpdatedBy = moderatorUserId;
+    }
+
     public bool HasPublishablePayload() => (EventResourceDeliveryTypeEnum)EventResourceDeliveryTypeId switch
     {
         EventResourceDeliveryTypeEnum.StoredFile => StorageObjectId.HasValue && StorageObjectId != Guid.Empty

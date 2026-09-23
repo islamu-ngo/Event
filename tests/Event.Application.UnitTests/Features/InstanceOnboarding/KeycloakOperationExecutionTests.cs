@@ -1082,11 +1082,21 @@ public sealed class KeycloakOperationExecutionTests
         public int ApplyCount { get; private set; }
         public int InspectCount { get; private set; }
         public Queue<KeycloakProvisioningOperationResult>
-            ProvisioningApplyResults { get; } = new();
+            ProvisioningApplyResults
+        {
+            get;
+        } = new();
         public List<string?>
-            InspectedProvisioningProviderIds { get; } = [];
+            InspectedProvisioningProviderIds
+        {
+            get;
+        } = [];
         public Func<CancellationToken, Task<KeycloakMapperOperationResult>>?
-            OnApply { get; set; }
+            OnApply
+        {
+            get;
+            set;
+        }
 
         public Task<KeycloakAdminInspectionResult> InspectAsync(
             KeycloakAdminInspectionRequest request,

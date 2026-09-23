@@ -354,7 +354,11 @@ public sealed class KeycloakProvisioningOperationTests
             "11111111-1111-7111-8111-111111111111";
         public bool TimeoutAfterAccept { get; init; }
         public CancellationTokenSource?
-            CancelCallerAfterAccept { get; init; }
+            CancelCallerAfterAccept
+        {
+            get;
+            init;
+        }
         public JsonObject? ExactClient { get; init; }
         public JsonObject? LastMutation { get; private set; }
         public List<string> MutationPaths { get; } = [];

@@ -42,9 +42,12 @@ public sealed class ProviderCredentialHttpBoundaryTests
 
     public static IEnumerable<Route> Routes() => Enum.GetValues<Route>();
     public static IEnumerable<(Route, Outcome)> Outcomes() =>
-        from route in Routes() from outcome in Enum.GetValues<Outcome>() select (route, outcome);
+        from route in Routes()
+        from outcome in Enum.GetValues<Outcome>()
+        select (route, outcome);
     public static IEnumerable<(Route, Caller)> DeniedCallers() =>
-        from route in Routes() from caller in Enum.GetValues<Caller>()
+        from route in Routes()
+        from caller in Enum.GetValues<Caller>()
         where caller != Caller.SetupOnly || !IsSetup(route)
         select (route, caller);
 
@@ -372,7 +375,8 @@ public sealed class ProviderCredentialHttpBoundaryTests
                 var authorizationConfiguration = Substitute.For<IAuthorizationProviderConfigurationService>();
                 authorizationConfiguration.ReadConfigurationAsync().Returns(new AuthorizationProviderConfigurationDto
                 {
-                    Provider = "cerbos", AuthorizationProviderManagedByDeployment = false
+                    Provider = "cerbos",
+                    AuthorizationProviderManagedByDeployment = false
                 });
                 services.RemoveAll<IAuthorizationProviderConfigurationService>();
                 services.AddSingleton(authorizationConfiguration);
@@ -386,33 +390,75 @@ public sealed class ProviderCredentialHttpBoundaryTests
             Guid userId = db.InstanceBootstrapStates.Single().CompletedByUserId!.Value;
             db.Users.Add(new User
             {
-                Id = userId, CreatedAt = DateTime.UtcNow, CreatedBy = userId,
-                Pii = new UserPii { UserId = userId, Email = $"{userId:N}@integration.test", FirstName = "Boundary", LastName = "Admin" }
+                Id = userId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                Pii = new UserPii
+                {
+                    UserId = userId,
+                    Email = $"{userId:N}@integration.test",
+                    FirstName = "Boundary",
+                    LastName = "Admin"
+                }
             });
             db.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = userId, User = null!,
-                AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(), AuthenticationProvider = null!,
-                ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(ExternalApiPhase0WebApplicationFactory.TestIssuer, userId.ToString()).Value,
-                ProviderDisplayName = "keycloak", CreatedAt = DateTime.UtcNow, CreatedBy = userId
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                AuthenticationProviderId =
+                    (int)"keycloak"
+                        .ParseAuthenticationProviderKind(),
+                AuthenticationProvider = null!,
+                ProviderKey =
+                    PlatformIdentityPrincipalExtensions
+                        .CreateOidcAccountKey(
+                            ExternalApiPhase0WebApplicationFactory
+                                .TestIssuer,
+                            userId.ToString())
+                        .Value,
+                ProviderDisplayName = "keycloak",
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId
             });
-            Role? role = db.Roles.SingleOrDefault(candidate => candidate.Id == (int)RoleEnum.Admin);
+            Role? role = db.Roles.SingleOrDefault(
+                candidate =>
+                    candidate.Id == (int)RoleEnum.Admin);
             if (role is null)
             {
-                role = new Role { Id = (int)RoleEnum.Admin, MasterCode = "platform.admin", FullName = "Platform Administrator", Scope = RoleScopeEnum.Platform, RoleScope = null!, IsSystem = true };
+                role = new Role
+                {
+                    Id = (int)RoleEnum.Admin,
+                    MasterCode = "platform.admin",
+                    FullName = "Platform Administrator",
+                    Scope = RoleScopeEnum.Platform,
+                    RoleScope = null!,
+                    IsSystem = true
+                };
                 db.Roles.Add(role);
             }
             db.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = userId, User = null!, RoleId = role.Id, Role = role,
-                GrantedAt = DateTime.UtcNow, GrantedBy = userId
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = userId
             });
             await db.SaveChangesAsync();
             return new Fixture(root, host, client, setup, provider, observer, userId);
         }
 
-        public async Task<HttpResponseMessage> SendAsync(Route route, string? key = null, bool invalidBody = false,
-            bool bearer = true, string? setup = null, bool useDefaultSetup = true, bool forgedTenant = false,
+        public async Task<HttpResponseMessage> SendAsync(
+            Route route,
+            string? key = null,
+            bool invalidBody = false,
+            bool bearer = true,
+            string? setup = null,
+            bool useDefaultSetup = true,
+            bool forgedTenant = false,
             CancellationToken cancellationToken = default)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, Path(route));
@@ -420,11 +466,37 @@ public sealed class ProviderCredentialHttpBoundaryTests
                 ? new StringContent("{", Encoding.UTF8, "application/json")
                 : JsonContent.Create(_bodies[route], _bodies[route].GetType());
             // An explicit empty Authorization value prevents DefaultRequestHeaders inheritance.
-            request.Headers.TryAddWithoutValidation("Authorization", bearer ? $"Bearer {_bearer}" : string.Empty);
-            if (useDefaultSetup && IsSetup(route)) setup = Setup.Secret;
-            if (setup is not null) request.Headers.Add("X-Setup-Secret", setup);
-            if (key is not null) request.Headers.Add("Idempotency-Key", key);
-            if (forgedTenant) request.Headers.Add("X-Tenant-Id", Guid.CreateVersion7().ToString());
+            request.Headers.TryAddWithoutValidation(
+                "Authorization",
+                bearer
+                    ? $"Bearer {_bearer}"
+                    : string.Empty);
+            if (useDefaultSetup && IsSetup(route))
+            {
+                setup = Setup.Secret;
+            }
+
+            if (setup is not null)
+            {
+                request.Headers.Add(
+                    "X-Setup-Secret",
+                    setup);
+            }
+
+            if (key is not null)
+            {
+                request.Headers.Add(
+                    "Idempotency-Key",
+                    key);
+            }
+
+            if (forgedTenant)
+            {
+                request.Headers.Add(
+                    "X-Tenant-Id",
+                    Guid.CreateVersion7().ToString());
+            }
+
             return await Client.SendAsync(request, cancellationToken);
         }
 
@@ -437,14 +509,30 @@ public sealed class ProviderCredentialHttpBoundaryTests
             {
                 var member = new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!, UserId = _userId, User = null!,
-                    StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId =
+                        PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = _userId,
+                    User = null!,
+                    StatusId =
+                        (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 };
                 db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = member.TenantId, Tenant = null!, TenantUserId = member.Id, TenantUser = member,
-                    RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                    GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = member.TenantId,
+                    Tenant = null!,
+                    TenantUserId = member.Id,
+                    TenantUser = member,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId =
+                        (int)RoleScopeEnum.Tenant,
+                    GrantedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
             await db.SaveChangesAsync();
@@ -456,7 +544,10 @@ public sealed class ProviderCredentialHttpBoundaryTests
             return await scope.ServiceProvider.GetRequiredService<ExploreDbContext>().IdempotencyRecords.CountAsync();
         }
 
-        public async Task SeedHistoricalAsync(string key, IdempotencyRequestIdentity identity, string marker)
+        public async Task SeedHistoricalAsync(
+            string key,
+            IdempotencyRequestIdentity identity,
+            string marker)
         {
             using var scope = _host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -464,11 +555,25 @@ public sealed class ProviderCredentialHttpBoundaryTests
             await db.SaveChangesAsync();
             await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>().SaveAsync(new IdempotencyRecord
             {
-                Id = Guid.CreateVersion7(), Key = key, TenantId = PlatformDefaults.DefaultTenantId,
-                UserId = identity.UserId, RequestMethod = identity.Method, RequestTarget = identity.RequestTarget,
-                RequestContentType = identity.ContentType, RequestBodyHash = identity.BodyHash, PrincipalFingerprint = identity.PrincipalFingerprint,
-                StatusCode = StatusCodes.Status200OK, ContentType = "application/json", ResponseBody = JsonSerializer.Serialize(new { credential = marker }),
-                CreatedAt = DateTime.UtcNow.AddMinutes(-1), ExpiresAt = DateTime.UtcNow.AddHours(1)
+                Id = Guid.CreateVersion7(),
+                Key = key,
+                TenantId =
+                    PlatformDefaults.DefaultTenantId,
+                UserId = identity.UserId,
+                RequestMethod = identity.Method,
+                RequestTarget = identity.RequestTarget,
+                RequestContentType = identity.ContentType,
+                RequestBodyHash = identity.BodyHash,
+                PrincipalFingerprint =
+                    identity.PrincipalFingerprint,
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "application/json",
+                ResponseBody = JsonSerializer.Serialize(
+                    new { credential = marker }),
+                CreatedAt =
+                    DateTime.UtcNow.AddMinutes(-1),
+                ExpiresAt =
+                    DateTime.UtcNow.AddHours(1)
             });
         }
 
@@ -524,12 +629,24 @@ public sealed class ProviderCredentialHttpBoundaryTests
     {
         private AuthProviderConfigurationDto _configuration = new()
         {
-            PrimaryProviderId = (int)AuthenticationProviderKind.Keycloak, PrimaryProviderCode = "keycloak",
-            KeycloakAuthority = ExternalApiPhase0WebApplicationFactory.TestIssuer, KeycloakClientId = "boundary-bff",
+            PrimaryProviderId =
+                (int)AuthenticationProviderKind.Keycloak,
+            PrimaryProviderCode = "keycloak",
+            KeycloakAuthority =
+                ExternalApiPhase0WebApplicationFactory.TestIssuer,
+            KeycloakClientId = "boundary-bff",
             KeycloakClientSecret = Canary()
         };
-        public Task<AuthProviderConfigurationDto> ReadConfigurationAsync() => Task.FromResult(_configuration with { KeycloakClientSecret = string.Empty });
-        public Task<AuthProviderConfigurationDto> ReadConfigurationWithSecretsAsync() => Task.FromResult(_configuration with { });
+        public Task<AuthProviderConfigurationDto>
+            ReadConfigurationAsync() =>
+            Task.FromResult(
+                _configuration with
+                {
+                    KeycloakClientSecret = string.Empty
+                });
+        public Task<AuthProviderConfigurationDto>
+            ReadConfigurationWithSecretsAsync() =>
+            Task.FromResult(_configuration with { });
         public Task<bool> IsConfiguredAsync() => Task.FromResult(true);
         public Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration, IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default)
         {

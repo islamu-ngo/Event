@@ -8,7 +8,6 @@ using Cerbos.Sdk.Utility;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Settings;
 using Explore.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -85,6 +84,9 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         check.Action == AuthorizationActions.StorageObjects.Create &&
         check.Facts is StorageUploadIntentFacts;
 
+    private static bool IsLocallyDeniedCheck(AuthorizationRequest check) =>
+        check.ResourceKind == ResourceKinds.EventResource || IsUnsupportedStorageTypedCheck(check);
+
     public async Task<IReadOnlyList<AuthorizationDecision>> AuthorizeBatchWithUnavailableSignalAsync(
         IReadOnlyList<AuthorizationRequest> checks,
         CancellationToken cancellationToken = default)
@@ -112,6 +114,9 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         if (checks.Count == 0)
             return [];
 
+        if (checks.All(IsLocallyDeniedCheck))
+            return DenyAll(checks.Count);
+
         var byoClient = _clientFactory.GetOrCreate(endpointUrl);
         return await ExecuteCheckWithStorageTypedDenyAsync(
             byoClient,
@@ -128,7 +133,7 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         CancellationToken cancellationToken,
         bool throwOnUnavailable = false)
     {
-        if (!checks.Any(IsUnsupportedStorageTypedCheck))
+        if (!checks.Any(IsLocallyDeniedCheck))
             return await ExecuteCheckAsync(client, endpointLabel, checks, cancellationToken, throwOnUnavailable);
 
         var results = Enumerable.Repeat(
@@ -139,7 +144,7 @@ public class CerbosAuthorizationService : IAuthorizationProvider
 
         for (var index = 0; index < checks.Count; index++)
         {
-            if (IsUnsupportedStorageTypedCheck(checks[index]))
+            if (IsLocallyDeniedCheck(checks[index]))
                 continue;
 
             passthroughIndexes.Add(index);

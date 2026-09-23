@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Closed immutable resource decision attributes. DomainAllowed is the server-evaluated upper bound, not caller-authored data.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenantId": { "type": "string", "minLength": 1 },
+    "eventId": { "type": "string", "minLength": 1 },
+    "sessionId": { "type": ["string", "null"] },
+    "publicationStateId": { "type": "integer", "minimum": 0 },
+    "disclosureModeId": { "type": "integer", "minimum": 0 },
+    "kindId": { "type": "integer", "minimum": 0 },
+    "deliveryTypeId": { "type": "integer", "minimum": 0 },
+    "discloseMetadata": { "type": "boolean" },
+    "disclosePrivateMetadata": { "type": "boolean" },
+    "canAccess": { "type": "boolean" },
+    "managementCeiling": { "type": "boolean" },
+    "publicationCeiling": { "type": "boolean" },
+    "isCreation": { "type": "boolean" },
+    "domainAllowed": { "type": "boolean" }
+  },
+  "required": ["tenantId", "eventId", "sessionId", "publicationStateId", "disclosureModeId", "kindId", "deliveryTypeId", "discloseMetadata", "disclosePrivateMetadata", "canAccess", "managementCeiling", "publicationCeiling", "isCreation", "domainAllowed"]
+}

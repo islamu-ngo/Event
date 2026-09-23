@@ -100,6 +100,23 @@ public static class AuthorizationActions
         public const string ManageAttendees = "manage-attendees";
     }
 
+    public static class EventResources
+    {
+        public const string View = AuthorizationActions.View;
+        public const string ViewManagement = Events.ViewManagement;
+        public const string Create = AuthorizationActions.Create;
+        public const string Update = AuthorizationActions.Update;
+        public const string Publish = Events.Publish;
+        public const string Unpublish = "unpublish";
+        public const string Archive = "archive";
+        public const string Delete = AuthorizationActions.Delete;
+        public const string Access = "access";
+        public const string Download = "download";
+        public const string ViewAudit = "view-audit";
+        public const string Export = "export";
+        public const string Moderate = "moderate";
+    }
+
     public static class RegistrationForms
     {
         public const string View = AuthorizationActions.View;

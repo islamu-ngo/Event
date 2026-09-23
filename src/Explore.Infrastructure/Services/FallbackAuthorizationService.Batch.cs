@@ -16,6 +16,21 @@ public partial class FallbackAuthorizationService
         if (checks.Count == 0)
             return [];
 
+        if (checks.Any(check => RequiresDedicatedResourceAuthority(check.ResourceKind)))
+        {
+            var boundedResults = checks.Select(_ => AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local)).ToArray();
+            var genericIndexes = Enumerable.Range(0, checks.Count)
+                .Where(index => !RequiresDedicatedResourceAuthority(checks[index].ResourceKind)).ToArray();
+            if (genericIndexes.Length == 0)
+                return boundedResults;
+
+            var genericResults = await AuthorizeBatchAsync(
+                genericIndexes.Select(index => checks[index]).ToArray(), cancellationToken);
+            for (var index = 0; index < genericIndexes.Length; index++)
+                boundedResults[genericIndexes[index]] = genericResults[index];
+            return boundedResults;
+        }
+
         if (checks.Count <= 2 || _machinePrincipalAccessor.IsMachineCaller)
         {
             var smallResults = new AuthorizationDecision[checks.Count];
@@ -650,6 +665,7 @@ public partial class FallbackAuthorizationService
             profile.TenantId,
             profile.UserId.Value,
             eventIds,
+            DateTime.UtcNow,
             cancellationToken);
     }
 

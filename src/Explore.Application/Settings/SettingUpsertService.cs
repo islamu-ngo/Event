@@ -221,6 +221,7 @@ public class SettingUpsertService
 
     private static void EnsureUnguarded(string settingKey)
     {
+        EventResourceProviderBindingDocument.RejectGenericMutation(settingKey);
         if (PublicationPolicySettingKeys.All.Contains(settingKey, StringComparer.Ordinal))
             throw new InvalidOperationException($"Guarded publication policy setting '{settingKey}' requires coordinated mutation.");
         if (InstanceOperatorIdentitySettingKeys.Contains(settingKey))

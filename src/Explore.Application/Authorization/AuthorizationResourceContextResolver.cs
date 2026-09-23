@@ -41,6 +41,18 @@ public sealed class AuthorizationResourceContextResolver(
         CancellationToken cancellationToken)
         where TRequest : notnull
     {
+        if (resourceKind == ResourceKinds.EventResource)
+        {
+            if (tenantContext is null || tenantContext.TenantId == Guid.Empty
+                || !Guid.TryParse(resourceId, out Guid targetId) || targetId == Guid.Empty
+                || declaredFacts is not null && (declaredFacts is not EventResourceTargetAuthorizationFacts target
+                    || target.TenantId != tenantContext.TenantId || target.ResourceId != targetId))
+                throw new AuthorizationException(resourceKind, action);
+            // Keep database resolution inside the resource authority A/B protocol, not the decorator.
+            return new AuthorizationContext(targetId.ToString("D"),
+                new EventResourceTargetAuthorizationFacts(tenantContext.TenantId, targetId));
+        }
+
         if (resourceKind == ResourceKinds.Webhook && request is IWebhookPersistedOwnerRequest persistedOwnerRequest)
         {
             var ownership = await ResolvePersistedWebhookOwnershipAsync(persistedOwnerRequest, cancellationToken);

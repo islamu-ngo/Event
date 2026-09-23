@@ -224,7 +224,7 @@ public class CerbosPrincipalBuilder
             return;
 
         var snapshot = await _eventAuthoritySnapshotService.GetForUserAndEventsAsync(
-            tenantId, userId, eventIds, ct);
+            tenantId, userId, eventIds, DateTime.UtcNow, ct);
 
         if (snapshot.Events.Count == 0)
             return;

@@ -1,0 +1,26 @@
+using Explore.Application.Authorization;
+
+namespace Explore.Application.Contracts.Services;
+
+/// <summary>
+/// Reads fresh, no-tracking, server-derived facts in the caller's serializable transaction.
+/// All time-aware authority resolvers receive evaluationUtc; implementations never sample their own clock.
+/// Missing, deleted, cross-tenant, or incomplete authority returns null.
+/// </summary>
+public interface IEventResourceAuthoritySnapshotReader
+{
+    Task<EventResourceAuthorizationFacts?> ReadAsync(
+        EventResourceAuthorityRequest request, DateTimeOffset evaluationUtc, CancellationToken cancellationToken);
+
+    /// <summary>Reads one subject's bounded targets by fact category, preserving input positions, including missing facts.</summary>
+    Task<IReadOnlyList<EventResourceAuthorizationFacts?>> ReadBatchAsync(
+        IReadOnlyList<EventResourceAuthorityRequest> requests, DateTimeOffset evaluationUtc, CancellationToken cancellationToken);
+}
+
+public sealed record EventResourceAuthorityRequest(
+    Guid TenantId, Guid ResourceId, Guid? SubjectUserId, bool IsMachineCaller,
+    string Action, DateTimeOffset? DeadlineUtc = null)
+{
+    public const int MaximumBatchResources = 500;
+    public const int MaximumBatchChecks = MaximumBatchResources * 13;
+}

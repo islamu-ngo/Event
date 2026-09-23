@@ -6,6 +6,7 @@ using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
@@ -836,7 +837,9 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             secretResolver,
             new CerbosAdminEndpointValidator(options),
             new StaticHttpClientFactory(new HttpClient(handler)),
-            Substitute.For<ILogger<CerbosPolicyPackageService>>());
+            Substitute.For<ILogger<CerbosPolicyPackageService>>(),
+            Substitute.For<IEventResourcePolicyPublicationFence>(),
+            Options.Create(new CerbosSettings { GrpcEndpoint = "https://instance-cerbos.example:3593" }));
     }
 
     private static void ConfigureResolvedSecret(ISecretResolver resolver, string key, string value) =>

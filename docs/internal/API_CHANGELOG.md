@@ -3,6 +3,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-23
+
+- **Resource-policy deployment activation.** Current instance administrators can
+  read and bind deployment aliases at
+  `GET/PUT /api/event-resource-provider-activation/bindings`, begin a closed
+  operation at `POST /api/event-resource-provider-activation/begin`, and attest
+  convergence at `POST /api/event-resource-provider-activation/activate`.
+  Activation requires matching operation/epoch, scope/version, complete replica
+  evidence and explicit `frozenParentPolicyContractConfirmed`. Invalid binding
+  shapes return 400 ProblemDetails; stale revisions or rejected activation
+  return 409. Responses are private/no-store and writes never replay generic
+  idempotency responses. Activation does not publish resource metadata or content.
+
 ## 2026-09-21
 
 - **Internal public-address establishment.** Setup has no URL field, confirmation

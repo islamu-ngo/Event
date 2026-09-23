@@ -1,12 +1,24 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Architecture.Tests;
 
 public sealed class ApiCompiledBoundaryTests
 {
+    [Test]
+    [Arguments(nameof(Explore.API.Controllers.EventResourceProviderActivationController.Bind))]
+    [Arguments(nameof(Explore.API.Controllers.EventResourceProviderActivationController.Begin))]
+    [Arguments(nameof(Explore.API.Controllers.EventResourceProviderActivationController.Activate))]
+    public async Task ActivationMutationsUseTheNativeWriteRatePolicy(string action)
+    {
+        var endpoint = typeof(Explore.API.Controllers.EventResourceProviderActivationController).GetMethod(action)!;
+        await Assert.That(endpoint.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName)
+            .IsEqualTo(Explore.API.Extensions.RateLimitingExtensions.WritePolicy);
+    }
+
     [Test]
     public async Task ControllersMustNotResolveServicesFromTheRequestContainer()
     {

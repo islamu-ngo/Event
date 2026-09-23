@@ -18,6 +18,7 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
         Guid tenantId,
         Guid userId,
         IReadOnlyCollection<Guid> eventIds,
+        DateTime evaluationTimeUtc,
         CancellationToken cancellationToken)
     {
         if (eventIds.Count == 0)
@@ -29,7 +30,6 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
         }
 
         var distinctEventIds = eventIds.Distinct().ToArray();
-        var utcNow = DateTime.UtcNow;
 
         var assignments = await _dbContext.EventRoleAssignments
             .AsNoTracking()
@@ -38,8 +38,8 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
                 a.UserId == userId &&
                 distinctEventIds.Contains(a.EventId) &&
                 a.Status == EventRoleAssignmentStatus.Active &&
-                a.StartsAtUtc <= utcNow &&
-                (a.ExpiresAtUtc == null || a.ExpiresAtUtc > utcNow))
+                a.StartsAtUtc <= evaluationTimeUtc &&
+                (a.ExpiresAtUtc == null || a.ExpiresAtUtc > evaluationTimeUtc))
             .Select(a => new AssignmentAuthorityRow(a.EventId, a.Role.MasterCode, a.RoleId))
             .ToListAsync(cancellationToken);
 

@@ -82,6 +82,9 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
         if (string.IsNullOrWhiteSpace(request.ResourceId))
             return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local, AuthorizationDecisionReasonCodes.InvalidRequest);
 
+        if (RequiresDedicatedResourceAuthority(request.ResourceKind))
+            return AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local);
+
         var resourceAttributes = TrustedAttributes(request);
         resourceAttributes = await AddTenantSettingLockAttributeAsync(request, resourceAttributes, cancellationToken);
 
@@ -104,6 +107,14 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
     /// </summary>
     private static Dictionary<string, object>? TrustedAttributes(AuthorizationRequest request) =>
         AuthorizationFactAttributeProjection.ToAttributes(request.Facts);
+
+    // This kind belongs exclusively to the fresh A/provider/B authority path, including Local mode.
+    // Generic admin, machine scopes, safe mode, and caller-supplied facts cannot substitute for it.
+    private static bool RequiresDedicatedResourceAuthority(string resourceKind) => resourceKind switch
+    {
+        "islamuevent_event_resource" => true,
+        _ => false
+    };
 
     private async Task<Dictionary<string, object>?> AddTenantSettingLockAttributeAsync(
         AuthorizationRequest request,

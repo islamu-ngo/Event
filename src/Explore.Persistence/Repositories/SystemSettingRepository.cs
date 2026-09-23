@@ -34,6 +34,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
@@ -80,6 +81,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
@@ -186,7 +188,8 @@ public class SystemSettingRepository : ISystemSettingRepository
 
     private void DetachTrackedSmtpSetting(string key)
     {
-        if (!RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
+        if (key != EventResourceProviderBindingDocument.SettingKey
+            && !RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
             return;
 
         // The policy lock protects the next read, but EF's identity map can still contain

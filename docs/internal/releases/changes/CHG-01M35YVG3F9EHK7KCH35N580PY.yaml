@@ -1,0 +1,33 @@
+# Public authorization change and its generated commit identity.
+Change-Id: CHG-01M35YVG3F9EHK7KCH35N580PY
+Title: "enforce live event resource entitlements"
+Type: feat
+Scope: access
+Summary: "Authorize each resource action from exact persisted event permissions and current subject and parent facts, with equivalent Cerbos and local decisions and a final revocation snapshot."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: The additive resource authority and provider-administration protocol replace no published resource API.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: Frozen subject and parent facts, selected provider narrowing, separate final snapshots and fresh mutation clocks prevent generic administrator, machine, stale-grant and cached-response bypasses.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Apply the generated AddEventResourceProviderActivation migration in the PostgreSQL, SQLite, SQL Server or shared MySQL/MariaDB history before remote resource authority is configured.
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: The native instance-owned cerbos.resource_deployment_bindings document is managed only through coordinated administrator operations, not generic settings or portable manifests.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Four provider-administration operations, immutable bindings, explicit convergence evidence and private ProblemDetails contracts are reflected in generated OpenAPI and clients.
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Register all deployment aliases, fence every writer and confirm full replica and frozen parent-policy compatibility before activation; uncertainty remains closed and recovery requires a new operation.

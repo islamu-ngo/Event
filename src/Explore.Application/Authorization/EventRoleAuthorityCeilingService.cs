@@ -153,7 +153,7 @@ public sealed class EventRoleAuthorityCeilingService : IEventRoleAuthorityCeilin
         CancellationToken cancellationToken)
     {
         var snapshot = await _authoritySnapshotService.GetForUserAndEventsAsync(
-            tenantId, assignerUserId, new[] { eventId }, cancellationToken);
+            tenantId, assignerUserId, new[] { eventId }, DateTime.UtcNow, cancellationToken);
 
         if (!snapshot.Events.TryGetValue(eventId, out var authority) ||
             !authority.PermissionCodes.Contains(PermissionCodes.EventManageTeam))

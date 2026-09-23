@@ -43,7 +43,7 @@ public abstract class EventRoleAssignmentCommandHandlerBase
         CancellationToken cancellationToken)
     {
         var snapshot = await snapshotService.GetForUserAndEventsAsync(
-            tenantId, actorUserId, new[] { eventId }, cancellationToken);
+            tenantId, actorUserId, new[] { eventId }, DateTime.UtcNow, cancellationToken);
 
         return snapshot.Events.TryGetValue(eventId, out var authority) &&
                authority.PermissionCodes.Contains(PermissionCodes.EventTransferOwnership);

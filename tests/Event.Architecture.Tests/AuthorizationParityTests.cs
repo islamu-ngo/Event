@@ -382,7 +382,10 @@ public partial class AuthorizationParityTests
                 continue;
 
             var fileName = Path.GetFileName(file);
-            if (!content.Contains($"cerbos:///{NamespacedPrincipalSchemaFileName}", StringComparison.Ordinal))
+            var expectedSchema = fileName == "islamuevent_event_resource.yaml"
+                ? "islamuevent_event_resource_principal.json"
+                : NamespacedPrincipalSchemaFileName;
+            if (!content.Contains($"cerbos:///{expectedSchema}", StringComparison.Ordinal))
                 violations.Add($"{fileName}: missing namespaced principal schema reference");
 
             if (content.Contains("cerbos:///principal.json", StringComparison.Ordinal))
@@ -391,7 +394,7 @@ public partial class AuthorizationParityTests
 
         await Assert.That(violations)
             .IsEmpty()
-            .Because("Every resource policy must use the namespaced shared principal schema after the hard cut.");
+            .Because("Every resource policy must use its exact namespaced principal contract; resource snapshots require the closed enrichment-free schema.");
     }
 
     [Test]

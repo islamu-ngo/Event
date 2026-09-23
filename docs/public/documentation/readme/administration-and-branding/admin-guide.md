@@ -106,6 +106,49 @@ a newly created account may be on a later page rather than page one.
 If refreshing account details fails, further resets remain unavailable until a
 refresh succeeds; the current password handover stays visible.
 
+### Resource-policy deployment activation (operator API)
+
+Remote event-resource policies use a deployment-level activation fence. This
+operator API is separate from resource authoring or publication; activating a
+provider does not enable a resource or bypass instance governance.
+
+Use `/api/event-resource-provider-activation` with current instance administrator
+authority. Responses are private and non-cacheable.
+`Idempotency-Key` does not replay an earlier activation receipt: each retry
+rechecks current administrator authority and deployment state.
+
+1. Read `GET /bindings` for the current binding revision. Register or update a
+   deployment through `PUT /bindings`, supplying its UUIDv7 deployment ID,
+   normalized gRPC endpoint aliases, explicit scope, policy version and the
+   expected binding revision. Empty scope selects Cerbos root policy. Keep every
+   alias for the same physical policy deployment under the same ID; aliases
+   cannot later be removed or transferred to another deployment.
+2. Before an external policy writer changes a bound deployment, call
+   `POST /begin` with its deployment ID. Resource authority closes immediately.
+   Known application-managed publishers fence their own writes, but every
+   external writer must participate too.
+3. Stop previous writers and verify the declared scope/version across all
+   reachable replicas. Call `POST /activate` with the operation ID and epoch from
+   the current operation receipt, the scope/version, confirmation that previous
+   writers have stopped, the positive reachable-replica count, and the number
+   running the declared policy. Both counts must agree. Set
+   `frozenParentPolicyContractConfirmed` to `true` only after verifying the
+   parent event moderation policies and their derived-role dependencies against
+   the frozen principal contract. Custom rules that use the legacy raw `nowUtc`
+   attribute must be migrated to derived-time predicates before activation.
+   Omitting or declining this confirmation keeps the operation closed.
+4. If publication is uncertain, cancelled, incomplete or failed, keep access
+   closed. Start a new operation, repair the deployment, verify convergence and
+   activate that new operation. An older receipt cannot activate a newer
+   operation. After a binding conflict, reload the binding revision before
+   making another change.
+
+The application cannot discover undeclared aliases or unannounced remote edits.
+Replica counts and convergence are operator attestations, not measurements
+inferred from an upload response. Do not treat the local epoch as a remote policy
+revision. Manage these bindings only through this protocol, not generic settings
+editing or configuration-manifest import.
+
 ### Background Scheduler
 
 When enabled, **Background Scheduler** in Instance Settings shows the current

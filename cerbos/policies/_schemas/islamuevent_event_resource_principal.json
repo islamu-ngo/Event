@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Closed server-derived resource subject projection. No ambient administrator or membership enrichment is accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tenantId": { "type": "string", "minLength": 1 },
+    "isTenantMember": { "type": "boolean" },
+    "controlsOrganizer": { "type": "boolean" },
+    "hasEventUpdate": { "type": "boolean" },
+    "hasEventPublish": { "type": "boolean" },
+    "canModerate": { "type": "boolean" }
+  },
+  "required": ["tenantId", "isTenantMember", "controlsOrganizer", "hasEventUpdate", "hasEventPublish", "canModerate"]
+}

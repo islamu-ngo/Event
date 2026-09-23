@@ -6,6 +6,7 @@ public interface IEventAuthoritySnapshotService
         Guid tenantId,
         Guid userId,
         IReadOnlyCollection<Guid> eventIds,
+        DateTime evaluationTimeUtc,
         CancellationToken cancellationToken);
 }
 

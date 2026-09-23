@@ -142,7 +142,7 @@ public sealed class RegistrationOrderFallbackAuthorizationTests
         FallbackAuthorizationService service = CreateService();
         Guid managerUserId = Guid.CreateVersion7();
         _adminContext.UserId.Returns(managerUserId);
-        _eventAuthority.GetForUserAndEventsAsync(_tenantId, managerUserId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+        _eventAuthority.GetForUserAndEventsAsync(_tenantId, managerUserId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(new EventAuthoritySnapshot(
                 _tenantId,
                 managerUserId,

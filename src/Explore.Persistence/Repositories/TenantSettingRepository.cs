@@ -63,6 +63,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         CancellationToken cancellationToken = default,
         Guid? actorId = null)
     {
+        EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
@@ -148,6 +149,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         string key,
         CancellationToken cancellationToken = default)
     {
+        EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
@@ -172,6 +174,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
@@ -203,6 +206,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         InstanceOperatorIdentitySettingKeys.RejectGenericMutation(key);
@@ -244,6 +248,8 @@ public class TenantSettingRepository : ITenantSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(overrides);
+        foreach (var setting in overrides)
+            EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         foreach (var setting in overrides)
         {
             VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
@@ -317,6 +323,9 @@ public class TenantSettingRepository : ITenantSettingRepository
             EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
             InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
         }
+        foreach (var setting in overrides)
+            EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
+
         if (occurredAtUtc.Kind != DateTimeKind.Utc)
         {
             throw new ArgumentException("Setting creation timestamp must use UTC kind.", nameof(occurredAtUtc));

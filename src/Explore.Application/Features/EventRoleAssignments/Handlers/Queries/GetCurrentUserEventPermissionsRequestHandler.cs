@@ -22,6 +22,7 @@ public sealed class GetCurrentUserEventPermissionsRequestHandler
             query.TenantId,
             query.UserId,
             new[] { query.EventId },
+            DateTime.UtcNow,
             cancellationToken);
 
         if (!snapshot.Events.TryGetValue(query.EventId, out var authority))

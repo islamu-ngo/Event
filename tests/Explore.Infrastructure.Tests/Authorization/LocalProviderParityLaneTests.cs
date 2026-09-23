@@ -368,6 +368,7 @@ public sealed class LocalProviderParityLaneTests
             Guid tenantId,
             Guid userId,
             IReadOnlyCollection<Guid> eventIds,
+            DateTime evaluationTimeUtc,
             CancellationToken cancellationToken)
         {
             var events = new Dictionary<Guid, EventAuthorityForUser>();

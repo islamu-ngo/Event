@@ -1,7 +1,7 @@
 ---
 title: Event resource persistence
 status: implemented-foundation
-last_updated: 2026-09-22
+last_updated: 2026-09-23
 ---
 
 # Event Resource Persistence
@@ -53,6 +53,22 @@ The aggregate exposes `AudienceRules` as a read-only snapshot backed by a privat
 `EventResourceAuditEntry` stores only closed action/outcome/reason values, responsible manager identity when retained, and a timestamp. It does not store raw metadata, destinations, or value snapshots. Tenant/resource and tenant/time indexes support bounded history and retention.
 
 ## Provider histories
+
+`AddEventResourceProviderActivation` adds a global deployment fence with a UUIDv7
+deployment identity, operation ownership, monotonic local epoch and optimistic
+concurrency stamp. Its table is intentionally not tenant-owned: aliases used by
+different tenants can identify the same remote policy deployment. The generated
+histories live in the same four application migration assemblies; MariaDB uses
+the MySQL assembly. Apply this migration before configuring remote resource
+authority. It introduces no storage bytes or tenant resource governance defaults.
+
+The native binding document and activation state commit together under the
+existing setting lock/unit of work. Snapshot reads are no-tracking and operator
+recovery starts a new operation; a failed or stale operation cannot reopen the
+fence. See [Authorization](AUTHORIZATION.md#resource-policy-deployment-activation)
+for the complete publication and convergence protocol. Reversing the additive
+activation migration discards its coordination state, so withdraw resource
+authority first and prefer forward repair.
 
 `AddEventResources` is generated independently for PostgreSQL, SQLite, SQL Server, and the shared MySQL/MariaDB migration assembly. Generated migrations and snapshots are never hand-edited. SQL Server's generated unique nullable attachment index includes its provider-specific non-null filter; the other engines use their native multiple-NULL uniqueness semantics.
 

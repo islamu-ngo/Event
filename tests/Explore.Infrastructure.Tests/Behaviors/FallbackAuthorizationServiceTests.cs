@@ -2439,6 +2439,7 @@ public class FallbackAuthorizationServiceTests
             TestTenantId,
             userId,
             Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 1 && ids.Contains(eventId)),
+            Arg.Any<DateTime>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -3444,6 +3445,7 @@ public class FallbackAuthorizationServiceTests
                 TestTenantId,
                 userId,
                 Arg.Any<IReadOnlyCollection<Guid>>(),
+                Arg.Any<DateTime>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {

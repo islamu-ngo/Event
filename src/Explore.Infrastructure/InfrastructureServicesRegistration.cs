@@ -22,6 +22,7 @@ using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.ConfigurationManifest.Managed;
 using Explore.Application.Management;
 using Explore.Application.Models;
+using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Application.Services.Webhooks;
 using Explore.Application.Utilities;
@@ -623,6 +624,14 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<CerbosAuthorizationService>();
         services.AddScoped<FallbackAuthorizationService>();
         services.AddScoped<ICerbosConfigResolver, CerbosConfigResolver>();
+        services.AddScoped<EventResourceProviderControlPlane>();
+        services.AddScoped<IEventResourcePolicyPublicationFence>(sp =>
+            sp.GetRequiredService<EventResourceProviderControlPlane>());
+        services.AddScoped<IEventResourceProviderSnapshotReader, EventResourceProviderSnapshotReader>();
+        services.AddScoped<IEventResourceAuthorizationProvider, EventResourceAuthorizationProvider>();
+        services.AddScoped<IEventResourceAuthoritySnapshotReader, EventResourceAuthoritySnapshotReader>();
+        services.AddScoped<EventResourceAuthorityOrchestrator>();
+        services.AddScoped<IEventResourceCapabilityAuthorizer, EventResourceCapabilityAuthorizer>();
         services.AddScoped<RuntimeAuthorizationProvider>();
         services.AddScoped<IAuthorizationProvider>(sp => sp.GetRequiredService<RuntimeAuthorizationProvider>());
         services.AddScoped<IAuthorizationProviderModeCacheInvalidator>(sp => sp.GetRequiredService<RuntimeAuthorizationProvider>());

@@ -445,6 +445,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
     {
         private SqliteConnection? _connection;
         private Func<ExploreDbContext> _contextFactory = null!;
+        private DbContextOptions<ExploreDbContext>? _options;
 
         public TestDatabase() { }
 
@@ -458,7 +459,13 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
 
         public async Task InitializeAsync()
         {
-            var connection = new SqliteConnection("Data Source=:memory:");
+            var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = $"event-resources-{Guid.CreateVersion7():N}",
+                Mode = SqliteOpenMode.Memory,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false
+            }.ToString());
             _connection = connection;
             await connection.OpenAsync();
             DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
@@ -470,6 +477,7 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             await LookupTableSeeder.SeedAsync(context);
             // Share immutable schema only; keep provider caching disabled and every context's state separate.
             options = TestDbContextOptions.Create(options).UseModel(context.Model).Options;
+            _options = options;
             _contextFactory = () =>
             {
                 var created = new ExploreDbContext(options);
@@ -482,6 +490,27 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             new(null, contextFactory);
 
         public ExploreDbContext CreateContext() => _contextFactory();
+
+        public ExploreDbContext CreateIndependentContext()
+        {
+            if (_options is null || _connection is null)
+                throw new InvalidOperationException("Independent connections require the initialized SQLite fixture.");
+            var options = TestDbContextOptions.Create(_options)
+                .UseSqlite(_connection.ConnectionString).Options;
+            var context = new ExploreDbContext(options);
+            context.EnableTenantFilterBypass("Event resource separate-connection revocation test.");
+            return context;
+        }
+
+        public ExploreDbContext CreateContext(params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors)
+        {
+            if (_options is null) throw new InvalidOperationException("Interceptors require the initialized SQLite fixture.");
+            DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create(_options)
+                .AddInterceptors(interceptors).Options;
+            var context = new ExploreDbContext(options);
+            context.EnableTenantFilterBypass("Event resource relational invariant test.");
+            return context;
+        }
 
         internal async Task<ResourceScope> SeedScopeAsync()
         {

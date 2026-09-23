@@ -14,6 +14,66 @@ using ISLAMU.ConfigurationManifest.SchemaGenerator;
 public sealed class ConfigurationManifestSchemaGenerationTests
 {
     [Test]
+    public async Task GeneratedResourceArrays_AreTypedClosedItemSetsInBothArtifacts()
+    {
+        var expectedItems = new Dictionary<string, string[]?>
+        {
+            [EventResourceSettingDefinitions.EnabledDeliveryTypes.Key] = ["ExternalLink", "StoredFile"],
+            [EventResourceSettingDefinitions.EnabledAudiences.Key] =
+            [
+                "AnyEventSessionSpeaker", "AuthenticatedTenantMember", "CheckedInParticipant",
+                "EventStaff", "Organizer", "Public", "SessionRegistrant", "SessionSpeaker", "TicketHolder"
+            ],
+            [EventResourceSettingDefinitions.PermittedFileTypes.Key] =
+            [
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ],
+            [EventResourceSettingDefinitions.ExternalOrigins.Key] = null
+        };
+        using JsonDocument manifest = JsonDocument.Parse(
+            ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest());
+        using JsonDocument package = JsonDocument.Parse(
+            ConfigurationManifestJsonSchemaGenerator.GenerateTenantConfigurationPackage());
+        foreach (JsonElement settings in new[]
+        {
+            manifest.RootElement.GetProperty("$defs").GetProperty("instanceSettings"),
+            manifest.RootElement.GetProperty("$defs").GetProperty("tenantSettings"),
+            package.RootElement.GetProperty("$defs").GetProperty("tenantSettings")
+        })
+        {
+            await Assert.That(settings.GetProperty("additionalProperties").GetBoolean()).IsFalse();
+            foreach (var (key, allowed) in expectedItems)
+            {
+                JsonElement array = settings.GetProperty("properties").GetProperty(key);
+                await Assert.That(array.GetProperty("type").GetString()).IsEqualTo("array");
+                await Assert.That(array.TryGetProperty("minItems", out _)).IsFalse();
+                await Assert.That(array.TryGetProperty("uniqueItems", out _)).IsFalse();
+                JsonElement items = array.GetProperty("items");
+                await Assert.That(items.GetProperty("type").GetString()).IsEqualTo("string");
+                await Assert.That(items.GetProperty("minLength").GetInt32()).IsEqualTo(1);
+                if (allowed is null)
+                    await Assert.That(items.TryGetProperty("enum", out _)).IsFalse();
+                else
+                    await Assert.That(items.GetProperty("enum").EnumerateArray()
+                        .Select(item => item.GetString()!).SequenceEqual(allowed, StringComparer.Ordinal)).IsTrue();
+            }
+        }
+    }
+
+    [Test]
+    public async Task JsonSettingWithoutDescriptor_RemainsRejectedByBothGenerators()
+    {
+        var undescribed = new ConfigurationManifestSettingCatalogEntry(
+            ConfigurationManifestScope.Tenant, EventResourceSettingDefinitions.EnabledDeliveryTypes);
+        await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest(
+            [undescribed], ConfigurationManifestCatalog.TenantDocuments.Values)).Throws<InvalidOperationException>();
+        await Assert.That(() => ConfigurationManifestJsonSchemaGenerator.GenerateTenantConfigurationPackage(
+            [undescribed], ConfigurationManifestCatalog.TenantDocuments.Values)).Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task GeneratedSchema_MatchesCheckedInArtifactByteForByte()
     {
         byte[] expected = await File.ReadAllBytesAsync(ContextSystemHelpers.RepoPath(

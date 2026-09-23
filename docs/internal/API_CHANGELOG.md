@@ -45,6 +45,8 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
   `GET/PUT /api/event-resource-provider-activation/bindings`, begin a closed
   operation at `POST /api/event-resource-provider-activation/begin`, and attest
   convergence at `POST /api/event-resource-provider-activation/activate`.
+  The admin binding GET uses endpoint authentication before the handler's fresh
+  instance-administrator check (401 anonymous, 403 signed-in non-admin).
   Activation requires matching operation/epoch, scope/version, complete replica
   evidence and explicit `frozenParentPolicyContractConfirmed`. Invalid binding
   shapes return 400 ProblemDetails; stale revisions or rejected activation

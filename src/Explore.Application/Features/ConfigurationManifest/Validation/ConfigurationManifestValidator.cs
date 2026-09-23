@@ -706,7 +706,8 @@ public static class ConfigurationManifestValidator
             SettingValueType.Integer => value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out _),
             SettingValueType.Boolean => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
             SettingValueType.Decimal => value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out _),
-            SettingValueType.Json => value.ValueKind is JsonValueKind.Object or JsonValueKind.Array,
+            SettingValueType.Json => entry.StringArray is { } descriptor
+                && IsValidStringArray(value, descriptor),
             SettingValueType.DateTime => value.ValueKind == JsonValueKind.String
                 && DateTimeOffset.TryParse(
                     value.GetString(),
@@ -740,6 +741,16 @@ public static class ConfigurationManifestValidator
                 StringComparison.Ordinal);
         return !isBrandingUrl || IsOptionalHttpsUrl(value.GetString()!);
     }
+
+    private static bool IsValidStringArray(
+        JsonElement value,
+        ConfigurationManifestStringArrayDescriptor descriptor) =>
+        value.ValueKind == JsonValueKind.Array
+        && value.EnumerateArray().All(item =>
+             item.ValueKind == JsonValueKind.String
+             && !string.IsNullOrEmpty(item.GetString())
+             && (descriptor.AllowedValues is not { } allowedValues
+                || allowedValues.Contains(item.GetString()!, StringComparer.Ordinal)));
 
     private static bool IsValidEventResourceValue(
         string key,

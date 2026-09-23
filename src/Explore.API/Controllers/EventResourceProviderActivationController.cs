@@ -4,7 +4,8 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
-using Explore.Application.Features.EventResourceProviderActivation;
+using Explore.Application.Features.EventResourceProviderActivation.Requests.Commands;
+using Explore.Application.Features.EventResourceProviderActivation.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 using Microsoft.AspNetCore.Authorization;
@@ -33,7 +34,7 @@ public sealed class EventResourceProviderActivationController(
 {
     [InstanceManagement]
     [HttpGet("bindings", Name = RouteNames.GetEventResourceProviderBindings)]
-    [AllowAnonymous]
+    [Authorize]
     [ProducesResponseType(typeof(EventResourceProviderBindingDocument), StatusCodes.Status200OK)]
     public async Task<ActionResult<EventResourceProviderBindingDocument>> GetBindings(CancellationToken cancellationToken) =>
         Ok(await read.QueryAsync(new(), cancellationToken));

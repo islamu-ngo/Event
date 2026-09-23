@@ -150,6 +150,9 @@ provider does not enable a resource or bypass instance governance.
 
 Use `/api/event-resource-provider-activation` with current instance administrator
 authority. Responses are private and non-cacheable.
+The binding read also requires an authenticated account: anonymous callers
+receive 401, while signed-in accounts without current instance-administrator
+authority receive 403.
 `Idempotency-Key` does not replay an earlier activation receipt: each retry
 rechecks current administrator authority and deployment state.
 

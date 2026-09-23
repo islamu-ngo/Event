@@ -1,12 +1,10 @@
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.EventResourceProviderActivation.Requests.Commands;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 
-namespace Explore.Application.Features.EventResourceProviderActivation;
-
-public sealed record BindEventResourceProviderCommand(EventResourceDeploymentBinding Binding, Guid ExpectedRevision)
-    : ICommand<EventResourceProviderOperation>;
+namespace Explore.Application.Features.EventResourceProviderActivation.Handlers.Commands;
 
 public sealed class BindEventResourceProviderCommandHandler(EventResourceProviderControlPlane controlPlane)
     : ICommandHandler<BindEventResourceProviderCommand, EventResourceProviderOperation>
@@ -23,9 +21,6 @@ public sealed class BindEventResourceProviderCommandHandler(EventResourceProvide
         }
     }
 }
-
-public sealed record BeginEventResourceProviderOperationCommand(Guid DeploymentId) : ICommand<EventResourceProviderOperation>;
-
 public sealed class BeginEventResourceProviderOperationCommandHandler(EventResourceProviderControlPlane controlPlane)
     : ICommandHandler<BeginEventResourceProviderOperationCommand, EventResourceProviderOperation>
 {
@@ -41,13 +36,6 @@ public sealed class BeginEventResourceProviderOperationCommandHandler(EventResou
         }
     }
 }
-
-/// <summary>The operator attests convergence; replica counts are not inferred from an Admin upload or a timeout.</summary>
-public sealed record ActivateEventResourceProviderCommand(Guid DeploymentId, Guid OperationId, long Epoch,
-    string Scope, string PolicyVersion, bool PreviousWritersStopped, int ReachableReplicaCount, int DeclaredPolicyReplicaCount,
-    bool FrozenParentPolicyContractConfirmed)
-    : ICommand<bool>;
-
 public sealed class ActivateEventResourceProviderCommandHandler(EventResourceProviderControlPlane controlPlane)
     : ICommandHandler<ActivateEventResourceProviderCommand, bool>
 {
@@ -64,13 +52,4 @@ public sealed class ActivateEventResourceProviderCommandHandler(EventResourcePro
             throw new BadRequestException(exception.Message);
         }
     }
-}
-
-public sealed record GetEventResourceProviderBindingsQuery : IQuery<EventResourceProviderBindingDocument>;
-
-public sealed class GetEventResourceProviderBindingsQueryHandler(EventResourceProviderControlPlane controlPlane)
-    : IQueryHandler<GetEventResourceProviderBindingsQuery, EventResourceProviderBindingDocument>
-{
-    public Task<EventResourceProviderBindingDocument> QueryAsync(GetEventResourceProviderBindingsQuery query, CancellationToken cancellationToken = default) =>
-        controlPlane.ReadBindingsAsync(cancellationToken);
 }

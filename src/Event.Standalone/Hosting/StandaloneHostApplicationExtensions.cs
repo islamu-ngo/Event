@@ -41,6 +41,10 @@ public static class StandaloneHostApplicationExtensions
             await next(context);
         });
         app.UseCombinedApiBridge();
+        // Explicit top-level registration prevents automatic authorization from
+        // running before the browser cookie has become a trusted API request.
+        app.UseAuthentication();
+        app.UseAuthorization();
         var dispatcher = app.Services.GetRequiredService<InProcessEventApiDispatcher>();
         app.Use(next =>
         {

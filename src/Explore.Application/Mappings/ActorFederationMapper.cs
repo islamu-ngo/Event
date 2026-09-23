@@ -106,6 +106,10 @@ public static partial class ActorFederationMapper
     // Operational detail exposes lifecycle and quarantine reason, never provider keys or audit authors.
     // Content eligibility is resolved by the consuming handler, not by the mapper.
     [MapperIgnoreSource(nameof(StorageObject.ObjectKey))]
+    [MapperIgnoreSource(nameof(StorageObject.DocumentSafetyState))]
+    [MapperIgnoreSource(nameof(StorageObject.InspectedObjectId))]
+    [MapperIgnoreSource(nameof(StorageObject.InspectedSha256Checksum))]
+    [MapperIgnoreSource(nameof(StorageObject.HasBoundDocumentInspection))]
     [MapperIgnoreSource(nameof(StorageObject.RegistrationContentRetentionUntilUtc))]
     [MapperIgnoreSource(nameof(StorageObject.QuarantinedBy))]
     [MapperIgnoreSource(nameof(StorageObject.CreatedAt))]
@@ -123,6 +127,10 @@ public static partial class ActorFederationMapper
 
     // Storage lists omit ownership graphs, checksum, quarantine detail and deletion/audit metadata.
     [MapperIgnoreSource(nameof(StorageObject.ObjectKey))]
+    [MapperIgnoreSource(nameof(StorageObject.DocumentSafetyState))]
+    [MapperIgnoreSource(nameof(StorageObject.InspectedObjectId))]
+    [MapperIgnoreSource(nameof(StorageObject.InspectedSha256Checksum))]
+    [MapperIgnoreSource(nameof(StorageObject.HasBoundDocumentInspection))]
     [MapperIgnoreSource(nameof(StorageObject.Sha256Checksum))]
     [MapperIgnoreSource(nameof(StorageObject.OwningResourceKind))]
     [MapperIgnoreSource(nameof(StorageObject.OwningResourceId))]

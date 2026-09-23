@@ -5,6 +5,7 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
@@ -244,6 +245,8 @@ public class StorageObjectController : ControllerBase
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPut("upload-sessions/{uploadSessionId:guid}/content", Name = RouteNames.UploadStorageUploadSessionContent)]
+    [PrivateNoStore]
+    [RevalidateIdempotencyReplay]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ComplexPolicy)]
     [RequestSizeLimit(536_870_912)]
@@ -287,6 +290,8 @@ public class StorageObjectController : ControllerBase
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpDelete("upload-sessions/{uploadSessionId:guid}", Name = RouteNames.CancelStorageUploadSession)]
+    [PrivateNoStore]
+    [RevalidateIdempotencyReplay]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.DefaultPolicy)]
     [EndpointSummary("Cancel a provider-neutral upload session")]

@@ -20,10 +20,22 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
             .FirstOrDefaultAsync(storageObject => storageObject.Id == id && storageObject.TenantId == tenantId,
                 cancellationToken);
 
+    public Task<StorageObject?> GetForGenericAccessAsync(Guid id, CancellationToken cancellationToken) =>
+        GenericAccessQuery().FirstOrDefaultAsync(storageObject => storageObject.Id == id, cancellationToken);
+
+    private IQueryable<StorageObject> GenericAccessQuery() =>
+        _dbContext.StorageObjects.AsNoTracking()
+            .Where(storageObject =>
+                storageObject.Purpose != StorageObjectPurposes.EventResource &&
+                storageObject.OwningResourceKind != StorageOwningResourceKinds.EventResource &&
+                !_dbContext.EventResources
+                    .IgnoreQueryFilters(new[] { QueryFilterNames.SoftDelete })
+                    .Any(resource => resource.TenantId == storageObject.TenantId &&
+                        resource.StorageObjectId == storageObject.Id));
+
     public async Task<List<StorageObject>> GetFilesWithDetails()
     {
-        return await _dbContext.StorageObjects
-            .AsNoTracking()
+        return await GenericAccessQuery()
             .Include(f => f.FileType)
             .Include(f => f.Tenant)
             .Include(f => f.Actor)
@@ -33,8 +45,7 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
 
     public async Task<StorageObject?> GetFileWithDetails(Guid id)
     {
-        return await _dbContext.StorageObjects
-            .AsNoTracking()
+        return await GenericAccessQuery()
             .Include(f => f.FileType)
             .Include(f => f.Tenant)
             .Include(f => f.Actor)
@@ -44,8 +55,7 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
 
     public async Task<(List<StorageObject> Items, int TotalCount)> GetFilesWithDetailsPaged(int pageNumber, int pageSize)
     {
-        var query = _dbContext.StorageObjects
-            .AsNoTracking()
+        var query = GenericAccessQuery()
             .Include(f => f.FileType)
             .Include(f => f.Actor)
                 .ThenInclude(a => a!.Pii)

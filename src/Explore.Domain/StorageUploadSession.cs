@@ -24,6 +24,8 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
     public required string Visibility { get; set; }
     public string? OwningResourceKind { get; set; }
     public Guid? OwningResourceId { get; set; }
+    public Guid? ExpectedResourceVersion { get; private set; }
+    public Guid? FinalizedResourceVersion { get; private set; }
     public required string Status { get; set; }
     public string? ObjectKey { get; set; }
     public string? Sha256Checksum { get; set; }
@@ -43,6 +45,33 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
     public DateTime? UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
     public Guid ConcurrencyStamp { get; set; }
+
+    public void BindEventResourceVersion(Guid expectedVersion)
+    {
+        if (ExpectedResourceVersion.HasValue || expectedVersion == Guid.Empty
+            || Status != StorageUploadSessionStates.Reserved
+            || Purpose != StorageObjectPurposes.EventResource || Visibility != StorageObjectVisibilities.PrivateOwner
+            || OwningResourceKind != StorageOwningResourceKinds.EventResource || OwningResourceId is null
+            || OwningResourceId == Guid.Empty || UserId is null || UserId == Guid.Empty)
+            throw new InvalidOperationException("Resource reservations require immutable resource, subject and version binding.");
+        ExpectedResourceVersion = expectedVersion;
+    }
+
+    public void StageEventResourceObject(Guid objectId)
+    {
+        if (!ExpectedResourceVersion.HasValue || Status != StorageUploadSessionStates.Uploading
+            || StorageObjectId.HasValue || objectId == Guid.Empty || string.IsNullOrWhiteSpace(ObjectKey))
+            throw new InvalidOperationException("Only a bound upload can stage its durable cleanup identity.");
+        StorageObjectId = objectId;
+    }
+
+    public void RecordFinalizedResourceVersion(Guid version)
+    {
+        if (!ExpectedResourceVersion.HasValue || Status != StorageUploadSessionStates.Finalized
+            || FinalizedResourceVersion.HasValue || version == Guid.Empty)
+            throw new InvalidOperationException("Only a committed resource attachment can bind its replay version.");
+        FinalizedResourceVersion = version;
+    }
 
     public void ReserveObjectKey(string objectKey)
     {

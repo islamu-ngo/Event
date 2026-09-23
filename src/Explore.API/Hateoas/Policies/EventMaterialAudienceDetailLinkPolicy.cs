@@ -15,6 +15,12 @@ public sealed class EventMaterialAudienceDetailLinkPolicy(ITenantContext tenant)
         if (tenant.TenantId == Guid.Empty || dto.Id == Guid.Empty || dto.EventId == Guid.Empty) yield break;
         yield return LinkDefinition.Self(RouteNames.GetEventResourceAudienceDetail, new { id = dto.Id });
         yield return LinkDefinition.Collection(RouteNames.ListEventResources, new { eventId = dto.EventId });
+        if (!dto.IsTeaser && dto.File is not null && dto.Availability == "available")
+            yield return LinkDefinition.Action("download", RouteNames.GetEventResourceContent,
+                    HttpMethods.Get, new { id = dto.Id }, requiresAuth: false)
+                .RequirePermission(AuthorizationActions.EventResources.Download, ResourceKinds.EventResource,
+                    dto.Id.ToString("D"), new AuthorizationScope(TenantId: tenant.TenantId.ToString("D")),
+                    new EventResourceTargetAuthorizationFacts(tenant.TenantId, dto.Id));
         yield return LinkDefinition.Action(LinkRelations.Management, RouteNames.GetEventResourceManagementDetail,
                 HttpMethods.Get, new { id = dto.Id }).Authenticated()
             .RequirePermission(AuthorizationActions.EventResources.ViewManagement, ResourceKinds.EventResource,

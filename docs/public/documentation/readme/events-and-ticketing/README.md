@@ -46,12 +46,13 @@ bypass a revoked or changed organizer role. Updates and state changes use the
 current resource `version` as `expectedVersion`; refresh the representation
 after a conflict.
 
-These are semantic drafts only: title, description, kind, disclosure choice,
-audience rules, timing intent, and a delivery-type placeholder. Do not send a
-file, external destination, download/access instruction, or other delivery
-data. Publishing is not available in this phase, even though a reserved API
-route exists. Archiving is terminal and does not publish anything; an archived
-draft can still be deleted when its HAL action is present.
+These authoring requests carry semantic drafts: title, description, kind,
+disclosure choice, audience rules, timing intent, and a delivery-type
+placeholder. Configure files through the separate upload action below rather
+than including storage references in a draft. External destinations are not
+accepted by these requests. Publishing requires a completed, policy-permitted
+file and a current `publish` action. Archiving is terminal and does not publish
+anything; an archived draft can still be deleted when its HAL action is present.
 
 The optional audit read is private and contains only the retained management
 action, outcome, reason, time, and manager attribution. Retention zero collects
@@ -67,7 +68,9 @@ Use `GET /api/event/{eventId}/resources` and follow each item's `self` link.
 Responses are private/no-store even for explicitly public materials. Eligible
 readers receive the permitted metadata; other readers may see an organizer's
 public teaser. Hidden and nonexistent resources both return 404. Audience reads
-never expose management notes or delivery references.
+never expose management notes or underlying storage references. Eligible file
+metadata contains only the display name, MIME type, byte size and safety state;
+a teaser contains none of those file details.
 
 Lists accept `pageSize` (20 by default, at most 100) and an opaque `cursor`.
 Follow the returned `next` HAL link instead of constructing a continuation.
@@ -81,6 +84,36 @@ Accessible-alternative links appear only when that alternative is independently
 visible to the reader. File download and external-link navigation remain
 separate capabilities; these metadata routes do not publish drafts or grant
 delivery.
+
+## Uploading and downloading resource files
+
+Follow the management representation's `upload-file` action to reserve a file
+for that resource and version. Supply its declared length, MIME type, display
+name and stable replay identity. Complete the returned upload session through
+the application transport. Do not construct a provider URL or attach a generic
+storage object. A successful upload is not permission to download or publish.
+If a version conflicts, refresh the resource before starting another operation.
+
+Supported declarations are PDF, DOCX and PPTX, within the effective instance,
+tenant and storage size/quota limits. HTML, SVG, arbitrary archives and
+macro-enabled Office formats are not accepted. PDF inspection checks a
+signature; Office inspection checks a conservative package subset and expansion
+limits. Neither is malware scanning. Files remain explicitly **unscanned**.
+Publication and access are denied by default until an instance administrator
+explicitly permits this subset; a tenant cannot opt in on its own.
+
+When eligible, follow the audience representation's `download` link. It serves
+a same-origin attachment and checks current access again immediately before
+response headers. An old link or uploader identity cannot bypass withdrawal,
+expiry, changed membership or tighter policy. Responses are private/no-store
+and do not support resumable ranges or cached conditional responses. Files
+remain private in the storage provider even for a public resource audience.
+
+Browser uploads use a subject/resource-bound opaque session. Their completion
+response identifies the resource only; refresh its representation to obtain
+the actions currently available. Keep the configured private storage and
+persistent local-storage root described in the
+[storage operator guide](../integrations-and-ai/storage.md).
 
 ---
 
@@ -97,6 +130,10 @@ Use `page` and `pageSize` (20 by default, at most 100) for bounded pages.
 No global count is returned. Every page requires current event and per-resource
 export authority; an old link cannot bypass revocation. This exports metadata,
 not file bytes, a ZIP archive, or an importable access grant.
+Owned files may include the same safe file descriptor. A `download.href`
+appears only when that exporting reader separately has current download
+authority, and following it requires a new decision. Export authority alone
+does not reveal a provider location or grant access to bytes.
 
 ## Related Guides & Next Steps
 

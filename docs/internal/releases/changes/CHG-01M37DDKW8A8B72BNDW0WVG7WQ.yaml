@@ -1,0 +1,33 @@
+# Resource-bound private document intake and live-authority streaming.
+Change-Id: CHG-01M37DDKW8A8B72BNDW0WVG7WQ
+Title: "bind resource files to live access authority"
+Type: feat
+Scope: storage
+Summary: "Reserve, validate and attach private resource files atomically, close generic storage-owner bypasses and authorize each application stream from a fresh consistent snapshot."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Adds resource-specific operations without removing an existing valid generic storage contract.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Binds inspection and private ownership to immutable content, closes generic uploader access, reauthorizes replay and checks fresh authority before stream headers.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Apply the generated BindEventResourceFiles forward migration for the selected application provider; MariaDB shares the MySQL catalog.
+  Configuration:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: not-applicable
+    Detail: Reuses existing resource governance and storage authorities; default unscanned publication and access remain denied and no new secret is introduced.
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: documented
+    Detail: Adds resource upload reservation, binary document streaming, safe file metadata and independently authorized application download references.
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Keep provider objects private, preserve local bytes with the database, and treat signature or package inspection as unscanned rather than a malware verdict.

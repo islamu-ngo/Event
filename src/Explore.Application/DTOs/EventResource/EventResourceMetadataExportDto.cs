@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventResource;
@@ -22,7 +23,19 @@ public sealed record EventResourceMetadataExportDto
     public Guid? AccessibleAlternativeEventResourceId { get; init; }
     public required EventResourceTimeIntentDto Availability { get; init; }
     public required ImmutableArray<EventResourceAudienceDto> AudienceRules { get; init; }
+    public EventResourceFileMetadataDto? File { get; init; }
+    public EventResourceDownloadReferenceDto? Download { get; init; }
+
+    [JsonIgnore]
+    public bool DownloadAuthorized { get; init; }
+
     public override string ToString() => nameof(EventResourceMetadataExportDto);
+}
+
+/// <summary>Application-controlled content route; never a provider or storage capability.</summary>
+public sealed record EventResourceDownloadReferenceDto(string Href)
+{
+    public override string ToString() => nameof(EventResourceDownloadReferenceDto);
 }
 
 public sealed record EventResourceMetadataExportPageDto(

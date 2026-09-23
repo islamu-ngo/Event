@@ -6,6 +6,7 @@ using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Contracts.Operations;
+using Explore.Domain;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
@@ -27,13 +28,19 @@ public class UpdateStorageObjectCommandHandler : ICommandHandler<UpdateStorageOb
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateStorageObjectCommand request, CancellationToken cancellationToken)
     {
-        var entity = await _storageObjectRepository.GetById(request.StorageObjectId);
+        var entity = await _storageObjectRepository.GetForGenericAccessAsync(request.StorageObjectId, cancellationToken);
         if (entity is null || entity.TenantId != _tenantContext.TenantId)
         {
             return BaseCommandResponse.Validation<Guid>(
                 ["Storage object not found."],
                 "Storage object update failed.");
         }
+
+        if (request.StorageObjectDto.Access?.Purpose == StorageObjectPurposes.EventResource ||
+            request.StorageObjectDto.Ownership?.OwningResourceKind == StorageOwningResourceKinds.EventResource)
+            return BaseCommandResponse.Validation<Guid>(
+                ["Resource ownership requires a resource-bound upload."],
+                "Storage object update failed.");
 
         if (await _storageObjectRepository.IsRetainedEvidenceAsync(entity.Id, cancellationToken))
         {

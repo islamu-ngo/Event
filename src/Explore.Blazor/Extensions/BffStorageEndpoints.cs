@@ -12,6 +12,8 @@ public static class BffStorageEndpoints
     private const string LegacyImagePurpose = "legacy_image";
     private const string PublicImageVisibility = "public_image";
     private const string PdfContentType = "application/pdf";
+    private const string WordContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private const string PresentationContentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
     private static readonly HashSet<string> RawDestinationFieldNames =
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -67,6 +69,13 @@ public static class BffStorageEndpoints
         app.MapPost(
                 "/bff/organizations/{organizationId:guid}/legitimacy-evidence/upload-session",
                 HandleOrganizationEvidenceUploadSessionAsync)
+            .RequireAuthorization()
+            .ValidateAntiforgery()
+            .ExcludeFromDescription();
+
+        app.MapPost(
+                "/bff/event-resources/{resourceId:guid}/upload-session",
+                HandleEventResourceUploadSessionAsync)
             .RequireAuthorization()
             .ValidateAntiforgery()
             .ExcludeFromDescription();
@@ -202,9 +211,90 @@ public static class BffStorageEndpoints
             issueResult.ExpiresInMinutes));
     }
 
+    private static async Task<IResult> HandleEventResourceUploadSessionAsync(
+        Guid resourceId,
+        EventResourceUploadSessionRequest? request,
+        HttpContext ctx,
+        IEventResourcesClient apiClient,
+        IStorageUploadSessionStore sessionStore,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var logger = loggerFactory.CreateLogger("EventResourceUploadSession");
+        if (request is null || request.ExpectedVersion == Guid.Empty)
+        {
+            return InvalidStorageUploadRequest("A current resource version is required.");
+        }
+
+        if (request.ExpectedSizeBytes <= 0)
+            return InvalidStorageUploadRequest("Expected file size must be greater than zero.");
+        string? fileName = request.FileName?.Trim();
+        if (!TryValidateResourceDeclaration(fileName, request.ContentType, out var contentType, out var problem))
+            return InvalidStorageUploadRequest(problem);
+
+        string idempotencyKey = $"bff:{Guid.CreateVersion7():N}";
+        BaseCommandResponseOfStorageUploadSessionDto uploadResponse;
+        try
+        {
+            uploadResponse = await apiClient.CreateEventResourceUploadSessionAsync(
+                resourceId,
+                idempotencyKey,
+                new CreateEventResourceUploadSessionDto
+                {
+                    ExpectedVersion = request.ExpectedVersion,
+                    ExpectedSizeBytes = request.ExpectedSizeBytes,
+                    ContentType = contentType,
+                    SafeDisplayName = fileName!,
+                    Extension = Path.GetExtension(fileName!).TrimStart('.'),
+                    IdempotencyKey = idempotencyKey
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (ApiException ex)
+        {
+            logger.LogWarning(
+                "Event resource upload session generation failed. Status={StatusCode}",
+                ex.StatusCode);
+            return BffForwardingResults.Problem(
+                ex,
+                "Failed to create an event resource upload session.",
+                "Event resource upload session failed");
+        }
+
+        if (uploadResponse.Success != true || uploadResponse.Id is null)
+        {
+            return Results.Problem(
+                detail: "Storage service returned an invalid upload session response.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+
+        var issueResult = await sessionStore.IssueForEventResourceAsync(
+            ctx.User,
+            uploadResponse.Id,
+            contentType,
+            resourceId,
+            cancellationToken);
+        if (!issueResult.Success || string.IsNullOrWhiteSpace(issueResult.SessionId))
+        {
+            logger.LogWarning(
+                "Rejected event resource upload session response. FailureCode={FailureCode}",
+                issueResult.FailureCode);
+            return Results.Problem(
+                detail: "Storage service returned an invalid upload session.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+
+        return Results.Ok(new StorageUploadSessionResponse(
+            issueResult.SessionId,
+            string.Empty,
+            string.Empty,
+            issueResult.ExpiresInMinutes));
+    }
+
     private static async Task<IResult> HandleStorageUploadProxyAsync(
         HttpContext ctx,
         IStorageObjectClient apiClient,
+        IHttpClientFactory clientFactory,
         IStorageUploadSessionStore sessionStore,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -287,11 +377,42 @@ public static class BffStorageEndpoints
         try
         {
             await using var stream = file.OpenReadStream();
-            var uploadResponse = await apiClient.UploadStorageUploadSessionContentAsync(
-                resolution.Session.ApiUploadSessionId,
-                stream,
-                cancellationToken: cancellationToken);
-            if (uploadResponse.Success != true || uploadResponse.Id?.StorageObjectId is null)
+            BaseCommandResponseOfStorageUploadSessionDto? uploadResponse;
+            if (resolution.Session.EventResourceId is not null)
+            {
+                using var uploadRequest = new HttpRequestMessage(
+                    HttpMethod.Put,
+                    $"api/storageobject/upload-sessions/{resolution.Session.ApiUploadSessionId:D}/content")
+                {
+                    Content = new StreamContent(stream)
+                };
+                uploadRequest.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+                uploadRequest.Headers.TryAddWithoutValidation("Idempotency-Key", $"bff:{Guid.CreateVersion7():N}");
+                using var uploadHttpResponse = await clientFactory
+                    .CreateClient(nameof(IStorageObjectClient))
+                    .SendAsync(uploadRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                if (!uploadHttpResponse.IsSuccessStatusCode)
+                {
+                    logger.LogWarning(
+                        "Upload proxy API request failed. Status={StatusCode}",
+                        (int)uploadHttpResponse.StatusCode);
+                    return Results.Problem(
+                        detail: "Storage upload failed.",
+                        statusCode: (int)uploadHttpResponse.StatusCode);
+                }
+
+                uploadResponse = await uploadHttpResponse.Content
+                    .ReadFromJsonAsync<BaseCommandResponseOfStorageUploadSessionDto>(cancellationToken);
+            }
+            else
+            {
+                uploadResponse = await apiClient.UploadStorageUploadSessionContentAsync(
+                    resolution.Session.ApiUploadSessionId,
+                    stream,
+                    cancellationToken: cancellationToken);
+            }
+
+            if (uploadResponse?.Success != true || uploadResponse.Id?.StorageObjectId is null)
             {
                 logger.LogWarning(
                     "Upload proxy received invalid finalization response for a resolved API upload session.");
@@ -301,6 +422,9 @@ public static class BffStorageEndpoints
             }
 
             await sessionStore.ConsumeAsync(resolution.Session.SessionId, cancellationToken);
+            if (resolution.Session.EventResourceId is { } resourceId)
+                return Results.Ok(new EventResourceUploadProxyResponse(resourceId));
+
             var storageObjectId = uploadResponse.Id.StorageObjectId.Value;
             var contentUrl = $"/api/storageobject/{storageObjectId}/content";
             var publicUrl = string.Equals(uploadResponse.Id.Visibility, PublicImageVisibility, StringComparison.Ordinal)
@@ -327,6 +451,14 @@ public static class BffStorageEndpoints
         string FileName,
         string ContentType,
         long ExpectedSizeBytes);
+
+    private sealed record EventResourceUploadSessionRequest(
+        Guid ExpectedVersion,
+        string FileName,
+        string ContentType,
+        long ExpectedSizeBytes);
+
+    private sealed record EventResourceUploadProxyResponse(Guid ResourceId);
 
     private sealed record StorageUploadSessionResponse(
         string UploadSessionId,
@@ -421,9 +553,30 @@ public static class BffStorageEndpoints
         out string contentType,
         out string problem)
     {
-        return string.Equals(contentTypeValue?.Trim(), PdfContentType, StringComparison.OrdinalIgnoreCase)
-            ? TryValidateEvidenceDeclaration(fileName, contentTypeValue, out contentType, out problem)
+        return contentTypeValue?.Trim().ToLowerInvariant() is PdfContentType or WordContentType or PresentationContentType
+            ? TryValidateResourceDeclaration(fileName, contentTypeValue, out contentType, out problem)
             : TryValidateImageDeclaration(fileName, contentTypeValue, out contentType, out problem);
+    }
+
+    private static bool TryValidateResourceDeclaration(
+        string? fileName, string? contentTypeValue, out string contentType, out string problem)
+    {
+        contentType = contentTypeValue?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!IsSafeBrowserFileName(fileName, out problem))
+            return false;
+        string? extension = contentType switch
+        {
+            PdfContentType => ".pdf",
+            WordContentType => ".docx",
+            PresentationContentType => ".pptx",
+            _ => null
+        };
+        if (extension is null || !string.Equals(Path.GetExtension(fileName), extension, StringComparison.OrdinalIgnoreCase))
+        {
+            problem = "Resource documents require a matching PDF, DOCX, or PPTX declaration.";
+            return false;
+        }
+        return true;
     }
 
     private static bool TryValidateEvidenceDeclaration(

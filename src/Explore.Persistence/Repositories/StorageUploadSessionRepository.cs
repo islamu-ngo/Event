@@ -33,6 +33,11 @@ public class StorageUploadSessionRepository : GenericRepository<StorageUploadSes
 
     public async Task<StorageUploadSession?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
     {
+        // Provider I/O separates short transactions. Never let the identity map hide cancellation
+        // or a competing finalization committed while the provider was running.
+        var tracked = _dbContext.StorageUploadSessions.Local.FirstOrDefault(session => session.Id == id);
+        if (tracked is not null)
+            await _dbContext.Entry(tracked).ReloadAsync(cancellationToken);
         return await _dbContext.StorageUploadSessions
             .FirstOrDefaultAsync(session => session.Id == id, cancellationToken);
     }

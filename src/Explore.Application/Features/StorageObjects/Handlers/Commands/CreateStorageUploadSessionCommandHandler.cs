@@ -59,6 +59,11 @@ public class CreateStorageUploadSessionCommandHandler
             return FencedFailure();
         }
 
+        if (request.UploadSessionDto.Purpose == StorageObjectPurposes.EventResource ||
+            request.UploadSessionDto.OwningResourceKind == StorageOwningResourceKinds.EventResource)
+            return Failure("Upload session reservation failed.",
+                ["Resource files require a resource-bound upload reservation."]);
+
         var validator = new CreateStorageUploadSessionDtoValidator();
         var validationResult = await validator.ValidateAsync(request.UploadSessionDto, cancellationToken);
 

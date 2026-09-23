@@ -31,6 +31,9 @@ public sealed record EventResourceAuthorityRequest(
     /// <summary>Binds an already prepared metadata projection to the exact persisted resource version.</summary>
     public Guid? ExpectedResourceVersion { get; init; }
 
+    /// <summary>Binds descriptive file metadata to the exact privately prepared attachment.</summary>
+    public string? ExpectedAttachmentGeneration { get; init; }
+
     /// <summary>Binds prepared audience metadata to its exact disclosure, not merely an unchanged row stamp.</summary>
     public Explore.Domain.Services.EventResourceAccessDecision? ExpectedDisclosure { get; init; }
 }

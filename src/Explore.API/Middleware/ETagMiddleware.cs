@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Security.Cryptography;
+using Explore.API.Filters;
 using Microsoft.IO;
 
 namespace Explore.API.Middleware;
@@ -30,7 +31,8 @@ public sealed class ETagMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
+        if (context.GetEndpoint()?.Metadata.GetMetadata<PrivateNoStoreAttribute>() is not null
+            || !HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
             await _next(context);
             return;

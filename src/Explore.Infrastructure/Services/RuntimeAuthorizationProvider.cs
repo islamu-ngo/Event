@@ -173,6 +173,23 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
     private async Task<IReadOnlyList<AuthorizationDecision>> EvaluateSelectedBatchAsync(
         IReadOnlyList<AuthorizationRequest> effectiveChecks, CancellationToken cancellationToken)
     {
+        // Persisted resource sessions cross the generic HTTP surface, not its collection authority.
+        // Rebind only server-resolved upload facts to the same native update capability as reservation.
+        if (effectiveChecks.Any(check => check.Facts is EventResourceUploadAuthorizationFacts))
+        {
+            var bound = effectiveChecks.Select(check => check.Facts is EventResourceUploadAuthorizationFacts upload
+                && check.ResourceKind == ResourceKinds.StorageObject && check.ResourceId == upload.UploadSessionId.ToString("D")
+                && check.Action is AuthorizationActions.Create or AuthorizationActions.Delete
+                ? new AuthorizationRequest(ResourceKinds.EventResource, upload.ResourceId.ToString("D"), "update",
+                    check.Scope, new EventResourceTargetAuthorizationFacts(upload.TenantId, upload.ResourceId), check.Subject, check.Tenant)
+                : check).ToArray();
+            // Invalid typed requests fail closed instead of recursing into generic policy.
+            if (bound.Any(check => check.Facts is EventResourceUploadAuthorizationFacts))
+                return effectiveChecks.Select(_ => AuthorizationDecision.Deny(AuthorizationProviderMetadata.Runtime,
+                    AuthorizationDecisionReasonCodes.InvalidRequest)).ToArray();
+            return await EvaluateSelectedBatchAsync(bound, cancellationToken);
+        }
+
         // Resource authority owns fresh routing and frozen facts. Generic cached BYO configuration,
         // machine scopes and emergency administrator paths must never evaluate these targets.
         var resourcePositions = Enumerable.Range(0, effectiveChecks.Count)

@@ -27,11 +27,21 @@ public sealed class EventMaterialDetailLinkPolicy(ITenantContext tenantContext)
         yield return Resource(LinkDefinition.Delete(RouteNames.DeleteEventResource, new { id = dto.Id }),
             dto, AuthorizationActions.EventResources.Delete);
         if (dto.PublicationState != EventResourcePublicationStateEnum.Archived)
+        {
             yield return Resource(LinkDefinition.Edit(RouteNames.UpdateEventResource, new { id = dto.Id }),
                 dto, AuthorizationActions.EventResources.Update);
+            if (dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.StoredFile)
+                yield return Resource(LinkDefinition.Action("upload-file", RouteNames.CreateEventResourceUploadSession,
+                    HttpMethods.Post, new { id = dto.Id }), dto, AuthorizationActions.EventResources.Update);
+        }
         if (dto.PublicationState is EventResourcePublicationStateEnum.Draft or EventResourcePublicationStateEnum.Withdrawn)
+        {
             yield return Resource(LinkDefinition.Action(LinkRelations.Archive, RouteNames.ArchiveEventResource,
                 HttpMethods.Post, new { id = dto.Id }), dto, AuthorizationActions.EventResources.Archive);
+            if (dto.Draft.DeliveryType == EventResourceDeliveryTypeEnum.StoredFile && dto.File is not null)
+                yield return Resource(LinkDefinition.Action(LinkRelations.Publish, RouteNames.PublishEventResource,
+                    HttpMethods.Post, new { id = dto.Id }), dto, AuthorizationActions.EventResources.Publish);
+        }
         if (dto.PublicationState == EventResourcePublicationStateEnum.Published)
         {
             yield return Resource(LinkDefinition.Action(LinkRelations.Unpublish, RouteNames.UnpublishEventResource,

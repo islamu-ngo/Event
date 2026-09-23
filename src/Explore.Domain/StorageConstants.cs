@@ -35,8 +35,9 @@ public static class StorageObjectPurposes
     public const string Attachment = "attachment";
     public const string Document = "document";
     public const string SystemAsset = "system_asset";
+    public const string EventResource = "event_resource";
 
-    public static readonly string[] All = [LegacyImage, ProfileImage, EventImage, Attachment, Document, SystemAsset];
+    public static readonly string[] All = [LegacyImage, ProfileImage, EventImage, Attachment, Document, SystemAsset, EventResource];
 }
 
 public static class StorageObjectLifecycleStates
@@ -65,4 +66,12 @@ public static class StorageUploadSessionStates
 public static class StorageOwningResourceKinds
 {
     public const string OrganizationTenant = "organization_tenant";
+    public const string EventResource = "event_resource";
+}
+
+public static class StorageDocumentSafetyStates
+{
+    public const string Unavailable = "unavailable";
+    public const string Unscanned = "unscanned";
+    public const string Rejected = "rejected";
 }

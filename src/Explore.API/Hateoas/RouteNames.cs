@@ -7,6 +7,8 @@ namespace Explore.API.Hateoas;
 public static class RouteNames
 {
     public const string GetEventResourceAudienceDetail = nameof(GetEventResourceAudienceDetail);
+    public const string GetEventResourceContent = nameof(GetEventResourceContent);
+    public const string CreateEventResourceUploadSession = nameof(CreateEventResourceUploadSession);
     public const string ListEventResources = nameof(ListEventResources);
     public const string ExportEventResourceMetadata = nameof(ExportEventResourceMetadata);
     public const string GetEventResourceManagementDetail = nameof(GetEventResourceManagementDetail);

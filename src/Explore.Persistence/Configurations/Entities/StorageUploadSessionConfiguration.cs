@@ -41,7 +41,8 @@ public class StorageUploadSessionConfiguration : IEntityTypeConfiguration<Storag
 
         builder.HasOne(e => e.StorageObject)
             .WithMany()
-            .HasForeignKey(e => e.StorageObjectId)
+            .HasForeignKey(e => new { e.TenantId, e.StorageObjectId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => new { e.TenantId, e.Status, e.ExpiresAt })
@@ -68,7 +69,8 @@ public class StorageUploadSessionConfiguration : IEntityTypeConfiguration<Storag
             t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
             t.HasCheckConstraint("ck_storage_upload_sessions_route_key", "route_key IN ('images', 'documents', 'general')");
             t.HasCheckConstraint("ck_storage_upload_sessions_visibility", "visibility IN ('public_image', 'authenticated_tenant', 'private_owner')");
-            t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset')");
+            t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
+            t.HasCheckConstraint("ck_storage_upload_sessions_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND user_id IS NOT NULL AND expected_resource_version IS NOT NULL AND expected_resource_version <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");
             t.HasCheckConstraint("ck_storage_upload_sessions_status", "status IN ('reserved', 'uploading', 'finalized', 'canceled', 'failed', 'expired')");
         });
     }

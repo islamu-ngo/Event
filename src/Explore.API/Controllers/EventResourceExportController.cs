@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -37,7 +38,14 @@ public sealed class EventResourceExportController(
         Guid eventId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
         var result = await export.QueryAsync(new(eventId, page, pageSize), cancellationToken);
-        if (result.Value is { } value) return Ok(value);
+        if (result.Value is { } value)
+        {
+            var items = value.Items.Select(item => item.DownloadAuthorized
+                && Url.RouteUrl(RouteNames.GetEventResourceContent, new { id = item.Id }) is { } href
+                    ? item with { Download = new(href) }
+                    : item with { Download = null }).ToImmutableArray();
+            return Ok(value with { Items = items });
+        }
         return result.Outcome switch
         {
             EventResourceAuthorityOutcome.NotFound => this.ToNotFoundProblem(

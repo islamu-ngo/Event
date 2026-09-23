@@ -29960,6 +29960,14 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("deleted_by");
 
+                    b.Property<string>("DocumentSafetyState")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("unavailable")
+                        .HasColumnName("document_safety_state");
+
                     b.Property<string>("Extension")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -29975,6 +29983,15 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT")
                         .HasColumnName("full_name");
+
+                    b.Property<Guid?>("InspectedObjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("inspected_object_id");
+
+                    b.Property<string>("InspectedSha256Checksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("inspected_sha256_checksum");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER")
@@ -30097,11 +30114,17 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_storage_objects", null, t =>
                         {
+                            t.HasCheckConstraint("ck_storage_objects_document_safety", "document_safety_state IN ('unavailable', 'unscanned', 'rejected')");
+
+                            t.HasCheckConstraint("ck_storage_objects_inspection_binding", "document_safety_state <> 'unscanned' OR (purpose = 'event_resource' AND inspected_object_id IS NOT NULL AND inspected_object_id = id AND inspected_sha256_checksum IS NOT NULL AND sha256_checksum IS NOT NULL AND inspected_sha256_checksum = sha256_checksum)");
+
                             t.HasCheckConstraint("ck_storage_objects_lifecycle_state", "lifecycle_state IN ('pending', 'active', 'quarantined', 'delete_requested', 'deleted')");
 
                             t.HasCheckConstraint("ck_storage_objects_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
 
-                            t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset')");
+                            t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
+
+                            t.HasCheckConstraint("ck_storage_objects_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");
 
                             t.HasCheckConstraint("ck_storage_objects_size_nonnegative", "size >= 0");
 
@@ -30139,6 +30162,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("created_by");
 
+                    b.Property<Guid?>("ExpectedResourceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expected_resource_version");
+
                     b.Property<long>("ExpectedSizeBytes")
                         .HasColumnType("INTEGER")
                         .HasColumnName("expected_size_bytes");
@@ -30169,6 +30196,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<DateTime?>("FinalizedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("finalized_at");
+
+                    b.Property<Guid?>("FinalizedResourceVersion")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("finalized_resource_version");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(128)
@@ -30275,9 +30306,6 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_storage_upload_sessions");
 
-                    b.HasIndex("StorageObjectId")
-                        .HasDatabaseName("ix_storage_upload_sessions_storage_object_id");
-
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_storage_upload_sessions_user_id");
 
@@ -30289,6 +30317,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_storage_upload_sessions_tenant_id_idempotency_key")
                         .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.HasIndex("TenantId", "StorageObjectId")
+                        .HasDatabaseName("ix_storage_upload_sessions_tenant_id_storage_object_id");
 
                     b.HasIndex("TenantId", "OwningResourceKind", "OwningResourceId")
                         .HasDatabaseName("ix_storage_upload_sessions_tenant_id_owning_resource_kind_owning_resource_id")
@@ -30305,9 +30336,11 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
 
-                            t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset')");
+                            t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_reserved_bytes_nonnegative", "reserved_bytes >= 0");
+
+                            t.HasCheckConstraint("ck_storage_upload_sessions_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND user_id IS NOT NULL AND expected_resource_version IS NOT NULL AND expected_resource_version <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_route_key", "route_key IN ('images', 'documents', 'general')");
 
@@ -47123,12 +47156,6 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Explore.Domain.StorageUploadSession", b =>
                 {
-                    b.HasOne("Explore.Domain.StorageObject", "StorageObject")
-                        .WithMany()
-                        .HasForeignKey("StorageObjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_storage_upload_sessions_storage_objects_storage_object_id");
-
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -47141,6 +47168,13 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_storage_upload_sessions_users_user_id");
+
+                    b.HasOne("Explore.Domain.StorageObject", "StorageObject")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StorageObjectId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_storage_upload_sessions_storage_objects_tenant_id_storage_object_id");
 
                     b.Navigation("StorageObject");
 

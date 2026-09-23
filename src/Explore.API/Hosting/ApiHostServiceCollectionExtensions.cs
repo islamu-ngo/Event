@@ -331,6 +331,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddOperationTransformer<SetupLiveRequestBodyTransformer>();
             options.AddOperationTransformer<ConfigurationImportRequestBodyTransformer>();
             options.AddOperationTransformer<EventOpenGraphImageResponseTransformer>();
+            options.AddOperationTransformer<EventResourceContentResponseTransformer>();
             options.AddOperationTransformer<ConfigurationManifestExportResponseTransformer>();
         });
 
@@ -344,7 +345,10 @@ public static class ApiHostServiceCollectionExtensions
             (context, services, loggerConfiguration) => loggerConfiguration
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
-                .Enrich.FromLogContext(),
+                .Enrich.FromLogContext()
+                // The framework's request-start/finish messages contain raw URLs
+                // before routing. RequestLoggingMiddleware owns safe HTTP events.
+                .MinimumLevel.Override("Microsoft.AspNetCore.Hosting.Diagnostics", Serilog.Events.LogEventLevel.Warning),
             writeToProviders: true);
         builder.Services.AddApiAuthentication(
             builder.Configuration,

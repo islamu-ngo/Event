@@ -33,8 +33,14 @@ public sealed class EventResourceAudienceWorkflow(
 
     private async Task<EventResourceAudienceDetailResult> ReadDetailAsync(Guid resourceId, CancellationToken cancellationToken)
     {
-        var resource = await unitOfWork.ExecuteSerializableAsync(
-            ct => resources.GetAuthorityResourceAsync(tenant.TenantId, resourceId, ct), cancellationToken);
+        var prepared = await unitOfWork.ExecuteSerializableAsync(async ct =>
+        {
+            var row = await resources.GetAuthorityResourceAsync(tenant.TenantId, resourceId, ct);
+            var storage = row?.StorageObjectId is { } storageId
+                ? await resources.GetStorageObjectAsync(tenant.TenantId, storageId, ct) : null;
+            return (Resource: row, File: row is null ? null : EventResourceFileSafety.Describe(row, storage));
+        }, cancellationToken);
+        var resource = prepared.Resource;
         if (resource is null) return new(EventResourceAudienceFailure.NotFound);
         var rows = new List<EventResource> { resource };
         if (resource.AccessibleAlternativeEventResourceId is { } alternativeId && alternativeId != resource.Id)
@@ -44,13 +50,14 @@ public sealed class EventResourceAudienceWorkflow(
             if (alternative?.EventId == resource.EventId) rows.Add(alternative);
         }
         var checks = rows.Select(BindVersion).ToArray();
+        checks[0] = checks[0] with { ExpectedAttachmentGeneration = prepared.File?.AttachmentGeneration };
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (decisions[0].Outcome != EventResourceAuthorityOutcome.Allowed)
             return new(Failure(decisions[0].Outcome));
         var accepted = Accepted(rows, checks, decisions);
         var proofChecks = new List<EventResourceAuthorityRequest>();
-        var dto = Project(resource, accepted, proofChecks);
+        var dto = Project(resource, accepted, proofChecks, prepared.File);
         return new(EventResourceAudienceFailure.None, dto,
             new(Scope(resource.EventId), null, proofChecks));
     }
@@ -73,18 +80,29 @@ public sealed class EventResourceAudienceWorkflow(
             ? parentRequest with { ExpectedResourceVersion = parent.Version, ExpectedDisclosure = parent.Disclosure }
             : null;
 
-        var rows = await unitOfWork.ExecuteSerializableAsync(async ct =>
+        var prepared = await unitOfWork.ExecuteSerializableAsync(async ct =>
         {
             if (await resources.CountActiveAsync(scope.TenantId, eventId, ct) > 500) return null;
             var specification = new EventResourceQuerySpecification().And(EventResourceFilter.Event(eventId))
                 .And(EventResourceFilter.PublicationState((int)EventResourcePublicationStateEnum.Published));
             if (scope.SubjectUserId is null || scope.IsMachineCaller)
                 specification = specification.And(EventResourceFilter.PublicDisclosure());
-            return await resources.ListCandidatesAsync(scope.TenantId, 500, specification, ct);
+            var candidates = await resources.ListCandidatesAsync(scope.TenantId, 500, specification, ct);
+            var storageIds = candidates.Select(row => row.StorageObjectId).OfType<Guid>().Distinct().ToArray();
+            var storage = (await resources.GetStorageObjectsAsync(scope.TenantId, storageIds, ct))
+                .ToDictionary(item => item.Id);
+            return new
+            {
+                Rows = candidates,
+                Files = candidates.ToDictionary(row => row.Id, row =>
+                    EventResourceFileSafety.Describe(row, storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty)))
+            };
         }, cancellationToken);
-        if (rows is null) return new(parentBinding is null
+        if (prepared is null) return new(parentBinding is null
             ? EventResourceAudienceFailure.NotFound : EventResourceAudienceFailure.Unavailable);
-        var checks = rows.Select(BindVersion).ToArray();
+        var rows = prepared.Rows;
+        var checks = rows.Select(row => BindVersion(row) with
+            { ExpectedAttachmentGeneration = prepared.Files[row.Id]?.AttachmentGeneration }).ToArray();
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         // Never return a partial public representation when provider availability is unknown.
@@ -109,7 +127,7 @@ public sealed class EventResourceAudienceWorkflow(
         var visible = rows.Skip(start).Where(row => accepted.ContainsKey(row.Id)).Take(pageSize + 1).ToArray();
         var proofChecks = new List<EventResourceAuthorityRequest>();
         if (parentBinding is null) proofChecks.Add(accepted.Values.First());
-        var items = visible.Take(pageSize).Select(row => Project(row, accepted, proofChecks)).ToImmutableArray();
+        var items = visible.Take(pageSize).Select(row => Project(row, accepted, proofChecks, prepared.Files[row.Id])).ToImmutableArray();
         string? next = null;
         if (visible.Length > pageSize)
         {
@@ -154,7 +172,8 @@ public sealed class EventResourceAudienceWorkflow(
                 { ExpectedDisclosure = decisions[pair.index].Disclosure });
 
     private static EventResourceAudienceDetailDto Project(EventResource row,
-        IReadOnlyDictionary<Guid, EventResourceAuthorityRequest> accepted, List<EventResourceAuthorityRequest> proof)
+        IReadOnlyDictionary<Guid, EventResourceAuthorityRequest> accepted, List<EventResourceAuthorityRequest> proof,
+        EventResourceFileMetadataDto? file)
     {
         var check = accepted[row.Id];
         proof.Add(check);
@@ -173,7 +192,7 @@ public sealed class EventResourceAudienceWorkflow(
             row.AudienceRules.Any(rule => rule.AudienceKindId == (int)EventResourceAudienceKindEnum.Public)
                 ? "public" : "eligibility-required",
             privateMetadata ? row.Description : null, privateMetadata ? row.LanguageCode : null,
-            privateMetadata ? row.AccessibilityNote : null, alternative);
+            privateMetadata ? row.AccessibilityNote : null, alternative, privateMetadata ? file : null);
     }
 
     private static EventResourceAudienceFailure Failure(EventResourceAuthorityOutcome outcome) => outcome switch

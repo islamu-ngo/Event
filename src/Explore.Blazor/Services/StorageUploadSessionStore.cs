@@ -13,7 +13,8 @@ public sealed record StorageUploadSession(
     Guid ApiUploadSessionId,
     string ContentType,
     long ExpectedSizeBytes,
-    DateTimeOffset ExpiresAtUtc);
+    DateTimeOffset ExpiresAtUtc,
+    Guid? EventResourceId = null);
 
 public sealed record StorageUploadSessionIssueResult(
     bool Success,
@@ -52,6 +53,13 @@ public interface IStorageUploadSessionStore
         string contentType,
         CancellationToken cancellationToken = default);
 
+    Task<StorageUploadSessionIssueResult> IssueForEventResourceAsync(
+        ClaimsPrincipal user,
+        StorageUploadSessionDto response,
+        string contentType,
+        Guid eventResourceId,
+        CancellationToken cancellationToken = default);
+
     Task<StorageUploadSessionResolveResult> ResolveAsync(
         ClaimsPrincipal user,
         string sessionId,
@@ -66,11 +74,27 @@ public sealed class StorageUploadSessionStore(IDistributedCache cache) : IStorag
     private const string CacheKeyPrefix = "storage-upload-session:";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<StorageUploadSessionIssueResult> IssueAsync(
+    public Task<StorageUploadSessionIssueResult> IssueAsync(
         ClaimsPrincipal user,
         StorageUploadSessionDto response,
         string contentType,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        IssueAsync(user, response, contentType, null, cancellationToken);
+
+    public Task<StorageUploadSessionIssueResult> IssueForEventResourceAsync(
+        ClaimsPrincipal user,
+        StorageUploadSessionDto response,
+        string contentType,
+        Guid eventResourceId,
+        CancellationToken cancellationToken = default) =>
+        IssueAsync(user, response, contentType, eventResourceId, cancellationToken);
+
+    private async Task<StorageUploadSessionIssueResult> IssueAsync(
+        ClaimsPrincipal user,
+        StorageUploadSessionDto response,
+        string contentType,
+        Guid? eventResourceId,
+        CancellationToken cancellationToken)
     {
         var ownerUserId = GetRequiredUserId(user);
         if (string.IsNullOrWhiteSpace(ownerUserId))
@@ -112,7 +136,8 @@ public sealed class StorageUploadSessionStore(IDistributedCache cache) : IStorag
             ApiUploadSessionId: apiUploadSessionId,
             ContentType: contentType.Trim(),
             ExpectedSizeBytes: expectedSizeBytes,
-            ExpiresAtUtc: expiresAtUtc);
+            ExpiresAtUtc: expiresAtUtc,
+            EventResourceId: eventResourceId);
 
         var payload = JsonSerializer.Serialize(session, JsonOptions);
         await cache.SetStringAsync(

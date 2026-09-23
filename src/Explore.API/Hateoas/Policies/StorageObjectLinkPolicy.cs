@@ -17,6 +17,10 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
     /// <inheritdoc />
     public IEnumerable<LinkDefinition> GetLinks(StorageObjectDto dto, ClaimsPrincipal? user)
     {
+        if (dto.Purpose == StorageObjectPurposes.EventResource ||
+            dto.OwningResourceKind == StorageOwningResourceKinds.EventResource)
+            yield break;
+
         yield return new LinkDefinition(
             LinkRelations.Self,
             RouteNames.GetStorageObjectById,
@@ -106,6 +110,9 @@ public sealed class StorageObjectCollectionLinkPolicy : ICollectionLinkPolicy<St
     /// <inheritdoc />
     public IEnumerable<LinkDefinition> GetItemLinks(StorageObjectListDto dto, ClaimsPrincipal? user)
     {
+        if (dto.Purpose == StorageObjectPurposes.EventResource)
+            yield break;
+
         yield return new LinkDefinition(
             LinkRelations.Self,
             RouteNames.GetStorageObjectById,

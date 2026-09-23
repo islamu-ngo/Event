@@ -15,7 +15,11 @@ public sealed class EventResourceMetadataExportOpenApiTests
             .Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
         await Assert.That(fields.SetEquals(["id", "eventSessionId", "publicationState", "title", "publicTitle",
             "description", "sensitiveNotes", "kind", "disclosureMode", "deliveryType", "languageCode",
-            "accessibilityNote", "sortOrder", "accessibleAlternativeEventResourceId", "availability", "audienceRules"])).IsTrue();
+            "accessibilityNote", "sortOrder", "accessibleAlternativeEventResourceId", "availability", "audienceRules",
+            "file", "download"])).IsTrue();
+        await Assert.That(schemas.GetProperty("EventResourceDownloadReferenceDto").GetProperty("properties")
+            .EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
+            .SetEquals(["href"])).IsTrue();
         var page = schemas.GetProperty("EventResourceMetadataExportPageDto").GetProperty("properties");
         await Assert.That(page.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
             .SetEquals(["eventId", "page", "pageSize", "items"])).IsTrue();

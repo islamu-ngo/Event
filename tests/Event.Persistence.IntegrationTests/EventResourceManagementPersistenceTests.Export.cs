@@ -54,7 +54,7 @@ public sealed partial class EventResourceManagementPersistenceTests
         await Assert.That(json.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal)
             .SetEquals(["id", "eventSessionId", "publicationState", "title", "publicTitle", "description", "sensitiveNotes",
                 "kind", "disclosureMode", "deliveryType", "languageCode", "accessibilityNote", "sortOrder",
-                "accessibleAlternativeEventResourceId", "availability", "audienceRules"])).IsTrue();
+                "accessibleAlternativeEventResourceId", "availability", "audienceRules", "file", "download"])).IsTrue();
         await Assert.That(json.GetRawText().Contains(protectedPayload, StringComparison.Ordinal)
             || json.GetRawText().Contains("https://private-material.example.test", StringComparison.Ordinal)).IsFalse();
     }
@@ -80,6 +80,76 @@ public sealed partial class EventResourceManagementPersistenceTests
             .ExportAsync(scope.EventAId, 1, 20, default);
         await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
         await Assert.That(result.Value).IsNull();
+    }
+
+    [Test]
+    public async Task ExportBindsFileMetadataToItsCurrentOwnedAttachmentGeneration()
+    {
+        var (scope, actor) = await SeedAsync();
+        var id = Guid.CreateVersion7();
+        await using (var seed = database.CreateContext())
+        {
+            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+                .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+            var resource = await seed.EventResources.SingleAsync(row => row.Id == id);
+            var storage = await seed.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
+            storage.Purpose = StorageObjectPurposes.EventResource;
+            storage.Visibility = StorageObjectVisibilities.PrivateOwner;
+            storage.OwningResourceKind = StorageOwningResourceKinds.EventResource;
+            storage.OwningResourceId = id;
+            storage.SafeDisplayName = "portable-owned.pdf";
+            resource.SetStoredFile(storage.Id, resource.ConcurrencyStamp, actor, Now);
+            await seed.SaveChangesAsync();
+        }
+        var provider = Substitute.For<IEventResourceAuthorizationProvider>();
+        bool changed = false;
+        provider.CheckBatchAsync(Arg.Any<IReadOnlyList<EventResourceProviderInput>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var inputs = call.Arg<IReadOnlyList<EventResourceProviderInput>>();
+                ArgumentNullException.ThrowIfNull(inputs);
+                if (!changed && inputs.Any(input => input.Action == "export" && input.Resource.Id == id))
+                {
+                    changed = true;
+                    await using var writer = database.CreateIndependentContext();
+                    await writer.StorageObjects.Where(row => row.Id == scope.StorageAId).ExecuteUpdateAsync(setters =>
+                        setters.SetProperty(row => row.OwningResourceId, Guid.CreateVersion7()));
+                }
+                return (IReadOnlyList<EventResourceProviderDecision>)inputs
+                    .Select(_ => EventResourceProviderDecision.Allow).ToArray();
+            });
+        await using var context = database.CreateIndependentContext();
+        var result = await Workflow(context, scope.TenantAId, actor, provider: provider)
+            .ExportAsync(scope.EventAId, 1, 20, default);
+        await Assert.That(changed).IsTrue();
+        await Assert.That(result.Value).IsNull();
+        await Assert.That(result.Outcome).IsNotEqualTo(EventResourceAuthorityOutcome.Allowed);
+    }
+
+    [Test]
+    public async Task ExportDoesNotDescribeAForeignOwnedAttachment()
+    {
+        var (scope, actor) = await SeedAsync();
+        var id = Guid.CreateVersion7();
+        await using var context = database.CreateContext();
+        await Assert.That((await Workflow(context, scope.TenantAId, actor)
+            .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+        var resource = await context.EventResources.SingleAsync(row => row.Id == id);
+        var storage = await context.StorageObjects.SingleAsync(row => row.Id == scope.StorageAId);
+        storage.Purpose = StorageObjectPurposes.EventResource;
+        storage.Visibility = StorageObjectVisibilities.PrivateOwner;
+        storage.OwningResourceKind = StorageOwningResourceKinds.EventResource;
+        storage.OwningResourceId = Guid.CreateVersion7();
+        storage.SafeDisplayName = "foreign-secret.pdf";
+        resource.SetStoredFile(storage.Id, resource.ConcurrencyStamp, actor, Now);
+        await context.SaveChangesAsync();
+        var result = await Workflow(context, scope.TenantAId, actor).ExportAsync(scope.EventAId, 1, 20, default);
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        var json = JsonSerializer.Serialize(result.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        await Assert.That(json.Contains("foreign-secret.pdf", StringComparison.Ordinal)).IsFalse();
+        using var document = JsonDocument.Parse(json);
+        await Assert.That(document.RootElement.GetProperty("items")[0].GetProperty("file").ValueKind)
+            .IsEqualTo(JsonValueKind.Null);
     }
 
     [Test]

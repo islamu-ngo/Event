@@ -139,6 +139,16 @@ Autosave keeps `policy` and non-credential `s3` changes separate. Discrete choic
 
 HAL links are the client source of truth for storage UI affordances. Storage object collection/detail responses expose ID-bound read links (`content`, `public-image`, and, on detail resources, `presigned-download`) only for active objects and expose the upload-session and metadata mutation links (`create-upload-session`, `edit`, `delete`) through server-side authorization metadata. Instance storage settings expose `edit`, `provider-test`, and `recalculate-usage` affordances for authorized instance administrators. Tenant storage settings expose `edit` only when instance delegation allows tenant overrides and the effective policy is not read-only. Link presence controls client affordances, but direct API writes still pass server-side authorization, lock, validation, transaction, and cache-invalidation checks.
 
+### Governed resource files
+
+Generic storage routes exclude `event_resource` purpose, ownership or retained
+attachment references before metadata projection, counts or provider access.
+Uploader ownership does not override this ceiling. Resource sessions use native
+resource-update authority and shared finalization; resource downloads use their
+own fresh audience decision and never expose presigned URLs. See
+[private file intake and delivery](EVENT_RESOURCES.md#private-file-intake-and-delivery)
+for inspection binding, version/quota transactions, transport and schema owners.
+
 ## Backup And Restore Impact
 
 Object storage is always part of the backup set when users can upload files.

@@ -87,6 +87,8 @@ public sealed partial class EventResourceManagementWorkflow(
         if (policy is null) return Failure(EventResourceAuthorityOutcome.Unavailable, resourceId, cancellationToken);
         var eventId = lease.Snapshot.Facts.Access.Parent.EventId;
         var now = clock.GetUtcNow().UtcDateTime;
+        if (action == "publish" && lease.Snapshot.Facts.Policy?.PublicationStateId == (int)EventResourcePublicationStateEnum.Withdrawn)
+            auditAction = EventResourceAuditAction.Republish;
         var audit = Audit(request, resourceId, auditAction, now);
         try
         {
@@ -99,8 +101,8 @@ public sealed partial class EventResourceManagementWorkflow(
                 if (resource.ConcurrencyStamp != expectedVersion || resource.IsDeleted
                     || resource.PublicationStateId == (int)EventResourcePublicationStateEnum.Archived && action != "delete")
                     return BaseCommandResponse.Conflict(resourceId);
-                // No delivery track has graduated. This is unconditional, even for seeded payloads.
-                if (action == "publish") return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
+                if (action == "publish" && resource.EventResourceDeliveryTypeId != (int)EventResourceDeliveryTypeEnum.StoredFile)
+                    return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
                 EventResourceAudienceRule[]? rules = null;
                 if (draft is not null)
                 {
@@ -121,6 +123,14 @@ public sealed partial class EventResourceManagementWorkflow(
                 // Domain rejection must roll back, including partially applied metadata/policy.
                 switch (action)
                 {
+                    case "publish":
+                        if (resource.PublicationStateId == (int)EventResourcePublicationStateEnum.Withdrawn)
+                            resource.Republish(lease.Snapshot.Facts.Access.Parent, lease.Snapshot.Facts.Access.PayloadSafetySatisfied,
+                                expectedVersion, request.SubjectUserId!.Value, now);
+                        else
+                            resource.Publish(lease.Snapshot.Facts.Access.Parent, lease.Snapshot.Facts.Access.PayloadSafetySatisfied,
+                                expectedVersion, request.SubjectUserId!.Value, now);
+                        break;
                     case "update":
                         resource.UpdateMetadata(draft!.ToMetadata(), expectedVersion, request.SubjectUserId!.Value, now);
                         resource.ReplacePolicy(draft.Availability.ToDomain(), rules!, expectedVersion, request.SubjectUserId.Value, now);

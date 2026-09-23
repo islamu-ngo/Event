@@ -48,7 +48,7 @@ public sealed class EventResourceAuthorizationFacts
         bool parentTarget = Policy is null;
         bool creating = request.Action == "create";
         if (parentTarget != request.TargetsParentEvent
-            || request.IsEventCollection && request.Action is not ("view-management" or "export")
+            || request.IsEventCollection && request.Action is not ("view" or "view-management" or "export")
             || request.ExpectedResourceVersion is { } expectedVersion && ResourceVersion != expectedVersion
             || request.ResourceId != ResourceId
             || request.TenantId != (Policy?.TenantId ?? Access.Parent.TenantId)
@@ -60,7 +60,9 @@ public sealed class EventResourceAuthorizationFacts
             ? new EventResourceAccessFacts(Access.TenantId, null, request.IsMachineCaller,
                 Access.Parent, [], Access.PayloadSafetySatisfied, Access.GovernancePolicy)
             : Access;
-        var decision = Policy is null ? new EventResourceAccessDecision(false, false, false)
+        var decision = Policy is null ? new EventResourceAccessDecision(
+            request.IsEventCollection && Access.Parent.EventEligible && !Access.Parent.EventDeleted
+                && Access.Parent.EventStatus == EventStatusEnum.Published, false, false)
             : EventResourceAccessRules.Evaluate(Policy, access, now);
         bool organizer = !publicOnly && Management.OrganizerControl.IsEffectiveAt(now);
         bool update = !publicOnly && Management.Permissions.Any(p =>
@@ -87,6 +89,8 @@ public sealed class EventResourceAuthorizationFacts
             "moderate" => !publicOnly && management && moderate,
             _ => false
         };
+        if (request.ExpectedDisclosure is { } expectedDisclosure && decision != expectedDisclosure)
+            allowed = false;
         EventResourceProviderInput? input = publicOnly || route is null ? null : new(route,
             new(request.SubjectUserId!.Value, request.TenantId, Management.TenantMembership.IsEffectiveAt(now),
                 organizer, update, publish, moderate),

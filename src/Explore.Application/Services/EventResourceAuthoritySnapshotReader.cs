@@ -86,7 +86,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         {
             EventResourceAuthorityRequest request = requests[index];
             if (request.ResourceId == Guid.Empty || request.SubjectUserId == Guid.Empty) continue;
-            if (request.IsEventCollection && request.Action is not ("view-management" or "export")) continue;
+            if (request.IsEventCollection && request.Action is not ("view" or "view-management" or "export")) continue;
 
             EventResource? resource = request.TargetsParentEvent ? null : resourcesById.GetValueOrDefault(request.ResourceId);
             if (!request.TargetsParentEvent && resource is null || resource?.IsDeleted == true) continue;

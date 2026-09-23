@@ -6,7 +6,7 @@ last_updated: 2026-09-23
 
 # Governed Event Resources
 
-`EventResource` is an independent tenant/event-owned aggregate for governed event materials. P5.A exposes private management of semantic drafts; it does not expose delivery or attendee discovery.
+`EventResource` is an independent tenant/event-owned aggregate for governed event materials. Management authors semantic drafts; audience reads expose only currently authorized metadata. Delivery is not enabled by either metadata surface.
 
 ## P5.A draft-management API
 
@@ -78,6 +78,36 @@ HAL assembly is asynchronous. Management metadata receives a final
 version-bound authorization check after that assembly; this is a decision
 boundary, not a guarantee that authority remains fresh through response
 completion.
+
+## Audience discovery boundary
+
+`GET /api/event/{eventId}/resources` and `GET /api/eventresource/{id}` use
+handler-owned native queries, explicit safe projections and private/no-store HAL.
+Audience DTOs never carry management notes, audience-rule objects, resource
+versions, backing identities or destination material. Teasers use the public
+title with closed availability/requirement values; protected description,
+language, accessibility and alternative references are omitted.
+
+Discovery evaluates the complete governed active set, capped at 500 resources,
+using category-bounded authority reads and provider batches. It returns at most
+100 authorized items (20 by default), without total counts or total pages.
+Continuation is emitted only after another authorized item is observed. Its
+position is the last returned `(SortOrder, Id)`, not a hidden candidate.
+
+The narrow Application cursor port uses native Data Protection in Infrastructure,
+with a distinct purpose, query version, tenant/event/subject-or-anonymous/machine
+binding and 15-minute expiry. Inputs longer than 2,048 characters are rejected
+before unprotection. Invalid, expired or wrong-scope state produces bounded 400
+without echoing the token. Every continuation reevaluates current authority;
+reordering may require a fresh first page.
+
+The native result retains a non-wire disclosure proof for post-HAL validation.
+It binds resource versions, private-versus-teaser disclosure, independently
+authorized alternative references and the additional continuation witness.
+Final fresh A/provider/B checks cannot reuse an earlier private projection after
+an entitlement downgrade, even when no resource stamp changed. Proof state is
+neither serialized nor a reusable grant. As with delivery's later boundary,
+this does not promise freshness through response completion.
 
 ## Relational ownership
 

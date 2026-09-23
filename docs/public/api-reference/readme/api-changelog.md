@@ -19,6 +19,20 @@ The draft HTTP API version is `0.1`. In pre-release development before v1, break
 
 ## Recent externally visible themes
 
+### Audience resource metadata (2026-09-23)
+
+Private/no-store `GET /api/event/{eventId}/resources` and
+`GET /api/eventresource/{id}` expose currently authorized resource metadata,
+safe public teasers and independently visible alternative links. Lists return
+HAL items and protected continuation, not global totals. Page size defaults
+to 20 and is limited to 100. Cursors expire after 15 minutes and cannot move
+between tenants, events or reader contexts; invalid state returns 400.
+
+Every request and continuation rechecks current authority, with a final
+disclosure check after HAL work. Hidden/nonexistent resources share 404.
+Management notes, audience rules, backing keys and destinations are excluded.
+No download, access or publication capability is enabled by this addition.
+
 ### Event-resource management drafts (2026-09-23)
 
 The authenticated management API adds private/no-store HAL representations for

@@ -5,6 +5,14 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Audience resource disclosure.** Two private/no-store native read routes add
+  explicit safe metadata and teaser projections, complete bounded discovery at
+  the 500-active-resource ceiling and purpose-bound 15-minute continuation.
+  Pagination contains no global counts; each response revalidates versions,
+  disclosure level, alternative references and any continuation witness after
+  HAL assembly. Cursor failures are bounded 400 and hidden resources remain 404.
+  No delivery surface is enabled. See [audience discovery](EVENT_RESOURCES.md#audience-discovery-boundary).
+
 - **Governed resource draft management.** Native resource commands and queries
   expose private/no-store management detail, event collections, and bounded
   audit reads. Client-retained UUIDv7 create IDs, required idempotency keys with

@@ -61,6 +61,27 @@ set the governing limits through the existing
 [event-resource governance](../administration-and-branding/admin-guide.md#event-resource-governance)
 workflow.
 
+## Reading event resources (API)
+
+Use `GET /api/event/{eventId}/resources` and follow each item's `self` link.
+Responses are private/no-store even for explicitly public materials. Eligible
+readers receive the permitted metadata; other readers may see an organizer's
+public teaser. Hidden and nonexistent resources both return 404. Audience reads
+never expose management notes or delivery references.
+
+Lists accept `pageSize` (20 by default, at most 100) and an opaque `cursor`.
+Follow the returned `next` HAL link instead of constructing a continuation.
+There are no global totals. A continuation exists only when another authorized
+item was observed; it is not a saved permission. Cursors expire after 15 minutes
+and are bound to the event, tenant and reader context. After signing in,
+switching reader context, expiry or reordering, start again without the cursor.
+Invalid cursor state returns 400 without including the token in the error.
+
+Accessible-alternative links appear only when that alternative is independently
+visible to the reader. File download and external-link navigation remain
+separate capabilities; these metadata routes do not publish drafts or grant
+delivery.
+
 ---
 
 ## Related Guides & Next Steps

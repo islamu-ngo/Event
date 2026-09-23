@@ -108,7 +108,7 @@ public sealed class EventResourceRepository : IEventResourceRepository
         _dbContext.EventResources.AsNoTracking()
             .Where(resource => resource.TenantId == tenantId && resource.EventId == eventId
                 && resource.PublicationStateId != (int)Explore.Domain.Enums.EventResourcePublicationStateEnum.Archived)
-            .Take(MaximumCandidateCount).CountAsync(cancellationToken);
+            .Take(MaximumCandidateCount + 1).CountAsync(cancellationToken);
 
     public async Task<IReadOnlyList<EventResource>> ListManagementAsync(Guid tenantId, Guid eventId,
         int skip, int limit, CancellationToken cancellationToken)

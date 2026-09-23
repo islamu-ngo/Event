@@ -90,6 +90,7 @@ public static class HateoasAssemblerRegistration
         services.AddHalResourceWithAssembler<EventDto, EventListDto, EventDetailLinkPolicy, EventCollectionLinkPolicy, EventResourceAssembler>();
         services.AddHalResource<EventTeamMemberDto, EventTeamMemberDetailLinkPolicy, EventTeamMemberCollectionLinkPolicy>();
         services.AddHalResource<EventResourceManagementDto, EventMaterialDetailLinkPolicy, EventMaterialCollectionLinkPolicy>();
+        services.AddHalResource<EventResourceAudienceDetailDto, EventMaterialAudienceDetailLinkPolicy, EventMaterialAudienceCollectionLinkPolicy>();
         services.AddScoped<EventTicketCatalogManagementLinkPolicy>();
         services.AddHalResourceWithAssembler<EventTicketCatalogManagementDto, EventTicketCatalogManagementLinkPolicy, EventTicketCatalogManagementCollectionLinkPolicy, EventTicketCatalogManagementResourceAssembler>();
         services.AddHalResource<PaidEventPublicationPreflightDto, PaidEventPublicationPreflightLinkPolicy, PaidEventPublicationPreflightCollectionLinkPolicy>();

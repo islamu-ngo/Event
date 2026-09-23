@@ -6,6 +6,10 @@ namespace Explore.Application.Hateoas;
 /// </summary>
 public static class LinkRelations
 {
+    public const string Resources = "resources";
+    public const string ManageResources = "manage-resources";
+    public const string Management = "management";
+    public const string AccessibleAlternative = "accessible-alternative";
     public const string CreateResource = "create-resource";
     public const string ViewAudit = "view-audit";
     public const string Unpublish = "unpublish";

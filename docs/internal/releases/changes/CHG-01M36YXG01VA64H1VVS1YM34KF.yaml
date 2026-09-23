@@ -1,0 +1,33 @@
+# Audience metadata disclosure and protected continuation.
+Change-Id: CHG-01M36YXG01VA64H1VVS1YM34KF
+Title: "disclose resource metadata to eligible audiences"
+Type: feat
+Scope: events
+Summary: "Expose audience-filtered resource lists and details with intentional safe teasers, bounded complete evaluation, non-enumerating results and current server-authored HAL actions."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Two new read routes and additive event HAL discovery links preserve existing management contracts.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Exact disclosure and version proofs are reauthorized after HAL; hidden resources and alternative identities remain concealed, and cursor scope cannot transfer authority.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Existing committed resource histories and indexes are unchanged; the active-count overflow sentinel uses the current schema.
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Cursor protection reuses the existing Data Protection keyring and resource governance; no configuration key, package or secret is added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Typed audience HAL detail and count-free continuation schemas, named routes, endpoint inventory and per-tag clients are generated together.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Follow current HAL continuation, refresh after cursor expiry or reader-context changes, and do not treat metadata visibility as file or external-link access.

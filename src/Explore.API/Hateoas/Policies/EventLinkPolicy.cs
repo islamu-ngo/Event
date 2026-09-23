@@ -33,6 +33,12 @@ public sealed class EventDetailLinkPolicy : ILinkPolicy<EventDto>
         if (dto.IsPubliclyEligible)
         {
             yield return new LinkDefinition(
+                LinkRelations.Resources,
+                RouteNames.ListEventResources,
+                new { eventId = dto.Id },
+                "GET");
+
+            yield return new LinkDefinition(
                 LinkRelations.Collection,
                 RouteNames.GetEvents,
                 null,

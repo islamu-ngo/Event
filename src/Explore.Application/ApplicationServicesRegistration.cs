@@ -331,6 +331,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IEventResourceGovernancePolicyReader, EventResourceGovernancePolicyReader>();
         services.AddScoped<EventResourceAuditRetentionService>();
         services.AddScoped<EventResourceManagementWorkflow>();
+        services.AddScoped<EventResourceAudienceWorkflow>();
         services.AddScoped<SettingUpsertService>();
         services.AddScoped<ManagedTenantProvisioningPreflight>();
         services.AddScoped<ManagedTenantProvisioningCapacityReader>();

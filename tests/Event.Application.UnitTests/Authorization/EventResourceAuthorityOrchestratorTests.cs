@@ -878,6 +878,25 @@ public class EventResourceAuthorityOrchestratorTests
             ? EventResourceAuthorityOutcome.Forbidden : EventResourceAuthorityOutcome.AuthenticationRequired);
     }
 
+    [Test]
+    public async Task PreparedPrivateMetadataCannotBorrowTeaserGrantAfterEntitlementDowngrade()
+    {
+        var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
+        f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Private", PublicTitle = "Public",
+            Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Teaser },
+            f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
+        f.Facts = f.Capture();
+        var version = f.Resource.ConcurrencyStamp;
+        var bound = f.Request with { Action = "view", ExpectedResourceVersion = version,
+            ExpectedDisclosure = new(true, true, true) };
+        var before = await f.Service.AuthorizeCapabilitiesAsync([bound]);
+        await Assert.That(before[0]).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent, [], true, f.Access.GovernancePolicy));
+        var after = await f.Service.AuthorizeCapabilitiesAsync([bound]);
+        await Assert.That(f.Resource.ConcurrencyStamp).IsEqualTo(version);
+        await Assert.That(after[0]).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+    }
+
     private static Task<IEventResourcePrivatePreparation> NeverPrepare(EventResourceAuthorizationFacts facts, CancellationToken ct) =>
         throw new InvalidOperationException("Denied decisions must never prepare delivery");
 

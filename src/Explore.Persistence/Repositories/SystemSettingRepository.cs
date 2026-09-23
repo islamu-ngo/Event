@@ -34,6 +34,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
@@ -54,6 +55,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (_dbContext.Database.CurrentTransaction is null)
@@ -81,6 +83,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);

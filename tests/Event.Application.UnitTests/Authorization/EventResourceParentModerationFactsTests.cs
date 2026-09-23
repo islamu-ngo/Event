@@ -49,7 +49,8 @@ public sealed class EventResourceParentModerationFactsTests
             false, true, null, false, new(Now, Now.AddHours(1), null, null));
         var frozen = new EventResourceParentModerationFacts(new(Principal(user, [tenant]), tenant, [parentId], []),
             new(tenant, parentId, Guid.CreateVersion7(), user, null, null, null, null, null, null, "native", user));
-        var facts = new EventResourceAuthorizationFacts(resource, new(tenant, user, false, parent, [], true),
+        var facts = new EventResourceAuthorizationFacts(resource, new(tenant, user, false, parent, [], true,
+                EventResourceGovernancePolicy.Default(long.MaxValue)),
             new(new(false), new(true), new(true), [], managementCeiling: true, publicationCeiling: true), "attachment", frozen);
         var route = new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "resource-scope", "1",
             ParentEventPolicy: new("parent-scope"));

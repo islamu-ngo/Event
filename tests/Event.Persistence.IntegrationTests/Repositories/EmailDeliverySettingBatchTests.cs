@@ -176,5 +176,5 @@ public sealed class EmailDeliverySettingBatchTests
             fixture.CurrentUserService, fixture.AdminContext, fixture.NotificationHandlers,
             NullLogger<UpdateSettingBatchCommandHandler>.Instance,
             fixture.PublicationPolicyBoundary, fixture.UnitOfWork, fixture.MutationLock, fixture.EmailDeliverySettingsWriter,
-            fixture.VisitorSettings);
+            fixture.VisitorSettings, fixture.EventResourceSettingsWriter);
 }

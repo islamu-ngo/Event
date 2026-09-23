@@ -13,6 +13,7 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -80,7 +81,8 @@ internal sealed class LocalLifecycleDeliveryFixture : IAsyncDisposable
             var settings = new HierarchicalSettingsResolver(new SystemSettingRepository(Application, MutationLock),
                 new TenantSettingRepository(Application, MutationLock), new OrganizationSettingRepository(Application),
                 new GroupSettingRepository(Application), new GroupTenantRepository(Application), new UserPreferenceRepository(Application),
-                this, MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, writer);
+                this, MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, writer,
+                new EventResourceSettingsWriter(Application, MutationLock, new EfCoreUnitOfWork(Application)));
             var secrets = Substitute.For<ISecretResolver>();
             secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(call =>
             {

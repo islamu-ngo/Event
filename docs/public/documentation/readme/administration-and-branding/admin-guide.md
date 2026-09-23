@@ -106,6 +106,36 @@ a newly created account may be on a later page rather than page one.
 If refreshing account details fails, further resets remain unavailable until a
 refresh succeeds; the current password handover stays visible.
 
+### Event resource governance
+
+Resource policy uses the existing native settings and configuration-manifest
+workflow. Instance administrators set the ceilings; tenant administrators may
+restrict them, not expand them. Instance locks remain effective in SingleTenant
+mode. A batch containing an invalid or widening choice is rejected as a whole.
+
+| Setting | Default and operator effect |
+| --- | --- |
+| `event_resources.enabled_delivery_types` | Stored files and external links; disabling a type removes attendee access to affected resources. |
+| `event_resources.enabled_audiences` | All supported audiences; disabling one hides resources whose policy uses it. |
+| `event_resources.permitted_file_types` | PDF, OOXML Word (`.docx`) and OOXML PowerPoint (`.pptx`) only. |
+| `event_resources.max_upload_bytes` | 10 MiB, also bounded by the current storage limits. |
+| `event_resources.allow_unscanned_documents` | `false`; only instance administrators can opt in. Tenant overrides are rejected. |
+| `event_resources.external_origins` | Empty; explicitly allow each HTTPS origin before external delivery. |
+| `event_resources.audit_retention_days` | 30 days; allowed range 0–90. Zero disables collection; tenants may shorten retention. |
+| `event_resources.max_active_resources` | 500; allowed range 0–500. Zero prevents new resource creation. |
+
+Origin entries are canonical HTTPS authorities, such as
+`https://materials.example.org`. Do not include a trailing slash, path, query,
+fragment, credentials or wildcard. Alternate spellings, including uppercase
+hosts and explicit default ports, are rejected rather than silently normalized.
+Tenant origin lists must be subsets of the instance list.
+
+Tightening an instance ceiling takes effect in fresh resource checks even if an
+older tenant override remains stored. Existing resources can still be repaired,
+withdrawn or deleted by their authorized managers; a disabled policy does not
+trap them in an unmanageable state. Enabling a delivery type does not bypass
+audience eligibility, provider authorization or file safety checks.
+
 ### Resource-policy deployment activation (operator API)
 
 Remote event-resource policies use a deployment-level activation fence. This

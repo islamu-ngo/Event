@@ -3,10 +3,12 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -66,8 +68,9 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
         var view = (await Reader(context).ReadAsync(new(scope.TenantAId, resource.Id, userId, state == "machine", "view"),
             new(Now), default))!;
         await Assert.That(view.Management.Moderation.IsEffectiveAt(new(Now))).IsEqualTo(expected);
-        await Assert.That(facts.Management.ManagementCeiling).IsFalse();
-        await Assert.That(facts.Management.PublicationCeiling).IsFalse();
+        await Assert.That(facts.Management.ManagementCeiling).IsTrue();
+        await Assert.That(facts.Management.PublicationCeiling).IsTrue();
+        await Assert.That(facts.Access.PayloadSafetySatisfied).IsFalse();
         await Assert.That(facts.Management.Permissions).IsEmpty();
         if (state != "machine")
         {
@@ -251,6 +254,11 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
         await Assert.That(changed == frozen).IsFalse();
     }
 
-    private static EventResourceAuthoritySnapshotReader Reader(ExploreDbContext context) =>
-        new(new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
+    private static EventResourceAuthoritySnapshotReader Reader(ExploreDbContext context)
+    {
+        var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
+        governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
+        return new(new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance);
+    }
 }

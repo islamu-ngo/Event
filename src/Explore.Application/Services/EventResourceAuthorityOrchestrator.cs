@@ -177,6 +177,7 @@ public sealed partial class EventResourceAuthorityOrchestrator(
     private static bool SameAuthority(EventResourceAuthoritySnapshot a, EventResourceAuthoritySnapshot b) =>
         a.Evaluation.ProviderInput == b.Evaluation.ProviderInput && a.Route == b.Route
         && a.Evaluation.Disclosure == b.Evaluation.Disclosure
+        && Equals(a.Facts.Access.GovernancePolicy, b.Facts.Access.GovernancePolicy)
         && a.Facts.ResourceVersion == b.Facts.ResourceVersion
         && a.Facts.StorageObjectId == b.Facts.StorageObjectId
         && a.Facts.AttachmentGeneration == b.Facts.AttachmentGeneration;

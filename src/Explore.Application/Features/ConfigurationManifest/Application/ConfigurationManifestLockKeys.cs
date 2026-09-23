@@ -1,6 +1,7 @@
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Collections.Immutable;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Compilation;
 using Explore.Application.Features.Tenants;
@@ -37,6 +38,14 @@ public static class ConfigurationManifestLockKeys
             || plan.Tenants.Any(tenant => !tenant.GuardedSettings.IsEmpty))
         {
             instanceResources.UnionWith(PublicationPolicySettingKeys.All);
+        }
+
+        if (plan.Instance.GuardedSettings.Any(setting =>
+                EventResourceSettingMutationGuard.Handles(setting.Key))
+            || plan.Tenants.Any(tenant => tenant.GuardedSettings.Any(setting =>
+                EventResourceSettingMutationGuard.Handles(setting.Key))))
+        {
+            instanceResources.UnionWith(EventResourceSettingMutationGuard.Keys);
         }
 
         instanceResources.UnionWith(TenantBrandingGovernanceMutationLockKeys.All);

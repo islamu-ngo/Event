@@ -6,6 +6,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Managed;
+using Explore.Application.Notifications;
 using Explore.Domain;
 using Microsoft.Extensions.Logging;
 
@@ -393,7 +394,8 @@ public sealed class ConfigurationImportApplyService(
             cancellationToken);
         session.Consume(freshPreview.Binding, target, tokenDigest, now);
         await sessions.UpdateAsync(session, cancellationToken);
-        await sectionApplier.ApplyAsync(
+        ImmutableArray<SettingChangedNotification> deferredNotifications =
+            await sectionApplier.ApplyAsync(
             target,
             sourceBytes,
             request,
@@ -461,7 +463,8 @@ public sealed class ConfigurationImportApplyService(
         await outbox.Create(ConfigurationImportEffectOutbox.Create(
             outboxId,
             operationId,
-            operation.CompletedAt!.Value));
+            operation.CompletedAt!.Value,
+            deferredNotifications));
         return operation;
     }
 

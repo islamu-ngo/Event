@@ -16,6 +16,7 @@ public static class EventResourceAccessRules
         ArgumentNullException.ThrowIfNull(facts);
         if (resource.IsDeleted || resource.TenantId != facts.TenantId
             || resource.PublicationStateId != (int)EventResourcePublicationStateEnum.Published
+            || !IsGovernanceEligible(resource, facts.GovernancePolicy)
             || !IsParentEligible(resource, facts.Parent)
             || !Enum.IsDefined((EventResourceDisclosureModeEnum)resource.DisclosureModeId)
             || resource.AudienceRules.Count == 0
@@ -38,6 +39,12 @@ public static class EventResourceAccessRules
 
     public static bool IsParentEligible(EventResource resource, EventResourceParentFacts parent) =>
         IsParentEligible(EventResourcePolicySnapshot.Capture(resource), parent);
+
+    public static bool IsGovernanceEligible(EventResourcePolicySnapshot resource, EventResourceGovernancePolicy? policy) =>
+        policy is not null
+        && policy.EnabledDeliveryTypes.Contains((EventResourceDeliveryTypeEnum)resource.EventResourceDeliveryTypeId)
+        && resource.AudienceRules.Count > 0
+        && resource.AudienceRules.All(rule => policy.EnabledAudiences.Contains((EventResourceAudienceKindEnum)rule.AudienceKindId));
 
     public static bool IsParentEligible(EventResourcePolicySnapshot resource, EventResourceParentFacts parent) =>
         parent.TenantId == resource.TenantId && parent.EventId == resource.EventId
@@ -162,10 +169,11 @@ public sealed record EventResourceAccessFacts
     public EventResourceParentFacts Parent { get; }
     public IReadOnlyList<EventResourceAudienceFact> Audience { get; }
     public bool PayloadSafetySatisfied { get; }
+    public EventResourceGovernancePolicy? GovernancePolicy { get; }
 
     public EventResourceAccessFacts(Guid tenantId, Guid? subjectUserId, bool isMachineCaller,
         EventResourceParentFacts parent, IEnumerable<EventResourceAudienceFact> audience,
-        bool payloadSafetySatisfied)
+        bool payloadSafetySatisfied, EventResourceGovernancePolicy? governancePolicy)
     {
         TenantId = tenantId;
         SubjectUserId = subjectUserId;
@@ -173,6 +181,7 @@ public sealed record EventResourceAccessFacts
         Parent = parent;
         Audience = Array.AsReadOnly(audience.ToArray());
         PayloadSafetySatisfied = payloadSafetySatisfied;
+        GovernancePolicy = governancePolicy;
     }
 }
 

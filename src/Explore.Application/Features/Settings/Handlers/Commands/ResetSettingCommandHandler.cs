@@ -29,6 +29,7 @@ public class ResetSettingCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
 
     public ResetSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -42,6 +43,7 @@ public class ResetSettingCommandHandler
         IUnitOfWork unitOfWork,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -58,6 +60,7 @@ public class ResetSettingCommandHandler
         _unitOfWork = unitOfWork;
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -98,6 +101,17 @@ public class ResetSettingCommandHandler
             var result = await _visitorSettings.ApplyAsync(
                 [new(_tenantContext.TenantId, request.Key, VisitorAccessSettingMutationKind.Remove)], actor, cancellationToken);
             return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, _tenantContext.TenantId);
+        }
+
+        if (EventResourceSettingMutationGuard.Handles(request.Key))
+        {
+            Guid? actor = await SettingCommandHelper.ResolveCurrentUserIdAsync(
+                _adminContext, _currentUserService, cancellationToken);
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(_tenantContext.TenantId, request.Key,
+                    EventResourceSettingMutationKind.Remove)], actor, cancellationToken);
+            return await result.CompleteAsync(
+                _resolver, _notificationHandlers, request.Scope, _tenantContext.TenantId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

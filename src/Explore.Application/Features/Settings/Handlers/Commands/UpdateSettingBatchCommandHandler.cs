@@ -34,6 +34,7 @@ public class UpdateSettingBatchCommandHandler
     private readonly ISettingMutationLock _mutationLock;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
 
     public UpdateSettingBatchCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -48,6 +49,7 @@ public class UpdateSettingBatchCommandHandler
         ISettingMutationLock mutationLock,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -65,6 +67,7 @@ public class UpdateSettingBatchCommandHandler
         _mutationLock = mutationLock;
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public async Task<BatchUpdateResponseDto> ExecuteAsync(
@@ -101,7 +104,9 @@ public class UpdateSettingBatchCommandHandler
             : [];
         if (request.Scope is SettingScope.Instance or SettingScope.Tenant
             && request.Values.Keys.Any(key => categoryKeys.Contains(key)
-                && (EmailDeliverySettingKeys.Contains(key) || VisitorAccessSettingMutationGuard.Handles(key))
+                && (EmailDeliverySettingKeys.Contains(key)
+                    || VisitorAccessSettingMutationGuard.Handles(key)
+                    || EventResourceSettingMutationGuard.Handles(key))
                 && SettingRegistry.Get(key) is { } definition
                 && IsScopeAllowed(definition, request.Scope)))
         {
@@ -110,6 +115,8 @@ public class UpdateSettingBatchCommandHandler
             var mutation = await _mutationLock.ExecuteOrderedGroupsAsync(
                 [request.Values.Keys.Any(VisitorAccessSettingMutationGuard.Handles)
                     ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
+                 request.Values.Keys.Any(EventResourceSettingMutationGuard.Handles)
+                    ? EventResourceSettingMutationGuard.Keys : [],
                  request.Values.Keys.Any(EmailDeliverySettingKeys.Contains) ? EmailDeliverySettingKeys.All : []],
                 token => _unitOfWork.ExecuteSerializableAsync(async transactionToken =>
                 {
@@ -200,7 +207,9 @@ public class UpdateSettingBatchCommandHandler
                 && PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal);
 
             // Guarded publication-policy keys own lock evaluation at their mutation boundary.
-            if (!isGuardedPublicationPolicyMutation && !VisitorAccessSettingMutationGuard.Handles(key))
+            if (!isGuardedPublicationPolicyMutation
+                && !VisitorAccessSettingMutationGuard.Handles(key)
+                && !EventResourceSettingMutationGuard.Handles(key))
             {
                 var (isBlocked, lockReason) = SettingCommandHelper.CheckLockState(
                     currentResolved, request.Scope);
@@ -313,9 +322,44 @@ public class UpdateSettingBatchCommandHandler
             deferredNotifications!.AddRange(visitorResult.DeferredNotifications);
         }
 
+        var resourceEntries = validationResults.Where(result => result.SkipReason is null
+            && EventResourceSettingMutationGuard.Handles(result.Key)).ToArray();
+        var appliedSpecializedKeys = new HashSet<string>(appliedVisitorKeys, StringComparer.Ordinal);
+        if (resourceEntries.Length > 0)
+        {
+            EventResourceSettingsWriteResult resourceResult = await _eventResourceSettingsWriter.ApplyAsync(
+                [.. resourceEntries.Select(entry => new EventResourceSettingMutation(
+                    request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
+                    entry.Key, EventResourceSettingMutationKind.SetValue, entry.SerializedValue))],
+                resolvedUserId, cancellationToken);
+            if (!resourceResult.Success)
+            {
+                if (request.Mode == BatchUpdateMode.Strict)
+                    return new BatchUpdateResponseDto
+                    {
+                        Success = false,
+                        Results = validationResults.Select(entry => new SettingUpdateResultDto
+                        { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? resourceResult.FailureCode }).ToList(),
+                        Message = resourceResult.FailureCode
+                    };
+                for (int index = 0; index < validationResults.Count; index++)
+                {
+                    var entry = validationResults[index];
+                    if (entry.SkipReason is null && EventResourceSettingMutationGuard.Handles(entry.Key))
+                        validationResults[index] = (entry.Key, entry.Value, entry.Definition,
+                            entry.SerializedValue, resourceResult.FailureCode, entry.OldValue);
+                }
+            }
+            else
+            {
+                appliedSpecializedKeys.UnionWith(resourceEntries.Select(entry => entry.Key));
+                deferredNotifications!.AddRange(resourceResult.DeferredNotifications);
+            }
+        }
+
         var smtpEntries = validationResults.Where(result => result.SkipReason is null
             && EmailDeliverySettingKeys.Contains(result.Key)).ToArray();
-        var appliedSmtpKeys = new HashSet<string>(appliedVisitorKeys, StringComparer.Ordinal);
+        var appliedSmtpKeys = new HashSet<string>(appliedSpecializedKeys, StringComparer.Ordinal);
         if (smtpEntries.Length > 0)
         {
             var smtpResult = await _emailSettingsWriter.ApplyAsync(

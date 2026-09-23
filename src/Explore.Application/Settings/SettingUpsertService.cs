@@ -18,12 +18,14 @@ public class SettingUpsertService
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
 
     public SettingUpsertService(
         ISystemSettingRepository systemSettingRepository,
         IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IEmailDeliverySettingsWriter emailSettingsWriter,
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
         _systemSettingRepository = systemSettingRepository;
@@ -31,6 +33,7 @@ public class SettingUpsertService
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _locationPrivacyMutations = locationPrivacyMutations;
         _emailSettingsWriter = emailSettingsWriter;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public Task<PublicationPolicyMutationResult> ApplyInstancePublicationPolicyAsync(
@@ -52,7 +55,6 @@ public class SettingUpsertService
         Guid? actorId = null,
         CancellationToken cancellationToken = default)
     {
-        EnsureUnguarded(settingKey);
         SettingPersistenceResult persistence = await PersistAsync(new SystemSetting
         {
             SettingKey = settingKey,
@@ -95,7 +97,6 @@ public class SettingUpsertService
         Guid? actorId,
         CancellationToken cancellationToken = default)
     {
-        EnsureUnguarded(settingKey);
         _ = await UpsertValueCoreAsync(
             settingKey,
             value,
@@ -112,6 +113,19 @@ public class SettingUpsertService
         Guid? actorId,
         CancellationToken cancellationToken = default)
     {
+        if (EventResourceSettingMutationGuard.Handles(settingKey))
+        {
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(null, settingKey,
+                    EventResourceSettingMutationKind.SetLock, IsLocked: isLocked)],
+                actorId, cancellationToken);
+            result.EnsureAccepted();
+            return result.DeferredNotifications.FirstOrDefault() ?? new SettingChangedNotification(
+                settingKey, null, fallbackValue,
+                isLocked ? SettingSource.SystemLocked : SettingSource.SystemDefault,
+                null, actorId, DateTime.UtcNow);
+        }
+
         EnsureUnguarded(settingKey);
         if (EmailDeliverySettingKeys.Contains(settingKey))
         {
@@ -221,6 +235,7 @@ public class SettingUpsertService
 
     private static void EnsureUnguarded(string settingKey)
     {
+        EventResourceSettingMutationGuard.RejectGenericMutation(settingKey);
         EventResourceProviderBindingDocument.RejectGenericMutation(settingKey);
         if (PublicationPolicySettingKeys.All.Contains(settingKey, StringComparer.Ordinal))
             throw new InvalidOperationException($"Guarded publication policy setting '{settingKey}' requires coordinated mutation.");
@@ -279,6 +294,20 @@ public class SettingUpsertService
         CancellationToken cancellationToken,
         bool useCallerTransaction = false)
     {
+        if (EventResourceSettingMutationGuard.Handles(setting.SettingKey))
+        {
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(null, setting.SettingKey,
+                    EventResourceSettingMutationKind.SetValue, setting.Value, setting.IsLocked)],
+                actorId, cancellationToken);
+            result.EnsureAccepted();
+            return new SettingPersistenceResult(
+                result.DeferredNotifications.IsEmpty
+                    ? setting.Value
+                    : result.DeferredNotifications[0].OldValue,
+                Mutation: null);
+        }
+
         if (EmailDeliverySettingKeys.Contains(setting.SettingKey))
         {
             var result = await _emailSettingsWriter.ApplyAsync(

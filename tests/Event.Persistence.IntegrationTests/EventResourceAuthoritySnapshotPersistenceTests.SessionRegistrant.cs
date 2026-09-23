@@ -108,7 +108,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var request = new EventResourceAuthorityRequest(scope.TenantAId, resource.Id, userId, false, "view");
         var before = (await reader.ReadAsync(request, new(Now), default))!;

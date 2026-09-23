@@ -22,7 +22,8 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IUnitOfWork unitOfWork,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
-    IVisitorAccessSettingsWriter visitorSettings)
+    IVisitorAccessSettingsWriter visitorSettings,
+    IEventResourceSettingsWriter eventResourceSettingsWriter)
     : ICommandHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -64,6 +65,16 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
                 [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
                 actorUserId, cancellationToken);
             return await result.CompleteAsync(settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
+        }
+
+        if (EventResourceSettingMutationGuard.Handles(request.Key))
+        {
+            EventResourceSettingsWriteResult result = await eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(request.TenantId, request.Key,
+                    EventResourceSettingMutationKind.SetValue, serializedValue)],
+                actorUserId, cancellationToken);
+            return await result.CompleteAsync(
+                settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

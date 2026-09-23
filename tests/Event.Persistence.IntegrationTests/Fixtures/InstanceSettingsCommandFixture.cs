@@ -35,10 +35,12 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
         EmailDeliverySettingsWriter = EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, MutationLock);
         VisitorSettings = new VisitorAccessSettingsWriter(context, MutationLock, UnitOfWork,
             new EventParticipationConfigurationRepository(context), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        EventResourceSettingsWriter = new EventResourceSettingsWriter(context, MutationLock, UnitOfWork);
         Settings = new HierarchicalSettingsResolver(SystemSettings, new TenantSettingRepository(context, MutationLock),
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
             new GroupTenantRepository(context), new UserPreferenceRepository(context), this,
-            MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, EmailDeliverySettingsWriter);
+            MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, EmailDeliverySettingsWriter,
+            EventResourceSettingsWriter);
         var httpContext = new HttpContextAccessor
         {
             HttpContext = new DefaultHttpContext
@@ -58,7 +60,8 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
         NotificationHandlers = _provider.GetServices<INotificationHandler<SettingChangedNotification>>();
         PublicationPolicyBoundary = new PublicationPolicyMutationBoundary(MutationLock,
             new CoordinatedSettingMutationRepository(context));
-        UpsertService = new SettingUpsertService(SystemSettings, NotificationHandlers, PublicationPolicyBoundary, EmailDeliverySettingsWriter);
+        UpsertService = new SettingUpsertService(SystemSettings, NotificationHandlers, PublicationPolicyBoundary,
+            EmailDeliverySettingsWriter, EventResourceSettingsWriter);
         Governance = new InstanceGovernanceSettingService(Settings, UpsertService,
             new ModuleCapabilityService(new TenantCapabilityRepository(context), new ModuleDefinitionRepository(context)),
             NullLogger<InstanceGovernanceSettingService>.Instance, EmailDeliverySettingsWriter);
@@ -72,6 +75,7 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
     internal SystemSettingRepository SystemSettings { get; }
     internal EmailDeliverySettingsWriter EmailDeliverySettingsWriter { get; }
     internal VisitorAccessSettingsWriter VisitorSettings { get; }
+    internal EventResourceSettingsWriter EventResourceSettingsWriter { get; }
     internal HierarchicalSettingsResolver Settings { get; }
     internal AdminContext AdminContext { get; }
     internal CurrentUserService CurrentUserService { get; }

@@ -2,6 +2,7 @@ namespace Explore.Infrastructure.Services;
 
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using IGroupSettingRepository = Explore.Application.Contracts.Persistence.IGroupSettingRepository;
 using IGroupTenantRepository = Explore.Application.Contracts.Persistence.IGroupTenantRepository;
 using IOrganizationSettingRepository = Explore.Application.Contracts.Persistence.IOrganizationSettingRepository;
@@ -38,6 +39,7 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
     private readonly ITenantContext _tenantContext;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
     private readonly IMemoryCache _cache;
     private readonly ILogger<HierarchicalSettingsResolver> _logger;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
@@ -59,7 +61,8 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         ISettingMutationLock mutationLock,
         IMemoryCache cache,
         ILogger<HierarchicalSettingsResolver> logger,
-        IEmailDeliverySettingsWriter emailSettingsWriter)
+        IEmailDeliverySettingsWriter emailSettingsWriter,
+        IEventResourceSettingsWriter eventResourceSettingsWriter)
     {
         _systemSettingRepository = systemSettingRepository;
         _tenantSettingRepository = tenantSettingRepository;
@@ -72,6 +75,7 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         _cache = cache;
         _logger = logger;
         _emailSettingsWriter = emailSettingsWriter;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public async Task<T?> ResolveAsync<T>(string key, SettingContext context, CancellationToken ct = default)
@@ -178,6 +182,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             return;
         }
 
+        if (EventResourceSettingMutationGuard.Handles(key))
+        {
+            await ApplyEventResourceMutationAsync(new EventResourceSettingMutation(
+                scope == SettingScope.Tenant ? scopeId : null, key,
+                EventResourceSettingMutationKind.SetValue, value), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -256,6 +268,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             return;
         }
 
+        if (EventResourceSettingMutationGuard.Handles(key))
+        {
+            await ApplyEventResourceMutationAsync(new EventResourceSettingMutation(
+                scope == SettingScope.Tenant ? scopeId : null, key,
+                EventResourceSettingMutationKind.Remove), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -310,6 +330,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             await ApplySmtpMutationAsync(new EmailDeliverySettingMutation(
                 TenantId: scope == SettingScope.Tenant ? scopeId : null, Key: key,
                 Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: true), scope, actorId, ct);
+            return;
+        }
+
+        if (EventResourceSettingMutationGuard.Handles(key))
+        {
+            await ApplyEventResourceMutationAsync(new EventResourceSettingMutation(
+                scope == SettingScope.Tenant ? scopeId : null, key,
+                EventResourceSettingMutationKind.SetLock, IsLocked: true), scope, actorId, ct);
             return;
         }
 
@@ -379,6 +407,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             return;
         }
 
+        if (EventResourceSettingMutationGuard.Handles(key))
+        {
+            await ApplyEventResourceMutationAsync(new EventResourceSettingMutation(
+                scope == SettingScope.Tenant ? scopeId : null, key,
+                EventResourceSettingMutationKind.SetLock, IsLocked: false), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -443,6 +479,19 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
                 .EnsureAccepted();
         }
         var result = await _emailSettingsWriter.ApplyAsync([mutation], actorId, cancellationToken);
+        result.EnsureAccepted();
+        InvalidateCache(scope, mutation.TenantId);
+    }
+
+    private async Task ApplyEventResourceMutationAsync(
+        EventResourceSettingMutation mutation, SettingScope scope, Guid actorId,
+        CancellationToken cancellationToken)
+    {
+        if (scope is not SettingScope.Instance and not SettingScope.Tenant)
+            throw new InvalidOperationException(
+                "Resource governance settings can only be mutated at Instance or Tenant scope.");
+        EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+            [mutation], actorId, cancellationToken);
         result.EnsureAccepted();
         InvalidateCache(scope, mutation.TenantId);
     }

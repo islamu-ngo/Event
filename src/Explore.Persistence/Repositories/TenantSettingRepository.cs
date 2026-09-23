@@ -63,6 +63,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         CancellationToken cancellationToken = default,
         Guid? actorId = null)
     {
+        EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
@@ -149,6 +150,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         string key,
         CancellationToken cancellationToken = default)
     {
+        EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
@@ -174,6 +176,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
@@ -206,6 +209,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        EventResourceSettingMutationGuard.RejectGenericMutation(key);
         EventResourceProviderBindingDocument.RejectGenericMutation(key);
         VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
@@ -249,7 +253,10 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         ArgumentNullException.ThrowIfNull(overrides);
         foreach (var setting in overrides)
+        {
+            EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
+        }
         foreach (var setting in overrides)
         {
             VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
@@ -324,7 +331,10 @@ public class TenantSettingRepository : ITenantSettingRepository
             InstanceOperatorIdentitySettingKeys.RejectGenericMutation(setting.SettingKey);
         }
         foreach (var setting in overrides)
+        {
+            EventResourceSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EventResourceProviderBindingDocument.RejectGenericMutation(setting.SettingKey);
+        }
 
         if (occurredAtUtc.Kind != DateTimeKind.Utc)
         {

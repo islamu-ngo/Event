@@ -107,6 +107,26 @@ public class EventResourceAuthorityOrchestratorTests
     }
 
     [Test]
+    public async Task GovernanceChangeInvalidatesAMutationLeaseEvenWhenProviderInputsStillAllow()
+    {
+        var f = new Fixture();
+        var management = Management([new("event:update", new(true))]);
+        f.Facts = f.Capture(management: management);
+        await using var result = await f.Service.AuthorizeAsync(f.Request with { Action = "update" },
+            (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(new Preparation("generation-1")));
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
+        var previous = f.Access.GovernancePolicy!;
+        var tightened = EventResourceGovernancePolicy.Create(previous.EnabledDeliveryTypes, previous.EnabledAudiences,
+            previous.PermittedFileTypes, previous.MaxUploadBytes / 2, previous.AllowUnscannedDocuments,
+            previous.ExternalOrigins, previous.AuditRetentionDays, previous.MaxActiveResources, long.MaxValue);
+        f.Facts = f.Capture(management: management, access: new(Tenant, Subject, false, f.Access.Parent,
+            f.Access.Audience, true, tightened));
+        var outcome = await f.UnitOfWork.ExecuteSerializableAsync(ct =>
+            f.Service.RecheckMutationAsync(result.Lease!, f.Resource.ConcurrencyStamp, ct));
+        await Assert.That(outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
+    }
+
+    [Test]
     public async Task Native_capabilities_resolve_current_authority_without_reusing_previous_allow()
     {
         var f = new Fixture();
@@ -416,7 +436,7 @@ public class EventResourceAuthorityOrchestratorTests
     public async Task Moderator_can_withdraw_but_cannot_download_restricted_material()
     {
         var f = new Fixture(EventResourceAudienceKindEnum.Organizer);
-        var noAudience = new EventResourceAccessFacts(Tenant, Subject, false, f.Access.Parent, [], true);
+        var noAudience = new EventResourceAccessFacts(Tenant, Subject, false, f.Access.Parent, [], true, f.Access.GovernancePolicy);
         f.Facts = f.Capture(management: Management([], moderator: true), access: noAudience);
         await using var preparation = new Preparation("generation-1");
         var result = await f.Service.AuthorizeAsync(f.Request with { Action = "moderate" },
@@ -437,7 +457,7 @@ public class EventResourceAuthorityOrchestratorTests
         var f = new Fixture(restricted ? EventResourceAudienceKindEnum.AuthenticatedTenantMember : EventResourceAudienceKindEnum.Public);
         var user = machine ? Subject : (Guid?)null;
         f.Request = f.Request with { IsMachineCaller = machine, SubjectUserId = user };
-        f.Facts = f.Capture(access: new(Tenant, user, machine, f.Access.Parent, f.Access.Audience, true));
+        f.Facts = f.Capture(access: new(Tenant, user, machine, f.Access.Parent, f.Access.Audience, true, f.Access.GovernancePolicy));
         f.OnProvider = (_, _) => throw new InvalidOperationException("Public-only callers must not enter PDP");
         await using var preparation = new Preparation("generation-1");
         var result = await f.Service.AuthorizeAsync(f.Request,
@@ -548,7 +568,7 @@ public class EventResourceAuthorityOrchestratorTests
     {
         var f = new Fixture(EventResourceAudienceKindEnum.EventStaff);
         var audience = f.Access.Audience.Select(a => a with { ExpiresAtUtc = Now.AddSeconds(5) });
-        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent, audience, true));
+        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent, audience, true, f.Access.GovernancePolicy));
         await using var preparation = new Preparation("generation-1");
         var result = await f.Service.AuthorizeAsync(f.Request, (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
         await using var lease = result.Lease;
@@ -596,7 +616,7 @@ public class EventResourceAuthorityOrchestratorTests
     {
         var f = new Fixture();
         f.Request = f.Request with { ResourceId = EventId, Action = "create" };
-        f.Facts = new(f.Access.Parent, Tenant, Subject, false, Management([new("event:update", new(true))]));
+        f.Facts = new(f.Access.Parent, Tenant, Subject, false, Management([new("event:update", new(true))]), f.Access.GovernancePolicy);
         await using var preparation = new Preparation("parent");
         var result = await f.Service.AuthorizeAsync(f.Request, (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
         await using var lease = result.Lease;
@@ -630,7 +650,7 @@ public class EventResourceAuthorityOrchestratorTests
         f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Private", PublicTitle = "Public",
             Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Teaser },
             f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
-        f.Facts = f.Capture(access: new(Tenant, null, false, f.Access.Parent, [], true));
+        f.Facts = f.Capture(access: new(Tenant, null, false, f.Access.Parent, [], true, f.Access.GovernancePolicy));
         await using var preparation = new Preparation("generation-1");
         var result = await f.Service.AuthorizeAsync(f.Request, (_, _) => Task.FromResult<IEventResourcePrivatePreparation>(preparation));
         await using var lease = result.Lease;
@@ -718,10 +738,10 @@ public class EventResourceAuthorityOrchestratorTests
     public async Task Provider_allow_cannot_cross_payload_safety_or_parent_domain_ceilings()
     {
         var f = new Fixture();
-        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent, f.Access.Audience, false));
+        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent, f.Access.Audience, false, f.Access.GovernancePolicy));
         var unsafePayload = await f.Service.AuthorizeAsync(f.Request, NeverPrepare);
         await Assert.That(unsafePayload.Outcome).IsEqualTo(EventResourceAuthorityOutcome.Forbidden);
-        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent with { EventEligible = false }, f.Access.Audience, true));
+        f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent with { EventEligible = false }, f.Access.Audience, true, f.Access.GovernancePolicy));
         var invisibleParent = await f.Service.AuthorizeAsync(f.Request, NeverPrepare);
         await Assert.That(invisibleParent.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
     }
@@ -737,7 +757,7 @@ public class EventResourceAuthorityOrchestratorTests
         f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Private", PublicTitle = "Public",
             Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Teaser },
             f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
-        f.Facts = f.Capture(access: new(Tenant, subject, false, f.Access.Parent, [], true));
+        f.Facts = f.Capture(access: new(Tenant, subject, false, f.Access.Parent, [], true, f.Access.GovernancePolicy));
         var result = await f.Service.AuthorizeAsync(f.Request, NeverPrepare);
         await Assert.That(result.Outcome).IsEqualTo(authenticated
             ? EventResourceAuthorityOutcome.Forbidden : EventResourceAuthorityOutcome.AuthenticationRequired);
@@ -787,7 +807,7 @@ public class EventResourceAuthorityOrchestratorTests
                 false, true, null, false, new EventResourceScheduleFacts(Now, Now.AddHours(1), null, null));
             Access = new EventResourceAccessFacts(Tenant, Subject, false, parent,
                 [new EventResourceAudienceFact { TenantId = Tenant, EventId = EventId, SubjectUserId = Subject,
-                    Kind = audience, IsCurrent = true }], true);
+                    Kind = audience, IsCurrent = true }], true, EventResourceGovernancePolicy.Default(long.MaxValue));
             Resource.Publish(parent, true, Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
             Facts = Capture();
             Service = new(UnitOfWork, this, this, this, Clock);

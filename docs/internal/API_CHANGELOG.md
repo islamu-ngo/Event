@@ -5,6 +5,15 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Native resource governance.** The `event_resources.*` setting family is
+  available through native settings and configuration manifests. Tenant writes
+  cannot widen instance ceilings or set the instance-only unscanned-document
+  opt-in; malformed and rejected tenant setting updates return validation
+  ProblemDetails. Coordinated batches and manifest imports preserve atomicity.
+  Current instance locks apply in SingleTenant mode, and resource authorization
+  rereads effective policy rather than relying on cached setting values.
+  See [resource governance](EVENT_RESOURCES.md#native-resource-governance).
+
 - **Resource-policy deployment activation.** Current instance administrators can
   read and bind deployment aliases at
   `GET/PUT /api/event-resource-provider-activation/bindings`, begin a closed

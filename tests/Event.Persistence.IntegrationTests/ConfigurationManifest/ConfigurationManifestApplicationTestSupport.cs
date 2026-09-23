@@ -17,6 +17,7 @@ using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
@@ -40,6 +41,7 @@ internal static class ConfigurationManifestApplicationTestSupport
         var unitOfWork = new EfCoreUnitOfWork(context);
         ISettingMutationLock lockBoundary = mutationLock
             ?? new RelationalSettingMutationLock(context, unitOfWork);
+        var resourcePolicy = new EventResourceSettingsWriter(context, lockBoundary, unitOfWork);
         IPublicationPolicyMutationBoundary policyBoundary = useRealPolicyBoundary
             ? new PublicationPolicyMutationBoundary(
                 lockBoundary,
@@ -77,6 +79,7 @@ internal static class ConfigurationManifestApplicationTestSupport
                     new TenantRepository(context),
                     new TenantSettingsDocumentRepository(context)),
             policyBoundary,
+            resourcePolicy,
             new PaidEventPolicyMutationBoundary(
                 new PaidEventPolicyRepository(context),
                 unitOfWork,
@@ -86,7 +89,8 @@ internal static class ConfigurationManifestApplicationTestSupport
                     new SystemSettingRepository(context, lockBoundary),
                     [],
                     policyBoundary,
-                    Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, lockBoundary)),
+                    Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, lockBoundary),
+                    resourcePolicy),
                 policyBoundary),
             new ConfigurationManifestTenantSettingMutationBoundary(
                 new TenantSettingRepository(context, lockBoundary)),

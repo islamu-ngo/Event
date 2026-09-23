@@ -20,6 +20,7 @@ public sealed class ConfigurationManifestApplier(
     IUnitOfWork unitOfWork,
     ITenantCreationService tenantCreationService,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
+    IEventResourceSettingsWriter eventResourceSettingsWriter,
     IPaidEventPolicyMutationBoundary paidEventPolicyMutationBoundary,
     IConfigurationManifestInstanceSettingMutationBoundary
         instanceSettingMutations,
@@ -284,7 +285,10 @@ public sealed class ConfigurationManifestApplier(
             }
         }
 
-        if (!tenant.GuardedSettings.IsEmpty)
+        ConfigurationManifestSettingWrite[] publicationSettings = tenant.GuardedSettings
+            .Where(setting => !EventResourceSettingMutationGuard.Handles(setting.Key))
+            .ToArray();
+        if (publicationSettings.Length > 0)
         {
             PublicationPolicyMutationResult result =
                 await publicationPolicyMutationBoundary
@@ -293,7 +297,7 @@ public sealed class ConfigurationManifestApplier(
                         tenant.PlannedTenantId,
                         ActorUserId: null,
                         plan.OccurredAt,
-                        [.. tenant.GuardedSettings.Select(setting =>
+                        [.. publicationSettings.Select(setting =>
                             new PublicationPolicySettingMutation(
                                 setting.Key,
                                 PublicationPolicyMutationKind.Set,
@@ -311,6 +315,13 @@ public sealed class ConfigurationManifestApplier(
                     failedTenantCount: 1);
             }
         }
+
+        await ApplyEventResourceSettingsAsync(
+            tenant.PlannedTenantId,
+            tenant.GuardedSettings,
+            actorUserId: null,
+            failedTenantCount: 1,
+            cancellationToken);
 
         if (!tenant.UnguardedSettings.IsEmpty)
         {
@@ -345,25 +356,29 @@ public sealed class ConfigurationManifestApplier(
         ConfigurationManifestApplyPlan plan,
         CancellationToken cancellationToken)
     {
-        if (plan.Instance.GuardedSettings.IsEmpty
-            && plan.Instance.UnguardedSettings.IsEmpty)
-        {
+        await ApplyEventResourceSettingsAsync(
+            tenantId: null,
+            plan.Instance.GuardedSettings,
+            actorUserId: null,
+            failedTenantCount: plan.Tenants.Length,
+            cancellationToken);
+
+        ConfigurationManifestSettingWrite[] nonResourceSettings =
+        [
+            .. plan.Instance.GuardedSettings.Where(setting =>
+                !EventResourceSettingMutationGuard.Handles(setting.Key)),
+            .. plan.Instance.UnguardedSettings
+        ];
+        if (nonResourceSettings.Length == 0)
             return;
-        }
 
         ConfigurationManifestInstanceSettingMutationResult result =
             await instanceSettingMutations.ApplyInCurrentTransactionAsync(
                 new ConfigurationManifestInstanceSettingMutationInput(
-                    [
-                        .. plan.Instance.GuardedSettings.Select(setting =>
-                            new ConfigurationManifestInstanceSettingMutation(
-                                setting.Key,
-                                setting.JsonValue)),
-                        .. plan.Instance.UnguardedSettings.Select(setting =>
-                            new ConfigurationManifestInstanceSettingMutation(
-                                setting.Key,
-                                setting.JsonValue))
-                    ],
+                    [.. nonResourceSettings.Select(setting =>
+                        new ConfigurationManifestInstanceSettingMutation(
+                            setting.Key,
+                            setting.JsonValue))],
                     ActorUserId: null,
                     plan.OccurredAt),
                 cancellationToken);
@@ -375,6 +390,39 @@ public sealed class ConfigurationManifestApplier(
                         .WriteConflict,
                 result.Message,
                 failedTenantCount: plan.Tenants.Length);
+        }
+    }
+
+    private async Task ApplyEventResourceSettingsAsync(
+        Guid? tenantId,
+        ImmutableArray<ConfigurationManifestSettingWrite> settings,
+        Guid? actorUserId,
+        int failedTenantCount,
+        CancellationToken cancellationToken)
+    {
+        ImmutableArray<EventResourceSettingMutation> mutations = settings
+            .Where(setting => EventResourceSettingMutationGuard.Handles(setting.Key))
+            .Select(setting => new EventResourceSettingMutation(
+                tenantId,
+                setting.Key,
+                EventResourceSettingMutationKind.SetValue,
+                setting.JsonValue))
+            .ToImmutableArray();
+        if (mutations.IsEmpty)
+            return;
+
+        EventResourceSettingsWriteResult result =
+            await eventResourceSettingsWriter.ApplyAsync(
+                mutations,
+                actorUserId,
+                cancellationToken);
+        if (!result.Success)
+        {
+            throw new ConfigurationManifestApplyRejectedException(
+                result.FailureCode
+                    ?? ConfigurationManifestApplicationFailureCodes.WriteConflict,
+                "The event-resource settings conflict with current governance ceilings or locks.",
+                failedTenantCount);
         }
     }
 

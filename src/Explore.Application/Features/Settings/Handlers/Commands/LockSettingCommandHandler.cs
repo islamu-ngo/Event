@@ -27,6 +27,7 @@ public class LockSettingCommandHandler
     private readonly ISettingMutationLock _mutationLock;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
 
     public LockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -40,6 +41,7 @@ public class LockSettingCommandHandler
         ISettingMutationLock mutationLock,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -54,6 +56,7 @@ public class LockSettingCommandHandler
         _mutationLock = mutationLock;
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -98,6 +101,17 @@ public class LockSettingCommandHandler
                 [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
                     VisitorAccessSettingMutationKind.SetLock, IsLocked: true)], actorId, cancellationToken);
             return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, scopeId);
+        }
+
+        if (EventResourceSettingMutationGuard.Handles(request.Key))
+        {
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(
+                    request.Scope == SettingScope.Tenant ? scopeId : null,
+                    request.Key, EventResourceSettingMutationKind.SetLock, IsLocked: true)],
+                actorId, cancellationToken);
+            return await result.CompleteAsync(
+                _resolver, _notificationHandlers, request.Scope, scopeId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

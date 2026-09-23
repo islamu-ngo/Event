@@ -448,7 +448,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var handler = new UpdateSettingBatchCommandHandler(commands.Settings, new UserPreferenceRepository(context), commands,
             commands.CurrentUserService, commands.AdminContext, commands.NotificationHandlers, NullLogger<UpdateSettingBatchCommandHandler>.Instance,
             commands.PublicationPolicyBoundary, commands.UnitOfWork, commands.MutationLock, commands.EmailDeliverySettingsWriter,
-            commands.VisitorSettings);
+            commands.VisitorSettings, commands.EventResourceSettingsWriter);
         await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.ExecuteAsync(new()
         {
             Category = SettingRegistry.Get(ModeKey)!.Category,

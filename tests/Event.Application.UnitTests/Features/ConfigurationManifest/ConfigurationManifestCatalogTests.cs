@@ -4,6 +4,7 @@ using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Settings;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
 
 public sealed class ConfigurationManifestCatalogTests
@@ -12,6 +13,13 @@ public sealed class ConfigurationManifestCatalogTests
     [
         "appearance.default_theme_mode",
         "event_reporting.intake_enabled",
+        "event_resources.audit_retention_days",
+        "event_resources.enabled_audiences",
+        "event_resources.enabled_delivery_types",
+        "event_resources.external_origins",
+        "event_resources.max_active_resources",
+        "event_resources.max_upload_bytes",
+        "event_resources.permitted_file_types",
         "events.group_submission_enabled",
         "events.organization_submission_enabled",
         "events.require_approval",
@@ -52,7 +60,7 @@ public sealed class ConfigurationManifestCatalogTests
     }
 
     [Test]
-    public async Task SettingCatalog_ContainsExactlyGuardedPublicationPolicyKeys()
+    public async Task SettingCatalog_ContainsExactlyApprovedCoordinatedKeys()
     {
         string[] guarded = ConfigurationManifestCatalog.TenantSettings.Values
             .Where(entry => entry.Definition.RequiresCoordinatedMutation)
@@ -60,6 +68,9 @@ public sealed class ConfigurationManifestCatalogTests
             .Order(StringComparer.Ordinal)
             .ToArray();
         string[] expected = PublicationPolicySettingKeys.All
+            .Concat(EventResourceSettingDefinitions.All
+                .Where(definition => definition.MaxScope >= SettingScope.Tenant)
+                .Select(definition => definition.Key))
             .Order(StringComparer.Ordinal)
             .ToArray();
 

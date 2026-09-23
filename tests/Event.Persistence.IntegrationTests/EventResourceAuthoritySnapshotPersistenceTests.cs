@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -90,7 +91,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         routes.ReadAsync(scope.TenantAId, Arg.Any<CancellationToken>())
             .Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var service = new EventResourceAuthorityOrchestrator(new EfCoreUnitOfWork(read),
-            new EventResourceAuthoritySnapshotReader(new EventResourceRepository(read), new EventAuthoritySnapshotService(read)),
+            CreateReader(new EventResourceRepository(read), new EventAuthoritySnapshotService(read)),
             routes, provider, new AuthorityClock());
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         AuthorityPreparation? preparation = null;
@@ -208,7 +209,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var request = new EventResourceAuthorityRequest(scope.TenantAId, resourceId, userId, false, "view");
         var before = (await reader.ReadAsync(request, new(Now), default))!;
@@ -265,7 +266,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var request = new EventResourceAuthorityRequest(scope.TenantAId, resource.Id, userId, false, "view");
         await Assert.That((await reader.ReadAsync(request, new(Now), default))!.Access.Parent.EventEligible).IsTrue();
@@ -302,7 +303,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, null, machine, "view"), new(Now), default);
@@ -327,7 +328,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
 
         await using var context = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var facts = (await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, userId, false, "view", new DateTimeOffset(Now.AddMinutes(1))),
@@ -373,7 +374,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
 
         await using var context = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
         var facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, userId, false, "view", new DateTimeOffset(Now.AddMinutes(1))),
@@ -426,7 +427,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         await Assert.That(fresh.Title).IsEqualTo("Fresh authority title");
         await Assert.That(tracked.Title).IsEqualTo("Portable resource");
 
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             repository, new EventAuthoritySnapshotService(staleContext));
         EventResourceAuthorizationFacts? facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, null, false, "view"),
@@ -457,7 +458,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
 
         await using ExploreDbContext read = database.CreateContext();
-        var reader = new EventResourceAuthoritySnapshotReader(
+        var reader = CreateReader(
             new EventResourceRepository(read), new EventAuthoritySnapshotService(read));
         EventResourceAuthorizationFacts? facts = await reader.ReadAsync(
             new(scope.TenantAId, resource.Id, null, false, "view",
@@ -487,7 +488,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         var smallCounter = new ReaderCommandCounter();
         await using (ExploreDbContext context = database.CreateContext(smallCounter))
         {
-            var reader = new EventResourceAuthoritySnapshotReader(
+            var reader = CreateReader(
                 new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
             IReadOnlyList<EventResourceAuthorizationFacts?> facts = await reader.ReadBatchAsync(
                 smallRequests, new DateTimeOffset(Now), default);
@@ -503,7 +504,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         var largeCounter = new ReaderCommandCounter();
         await using (ExploreDbContext context = database.CreateContext(largeCounter))
         {
-            var reader = new EventResourceAuthoritySnapshotReader(
+            var reader = CreateReader(
                 new EventResourceRepository(context), new EventAuthoritySnapshotService(context));
             IReadOnlyList<EventResourceAuthorizationFacts?> facts = await reader.ReadBatchAsync(
                 largeRequests, new DateTimeOffset(Now), default);
@@ -536,6 +537,15 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             overflow = exception;
         }
         await Assert.That(overflow).IsNotNull();
+    }
+
+    private static EventResourceAuthoritySnapshotReader CreateReader(
+        IEventResourceRepository resources, IEventAuthoritySnapshotService authority)
+    {
+        var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
+        governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(EventResourceGovernancePolicy.Default(long.MaxValue));
+        return new(resources, authority, governance);
     }
 
     private sealed class AuthorityClock : TimeProvider

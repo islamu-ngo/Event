@@ -93,6 +93,20 @@ public static class GovernanceSettingKeys
         public const string CardClickOpensDetailPage = "events.card_click_opens_detail_page";
     }
 
+    public static class EventResources
+    {
+        private const string Base = "event_resources";
+
+        public const string EnabledDeliveryTypes = Base + ".enabled_delivery_types";
+        public const string EnabledAudiences = Base + ".enabled_audiences";
+        public const string PermittedFileTypes = Base + ".permitted_file_types";
+        public const string MaxUploadBytes = Base + ".max_upload_bytes";
+        public const string AllowUnscannedDocuments = Base + ".allow_unscanned_documents";
+        public const string ExternalOrigins = Base + ".external_origins";
+        public const string AuditRetentionDays = Base + ".audit_retention_days";
+        public const string MaxActiveResources = Base + ".max_active_resources";
+    }
+
     public static class EventReporting
     {
         public const string IntakeEnabled = "event_reporting.intake_enabled";

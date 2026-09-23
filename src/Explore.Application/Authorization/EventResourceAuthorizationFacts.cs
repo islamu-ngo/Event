@@ -3,6 +3,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Authorization;
 
@@ -32,9 +33,10 @@ public sealed class EventResourceAuthorizationFacts
 
     /// <summary>Creation resolves its existing parent Event, never a fabricated persisted resource.</summary>
     public EventResourceAuthorizationFacts(EventResourceParentFacts parent, Guid parentVersion,
-        Guid? subjectUserId, bool isMachineCaller, EventResourceManagementFacts management)
+        Guid? subjectUserId, bool isMachineCaller, EventResourceManagementFacts management,
+        EventResourceGovernancePolicy? governancePolicy)
     {
-        Access = new(parent.TenantId, subjectUserId, isMachineCaller, parent, [], false);
+        Access = new(parent.TenantId, subjectUserId, isMachineCaller, parent, [], false, governancePolicy);
         Management = management;
         ResourceVersion = parentVersion;
         AttachmentGeneration = "parent";
@@ -52,7 +54,7 @@ public sealed class EventResourceAuthorizationFacts
         bool publicOnly = request.IsMachineCaller || request.SubjectUserId is null;
         var access = publicOnly
             ? new EventResourceAccessFacts(Access.TenantId, null, request.IsMachineCaller,
-                Access.Parent, [], Access.PayloadSafetySatisfied)
+                Access.Parent, [], Access.PayloadSafetySatisfied, Access.GovernancePolicy)
             : Access;
         var decision = Policy is null ? new EventResourceAccessDecision(false, false, false)
             : EventResourceAccessRules.Evaluate(Policy, access, now);
@@ -66,6 +68,7 @@ public sealed class EventResourceAuthorizationFacts
             && !Access.Parent.EventDeleted && Access.Parent.TenantId == request.TenantId
             && (creating || Access.Parent.EventId == Policy!.EventId);
         bool publication = Policy is not null && management && Management.PublicationCeiling && Access.PayloadSafetySatisfied
+            && EventResourceAccessRules.IsGovernanceEligible(Policy, Access.GovernancePolicy)
             && Policy.HasPublishablePayload && EventResourceAccessRules.IsParentEligible(Policy, Access.Parent)
             && Policy.Availability.TryResolve(Access.Parent.Schedule, out _, out _)
             && Policy.PublicationStateId is (int)EventResourcePublicationStateEnum.Draft

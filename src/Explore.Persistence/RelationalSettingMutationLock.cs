@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
@@ -57,7 +58,8 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
         }
 
         bool visitorPolicy = RequiresVisitorAccessFence(orderedKeys);
-        if (RequiresEmailDeliveryFence(orderedKeys) || visitorPolicy)
+        bool resourcePolicy = RequiresEventResourceGovernanceFence(orderedKeys);
+        if (RequiresEmailDeliveryFence(orderedKeys) || visitorPolicy || resourcePolicy)
         {
             IReadOnlySet<string>? outerKeys = _outerOrderedKeys.Value;
             if (outerKeys is null)
@@ -70,7 +72,7 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
                 // use the same order so a database writer cannot block its own lock holder.
                 return ExecuteOrderedGroupsAsync(
                     [orderedKeys],
-                    token => visitorPolicy
+                    token => visitorPolicy || resourcePolicy
                         ? _unitOfWork.ExecuteSerializableAsync(
                             innerToken => ExecuteInsideTransactionAsync(orderedKeys, operation, innerToken), token)
                         : _unitOfWork.ExecuteInTransactionAsync(
@@ -214,6 +216,9 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
         if (RequiresVisitorAccessFence(normalizedKeys))
             normalizedKeys = normalizedKeys.Concat(VisitorAccessCapabilityResolver.AuthoritySettingKeys)
                 .Distinct(StringComparer.Ordinal).OrderBy(key => key, StringComparer.Ordinal).ToArray();
+        if (RequiresEventResourceGovernanceFence(normalizedKeys))
+            normalizedKeys = normalizedKeys.Concat(EventResourceSettingMutationGuard.Keys)
+                .Distinct(StringComparer.Ordinal).OrderBy(key => key, StringComparer.Ordinal).ToArray();
 
         return RequiresEmailDeliveryFence(normalizedKeys)
             ? [GovernanceSettingKeys.Email.DeliveryEnabled,
@@ -238,6 +243,12 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             }
         }
 
+        if (RequiresEventResourceGovernanceFence(ordered))
+        {
+            ordered.RemoveAll(EventResourceSettingMutationGuard.Handles);
+            ordered.InsertRange(0, EventResourceSettingMutationGuard.Keys.OrderBy(key => key, StringComparer.Ordinal));
+        }
+
         // Visitor authority is always one complete group, independent of the caller's other groups.
         if (RequiresVisitorAccessFence(ordered))
         {
@@ -253,6 +264,9 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
 
     internal static bool RequiresVisitorAccessFence(IEnumerable<string> keys) =>
         keys.Select(NormalizeCanonicalKey).Any(VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains);
+
+    internal static bool RequiresEventResourceGovernanceFence(IEnumerable<string> keys) =>
+        keys.Select(NormalizeCanonicalKey).Any(EventResourceSettingMutationGuard.Handles);
 
     internal static bool RequiresEmailDeliveryFence(IEnumerable<string> keys) =>
         keys.Select(NormalizeCanonicalKey).Any(key => key == GovernanceSettingKeys.TenantDelegation.LockSmtp

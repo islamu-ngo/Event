@@ -7,13 +7,15 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services;
+using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Services;
 
 /// <summary>Builds immutable resource-authority snapshots exclusively from fresh, bounded repository reads.</summary>
 public sealed partial class EventResourceAuthoritySnapshotReader(
     IEventResourceRepository resources,
-    IEventAuthoritySnapshotService eventAuthority) : IEventResourceAuthoritySnapshotReader
+    IEventAuthoritySnapshotService eventAuthority,
+    IEventResourceGovernancePolicyReader governance) : IEventResourceAuthoritySnapshotReader
 {
     private const int FactLimit = EventResourceAuthorityRequest.MaximumBatchChecks;
 
@@ -47,6 +49,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             return result;
 
         Guid tenantId = first.TenantId;
+        EventResourceGovernancePolicy? governancePolicy = await governance.ReadAsync(tenantId, cancellationToken);
         Guid[] resourceIds = requests.Where(request => request.Action != "create" && request.ResourceId != Guid.Empty)
             .Select(request => request.ResourceId).Distinct().ToArray();
         IReadOnlyList<EventResource> resourceRows = await resources.GetAuthorityResourcesAsync(
@@ -115,17 +118,20 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
             EventResourceManagementFacts management = new(
                 new EventResourceTimedAuthority(organizer), new EventResourceTimedAuthority(subject.TenantMember),
                 new EventResourceTimedAuthority(subject.CanModerate),
-                grants, managementCeiling: false, publicationCeiling: false);
+                grants, managementCeiling: resource is not null || governancePolicy is
+                {
+                    MaxActiveResources: > 0, EnabledDeliveryTypes.Count: > 0, EnabledAudiences.Count: > 0
+                }, publicationCeiling: governancePolicy is not null);
             if (resource is null)
             {
                 result[index] = new(parent, parentEvent.ConcurrencyStamp, request.SubjectUserId,
-                    request.IsMachineCaller, management);
+                    request.IsMachineCaller, management, governancePolicy);
                 continue;
             }
 
-            (bool payloadSafe, string generation) = ReadAttachment(resource, storageById);
+            (bool payloadSafe, string generation) = ReadAttachment(resource, storageById, governancePolicy);
             result[index] = new(resource,
-                new(tenantId, request.SubjectUserId, request.IsMachineCaller, parent, audience, payloadSafe),
+                new(tenantId, request.SubjectUserId, request.IsMachineCaller, parent, audience, payloadSafe, governancePolicy),
                 management, generation, request.Action == "moderate" && subject.ModerationPrincipal is { } principal
                     ? new(principal, CaptureNativeParent(parentEvent)) : null);
         }
@@ -413,7 +419,7 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
     };
 
     private static (bool Safe, string Generation) ReadAttachment(
-        EventResource resource, IReadOnlyDictionary<Guid, StorageObject> storageById)
+        EventResource resource, IReadOnlyDictionary<Guid, StorageObject> storageById, EventResourceGovernancePolicy? governancePolicy)
     {
         if (resource.StorageObjectId is not { } storageId)
         {
@@ -421,7 +427,9 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 resource.ExternalDestinationProtectionVersion,
                 resource.ExternalDestinationSafeOrigin ?? string.Empty,
                 resource.ExternalDestinationCiphertext ?? string.Empty);
-            return (resource.HasPublishablePayload(), Sha256(protectedPayload));
+            return (resource.HasPublishablePayload()
+                && governancePolicy?.AllowsExternalOrigin(resource.ExternalDestinationSafeOrigin ?? string.Empty) == true,
+                Sha256(protectedPayload));
         }
         if (!storageById.TryGetValue(storageId, out StorageObject? storage)
             || storage.IsDeleted || storage.LifecycleState != StorageObjectLifecycleStates.Active

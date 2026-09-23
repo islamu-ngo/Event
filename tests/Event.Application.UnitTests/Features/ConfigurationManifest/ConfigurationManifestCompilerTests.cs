@@ -235,6 +235,33 @@ public sealed class ConfigurationManifestCompilerTests
     }
 
     [Test]
+    public async Task Compile_ResourceSettingLocksTheCompleteCoordinatedFamily()
+    {
+        ConfigurationManifestV1Alpha2 manifest = CreateManifest(
+            new ConfigurationManifestInstanceV1Alpha2
+            {
+                Settings = new Dictionary<string, JsonElement>(
+                    StringComparer.Ordinal)
+                {
+                    [EventResourceSettingDefinitions.MaxActiveResources.Key] =
+                        ConfigurationManifestTestData.Json("100")
+                },
+                Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(
+                    StringComparer.Ordinal)
+            },
+            CreateTenant("primary"));
+
+        ConfigurationManifestApplyPlan plan = ConfigurationManifestCompiler.Compile(
+            ReadResult(manifest),
+            OperationId,
+            OccurredAt);
+        string[] locks = ConfigurationManifestLockKeys.Compile(plan).ToArray();
+
+        await Assert.That(EventResourceSettingDefinitions.All.All(definition =>
+            locks.Contains(definition.Key, StringComparer.Ordinal))).IsTrue();
+    }
+
+    [Test]
     public async Task Compile_OmittedFieldsProduceNoResetOrDeletionWrites()
     {
         ConfigurationManifestApplyPlan plan =

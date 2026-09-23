@@ -33,6 +33,11 @@ public sealed class EventMaterialCollectionLinkPolicy(ITenantContext tenantConte
             .RequirePermission(AuthorizationActions.EventResources.Create, ResourceKinds.EventResource,
                 context.EventId.ToString("D"), new AuthorizationScope(TenantId: context.TenantId.ToString("D")),
                 new EventResourceTargetAuthorizationFacts(context.TenantId, context.EventId));
+        yield return LinkDefinition.Action(LinkRelations.ExportResourceMetadata, RouteNames.ExportEventResourceMetadata,
+                HttpMethods.Get, new { eventId = context.EventId })
+            .RequirePermission(AuthorizationActions.EventResources.Export, ResourceKinds.EventResource,
+                context.EventId.ToString("D"), new AuthorizationScope(TenantId: context.TenantId.ToString("D")),
+                new EventResourceCollectionAuthorizationFacts(context.TenantId, context.EventId));
     }
 
     private LinkDefinition Resource(LinkDefinition link, EventResourceManagementDto dto, string action) =>

@@ -13,6 +13,8 @@ internal static class HalOpenApiSchemaCatalog
         typeof(Explore.Application.DTOs.Event.EventDto),
         typeof(Explore.Application.DTOs.Event.EventListDto),
         typeof(Explore.Application.DTOs.EventResource.EventResourceManagementDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceMetadataExportDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceMetadataExportPageDto),
         typeof(Explore.Application.DTOs.EventResource.EventResourceAudienceDetailDto),
         typeof(Explore.API.Models.EventResourceAudiencePageResource),
         typeof(Explore.Application.DTOs.EventResource.EventResourceManagementCollectionDto),

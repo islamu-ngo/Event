@@ -11,6 +11,7 @@ public static class LinkRelations
     public const string Management = "management";
     public const string AccessibleAlternative = "accessible-alternative";
     public const string CreateResource = "create-resource";
+    public const string ExportResourceMetadata = "export";
     public const string ViewAudit = "view-audit";
     public const string Unpublish = "unpublish";
     public const string Moderate = "moderate";

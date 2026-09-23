@@ -45,10 +45,26 @@ public sealed class EventMaterialHateoasTests
         tenant.TenantId.Returns(tenantId);
         var policy = new EventMaterialCollectionLinkPolicy(tenant);
         await Assert.That(policy.GetCollectionLinks(null, null)).IsEmpty();
-        var create = policy.GetCollectionLinks(null, new EventMaterialCollectionAuthorizationContext(tenantId, eventId)).Single();
+        var create = policy.GetCollectionLinks(null, new EventMaterialCollectionAuthorizationContext(tenantId, eventId))
+            .Single(link => link.Rel == "create-resource");
         await Assert.That(create.PermissionFacts).IsEqualTo(new EventResourceTargetAuthorizationFacts(tenantId, eventId));
         await Assert.That(create.PermissionAction).IsEqualTo("create");
         await Assert.That(create.RequiresAuth).IsTrue();
+    }
+
+    [Test]
+    public async Task MetadataExportRequiresItsOwnExactParentAuthority()
+    {
+        Guid tenantId = Guid.CreateVersion7(), eventId = Guid.CreateVersion7();
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(tenantId);
+        var policy = new EventMaterialCollectionLinkPolicy(tenant);
+        var export = policy.GetCollectionLinks(null, new EventMaterialCollectionAuthorizationContext(tenantId, eventId))
+            .Single(link => link.Rel == "export");
+        await Assert.That(export.PermissionAction).IsEqualTo("export");
+        await Assert.That(export.PermissionFacts).IsEqualTo(new EventResourceCollectionAuthorizationFacts(tenantId, eventId));
+        await Assert.That(export.RequiresAuth).IsTrue();
+        await Assert.That(policy.GetCollectionLinks(null, new EventMaterialCollectionAuthorizationContext(Guid.CreateVersion7(), eventId))).IsEmpty();
     }
 
     private static EventResourceManagementDto Resource(EventResourcePublicationStateEnum state) => new(

@@ -36358,6 +36358,134 @@
         "x-idempotency-key-required": true
       }
     },
+    "/api/event/{eventId}/resources/export": {
+      "get": {
+        "tags": [
+          "EventResourceExport"
+        ],
+        "operationId": "ExportEventResourceMetadata",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResourceMetadataExportPageDto"
+                }
+              },
+              "application/json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated"
+      }
+    },
     "/api/eventresource/{id}/management": {
       "get": {
         "tags": [
@@ -124551,6 +124679,138 @@
           }
         }
       },
+      "EventResourceMetadataExportDto": {
+        "required": [
+          "id",
+          "publicationState",
+          "title",
+          "kind",
+          "disclosureMode",
+          "deliveryType",
+          "availability",
+          "audienceRules"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventSessionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "publicationState": {
+            "$ref": "#/components/schemas/EventResourcePublicationStateEnum"
+          },
+          "title": {
+            "type": "string"
+          },
+          "publicTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sensitiveNotes": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventResourceKindEnum"
+          },
+          "disclosureMode": {
+            "$ref": "#/components/schemas/EventResourceDisclosureModeEnum"
+          },
+          "deliveryType": {
+            "$ref": "#/components/schemas/EventResourceDeliveryTypeEnum"
+          },
+          "languageCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accessibilityNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "accessibleAlternativeEventResourceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/EventResourceTimeIntentDto"
+          },
+          "audienceRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventResourceAudienceDto"
+            }
+          }
+        }
+      },
+      "EventResourceMetadataExportPageDto": {
+        "required": [
+          "eventId",
+          "page",
+          "pageSize",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventResourceMetadataExportDto"
+            }
+          }
+        }
+      },
       "EventResourceProviderBindingDocument": {
         "required": [
           "revision",
@@ -184099,6 +184359,9 @@
     },
     {
       "name": "EventResourceManagement"
+    },
+    {
+      "name": "EventResourceExport"
     },
     {
       "name": "EventResourceProviderActivation"

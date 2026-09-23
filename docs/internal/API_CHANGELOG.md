@@ -5,6 +5,13 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Portable resource metadata.** A private/no-store export query uses exact
+  parent and per-resource `export` authority with version-bound final checks.
+  The explicit bounded projection preserves semantic metadata, audience rules
+  and relative timing without delivery material, audit rows or attribution.
+  The management collection gains a scoped export action; generated consumers
+  retain the typed JSON contract. See [metadata portability](EVENT_RESOURCES.md#authorized-metadata-portability).
+
 - **Audience resource disclosure.** Two private/no-store native read routes add
   explicit safe metadata and teaser projections, complete bounded discovery at
   the 500-active-resource ceiling and purpose-bound 15-minute continuation.

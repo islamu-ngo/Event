@@ -84,6 +84,20 @@ delivery.
 
 ---
 
+## Exporting resource metadata
+
+An authorized manager may follow the management collection's `export` link to
+`GET /api/event/{eventId}/resources/export`. The private/no-store JSON contains
+semantic metadata, audience rules and original relative timing intent. It can
+include private organizer notes, so handle the exported document accordingly.
+It contains no stored-file locator, destination, encryption envelope, manager
+attribution or attendee history.
+
+Use `page` and `pageSize` (20 by default, at most 100) for bounded pages.
+No global count is returned. Every page requires current event and per-resource
+export authority; an old link cannot bypass revocation. This exports metadata,
+not file bytes, a ZIP archive, or an importable access grant.
+
 ## Related Guides & Next Steps
 
 * **[Administration Guide](../administration-and-branding/admin-guide.md)** — Configure platform monetization and organization verified badges.

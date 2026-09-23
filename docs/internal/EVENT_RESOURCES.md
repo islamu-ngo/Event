@@ -109,6 +109,30 @@ an entitlement downgrade, even when no resource stamp changed. Proof state is
 neither serialized nor a reusable grant. As with delivery's later boundary,
 this does not promise freshness through response completion.
 
+## Authorized metadata portability
+
+`GET /api/event/{eventId}/resources/export?page=&pageSize=` returns bounded
+semantic JSON under the distinct native `export` action. The parent event and
+every included resource require current export authority; management visibility
+alone is not a provider export decision. The management collection advertises
+`export` only through its scoped capability policy.
+
+The explicit immutable projection preserves kind, publication state, authorized
+public/private metadata (including management notes), audience qualifiers,
+relative availability intent and same-event semantic references. It excludes
+concurrency stamps, audit history, manager attribution, storage identity,
+provider keys, protected envelopes, origins and destinations. Delivery
+descriptors or download references are not emitted before their owning delivery
+capability exists.
+
+Pages default to 20 and are capped at 100. There are no totals or inferred final
+page links. Rows are projected in a bounded serializable read, then exact
+resource versions are bound to a fresh parent-plus-row A/provider/B export
+decision immediately before returning JSON. A stale projection or any denied
+row discards the entire prepared page. Cancellation remains caller-owned;
+infrastructure failure carries no metadata. This is not bulk ZIP export or
+resource import, and the document is not an authorization grant.
+
 ## Relational ownership
 
 The database enforces tenant-qualified ownership instead of relying on globally unique identifiers:

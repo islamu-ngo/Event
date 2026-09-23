@@ -19,6 +19,18 @@ The draft HTTP API version is `0.1`. In pre-release development before v1, break
 
 ## Recent externally visible themes
 
+### Portable resource metadata (2026-09-23)
+
+`GET /api/event/{eventId}/resources/export` adds private/no-store semantic JSON
+for currently authorized managers. Parent and per-resource `export` decisions
+are distinct from management visibility. Pages default to 20, are capped at 100
+and expose no totals. Stale resource revisions or denied rows release no page.
+
+The document preserves authorized metadata, audience qualifiers and timing
+intent, while excluding backing locations, destinations, protected envelopes,
+audit/attendee history and manager attribution. The management collection
+offers the scoped `export` HAL action. No file delivery or import is enabled.
+
 ### Audience resource metadata (2026-09-23)
 
 Private/no-store `GET /api/event/{eventId}/resources` and

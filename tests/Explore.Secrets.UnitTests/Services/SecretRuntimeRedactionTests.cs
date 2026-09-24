@@ -30,7 +30,9 @@ public sealed class SecretRuntimeRedactionTests
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
-            .Returns<Task<string?>>(_ => throw new InvalidOperationException(ProviderBodyCanary));
+            .Returns<Task<SecretProviderValue?>>(_ =>
+                throw new InvalidOperationException(
+                    ProviderBodyCanary));
         var factory = Substitute.For<IInfisicalClientFactory>();
         factory.GetClientAsync(Arg.Any<CancellationToken>()).Returns(client);
         var logger = new CollectingLogger<InfisicalSecretSource>();
@@ -50,6 +52,50 @@ public sealed class SecretRuntimeRedactionTests
         await Assert.That(logger.Output).DoesNotContain(ProviderBodyCanary);
         await Assert.That(logger.Output).DoesNotContain(EnvironmentCanary);
         await Assert.That(logger.Output).DoesNotContain(PathCanary);
+    }
+
+    [Test]
+    public async Task InfisicalRevisionChangesWithoutUsingSecretValue()
+    {
+        const string secretCanary = "runtime-secret-canary";
+        var client = Substitute.For<IInfisicalClient>();
+        client.GetSecretAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                new SecretProviderValue(
+                    secretCanary,
+                    "provider-id:41"),
+                new SecretProviderValue(
+                    secretCanary,
+                    "provider-id:42"));
+        var factory = Substitute.For<IInfisicalClientFactory>();
+        factory.GetClientAsync(Arg.Any<CancellationToken>())
+            .Returns(client);
+        var source = new InfisicalSecretSource(
+            factory,
+            new CollectingLogger<InfisicalSecretSource>());
+        SecretBinding binding = SecretBinding.CreateInfisical(
+            SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret,
+            SecretScope.Instance,
+            scopeId: null,
+            EnvironmentCanary,
+            PathCanary,
+            "KEYCLOAK_BLAZOR_CLIENT_SECRET");
+
+        SecretResolutionResult first =
+            await source.GetSecretAsync(binding);
+        SecretResolutionResult second =
+            await source.GetSecretAsync(binding);
+
+        await Assert.That(first.Secret!.BindingRevision)
+            .IsNotEqualTo(second.Secret!.BindingRevision);
+        await Assert.That(first.Secret.BindingRevision)
+            .DoesNotContain(secretCanary);
+        await Assert.That(second.Secret.BindingRevision)
+            .DoesNotContain(secretCanary);
     }
 
     [Test]

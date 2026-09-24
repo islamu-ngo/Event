@@ -113,18 +113,31 @@ provider-neutral:
 
 ### Provider credential HTTP response boundary
 
-The seven existing credential-bearing provider-management POST operations are
-`private, no-store` and exclude generic idempotency response storage. A repeated
-request reaches the existing operation and re-evaluates current setup or instance
-administrator authority and the current provider outcome; a historical successful
-response is never replayed as provider authority. The existing secret-bearing
-internal authentication-configuration GET is also `private, no-store`.
+All seven `/api/instance/keycloak` routes are `private, no-store` and bypass
+generic idempotency response storage. Each request independently requires active
+setup authority or persisted instance-administrator authority; an authenticated
+principal, route attribute, or receipt ID alone is insufficient. A receipt read
+also checks the server-derived setup-generation binding for setup-created work or
+the verified administrator-creator binding for administrator-created work.
 
-This changes neither routes, request or response DTOs, operation IDs,
-authorization filters, handlers, HAL affordances, provider reconciliation, nor
-generated contracts. It is limited to HTTP response retention and replay:
-database-secret removal, provider-fallback removal, UI clearing, log hardening,
-lifecycle-service identity, and Infisical isolation remain outside this change.
+`POST /inspect` and `POST /operations/{id}/apply` accept administrator credentials
+only as fresh advanced-form input for that foreground request. They are not read
+from deployment configuration, carried into another request, or retained in a
+receipt, cookie, storage, log, job, cache, or support artifact. Receipts expire
+after 15 minutes and retain only allowlisted nonsecret approval, target, state,
+and outcome fields.
+
+Repeated requests re-evaluate current authority and receipt state rather than
+replaying a historical HTTP response. Reconciliation is provider-read-only; it can
+update the local receipt outcome but cannot retry, resume, or roll back a provider
+write. A submitted call with an unknown outcome remains blocked for explicit
+inspect-only reconciliation.
+
+Application startup has no Keycloak administrative authority, mounts no sample
+realm, and launches no import/reconciliation worker. A fresh managed-local
+provider reaches setup before realm discovery succeeds. Every Event-initiated
+write requires the foreground authority, receipt state and exact provider
+preconditions above.
 
 When AT Protocol is primary, a verified DID may JIT-create a passwordless
 `User`, personal `Actor`, and global `UserExternalLogin`. This creates no role.

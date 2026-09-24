@@ -259,33 +259,6 @@ public sealed class InfisicalConfigurationProviderTests
     }
 
     [Test]
-    public async Task ConvertToConfigurationKey_WhenKeycloakSmtpFolderSecretsProvided_PreservesKeycloakBootstrapNames()
-    {
-        string[] keys =
-        [
-            "KEYCLOAK_SMTP_HOST",
-            "KEYCLOAK_SMTP_PORT",
-            "KEYCLOAK_SMTP_FROM",
-            "KEYCLOAK_SMTP_FROM_DISPLAY_NAME",
-            "KEYCLOAK_SMTP_AUTH",
-            "KEYCLOAK_SMTP_SSL",
-            "KEYCLOAK_SMTP_STARTTLS",
-            "KEYCLOAK_SMTP_REPLY_TO",
-            "KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME",
-            "KEYCLOAK_SMTP_ENVELOPE_FROM",
-            "KEYCLOAK_SMTP_USER",
-            "KEYCLOAK_SMTP_PASSWORD",
-        ];
-
-        foreach (var key in keys)
-        {
-            var configurationKey = await ConvertToConfigurationKey(key, "/keycloak/smtp");
-
-            await Assert.That(configurationKey).IsEqualTo(key);
-        }
-    }
-
-    [Test]
     public async Task ConvertToConfigurationKey_WhenWebPushFolderLegacySecretsProvided_MapsToWebPush()
     {
         var enabled = await ConvertToConfigurationKey("WEB_PUSH_ENABLED", "/api/webpush");

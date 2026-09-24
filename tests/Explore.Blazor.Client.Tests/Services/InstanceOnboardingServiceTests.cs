@@ -34,6 +34,7 @@ public class InstanceOnboardingServiceTests
         _bffAuthApi = RestService.For<IBffAuthApi>(authClient);
         _service = new InstanceOnboardingService(
             new InstanceAuthenticationSettingsClient(client),
+            new InstanceKeycloakOperationsClient(client),
             new InstanceAuthorizationSettingsClient(client),
             new InstanceGovernanceSettingsClient(client),
             new InstanceMessagingSettingsClient(client),
@@ -279,66 +280,6 @@ public class InstanceOnboardingServiceTests
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.Message).IsEqualTo("Validation failed.");
         await Assert.That(result.Errors).IsNotEmpty();
-    }
-
-    #endregion
-
-    #region KeycloakBootstrapAsync
-
-    [Test]
-    public async Task BootstrapKeycloakRealmAsync_UsesSetupEndpointAndRefreshesAuthSchemes_WhenApiSucceeds()
-    {
-        // Arrange
-        Uri? requestUri = null;
-        HttpMethod? method = null;
-        string? requestBody = null;
-        var refreshCalled = false;
-        var commandResponse = new BaseCommandResponseOfGuid { Success = true, Message = "Bootstrapped" };
-        SetupBffClient(async request =>
-        {
-            requestUri = request.RequestUri;
-            method = request.Method;
-            requestBody = await request.Content!.ReadAsStringAsync();
-            return CreateJsonResponse(commandResponse);
-        });
-        SetupBffSelfClient(request =>
-        {
-            refreshCalled = request.RequestUri?.AbsolutePath == "/bff/auth/refresh-schemes";
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
-        });
-
-        // Act
-        var result = await _service.BootstrapKeycloakRealmAsync(CreateKeycloakBootstrapRequest());
-
-        // Assert
-        await Assert.That(result.Success).IsTrue();
-        await Assert.That(requestUri).IsNotNull();
-        await Assert.That(requestUri!.AbsolutePath).IsEqualTo("/api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap");
-        await Assert.That(method).IsEqualTo(HttpMethod.Post);
-        await Assert.That(requestBody).Contains("\"blazorRedirectUris\":[\"https://localhost/*\"]");
-        await Assert.That(requestBody).Contains("\"blazorWebOrigins\":[\"\\u002B\"]");
-        await Assert.That(refreshCalled).IsTrue();
-    }
-
-    [Test]
-    public async Task BootstrapKeycloakRealmAsync_DoesNotRefreshAuthSchemes_WhenApiFails()
-    {
-        // Arrange
-        var refreshCalled = false;
-        var commandResponse = new BaseCommandResponseOfGuid { Success = false, Message = "Bootstrap failed" };
-        SetupBffClient(CreateJsonResponse(commandResponse, HttpStatusCode.BadRequest));
-        SetupBffSelfClient(request =>
-        {
-            refreshCalled = true;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
-        });
-
-        // Act
-        var result = await _service.BootstrapKeycloakRealmAsync(CreateKeycloakBootstrapRequest());
-
-        // Assert
-        await Assert.That(result.Success).IsFalse();
-        await Assert.That(refreshCalled).IsFalse();
     }
 
     #endregion
@@ -1247,20 +1188,6 @@ public class InstanceOnboardingServiceTests
         };
         return response;
     }
-
-    private static KeycloakBootstrapRequestDto CreateKeycloakBootstrapRequest() =>
-        new()
-        {
-            KeycloakBaseUrl = "https://keycloak.example.com",
-            Realm = "ISLAMU",
-            BlazorClientId = "islamu-event-blazor",
-            BlazorClientSecret = "runtime-blazor-secret",
-            ApiClientId = "islamu-event-api",
-            ApiClientSecret = "runtime-api-secret",
-            Mode = 0,
-            BootstrapAdminUsername = "keycloak-admin",
-            BootstrapAdminPassword = "one-time-admin-password"
-        };
 
     private void SetupBffClient(HttpResponseMessage response)
     {

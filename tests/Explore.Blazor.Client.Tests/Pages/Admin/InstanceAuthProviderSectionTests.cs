@@ -1,5 +1,7 @@
 using Explore.Blazor.Client.Contracts.Interop;
+using Explore.Blazor.Client.Components.Onboarding;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
+using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -37,6 +39,47 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
         await Assert.That(cut.Markup).Contains("AT Protocol Login");
         await Assert.That(cut.Markup).Contains("Disable AT Protocol Login");
         await Assert.That(model.PrimaryProviderId).IsEqualTo(4);
+    }
+
+    [Test]
+    public async Task KeycloakPrimaryUsesSharedOperatorPanel()
+    {
+        AuthProviderConfigurationDto model = LocalModel();
+        model.PrimaryProviderId = 1;
+        model.KeycloakAuthority =
+            "https://identity.example.test/realms/operators";
+        model.KeycloakClientId = "event-bff";
+        var service =
+            Substitute.For<IInstanceOnboardingService>();
+        service.GetKeycloakConnectionAsync(
+                Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfKeycloakConnectionDto
+            {
+                Status = "resolved",
+                Available = true,
+                CredentialOwnership = "deployment-managed",
+                CredentialStatus = "resolved",
+                OperatorGuidance = "reinspect",
+                _links = new Dictionary<string, HalLink>()
+            });
+
+        var cut = _context.Render<InstanceAuthProviderSection>(
+            parameters => parameters
+                .Add(component => component.Model, model)
+                .Add(
+                    component => component.AuthorizationModel,
+                    new AuthorizationProviderConfigurationDto
+                    {
+                        Provider = "local",
+                        AuthorizationProviderManagedByDeployment =
+                            false
+                    })
+                .Add(component => component.IsSingleTenant, true)
+                .Add(component => component.OnboardingService, service));
+
+        await Assert.That(
+                cut.FindComponents<KeycloakOperatorPanel>())
+            .HasCount().EqualTo(1);
     }
 
     [Test]

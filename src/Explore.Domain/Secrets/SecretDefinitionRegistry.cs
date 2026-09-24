@@ -120,10 +120,7 @@ public static class SecretDefinitionRegistry
             public const string Realm = "keycloak.realm";
             public const string ClientId = "keycloak.client_id";
             public const string BlazorClientSecret = "keycloak.blazor_client_secret";
-            public const string ApiClientSecret = "keycloak.api_client_secret";
             public const string Endpoint = "keycloak.endpoint";
-            public const string AdminUsername = "keycloak.admin_username";
-            public const string AdminPassword = "keycloak.admin_password";
             public const string DbPassword = "keycloak.db_password";
         }
 
@@ -403,17 +400,6 @@ public static class SecretDefinitionRegistry
             },
             new()
             {
-                Key = Keys.Keycloak.ApiClientSecret,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
-                DefaultInfisicalKey = "KEYCLOAK_API_CLIENT_SECRET",
-                DefaultEnvironmentVariableName = "KEYCLOAK_API_CLIENT_SECRET",
-                IsBootstrapSecret = false,
-                Description = "Keycloak OIDC client secret for the API service (confidential client).",
-            },
-            new()
-            {
                 Key = Keys.Keycloak.Endpoint,
                 AllowedScopes = instanceOnly,
                 AllowedSources = nonBootstrapSources,
@@ -422,28 +408,6 @@ public static class SecretDefinitionRegistry
                 DefaultEnvironmentVariableName = "KEYCLOAK_ENDPOINT",
                 IsBootstrapSecret = false,
                 Description = "Keycloak base URL (e.g. https://auth.example.com).",
-            },
-            new()
-            {
-                Key = Keys.Keycloak.AdminUsername,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
-                DefaultInfisicalKey = "KEYCLOAK_ADMIN_USERNAME",
-                DefaultEnvironmentVariableName = "KEYCLOAK_ADMIN_USERNAME",
-                IsBootstrapSecret = false,
-                Description = "Keycloak realm administrator username.",
-            },
-            new()
-            {
-                Key = Keys.Keycloak.AdminPassword,
-                AllowedScopes = instanceOnly,
-                AllowedSources = nonBootstrapSources,
-                DefaultInfisicalPath = "/keycloak",
-                DefaultInfisicalKey = "KEYCLOAK_ADMIN_PASSWORD",
-                DefaultEnvironmentVariableName = "KEYCLOAK_ADMIN_PASSWORD",
-                IsBootstrapSecret = false,
-                Description = "Keycloak realm administrator password.",
             },
             new()
             {

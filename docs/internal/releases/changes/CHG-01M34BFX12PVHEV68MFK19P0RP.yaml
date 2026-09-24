@@ -1,0 +1,34 @@
+# Records retirement of implicit Keycloak startup reconciliation.
+# Establishes initial-import and explicit-operation preservation contracts.
+Change-Id: CHG-01M34BFX12PVHEV68MFK19P0RP
+Title: stop changing Keycloak during application startup
+Type: fix
+Scope: self-hosting
+Summary: Remove automatic sample import and startup reconciliation while preserving provider volumes behind explicit reviewed operations.
+Group: keycloak-operator-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: The keycloak-init service, sample import, startup waits, callback overrides and API client-secret bootstrap input are removed without replacements.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Startup has no Keycloak administrative authority; all later provider writes require a reviewed receipt.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Existing realms and volumes remain untouched; fresh managed-local installations explicitly provision or manually prepare the provider.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Retired callback and API-secret inputs are removed from Compose, AppHost and the generated environment catalogue.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Startup retirement does not change the reviewed operator API schema.
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-compose.md
+    Disposition: documented
+    Detail: Operators coordinate backups, rotation, restart, inspection and uncertain-outcome recovery explicitly.

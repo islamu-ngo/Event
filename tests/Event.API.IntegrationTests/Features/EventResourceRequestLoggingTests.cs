@@ -124,6 +124,27 @@ public sealed class EventResourceRequestLoggingTests
         await Assert.That(emitted).DoesNotContain(credential);
     }
 
+    [Test]
+    public async Task UnmatchedResourceActivityClearsLegacyHttpUrl()
+    {
+        Guid identifier = Guid.CreateVersion7();
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = $"/api/eventresource/{identifier}/content/private-token";
+        string rawUrl = $"https://localhost{context.Request.Path}?token=private-token";
+        using var activity = new Activity("unmatched resource").Start();
+        activity.SetTag("url.path", context.Request.Path.Value);
+        activity.SetTag("http.url", rawUrl);
+        var logger = new Capture();
+        var middleware = new RequestLoggingMiddleware(_ => Task.CompletedTask, logger);
+
+        await middleware.InvokeAsync(context, Substitute.For<ITenantContextAccessor>());
+
+        await Assert.That(activity.GetTagItem("url.path")).IsEqualTo("route-unresolved");
+        await Assert.That(activity.GetTagItem("http.url")).IsNull();
+        await Assert.That(logger.Entries.Single()).DoesNotContain(identifier.ToString("D"));
+    }
+
     private sealed class Capture : ILogger<RequestLoggingMiddleware>
     {
         public List<string> Entries { get; } = [];

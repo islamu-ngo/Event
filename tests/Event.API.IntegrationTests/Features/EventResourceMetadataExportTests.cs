@@ -69,6 +69,8 @@ public sealed class EventResourceMetadataExportTests
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId, EventResourceAudienceKindEnum.Public)], userId, now);
             resource.SetExternalDestination(ciphertext, 1, "https://not-exported.example.test", resource.ConcurrencyStamp, userId, now);
             database.EventResources.Add(resource);
+            var binding = StorageProviderBinding.Local(Path.GetFullPath("resource-export-test-storage"));
+            database.Add(binding);
             foreach (var item in new[]
                      {
                          (Id: downloadableId, Future: false, Name: "downloadable.pdf"),
@@ -81,7 +83,8 @@ public sealed class EventResourceMetadataExportTests
                     Id = storageId, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
                     FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
                     Uri = $"/api/eventresource/{item.Id:D}/content", ObjectKey = $"{providerKey}-{item.Id:N}",
-                    Provider = StorageProviders.Local, FullName = item.Name, SafeDisplayName = item.Name,
+                    Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
+                    FullName = item.Name, SafeDisplayName = item.Name,
                     Extension = ".pdf", ContentType = EventResourceGovernancePolicy.PdfMediaType,
                     Size = 13, Sha256Checksum = checksum, Purpose = StorageObjectPurposes.EventResource,
                     Visibility = StorageObjectVisibilities.PrivateOwner,

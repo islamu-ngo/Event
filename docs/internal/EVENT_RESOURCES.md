@@ -84,10 +84,13 @@ Unavailable keys, tampering, withdrawal and policy changes emit no Location.
 Only the **initial** origin is constrained: neither DNS resolution nor later
 browser/provider redirects are confined by server-side validation.
 
-Keep retired key material available until dependent resources are withdrawn
-or replaced. A backup containing both encrypted rows and unwrapped
-Data Protection key XML is not confidential against full backup compromise;
-use the deployment's existing key-wrapping authority where configured.
+Keep retired key material available while any stored destination ciphertext
+still depends on it, including withdrawn and archived resources. Withdrawal
+or archive hides a link but retains its ciphertext; republishing must decrypt
+it. Retire a key only after every dependent destination is replaced or
+removed. A backup containing both encrypted rows and unwrapped Data
+Protection key XML is not confidential against full backup compromise; use
+the deployment's existing key-wrapping authority where configured.
 
 The audit page contains only a closed action/outcome/reason, timestamp, and
 retained responsible-manager identity. A successful mutation writes that

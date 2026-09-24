@@ -103,15 +103,17 @@ before retrying an availability failure.
 
 The API encrypts event-resource destinations with its existing database-backed
 Data Protection keyring, scoped to the tenant, resource and protection
-version. Keep retired keys until every destination protected under them has
-been withdrawn or replaced; a restart or normal key rotation should not
-discard an active link. Missing keys fail closed without returning a
-destination. Backing up the database together with **unwrapped** key XML does
-not protect links against a full database/backup compromise; use the
-deployment's approved key-wrapping authority where configured and protect
-backups accordingly. BFF cookie-key storage is not an alternative authority
-for API destination decryption; Combined hosting retains the API database
-keyring even when optional BFF Redis is configured.
+version. Keep retired keys while any stored destination ciphertext depends
+on them, including withdrawn or archived links. Withdrawal hides a link
+without removing its ciphertext; republishing must decrypt it. Retire a
+key only after every dependent destination is replaced or removed.
+Missing keys fail closed without returning a destination. Backing up the
+database together with **unwrapped** key XML does not protect links against
+a full database/backup compromise; use the deployment's approved
+key-wrapping authority where configured and protect backups accordingly.
+BFF cookie-key storage is not an alternative authority for API destination
+decryption; Combined hosting retains the API database keyring even when
+optional BFF Redis is configured.
 
 ## Organization Evidence PDF Uploads
 

@@ -300,6 +300,54 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
     }
 
     [Test]
+    public async Task InterruptedReplacementPreservesOneAttachmentQuotaAndAudit()
+    {
+        var seed = await SeedAsync();
+        Guid originalObjectId;
+        await using (var originalContext = database.CreateContext())
+        {
+            var original = Workflow(originalContext, seed);
+            var reservation = await original.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
+            var attached = await FinalizeAsync(original, reservation.Id!.Id);
+            await Assert.That(attached.IsSuccess).IsTrue();
+            originalObjectId = attached.Id!.StorageObjectId!.Value;
+        }
+        Guid version;
+        await using (var read = database.CreateContext())
+            version = (await read.EventResources.AsNoTracking().SingleAsync(row => row.Id == seed.ResourceId)).ConcurrencyStamp;
+
+        Guid replacementId = Guid.Empty;
+        await using var context = database.CreateContext();
+        var workflow = Workflow(context, seed, async () =>
+        {
+            await using var cancellation = database.CreateContext();
+            var cancel = Workflow(cancellation, seed);
+            await Assert.That((await cancel.CancelAsync(replacementId, default)).IsSuccess).IsTrue();
+            await Assert.That((await cancel.CancelAsync(replacementId, default)).IsSuccess).IsTrue();
+        });
+        replacementId = (await workflow.ReserveAsync(seed.ResourceId, Intent(version), default)).Id!.Id;
+        await Assert.That((await FinalizeAsync(workflow, replacementId)).IsSuccess).IsFalse();
+        await using var verify = database.CreateContext();
+        var resource = await verify.EventResources.AsNoTracking().SingleAsync(row => row.Id == seed.ResourceId);
+        await Assert.That(resource.StorageObjectId).IsEqualTo(originalObjectId);
+        await Assert.That((await verify.StorageObjects.SingleAsync(row => row.Id == originalObjectId)).LifecycleState)
+            .IsEqualTo(StorageObjectLifecycleStates.Active);
+        var replacement = await verify.StorageUploadSessions.SingleAsync(row => row.Id == replacementId);
+        await Assert.That(replacement.Status).IsEqualTo(StorageUploadSessionStates.Canceled);
+        await Assert.That(replacement.ProducerSettled).IsTrue();
+        await Assert.That((await verify.StorageObjectDeletionTombstones.SingleAsync(row =>
+            row.Id == replacement.StorageObjectId)).State).IsEqualTo(StorageObjectDeletionState.Ready);
+        await Assert.That(await verify.StorageObjects.CountAsync(row => row.OwningResourceId == seed.ResourceId
+            && row.LifecycleState == StorageObjectLifecycleStates.Active)).IsEqualTo(1);
+        var quota = await verify.StorageUsageCounters.SingleAsync(row => row.TenantId == seed.TenantId);
+        await Assert.That(quota.ReservedBytes).IsEqualTo(0);
+        await Assert.That(quota.UsedBytes).IsEqualTo(Pdf.Length);
+        await Assert.That(quota.ObjectCount).IsEqualTo(1);
+        await Assert.That(await verify.EventResourceAuditEntries.CountAsync(row => row.EventResourceId == seed.ResourceId
+            && row.Action == EventResourceAuditAction.ConfigureDelivery)).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task ProviderSuccessAuditFailureRollsBackAttachmentAndLeavesReconciliationIdentity()
     {
         var seed = await SeedAsync();
@@ -348,6 +396,88 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         await Assert.That((await verify.StorageObjects.SingleAsync(value => value.Id == objectId)).LifecycleState).IsEqualTo(StorageObjectLifecycleStates.Active);
         await Assert.That(await verify.StorageObjectDeletionTombstones.AnyAsync(value => value.Id == objectId)).IsFalse();
         await Assert.That((await verify.StorageUsageCounters.SingleAsync(value => value.TenantId == seed.TenantId)).UsedBytes).IsEqualTo(Pdf.Length);
+    }
+
+    [Test]
+    [Arguments("pending")]
+    [Arguments("unscanned")]
+    [Arguments("cross-owned")]
+    [Arguments("policy-disallowed")]
+    public async Task PublishCannotUseUnfinishedUnsafeForeignOrPolicyDisallowedFiles(string condition)
+    {
+        var seed = await SeedAsync();
+        await using var context = database.CreateContext();
+        var upload = Workflow(context, seed);
+        var sessionId = (await upload.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
+        if (condition != "pending")
+        {
+            var completed = await FinalizeAsync(upload, sessionId);
+            await Assert.That(completed.IsSuccess).IsTrue();
+            if (condition == "cross-owned")
+                await context.StorageObjects.Where(value => value.Id == completed.Id!.StorageObjectId!.Value)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.OwningResourceId, Guid.CreateVersion7()));
+        }
+        var parent = await context.Events.SingleAsync(value => value.Id == seed.EventId);
+        parent.Publish(Now);
+        parent.VisibilityTypeId = (int)VisibilityTypeEnum.Public;
+        await context.SaveChangesAsync();
+        var version = (await context.EventResources.AsNoTracking()
+            .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
+        var manager = Management(context, seed, condition is "cross-owned" or "policy-disallowed",
+            condition == "policy-disallowed"
+                ? ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] : null);
+        await Assert.That((await manager.ChangeStateAsync(seed.ResourceId, version,
+            EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
+        await using var verify = database.CreateContext();
+        await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId))
+            .PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Draft);
+        await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == seed.ResourceId
+            && value.Action == EventResourceAuditAction.Publish)).IsFalse();
+    }
+
+    [Test]
+    public async Task FailedPublicationAuditRetainsDraftAndAttachmentForOneAuthorizedRetry()
+    {
+        var seed = await SeedAsync();
+        Guid fileId, version;
+        await using (var uploadContext = database.CreateContext())
+        {
+            var upload = Workflow(uploadContext, seed);
+            var sessionId = (await upload.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
+            fileId = (await FinalizeAsync(upload, sessionId)).Id!.StorageObjectId!.Value;
+            var parent = await uploadContext.Events.SingleAsync(value => value.Id == seed.EventId);
+            parent.Publish(Now);
+            parent.VisibilityTypeId = (int)VisibilityTypeEnum.Public;
+            await uploadContext.SaveChangesAsync();
+            version = (await uploadContext.EventResources.AsNoTracking()
+                .SingleAsync(value => value.Id == seed.ResourceId)).ConcurrencyStamp;
+        }
+        await using (var failing = database.CreateContext(new AuditFailure()))
+            await Assert.That(async () => await Management(failing, seed, allowUnscanned: true)
+                .ChangeStateAsync(seed.ResourceId, version, EventResourceManagementAction.Publish, default))
+                .Throws<DbUpdateException>();
+        await using (var rolledBack = database.CreateContext())
+        {
+            var resource = await rolledBack.EventResources.SingleAsync(value => value.Id == seed.ResourceId);
+            await Assert.That(resource.PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Draft);
+            await Assert.That(resource.ConcurrencyStamp).IsEqualTo(version);
+            await Assert.That(resource.StorageObjectId).IsEqualTo(fileId);
+            await Assert.That(await rolledBack.EventResourceAuditEntries.AnyAsync(entry =>
+                entry.EventResourceId == seed.ResourceId && entry.Action == EventResourceAuditAction.Publish)).IsFalse();
+        }
+        await using (var resumed = database.CreateContext())
+        {
+            var management = Management(resumed, seed, allowUnscanned: true);
+            await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
+                EventResourceManagementAction.Publish, default)).IsSuccess).IsTrue();
+            await Assert.That((await management.ChangeStateAsync(seed.ResourceId, version,
+                EventResourceManagementAction.Publish, default)).IsSuccess).IsFalse();
+        }
+        await using var verify = database.CreateContext();
+        await Assert.That((await verify.EventResources.SingleAsync(value => value.Id == seed.ResourceId))
+            .PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Published);
+        await Assert.That(await verify.EventResourceAuditEntries.CountAsync(entry =>
+            entry.EventResourceId == seed.ResourceId && entry.Action == EventResourceAuditAction.Publish)).IsEqualTo(1);
     }
 
     [Test]
@@ -909,14 +1039,15 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             Lifecycle(context), authority, tenant, user, Substitute.For<IMachinePrincipalAccessor>(), new Clock());
     }
 
-    private static EventResourceManagementWorkflow Management(ExploreDbContext context, Seed seed, bool allowUnscanned = false)
+    private static EventResourceManagementWorkflow Management(ExploreDbContext context, Seed seed, bool allowUnscanned = false,
+        string[]? mediaTypes = null)
     {
         var repository = new EventResourceRepository(context);
         var unit = new EfCoreUnitOfWork(context);
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(seed.TenantId, Arg.Any<CancellationToken>()).Returns(EventResourceGovernancePolicy.Create(
             Enum.GetValues<EventResourceDeliveryTypeEnum>(), Enum.GetValues<EventResourceAudienceKindEnum>(),
-            [EventResourceGovernancePolicy.PdfMediaType], 1_000_000, allowUnscanned, [], 30, 500, long.MaxValue));
+            mediaTypes ?? [EventResourceGovernancePolicy.PdfMediaType], 1_000_000, allowUnscanned, [], 30, 500, long.MaxValue));
         var routes = Substitute.For<IEventResourceProviderSnapshotReader>();
         routes.ReadAsync(seed.TenantId, Arg.Any<CancellationToken>()).Returns(new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default"));
         var provider = Substitute.For<IEventResourceAuthorizationProvider>();

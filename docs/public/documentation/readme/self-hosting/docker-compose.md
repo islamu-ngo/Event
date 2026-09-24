@@ -52,12 +52,14 @@ connections.
 | `redis` | `6379`, container network only | Cache and the UI's Data Protection key persistence |
 | `keycloak` | `8080` / `http://localhost:8080` | External identity provider; shipped command uses `start-dev` |
 | `keycloak-db` | `5432`, container network only | Keycloak database |
-| `keycloak-init` | No published port | One-shot realm/client configuration |
 | `privacy-erasure-authority-volume-init` | No published port | Sets dedicated authority-volume ownership/permissions |
 
 Local is the curated authentication default, but the current Compose dependency
-graph still starts Keycloak and its initialization services. Selecting Local does
-not remove them. For a genuinely infrastructure-minimal deployment, use
+graph still starts Keycloak. It does not mount or import the repository sample
+realm. A fresh installation reaches setup first; use the advanced operator
+workflow to inspect and explicitly create absent Keycloak resources. Existing
+realms are never synchronized at application startup. Selecting Local does not
+remove Keycloak. For a genuinely infrastructure-minimal deployment, use
 [Standalone](docker-standalone.md).
 
 ### Optional Service Profiles
@@ -124,8 +126,9 @@ If supplying identity via environment variables, supply `INSTANCE__OPERATORIDENT
 as an HTTPS origin even when the instance is unofficial. Select a supported `OPERATORKINDCODE`
 matching the operator's legal status, such as `unincorporated_association` or
 `registered_organization`; `community` is not accepted.
-Check database runtime/migrator role grants and align Keycloak realm/client values
-with your imported realm. No SMTP configuration is required for Local setup.
+Check database runtime/migrator role grants and align Keycloak runtime values
+with operator-owned provider state. If the target realm/client is absent,
+provision it explicitly from setup. No SMTP configuration is required for Local setup.
 Legal contact email is still required; it is not an account-verification channel.
 
 `.env.example` intentionally omits advanced settings. Use the separate
@@ -221,6 +224,14 @@ Once containers are running, navigate to the web onboarding wizard or configure 
    credential, then sign in afresh. No SMTP verification message is required.
 5. Completed setup is locked and the generated file is removed. Delete the host
    copy with `rm -f ./setup-secret`.
+
+By default, the bundled stack sends foreground Keycloak operator requests only
+to the fixed `http://keycloak:8080` service on its private Compose network. Changing
+`KEYCLOAK_INTERNAL_URL` does not redirect submitted administrator credentials.
+An explicit HTTPS `KEYCLOAK_ENDPOINT` may select an external provider; external
+or non-loopback Keycloak operator targets must use HTTPS. The default
+`http://localhost:7002` application origin is accepted only as the local
+browser callback origin; use HTTPS for every non-loopback deployment.
 
 The setup profile's **Support email** is public site identity. It is persisted
 separately from credential email, legal operator contact and SMTP sender policy;
@@ -359,6 +370,11 @@ backup. Preserve ownership and access restrictions on restore. Persistent storag
 alone does not prove crash recovery or survival of every browser session. Rehearse
 recovery in isolation using [Privacy Erasure](../security-and-identity/privacy-erasure.md)
 and the [backup runbook](../configuration-and-operations/backup-restore-upgrade.md).
+
+Before an approved Keycloak operation, capture a coordinated application and
+Keycloak database backup. If Apply returns an unknown outcome, retain those
+backups and the operation receipt, do not replay, and reconcile before any new
+plan.
 
 ---
 

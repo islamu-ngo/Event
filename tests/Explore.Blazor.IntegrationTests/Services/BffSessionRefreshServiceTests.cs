@@ -142,6 +142,73 @@ public sealed class BffSessionRefreshServiceTests
     }
 
     [Test]
+    public async Task RefreshSessionAsync_WhenAccountSyncRejects_RequiresSafeFullSignInWithoutLogout()
+    {
+        string accessToken = CreateJwt(
+            "sync-rejected-user",
+            DateTime.UtcNow.AddMinutes(30),
+            "sync-rejected-session");
+        ClaimsPrincipal principal = CreatePrincipal(
+            "sync-rejected-user",
+            "sync-rejected-session");
+        var authService = new TestAuthenticationService(
+            AuthenticateResult.Success(
+                CreateTicket(principal, accessToken)));
+        var tokenStore = Substitute.For<ICircuitTokenStore>();
+        var syncHandler = new UserSynchronizationHandler(
+            accepted: false);
+        BffSessionRefreshService service = CreateService(
+            adminHandler: syncHandler);
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            DefaultHttpContext context = CreateContext(
+                authService: authService,
+                tokenStore: tokenStore);
+            context.Request.QueryString =
+                new QueryString(
+                    "?returnUrl=https%3A%2F%2Fevil.example%2Fsteal");
+
+            IResult result = await service.RefreshSessionAsync(
+                context,
+                CancellationToken.None);
+            await ExecuteAsync(result, context);
+
+            await Assert.That(context.Response.StatusCode)
+                .IsEqualTo(StatusCodes.Status409Conflict);
+            using JsonDocument response = JsonDocument.Parse(
+                await new StreamReader(
+                        context.Response.Body,
+                        leaveOpen: true)
+                    .ReadToEndAsync());
+            await Assert.That(
+                    response.RootElement
+                        .GetProperty("reason")
+                        .GetString())
+                .IsEqualTo("account_sync_rejected");
+            await Assert.That(
+                    response.RootElement
+                        .GetProperty("signInPath")
+                        .GetString())
+                .IsEqualTo("/login?returnUrl=%2F");
+            await Assert.That(
+                    response.RootElement
+                        .GetProperty(
+                            "reauthenticationRequired")
+                        .GetBoolean())
+                .IsTrue();
+        }
+
+        await Assert.That(syncHandler.SyncCount).IsEqualTo(2);
+        await Assert.That(authService.SignInCount).IsEqualTo(0);
+        await Assert.That(authService.SignOutCount).IsEqualTo(0);
+        tokenStore.DidNotReceive().Store(
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string>());
+    }
+
+    [Test]
     public async Task RefreshSessionAsync_WithAtprotoCookie_UsesPrivateBridgeAndStoresOnlyReplacementToken()
     {
         var principal = CreateAtprotoPrincipal();
@@ -351,12 +418,15 @@ public sealed class BffSessionRefreshServiceTests
             onboardingStatusProvider = new FixedOnboardingStatusProvider();
         }
 
-        IHttpClientFactory adminClientFactory = Substitute.For<IHttpClientFactory>();
-        if (adminHandler is not null)
-        {
-            adminClientFactory = new FixedHttpClientFactory(
-                new HttpClient(adminHandler) { BaseAddress = new Uri("https://api.example/") });
-        }
+        adminHandler ??=
+            new UserSynchronizationHandler(accepted: true);
+        IHttpClientFactory adminClientFactory =
+            new FixedHttpClientFactory(
+                new HttpClient(adminHandler)
+                {
+                    BaseAddress =
+                        new Uri("https://api.example/")
+                });
 
         var adminClaimsTransformation = new BffAdminClaimsTransformation(
             adminClientFactory,
@@ -452,6 +522,7 @@ public sealed class BffSessionRefreshServiceTests
             .AddSingleton(cookieStore)
             .AddSingleton(tokenStore)
             .AddSingleton(onboardingStatusProvider)
+            .AddSingleton<IBffReturnUrlService, BffReturnUrlService>()
             .BuildServiceProvider();
 
         return new DefaultHttpContext { RequestServices = services, Response = { Body = new MemoryStream() } };
@@ -668,6 +739,68 @@ public sealed class BffSessionRefreshServiceTests
         {
             Content = JsonContent.Create(value)
         };
+    }
+
+    private sealed class UserSynchronizationHandler(
+        bool accepted) : HttpMessageHandler
+    {
+        public int SyncCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Post
+                && request.RequestUri!.AbsolutePath
+                    == "/api/user/sync")
+            {
+                SyncCount++;
+                return Task.FromResult(
+                    accepted
+                        ? Json(
+                            HttpStatusCode.OK,
+                            new
+                            {
+                                success = true,
+                                id = UserId
+                            })
+                        : Json(
+                            HttpStatusCode.BadRequest,
+                            new
+                            {
+                                title =
+                                    "Account synchronization rejected."
+                            }));
+            }
+
+            if (request.Method == HttpMethod.Get
+                && request.RequestUri!.AbsolutePath
+                    == "/api/user/admin-authority")
+            {
+                return Task.FromResult(Json(
+                    HttpStatusCode.OK,
+                    new
+                    {
+                        isInstanceAdmin = false,
+                        hasAnyAuthority = false,
+                        adminTenantIds = Array.Empty<Guid>(),
+                        adminOrganizationIds = Array.Empty<Guid>(),
+                        adminGroupIds = Array.Empty<Guid>()
+                    }));
+            }
+
+            return Task.FromResult(
+                new HttpResponseMessage(
+                    HttpStatusCode.NotFound));
+        }
+
+        private static HttpResponseMessage Json<T>(
+            HttpStatusCode status,
+            T value) =>
+            new(status)
+            {
+                Content = JsonContent.Create(value)
+            };
     }
 
     private sealed class AtprotoBridgeHandler(HttpStatusCode statusCode) : HttpMessageHandler

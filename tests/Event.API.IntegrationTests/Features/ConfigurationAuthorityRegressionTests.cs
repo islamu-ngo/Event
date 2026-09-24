@@ -127,44 +127,6 @@ public sealed class ConfigurationAuthorityRegressionTests
     }
 
     [Test]
-    public async Task Infisical_KeycloakSmtpFolderSecretsPublishKeycloakBootstrapNames()
-    {
-        string password = Guid.CreateVersion7().ToString("N");
-        await using var server = await SecretServer.StartAsync(path => path == "/keycloak"
-            ? [
-                new("KEYCLOAK_SMTP_HOST", "smtp.example.test", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_PORT", "587", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_FROM", "noreply@example.test", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_FROM_DISPLAY_NAME", "ISLAMU Event", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_AUTH", "true", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_SSL", "false", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_STARTTLS", "true", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_REPLY_TO", "support@example.test", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME", "ISLAMU Support", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_ENVELOPE_FROM", "bounce@example.test", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_USER", "smtp-user", "/keycloak/smtp"),
-                new("KEYCLOAK_SMTP_PASSWORD", password, "/keycloak/smtp"),
-            ]
-            : []);
-        using var source = new InfisicalConfigurationProvider(new()
-        {
-            Url = server.Url,
-            ProjectId = "project-id",
-            ClientId = "client-id",
-            ClientSecret = Guid.CreateVersion7().ToString("N"),
-            Environment = "testing",
-            Paths = ["/keycloak"],
-        });
-
-        source.Load();
-        source.TryGet("KEYCLOAK_SMTP_HOST", out string? host);
-        source.TryGet("KEYCLOAK_SMTP_PASSWORD", out string? configuredPassword);
-
-        await Assert.That(host).IsEqualTo("smtp.example.test");
-        await Assert.That(configuredPassword).IsEqualTo(password);
-    }
-
-    [Test]
     public async Task Infisical_RecursiveResponseRetainsSiblingNamespacesAndCannotOverwritePrimaryDatabase()
     {
         await using var server = await SecretServer.StartAsync(_ =>

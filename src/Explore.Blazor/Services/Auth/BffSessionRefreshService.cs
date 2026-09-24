@@ -71,12 +71,28 @@ public sealed class BffSessionRefreshService(
         var initialOnboardingStatus = await onboardingStatusProvider
             .GetStatusAsync(cancellationToken)
             .ConfigureAwait(false);
-        var adminClaimsUpdated = await adminClaimsTransformation.EnrichPrincipalAsync(
-            authResult.Principal,
-            authResult.Properties,
-            forceRefresh: true,
-            synchronizeUser: true,
-            cancellationToken: cancellationToken);
+        BffPrincipalRefreshResult principalRefresh =
+            tokenAssessment.RequiresAccountSynchronization
+                ? await adminClaimsTransformation
+                    .RefreshPrincipalAsync(
+                        authResult.Principal,
+                        authResult.Properties,
+                        cancellationToken)
+                : new BffPrincipalRefreshResult(
+                    SynchronizationAttempted: false,
+                    UserSynchronized: true,
+                    AdminClaimsUpdated: false);
+        if (principalRefresh.SynchronizationAttempted
+            && !principalRefresh.UserSynchronized)
+        {
+            return RequireAccountSynchronizationSignIn(
+                context,
+                authResult.Principal,
+                logger);
+        }
+
+        bool adminClaimsUpdated =
+            principalRefresh.AdminClaimsUpdated;
         var refreshedOnboardingStatus = await onboardingStatusProvider
             .GetStatusAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -117,7 +133,13 @@ public sealed class BffSessionRefreshService(
             "[AuthEndpoints] Refresh session completed | Outcome={Outcome} Reason={Reason} Purpose={Purpose} AdminClaimsUpdated={AdminClaimsUpdated}",
             "accepted", tokenAssessment.Reason, "session_refresh", adminClaimsUpdated);
 
-        return Results.Ok(new { refreshed = true, adminClaimsUpdated, tokenStatus = tokenAssessment.Reason });
+        return Results.Ok(new
+        {
+            refreshed = true,
+            adminClaimsUpdated,
+            tokenStatus = tokenAssessment.Reason,
+            accountStatus = "synchronized"
+        });
     }
 
     public async Task RevokeAtprotoSessionAsync(
@@ -258,12 +280,22 @@ public sealed class BffSessionRefreshService(
             var initialOnboardingStatus = await onboardingStatusProvider
                 .GetStatusAsync(cancellationToken)
                 .ConfigureAwait(false);
-            var adminClaimsUpdated = await adminClaimsTransformation.EnrichPrincipalAsync(
-                authentication.Principal!,
-                authentication.Properties,
-                forceRefresh: true,
-                synchronizeUser: true,
-                cancellationToken: cancellationToken);
+            BffPrincipalRefreshResult principalRefresh =
+                await adminClaimsTransformation.RefreshPrincipalAsync(
+                    authentication.Principal!,
+                    authentication.Properties,
+                    cancellationToken);
+            if (principalRefresh.SynchronizationAttempted
+                && !principalRefresh.UserSynchronized)
+            {
+                return RequireAccountSynchronizationSignIn(
+                    context,
+                    authentication.Principal!,
+                    logger);
+            }
+
+            bool adminClaimsUpdated =
+                principalRefresh.AdminClaimsUpdated;
             var refreshedOnboardingStatus = await onboardingStatusProvider
                 .GetStatusAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -339,6 +371,37 @@ public sealed class BffSessionRefreshService(
         return Results.Json(
             new { refreshed = false, reason = "reauthentication_required" },
             statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    private IResult RequireAccountSynchronizationSignIn(
+        HttpContext context,
+        ClaimsPrincipal principal,
+        ILogger logger)
+    {
+        ClearCircuitTokenState(
+            context,
+            principal,
+            logger,
+            "account_sync_rejected");
+        IBffReturnUrlService returnUrlService =
+            context.RequestServices
+                .GetRequiredService<IBffReturnUrlService>();
+        string returnUrl =
+            returnUrlService.GetSafeReturnUrl(
+                context,
+                logger);
+        string signInPath =
+            returnUrlService.BuildLoginRedirectUrl(
+                returnUrl);
+        return Results.Json(
+            new
+            {
+                refreshed = false,
+                reason = "account_sync_rejected",
+                reauthenticationRequired = true,
+                signInPath
+            },
+            statusCode: StatusCodes.Status409Conflict);
     }
 
     private static bool IsOnboardingSessionAllowed(

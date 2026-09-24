@@ -15822,6 +15822,96 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.ToTable("ie_integration_sync_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Domain.Keycloak.KeycloakOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("ChangeSet")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("change_set");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("digest");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<bool>("IsCancellationRequested")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("is_cancellation_requested");
+
+                    b.Property<DateTimeOffset?>("SettledAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("settled_at_utc");
+
+                    b.Property<long?>("SettledAtUtcTicks")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("settled_at_utc_ticks");
+
+                    b.Property<long>("SetupGeneration")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("setup_generation");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StepOutcomes")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("step_outcomes");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_keycloak_operation_receipts");
+
+                    b.HasIndex("SettledAtUtcTicks")
+                        .HasDatabaseName("ix_keycloakoperationreceipts_settled_at_utc_ticks");
+
+                    b.HasIndex("State")
+                        .HasDatabaseName("ix_keycloakoperationreceipts_state");
+
+                    b.ToTable("ie_KeycloakOperationReceipts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_Expiry", "expires_at_utc > created_at_utc")
+                                .HasName("ck_keycloakoperationreceipts_expiry");
+
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_Settlement", "((state IN ('Previewed','Applying','OutcomeUnknown') AND settled_at_utc IS NULL AND settled_at_utc_ticks IS NULL) OR (state NOT IN ('Previewed','Applying','OutcomeUnknown') AND settled_at_utc IS NOT NULL AND settled_at_utc_ticks IS NOT NULL))")
+                                .HasName("ck_keycloakoperationreceipts_settlement");
+
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_SetupGeneration", "setup_generation > 0")
+                                .HasName("ck_keycloakoperationreceipts_setupgeneration");
+
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_State", "state IN ('Previewed','Applying','Verified','PartiallyApplied','OutcomeUnknown','Conflict','FailedBeforeWrite','Cancelled','Expired')")
+                                .HasName("ck_keycloakoperationreceipts_state");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.Language", b =>
                 {
                     b.Property<int>("Id")
@@ -41127,6 +41217,58 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Keycloak.KeycloakOperation", b =>
+                {
+                    b.OwnsOne("Explore.Domain.Keycloak.KeycloakTarget", "Target", b1 =>
+                        {
+                            b1.Property<Guid>("KeycloakOperationId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Authority")
+                                .IsRequired()
+                                .HasMaxLength(2048)
+                                .HasColumnType("TEXT")
+                                .HasColumnName("target_authority");
+
+                            b1.Property<string>("AuthorityKey")
+                                .IsRequired()
+                                .HasMaxLength(64)
+                                .HasColumnType("TEXT")
+                                .HasColumnName("target_authority_key");
+
+                            b1.Property<string>("Client")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("TEXT")
+                                .HasColumnName("target_client");
+
+                            b1.Property<Guid>("InstanceId")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("target_instance_id");
+
+                            b1.Property<string>("Realm")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("TEXT")
+                                .HasColumnName("target_realm");
+
+                            b1.HasKey("KeycloakOperationId");
+
+                            b1.HasIndex("InstanceId", "AuthorityKey", "Realm")
+                                .HasDatabaseName("ix_keycloakoperationreceipts_target_instance_id_target_authority_key_target_realm");
+
+                            b1.ToTable("ie_KeycloakOperationReceipts");
+
+                            b1.WithOwner()
+                                .HasForeignKey("KeycloakOperationId")
+                                .HasConstraintName("fk_keycloakoperationreceipts_keycloakoperationreceipts_id");
+                        });
+
+                    b.Navigation("Target")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Explore.Domain.LegalDocumentLocalizedSource", b =>

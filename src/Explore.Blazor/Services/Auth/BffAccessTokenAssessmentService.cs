@@ -11,7 +11,10 @@ public interface IBffAccessTokenAssessmentService
     string? ResolveUserId(ClaimsPrincipal? principal);
 }
 
-public readonly record struct BffAccessTokenAssessment(bool IsUsable, string Reason);
+public readonly record struct BffAccessTokenAssessment(
+    bool IsUsable,
+    bool RequiresAccountSynchronization,
+    string Reason);
 
 public sealed class BffAccessTokenAssessmentService : IBffAccessTokenAssessmentService
 {
@@ -21,7 +24,10 @@ public sealed class BffAccessTokenAssessmentService : IBffAccessTokenAssessmentS
     {
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            return new BffAccessTokenAssessment(false, "missing_access_token");
+            return new BffAccessTokenAssessment(
+                false,
+                false,
+                "missing_access_token");
         }
 
         try
@@ -29,21 +35,33 @@ public sealed class BffAccessTokenAssessmentService : IBffAccessTokenAssessmentS
             var handler = new JwtSecurityTokenHandler();
             if (!handler.CanReadToken(accessToken))
             {
-                return new BffAccessTokenAssessment(false, "unreadable_access_token");
+                return new BffAccessTokenAssessment(
+                    false,
+                    false,
+                    "unreadable_access_token");
             }
 
             var token = handler.ReadJwtToken(accessToken);
             var validToUtc = token.ValidTo;
             if (validToUtc <= DateTime.UtcNow.Add(ExpirySafetyWindow))
             {
-                return new BffAccessTokenAssessment(false, "expired_access_token");
+                return new BffAccessTokenAssessment(
+                    false,
+                    false,
+                    "expired_access_token");
             }
 
-            return new BffAccessTokenAssessment(true, "valid_access_token");
+            return new BffAccessTokenAssessment(
+                true,
+                true,
+                "valid_access_token");
         }
         catch (Exception)
         {
-            return new BffAccessTokenAssessment(false, "access_token_parse_failed");
+            return new BffAccessTokenAssessment(
+                false,
+                false,
+                "access_token_parse_failed");
         }
     }
 

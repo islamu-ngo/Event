@@ -51,6 +51,20 @@ public class OfflineTranslationProviderTests
     }
 
     [Test]
+    [Arguments("en")]
+    [Arguments("fr")]
+    [Arguments("ar")]
+    public async Task ResourceKeys_AreAvailableInEveryEmbeddedBundle(string languageCode)
+    {
+        var keys = (await _provider.ExportTranslationsAsync(languageCode))
+            .Select(item => item.KeyName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        await Assert.That(keys.Contains("ui.admin.resources.heading")).IsTrue();
+        await Assert.That(keys.Contains("ui.event.resources.heading")).IsTrue();
+    }
+
+    [Test]
     public async Task ExportTranslations_WhenWritableBundleExists_MergesWithEmbeddedDefaults()
     {
         var root = CreateTempContentRoot();

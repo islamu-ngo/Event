@@ -135,7 +135,7 @@
     private Guid _loadedEvent;
     private Guid? _confirmDeleteId;
     private int _page = 1;
-    private string T(string key, string fallback) => Translation.T($"event.resources.{key}", fallback);
+    private string T(string key, string fallback) => Translation.T($"ui.event.resources.{key}", fallback);
     private static bool Has(IDictionary<string, HalLink>? links, string relation) => links?.ContainsKey(relation) == true;
 
     protected override async Task OnParametersSetAsync()

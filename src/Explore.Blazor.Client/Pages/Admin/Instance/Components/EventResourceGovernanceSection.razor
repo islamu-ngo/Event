@@ -110,7 +110,7 @@
     private bool _loading = true, _saving, _failed, _restoreFocus;
     private string? _message;
     private bool HasEdit => _settings?._links?.ContainsKey("edit") == true;
-    private string T(string key, string fallback) => Translations.T(key, fallback);
+    private string T(string key, string fallback) => Translations.T($"ui.{key}", fallback);
     private string SourceLabel(SettingSource? source) => source switch
     {
         SettingSource.SystemDefault => T("admin.resources.systemDefault", "System default"),

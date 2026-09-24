@@ -52,7 +52,7 @@
     private string? _nextCursor;
     private IDictionary<string, HalLink>? _links;
     private readonly List<HalResourceOfEventResourceAudienceDetailDto> _items = [];
-    private string T(string key, string fallback) => Translation.T($"event.resources.{key}", fallback);
+    private string T(string key, string fallback) => Translation.T($"ui.event.resources.{key}", fallback);
 
     // Only root-relative links are browser destinations; never turn a safe-origin label into an href.
     public static string? Href(IDictionary<string, HalLink>? links, string relation) =>

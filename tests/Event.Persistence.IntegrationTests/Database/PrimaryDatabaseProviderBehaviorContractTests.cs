@@ -6,6 +6,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Keycloak;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Projections;
@@ -45,6 +46,79 @@ public sealed class PrimaryDatabaseRuntimeSmokeTests
 [NotInParallel("PrimaryDatabaseProviderBehaviorContract")]
 public sealed class PrimaryDatabaseProviderBehaviorContractTests
 {
+    [Test]
+    public async Task MigratedProviderPersistsReceiptAndRejectsStaleStamp()
+    {
+        PrimaryDatabaseProviderBehaviorFixture fixture =
+            PrimaryDatabaseProviderBehaviorFixture.Create();
+        await fixture.PrepareAsync();
+        DateTimeOffset now =
+            new(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
+        KeycloakDesiredProjection desired =
+            KeycloakDesiredProjection.Mapper(
+                "event-bff:audience",
+                KeycloakMapperSemantic.Audience,
+                "event-api");
+        var operation = new KeycloakOperation(
+            new KeycloakChangeSet(
+            [
+                new KeycloakChangeStep(
+                    "mapper:audience",
+                    KeycloakStep.UpdateMapper,
+                    KeycloakResourceKind.ProtocolMapper,
+                    "event-bff:audience",
+                    KeycloakStepPrecondition
+                        .MustMatchFingerprint,
+                    "expected-fingerprint",
+                    "expected-identity-fingerprint",
+                    "desired-fingerprint",
+                    "binding-fingerprint",
+                    desired)
+            ]),
+            new KeycloakTarget(
+                Guid.CreateVersion7(),
+                "https://identity.example.test",
+                "operators",
+                "event-bff"),
+            "provider-matrix-actor",
+            7,
+            "provider-matrix-digest",
+            now,
+            now.AddMinutes(15));
+        await using (ExploreDbContext seed =
+            fixture.CreateSystemContext())
+        {
+            await new KeycloakOperationRepository(seed)
+                .AddAsync(operation);
+        }
+
+        await using ExploreDbContext winnerContext =
+            fixture.CreateSystemContext();
+        await using ExploreDbContext staleContext =
+            fixture.CreateSystemContext();
+        var winnerRepository =
+            new KeycloakOperationRepository(winnerContext);
+        var staleRepository =
+            new KeycloakOperationRepository(staleContext);
+        KeycloakOperation winner =
+            (await winnerRepository.GetAsync(operation.Id))!;
+        KeycloakOperation stale =
+            (await staleRepository.GetAsync(operation.Id))!;
+        Guid winnerStamp = winner.ConcurrencyStamp;
+        Guid staleStamp = stale.ConcurrencyStamp;
+
+        winner.RequestCancellation(now.AddMinutes(1));
+        await winnerRepository.SaveAsync(
+            winner,
+            winnerStamp);
+        stale.RequestCancellation(now.AddMinutes(2));
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
+            () => staleRepository.SaveAsync(
+                stale,
+                staleStamp));
+    }
+
     [Test]
     public Task MigratedProviderSupportsSharedPersistenceBehavior()
     {

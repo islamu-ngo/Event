@@ -190,6 +190,8 @@ public static class PersistenceServicesRegistration
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IAtprotoSessionRefreshLock, RelationalAtprotoSessionRefreshLock>();
         services.AddScoped<ISetupLiveRepository, SetupLiveRepository>();
+        services.AddScoped<IKeycloakOperationRepository, KeycloakOperationRepository>();
+        services.AddScoped<IKeycloakOperationCoordinator, RelationalKeycloakOperationCoordinator>();
         services.AddScoped<ISetupSecretBindingOperationCoordinator,
             RelationalSetupSecretBindingOperationCoordinator>();
 

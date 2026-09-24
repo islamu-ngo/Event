@@ -16,7 +16,12 @@ The standalone container is the smallest path. It runs one application process w
 
 ## When should I use split Docker Compose?
 
-Use split Compose when you want PostgreSQL and independently operated supporting services. Validate with `docker compose config --quiet`, complete `keycloak-init`, run database migration before API and UI startup, and wait for health rather than treating process start as readiness.
+Use split Compose when you want PostgreSQL and independently operated
+supporting services. Validate with `docker compose config --quiet`, run database
+migration before API and UI startup, and wait for health rather than treating
+process start as readiness. Compose never imports the sample realm. A clean
+Keycloak database reaches setup first; use setup-time inspection and reviewed
+provisioning for absent resources.
 
 ## Can I deploy to Coolify, Azure, or AWS?
 

@@ -16,6 +16,9 @@ public sealed class EnvironmentSecretSource(
     IOptions<SecretProviderOptions> options,
     UserSecretsAuthority userSecretsAuthority) : ISecretSource
 {
+    private static readonly string ProcessRevision =
+        Guid.CreateVersion7().ToString("N");
+
     /// <inheritdoc />
     public SecretSourceType SourceType => SecretSourceType.EnvironmentVariable;
 
@@ -45,7 +48,10 @@ public sealed class EnvironmentSecretSource(
             binding.SourceType,
             binding.Scope,
             binding.ScopeId,
-            DateTime.UtcNow)));
+            DateTime.UtcNow,
+            $"environment:{binding.Id:N}:"
+            + $"{binding.UpdatedAt?.Ticks}:"
+            + ProcessRevision)));
     }
 
     /// <inheritdoc />

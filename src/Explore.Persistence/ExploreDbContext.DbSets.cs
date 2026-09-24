@@ -1,4 +1,5 @@
 using Explore.Domain;
+using Explore.Domain.Keycloak;
 using Explore.Domain.Ai;
 using Explore.Domain.Federation;
 using Explore.Domain.Modules;
@@ -19,6 +20,7 @@ namespace Explore.Persistence;
 public partial class ExploreDbContext
 {
     public DbSet<SetupTargetEnrollment> SetupTargetEnrollments { get; set; }
+    public DbSet<KeycloakOperation> KeycloakOperations { get; set; }
     public DbSet<SetupEnrollmentIssuanceClaim> SetupEnrollmentIssuanceClaims { get; set; }
     public DbSet<SetupSecretBindingOperation> SetupSecretBindingOperations { get; set; }
 

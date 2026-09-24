@@ -123,6 +123,9 @@ access denial or policy change before editing again. Tenant controls offer
 only values at or below the current effective numeric ceilings and subsets of
 currently enabled delivery types, audiences, file types and HTTPS origins.
 Only the instance section can opt in to unscanned documents.
+After a save or denial, the policy controls reload and keyboard focus returns
+to the original control when available, or to the section heading if that
+control was replaced; the result is announced separately.
 
 API clients can read `GET /api/settings/instance/event-resources` as an
 instance administrator, or `GET /api/settings/tenant/EventResources` in the

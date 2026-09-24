@@ -1,5 +1,6 @@
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
+using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using MudBlazor;
 
@@ -9,8 +10,13 @@ public sealed class EventResourceGovernanceSectionTests : IDisposable
 {
     private readonly BlazorTestContext _ctx = new();
     private readonly IEventResourceGovernanceService _service = Substitute.For<IEventResourceGovernanceService>();
+    private readonly IAccessibilityFocusService _focus;
 
-    public EventResourceGovernanceSectionTests() => _ctx.Services.AddSingleton(_service);
+    public EventResourceGovernanceSectionTests()
+    {
+        _ctx.Services.AddSingleton(_service);
+        _focus = _ctx.AddMockService<IAccessibilityFocusService>();
+    }
     public void Dispose() => _ctx.Dispose();
 
     [Test]
@@ -105,6 +111,9 @@ public sealed class EventResourceGovernanceSectionTests : IDisposable
         await cut.Find("[data-resource-field='event_resources.max_upload_bytes']").ChangeAsync("50");
         await cut.Find("[data-resource-save]").ClickAsync();
         await Assert.That(reads).IsEqualTo(2);
+        await Assert.That(cut.Find("#resource-policy-title").HasAttribute("tabindex")).IsTrue();
+        await _focus.Received(1).SaveFocusAsync();
+        await _focus.Received(1).RestoreFocusAsync("#resource-policy-title");
         await _service.Received(1).UpdateAsync(instance, Arg.Is<UpdateSettingBatchDto>(batch =>
             batch.Mode == BatchUpdateMode.Strict && batch.Values["event_resources.max_upload_bytes"] == "50"), Arg.Any<CancellationToken>());
     }

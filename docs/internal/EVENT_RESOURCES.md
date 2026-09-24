@@ -138,6 +138,10 @@ exceed the currently displayed effective ceiling. Server-side coordinated
 mutation and policy intersection remain authoritative: a stale browser may
 be denied and must reload the group before another write. Instance locks
 remain active even in SingleTenant mode.
+After either a save or denial, the form reloads current policy, restores
+keyboard focus to its heading when the original control was replaced, and
+announces the result through a status or alert without duplicating that text
+in the focus target.
 
 The AT Protocol event source-field manifest explicitly excludes private
 stored-document inspection state and storage-provider identifiers. Its

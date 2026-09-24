@@ -4,6 +4,7 @@
 .event-resource-governance__field fieldset { display: flex; flex-wrap: wrap; gap: .75rem; border: 0; padding: 0; margin: 0; }
 .event-resource-governance__field fieldset label { display: inline-flex; align-items: center; gap: .3rem; }
 .event-resource-governance__field p { margin: 0; }
+.event-resource-governance h2:focus,
 .event-resource-governance button:focus-visible,
 .event-resource-governance input:focus-visible,
 .event-resource-governance textarea:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }

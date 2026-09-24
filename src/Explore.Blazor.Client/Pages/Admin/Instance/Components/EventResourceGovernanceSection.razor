@@ -2,13 +2,15 @@
 @using System.Text.Json
 @using Explore.Blazor.Client.Clients
 @using Explore.Blazor.Client.Contracts.Services
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
 @implements IDisposable
 @inject IEventResourceGovernanceService Governance
 @inject ITranslationService Translations
+@inject IAccessibilityFocusService Focus
 @inject ILogger<EventResourceGovernanceSection> Logger
 
 <section class="event-resource-governance" aria-labelledby="resource-policy-title">
-    <h2 id="resource-policy-title">@T("admin.resources.heading", "Event resource policy")</h2>
+    <h2 id="resource-policy-title" tabindex="-1">@T("admin.resources.heading", "Event resource policy")</h2>
     <p>@(InstanceScope
         ? T("admin.resources.instanceSummary", "Set instance resource limits, allowed delivery options and the explicit unscanned-document exception.")
         : T("admin.resources.tenantSummary", "Effective resource limits and allowed delivery options. Tenant changes can only narrow the current policy. The configured source shows where an override is stored; effective values may be lower after instance tightening."))</p>
@@ -78,7 +80,7 @@
         }
         <button type="button" data-resource-save disabled="@(_saving || !HasEdit || _draft.Count == 0 || _errors.Count > 0)" @onclick="SaveAsync">@T("admin.resources.save", "Save resource policy")</button>
     }
-    @if (_message is not null) { <p role="@(_failed ? "alert" : "status")" tabindex="-1">@_message</p> }
+    @if (_message is not null) { <p role="@(_failed ? "alert" : "status")">@_message</p> }
 </section>
 
 @code {
@@ -105,7 +107,7 @@
     private readonly Dictionary<string, string> _draft = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
     private HalResourceOfSettingGroupResponseDto? _settings;
-    private bool _loading = true, _saving, _failed;
+    private bool _loading = true, _saving, _failed, _restoreFocus;
     private string? _message;
     private bool HasEdit => _settings?._links?.ContainsKey("edit") == true;
     private string T(string key, string fallback) => Translations.T(key, fallback);
@@ -121,6 +123,14 @@
     {
         Translations.OnLanguageChanged += LanguageChanged;
         await LoadAsync();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_restoreFocus && !_loading)
+        {
+            _restoreFocus = false;
+            await Focus.RestoreFocusAsync("#resource-policy-title");
+        }
     }
     private void LanguageChanged(string language) => _ = InvokeAsync(StateHasChanged);
     public void Dispose() => Translations.OnLanguageChanged -= LanguageChanged;
@@ -205,6 +215,7 @@
         if (!HasEdit || _saving || _errors.Count > 0 || _draft.Count == 0 || _draft.Any(pair =>
             Fields.FirstOrDefault(f => f.Key == pair.Key) is not { } field || Find(pair.Key) is not { } setting
             || !CanEdit(setting) || !Validate(field, setting, pair.Value))) return;
+        await Focus.SaveFocusAsync();
         _saving = true;
         _message = null;
         try
@@ -227,6 +238,7 @@
         {
             await LoadAsync();
             _saving = false;
+            _restoreFocus = true;
         }
     }
     private bool Validate(Field field, EffectiveSettingDto setting, string value) => field.Kind switch

@@ -39,6 +39,11 @@ ABOUTME: Captures key runtime patterns and boundaries that are not obvious from 
 | **Code Hygiene** | **0 TODO / 0 FIXME / 0 HACK** | 0 `[Obsolete]`, 0 `NotImplementedException`, ~95% ABOUTME coverage |
 | **ADRs Documented** | 26 ADRs | Complete architectural decisions recorded in `docs/internal/adr/` |
 
+For the governed event-material capability, see the
+[resource technical contract](EVENT_RESOURCES.md) and
+[ADR-033](adr/ADR-033-governed-event-resource-delivery.md) for ownership,
+authorization snapshots, private delivery and recovery limits.
+
 ## Ticketing Recovery And Deployment Capability Authority
 
 Ticketing recovery follows a durable state-machine pattern rather than

@@ -6,6 +6,10 @@ last_updated: 2026-09-23
 
 # Governed Event Resources
 
+The permanent delivery and revocation decision is
+[ADR-033](adr/ADR-033-governed-event-resource-delivery.md). Operator and
+attendee guidance is linked from the public documentation navigation.
+
 `EventResource` is an independent tenant/event-owned aggregate for governed event materials. Management authors semantic drafts; audience reads expose only currently authorized metadata. Metadata never substitutes for the separate delivery decision.
 
 ## P5.A draft-management API

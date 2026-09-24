@@ -54,3 +54,26 @@
 - [x] Stays in journal as fault-injection evidence; the bounded cleanup contract is recorded in ADR-014.
 
 ---
+
+[2026-09-24 Europe/Brussels] — Joined DID columns need the same portable ordinal collation
+
+**Context**: While closing the five-provider event-resource policy matrix, SQL Server failed four otherwise-passing public-event eligibility cases after the generated resource migrations.
+
+**Symptom / Observation**: SQL Server reported `Cannot resolve the collation conflict between "SQL_Latin1_General_CP1_CI_AS" and "Latin1_General_100_BIN2" in the equal to operation.` The corresponding selected cases passed on the other four engines.
+
+**Root Cause**: The read joined `AtprotoRecord.Did` to `AtprotoIdentity.Did`. The identity column used `UsePortableOrdinalAscii()` while the record column inherited the database default. SQL Server cannot compare those differently collated columns without an explicit compatible policy.
+
+**Resolution**: Configure the record DID with the same portable ordinal policy and regenerate all four native EF histories, including the shared MySQL/MariaDB catalog. The selected class then passed 9/9 on SQL Server and on each other engine; every catalog reported no pending model changes. No migration or snapshot was hand-edited.
+
+**Why This Matters for Future Work**: Column equality in a query has a cross-table collation contract. Provider-neutral test successes do not establish that a SQL Server join between a default-collated and an ordinal-collated identity will work. Align model configuration at both join endpoints, regenerate unapplied migrations, then exercise the actual provider before treating a caller-level error as an authorization decision.
+
+**References**:
+
+- `src/Explore.Persistence/Configurations/Entities/AtprotoRecordConfiguration.cs`
+- `src/Explore.Persistence/Configurations/Entities/ActorIdentityConfiguration.cs`
+- `tests/Event.Persistence.IntegrationTests/Database/PrimaryDatabaseProviderBehaviorContractTests.cs`
+- `docs/internal/adr/ADR-033-governed-event-resource-delivery.md`
+
+**Promotion Consideration**:
+
+- [x] Stays in the persistence journal as demonstrated provider behavior.

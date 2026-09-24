@@ -112,6 +112,34 @@ Resource policy uses the existing native settings and configuration-manifest
 workflow. Instance administrators set the ceilings; tenant administrators may
 restrict them, not expand them. Instance locks remain effective in SingleTenant
 mode. A batch containing an invalid or widening choice is rejected as a whole.
+The **Event resources** section in instance governance shows the current
+instance policy, its source and locks. The corresponding section under tenant
+policies shows effective tenant values, including inherited instance limits.
+The displayed configured source identifies where the stored override came
+from; after an instance administrator tightens a ceiling, the effective value
+can be lower than a tenant's earlier override.
+An unavailable edit action or locked setting is read-only; refresh after an
+access denial or policy change before editing again. Tenant controls offer
+only values at or below the current effective numeric ceilings and subsets of
+currently enabled delivery types, audiences, file types and HTTPS origins.
+Only the instance section can opt in to unscanned documents.
+
+API clients can read `GET /api/settings/instance/event-resources` as an
+instance administrator, or `GET /api/settings/tenant/EventResources` in the
+current tenant. Both return private effective settings with `source`,
+`isLocked`, `canEdit` and `reason`. Follow the returned `edit` HAL link when
+present to submit a strict `UpdateSettingBatchDto` by `PUT`; it is not a
+permanent permission. Instance reads and writes require current instance
+administrator authority. A signed-in non-administrator receives 403, and an
+anonymous caller receives 401. Tenant writes still enforce instance ceilings
+and fresh locks on the server even if the browser has an older edit link.
+Before serving resource reads on an existing development database, apply the
+latest generated application migrations using the selected provider's
+migration service. This includes `AlignAtprotoRecordDidCollation`, which keeps
+federated event eligibility and resource access consistent; MariaDB uses the
+MySQL migration catalog. Until the migration is applied, SQL Server may deny
+affected resource reads as unavailable rather than expose data using a
+mismatched identifier comparison.
 
 | Setting | Default and operator effect |
 | --- | --- |

@@ -107,6 +107,39 @@ form clears its URL after submission and shows only safe-origin metadata.
 Blazor components rely on the service and server authority independently:
 HAL hides an affordance; it does not grant a write.
 
+### Native resource policy surfaces
+
+`GET/PUT /api/settings/instance/event-resources` fixes the native
+`EventResources` category at instance scope and requires current instance
+administrator authority for both reads and writes. The private/no-store GET
+resolves all eight effective `SettingGroupResponseDto` entries with value,
+source, lock, editability and reason. The PUT accepts only registered resource
+keys, forces strict `UpdateSettingBatchCommand` mode and delegates to the
+coordinated setting writer rather than directly updating rows. Invalid
+private values are not reflected in API validation responses.
+
+The existing `GET/PUT /api/settings/tenant/EventResources` resolves the same
+category for the current tenant. Tenant GET replaces each raw merged value
+with the current `EventResourceGovernancePolicyReader` intersection of instance,
+tenant and storage ceilings; it fails closed when that policy is unavailable.
+`source` still identifies the stored setting's provenance, which can differ
+from the authority behind a tighter effective `value`. Its generated HAL
+group emits `self`; an
+`edit` relation for either scope requires at least one currently editable
+setting and the corresponding scoped permission. A missing `edit` link makes
+the entire client form read-only; `CanEdit` additionally gates each field.
+`allow_unscanned_documents` is instance-only. Tenant collection controls
+offer only subsets of current effective values, and numeric controls cannot
+exceed the currently displayed effective ceiling. Server-side coordinated
+mutation and policy intersection remain authoritative: a stale browser may
+be denied and must reload the group before another write. Instance locks
+remain active even in SingleTenant mode.
+
+The AT Protocol event source-field manifest explicitly excludes private
+stored-document inspection state and storage-provider identifiers. Its
+completeness test guards future additions to `StorageObject` against
+unreviewed federation projections.
+
 The audit page contains only a closed action/outcome/reason, timestamp, and
 retained responsible-manager identity. A successful mutation writes that
 minimal audit entry in the same serializable transaction as the resource
@@ -259,6 +292,16 @@ The forward `BindEventResourceFiles` migrations add explicit inspection binding
 and upload version facts, private-owner constraints and the tenant-qualified
 session/object relationship. Their PostgreSQL, SQLite, SQL Server and MySQL
 histories are generated artifacts.
+
+The generated `AlignAtprotoRecordDidCollation` forward histories make
+`AtprotoRecord.Did` use the same provider-appropriate ordinal ASCII collation
+as `AtprotoIdentity.Did`. Public event eligibility compares those persisted
+identifiers when evaluating resource authority; a SQL Server database with
+the mismatched old collations fails that query closed instead of granting a
+resource. Apply the selected provider history before serving resource reads.
+MariaDB uses the shared MySQL catalog. The SQLite generated reverse operation,
+all four model snapshots and all five real-engine behavior contracts were
+verified without editing migration files by hand.
 
 ### Retirement and producer settlement
 

@@ -1,0 +1,9 @@
+.event-resource-governance { display: grid; gap: 1rem; }
+.event-resource-governance__field { display: grid; gap: .35rem; padding-block: .75rem; border-block-end: 1px solid var(--mud-palette-lines-default); }
+.event-resource-governance__field > input, .event-resource-governance__field > textarea { max-inline-size: 36rem; inline-size: 100%; }
+.event-resource-governance__field fieldset { display: flex; flex-wrap: wrap; gap: .75rem; border: 0; padding: 0; margin: 0; }
+.event-resource-governance__field fieldset label { display: inline-flex; align-items: center; gap: .3rem; }
+.event-resource-governance__field p { margin: 0; }
+.event-resource-governance button:focus-visible,
+.event-resource-governance input:focus-visible,
+.event-resource-governance textarea:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }

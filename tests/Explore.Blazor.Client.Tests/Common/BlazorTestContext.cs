@@ -79,6 +79,16 @@ public class BlazorTestContext : BunitContext
             Explore.Blazor.Client.Contracts.Services.ITicketPurchaseGovernanceService>());
         Services.AddSingleton(Substitute.For<IAtprotoFederationSettingsService>());
         Services.AddSingleton(Substitute.For<ITenantReportingIntakePolicyService>());
+        // Parent admin pages embed the resource policy section. Keep unrelated page tests
+        // read-only unless they explicitly supply a current governance HAL representation.
+        var resourceGovernance = Substitute.For<Explore.Blazor.Client.Contracts.Services.IEventResourceGovernanceService>();
+        resourceGovernance.GetAsync(Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new Explore.Blazor.Client.Clients.HalResourceOfSettingGroupResponseDto
+            {
+                Category = "EventResources",
+                Settings = []
+            }));
+        Services.AddSingleton(resourceGovernance);
         Services.AddSingleton(Substitute.For<IBrowserActionInterop>());
         // EventLocation disclosure is now a page-level dependency of EventDetail. A default fail-closed
         // substitute (no disclosures) keeps unrelated page tests from having to know about venue privacy.

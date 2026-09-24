@@ -16,7 +16,10 @@
         </MudText>
     </div>
     <MudStack Spacing="3">
-
+        @if (ShowGeneralGovernance)
+        {
+            <EventResourceGovernanceSection InstanceScope="true" />
+        }
 
         @if (ShowDeploymentMode)
         {

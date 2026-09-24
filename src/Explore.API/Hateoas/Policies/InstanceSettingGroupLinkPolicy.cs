@@ -15,6 +15,27 @@ public sealed class AtprotoInstanceSettingGroupLinkPolicy : ILinkPolicy<SettingG
         {
             foreach (var link in EmailDeliverySettingsLinkPolicy.TenantLinks(dto))
                 yield return link;
+            if (dto.Category == EventResourceSettingDefinitions.Category && dto.Settings.Any(setting => setting.CanEdit))
+            {
+                var tenantId = dto.TenantId.Value;
+                yield return Link(LinkRelations.Edit, RouteNames.UpdateTenantSettingsBatch, "PUT",
+                    new { category = dto.Category })
+                    .RequirePermission(AuthorizationActions.TenantSettings.Update,
+                        ResourceKinds.TenantSetting, $"{tenantId}:event-resources",
+                        new AuthorizationScope(TenantId: tenantId.ToString("D")),
+                        new TenantSettingAuthorizationFacts(tenantId));
+            }
+            yield break;
+        }
+        if (dto.Category == EventResourceSettingDefinitions.Category)
+        {
+            yield return Link(LinkRelations.Self, RouteNames.GetInstanceEventResourceSettings, "GET", null)
+                .RequirePermission(AuthorizationActions.InstanceSettings.View,
+                    ResourceKinds.InstanceSetting, dto.Category, facts: Facts());
+            if (dto.Settings.Any(setting => setting.CanEdit))
+                yield return Link(LinkRelations.Edit, RouteNames.UpdateInstanceEventResourceSettings, "PUT", null)
+                    .RequirePermission(AuthorizationActions.InstanceSettings.Update,
+                        ResourceKinds.InstanceSetting, dto.Category, facts: Facts());
             yield break;
         }
         if (dto.Category != AtprotoFederationSettingDefinitions.Category)

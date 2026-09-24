@@ -5,6 +5,18 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Event-resource operator settings.** Instance administrators can read
+  and strictly batch-update the resource category at
+  `GET/PUT /api/settings/instance/event-resources`. The authenticated,
+  private/no-store read returns eight effective values with source, lock,
+  editability and a conditional HAL `edit` relation. Anonymous callers
+  receive 401; signed-in non-administrators receive 403. The existing
+  tenant `EventResources` category now advertises `edit` only when a
+  current setting and tenant permission allow it. Tenant mutations still
+  cannot widen instance limits or opt in to unscanned documents, and
+  instance changes use the coordinated writer. See
+  [native resource policy surfaces](EVENT_RESOURCES.md#native-resource-policy-surfaces).
+
 - **Protected external resource destinations.** An authenticated,
   idempotency-revalidated `PUT /api/eventresource/{id}/destination` accepts a
   full, strictly validated HTTPS link but never reads it back. Only the safe

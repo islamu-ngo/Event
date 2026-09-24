@@ -86,6 +86,13 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
     }
 
     [Test]
+    public Task EventResourceFinalReadDoesNotReuseTrackedAuthority()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceFileProviderContractAssertions.AssertFinalReadDoesNotReuseTrackedAuthorityAsync(fixture);
+    }
+
+    [Test]
     public Task EventResourceAttachmentHasOneOwner()
     {
         var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();

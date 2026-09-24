@@ -3105,7 +3105,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
-                        .HasColumnName("did");
+                        .HasColumnName("did")
+                        .UseCollation("Latin1_General_100_BIN2")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<int>("Direction")
                         .HasColumnType("int")

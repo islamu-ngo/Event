@@ -1,8 +1,14 @@
+using System.Text.Json;
+using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.AiAssistant.Handlers.Queries;
+using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence.Repositories;
+using NSubstitute;
 using TUnit.Core;
 using DomainEvent = Explore.Domain.Event;
 
@@ -102,6 +108,55 @@ public sealed class EventAiReferenceRepositoryTests(PostgreSqlContainerFixture f
             CancellationToken.None);
 
         await Assert.That(results).IsEmpty();
+    }
+
+    [Test]
+    public async Task AiReferenceSearchExcludesAnActualPublishedResourceAndItsDestination()
+    {
+        await fixture.ResetAsync();
+        var scope = await SeedTenantAsync("ai-resource-exclusion");
+        var publicEvent = CreateEvent(scope, "Public workshop", "Public event summary",
+            EventStatusEnum.Published, VisibilityTypeEnum.Public, DateTimeOffset.UtcNow.AddDays(1));
+        var resourceId = Guid.CreateVersion7();
+        var now = DateTime.UtcNow;
+        var resource = EventResource.CreateDraft(resourceId, scope.TenantId, publicEvent.Id, null,
+            new EventResourceMetadata
+            {
+                Title = "Private attendee handout",
+                PublicTitle = "Private teaser",
+                SensitiveNotes = "private-organizer-note",
+                Kind = EventResourceKindEnum.GeneralDocument,
+                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+            },
+            EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
+            [EventResourceAudienceRule.Create(scope.TenantId, publicEvent.Id, resourceId,
+                EventResourceAudienceKindEnum.Public)], scope.ActorId, now);
+        resource.SetExternalDestination(Guid.CreateVersion7().ToString("N"), 1,
+            "https://restricted.example.test", resource.ConcurrencyStamp, scope.ActorId, now);
+        resource.Publish(new(scope.TenantId, publicEvent.Id, null, EventStatusEnum.Published, false, true,
+            null, false, new(new(now), new(now.AddHours(1)), null, null)), true,
+            resource.ConcurrencyStamp, scope.ActorId, now);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Events.Add(publicEvent);
+            seed.EventResources.Add(resource);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = fixture.CreateTenantFilteredDbContext(new TestTenantContext(scope.TenantId));
+        var actors = Substitute.For<IActorRepository>();
+        actors.SearchAiReferenceActorsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Actor>());
+        var results = await new SearchAiReferencesQueryHandler(new EventRepository(context), actors)
+            .QueryAsync(new SearchAiReferencesQuery { SearchTerm = "Public workshop", Limit = 10 }, CancellationToken.None);
+
+        await Assert.That(results.Count).IsEqualTo(1);
+        await Assert.That(results.Single().DisplayName).IsEqualTo(publicEvent.Title);
+        string wire = JsonSerializer.Serialize(results);
+        await Assert.That(wire).DoesNotContain(resource.Title);
+        await Assert.That(wire).DoesNotContain(resource.ExternalDestinationSafeOrigin!);
+        await Assert.That(wire).DoesNotContain(resource.ExternalDestinationCiphertext!);
+        await Assert.That(wire).DoesNotContain(resource.SensitiveNotes!);
     }
 
     private async Task<EventReferenceScope> SeedTenantAsync(string slugPrefix)

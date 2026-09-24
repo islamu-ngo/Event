@@ -3,6 +3,7 @@ using System;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Explore.Persistence.Migrations.Sqlite.Migrations
 {
     [DbContext(typeof(ExploreDbContext))]
-    partial class ExploreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924003748_AlignAtprotoRecordDidCollation")]
+    partial class AlignAtprotoRecordDidCollation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");

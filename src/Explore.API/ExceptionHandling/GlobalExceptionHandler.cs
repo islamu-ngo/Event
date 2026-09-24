@@ -72,6 +72,11 @@ internal sealed class GlobalExceptionHandler(
                 "Concurrency conflict",
                 concurrencyConflictException.Message,
                 ApiProblemCodes.ConcurrencyConflict),
+            KeycloakOperationConflictException keycloakConflictException => (
+                StatusCodes.Status409Conflict,
+                "Keycloak operation conflict",
+                keycloakConflictException.Message,
+                ApiProblemCodes.ResourceConflict),
             QuotaExceededException quotaExceededException => (
                 QuotaProblemDetailsFactory.StatusCode,
                 QuotaProblemDetailsFactory.Title,

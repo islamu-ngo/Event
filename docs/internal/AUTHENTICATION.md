@@ -39,6 +39,67 @@ realm contract includes this mapper. Repair does not rewrite existing bearer
 tokens: a fresh provider sign-in is required. Setup authority never supplies an
 account subject or bypasses native account synchronization.
 
+## Keycloak Connection And Inspection Boundary
+
+Runtime Keycloak authority, realm, BFF client ID and BFF client secret resolve
+from the deployment's one selected secret authority. Application database
+settings are not a fallback for the client secret, and an unavailable,
+unauthorized, invalid or unconfigured binding keeps its distinct fail-closed
+state. The BFF and API use the same effective tuple; conflicting BFF and API
+client IDs are invalid.
+
+Normal connection checks use public OIDC discovery and perform no administrative
+write. Privileged inspection is a separate foreground request. It accepts only
+the administrator username and password freshly submitted in that request;
+environment, Infisical and User Secrets values for Keycloak administrator
+credentials are never consulted. The request uses a bounded HttpClient with
+redirects and cookies disabled, verified TLS, and explicit
+Development/Testing-only loopback HTTP. The bundled Compose and Aspire
+topologies additionally bind privileged REST traffic to their exact generated
+Keycloak origin on the private orchestration network. That managed-local
+exception is configured by the topology itself, is not inferred from
+operator-supplied endpoints, and rejects every other plaintext host, port or
+base path. Browser-facing local callback generation accepts HTTP only for an
+exact loopback origin; non-loopback deployments require HTTPS.
+
+Existing realms are outside broad reconciliation authority. Inspection may
+recognize effective native, directly assigned or inherited subject and audience
+mappers, but it does not change realm settings, roles, shared client scopes,
+users, sessions, existing-client type/flow settings or client secrets.
+`offline_access` is optional and is not a repair prerequisite. Legacy bootstrap,
+realm-sync apply and client-secret rotation routes are removed without aliases.
+
+The reviewed operation workflow can create only a realm or client that a fresh
+Admin REST read proves absent. Realm creation writes the approved initial
+defaults once. Confidential BFF creation receives the current deployment-owned
+runtime secret server-side; bearer-only API creation omits `secret`. A name
+race, ambiguous match, existing resource or incompatible shape is a conflict,
+never an adoption or update. Mapper repair remains the only operation that may
+update an existing Keycloak resource, and it binds the exact provider identity,
+type, name, claim and reviewed semantic state.
+
+Every remote send follows a durable local intent. A timeout, disconnect or 5xx
+after send becomes `OutcomeUnknown`; later steps stop. Reconciliation reads only
+the captured provider identity and never creates, adopts by name, retries or
+rolls back. Proposal expiry blocks a new apply, while an already uncertain write
+remains recoverable through fresh current-authority read-only reconciliation.
+
+The setup and instance-administration surfaces share one
+`KeycloakOperatorPanel`. It renders connection, inspection, planning, apply,
+reconcile and cancel controls strictly from HAL links. Administrator
+credentials are write-only foreground inputs cleared after every attempt;
+Apply additionally requires review of the receipt steps and an explicit
+confirmation phrase.
+
+API, BFF and AppHost startup never call the Keycloak Admin API or import the
+repository sample realm. Managed-local Keycloak starts with its persistent
+database; absent realm/client creation occurs only through the setup-time
+operator receipt workflow.
+
+Provider users, credentials, MFA and realm roles are manual Keycloak
+prerequisites. Event never creates a first provider user; setup binds platform
+authority only after the operator establishes and authenticates that identity.
+
 ## Clean Architecture Flow
 
 Local HTTP requests enter through `LocalAuthController` or the antiforgery-protected BFF endpoints. Controllers create immutable Local authentication commands and dispatch through MediatR:

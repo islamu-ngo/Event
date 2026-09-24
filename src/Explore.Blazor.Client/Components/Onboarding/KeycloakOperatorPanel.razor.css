@@ -1,0 +1,80 @@
+.keycloak-operator-panel {
+    inline-size: 100%;
+}
+
+.keycloak-operator-panel__facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: var(--mud-spacing-2);
+    margin: 0;
+}
+
+.keycloak-operator-panel__facts div {
+    min-inline-size: 0;
+}
+
+.keycloak-operator-panel__facts dt {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+}
+
+.keycloak-operator-panel__facts dd {
+    margin-inline-start: 0;
+    overflow-wrap: anywhere;
+}
+
+.keycloak-operator-panel__credentials,
+.keycloak-operator-panel__plan,
+.keycloak-operator-panel__inspection,
+.keycloak-operator-panel__receipt {
+    display: grid;
+    gap: var(--mud-spacing-2);
+    min-inline-size: 0;
+    padding: var(--mud-spacing-3);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--mud-default-borderradius);
+}
+
+.keycloak-operator-panel__credentials legend,
+.keycloak-operator-panel__plan legend {
+    padding-inline: var(--mud-spacing-1);
+    font-weight: 600;
+}
+
+.keycloak-operator-panel__actions {
+    flex-wrap: wrap;
+}
+
+.keycloak-operator-panel__steps {
+    display: grid;
+    gap: var(--mud-spacing-1);
+    margin: 0;
+    padding-inline-start: 1.5rem;
+}
+
+.keycloak-operator-panel__steps li {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1fr) auto;
+    gap: var(--mud-spacing-2);
+    align-items: baseline;
+}
+
+.keycloak-operator-panel__steps code {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
+}
+
+.keycloak-operator-panel__steps small {
+    grid-column: 1 / -1;
+    color: var(--mud-palette-text-secondary);
+}
+
+@media (max-width: 600px) {
+    .keycloak-operator-panel__steps li {
+        grid-template-columns: 1fr;
+    }
+
+    .keycloak-operator-panel__steps code {
+        grid-column: auto;
+    }
+}

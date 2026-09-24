@@ -141,7 +141,8 @@ public sealed class LocalInstanceOnboardingTests
             Context.Services.AddSingleton(users);
             var auth = RestService.For<IBffAuthApi>(_client);
             Context.Services.AddSingleton<IInstanceOnboardingService>(services => new InstanceOnboardingService(
-                new InstanceAuthenticationSettingsClient(_client), new InstanceAuthorizationSettingsClient(_client),
+                new InstanceAuthenticationSettingsClient(_client), new InstanceKeycloakOperationsClient(_client),
+                new InstanceAuthorizationSettingsClient(_client),
                 new InstanceGovernanceSettingsClient(_client), new InstanceMessagingSettingsClient(_client),
                 new InstanceOnboardingClient(_client), new InstancePresentationSettingsClient(_client),
                 new InstanceStorageSettingsClient(_client), new SystemClient(_client), new TenantClient(_client),

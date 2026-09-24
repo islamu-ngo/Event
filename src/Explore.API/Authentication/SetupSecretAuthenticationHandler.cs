@@ -20,6 +20,7 @@ public sealed class SetupSecretAuthenticationHandler(
     private const string AuthProviderPath = "/api/instance/settings/auth-provider";
     private const string AuthorizationProviderPath = "/api/instance/settings/authz-provider";
     private const string OperatorIdentityPath = "/api/instance-operator-identity";
+    private const string KeycloakOperationsPath = "/api/instance/keycloak";
     private bool _setupModeInactive;
 
     internal static bool SupportsRequest(HttpRequest request)
@@ -36,7 +37,65 @@ public sealed class SetupSecretAuthenticationHandler(
            || HttpMethods.IsGet(request.Method)
                && string.Equals(request.Path.Value, "/api/instance/settings/branding", StringComparison.OrdinalIgnoreCase)
            || HttpMethods.IsPatch(request.Method)
-               && string.Equals(request.Path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase);
+               && string.Equals(request.Path.Value, "/api/InstanceOnboarding/profile", StringComparison.OrdinalIgnoreCase)
+           || IsKeycloakOperatorRequest(request);
+
+    private static bool IsKeycloakOperatorRequest(HttpRequest request)
+    {
+        string? value = request.Path.Value;
+        if (value is null)
+        {
+            return false;
+        }
+
+        if (HttpMethods.IsGet(request.Method)
+            && string.Equals(
+                value,
+                $"{KeycloakOperationsPath}/connection",
+                StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPost(request.Method)
+            && (string.Equals(
+                    value,
+                    $"{KeycloakOperationsPath}/inspect",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    value,
+                    $"{KeycloakOperationsPath}/plans",
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        string prefix = $"{KeycloakOperationsPath}/operations/";
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] segments = value[prefix.Length..]
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 1)
+        {
+            return HttpMethods.IsGet(request.Method)
+                && Guid.TryParse(segments[0], out _);
+        }
+
+        return segments.Length == 2
+            && HttpMethods.IsPost(request.Method)
+            && Guid.TryParse(segments[0], out _)
+            && (string.Equals(
+                    segments[1],
+                    "apply",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    segments[1],
+                    "reconcile",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    segments[1],
+                    "cancel",
+                    StringComparison.OrdinalIgnoreCase));
+    }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

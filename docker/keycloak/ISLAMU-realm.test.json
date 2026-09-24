@@ -30,7 +30,7 @@
     "web-origins",
     "acr"
   ],
-  "defaultOptionalClientScopes": ["offline_access", "address", "phone"],
+  "defaultOptionalClientScopes": ["address", "phone"],
   "roles": {
     "realm": [
       {
@@ -38,21 +38,12 @@
         "description": "Composite role for default ISLAMU realm",
         "composite": true,
         "composites": {
-          "realm": ["offline_access"]
+          "realm": []
         }
-      },
-      {
-        "name": "offline_access",
-        "description": "Offline access role"
       }
     ]
   },
-  "scopeMappings": [
-    {
-      "clientScope": "offline_access",
-      "roles": ["offline_access"]
-    }
-  ],
+  "scopeMappings": [],
   "clientScopes": [
     {
       "name": "openid",
@@ -178,15 +169,6 @@
       ]
     },
     {
-      "name": "offline_access",
-      "description": "OpenID Connect built-in scope: offline_access",
-      "protocol": "openid-connect",
-      "attributes": {
-        "consent.screen.text": "Access your applications when you are not present",
-        "display.on.consent.screen": "true"
-      }
-    },
-    {
       "name": "address",
       "description": "OpenID Connect built-in scope: address",
       "protocol": "openid-connect",
@@ -223,7 +205,7 @@
         "web-origins",
         "acr"
       ],
-      "optionalClientScopes": ["offline_access", "address", "phone"],
+      "optionalClientScopes": ["address", "phone"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "https://localhost/signout-callback-oidc",

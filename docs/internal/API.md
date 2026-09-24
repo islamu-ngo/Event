@@ -147,6 +147,35 @@ existing setup-only PATCH operation before refreshing readiness. Persisted profi
 projection includes the stored canonical host; it does not invent a URL scheme or
 persist the non-persisted purpose/time-zone fields.
 
+### Keycloak Operator Operations
+
+The private Keycloak operator surface is rooted at `/api/instance/keycloak`.
+Every request evaluates active setup authority or persisted instance-administrator
+authority at request time; a route attribute or a receipt ID never grants that
+authority. All seven responses are `private, no-store`. None participates in
+generic idempotency response storage, so a historical response cannot replay
+current provider or administrator authority.
+
+| Method and route | Operation | Contract |
+| --- | --- | --- |
+| `GET /api/instance/keycloak/connection` | `GetInstanceKeycloakConnection` | Returns sanitized effective binding and available HAL actions; it never returns credentials. |
+| `POST /api/instance/keycloak/inspect` | `InspectInstanceKeycloak` | Performs foreground, read-only discovery or privileged inspection. Advanced-form administrator credentials are accepted only for this request. |
+| `POST /api/instance/keycloak/plans` | `PlanInstanceKeycloak` | Stores a server-authored, credential-free approved-operation receipt after validating the current target and authority. |
+| `GET /api/instance/keycloak/operations/{id}` | `GetInstanceKeycloakOperation` | Returns a private receipt only to a currently authorized requester that satisfies its creator or setup-generation binding. |
+| `POST /api/instance/keycloak/operations/{id}/apply` | `ApplyInstanceKeycloakOperation` | Applies only the receipt's reviewed scope and requires fresh advanced-form administrator credentials when provider privilege is needed. |
+| `POST /api/instance/keycloak/operations/{id}/reconcile` | `ReconcileInstanceKeycloakOperation` | Reads provider state and updates the local outcome; reconciliation never writes to Keycloak. |
+| `POST /api/instance/keycloak/operations/{id}/cancel` | `CancelInstanceKeycloakOperation` | Prevents remaining unsent work where possible; it never rolls back a submitted provider request. |
+
+A proposal receipt expires 15 minutes after creation. Setup-created receipts are
+bound to their server-derived setup generation; administrator-created receipts
+are bound to their verified creator. Apply, read, reconcile, and cancel recheck
+that binding as well as current setup-or-instance-administrator authority. The
+receipt contains only allowlisted nonsecret target, approval, state, and outcome
+data: it contains no administrator username, password, token, runtime credential,
+or provider response body. An uncertain or partial provider result remains visible
+until an operator performs inspect-only reconciliation. The service neither retries
+mutating provider calls automatically nor rolls them back.
+
 ### Generated C# Client Shape
 
 The OpenAPI document defines wire shape; repository generation policy defines the checked-in C# shape. Pinned NSwag first emits POCO syntax, then `eng/tools/Explore.GeneratedContracts` converts structurally eligible response/value schemas into nominal records without changing JSON names, requiredness, nullability, HAL relations, operation methods, or wire payloads. Protocol inputs, nested request graphs, HAL resources, inherited schemas, clients, exceptions, file wrappers, and explicitly mutable UI/service contracts remain classes. Generated record properties are init-only except `[JsonExtensionData] AdditionalProperties`, which stays settable for System.Text.Json AOT compatibility.
@@ -793,6 +822,9 @@ Configured in `RateLimitingExtensions.cs`. All settings are configurable via `ap
   route in the partition so status, journey, and provider-configuration reads
   cannot exhaust one another; setup mutations retain one shared IP partition.
 - **Defaults**: 5 requests per partition per 60-second window.
+- **Keycloak operator routes**: the seven `/api/instance/keycloak` routes use the
+  setup or authenticated authority partition selected by the current request;
+  setup authority does not bypass the receipt's setup-generation binding.
 
 ### AnalyticsRelay (Fixed Window)
 - **Policy**: `AnalyticsRelay` — for anonymous browser analytics relay traffic.
@@ -1550,6 +1582,11 @@ Write operations support the `Idempotency-Key` HTTP header for safe retries:
 - `5xx`, large, or non-JSON responses are not persisted for replay.
 - Keys expire after 24 hours for replay eligibility. Expired rows are ignored by reads; the `idempotency-cleanup` Quartz job physically deletes expired rows after the configured `IdempotencyCleanup:ExpirationGraceHours` safety buffer.
 - Entity: `IdempotencyRecord` with `Key`, `TenantId`, request fingerprint fields, `StatusCode`, `ResponseBody`, `CreatedAt`, and `ExpiresAt`.
+
+The seven `/api/instance/keycloak` operation routes are explicitly excluded from
+this mechanism. In particular, inspection and apply can carry ephemeral
+administrator credentials, and receipt state rather than a replayed HTTP response
+is the only supported repeat-operation record.
 
 ---
 

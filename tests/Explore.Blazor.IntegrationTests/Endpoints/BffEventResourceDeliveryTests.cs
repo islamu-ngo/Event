@@ -69,6 +69,9 @@ public sealed class BffEventResourceDeliveryTests : IAsyncDisposable
         AddSession(reserve, _authHeader);
         reserve.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "browser-forged");
         reserve.Headers.Add(EventBffHeaderNames.TenantSlug, "browser-forged");
+        foreach (string header in new[] { "X-Tenant-Id", "X-Subject-Id", "X-Guest-Id",
+                     "X-Dependent-Id", "X-Role-Claim" })
+            reserve.Headers.TryAddWithoutValidation(header, Guid.CreateVersion7().ToString("D"));
 
         using var reserved = await _client.SendAsync(reserve);
 
@@ -83,6 +86,9 @@ public sealed class BffEventResourceDeliveryTests : IAsyncDisposable
         await Assert.That(_api.ReserveAuthorization).StartsWith("Bearer ");
         await Assert.That(_api.ReserveAuthorization).DoesNotContain("browser-forged");
         await Assert.That(_api.ReserveTenant).DoesNotContain("browser-forged");
+        foreach (string header in new[] { "X-Tenant-Id", "X-Subject-Id", "X-Guest-Id",
+                     "X-Dependent-Id", "X-Role-Claim" })
+            await Assert.That(_api.ReserveHeaderNames.Contains(header)).IsFalse();
 
         using var wrongUserUpload = CreateUploadRequest(opaqueSession, fileName, contentType);
         AddSession(wrongUserUpload, TestAuthHandler.CreateAuthHeaderValue(
@@ -374,6 +380,8 @@ public sealed class BffEventResourceDeliveryTests : IAsyncDisposable
         public string ReserveBody { get; private set; } = string.Empty;
         public string ReserveAuthorization { get; private set; } = string.Empty;
         public string ReserveTenant { get; private set; } = string.Empty;
+        public IReadOnlySet<string> ReserveHeaderNames { get; private set; } =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public int ReserveCount { get; private set; }
         public int UploadCount { get; private set; }
         public byte[] UploadBytes { get; private set; } = [];
@@ -400,6 +408,8 @@ public sealed class BffEventResourceDeliveryTests : IAsyncDisposable
                 ReserveTenant = request.Headers.TryGetValues(EventBffHeaderNames.TenantSlug, out var tenants)
                     ? string.Join(',', tenants)
                     : string.Empty;
+                ReserveHeaderNames = request.Headers.Select(header => header.Key)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 return JsonResponse(SessionJson(ApiUploadSessionId, null, "reserved"));
             }
 

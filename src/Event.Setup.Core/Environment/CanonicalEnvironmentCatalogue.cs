@@ -103,22 +103,6 @@ public static partial class CanonicalEnvironmentCatalogue
         INFISICAL_CLIENT_SECRET
         INFISICAL_ENV
         DATABASE_TRUST_SERVER_CERTIFICATE
-        KEYCLOAK_API_CLIENT_SECRET
-        KEYCLOAK_BLAZOR_REDIRECT_URIS
-        KEYCLOAK_BLAZOR_WEB_ORIGINS
-        KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS
-        KEYCLOAK_SMTP_HOST
-        KEYCLOAK_SMTP_PORT
-        KEYCLOAK_SMTP_FROM
-        KEYCLOAK_SMTP_FROM_DISPLAY_NAME
-        KEYCLOAK_SMTP_AUTH
-        KEYCLOAK_SMTP_SSL
-        KEYCLOAK_SMTP_STARTTLS
-        KEYCLOAK_SMTP_REPLY_TO
-        KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME
-        KEYCLOAK_SMTP_ENVELOPE_FROM
-        KEYCLOAK_SMTP_USER
-        KEYCLOAK_SMTP_PASSWORD
         KEYCLOAK_REQUIRE_HTTPS_METADATA
         IDENTITY_DATABASE_PROVIDER
         IDENTITY_DATABASE_CONNECTION_STRING
@@ -575,22 +559,6 @@ public static partial class CanonicalEnvironmentCatalogue
         KEYCLOAK_ADMIN
         KEYCLOAK_ADMIN_PASSWORD
         KEYCLOAK_HTTP_PORT
-        KEYCLOAK_API_CLIENT_SECRET
-        KEYCLOAK_BLAZOR_REDIRECT_URIS
-        KEYCLOAK_BLAZOR_WEB_ORIGINS
-        KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS
-        KEYCLOAK_SMTP_HOST
-        KEYCLOAK_SMTP_PORT
-        KEYCLOAK_SMTP_FROM
-        KEYCLOAK_SMTP_FROM_DISPLAY_NAME
-        KEYCLOAK_SMTP_AUTH
-        KEYCLOAK_SMTP_SSL
-        KEYCLOAK_SMTP_STARTTLS
-        KEYCLOAK_SMTP_REPLY_TO
-        KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME
-        KEYCLOAK_SMTP_ENVELOPE_FROM
-        KEYCLOAK_SMTP_USER
-        KEYCLOAK_SMTP_PASSWORD
         KEYCLOAK_INTERNAL_URL
         REDIS_CONNECTION_STRING
         AUTHORIZATION_PROVIDER
@@ -658,7 +626,7 @@ public static partial class CanonicalEnvironmentCatalogue
         OSPREY_SYNC_ACTION_PORT
         """);
 
-    private static readonly string[] SecretKeyData = Lines(
+    private static readonly string[] SecretBindingKeyData = Lines(
         """
         SETUP_SECRET
         INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
@@ -672,10 +640,7 @@ public static partial class CanonicalEnvironmentCatalogue
         KEYCLOAK_REALM
         KEYCLOAK_CLIENT_ID
         KEYCLOAK_BLAZOR_CLIENT_SECRET
-        KEYCLOAK_API_CLIENT_SECRET
         KEYCLOAK_ENDPOINT
-        KEYCLOAK_ADMIN_USERNAME
-        KEYCLOAK_ADMIN_PASSWORD
         KEYCLOAK_DB_PASSWORD
         AUTHENTICATION_LOCAL_JWT_KEY
         IDENTITY_DATABASE_CONNECTION_STRING
@@ -721,7 +686,7 @@ public static partial class CanonicalEnvironmentCatalogue
         """);
 
     private static readonly HashSet<string> SecretKeys =
-        SecretKeyData.ToHashSet(StringComparer.Ordinal);
+        SecretBindingKeyData.ToHashSet(StringComparer.Ordinal);
 
     public static IReadOnlyList<string> DotenvEnvironmentKeys =>
         Array.AsReadOnly((string[])DotenvKeyData.Clone());
@@ -730,13 +695,18 @@ public static partial class CanonicalEnvironmentCatalogue
         Array.AsReadOnly((string[])ComposeKeyData.Clone());
 
     public static IReadOnlySet<string> SecretBindingEnvironmentKeys =>
-        new HashSet<string>(SecretKeys, StringComparer.Ordinal);
+        new HashSet<string>(
+            SecretBindingKeyData,
+            StringComparer.Ordinal);
 
     public static EnvironmentCatalogue Catalogue { get; } = CreateCatalogue();
 
     private static EnvironmentCatalogue CreateCatalogue()
     {
-        string[] allKeys = DotenvKeyData.Concat(AdvancedKeyData).Concat(ComposeKeyData).Concat(SecretKeyData)
+        string[] allKeys = DotenvKeyData
+            .Concat(AdvancedKeyData)
+            .Concat(ComposeKeyData)
+            .Concat(SecretBindingKeyData)
             .Distinct(StringComparer.Ordinal).ToArray();
         if (MetadataPolicies.Count != allKeys.Length
             || allKeys.Any(key => !MetadataPolicies.ContainsKey(key)))

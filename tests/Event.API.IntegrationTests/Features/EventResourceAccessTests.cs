@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Event.API.IntegrationTests.Features;
 
@@ -30,9 +31,13 @@ public sealed class EventResourceAccessTests
     [Arguments("version")]
     [Arguments("withdraw")]
     [Arguments("policy")]
+    [Arguments("cancel-parent-before-final-read")]
+    [Arguments("staff-expiry-before-final-read")]
+    [Arguments("window-boundaries")]
     public async Task RedirectOnlyRevealsAuthorizedProtectedDestination(string change)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        var clock = new AccessClock(DateTimeOffset.UtcNow);
         var credentials = await factory.SeedLocalUserAsync(emailConfirmed: true);
         Guid eventId = Guid.CreateVersion7(), resourceId = Guid.CreateVersion7();
         string sentinel = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
@@ -71,18 +76,33 @@ public sealed class EventResourceAccessTests
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
             db.EventRoleAssignments.Add(EventRoleAssignment.Create(PlatformDefaults.DefaultTenantId, eventId, userId,
-                (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddMinutes(-1), null, userId));
+                (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddMinutes(-1),
+                change == "staff-expiry-before-final-read" ? clock.GetUtcNow().AddSeconds(5).UtcDateTime : null, userId));
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
                 new EventResourceMetadata { Title = "Public destination", PublicTitle = "Visit",
                     Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.Public },
-                EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
+                EventResourceDeliveryTypeEnum.ExternalLink,
+                change == "window-boundaries"
+                    ? EventResourceAvailability.Create(absoluteStartUtc: clock.GetUtcNow().AddMinutes(1),
+                        absoluteEndUtc: clock.GetUtcNow().AddMinutes(2))
+                    : EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,
-                    EventResourceAudienceKindEnum.Public)], userId, DateTime.UtcNow);
+                    change == "staff-expiry-before-final-read"
+                        ? EventResourceAudienceKindEnum.EventStaff : EventResourceAudienceKindEnum.Public)],
+                userId, DateTime.UtcNow);
             db.EventResources.Add(resource);
             await db.SaveChangesAsync();
         }
         using var hosted = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            services.Configure<MvcOptions>(options => options.Filters.Add(new BeforeRedirect(change, factory, resourceId, userId)))));
+        {
+            services.Configure<MvcOptions>(options =>
+                options.Filters.Add(new BeforeRedirect(change, factory, eventId, resourceId, userId, clock)));
+            if (change is "staff-expiry-before-final-read" or "window-boundaries")
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton<TimeProvider>(clock);
+            }
+        }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials))
@@ -128,8 +148,16 @@ public sealed class EventResourceAccessTests
                    new { expectedVersion = version }))
             await Assert.That(published.StatusCode).IsEqualTo(HttpStatusCode.OK)
                 .Because(await published.Content.ReadAsStringAsync());
+        long managementAuditRows;
+        await using (var audit = factory.CreateDatabase())
+        {
+            audit.EnableTenantFilterBypass("Count management evidence before any attendee redirect read.");
+            managementAuditRows = await audit.EventResourceAuditEntries.CountAsync(row => row.EventResourceId == resourceId);
+            await Assert.That(managementAuditRows).IsGreaterThan(0);
+        }
         client.DefaultRequestHeaders.Remove("Idempotency-Key");
-        client.DefaultRequestHeaders.Authorization = null;
+        if (change != "staff-expiry-before-final-read")
+            client.DefaultRequestHeaders.Authorization = null;
         if (change is "scope" or "tenant" or "tamper" or "version")
         {
             await using var db = factory.CreateDatabase();
@@ -162,15 +190,22 @@ public sealed class EventResourceAccessTests
         await Assert.That(metadata.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string metadataBody = await metadata.Content.ReadAsStringAsync();
         await Assert.That(metadataBody).DoesNotContain(sentinel);
+        if (change == "staff-expiry-before-final-read")
+        {
+            using var document = JsonDocument.Parse(metadataBody);
+            await Assert.That(document.RootElement.GetProperty("_links").TryGetProperty("access", out _)).IsTrue()
+                .Because("the authenticated staff member must have a valid redirect action before expiry");
+        }
+        string? savedAction = null;
         if (change == "allow")
         {
             using var document = JsonDocument.Parse(metadataBody);
             await Assert.That(document.RootElement.GetProperty("externalDestinationSafeOrigin").GetString())
                 .IsEqualTo("https://resource.example.org");
-            string href = document.RootElement.GetProperty("_links").GetProperty("access")
+            savedAction = document.RootElement.GetProperty("_links").GetProperty("access")
                 .GetProperty("href").GetString()!;
-            await Assert.That(href).DoesNotContain(sentinel);
-            await Assert.That(href).Contains($"/api/eventresource/{resourceId}/access");
+            await Assert.That(savedAction).DoesNotContain(sentinel);
+            await Assert.That(savedAction).Contains($"/api/eventresource/{resourceId}/access");
         }
         using var response = await client.GetAsync($"/api/eventresource/{resourceId}/access");
         string body = await response.Content.ReadAsStringAsync();
@@ -187,14 +222,92 @@ public sealed class EventResourceAccessTests
         }
         await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
         await Assert.That(body).DoesNotContain(sentinel);
+        if (change == "window-boundaries")
+        {
+            clock.Advance(TimeSpan.FromMinutes(1));
+            using (var start = await client.GetAsync($"/api/eventresource/{resourceId}/access"))
+            {
+                await Assert.That(start.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+                await Assert.That(start.Headers.Location!.AbsoluteUri).IsEqualTo(destination);
+            }
+            clock.Advance(TimeSpan.FromMinutes(1));
+            using (var end = await client.GetAsync($"/api/eventresource/{resourceId}/access"))
+            {
+                await Assert.That(end.IsSuccessStatusCode).IsFalse();
+                await Assert.That(end.Headers.Location).IsNull();
+                await Assert.That((await end.Content.ReadAsStringAsync()).Contains(sentinel, StringComparison.Ordinal))
+                    .IsFalse();
+            }
+        }
+        if (change is not ("withdraw" or "policy" or "cancel-parent-before-final-read"))
+        {
+            await using var audit = factory.CreateDatabase();
+            audit.EnableTenantFilterBypass("Attendee metadata and redirect reads never create browsing history.");
+            long afterReads = await audit.EventResourceAuditEntries.CountAsync(row => row.EventResourceId == resourceId);
+            await Assert.That(afterReads).IsEqualTo(managementAuditRows)
+                .Because($"Management audit rows changed during an attendee read: before={managementAuditRows}, after={afterReads}.");
+        }
+        if (savedAction is not null)
+        {
+            await using (var db = factory.CreateDatabase())
+            {
+                db.EnableTenantFilterBypass("Withdraw the published destination after preserving its HAL action.");
+                var resource = await db.EventResources.SingleAsync(row => row.Id == resourceId);
+                resource.Withdraw(resource.ConcurrencyStamp, userId, DateTime.UtcNow);
+                await db.SaveChangesAsync();
+            }
+            await AssertOldActionDeniedAsync();
+            await using (var db = factory.CreateDatabase())
+            {
+                db.EnableTenantFilterBypass("Republish the same destination with current parent authority.");
+                var resource = await db.EventResources.Include(row => row.AudienceRules)
+                    .SingleAsync(row => row.Id == resourceId);
+                resource.Republish(new(PlatformDefaults.DefaultTenantId, eventId, null, EventStatusEnum.Published,
+                    false, true, null, false, new(null, null, null, null)), true,
+                    resource.ConcurrencyStamp, userId, DateTime.UtcNow);
+                await db.SaveChangesAsync();
+            }
+            using (var restored = await client.GetAsync(savedAction))
+            {
+                await Assert.That(restored.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
+                await Assert.That(restored.Headers.Location!.AbsoluteUri).IsEqualTo(destination);
+            }
+            await using (var db = factory.CreateDatabase())
+            {
+                db.EnableTenantFilterBypass("Archive the withdrawn destination after confirming republish.");
+                var resource = await db.EventResources.SingleAsync(row => row.Id == resourceId);
+                resource.Withdraw(resource.ConcurrencyStamp, userId, DateTime.UtcNow);
+                resource.Archive(resource.ConcurrencyStamp, userId, DateTime.UtcNow);
+                await db.SaveChangesAsync();
+            }
+            await AssertOldActionDeniedAsync();
+            await using (var db = factory.CreateDatabase())
+            {
+                db.EnableTenantFilterBypass("Delete the archived resource and its protected destination.");
+                var resource = await db.EventResources.SingleAsync(row => row.Id == resourceId);
+                resource.Delete(resource.ConcurrencyStamp, userId, DateTime.UtcNow);
+                await db.SaveChangesAsync();
+            }
+            await AssertOldActionDeniedAsync();
+
+            async Task AssertOldActionDeniedAsync()
+            {
+                using var denied = await client.GetAsync(savedAction);
+                await Assert.That(denied.IsSuccessStatusCode).IsFalse();
+                await Assert.That(denied.Headers.Location).IsNull();
+                await Assert.That((await denied.Content.ReadAsStringAsync()).Contains(sentinel, StringComparison.Ordinal))
+                    .IsFalse();
+            }
+        }
     }
 
-    private sealed class BeforeRedirect(string change, LocalAdmissionWebApplicationFactory factory, Guid resourceId, Guid userId)
+    private sealed class BeforeRedirect(string change, LocalAdmissionWebApplicationFactory factory, Guid eventId,
+        Guid resourceId, Guid userId, AccessClock clock)
         : IAsyncResultFilter
     {
         public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
         {
-            if (context.Result is EventResourceRedirectResult && change is "withdraw" or "policy")
+            if (context.Result is EventResourceRedirectResult && change is "withdraw" or "policy" or "cancel-parent-before-final-read")
             {
                 await using var db = factory.CreateDatabase();
                 db.EnableTenantFilterBypass("Change exact resource authority before redirect headers.");
@@ -202,6 +315,11 @@ public sealed class EventResourceAccessTests
                 {
                     var resource = await db.EventResources.SingleAsync(row => row.Id == resourceId);
                     resource.Withdraw(resource.ConcurrencyStamp, userId, DateTime.UtcNow);
+                }
+                else if (change == "cancel-parent-before-final-read")
+                {
+                    var parent = await db.Events.SingleAsync(row => row.Id == eventId);
+                    await Assert.That(parent.Cancel(DateTime.UtcNow)).IsTrue();
                 }
                 else
                 {
@@ -211,7 +329,15 @@ public sealed class EventResourceAccessTests
                 }
                 await db.SaveChangesAsync();
             }
+            if (context.Result is EventResourceRedirectResult && change == "staff-expiry-before-final-read")
+                clock.Advance(TimeSpan.FromSeconds(10));
             await next();
         }
+    }
+
+    private sealed class AccessClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+        public void Advance(TimeSpan elapsed) => now += elapsed;
     }
 }

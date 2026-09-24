@@ -178,6 +178,47 @@ public sealed partial class EventResourceDiscoveryTests
             await Assert.That(revoked.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
             await PrivateAsync(revoked);
         }
+        client.DefaultRequestHeaders.IfNoneMatch.Clear();
+        await using (var restore = factory.CreateDatabase())
+        {
+            restore.EnableTenantFilterBypass("Restore only the member before independently cancelling the parent.");
+            await restore.TenantUsers.Where(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == userId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.StatusId, (int)TenantUserStatusEnum.Active), Token);
+        }
+        using (var entitledAgain = await client.GetAsync($"/api/eventresource/{hiddenId:D}", Token))
+        {
+            await Assert.That(entitledAgain.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(await entitledAgain.Content.ReadAsStringAsync(Token)).Contains(privateTitle);
+        }
+        await using (var cancellation = factory.CreateDatabase())
+        {
+            cancellation.EnableTenantFilterBypass("Cancel the published parent while its entitled member remains active.");
+            var parent = await cancellation.Events.SingleAsync(row => row.Id == eventId, Token);
+            await Assert.That(parent.Cancel(DateTime.UtcNow)).IsTrue();
+            await cancellation.SaveChangesAsync(Token);
+        }
+        foreach (var id in new[] { hiddenId, teaserId, publicId })
+        {
+            using var denied = await client.GetAsync($"/api/eventresource/{id:D}", Token);
+            await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+            await PrivateAsync(denied);
+            string deniedBody = await denied.Content.ReadAsStringAsync(Token);
+            await Assert.That(deniedBody).DoesNotContain(privateTitle);
+            await Assert.That(deniedBody).DoesNotContain(privateNotes);
+        }
+        using (var cancelledCollection = await client.GetAsync($"/api/event/{eventId:D}/resources", Token))
+        {
+            await Assert.That(cancelledCollection.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.OK).IsTrue();
+            string body = await cancelledCollection.Content.ReadAsStringAsync(Token);
+            await Assert.That(body).DoesNotContain(privateTitle);
+            await Assert.That(body).DoesNotContain(privateNotes);
+            if (cancelledCollection.StatusCode == HttpStatusCode.OK)
+            {
+                using var document = JsonDocument.Parse(body);
+                await Assert.That(document.RootElement.GetProperty("_embedded").GetProperty("items").GetArrayLength())
+                    .IsEqualTo(0);
+            }
+        }
         await using var verification = factory.CreateDatabase();
         verification.EnableTenantFilterBypass("Audience test checks exact event resources for unintended audit collection.");
         await Assert.That(await verification.EventResourceAuditEntries

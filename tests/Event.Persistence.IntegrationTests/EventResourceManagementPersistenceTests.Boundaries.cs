@@ -43,6 +43,49 @@ public sealed partial class EventResourceManagementPersistenceTests
     }
 
     [Test]
+    public async Task FailedAuditRollsBackMetadataAndPolicyWithoutConsumingReplayIdentity()
+    {
+        var (scope, actor) = await SeedAsync();
+        Guid id = Guid.CreateVersion7(), version;
+        await using (var seed = database.CreateContext())
+        {
+            await Assert.That((await Workflow(seed, scope.TenantAId, actor)
+                .CreateAsync(scope.EventAId, id, Draft(), default)).IsSuccess).IsTrue();
+            version = (await seed.EventResources.SingleAsync(value => value.Id == id)).ConcurrencyStamp;
+        }
+        var revised = Draft() with
+        {
+            Title = "Audited revision", AudienceRules = [new(EventResourceAudienceKindEnum.Organizer)]
+        };
+        await using (var failing = database.CreateContext(new AuditFailure()))
+            await Assert.That(async () => await Workflow(failing, scope.TenantAId, actor)
+                .UpdateAsync(id, version, revised, default)).Throws<DbUpdateException>();
+        await using (var rolledBack = database.CreateContext())
+        {
+            var previous = await rolledBack.EventResources.Include(value => value.AudienceRules)
+                .SingleAsync(value => value.Id == id);
+            await Assert.That(previous.Title).IsEqualTo(Draft().Title);
+            await Assert.That(previous.ConcurrencyStamp).IsEqualTo(version);
+            await Assert.That(previous.AudienceRules.Single().AudienceKindId).IsEqualTo((int)EventResourceAudienceKindEnum.Public);
+            await Assert.That(await rolledBack.EventResourceAuditEntries.CountAsync(value => value.EventResourceId == id))
+                .IsEqualTo(1);
+        }
+        await using (var resumed = database.CreateContext())
+        {
+            var workflow = Workflow(resumed, scope.TenantAId, actor);
+            await Assert.That((await workflow.UpdateAsync(id, version, revised, default)).IsSuccess).IsTrue();
+            await Assert.That((await workflow.UpdateAsync(id, version, revised, default)).IsSuccess).IsFalse();
+        }
+        await using var verify = database.CreateContext();
+        var committed = await verify.EventResources.Include(value => value.AudienceRules)
+            .SingleAsync(value => value.Id == id);
+        await Assert.That(committed.Title).IsEqualTo(revised.Title);
+        await Assert.That(committed.AudienceRules.Single().AudienceKindId).IsEqualTo((int)EventResourceAudienceKindEnum.Organizer);
+        await Assert.That(await verify.EventResourceAuditEntries.CountAsync(value => value.EventResourceId == id))
+            .IsEqualTo(2);
+    }
+
+    [Test]
     public async Task RevocationAfterAcceptedReadCannotReuseFinalMutationAuthority()
     {
         var (scope, actor) = await SeedAsync();
@@ -60,6 +103,96 @@ public sealed partial class EventResourceManagementPersistenceTests
         await Assert.That(result.IsSuccess).IsFalse();
         await using var verify = database.CreateContext();
         await Assert.That(await verify.EventResources.AnyAsync(value => value.Id == id)).IsFalse();
+        await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == id)).IsFalse();
+    }
+
+    [Test]
+    public async Task AudienceEditCannotRepublishAfterWithdrawalAndManagerRevocation()
+    {
+        var (scope, actor) = await SeedAsync();
+        Guid id, version;
+        await using (var seed = database.CreateContext())
+        {
+            var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
+            parent.Publish(Now);
+            var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
+            id = resource.Id;
+            resource.SetExternalDestination("protected-payload", 1, "https://resource.example.org",
+                resource.ConcurrencyStamp, actor, Now);
+            resource.Publish(new(scope.TenantAId, scope.EventAId, null, EventStatusEnum.Published,
+                false, true, null, false, new(null, null, null, null)), true,
+                resource.ConcurrencyStamp, actor, Now);
+            seed.EventResources.Add(resource);
+            await seed.SaveChangesAsync();
+            version = resource.ConcurrencyStamp;
+        }
+        await using var context = database.CreateIndependentContext();
+        var unit = new RevokeAfterAcceptedRead(new EfCoreUnitOfWork(context), async () =>
+        {
+            await using var writer = database.CreateIndependentContext();
+            var parent = await writer.Events.SingleAsync(value => value.Id == scope.EventAId);
+            parent.OrganizerActorId = null;
+            var resource = await writer.EventResources.SingleAsync(value => value.Id == id);
+            resource.Withdraw(resource.ConcurrencyStamp, actor, Now);
+            await writer.SaveChangesAsync();
+        });
+        var result = await Workflow(context, scope.TenantAId, actor,
+            Policy(origins: ["https://resource.example.org"]), unitOfWork: unit)
+            .UpdateAsync(id, version, Draft() with
+            {
+                Title = "Stale audience revision",
+                DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink,
+                AudienceRules = [new(EventResourceAudienceKindEnum.Organizer)]
+            }, default);
+        await Assert.That(result.IsSuccess).IsFalse();
+        await using var verify = database.CreateContext();
+        var current = await verify.EventResources.Include(value => value.AudienceRules)
+            .SingleAsync(value => value.Id == id);
+        await Assert.That(current.PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Withdrawn);
+        await Assert.That(current.Title).IsNotEqualTo("Stale audience revision");
+        await Assert.That(current.AudienceRules.Single().AudienceKindId).IsEqualTo((int)EventResourceAudienceKindEnum.Public);
+        await Assert.That(current.ExternalDestinationCiphertext).IsEqualTo("protected-payload");
+        await Assert.That((await verify.Events.SingleAsync(value => value.Id == scope.EventAId)).OrganizerActorId).IsNull();
+        await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == id)).IsFalse();
+    }
+
+    [Test]
+    public async Task DraftPublicationCannotSurviveManagerGrantRemovalBeforeFinalMutation()
+    {
+        var (scope, actor) = await SeedAsync();
+        Guid id, version;
+        await using (var seed = database.CreateContext())
+        {
+            var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
+            parent.Publish(Now);
+            var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
+            id = resource.Id;
+            resource.SetExternalDestination("protected-payload", 1, "https://resource.example.org",
+                resource.ConcurrencyStamp, actor, Now);
+            seed.EventResources.Add(resource);
+            await seed.SaveChangesAsync();
+            version = resource.ConcurrencyStamp;
+        }
+        await using var context = database.CreateIndependentContext();
+        var unit = new RevokeAfterAcceptedRead(new EfCoreUnitOfWork(context), async () =>
+        {
+            await using var writer = database.CreateIndependentContext();
+            var parent = await writer.Events.SingleAsync(value => value.Id == scope.EventAId);
+            parent.OrganizerActorId = null;
+            await writer.SaveChangesAsync();
+        });
+        var protector = Substitute.For<IEventResourceDestinationProtector>();
+        protector.Unprotect(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>())
+            .Returns("https://resource.example.org/handout");
+        var result = await Workflow(context, scope.TenantAId, actor,
+            Policy(origins: ["https://resource.example.org"]), unitOfWork: unit)
+            .ChangeStateAsync(id, version, EventResourceManagementAction.Publish, default, protector);
+        await Assert.That(result.IsSuccess).IsFalse();
+        await using var verify = database.CreateContext();
+        var current = await verify.EventResources.SingleAsync(value => value.Id == id);
+        await Assert.That(current.PublicationStateId).IsEqualTo((int)EventResourcePublicationStateEnum.Draft);
+        await Assert.That(current.ConcurrencyStamp).IsEqualTo(version);
+        await Assert.That((await verify.Events.SingleAsync(value => value.Id == scope.EventAId)).OrganizerActorId).IsNull();
         await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == id)).IsFalse();
     }
 

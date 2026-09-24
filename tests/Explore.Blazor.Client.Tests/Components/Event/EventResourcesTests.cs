@@ -98,6 +98,38 @@ public sealed class EventResourcesTests : IDisposable
     }
 
     [Test]
+    public async Task ExternalAccessAnnouncesTheOutsideServiceBeforeFollowingItsAction()
+    {
+        var detail = Detail("access");
+        _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(Page(detail));
+        _client.GetEventResourceAudienceDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(detail);
+
+        var cut = Render();
+        var access = cut.WaitForElement("[data-testid='resource-access']");
+        var warning = cut.Find($"#resource-external-warning-{_resourceId:N}");
+        await Assert.That(warning.TextContent.Trim()).IsNotEmpty();
+        await Assert.That(access.GetAttribute("aria-describedby")).IsEqualTo(warning.Id);
+        await Assert.That(warning.NextElementSibling?.GetAttribute("data-testid")).IsEqualTo("resource-access");
+        await Assert.That(access.GetAttribute("href")).IsEqualTo($"/api/event/resources/{_resourceId}/access");
+    }
+
+    [Test]
+    public async Task DownloadDetailsExposeTheValidatedFileType()
+    {
+        var detail = Detail("download");
+        _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(Page(detail));
+        _client.GetEventResourceAudienceDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(detail);
+
+        var cut = Render();
+        cut.WaitForElement("[data-testid='resource-download']");
+        await Assert.That(cut.Markup).Contains(detail.File!.ContentType);
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task AccessibleAlternativeRequiresItsOwnRelation(bool advertised)

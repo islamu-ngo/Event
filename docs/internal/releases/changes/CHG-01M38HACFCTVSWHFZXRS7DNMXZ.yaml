@@ -1,0 +1,29 @@
+# Event-resource browser corrections for safe navigation and editor accessibility.
+Change-Id: CHG-01M38HACFCTVSWHFZXRS7DNMXZ
+Title: "Accessible resource navigation and editing"
+Type: fix
+Scope: events
+Summary: "Visitors see external-link warnings and file type; editors retain focus and associated form errors."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: The attendee surface warns before an external provider is opened and explains that an already-revealed link requires provider-side rotation.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Readers see the safe origin and warning before leaving; organizer forms retain keyboard focus and associate field errors.

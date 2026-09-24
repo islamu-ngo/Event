@@ -2,6 +2,7 @@ using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Components;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services;
+using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Blazor.Client.Tests.Pages.Studio;
@@ -12,6 +13,7 @@ public sealed class StudioEventResourcesTests : IDisposable
     private readonly BlazorTestContext _ctx = new();
     private readonly IEventResourceManagementClient _management;
     private readonly IEventResourceExportClient _export;
+    private readonly IAccessibilityFocusService _focus;
     private readonly Guid _eventId = Guid.CreateVersion7();
     private readonly Guid _resourceId = Guid.CreateVersion7();
     private readonly Guid _version = Guid.CreateVersion7();
@@ -20,6 +22,7 @@ public sealed class StudioEventResourcesTests : IDisposable
     {
         _management = _ctx.AddMockService<IEventResourceManagementClient>();
         _export = _ctx.AddMockService<IEventResourceExportClient>();
+        _focus = _ctx.AddMockService<IAccessibilityFocusService>();
         _ctx.Services.AddScoped<IEventResourceService>(_ => new EventResourceService(
             Substitute.For<IEventResourcesClient>(), _management, _export));
     }
@@ -142,6 +145,69 @@ public sealed class StudioEventResourcesTests : IDisposable
         await Assert.That(cut.Find("label[for='resource-destination']").TextContent).IsNotEmpty();
         await Assert.That(cut.Find("#resource-destination").GetAttribute("autocomplete")).IsEqualTo("off");
         await Assert.That(cut.FindAll("[value*='destination.example.test']")).IsEmpty();
+    }
+
+    [Test]
+    public async Task CancellingEditorRestoresFocusToItsOriginalAction()
+    {
+        _management.ListEventResourceManagementAsync(_eventId, Arg.Any<int?>(), Arg.Any<int?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Collection(["create-resource"]));
+        _management.GetEventResourceManagementDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(Item());
+
+        var cut = Render();
+        await cut.WaitForElement("[data-testid='resource-create-resource']").ClickAsync();
+        await _focus.Received(1).SaveFocusAsync();
+        await cut.Find("form button[type='button']").ClickAsync();
+
+        await Assert.That(cut.FindAll("form")).IsEmpty();
+        await Assert.That(cut.Find("#resource-studio-focus")).IsNotNull();
+        await _focus.Received(1).RestoreFocusAsync("#resource-studio-focus");
+    }
+
+    [Test]
+    public async Task InvalidTitleIsAssociatedWithItsFormControl()
+    {
+        _management.ListEventResourceManagementAsync(_eventId, Arg.Any<int?>(), Arg.Any<int?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Collection(["create-resource"]));
+        _management.GetEventResourceManagementDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(Item());
+
+        var cut = Render();
+        await cut.WaitForElement("[data-testid='resource-create-resource']").ClickAsync();
+        await cut.Find("form").SubmitAsync();
+
+        await Assert.That(cut.Find("#resource-title").GetAttribute("aria-describedby"))
+            .IsEqualTo("resource-title-error");
+        await Assert.That(cut.Find("#resource-title-error").TextContent.Trim()).IsNotEmpty();
+        await _management.DidNotReceive().CreateEventResourceAsync(Arg.Any<Guid>(),
+            Arg.Any<string>(), Arg.Any<CreateEventResourceRequestDto>(), Arg.Any<string?>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task FailedSaveRefocusesTheEditorAfterItsResourceListReloads()
+    {
+        _management.ListEventResourceManagementAsync(_eventId, Arg.Any<int?>(), Arg.Any<int?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Collection(["create-resource"]));
+        _management.GetEventResourceManagementDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(Item());
+        _management.CreateEventResourceAsync(_eventId, Arg.Any<string>(),
+            Arg.Any<CreateEventResourceRequestDto>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<BaseCommandResponseOfGuid>(new ApiException("Denied", 403, "",
+                new Dictionary<string, IEnumerable<string>>(), null)));
+
+        var cut = Render();
+        await cut.WaitForElement("[data-testid='resource-create-resource']").ClickAsync();
+        await cut.Find("#resource-title").ChangeAsync("Handout");
+        await cut.Find("#resource-audience").ChangeAsync("Public");
+        await cut.Find("form").SubmitAsync();
+
+        await Assert.That(cut.Find("#resource-title")).IsNotNull();
+        await _focus.Received(1).FocusAsync("#resource-title", Arg.Any<bool>());
     }
 
     [Test]

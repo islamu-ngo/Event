@@ -22,12 +22,15 @@
                     @if (!string.IsNullOrWhiteSpace(item.AccessibilityNote)) { <p>@item.AccessibilityNote</p> }
                     @if (Href(item._links, "accessible-alternative") is { } alternative)
                     { <p><a href="@alternative" data-testid="resource-accessible-alternative">@T("alternative", "Accessible alternative")</a></p> }
-                    @if (item.File is { } file) { <p>@file.FileName · @file.SizeBytes @T("bytes", "bytes") · @file.SafetyState</p> }
+                    @if (item.File is { } file) { <p>@file.FileName · @T("fileType", "File type"): @file.ContentType · @file.SizeBytes @T("bytes", "bytes") · @file.SafetyState</p> }
                     @if (!string.IsNullOrWhiteSpace(item.ExternalDestinationSafeOrigin)) { <p>@T("origin", "Destination origin"): @item.ExternalDestinationSafeOrigin</p> }
                     @if (Href(item._links, "download") is { } download)
                     { <a href="@download" data-testid="resource-download">@T("download", "Download")</a> }
                     @if (Href(item._links, "access") is { } access)
-                    { <a href="@access" rel="noopener noreferrer" data-testid="resource-access">@T("access", "Open resource")</a> }
+                    {
+                        <p id="@($"resource-external-warning-{item.Id:N}")">@T("externalWarning", "This link opens an external service. The provider may retain a revealed link; withdrawing platform access cannot revoke it. Ask the provider to rotate the link if access must stop.")</p>
+                        <a href="@access" rel="noopener noreferrer" aria-describedby="@($"resource-external-warning-{item.Id:N}")" data-testid="resource-access">@T("access", "Open resource")</a>
+                    }
                 </article>
             }
         </div>

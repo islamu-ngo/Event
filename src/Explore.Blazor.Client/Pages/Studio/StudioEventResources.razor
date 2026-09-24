@@ -2,18 +2,20 @@
 @using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Components.Event
 @using Explore.Blazor.Client.Contracts.Interop
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
 @inject IEventResourceService Resources
 @inject ITranslationService Translation
 @inject IBrowserActionInterop BrowserActions
+@inject IAccessibilityFocusService Focus
 
-<div class="studio-resources" dir="@(Translation.CurrentLanguage == "ar" ? "rtl" : null)">
+<div id="resource-studio-focus" class="studio-resources" tabindex="-1" dir="@(Translation.CurrentLanguage == "ar" ? "rtl" : null)">
     @if (_loading) { <p role="status">@T("loading", "Loading resources…")</p> }
     else if (_error is not null) { <p role="alert">@_error</p> }
     else
     {
         <div class="studio-resources__actions">
             @if (Has(_collection?._links, "create-resource"))
-            { <button type="button" data-testid="resource-create-resource" @onclick="BeginCreate">@T("create", "New resource")</button> }
+            { <button type="button" data-testid="resource-create-resource" @onclick="BeginCreateAsync">@T("create", "New resource")</button> }
             @if (Has(_collection?._links, "export"))
             { <button type="button" data-testid="resource-export" @onclick="ExportAsync">@T("export", "Export metadata")</button> }
         </div>
@@ -22,7 +24,9 @@
             <form class="studio-resources__form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
                 <h3>@(_target is null ? T("create", "New resource") : T("edit", "Edit resource"))</h3>
                 <label for="resource-title">@T("title", "Title")</label>
-                <input id="resource-title" required maxlength="200" @bind="_draft.Title" />
+                <input id="resource-title" required maxlength="200" aria-describedby="@(_invalidField == "title" ? "resource-title-error" : null)"
+                       aria-invalid="@(_invalidField == "title")" @bind="_draft.Title" />
+                @if (_invalidField == "title") { <p id="resource-title-error" role="alert">@T("titleRequired", "Enter a resource title.")</p> }
                 <label for="resource-description">@T("description", "Description")</label>
                 <textarea id="resource-description" @bind="_draft.Description"></textarea>
                 <label for="resource-public-title">@T("publicTitle", "Public teaser title")</label>
@@ -36,13 +40,15 @@
                 @if (_target is null)
                 {
                     <label for="resource-audience">@T("audience", "Audience")</label>
-                    <select id="resource-audience" required @bind="_audienceKind">
+                    <select id="resource-audience" required aria-describedby="@(_invalidField == "audience" ? "resource-audience-error" : null)"
+                            aria-invalid="@(_invalidField == "audience")" @bind="_audienceKind">
                         <option value="">@T("chooseAudience", "Choose an audience")</option>
                         <option value="@EventResourceAudienceKindEnum.Public">@T("public", "Public")</option>
                         <option value="@EventResourceAudienceKindEnum.AuthenticatedTenantMember">@T("tenantMembers", "Authenticated tenant members")</option>
                         <option value="@EventResourceAudienceKindEnum.AnyEventSessionSpeaker">@T("speakers", "Event speakers")</option>
                         <option value="@EventResourceAudienceKindEnum.Organizer">@T("organizers", "Organizers")</option>
                     </select>
+                    @if (_invalidField == "audience") { <p id="resource-audience-error" role="alert">@T("audienceRequired", "Choose an audience.")</p> }
                 }
                 <label for="resource-language">@T("language", "Language code")</label>
                 <input id="resource-language" @bind="_draft.LanguageCode" />
@@ -50,7 +56,7 @@
                 <textarea id="resource-accessibility" @bind="_draft.AccessibilityNote"></textarea>
                 <label for="resource-notes">@T("notes", "Private organizer notes")</label>
                 <textarea id="resource-notes" @bind="_draft.SensitiveNotes"></textarea>
-                <div class="studio-resources__actions"><button type="submit" disabled="@_busy">@T("save", "Save")</button><button type="button" @onclick="Cancel">@T("cancel", "Cancel")</button></div>
+                <div class="studio-resources__actions"><button type="submit" disabled="@_busy">@T("save", "Save")</button><button type="button" @onclick="CancelAsync">@T("cancel", "Cancel")</button></div>
             </form>
         }
         @if (_destinationTarget is { } destinationTarget)
@@ -59,8 +65,11 @@
                 <h3>@T("destination", "Set external destination")</h3>
                 <p>@T("writeOnly", "The full URL is write-only and cannot be retrieved after saving. Existing destination is not shown.")</p>
                 <label for="resource-destination">@T("destinationUrl", "HTTPS destination URL")</label>
-                <input id="resource-destination" type="url" required pattern="https://.*" autocomplete="off" @bind="_destination" />
-                <div class="studio-resources__actions"><button type="submit" disabled="@_busy">@T("save", "Save")</button><button type="button" @onclick="Cancel">@T("cancel", "Cancel")</button></div>
+                <input id="resource-destination" type="url" required pattern="https://.*" autocomplete="off"
+                       aria-describedby="@(_invalidField == "destination" ? "resource-destination-error" : null)"
+                       aria-invalid="@(_invalidField == "destination")" @bind="_destination" />
+                @if (_invalidField == "destination") { <p id="resource-destination-error" role="alert">@T("destinationInvalid", "Enter a valid HTTPS destination.")</p> }
+                <div class="studio-resources__actions"><button type="submit" disabled="@_busy">@T("save", "Save")</button><button type="button" @onclick="CancelAsync">@T("cancel", "Cancel")</button></div>
             </form>
         }
         @if (_audit is not null)
@@ -84,8 +93,8 @@
                     @if (item.File is { } file) { <p>@file.FileName · @file.SafetyState</p> }
                     @if (item.ExternalDestinationSafeOrigin is { } origin) { <p>@T("origin", "Destination origin"): @origin</p> }
                     <div class="studio-resources__actions">
-                        @if (Has(item._links, "edit")) { <button type="button" data-testid="resource-edit" @onclick="() => BeginEdit(item)">@T("edit", "Edit")</button> }
-                        @if (Has(item._links, "configure-destination")) { <button type="button" data-testid="resource-configure-destination" @onclick="() => BeginDestination(item)">@T("destination", "Set external destination")</button> }
+                        @if (Has(item._links, "edit")) { <button type="button" data-testid="resource-edit" @onclick="() => BeginEditAsync(item)">@T("edit", "Edit")</button> }
+                        @if (Has(item._links, "configure-destination")) { <button type="button" data-testid="resource-configure-destination" @onclick="() => BeginDestinationAsync(item)">@T("destination", "Set external destination")</button> }
                         @foreach (var action in new[] { "publish", "unpublish", "archive", "moderate" })
                         {
                             if (Has(item._links, action))
@@ -121,8 +130,8 @@
     private EventResourceDraftDto _draft = new();
     private EventResourceAudienceKindEnum? _audienceKind;
     private string _destination = "";
-    private string? _error, _status;
-    private bool _editing, _busy, _loading = true;
+    private string? _error, _status, _invalidField;
+    private bool _editing, _busy, _loading = true, _restoreFocus, _restoreEditorFocus;
     private Guid _loadedEvent;
     private Guid? _confirmDeleteId;
     private int _page = 1;
@@ -136,8 +145,23 @@
         _page = 1;
         _audit = null;
         _exportPage = null;
+        _restoreFocus = false; _restoreEditorFocus = false;
         Cancel();
         await ReloadAsync();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_restoreFocus && !_loading)
+        {
+            _restoreFocus = false;
+            await Focus.RestoreFocusAsync("#resource-studio-focus");
+        }
+        else if (_restoreEditorFocus && !_loading)
+        {
+            _restoreEditorFocus = false;
+            await Focus.FocusAsync(_error is not null ? "#resource-studio-focus"
+                : _editing ? "#resource-title" : "#resource-destination");
+        }
     }
     private async Task ReloadAsync()
     {
@@ -157,11 +181,17 @@
         finally { _loading = false; }
     }
     private async Task NextAsync() { _page++; await ReloadAsync(); }
-    private void BeginCreate() { _target = null; _draft = new() { Availability = new EventResourceTimeIntentDto() }; _audienceKind = null; _editing = true; _destinationTarget = null; }
-    private void BeginEdit(HalResourceOfEventResourceManagementDto item)
+    private async Task BeginCreateAsync()
     {
+        await Focus.SaveFocusAsync();
+        _target = null; _draft = new() { Availability = new EventResourceTimeIntentDto() };
+        _audienceKind = null; _invalidField = null; _editing = true; _destinationTarget = null;
+    }
+    private async Task BeginEditAsync(HalResourceOfEventResourceManagementDto item)
+    {
+        await Focus.SaveFocusAsync();
         _target = item;
-        _audienceKind = null;
+        _audienceKind = null; _invalidField = null;
         var d = item.Draft;
         _draft = new EventResourceDraftDto { Title = d.Title, PublicTitle = d.PublicTitle, Description = d.Description,
             SensitiveNotes = d.SensitiveNotes, Kind = d.Kind, DisclosureMode = d.DisclosureMode,
@@ -171,11 +201,19 @@
             Availability = d.Availability, AudienceRules = d.AudienceRules };
         _editing = true; _destinationTarget = null;
     }
-    private void BeginDestination(HalResourceOfEventResourceManagementDto item) { _destination = ""; _destinationTarget = item; _editing = false; }
-    private void Cancel() { _editing = false; _destinationTarget = null; _confirmDeleteId = null; _destination = ""; _error = null; }
+    private async Task BeginDestinationAsync(HalResourceOfEventResourceManagementDto item)
+    {
+        await Focus.SaveFocusAsync();
+        _destination = ""; _invalidField = null; _destinationTarget = item; _editing = false;
+    }
+    private void Cancel() { _editing = false; _destinationTarget = null; _confirmDeleteId = null; _destination = ""; _error = null; _invalidField = null; }
+    private void CancelAsync() { Cancel(); _restoreFocus = true; }
     private async Task SaveAsync()
     {
-        if (_busy || !_editing || string.IsNullOrWhiteSpace(_draft.Title) || (_target is null && _audienceKind is null)) return;
+        if (_busy || !_editing) return;
+        _invalidField = string.IsNullOrWhiteSpace(_draft.Title) ? "title"
+            : _target is null && _audienceKind is null ? "audience" : null;
+        if (_invalidField is not null) return;
         await ExecuteAsync(async () =>
         {
             if (_target is null)
@@ -192,17 +230,22 @@
                 await Resources.UpdateAsync(current.Id, new UpdateEventResourceRequestDto { ExpectedVersion = current.Version, Draft = _draft });
             }
             Cancel();
+            _restoreFocus = true;
         });
     }
     private async Task SaveDestinationAsync()
     {
-        if (_busy || _destinationTarget is not { } target || !Uri.TryCreate(_destination, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) return;
+        if (_busy || _destinationTarget is not { } target) return;
+        _invalidField = !Uri.TryCreate(_destination, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps
+            ? "destination" : null;
+        if (_invalidField is not null) return;
         await ExecuteAsync(async () =>
         {
             var current = await Resources.ManagementDetailAsync(target.Id);
             if (!Has(current._links, "configure-destination") || current.Version != target.Version) { _status = T("denied", "The action is no longer available. Resource list refreshed."); return; }
             await Resources.DestinationAsync(current.Id, new EventResourceDestinationWriteDto { ExpectedVersion = current.Version, Destination = _destination });
             Cancel();
+            _restoreFocus = true;
         });
     }
     private async Task MutateAsync(HalResourceOfEventResourceManagementDto item, string relation)
@@ -250,6 +293,11 @@
         _status = null;
         try { await command(); _status ??= T("updated", "Resource list refreshed."); }
         catch (ApiException) { _status = T("denied", "The action is no longer available. Resource list refreshed."); }
-        finally { _busy = false; await ReloadAsync(); }
+        finally
+        {
+            _busy = false;
+            _restoreEditorFocus = _editing || _destinationTarget is not null;
+            await ReloadAsync();
+        }
     }
 }

@@ -6,8 +6,10 @@ using Explore.Application.Models.Storage;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Constants;
 using Explore.Domain.Services;
 using Explore.Domain.ValueObjects;
+using Explore.Persistence.Services;
 using Explore.Persistence.Repositories;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -93,16 +95,37 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         var scope = await seeds.SeedScopeAsync();
         var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
         var binding = StorageProviderBinding.Local(Path.GetTempPath());
-        Guid objectId = Guid.CreateVersion7(), managerId = Guid.CreateVersion7();
+        Guid objectId = Guid.CreateVersion7();
         string key = $"objects/{objectId:N}";
         var clock = new CleanupClock(new DateTimeOffset(Now));
         await using var context = database.CreateContext();
+        Guid managerId = (await context.Actors.Where(actor => actor.Id == scope.ActorId)
+            .Select(actor => actor.UserId).SingleAsync())!.Value;
+        var parent = await context.Events.SingleAsync(row => row.Id == scope.EventAId);
+        if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
+        parent.VisibilityTypeId = (int)VisibilityTypeEnum.Public;
+        context.TenantUsers.Add(new TenantUser
+        {
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            UserId = managerId,
+            User = null!,
+            ActorId = scope.ActorId,
+            Actor = null!,
+            StatusId = (int)TenantUserStatusEnum.Active
+        });
+        string checksum = Convert.ToHexString(SHA256.HashData("%PDF-1.7\ncleanup\n%%EOF"u8));
+        var settings = new EventResourceSettingsWriter(context,
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)), new EfCoreUnitOfWork(context));
+        var setting = await settings.ApplyAsync([new(null, GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
+            EventResourceSettingMutationKind.SetValue, "true")], null);
+        await Assert.That(setting.Success).IsTrue();
         context.AddRange(resource, binding, new StorageObject
         {
             Id = objectId, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
             FileType = null!, Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
             ObjectKey = key, Uri = "/private", FullName = "private.pdf", SafeDisplayName = "private.pdf",
-            Extension = "pdf", ContentType = "application/pdf", Size = 64,
+            Extension = "pdf", ContentType = "application/pdf", Size = 64, Sha256Checksum = checksum,
             Purpose = StorageObjectPurposes.EventResource, OwningResourceKind = StorageOwningResourceKinds.EventResource,
             OwningResourceId = resource.Id, Visibility = StorageObjectVisibilities.PrivateOwner,
             LifecycleState = StorageObjectLifecycleStates.Active, CreatedAt = Now,
@@ -114,10 +137,21 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         });
         await context.SaveChangesAsync();
         resource.SetStoredFile(objectId, resource.ConcurrencyStamp, managerId, Now);
-        context.Add(EventResourceAuditEntry.Create(scope.TenantAId, resource.Id, managerId,
+        (await context.StorageObjects.SingleAsync(row => row.Id == objectId)).RecordEventResourceInspection(objectId, checksum);
+        resource.ReplacePolicy(resource.Availability,
+            [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, resource.Id,
+                EventResourceAudienceKindEnum.Public)], resource.ConcurrencyStamp, managerId, Now);
+        resource.Publish(new(scope.TenantAId, scope.EventAId, null, EventStatusEnum.Published,
+            false, true, null, false, new(null, null, null, null)),
+            true, resource.ConcurrencyStamp, managerId, Now);
+        var retainedAudit = EventResourceAuditEntry.Create(scope.TenantAId, resource.Id, managerId,
+            EventResourceAuditAction.ConfigureDelivery, EventResourceAuditOutcome.Succeeded,
+            EventResourceAuditReason.OrganizerMutation, Now);
+        context.AddRange(retainedAudit, EventResourceAuditEntry.Create(scope.TenantAId, resource.Id, managerId,
             EventResourceAuditAction.ConfigureDelivery, EventResourceAuditOutcome.Succeeded,
             EventResourceAuditReason.OrganizerMutation, Now.AddDays(-31)));
         await context.SaveChangesAsync();
+        await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
         var unit = new EfCoreUnitOfWork(context);
         var lifecycle = new EventResourceStorageLifecycleRepository(context);
         await unit.ExecuteSerializableAsync(async ct =>
@@ -146,6 +180,7 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await Assert.That(exists).IsTrue();
         await Assert.That(await tombstones.GetByIdAsync(objectId, default)).IsNotNull();
         await Assert.That(await context.StorageObjects.IgnoreQueryFilters().AnyAsync(item => item.Id == objectId)).IsFalse();
+        await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
 
         var governance = Substitute.For<IEventResourceGovernancePolicyReader>();
         governance.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -153,15 +188,50 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         var retention = new EventResourceAuditRetentionService(new EventResourceAuditRetentionRepository(context),
             governance, unit, clock);
         await retention.CleanupAsync(default);
+        var auditAfterExpiry = await context.EventResourceAuditEntries.AsNoTracking()
+            .SingleAsync(item => item.EventResourceId == resource.Id);
+        await Assert.That(auditAfterExpiry.Id).IsEqualTo(retainedAudit.Id);
+        await Assert.That(auditAfterExpiry.ResponsibleManagerUserId).IsEqualTo(managerId);
+        await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(async ct =>
+        {
+            await new UserLocationPrivacyErasureRepository(context).AnonymizeRetainedAuditEvidenceAsync(managerId, ct);
+            return true;
+        });
+        await Assert.That((await context.EventResourceAuditEntries.AsNoTracking()
+            .SingleAsync(item => item.Id == retainedAudit.Id)).ResponsibleManagerUserId).IsNull();
+        await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(await tombstones.GetByIdAsync(objectId, default)).IsNotNull();
+        clock.UtcNow = new DateTimeOffset(Now.AddDays(31));
+        await retention.CleanupAsync(default);
         await Assert.That(await context.EventResourceAuditEntries.AnyAsync(item => item.EventResourceId == resource.Id)).IsFalse();
         await context.EventResources.IgnoreQueryFilters().Where(item => item.Id == resource.Id).ExecuteDeleteAsync();
+        await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
         var retained = await tombstones.GetByIdAsync(objectId, default);
         await Assert.That(retained).IsNotNull();
-        clock.UtcNow = new DateTimeOffset(DateTime.SpecifyKind(retained!.NextAttemptAtUtc!.Value, DateTimeKind.Utc));
+        await Assert.That(retained!.NextAttemptAtUtc.HasValue).IsTrue();
+        await Assert.That(retained.NextAttemptAtUtc!.Value).IsLessThan(clock.UtcNow.UtcDateTime);
         unavailable = false;
         await worker.ProcessDueAsync(100, false, default);
         await Assert.That(exists).IsFalse();
         await Assert.That(await tombstones.GetByIdAsync(objectId, default)).IsNull();
+        await Assert.That(await DeliveryAsync()).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+
+        async Task<EventResourceAuthorityOutcome> DeliveryAsync()
+        {
+            await using var read = database.CreateContext();
+            var readUnit = new EfCoreUnitOfWork(read);
+            var mutationLock = new RelationalSettingMutationLock(read, readUnit);
+            var policy = new EventResourceGovernancePolicyReader(
+                new SystemSettingRepository(read, mutationLock), new TenantSettingRepository(read, mutationLock));
+            var repository = new EventResourceRepository(read);
+            var authority = new EventResourceAuthorityOrchestrator(readUnit,
+                new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(read), policy),
+                Substitute.For<IEventResourceProviderSnapshotReader>(),
+                Substitute.For<IEventResourceAuthorizationProvider>(), clock);
+            return (await authority.AuthorizeCapabilitiesAsync(
+                [new EventResourceAuthorityRequest(scope.TenantAId, resource.Id, null, false, "download",
+                    clock.GetUtcNow().AddMinutes(1))], default))[0];
+        }
     }
 
     private sealed class CleanupClock(DateTimeOffset now) : TimeProvider

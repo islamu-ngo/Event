@@ -5,9 +5,6 @@ public enum InstanceBootstrapAuditEventType
     SetupSecretAccepted = 41001,
     SetupSecretRejected = 41002,
     SetupModeInactive = 41003,
-    KeycloakBootstrapStarted = 41010,
-    KeycloakBootstrapSucceeded = 41011,
-    KeycloakBootstrapFailed = 41012,
     SetupModeDisabled = 41020,
     SetupProfileSaved = 41021
 }

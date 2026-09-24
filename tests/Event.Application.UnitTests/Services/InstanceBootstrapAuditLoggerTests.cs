@@ -16,11 +16,11 @@ public class InstanceBootstrapAuditLoggerTests
     }
 
     [Test]
-    public async Task Log_WhenBootstrapSucceeds_UsesInformationEventId()
+    public async Task Log_WhenProfileSaved_UsesInformationEventId()
     {
         _auditLogger.Log(new InstanceBootstrapAuditEvent(
-            InstanceBootstrapAuditEventType.KeycloakBootstrapSucceeded,
-            Operation: "keycloak_bootstrap",
+            InstanceBootstrapAuditEventType.SetupProfileSaved,
+            Operation: "setup_profile",
             Outcome: "succeeded",
             Provider: "keycloak",
             Mode: "PatchExistingRealm",
@@ -30,11 +30,11 @@ public class InstanceBootstrapAuditLoggerTests
         _logger.Received(1).Log(
             LogLevel.Information,
             Arg.Is<EventId>(eventId =>
-                eventId.Id == (int)InstanceBootstrapAuditEventType.KeycloakBootstrapSucceeded
-                && eventId.Name == nameof(InstanceBootstrapAuditEventType.KeycloakBootstrapSucceeded)),
+                eventId.Id == (int)InstanceBootstrapAuditEventType.SetupProfileSaved
+                && eventId.Name == nameof(InstanceBootstrapAuditEventType.SetupProfileSaved)),
             Arg.Is<object>(state =>
-                LogStateContains(state, "BootstrapAuditEvent", nameof(InstanceBootstrapAuditEventType.KeycloakBootstrapSucceeded))
-                && LogStateContains(state, "Operation", "keycloak_bootstrap")
+                LogStateContains(state, "BootstrapAuditEvent", nameof(InstanceBootstrapAuditEventType.SetupProfileSaved))
+                && LogStateContains(state, "Operation", "setup_profile")
                 && LogStateContains(state, "Outcome", "succeeded")),
             Arg.Any<Exception?>(),
             Arg.Any<Func<object, Exception?, string>>());
@@ -72,8 +72,8 @@ public class InstanceBootstrapAuditLoggerTests
         const string realm = "private-realm";
         const string clientId = "private-client";
         _auditLogger.Log(new InstanceBootstrapAuditEvent(
-            InstanceBootstrapAuditEventType.KeycloakBootstrapFailed,
-            Operation: "keycloak_bootstrap",
+            InstanceBootstrapAuditEventType.SetupSecretRejected,
+            Operation: "setup_secret_gate",
             Outcome: "failed",
             ActorUserId: actorUserId,
             FailureCode: "keycloak_admin_rejected",

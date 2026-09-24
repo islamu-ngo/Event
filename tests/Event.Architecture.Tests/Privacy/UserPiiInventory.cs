@@ -501,9 +501,6 @@ internal static class UserPiiInventory
         Local("WebhookEndpoint.Url", "Endpoint -> WebhookConsumer.OwnerUserId", "Webhook endpoint handlers", UserPiiDisposition.HardDelete),
         Local("WebhookProviderPublicationAttempt.ExternalProviderMessageId", "Publication -> WebhookConsumer.OwnerUserId", "Webhook provider publisher", UserPiiDisposition.HardDelete),
 
-        External("provider:keycloak:platform-managed-account", "UserExternalLogin.ProviderKey", "Keycloak identity adapter",
-            UserPiiProviderAction.DeletePlatformManagedIdentity,
-            typeof(Explore.Infrastructure.Services.Keycloak.KeycloakBootstrapService)),
         External("provider:keycloak:upstream-session", "UserExternalLogin.ProviderKey", "Keycloak identity adapter",
             UserPiiProviderAction.RevokeOrUnlinkExternalIdentity,
             typeof(Explore.Infrastructure.Services.Keycloak.KeycloakAccountAuthorityLifecycleEmailService)),

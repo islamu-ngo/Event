@@ -1,0 +1,34 @@
+# Records durable intent-before-send receipts for approved Keycloak operations.
+# Documents recovery, retention, provider portability and forward-fix rollback.
+Change-Id: CHG-01M34BFWFXW5KZQ9XG82PD92J4
+Title: retain uncertain Keycloak operations for safe reconciliation
+Type: fix
+Scope: access
+Summary: Persist credential-free Keycloak operation intent before transmission and block replay until read-only reconciliation settles uncertain outcomes.
+Group: keycloak-operator-access
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Keycloak writes now require a durable approval receipt and unresolved intent blocks overlapping realm operations.
+  Security:
+    Reference: schemas/islamu-event.md
+    Disposition: documented
+    Detail: Receipts contain only allowlisted intent and authority bindings; credentials, tokens, secrets and raw provider responses are excluded.
+  Migration:
+    Reference: docs/internal/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: Additive provider migrations create the KeycloakOperationReceipts table; retained environments use forward fixes and refuse destructive downgrade while unresolved receipts exist.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: Receipt persistence adds no external configuration.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: HTTP operation resources are delivered in the reviewed-operation phase.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Outcome-unknown operations block replay, cancellation cannot undo a sent request, and reconciliation is required before retry.

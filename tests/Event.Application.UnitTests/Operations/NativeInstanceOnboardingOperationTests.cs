@@ -80,13 +80,10 @@ public sealed class NativeInstanceOnboardingOperationTests
     [
         // Commands (29)
         typeof(SaveInstanceOperatorIdentityCommand),
-        typeof(ApplyKeycloakRealmSyncCommand),
-        typeof(BootstrapKeycloakRealmCommand),
         typeof(ClaimConfiguredInstanceAdministratorCommand),
         typeof(CompleteInstanceOnboardingCommand),
         typeof(CompleteLocalInstanceOnboardingCommand),
         typeof(RecalculateInstanceStorageUsageCommand),
-        typeof(RotateKeycloakClientSecretCommand),
         typeof(SaveInstanceOnboardingProfileCommand),
         typeof(SyncAuthorizationPolicyPackageCommand),
         typeof(UpdateAnalyticsGovernanceSettingsCommand),
@@ -125,8 +122,6 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(GetOnboardingPreflightQuery),
         typeof(GetResolverConfigurationQuery),
         typeof(GetSystemOnboardingStatusQuery),
-        typeof(PreviewKeycloakRealmSyncQuery),
-        typeof(RunKeycloakRealmDoctorQuery),
         typeof(TestInstanceSmtpConnectionQuery),
         typeof(TestInstanceStorageProviderQuery)
     ];
@@ -134,13 +129,10 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Test]
     [Arguments(typeof(SaveInstanceOperatorIdentityCommand), typeof(ICommand<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>))]
     [Arguments(typeof(GetInstanceOperatorIdentityQuery), typeof(IQuery<InstanceOperatorIdentityDocumentDto>))]
-    [Arguments(typeof(ApplyKeycloakRealmSyncCommand), typeof(ICommand<KeycloakRealmSyncPlanDto>))]
-    [Arguments(typeof(BootstrapKeycloakRealmCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(ClaimConfiguredInstanceAdministratorCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(CompleteInstanceOnboardingCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(CompleteLocalInstanceOnboardingCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(RecalculateInstanceStorageUsageCommand), typeof(ICommand<InstanceStorageUsageDto>))]
-    [Arguments(typeof(RotateKeycloakClientSecretCommand), typeof(ICommand<KeycloakClientSecretRotationResultDto>))]
     [Arguments(typeof(SaveInstanceOnboardingProfileCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(SyncAuthorizationPolicyPackageCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UpdateAnalyticsGovernanceSettingsCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
@@ -176,8 +168,6 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Arguments(typeof(GetOnboardingPreflightQuery), typeof(IQuery<OnboardingPreflightDto>))]
     [Arguments(typeof(GetResolverConfigurationQuery), typeof(IQuery<ResolverConfigurationDto>))]
     [Arguments(typeof(GetSystemOnboardingStatusQuery), typeof(IQuery<SystemOnboardingStatusDto>))]
-    [Arguments(typeof(PreviewKeycloakRealmSyncQuery), typeof(IQuery<KeycloakRealmSyncPlanDto>))]
-    [Arguments(typeof(RunKeycloakRealmDoctorQuery), typeof(IQuery<KeycloakRealmDoctorResultDto>))]
     [Arguments(typeof(TestInstanceSmtpConnectionQuery), typeof(IQuery<EmailResult>))]
     [Arguments(typeof(TestInstanceStorageProviderQuery), typeof(IQuery<InstanceStorageProviderStatusDto>))]
     public async Task Requests_ExposeOnlyTheirExactNativeOperation(Type request, Type port)

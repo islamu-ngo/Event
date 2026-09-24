@@ -61,7 +61,6 @@ public class InstanceOnboardingController : EventControllerBase
     private readonly ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>> _saveProfileCommand;
     private readonly ICommandHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>> _completeOnboardingCommand;
     private readonly ICommandHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>> _completeLocalOnboardingCommand;
-    private readonly ICommandHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>> _bootstrapKeycloakRealmCommand;
     private readonly ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>> _syncPolicyPackageCommand;
     private readonly ICommandHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>> _verifyCerbosEndpointCommand;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
@@ -84,7 +83,6 @@ public class InstanceOnboardingController : EventControllerBase
         ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>> saveProfileCommand,
         ICommandHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>> completeOnboardingCommand,
         ICommandHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>> completeLocalOnboardingCommand,
-        ICommandHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>> bootstrapKeycloakRealmCommand,
         ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>> syncPolicyPackageCommand,
         ICommandHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>> verifyCerbosEndpointCommand,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
@@ -106,7 +104,6 @@ public class InstanceOnboardingController : EventControllerBase
         _saveProfileCommand = saveProfileCommand;
         _completeOnboardingCommand = completeOnboardingCommand;
         _completeLocalOnboardingCommand = completeLocalOnboardingCommand;
-        _bootstrapKeycloakRealmCommand = bootstrapKeycloakRealmCommand;
         _syncPolicyPackageCommand = syncPolicyPackageCommand;
         _verifyCerbosEndpointCommand = verifyCerbosEndpointCommand;
         _identityQuery = identityQuery;
@@ -396,41 +393,6 @@ public class InstanceOnboardingController : EventControllerBase
     {
         var configuration = await _authProviderConfigurationService.ReadConfigurationWithSecretsAsync();
         return Ok(configuration);
-    }
-
-    /// <summary>
-    /// Bootstraps an external Keycloak realm and persists runtime auth-provider configuration during setup.
-    /// </summary>
-    [AllowAnonymous]
-    [SetupSecretRequired]
-    [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
-    [EndpointClassification(EndpointClass.Admin)]
-    [PrivateNoStore]
-    [SuppressIdempotencyResponseStorage]
-    [HttpPost("auth-provider-configuration/keycloak-bootstrap", Name = RouteNames.BootstrapInstanceOnboardingKeycloakRealm)]
-    [EndpointSummary("Bootstrap Keycloak Realm (Setup)")]
-    [EndpointDescription("Bootstraps an external Keycloak realm/client configuration during instance setup. Protected by setup secret; one-time admin credentials are not stored.")]
-    [Consumes("application/json")]
-    [RequestTimeout(RequestTimeoutExtensions.ComplexPolicy)]
-    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<BaseCommandResponse<Guid>>> BootstrapKeycloakRealm([FromBody] KeycloakBootstrapRequestDto request, CancellationToken cancellationToken = default)
-    {
-        var response = await _bootstrapKeycloakRealmCommand.ExecuteAsync(
-            new BootstrapKeycloakRealmCommand { BootstrapRequest = request },
-            cancellationToken);
-
-        if (!response.IsSuccess)
-        {
-            return this.ToAuthProviderProblem(response);
-        }
-
-        return Ok(response);
     }
 
     [AllowAnonymous]

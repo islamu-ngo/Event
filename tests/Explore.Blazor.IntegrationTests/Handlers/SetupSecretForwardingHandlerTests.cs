@@ -298,7 +298,7 @@ public class SetupSecretForwardingHandlerTests
     }
 
     [Test]
-    public async Task SendAsync_KeycloakBootstrapPath_WithInboundHeaderAndSessionSecret_ForwardsTrustedSessionSecret()
+    public async Task SendAsync_KeycloakOperationPath_WithInboundHeaderAndSessionSecret_ForwardsTrustedSessionSecret()
     {
         var userId = Guid.NewGuid().ToString();
         var httpContext = new DefaultHttpContext();
@@ -311,13 +311,15 @@ public class SetupSecretForwardingHandlerTests
             authenticationType: "Cookies"));
 
         var sessionService = new SetupSecretSessionService();
-        sessionService.SetForUser(SetupKey(userId), "trusted-keycloak-bootstrap-secret");
+        sessionService.SetForUser(SetupKey(userId), "trusted-keycloak-operation-secret");
 
         var innerHandler = new CapturingHandler();
         using var handler = CreateHandler(httpContext, sessionService, innerHandler);
 
         using var invoker = new HttpMessageInvoker(handler, disposeHandler: false);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/api/InstanceOnboarding/auth-provider-configuration/keycloak-bootstrap");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "https://api.example.com/api/instance/keycloak/plans");
         request.Headers.Add("X-Setup-Secret", "client-controlled-secret");
 
         _ = await invoker.SendAsync(request, CancellationToken.None);
@@ -326,7 +328,35 @@ public class SetupSecretForwardingHandlerTests
 
         await Assert.That(innerHandler.CapturedRequest).IsNotNull();
         await Assert.That(innerHandler.CapturedRequest!.Headers.Contains("X-Setup-Secret")).IsTrue();
-        await Assert.That(innerHandler.CapturedRequest.Headers.GetValues("X-Setup-Secret").Single()).IsEqualTo("trusted-keycloak-bootstrap-secret");
+        await Assert.That(innerHandler.CapturedRequest.Headers.GetValues("X-Setup-Secret").Single()).IsEqualTo("trusted-keycloak-operation-secret");
+    }
+
+    [Test]
+    public async Task SendAsync_UnknownKeycloakPath_StripsInboundSetupSecret()
+    {
+        var innerHandler = new CapturingHandler();
+        using var handler = CreateHandler(
+            new DefaultHttpContext(),
+            new SetupSecretSessionService(),
+            innerHandler);
+        using var invoker = new HttpMessageInvoker(
+            handler,
+            disposeHandler: false);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "https://api.example.com/api/instance/keycloak/future");
+        request.Headers.Add(
+            "X-Setup-Secret",
+            "client-controlled-secret");
+
+        _ = await invoker.SendAsync(
+            request,
+            CancellationToken.None);
+
+        await Assert.That(innerHandler.CapturedRequest).IsNotNull();
+        await Assert.That(innerHandler.CapturedRequest!.Headers
+                .Contains("X-Setup-Secret"))
+            .IsFalse();
     }
 
     [Test]

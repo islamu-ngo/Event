@@ -83,7 +83,46 @@ public sealed class KeycloakRealmOwnershipTests
     }
 
     [Test]
-    public async Task ProductionRealmExportMustUseExactBffCallbacksAndNoEmbeddedClientSecret()
+    [Arguments("docker/keycloak/realm-export.json")]
+    [Arguments("docker/keycloak/ISLAMU-realm.test.json")]
+    public async Task InertRealmExportsDoNotPrescribeOfflineAccess(
+        string relativePath)
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            await File.ReadAllTextAsync(
+                Path.Combine(RepoRoot, relativePath)));
+        JsonElement root = document.RootElement;
+        string[] optionalScopes = root
+            .GetProperty("defaultOptionalClientScopes")
+            .EnumerateArray()
+            .Select(value => value.GetString() ?? string.Empty)
+            .ToArray();
+        string[] realmRoles = root
+            .GetProperty("roles")
+            .GetProperty("realm")
+            .EnumerateArray()
+            .Select(role =>
+                role.GetProperty("name").GetString()
+                ?? string.Empty)
+            .ToArray();
+        string[] clientScopes = root
+            .GetProperty("clientScopes")
+            .EnumerateArray()
+            .Select(scope =>
+                scope.GetProperty("name").GetString()
+                ?? string.Empty)
+            .ToArray();
+
+        await Assert.That(optionalScopes)
+            .DoesNotContain("offline_access");
+        await Assert.That(realmRoles)
+            .DoesNotContain("offline_access");
+        await Assert.That(clientScopes)
+            .DoesNotContain("offline_access");
+    }
+
+    [Test]
+    public async Task InertSampleRealmExportMustUseExactCallbacksAndNoSecret()
     {
         using var document = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(RepoRoot, "docker/keycloak/realm-export.json")));
@@ -104,7 +143,11 @@ public sealed class KeycloakRealmOwnershipTests
             .GetString()!
             .Split("##", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        await Assert.That(blazorClient.TryGetProperty("secret", out _)).IsFalse();
+        await Assert.That(
+                blazorClient.TryGetProperty(
+                    "secret",
+                    out _))
+            .IsFalse();
         await Assert.That(redirectUris).IsEquivalentTo(ExpectedProductionRedirectUris);
         await Assert.That(webOrigins).IsEquivalentTo(ExpectedProductionWebOrigins);
         await Assert.That(logoutRedirectUris).IsEquivalentTo(ExpectedProductionLogoutRedirectUris);
@@ -114,56 +157,45 @@ public sealed class KeycloakRealmOwnershipTests
     }
 
     [Test]
-    public async Task KeycloakInitMustReconcileHardenedRealmAndClientSettingsWithoutStaticSecretFallback()
-    {
-        var script = await File.ReadAllTextAsync(
-            Path.Combine(RepoRoot, "docker/keycloak/keycloak-init.sh"));
-        var appHost = await File.ReadAllTextAsync(
-            Path.Combine(RepoRoot, "src/Explore.AppHost/AppHost.cs"));
-
-        await Assert.That(script).Contains("-s sslRequired=external");
-        await Assert.That(script).Contains("-s verifyEmail=true");
-        await Assert.That(script).Contains("-s 'passwordPolicy=length(12) and notUsername and notEmail and passwordHistory(5)'");
-        await Assert.That(script).Contains("-s ssoSessionIdleTimeout=1800");
-        await Assert.That(script).Contains("-s offlineSessionMaxLifespanEnabled=true");
-        await Assert.That(script).Contains("-s \"webOrigins=$BLAZOR_WEB_ORIGINS\"");
-        await Assert.That(script).Contains("attributes.\"pkce.code.challenge.method\"");
-        await Assert.That(script).Contains(
-            JsonSerializer.Serialize(ExpectedProductionRedirectUris)
-                .Replace("\"", "\\\"", StringComparison.Ordinal));
-        await Assert.That(script).Contains(
-            JsonSerializer.Serialize(ExpectedProductionWebOrigins)
-                .Replace("\"", "\\\"", StringComparison.Ordinal));
-        await Assert.That(script).Contains(string.Join("##", ExpectedProductionLogoutRedirectUris));
-        await Assert.That(script).DoesNotContain("attributes=$attributes");
-        await Assert.That(script).DoesNotContain("DEFAULT_LOCAL_BLAZOR_SECRET");
-        await Assert.That(script).DoesNotContain("KEYCLOAK_INIT_ALLOW_DEFAULT_LOCAL_SECRET");
-        await Assert.That(script).DoesNotContain("webOrigins=[\"+\"]");
-        await Assert.That(script).DoesNotContain("/*");
-        await Assert.That(appHost).DoesNotContain("islamu-event-blazor-secret");
-        await Assert.That(appHost).DoesNotContain("new GenerateParameterDefault");
-        await Assert.That(appHost).Contains("configuration[\"KEYCLOAK_BLAZOR_CLIENT_SECRET\"] ?? string.Empty");
-        await Assert.That(appHost).Contains(".WithEnvironment(\"KEYCLOAK_BLAZOR_REDIRECT_URIS\"");
-        await Assert.That(appHost).Contains(".WithEnvironment(\"KEYCLOAK_BLAZOR_WEB_ORIGINS\"");
-        await Assert.That(appHost).Contains(".WithEnvironment(\"KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS\"");
-    }
-
-    [Test]
-    public async Task AspireKeycloakInitMustUseAllocatedBffPortsForExactCallbacks()
+    public async Task NormalStartupMustNotLaunchKeycloakReconciliation()
     {
         var appHost = await File.ReadAllTextAsync(
             Path.Combine(RepoRoot, "src/Explore.AppHost/AppHost.cs"));
+        var compose = await File.ReadAllTextAsync(
+            Path.Combine(RepoRoot, "docker-compose.yml"));
 
-        await Assert.That(appHost).Contains(
-            ".GetEndpoint(\"http\", KnownNetworkIdentifiers.LocalhostNetwork)");
-        await Assert.That(appHost).Contains(
-            ".GetEndpoint(\"https\", KnownNetworkIdentifiers.LocalhostNetwork)");
-        await Assert.That(appHost).Contains("http://localhost:{httpPort}/signin-oidc");
-        await Assert.That(appHost).Contains("https://localhost:{httpsPort}/signin-oidc");
-        await Assert.That(appHost).Contains("http://localhost:{httpPort}/signout-callback-oidc");
-        await Assert.That(appHost).Contains("https://localhost:{httpsPort}/signout-callback-oidc");
-        await Assert.That(appHost).DoesNotContain(
-            ".WithEnvironment(\"KEYCLOAK_BLAZOR_REDIRECT_URIS\", configuration[\"KEYCLOAK_BLAZOR_REDIRECT_URIS\"] ?? string.Empty)");
+        await Assert.That(appHost)
+            .DoesNotContain("AddContainer(\"keycloak-init\"");
+        await Assert.That(appHost)
+            .DoesNotContain("KeycloakInit");
+        await Assert.That(appHost)
+            .DoesNotContain("keycloak-init.sh");
+        await Assert.That(compose)
+            .DoesNotContain("keycloak-init:");
+        await Assert.That(appHost)
+            .DoesNotContain("--import-realm");
+        await Assert.That(appHost)
+            .DoesNotContain("realm-export.json");
+        await Assert.That(compose)
+            .DoesNotContain("--import-realm");
+        await Assert.That(compose)
+            .DoesNotContain("realm-export.json");
+        await Assert.That(File.Exists(
+                Path.Combine(
+                    RepoRoot,
+                    "docker/keycloak/keycloak-init.sh")))
+            .IsFalse();
+        foreach (string retiredKey in new[]
+                 {
+                     "KEYCLOAK_API_CLIENT_SECRET",
+                     "KEYCLOAK_BLAZOR_REDIRECT_URIS",
+                     "KEYCLOAK_BLAZOR_WEB_ORIGINS",
+                     "KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS"
+                 })
+        {
+            await Assert.That(appHost).DoesNotContain(retiredKey);
+            await Assert.That(compose).DoesNotContain(retiredKey);
+        }
     }
 
     [Test]

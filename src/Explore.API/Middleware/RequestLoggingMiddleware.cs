@@ -85,6 +85,7 @@ public sealed class RequestLoggingMiddleware
         activity.SetTag("url.path", routeIdentity);
         activity.SetTag("url.query", null);
         activity.SetTag("url.full", null);
+        activity.SetTag("http.url", null);
         activity.SetTag("http.target", routeIdentity);
     }
 }

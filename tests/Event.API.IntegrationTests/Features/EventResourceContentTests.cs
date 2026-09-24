@@ -6,6 +6,7 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
+using Explore.Application.DTOs.Settings;
 using Explore.Application.Models.Storage;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -29,10 +30,14 @@ public sealed partial class EventResourceContentTests
     [Arguments("allow")]
     [Arguments("withdraw")]
     [Arguments("tighten")]
+    [Arguments("tighten-audience")]
+    [Arguments("tighten-filetype")]
+    [Arguments("tighten-size")]
     [Arguments("expire")]
     [Arguments("expire-before-headers")]
     [Arguments("cancel-result")]
     [Arguments("owner-after-hal")]
+    [Arguments("window-boundaries")]
     public async Task PreparedBytesStayPrivateUntilFinalAuthorityAndClockChecks(string change)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
@@ -55,13 +60,20 @@ public sealed partial class EventResourceContentTests
                 UserId = userId, User = user, ActorId = actor.Id,
                 StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = clock.GetUtcNow().UtcDateTime
             });
+            if (change == "tighten-audience")
+                db.PlatformUserRoles.Add(new PlatformUserRole
+                {
+                    Id = Guid.CreateVersion7(), UserId = userId, User = user,
+                    RoleId = (int)RoleEnum.Admin, Role = null!,
+                    GrantedAt = clock.GetUtcNow().UtcDateTime, GrantedBy = userId
+                });
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                 Value = change == "owner-after-hal" ? "false" : "true",
                 ValueType = SettingValueType.Boolean, Category = "EventResources"
             });
-            if (change == "owner-after-hal")
+            if (change is "owner-after-hal" or "tighten-audience")
                 db.SystemSettings.Add(new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
@@ -100,7 +112,11 @@ public sealed partial class EventResourceContentTests
                     Kind = EventResourceKindEnum.GeneralDocument,
                     DisclosureMode = EventResourceDisclosureModeEnum.Public
                 }, EventResourceDeliveryTypeEnum.StoredFile,
-                EventResourceAvailability.Create(absoluteEndUtc: clock.GetUtcNow().AddMinutes(1)),
+                change == "window-boundaries"
+                    ? EventResourceAvailability.Create(
+                        absoluteStartUtc: clock.GetUtcNow().AddMinutes(1),
+                        absoluteEndUtc: clock.GetUtcNow().AddMinutes(2))
+                    : EventResourceAvailability.Create(absoluteEndUtc: clock.GetUtcNow().AddMinutes(1)),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,
                     EventResourceAudienceKindEnum.Public)], userId, clock.GetUtcNow().UtcDateTime);
             resource.SetStoredFile(storageId, resource.ConcurrencyStamp, userId, clock.GetUtcNow().UtcDateTime);
@@ -112,6 +128,7 @@ public sealed partial class EventResourceContentTests
         }
 
         bool opened = false, disposed = false;
+        HttpClient? administrator = null;
         var disposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var provider = Substitute.For<IFileStorageProvider>();
         provider.Provider.Returns(StorageProviders.Local);
@@ -121,7 +138,20 @@ public sealed partial class EventResourceContentTests
             opened = true;
             if (change == "expire")
                 clock.Advance(TimeSpan.FromMinutes(2));
-            if (change is "withdraw" or "tighten")
+            if (change == "tighten-audience")
+            {
+                using var tightened = await administrator!.PutAsJsonAsync(
+                    "/api/settings/instance/event-resources", new UpdateSettingBatchDto
+                    {
+                        Values = new Dictionary<string, string>
+                        {
+                            [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Organizer\"]"
+                        }
+                    });
+                await Assert.That(tightened.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                    .Because(await tightened.Content.ReadAsStringAsync());
+            }
+            if (change is "withdraw" or "tighten" or "tighten-filetype" or "tighten-size")
             {
                 await using var mutate = factory.CreateDatabase();
                 mutate.EnableTenantFilterBypass("Resource delivery test mutates one exact tenant/resource.");
@@ -131,12 +161,26 @@ public sealed partial class EventResourceContentTests
                         row.TenantId == PlatformDefaults.DefaultTenantId && row.Id == resourceId);
                     resource.Withdraw(resource.ConcurrencyStamp, userId, clock.GetUtcNow().UtcDateTime);
                 }
-                else
+                else if (change == "tighten")
                 {
                     var policy = await mutate.SystemSettings.SingleAsync(row =>
                         row.SettingKey == GovernanceSettingKeys.EventResources.AllowUnscannedDocuments);
                     policy.Value = "false";
                 }
+                else
+                    mutate.SystemSettings.Add(new SystemSetting
+                    {
+                        SettingKey = change == "tighten-filetype"
+                            ? GovernanceSettingKeys.EventResources.PermittedFileTypes
+                            : GovernanceSettingKeys.EventResources.MaxUploadBytes,
+                        Value = change switch
+                        {
+                            "tighten-filetype" => "[\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"]",
+                            _ => "1"
+                        },
+                        ValueType = change == "tighten-size" ? SettingValueType.Long : SettingValueType.Json,
+                        Category = "EventResources"
+                    });
                 await mutate.SaveChangesAsync();
             }
             return new FileStorageReadResult(new ObservedRead(bytes, () =>
@@ -172,6 +216,15 @@ public sealed partial class EventResourceContentTests
         {
             BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
         });
+        if (change == "tighten-audience")
+        {
+            administrator = client;
+            using var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials);
+            login.EnsureSuccessStatusCode();
+            using var loginJson = System.Text.Json.JsonDocument.Parse(await login.Content.ReadAsStringAsync());
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+                loginJson.RootElement.GetProperty("token").GetString());
+        }
         if (change == "owner-after-hal")
         {
             using var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials);
@@ -189,7 +242,8 @@ public sealed partial class EventResourceContentTests
                 await Assert.That(opened).IsFalse();
                 return;
             }
-            await Assert.That(metadata.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(metadata.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                .Because(await metadata.Content.ReadAsStringAsync());
             if (change == "allow")
             {
                 string json = await metadata.Content.ReadAsStringAsync();
@@ -203,6 +257,34 @@ public sealed partial class EventResourceContentTests
                 await Assert.That(json).DoesNotContain(objectKey);
                 await Assert.That(json).DoesNotContain(checksum);
             }
+        }
+        if (change == "window-boundaries")
+        {
+            using (var before = await client.GetAsync($"/api/eventresource/{resourceId}/content"))
+            {
+                await Assert.That(before.IsSuccessStatusCode).IsFalse();
+                await Assert.That(before.Content.Headers.ContentDisposition).IsNull();
+            }
+            await Assert.That(opened).IsFalse();
+            clock.Advance(TimeSpan.FromMinutes(1));
+            using (var start = await client.GetAsync($"/api/eventresource/{resourceId}/content"))
+            {
+                await Assert.That(start.StatusCode).IsEqualTo(HttpStatusCode.OK);
+                await Assert.That(await start.Content.ReadAsByteArrayAsync()).IsEquivalentTo(bytes);
+            }
+            clock.Advance(TimeSpan.FromMinutes(1));
+            using (var end = await client.GetAsync($"/api/eventresource/{resourceId}/content"))
+            {
+                await Assert.That(end.IsSuccessStatusCode).IsFalse();
+                await Assert.That(end.Content.Headers.ContentDisposition).IsNull();
+                await Assert.That((await end.Content.ReadAsStringAsync()).Contains("%PDF", StringComparison.Ordinal))
+                    .IsFalse();
+            }
+            await provider.Received(1).OpenReadAsync(Arg.Any<FileStorageReadInput>(), Arg.Any<CancellationToken>());
+            await disposal.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.That(disposed).IsTrue();
+            await AssertNoBrowseAuditAsync();
+            return;
         }
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/eventresource/{resourceId}/content");
         request.Headers.TryAddWithoutValidation("If-None-Match", "*");
@@ -233,6 +315,26 @@ public sealed partial class EventResourceContentTests
         await disposal.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(disposed).IsTrue();
         await Assert.That(System.Text.Encoding.UTF8.GetString(body)).DoesNotContain(objectKey);
+        if (change == "tighten")
+        {
+            using var detail = await client.GetAsync($"/api/eventresource/{resourceId}");
+            await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK)
+                .Because(await detail.Content.ReadAsStringAsync());
+            using var projection = System.Text.Json.JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+            await Assert.That(projection.RootElement.GetProperty("file").GetProperty("safetyState").GetString())
+                .IsEqualTo("unscanned");
+            await Assert.That(projection.RootElement.GetProperty("_links").TryGetProperty("download", out _))
+                .IsFalse();
+        }
+        if (change == "allow") await AssertNoBrowseAuditAsync();
+
+        async Task AssertNoBrowseAuditAsync()
+        {
+            await using var audit = factory.CreateDatabase();
+            audit.EnableTenantFilterBypass("Attendee file reads do not write management audit history.");
+            await Assert.That(await audit.EventResourceAuditEntries.AnyAsync(row => row.EventResourceId == resourceId))
+                .IsFalse();
+        }
     }
 
     private sealed class ResultBoundary(string change, ResourceClock clock) : IAsyncResultFilter

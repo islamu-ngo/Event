@@ -1,10 +1,14 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Handlers.Queries;
+using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
+using Explore.Application.Settings.Groups;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
+using Explore.Domain.Ai;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence.Repositories;
@@ -157,6 +161,26 @@ public sealed class EventAiReferenceRepositoryTests(PostgreSqlContainerFixture f
         await Assert.That(wire).DoesNotContain(resource.ExternalDestinationSafeOrigin!);
         await Assert.That(wire).DoesNotContain(resource.ExternalDestinationCiphertext!);
         await Assert.That(wire).DoesNotContain(resource.SensitiveNotes!);
+
+        var conversation = new AiConversation
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantId,
+            UserId = Guid.CreateVersion7(),
+            Status = AiConversationStatus.Active,
+            CreatedAt = now,
+            ConcurrencyStamp = Guid.CreateVersion7()
+        };
+        conversation.AddReference(AiReferenceKind.Event, publicEvent.Id,
+            results.Single().DisplayName, results.Single().Summary, conversation.UserId, now);
+        var prompt = new AiPromptContextBuilder().Build(
+            conversation, new AiAssistantSettingGroup(), AiProviderDefaults.FakeModelId);
+        string providerMessages = JsonSerializer.Serialize(prompt.Messages);
+        await Assert.That(providerMessages).Contains(publicEvent.Title);
+        await Assert.That(providerMessages).DoesNotContain(resource.Title);
+        await Assert.That(providerMessages).DoesNotContain(resource.ExternalDestinationSafeOrigin!);
+        await Assert.That(providerMessages).DoesNotContain(resource.ExternalDestinationCiphertext!);
+        await Assert.That(providerMessages).DoesNotContain(resource.SensitiveNotes!);
     }
 
     private async Task<EventReferenceScope> SeedTenantAsync(string slugPrefix)

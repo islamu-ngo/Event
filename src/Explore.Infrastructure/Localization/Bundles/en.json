@@ -50,6 +50,7 @@
   "event.resources.destinationInvalid": "Enter a valid HTTPS destination.",
   "event.resources.disclosure": "Disclosure",
   "event.resources.download": "Download",
+  "event.resources.downloadLimitation": "A download already in progress may finish after access is withdrawn. New download requests are denied.",
   "event.resources.edit": "Edit",
   "event.resources.editHeading": "Edit resource",
   "event.resources.empty": "No resources available yet.",

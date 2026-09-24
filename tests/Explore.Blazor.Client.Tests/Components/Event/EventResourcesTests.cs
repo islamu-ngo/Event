@@ -125,8 +125,64 @@ public sealed class EventResourcesTests : IDisposable
             Arg.Any<CancellationToken>()).Returns(detail);
 
         var cut = Render();
-        cut.WaitForElement("[data-testid='resource-download']");
+        var download = cut.WaitForElement("[data-testid='resource-download']");
         await Assert.That(cut.Markup).Contains(detail.File!.ContentType);
+        var limitation = cut.Find($"#resource-download-limitation-{_resourceId:N}");
+        await Assert.That(limitation.TextContent.Trim()).IsNotEmpty();
+        await Assert.That(download.GetAttribute("aria-describedby")).IsEqualTo(limitation.Id);
+    }
+
+    [Test]
+    public async Task TeaserRendersItsPublicTitleWithoutAnyPrivateMetadata()
+    {
+        var detail = Detail();
+        detail.Title = "Public resource teaser";
+        detail.IsTeaser = true;
+        detail.Description = "private-description";
+        detail.LanguageCode = "private-language";
+        detail.AccessibilityNote = "private-accessibility-note";
+        detail.File = new EventResourceFileMetadataDto
+        {
+            FileName = "private-file.pdf", ContentType = "application/pdf",
+            SizeBytes = 1024, SafetyState = "Ready"
+        };
+        detail.ExternalDestinationSafeOrigin = "https://private-origin.example.test";
+        _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(Page(detail));
+        _client.GetEventResourceAudienceDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(detail);
+
+        var cut = Render();
+        cut.WaitForElement("[data-testid='event-resource-title']");
+        await Assert.That(cut.Find("[data-testid='event-resource-title']").TextContent).IsEqualTo(detail.Title);
+        foreach (string hidden in new[] { "private-description", "private-language",
+                     "private-accessibility-note", "private-file.pdf", "private-origin.example.test" })
+            await Assert.That(cut.Markup).DoesNotContain(hidden);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task UnscannedSafetyRemainsVisibleWhileDownloadFollowsTheLatestHal(bool available)
+    {
+        var detail = available ? Detail("download") : Detail();
+        detail.File = new EventResourceFileMetadataDto
+        {
+            FileName = "handout.pdf", ContentType = "application/pdf",
+            SizeBytes = 1024, SafetyState = "unscanned"
+        };
+        if (!available) detail.Availability = "unavailable";
+        _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(Page(detail));
+        _client.GetEventResourceAudienceDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>()).Returns(detail);
+        var cut = Render();
+        cut.WaitForElement("[data-testid='event-resource-title']");
+        await Assert.That(cut.Markup).Contains("unscanned");
+        if (available)
+            await Assert.That(cut.FindAll("[data-testid='resource-download']").Count).IsEqualTo(1);
+        else
+            await Assert.That(cut.FindAll("[data-testid='resource-download']")).IsEmpty();
     }
 
     [Test]

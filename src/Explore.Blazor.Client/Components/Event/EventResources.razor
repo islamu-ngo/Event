@@ -17,15 +17,18 @@
                     <h3 data-testid="event-resource-title">@item.Title</h3>
                     @if (item.IsTeaser) { <p>@T("teaser", "Preview only")</p> }
                     <p>@item.Availability · @item.Requirements</p>
-                    @if (!string.IsNullOrWhiteSpace(item.Description)) { <p>@item.Description</p> }
-                    @if (!string.IsNullOrWhiteSpace(item.LanguageCode)) { <p>@T("language", "Language"): @item.LanguageCode</p> }
-                    @if (!string.IsNullOrWhiteSpace(item.AccessibilityNote)) { <p>@item.AccessibilityNote</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.Description)) { <p>@item.Description</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.LanguageCode)) { <p>@T("language", "Language"): @item.LanguageCode</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.AccessibilityNote)) { <p>@item.AccessibilityNote</p> }
                     @if (Href(item._links, "accessible-alternative") is { } alternative)
                     { <p><a href="@alternative" data-testid="resource-accessible-alternative">@T("alternative", "Accessible alternative")</a></p> }
-                    @if (item.File is { } file) { <p>@file.FileName · @T("fileType", "File type"): @file.ContentType · @file.SizeBytes @T("bytes", "bytes") · @file.SafetyState</p> }
-                    @if (!string.IsNullOrWhiteSpace(item.ExternalDestinationSafeOrigin)) { <p>@T("origin", "Destination origin"): @item.ExternalDestinationSafeOrigin</p> }
+                    @if (!item.IsTeaser && item.File is { } file) { <p>@file.FileName · @T("fileType", "File type"): @file.ContentType · @file.SizeBytes @T("bytes", "bytes") · @file.SafetyState</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.ExternalDestinationSafeOrigin)) { <p>@T("origin", "Destination origin"): @item.ExternalDestinationSafeOrigin</p> }
                     @if (Href(item._links, "download") is { } download)
-                    { <a href="@download" data-testid="resource-download">@T("download", "Download")</a> }
+                    {
+                        <p id="@($"resource-download-limitation-{item.Id:N}")">@T("downloadLimitation", "A download already in progress may finish after access is withdrawn. New download requests are denied.")</p>
+                        <a href="@download" aria-describedby="@($"resource-download-limitation-{item.Id:N}")" data-testid="resource-download">@T("download", "Download")</a>
+                    }
                     @if (Href(item._links, "access") is { } access)
                     {
                         <p id="@($"resource-external-warning-{item.Id:N}")">@T("externalWarning", "This link opens an external service. The provider may retain a revealed link; withdrawing platform access cannot revoke it. Ask the provider to rotate the link if access must stop.")</p>

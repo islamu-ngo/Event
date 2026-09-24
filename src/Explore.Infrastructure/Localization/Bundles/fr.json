@@ -50,6 +50,7 @@
   "event.resources.destinationInvalid": "Saisissez une URL de destination HTTPS valide.",
   "event.resources.disclosure": "Visibilité",
   "event.resources.download": "Télécharger",
+  "event.resources.downloadLimitation": "Un téléchargement déjà commencé peut se terminer après le retrait de l’accès. Les nouvelles demandes de téléchargement sont refusées.",
   "event.resources.edit": "Modifier",
   "event.resources.editHeading": "Modifier la ressource",
   "event.resources.empty": "Aucune ressource disponible.",

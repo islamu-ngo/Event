@@ -157,6 +157,9 @@ response headers. An old link or uploader identity cannot bypass withdrawal,
 expiry, changed membership or tighter policy. Responses are private/no-store
 and do not support resumable ranges or cached conditional responses. Files
 remain private in the storage provider even for a public resource audience.
+Withdrawal denies new download requests, including attempts to reuse a saved
+link, but a download that already started may finish. A teaser never reveals
+private descriptions, file details or the external destination's origin.
 
 Browser uploads use a subject/resource-bound opaque session. Their completion
 response identifies the resource only; refresh its representation to obtain

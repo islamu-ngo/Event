@@ -100,6 +100,13 @@ use the deployment's existing key-wrapping authority where configured.
 role checks or destination readback. The attendee surface loads audience
 collection and fresh item details; only a root-relative, exact `download`,
 `access` or `accessible-alternative` HAL relation produces a delivery anchor.
+Teaser cards render the public title and availability requirements, never
+private description, language, accessibility notes, file details or safe
+origin, even if a client detail record contains inconsistent private fields.
+The file safety state remains truthful metadata when a private detail is
+visible without a current `download` relation; only that relation creates
+the action. The associated download explanation states that withdrawal can
+deny the next request but cannot stop a response already streaming.
 The safe origin is plain text, not a preview/fetch target. The Studio
 navigation obtains `manage-resources` from the fresh audience collection,
 including for a private event whose public parent `resources` link is absent.

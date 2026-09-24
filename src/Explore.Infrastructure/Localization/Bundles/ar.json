@@ -50,6 +50,7 @@
   "event.resources.destinationInvalid": "أدخل رابط وجهة HTTPS صالحاً.",
   "event.resources.disclosure": "الإفصاح",
   "event.resources.download": "تنزيل",
+  "event.resources.downloadLimitation": "قد يستمر تنزيل بدأ قبل سحب الوصول. تُرفض طلبات التنزيل الجديدة.",
   "event.resources.edit": "تعديل",
   "event.resources.editHeading": "تعديل المورد",
   "event.resources.empty": "لا توجد موارد متاحة بعد.",

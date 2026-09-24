@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Explore.API.BackgroundServices;
+using Explore.API.Authorization;
 using Explore.API.Configuration;
 using Explore.API.Extensions;
 using Explore.API.HealthChecks;
@@ -10,6 +11,7 @@ using Explore.API.Services.Calendar;
 using Explore.API.Services.OpenGraph;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
@@ -128,6 +130,9 @@ public static class ApiHostServiceCollectionExtensions
             enableAuditing: true,
             enableRefreshService: !isOpenApiGeneration);
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<
+            IKeycloakOperatorAuthority,
+            HttpKeycloakOperatorAuthority>();
 
         if ((builder.Environment.IsEnvironment("Testing") || builder.Environment.IsDevelopment()) &&
             string.IsNullOrWhiteSpace(builder.Configuration[$"{EmbeddedPrivacyErasureAuthorityOptions.SectionName}:Path"]))

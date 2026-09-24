@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @layout SetupLayout
 @using Explore.Blazor.Client.Components.Forms
+@using Explore.Blazor.Client.Components.Onboarding
 @using Explore.Blazor.Client.Contracts.Services
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Explore.Blazor.Client.Pages.Onboarding.Components
@@ -163,106 +164,23 @@
                                     {
                                         <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true">
                                             <MudText Typo="Typo.caption">
-                                                Keycloak runtime values were detected from deployment configuration and prefilled below. You can still patch the external realm during setup before the first admin account exists.
+                                                Keycloak runtime values were detected from deployment configuration. Runtime credentials remain deployment-owned; use the reviewed operator workflow for inspection and any approved create-only provisioning.
                                             </MudText>
                                         </MudAlert>
                                     }
 
-                                    <MudRadioGroup T="KeycloakConfigurationMode" @bind-Value="_keycloakConfigurationMode">
-                                        <MudRadio T="KeycloakConfigurationMode" Value="KeycloakConfigurationMode.Manual" Color="Color.Primary" Dense="true">
-                                            Use an already configured Keycloak realm
-                                        </MudRadio>
-                                        <MudRadio T="KeycloakConfigurationMode" Value="KeycloakConfigurationMode.Bootstrap" Color="Color.Primary" Dense="true"
-                                                  data-testid="keycloak-bootstrap-mode">
-                                            Let ISLAMU configure Keycloak clients now
-                                        </MudRadio>
-                                    </MudRadioGroup>
-
-                                    @if (_keycloakConfigurationMode == KeycloakConfigurationMode.Manual)
-                                    {
-                                        <MudTextField Variant="Variant.Outlined" T="string"
-                                                      Label="Authority URL (Required)"
-                                                      @bind-Value="_model.KeycloakAuthority"
-                                                      Placeholder="https://keycloak.example.com/realms/myrealm"
-                                                      HelperText="The Keycloak realm URL used for OIDC discovery." />
-                                        <MudTextField Variant="Variant.Outlined" T="string"
-                                                      Label="Client ID (Required)"
-                                                      @bind-Value="_model.KeycloakClientId"
-                                                      Placeholder="my-client" />
-                                        <MudTextField Variant="Variant.Outlined" T="string"
-                                                      Label="Client Secret"
-                                                      InputType="InputType.Password"
-                                                      @bind-Value="_model.KeycloakClientSecret"
-                                                      HelperText="Optional for public clients. Required for confidential clients." />
-                                    }
-                                    else
-                                    {
-                                        <div data-testid="keycloak-bootstrap-fields">
-                                             <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-                                                  The platform will use the bootstrap admin credential one time to create or patch Keycloak clients. The admin credential is not stored after this request.
-                                             </MudAlert>
-                                            <MudSelect T="KeycloakBootstrapMode?" Variant="Variant.Outlined"
-                                                       Label="Bootstrap action"
-                                                       @bind-Value="_keycloakBootstrap.Mode"
-                                                       HelperText="Choose whether the platform should create the realm when it is missing, or only patch an existing realm.">
-                                                <MudSelectItem T="KeycloakBootstrapMode?" Value="@KeycloakBootstrapMode.PatchExistingRealm">Patch existing realm</MudSelectItem>
-                                                <MudSelectItem T="KeycloakBootstrapMode?" Value="@KeycloakBootstrapMode.CreateRealm">Create realm if missing</MudSelectItem>
-                                            </MudSelect>
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="Keycloak base URL (Required)"
-                                                           @bind-Value="_keycloakBootstrap.KeycloakBaseUrl"
-                                                           data-testid="keycloak-bootstrap-base-url"
-                                                           Immediate="true"
-                                                           Placeholder="https://keycloak.example.com"
-                                                           HelperText="The root Keycloak URL, without /realms/{realm}." />
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="Realm (Required)"
-                                                           @bind-Value="_keycloakBootstrap.Realm"
-                                                           data-testid="keycloak-bootstrap-realm"
-                                                           Immediate="true"
-                                                            Placeholder="events" />
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="Blazor BFF client ID (Required)"
-                                                           @bind-Value="_keycloakBootstrap.BlazorClientId"
-                                                           data-testid="keycloak-bootstrap-client-id"
-                                                           Immediate="true"
-                                                           Placeholder="islamu-event-blazor" />
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="BFF client secret (Required)"
-                                                           aria-label="Blazor BFF client secret (required)"
-                                                           data-testid="keycloak-bootstrap-client-secret"
-                                                           InputType="InputType.Password"
-                                                           @bind-Value="_keycloakBootstrap.BlazorClientSecret"
-                                                           Immediate="true"
-                                                           HelperText="Stored as the runtime BFF client secret after bootstrap succeeds." />
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="API client ID (Optional)"
-                                                           @bind-Value="_keycloakBootstrap.ApiClientId"
-                                                           Immediate="true"
-                                                           Placeholder="islamu-event-api" />
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="API client secret (Optional)"
-                                                           InputType="InputType.Password"
-                                                           @bind-Value="_keycloakBootstrap.ApiClientSecret"
-                                                           Immediate="true"
-                                                            HelperText="Only sent when you want the platform to synchronize the API resource-server client secret." />
-                                             <MudTextField Variant="Variant.Outlined" T="string"
-                                                           Label="Admin username (Required)"
-                                                           aria-label="One-time Keycloak admin username (required)"
-                                                           data-testid="keycloak-bootstrap-admin-username"
-                                                           @bind-Value="_keycloakBootstrap.BootstrapAdminUsername"
-                                                           Immediate="true"
-                                                            HelperText="Used only for this bootstrap request and never stored by the platform." />
-                                              <MudTextField Variant="Variant.Outlined" T="string"
-                                                            Label="Admin password (Required)"
-                                                            aria-label="One-time Keycloak admin password (required)"
-                                                            data-testid="keycloak-bootstrap-admin-password"
-                                                            InputType="InputType.Password"
-                                                            @bind-Value="_keycloakBootstrap.BootstrapAdminPassword"
-                                                            Immediate="true"
-                                                            HelperText="Cleared from this form after submit, whether bootstrap succeeds or fails." />
-                                        </div>
-                                    }
+                                    <MudTextField Variant="Variant.Outlined" T="string"
+                                                  Label="Authority URL (Required)"
+                                                  @bind-Value="_model.KeycloakAuthority"
+                                                  Placeholder="https://keycloak.example.com/realms/myrealm"
+                                                  HelperText="The Keycloak realm URL used for OIDC discovery." />
+                                    <MudTextField Variant="Variant.Outlined" T="string"
+                                                  Label="Client ID (Required)"
+                                                  @bind-Value="_model.KeycloakClientId"
+                                                  Placeholder="my-client" />
+                                    <MudAlert Severity="Severity.Info" Dense="true">
+                                        The confidential client secret is supplied by the deployment authority and is never entered in this browser.
+                                    </MudAlert>
 
                                     <section class="auth-provider-configuration__visitor-onboarding"
                                              aria-labelledby="onboarding-keycloak-public-heading">
@@ -292,6 +210,12 @@
                                             @PublicSignupUrlWarning(_model.KeycloakPublicSignupUrl)
                                         }
                                     </section>
+                                    @if (IsKeycloakPrimary)
+                                    {
+                                        <KeycloakOperatorPanel
+                                            Service="@InstanceOnboardingService"
+                                            HeadingId="setup-keycloak-operator-heading" />
+                                    }
                             </MudStack>
                         </div>
                     </details>
@@ -486,8 +410,6 @@
     private const PublicOnboardingPolicy PublicOnboardingAllowed = PublicOnboardingPolicy.Allowed;
     private const PublicOnboardingPolicy PublicOnboardingDenied = PublicOnboardingPolicy.Denied;
     private AuthProviderConfigurationDto _model = new();
-    private KeycloakBootstrapRequestDto _keycloakBootstrap = new();
-    private KeycloakConfigurationMode _keycloakConfigurationMode = KeycloakConfigurationMode.Manual;
     private bool _isLoading = true;
     private FormSubmitState _submitState = new();
     private string? _errorMessage;
@@ -512,18 +434,9 @@
         CurrentPrimaryProviderId == AtprotoProviderId;
 
     private bool HasKeycloakCredentials =>
-        _keycloakConfigurationMode == KeycloakConfigurationMode.Manual
-            ? _model.KeycloakDetectedFromEnvironment == true ||
-              (!string.IsNullOrWhiteSpace(_model.KeycloakAuthority) && !string.IsNullOrWhiteSpace(_model.KeycloakClientId))
-            : HasKeycloakBootstrapCredentials;
-
-    private bool HasKeycloakBootstrapCredentials =>
-        !string.IsNullOrWhiteSpace(_keycloakBootstrap.KeycloakBaseUrl) &&
-        !string.IsNullOrWhiteSpace(_keycloakBootstrap.Realm) &&
-        !string.IsNullOrWhiteSpace(_keycloakBootstrap.BlazorClientId) &&
-        !string.IsNullOrWhiteSpace(_keycloakBootstrap.BlazorClientSecret) &&
-        !string.IsNullOrWhiteSpace(_keycloakBootstrap.BootstrapAdminUsername) &&
-        !string.IsNullOrWhiteSpace(_keycloakBootstrap.BootstrapAdminPassword);
+        _model.KeycloakDetectedFromEnvironment == true ||
+        (!string.IsNullOrWhiteSpace(_model.KeycloakAuthority)
+         && !string.IsNullOrWhiteSpace(_model.KeycloakClientId));
 
     private bool HasAtprotoCredentials =>
         !string.IsNullOrWhiteSpace(_model.AtprotoPublicUrl);
@@ -622,7 +535,6 @@
         _googleSecretAlreadyConfigured = _model.GoogleSsoEnabled == true;
         _model.KeycloakClientSecret = string.Empty;
         _model.GoogleClientSecret = string.Empty;
-        SeedKeycloakBootstrapDefaults();
 
         // Pre-fill the ATProto public URL from the current browser request if not already set
         if (string.IsNullOrWhiteSpace(_model.AtprotoPublicUrl))
@@ -677,13 +589,11 @@
         _errorMessage = null;
         _successMessage = null;
 
-        var usingKeycloakBootstrap = ShouldBootstrapKeycloak;
         BaseCommandResponseOfGuid response;
         try
         {
-            response = usingKeycloakBootstrap
-                ? await BootstrapKeycloakAndApplyPublicOnboardingAsync()
-                : await InstanceOnboardingService.UpdateAuthProviderConfigurationAsAdminAsync(_model);
+            response = await InstanceOnboardingService
+                .UpdateAuthProviderConfigurationAsAdminAsync(_model);
         }
         catch (Exception)
         {
@@ -711,23 +621,23 @@
             return;
         }
 
-        if (!usingKeycloakBootstrap)
+        // Trigger dynamic auth scheme registration in the BFF.
+        try
         {
-            // Trigger dynamic auth scheme registration in the BFF. Bootstrap calls do this in the service.
-            try
+            var refreshResponse = await BffAuthApi.RefreshSchemesAsync(
+                CancellationToken.None);
+            if (!refreshResponse.IsSuccessStatusCode)
             {
-                var refreshResponse = await BffAuthApi.RefreshSchemesAsync(CancellationToken.None);
-                if (!refreshResponse.IsSuccessStatusCode)
-                {
-                    Logger.LogWarning(
-                        "Failed to refresh auth schemes after saving config. Status: {StatusCode}. Login may require app restart.",
-                        (int)refreshResponse.StatusCode);
-                }
+                Logger.LogWarning(
+                    "Failed to refresh auth schemes after saving config. Status: {StatusCode}. Login may require app restart.",
+                    (int)refreshResponse.StatusCode);
             }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Failed to refresh auth schemes after saving config. Login may require app restart.");
-            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(
+                ex,
+                "Failed to refresh auth schemes after saving config. Login may require app restart.");
         }
 
         _submitState.Complete();
@@ -746,43 +656,6 @@
         };
         Navigation.NavigateTo(destination, forceLoad: true);
     }
-
-    private async Task<BaseCommandResponseOfGuid> BootstrapKeycloakAndApplyPublicOnboardingAsync()
-    {
-        PublicOnboardingPolicy? keycloakPolicy = _model.KeycloakPublicOnboardingPolicy;
-        string? keycloakSignupUrl = _model.KeycloakPublicSignupUrl;
-        PublicOnboardingPolicy? googlePolicy = _model.GooglePublicOnboardingPolicy;
-        string? googleSignupUrl = _model.GooglePublicSignupUrl;
-
-        BaseCommandResponseOfGuid bootstrap;
-        try
-        {
-            bootstrap = await InstanceOnboardingService.BootstrapKeycloakRealmAsync(_keycloakBootstrap);
-        }
-        finally
-        {
-            ClearKeycloakBootstrapSecrets();
-        }
-
-        if (bootstrap.Success != true)
-        {
-            return bootstrap;
-        }
-
-        AuthProviderConfigurationDto canonical = await InstanceOnboardingService.GetAuthProviderConfigurationAsync();
-        canonical.KeycloakPublicOnboardingPolicy = keycloakPolicy;
-        canonical.KeycloakPublicSignupUrl = keycloakSignupUrl;
-        canonical.GooglePublicOnboardingPolicy = googlePolicy;
-        canonical.GooglePublicSignupUrl = googleSignupUrl;
-        canonical.KeycloakClientSecret = string.Empty;
-        canonical.GoogleClientSecret = string.Empty;
-        _model = canonical;
-        return await InstanceOnboardingService.UpdateAuthProviderConfigurationAsAdminAsync(canonical);
-    }
-
-    private bool ShouldBootstrapKeycloak =>
-        IsKeycloakPrimary &&
-        _keycloakConfigurationMode == KeycloakConfigurationMode.Bootstrap;
 
     private void SetPrimaryProvider(int providerId)
     {
@@ -804,40 +677,6 @@
             _model.GoogleSsoEnabled = false;
             _model.GoogleClientSecret = string.Empty;
         }
-    }
-
-    private void SeedKeycloakBootstrapDefaults()
-    {
-        if (!string.IsNullOrWhiteSpace(_model.KeycloakAuthority) &&
-            Uri.TryCreate(_model.KeycloakAuthority, UriKind.Absolute, out var authorityUri))
-        {
-            var realmPrefix = "/realms/";
-            var realmIndex = authorityUri.AbsolutePath.IndexOf(realmPrefix, StringComparison.OrdinalIgnoreCase);
-            if (realmIndex >= 0)
-            {
-                var basePath = authorityUri.AbsolutePath[..realmIndex].TrimEnd('/');
-                _keycloakBootstrap.KeycloakBaseUrl = authorityUri.GetLeftPart(UriPartial.Authority) + basePath;
-                _keycloakBootstrap.Realm = Uri.UnescapeDataString(authorityUri.AbsolutePath[(realmIndex + realmPrefix.Length)..].Trim('/'));
-            }
-            else
-            {
-                _keycloakBootstrap.KeycloakBaseUrl = authorityUri.ToString().TrimEnd('/');
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(_model.KeycloakClientId))
-        {
-            _keycloakBootstrap.BlazorClientId = _model.KeycloakClientId;
-        }
-
-    }
-
-    private void ClearKeycloakBootstrapSecrets()
-    {
-        _keycloakBootstrap.BlazorClientSecret = string.Empty;
-        _keycloakBootstrap.ApiClientSecret = string.Empty;
-        _keycloakBootstrap.BootstrapAdminUsername = string.Empty;
-        _keycloakBootstrap.BootstrapAdminPassword = string.Empty;
     }
 
     private void MarkDirty(ChangeEventArgs _) => _isDirty = true;
@@ -872,7 +711,6 @@
 
     private void DiscardAndExit()
     {
-        ClearKeycloakBootstrapSecrets();
         _model.KeycloakClientSecret = string.Empty;
         _model.GoogleClientSecret = string.Empty;
         Navigation.NavigateTo("/setup", forceLoad: true);
@@ -885,7 +723,6 @@
         canonical.GoogleClientSecret = string.Empty;
         _model = canonical;
         _googleSecretAlreadyConfigured = canonical.GoogleSsoEnabled == true;
-        SeedKeycloakBootstrapDefaults();
     }
 
     private static bool IsVisitorPolicyConflict(string? failureCode) => failureCode is
@@ -940,9 +777,4 @@
 
     private string T(string key, string fallback) => TranslationService.T(key, fallback);
 
-    private enum KeycloakConfigurationMode
-    {
-        Manual,
-        Bootstrap
-    }
 }

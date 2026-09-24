@@ -128,7 +128,10 @@ public sealed class AppHostTopologyArchitectureTests
 
         await Assert.That(CountMatches(standaloneBranch, ".WithReference(migrations)")).IsEqualTo(1);
         await Assert.That(CountMatches(standaloneBranch, ".WaitForCompletion(migrations)")).IsEqualTo(1);
-        await Assert.That(CountMatches(standaloneBranch, "ConfigureLocalKeycloakCallbacks(")).IsEqualTo(1);
+        await Assert.That(CountMatches(
+                standaloneBranch,
+                "ConfigureLocalKeycloakCallbacks("))
+            .IsEqualTo(0);
         await Assert.That(CountMatches(standaloneBranch, "ConfigureLocalPlatformApi(")).IsEqualTo(1);
         await Assert.That(CountMatches(standaloneBranch, "ConfigureLocalPlatformBlazor(")).IsEqualTo(1);
     }

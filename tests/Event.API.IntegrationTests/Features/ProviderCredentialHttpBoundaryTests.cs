@@ -36,15 +36,18 @@ public sealed class ProviderCredentialHttpBoundaryTests
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private const string InternalPath = "/api/instanceonboarding/auth-provider-configuration/internal";
 
-    public enum Route { Bootstrap, SetupPolicySync, Doctor, Preview, Apply, Rotate, SettingsPolicySync }
+    public enum Route { SetupPolicySync, SettingsPolicySync }
     public enum Outcome { Success, Validation, ProviderRejection }
     public enum Caller { Anonymous, TenantAdmin, RevokedAdmin, CompletedSetup, ForgedSetup, SetupOnly }
 
     public static IEnumerable<Route> Routes() => Enum.GetValues<Route>();
     public static IEnumerable<(Route, Outcome)> Outcomes() =>
-        from route in Routes() from outcome in Enum.GetValues<Outcome>() select (route, outcome);
+        from route in Routes()
+        from outcome in Enum.GetValues<Outcome>()
+        select (route, outcome);
     public static IEnumerable<(Route, Caller)> DeniedCallers() =>
-        from route in Routes() from caller in Enum.GetValues<Caller>()
+        from route in Routes()
+        from caller in Enum.GetValues<Caller>()
         where caller != Caller.SetupOnly || !IsSetup(route)
         select (route, caller);
 
@@ -245,22 +248,60 @@ public sealed class ProviderCredentialHttpBoundaryTests
         await AssertPrivateAsync(response);
     }
 
-    private static bool IsSetup(Route route) => route is Route.Bootstrap or Route.SetupPolicySync;
+    [Test]
+    [Arguments("GET", "/api/instance/keycloak/connection", false, HttpStatusCode.OK)]
+    [Arguments("POST", "/api/instance/keycloak/inspect", true, HttpStatusCode.BadRequest)]
+    [Arguments("POST", "/api/instance/keycloak/plans", true, HttpStatusCode.BadRequest)]
+    [Arguments("GET", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222", false, HttpStatusCode.NotFound)]
+    [Arguments("POST", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222/apply", true, HttpStatusCode.BadRequest)]
+    [Arguments("POST", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222/reconcile", true, HttpStatusCode.BadRequest)]
+    [Arguments("POST", "/api/instance/keycloak/operations/019db1de-1723-7acd-bada-222222222222/cancel", false, HttpStatusCode.NotFound)]
+    public async Task KeycloakOperationRoutes_AcceptCurrentSetupAuthorityAndRemainPrivate(
+        string method,
+        string path,
+        bool malformedBody,
+        HttpStatusCode expected)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var request = new HttpRequestMessage(
+            new HttpMethod(method),
+            path);
+        request.Headers.TryAddWithoutValidation("Authorization", string.Empty);
+        request.Headers.Add("X-Setup-Secret", fixture.Setup.Secret);
+        request.Headers.Add("Idempotency-Key", new string('k', 129));
+        if (malformedBody)
+        {
+            request.Content = new StringContent(
+                "{",
+                Encoding.UTF8,
+                "application/json");
+        }
+
+        using HttpResponseMessage response =
+            await fixture.Client.SendAsync(request);
+        string body = await response.Content.ReadAsStringAsync();
+
+        await Assert.That(response.StatusCode)
+            .IsEqualTo(expected)
+            .Because(body);
+        await Assert.That(response.Headers.Contains("X-Idempotency-Replay"))
+            .IsFalse();
+        await Assert.That(await fixture.RecordCountAsync()).IsEqualTo(0);
+        await AssertPrivateAsync(response);
+    }
+
+    private static bool IsSetup(Route route) =>
+        route == Route.SetupPolicySync;
     private static string Path(Route route) => route switch
     {
-        Route.Bootstrap => "/api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap",
         Route.SetupPolicySync => "/api/instanceonboarding/authz-provider-configuration/sync",
-        Route.Doctor => "/api/instance/settings/auth-provider/keycloak/doctor",
-        Route.Preview => "/api/instance/settings/auth-provider/keycloak/sync-preview",
-        Route.Apply => "/api/instance/settings/auth-provider/keycloak/sync-apply",
-        Route.Rotate => "/api/instance/settings/auth-provider/keycloak/client-secret/rotate",
         Route.SettingsPolicySync => "/api/instance/settings/authz-provider/sync",
         _ => throw new ArgumentOutOfRangeException(nameof(route))
     };
     private static HttpStatusCode ExpectedOutcome(Route route, Outcome outcome) => outcome switch
     {
         Outcome.Validation => HttpStatusCode.BadRequest,
-        Outcome.ProviderRejection when route is Route.Bootstrap or Route.SetupPolicySync or Route.SettingsPolicySync => HttpStatusCode.BadRequest,
+        Outcome.ProviderRejection => HttpStatusCode.BadRequest,
         _ => HttpStatusCode.OK
     };
     private static string Canary() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -308,21 +349,8 @@ public sealed class ProviderCredentialHttpBoundaryTests
             string password = Canary();
             _bodies = new()
             {
-                [Route.Bootstrap] = new KeycloakBootstrapRequestDto
-                {
-                    KeycloakBaseUrl = "https://provider.test", Realm = "boundary", BlazorClientId = "boundary-bff",
-                    BlazorClientSecret = Canary(), BootstrapAdminUsername = username, BootstrapAdminPassword = password
-                },
                 [Route.SetupPolicySync] = new AuthorizationPolicyPackageSyncRequestDto { AdminUsername = username, AdminPassword = password },
-                [Route.SettingsPolicySync] = new AuthorizationPolicyPackageSyncRequestDto { AdminUsername = username, AdminPassword = password },
-                [Route.Doctor] = new KeycloakRealmDoctorRequestDto { UseTemporaryAdminCredentials = true, BootstrapAdminUsername = username, BootstrapAdminPassword = password },
-                [Route.Preview] = new KeycloakRealmSyncPreviewRequestDto { UseTemporaryAdminCredentials = true, BootstrapAdminUsername = username, BootstrapAdminPassword = password },
-                [Route.Apply] = new KeycloakRealmSyncApplyRequestDto { BackupConfirmed = true, BootstrapAdminUsername = username, BootstrapAdminPassword = password },
-                [Route.Rotate] = new KeycloakClientSecretRotationRequestDto
-                {
-                    ConfirmApplicationManagedSecret = true, ClientId = "boundary-bff", NewClientSecret = Canary(),
-                    BootstrapAdminUsername = username, BootstrapAdminPassword = password
-                }
+                [Route.SettingsPolicySync] = new AuthorizationPolicyPackageSyncRequestDto { AdminUsername = username, AdminPassword = password }
             };
         }
 
@@ -340,8 +368,6 @@ public sealed class ProviderCredentialHttpBoundaryTests
             };
             WebApplicationFactory<Program> host = root.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<IKeycloakBootstrapService>();
-                services.AddSingleton<IKeycloakBootstrapService>(provider);
                 services.RemoveAll<IPolicyPackageService>();
                 services.AddSingleton<IPolicyPackageService>(provider);
                 // Only configuration storage/provider I/O is substituted. Authority, native
@@ -349,7 +375,8 @@ public sealed class ProviderCredentialHttpBoundaryTests
                 var authorizationConfiguration = Substitute.For<IAuthorizationProviderConfigurationService>();
                 authorizationConfiguration.ReadConfigurationAsync().Returns(new AuthorizationProviderConfigurationDto
                 {
-                    Provider = "cerbos", AuthorizationProviderManagedByDeployment = false
+                    Provider = "cerbos",
+                    AuthorizationProviderManagedByDeployment = false
                 });
                 services.RemoveAll<IAuthorizationProviderConfigurationService>();
                 services.AddSingleton(authorizationConfiguration);
@@ -363,33 +390,75 @@ public sealed class ProviderCredentialHttpBoundaryTests
             Guid userId = db.InstanceBootstrapStates.Single().CompletedByUserId!.Value;
             db.Users.Add(new User
             {
-                Id = userId, CreatedAt = DateTime.UtcNow, CreatedBy = userId,
-                Pii = new UserPii { UserId = userId, Email = $"{userId:N}@integration.test", FirstName = "Boundary", LastName = "Admin" }
+                Id = userId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                Pii = new UserPii
+                {
+                    UserId = userId,
+                    Email = $"{userId:N}@integration.test",
+                    FirstName = "Boundary",
+                    LastName = "Admin"
+                }
             });
             db.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = userId, User = null!,
-                AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(), AuthenticationProvider = null!,
-                ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(ExternalApiPhase0WebApplicationFactory.TestIssuer, userId.ToString()).Value,
-                ProviderDisplayName = "keycloak", CreatedAt = DateTime.UtcNow, CreatedBy = userId
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                AuthenticationProviderId =
+                    (int)"keycloak"
+                        .ParseAuthenticationProviderKind(),
+                AuthenticationProvider = null!,
+                ProviderKey =
+                    PlatformIdentityPrincipalExtensions
+                        .CreateOidcAccountKey(
+                            ExternalApiPhase0WebApplicationFactory
+                                .TestIssuer,
+                            userId.ToString())
+                        .Value,
+                ProviderDisplayName = "keycloak",
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId
             });
-            Role? role = db.Roles.SingleOrDefault(candidate => candidate.Id == (int)RoleEnum.Admin);
+            Role? role = db.Roles.SingleOrDefault(
+                candidate =>
+                    candidate.Id == (int)RoleEnum.Admin);
             if (role is null)
             {
-                role = new Role { Id = (int)RoleEnum.Admin, MasterCode = "platform.admin", FullName = "Platform Administrator", Scope = RoleScopeEnum.Platform, RoleScope = null!, IsSystem = true };
+                role = new Role
+                {
+                    Id = (int)RoleEnum.Admin,
+                    MasterCode = "platform.admin",
+                    FullName = "Platform Administrator",
+                    Scope = RoleScopeEnum.Platform,
+                    RoleScope = null!,
+                    IsSystem = true
+                };
                 db.Roles.Add(role);
             }
             db.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = userId, User = null!, RoleId = role.Id, Role = role,
-                GrantedAt = DateTime.UtcNow, GrantedBy = userId
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = userId
             });
             await db.SaveChangesAsync();
             return new Fixture(root, host, client, setup, provider, observer, userId);
         }
 
-        public async Task<HttpResponseMessage> SendAsync(Route route, string? key = null, bool invalidBody = false,
-            bool bearer = true, string? setup = null, bool useDefaultSetup = true, bool forgedTenant = false,
+        public async Task<HttpResponseMessage> SendAsync(
+            Route route,
+            string? key = null,
+            bool invalidBody = false,
+            bool bearer = true,
+            string? setup = null,
+            bool useDefaultSetup = true,
+            bool forgedTenant = false,
             CancellationToken cancellationToken = default)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, Path(route));
@@ -397,11 +466,37 @@ public sealed class ProviderCredentialHttpBoundaryTests
                 ? new StringContent("{", Encoding.UTF8, "application/json")
                 : JsonContent.Create(_bodies[route], _bodies[route].GetType());
             // An explicit empty Authorization value prevents DefaultRequestHeaders inheritance.
-            request.Headers.TryAddWithoutValidation("Authorization", bearer ? $"Bearer {_bearer}" : string.Empty);
-            if (useDefaultSetup && IsSetup(route)) setup = Setup.Secret;
-            if (setup is not null) request.Headers.Add("X-Setup-Secret", setup);
-            if (key is not null) request.Headers.Add("Idempotency-Key", key);
-            if (forgedTenant) request.Headers.Add("X-Tenant-Id", Guid.CreateVersion7().ToString());
+            request.Headers.TryAddWithoutValidation(
+                "Authorization",
+                bearer
+                    ? $"Bearer {_bearer}"
+                    : string.Empty);
+            if (useDefaultSetup && IsSetup(route))
+            {
+                setup = Setup.Secret;
+            }
+
+            if (setup is not null)
+            {
+                request.Headers.Add(
+                    "X-Setup-Secret",
+                    setup);
+            }
+
+            if (key is not null)
+            {
+                request.Headers.Add(
+                    "Idempotency-Key",
+                    key);
+            }
+
+            if (forgedTenant)
+            {
+                request.Headers.Add(
+                    "X-Tenant-Id",
+                    Guid.CreateVersion7().ToString());
+            }
+
             return await Client.SendAsync(request, cancellationToken);
         }
 
@@ -414,14 +509,30 @@ public sealed class ProviderCredentialHttpBoundaryTests
             {
                 var member = new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!, UserId = _userId, User = null!,
-                    StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId =
+                        PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = _userId,
+                    User = null!,
+                    StatusId =
+                        (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 };
                 db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = member.TenantId, Tenant = null!, TenantUserId = member.Id, TenantUser = member,
-                    RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                    GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = member.TenantId,
+                    Tenant = null!,
+                    TenantUserId = member.Id,
+                    TenantUser = member,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId =
+                        (int)RoleScopeEnum.Tenant,
+                    GrantedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
             await db.SaveChangesAsync();
@@ -433,7 +544,10 @@ public sealed class ProviderCredentialHttpBoundaryTests
             return await scope.ServiceProvider.GetRequiredService<ExploreDbContext>().IdempotencyRecords.CountAsync();
         }
 
-        public async Task SeedHistoricalAsync(string key, IdempotencyRequestIdentity identity, string marker)
+        public async Task SeedHistoricalAsync(
+            string key,
+            IdempotencyRequestIdentity identity,
+            string marker)
         {
             using var scope = _host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
@@ -441,11 +555,25 @@ public sealed class ProviderCredentialHttpBoundaryTests
             await db.SaveChangesAsync();
             await scope.ServiceProvider.GetRequiredService<IIdempotencyRepository>().SaveAsync(new IdempotencyRecord
             {
-                Id = Guid.CreateVersion7(), Key = key, TenantId = PlatformDefaults.DefaultTenantId,
-                UserId = identity.UserId, RequestMethod = identity.Method, RequestTarget = identity.RequestTarget,
-                RequestContentType = identity.ContentType, RequestBodyHash = identity.BodyHash, PrincipalFingerprint = identity.PrincipalFingerprint,
-                StatusCode = StatusCodes.Status200OK, ContentType = "application/json", ResponseBody = JsonSerializer.Serialize(new { credential = marker }),
-                CreatedAt = DateTime.UtcNow.AddMinutes(-1), ExpiresAt = DateTime.UtcNow.AddHours(1)
+                Id = Guid.CreateVersion7(),
+                Key = key,
+                TenantId =
+                    PlatformDefaults.DefaultTenantId,
+                UserId = identity.UserId,
+                RequestMethod = identity.Method,
+                RequestTarget = identity.RequestTarget,
+                RequestContentType = identity.ContentType,
+                RequestBodyHash = identity.BodyHash,
+                PrincipalFingerprint =
+                    identity.PrincipalFingerprint,
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "application/json",
+                ResponseBody = JsonSerializer.Serialize(
+                    new { credential = marker }),
+                CreatedAt =
+                    DateTime.UtcNow.AddMinutes(-1),
+                ExpiresAt =
+                    DateTime.UtcNow.AddHours(1)
             });
         }
 
@@ -501,12 +629,24 @@ public sealed class ProviderCredentialHttpBoundaryTests
     {
         private AuthProviderConfigurationDto _configuration = new()
         {
-            PrimaryProviderId = (int)AuthenticationProviderKind.Keycloak, PrimaryProviderCode = "keycloak",
-            KeycloakAuthority = ExternalApiPhase0WebApplicationFactory.TestIssuer, KeycloakClientId = "boundary-bff",
+            PrimaryProviderId =
+                (int)AuthenticationProviderKind.Keycloak,
+            PrimaryProviderCode = "keycloak",
+            KeycloakAuthority =
+                ExternalApiPhase0WebApplicationFactory.TestIssuer,
+            KeycloakClientId = "boundary-bff",
             KeycloakClientSecret = Canary()
         };
-        public Task<AuthProviderConfigurationDto> ReadConfigurationAsync() => Task.FromResult(_configuration with { KeycloakClientSecret = string.Empty });
-        public Task<AuthProviderConfigurationDto> ReadConfigurationWithSecretsAsync() => Task.FromResult(_configuration with { });
+        public Task<AuthProviderConfigurationDto>
+            ReadConfigurationAsync() =>
+            Task.FromResult(
+                _configuration with
+                {
+                    KeycloakClientSecret = string.Empty
+                });
+        public Task<AuthProviderConfigurationDto>
+            ReadConfigurationWithSecretsAsync() =>
+            Task.FromResult(_configuration with { });
         public Task<bool> IsConfiguredAsync() => Task.FromResult(true);
         public Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration, IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default)
         {
@@ -515,7 +655,7 @@ public sealed class ProviderCredentialHttpBoundaryTests
         }
     }
 
-    private sealed class ProviderBoundary : IKeycloakBootstrapService, IPolicyPackageService
+    private sealed class ProviderBoundary : IPolicyPackageService
     {
         private int _calls;
         public int Calls => Volatile.Read(ref _calls);
@@ -531,31 +671,6 @@ public sealed class ProviderCredentialHttpBoundaryTests
             if (call == 1) FirstEntered.TrySetResult();
             if (call == 2) SecondEntered.TrySetResult();
             if (Block) await Release.Task.WaitAsync(Deadline, cancellationToken);
-        }
-        public async Task<KeycloakBootstrapResultDto> BootstrapAsync(KeycloakBootstrapRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Success = !Reject, Message = Message, FailureCode = Reject ? "keycloak_bootstrap_failed" : null };
-        }
-        public async Task<KeycloakRealmDoctorResultDto> DiagnoseRealmAsync(AuthProviderConfigurationDto configuration, KeycloakRealmDoctorRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { OverallStatus = Reject ? "blocked" : "healthy", Message = Message };
-        }
-        public async Task<KeycloakRealmSyncPlanDto> PreviewRealmSyncAsync(AuthProviderConfigurationDto configuration, KeycloakRealmSyncPreviewRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Status = Reject ? "blocked" : "ready", Message = Message };
-        }
-        public async Task<KeycloakRealmSyncPlanDto> ApplyRealmSyncAsync(AuthProviderConfigurationDto configuration, KeycloakRealmSyncApplyRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Status = Reject ? "blocked" : "applied", Message = Message };
-        }
-        public async Task<KeycloakClientSecretRotationResultDto> RotateClientSecretAsync(AuthProviderConfigurationDto configuration, KeycloakClientSecretRotationRequestDto request, CancellationToken cancellationToken)
-        {
-            await EnterAsync(cancellationToken);
-            return new() { Status = Reject ? "blocked" : "rotated", Message = Message };
         }
         public async Task<PolicyPackagePublishResult> PublishAsync(CancellationToken cancellationToken = default, PolicyPackageAdminCredentials? oneTimeCredentials = null)
         {

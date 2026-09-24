@@ -63,8 +63,10 @@ on an abandoned lock. This does not change the one-replica requirement.
 ISLAMU Event Standalone requires persistent storage mounted at `/app/data` to retain the primary database, privacy-erasure authority, Data Protection keys, and uploaded media:
 
 Local upload bytes default to `/app/data/storage`, even without an explicit root
-setting. A deployment override still wins; mount and back up that directory too
-if it is outside `/app/data`.
+setting. A deployment override uses `Storage__Local__RootPath` and still wins;
+mount and back up that directory too if it is outside `/app/data`. The
+`LOCAL_STORAGE_ROOT_PATH` alias is translated by Docker Compose, not by
+Standalone's direct `docker run --env-file` invocation.
 
 ```bash
 docker volume create event_standalone_data
@@ -94,7 +96,7 @@ ASPNETCORE_ENVIRONMENT=Production
 SECRET_PROVIDER=Environment
 DATABASE_PROVIDER=sqlite
 DEPLOYMENT_MODE=SingleTenant
-LOCAL_STORAGE_ROOT_PATH=/app/data/storage
+Storage__Local__RootPath=/app/data/storage
 
 # Bounded SQLite profile: optional processing stays off
 Webhooks__Enabled=false

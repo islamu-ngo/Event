@@ -172,6 +172,38 @@ bindings without reviving compromised or revoked credentials. Credentials and
 sessions still undergo current authorization checks; do not promise cookie
 survival solely because key material was restored.
 
+### Recover Keycloak operation receipts
+
+The primary application database stores reviewed Keycloak operation receipts;
+the Keycloak database or provider backup stores the resources those receipts
+describe. Restore them from the same coordinated recovery point whenever
+possible. A primary-database-only restore can bring back an `Applying` or
+`OutcomeUnknown` receipt while Keycloak is already newer than the application
+backup.
+
+Before reopening public traffic:
+
+1. Keep normal users and automated deployment actions stopped. Start only the
+   restored databases, Keycloak and the application services needed for
+   restricted administrator access.
+2. Open the Keycloak operator panel in setup or instance administration and
+   review every unresolved `Applying` or `OutcomeUnknown` receipt.
+3. Submit fresh Keycloak administrator credentials and choose **Reconcile**.
+   Reconciliation performs read-only checks against the receipt's captured
+   realm, client or mapper identity; it does not resend the original mutation.
+4. If the result remains unknown, correct provider reachability and choose
+   **Reconcile** again. Never choose **Apply** as a retry, delete the receipt,
+   edit its digest, reset the Keycloak volume, or delete and re-import the
+   realm.
+5. Reopen traffic only after the receipts settle and a fresh inspection shows
+   the expected realm, clients and mappers. Verify a real user sign-in and keep
+   the immutable provider IDs from the restored state.
+
+An operation receipt that is absent from the restored primary database must not
+be reconstructed from Keycloak or treated as proof that a write is safe to
+repeat. Take a new coordinated backup after recovery so the application
+receipts and Keycloak resources share a verified recovery point.
+
 ### Step 4: Migrate, Verify Replay, Then Reopen Traffic
 
 ```bash

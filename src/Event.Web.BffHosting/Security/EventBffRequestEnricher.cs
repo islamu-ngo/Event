@@ -187,14 +187,69 @@ public static class EventBffRequestPolicy
         return path.StartsWithSegments("/api/InstanceOnboarding/complete", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/InstanceOnboarding/validate-secret", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments(
-                "/api/InstanceOnboarding/auth-provider-configuration/keycloak-bootstrap",
-                StringComparison.OrdinalIgnoreCase)
-            || path.StartsWithSegments(
                 "/api/InstanceOnboarding/auth-provider-configuration",
                 StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments(
                 "/api/InstanceOnboarding/authz-provider-configuration",
-                StringComparison.OrdinalIgnoreCase);
+                StringComparison.OrdinalIgnoreCase)
+            || IsKeycloakOperatorRequest(method, path);
+    }
+
+    private static bool IsKeycloakOperatorRequest(
+        string method,
+        PathString path)
+    {
+        string? value = path.Value;
+        if (value is null)
+        {
+            return false;
+        }
+
+        if (HttpMethods.IsGet(method)
+            && string.Equals(
+                value,
+                "/api/instance/keycloak/connection",
+                StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPost(method)
+            && (string.Equals(
+                    value,
+                    "/api/instance/keycloak/inspect",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    value,
+                    "/api/instance/keycloak/plans",
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        const string prefix = "/api/instance/keycloak/operations/";
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] segments = value[prefix.Length..]
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        bool operationRead = segments.Length == 1
+                && HttpMethods.IsGet(method)
+                && Guid.TryParse(segments[0], out _);
+        bool operationWrite = segments.Length == 2
+                && HttpMethods.IsPost(method)
+                && Guid.TryParse(segments[0], out _)
+                && (string.Equals(
+                        segments[1],
+                        "apply",
+                        StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        segments[1],
+                        "reconcile",
+                        StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        segments[1],
+                        "cancel",
+                        StringComparison.OrdinalIgnoreCase));
+        return operationRead || operationWrite;
     }
 
     private static bool IsUnsafeMethod(string method) =>

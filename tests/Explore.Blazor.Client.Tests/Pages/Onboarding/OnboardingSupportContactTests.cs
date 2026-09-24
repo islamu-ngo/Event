@@ -22,7 +22,8 @@ public sealed class OnboardingSupportContactTests
         context.Services.AddSingleton(Substitute.For<IUserService>());
         var auth = RestService.For<IBffAuthApi>(client);
         context.Services.AddSingleton<IInstanceOnboardingService>(services => new InstanceOnboardingService(
-            new InstanceAuthenticationSettingsClient(client), new InstanceAuthorizationSettingsClient(client),
+            new InstanceAuthenticationSettingsClient(client), new InstanceKeycloakOperationsClient(client),
+            new InstanceAuthorizationSettingsClient(client),
             new InstanceGovernanceSettingsClient(client), new InstanceMessagingSettingsClient(client),
             new InstanceOnboardingClient(client), new InstancePresentationSettingsClient(client),
             new InstanceStorageSettingsClient(client), new SystemClient(client), new TenantClient(client),

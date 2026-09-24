@@ -132,7 +132,6 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(HomeDiscoveryMode),
         typeof(HomeDiscoverySectionStatus),
         typeof(IntegrationSyncRecoveryDecision),
-        typeof(KeycloakBootstrapMode),
         typeof(LocationAddressSourceEnum),
         typeof(LocationAddressVisibilityEnum),
         typeof(ManagedProviderOrganizerKindDto),

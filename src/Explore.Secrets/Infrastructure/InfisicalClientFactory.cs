@@ -171,7 +171,7 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
             _writeSecretAsync = writeSecretAsync;
         }
 
-        public async Task<string?> GetSecretAsync(
+        public async Task<SecretProviderValue?> GetSecretAsync(
             string environment,
             string folderPath,
             string secretName,
@@ -203,7 +203,9 @@ public sealed class InfisicalClientFactory : IInfisicalClientFactory, IAsyncDisp
             {
                 if (string.Equals(secret.SecretKey, secretName, StringComparison.OrdinalIgnoreCase))
                 {
-                    return secret.SecretValue;
+                    return new SecretProviderValue(
+                        secret.SecretValue,
+                        $"{secret.Id}:{secret.Version}");
                 }
             }
 

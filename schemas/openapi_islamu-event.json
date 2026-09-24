@@ -58817,362 +58817,6 @@
         "x-rate-limit-policy": "Write"
       }
     },
-    "/api/instance/settings/auth-provider/keycloak/doctor": {
-      "post": {
-        "tags": [
-          "InstanceAuthenticationSettings"
-        ],
-        "summary": "Run Keycloak Realm Doctor",
-        "description": "Runs read-only Keycloak realm diagnostics. Temporary admin credentials are used only for this request and are not stored.",
-        "operationId": "RunInstanceKeycloakRealmDoctor",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakRealmDoctorRequestDto"
-              }
-            },
-            "application/*+json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakRealmDoctorRequestDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmDoctorResultDto"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmDoctorResultDto"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmDoctorResultDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Authenticated"
-      }
-    },
-    "/api/instance/settings/auth-provider/keycloak/sync-preview": {
-      "post": {
-        "tags": [
-          "InstanceAuthenticationSettings"
-        ],
-        "summary": "Preview Keycloak Realm Sync",
-        "description": "Generates a read-only additive Keycloak realm sync plan. Temporary admin credentials are used only for this request and are not stored.",
-        "operationId": "PreviewInstanceKeycloakRealmSync",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakRealmSyncPreviewRequestDto"
-              }
-            },
-            "application/*+json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakRealmSyncPreviewRequestDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmSyncPlanDto"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmSyncPlanDto"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmSyncPlanDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Authenticated"
-      }
-    },
-    "/api/instance/settings/auth-provider/keycloak/sync-apply": {
-      "post": {
-        "tags": [
-          "InstanceAuthenticationSettings"
-        ],
-        "summary": "Apply Keycloak Realm Sync",
-        "description": "Applies backup-confirmed additive Keycloak realm repairs. Temporary admin credentials are used only for this request and are not stored.",
-        "operationId": "ApplyInstanceKeycloakRealmSync",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakRealmSyncApplyRequestDto"
-              }
-            },
-            "application/*+json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakRealmSyncApplyRequestDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmSyncPlanDto"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmSyncPlanDto"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakRealmSyncPlanDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Authenticated"
-      }
-    },
-    "/api/instance/settings/auth-provider/keycloak/client-secret/rotate": {
-      "post": {
-        "tags": [
-          "InstanceAuthenticationSettings"
-        ],
-        "summary": "Rotate Keycloak Client Secret",
-        "description": "Rotates an application-managed Keycloak client secret. Deployment-managed secrets return operator instructions and are not changed by the application.",
-        "operationId": "RotateInstanceKeycloakClientSecret",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakClientSecretRotationRequestDto"
-              }
-            },
-            "application/*+json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakClientSecretRotationRequestDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakClientSecretRotationResultDto"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakClientSecretRotationResultDto"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeycloakClientSecretRotationResultDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Authenticated"
-      }
-    },
     "/api/instance/settings/auth-provider/status": {
       "get": {
         "tags": [
@@ -62540,6 +62184,439 @@
         "x-endpoint-class": "Authenticated"
       }
     },
+    "/api/instance/keycloak/connection": {
+      "get": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Get Effective Keycloak Connection",
+        "operationId": "GetInstanceKeycloakConnection",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakConnectionDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakConnectionDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/instance/keycloak/inspect": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Inspect Keycloak Configuration",
+        "operationId": "InspectInstanceKeycloak",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakInspectionCredentials"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakInspectionCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakInspectionDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakInspectionDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/plans": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Plan Keycloak Operation",
+        "operationId": "PlanInstanceKeycloak",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationPlanInput"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationPlanInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}": {
+      "get": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Get Keycloak Operation",
+        "operationId": "GetInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}/apply": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Apply Keycloak Operation",
+        "operationId": "ApplyInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}/reconcile": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Reconcile Keycloak Operation",
+        "operationId": "ReconcileInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
+    "/api/instance/keycloak/operations/{operationId}/cancel": {
+      "post": {
+        "tags": [
+          "InstanceKeycloakOperations"
+        ],
+        "summary": "Cancel Keycloak Operation",
+        "operationId": "CancelInstanceKeycloakOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfKeycloakOperationDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
     "/api/instance/settings/smtp": {
       "get": {
         "tags": [
@@ -64219,191 +64296,6 @@
           },
           "429": {
             "description": "Too Many Requests",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "x-endpoint-class": "Admin",
-        "x-rate-limit-policy": "SetupSecret"
-      }
-    },
-    "/api/instanceonboarding/auth-provider-configuration/keycloak-bootstrap": {
-      "post": {
-        "tags": [
-          "InstanceOnboarding"
-        ],
-        "summary": "Bootstrap Keycloak Realm (Setup)",
-        "description": "Bootstraps an external Keycloak realm/client configuration during instance setup. Protected by setup secret; one-time admin credentials are not stored.",
-        "operationId": "BootstrapInstanceOnboardingKeycloakRealm",
-        "parameters": [
-          {
-            "name": "api-version",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Api-Version",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakBootstrapRequestDto"
-              }
-            },
-            "application/*+json; v=0.1": {
-              "schema": {
-                "$ref": "#/components/schemas/KeycloakBootstrapRequestDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "Gone",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Bad Gateway",
-            "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "application/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
-              "text/json; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
@@ -112947,9 +112839,6 @@
           "keycloakClientId": {
             "type": "string"
           },
-          "keycloakClientSecret": {
-            "type": "string"
-          },
           "atprotoLoginEnabled": {
             "type": "boolean"
           },
@@ -145094,6 +144983,202 @@
           }
         }
       },
+      "HalResourceOfKeycloakConnectionDto": {
+        "required": [
+          "status",
+          "authority",
+          "realm",
+          "clientId",
+          "available",
+          "credentialOwnership",
+          "credentialStatus",
+          "requiresCoordinatedRestart",
+          "operatorGuidance"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "credentialOwnership": {
+            "type": "string"
+          },
+          "credentialStatus": {
+            "type": "string"
+          },
+          "requiresCoordinatedRestart": {
+            "type": "boolean"
+          },
+          "operatorGuidance": {
+            "type": "string"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfKeycloakInspectionDto": {
+        "required": [
+          "status",
+          "reasonCode",
+          "authority",
+          "realm",
+          "clientId",
+          "findings"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfKeycloakOperationDto": {
+        "required": [
+          "id",
+          "state",
+          "digest",
+          "createdAtUtc",
+          "expiresAtUtc",
+          "settledAtUtc",
+          "isCancellationRequested",
+          "steps",
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settledAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isCancellationRequested": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KeycloakStepOutcomeDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfLocalCredentialIssueDto": {
         "type": "object",
         "properties": {
@@ -157106,538 +157191,250 @@
           }
         }
       },
-      "KeycloakBootstrapMode": {
-        "enum": [
-          "PatchExistingRealm",
-          "CreateRealm"
+      "KeycloakConnectionDto": {
+        "required": [
+          "status",
+          "authority",
+          "realm",
+          "clientId",
+          "available",
+          "credentialOwnership",
+          "credentialStatus",
+          "requiresCoordinatedRestart",
+          "operatorGuidance"
         ],
-        "type": "string"
-      },
-      "KeycloakBootstrapRequestDto": {
-        "type": "object",
-        "properties": {
-          "keycloakBaseUrl": {
-            "type": "string"
-          },
-          "realm": {
-            "type": "string"
-          },
-          "blazorClientId": {
-            "type": "string"
-          },
-          "blazorClientSecret": {
-            "type": "string"
-          },
-          "blazorRedirectUris": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "blazorWebOrigins": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "apiClientId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "apiClientSecret": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "mode": {
-            "$ref": "#/components/schemas/KeycloakBootstrapMode"
-          },
-          "bootstrapAdminUsername": {
-            "type": "string"
-          },
-          "bootstrapAdminPassword": {
-            "type": "string"
-          }
-        }
-      },
-      "KeycloakClientDesiredStateDto": {
-        "type": "object",
-        "properties": {
-          "clientId": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "clientKind": {
-            "type": "string"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "protocol": {
-            "type": "string"
-          },
-          "publicClient": {
-            "type": "boolean"
-          },
-          "bearerOnly": {
-            "type": "boolean"
-          },
-          "standardFlowEnabled": {
-            "type": "boolean"
-          },
-          "directAccessGrantsEnabled": {
-            "type": "boolean"
-          },
-          "serviceAccountsEnabled": {
-            "type": "boolean"
-          },
-          "redirectUris": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "webOrigins": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "optionalClientScopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "defaultClientScopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "realmRoleMappings": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "protocolMappers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakProtocolMapperDesiredStateDto"
-            }
-          }
-        }
-      },
-      "KeycloakClientScopeDesiredStateDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "protocol": {
-            "type": "string"
-          },
-          "realmRoleMappings": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "KeycloakClientSecretRotationRequestDto": {
-        "type": "object",
-        "properties": {
-          "clientId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "secretOwnershipMode": {
-            "type": "string"
-          },
-          "confirmApplicationManagedSecret": {
-            "type": "boolean"
-          },
-          "newClientSecret": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "bootstrapAdminUsername": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "bootstrapAdminPassword": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "KeycloakClientSecretRotationResultDto": {
         "type": "object",
         "properties": {
           "status": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "clientId": {
-            "type": "string"
-          },
-          "secretOwnershipMode": {
-            "type": "string"
-          },
-          "authSchemesReloaded": {
-            "type": "boolean"
-          },
-          "requiresRestart": {
-            "type": "boolean"
-          },
-          "operatorInstructions": {
-            "type": "string"
-          },
-          "operations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakRealmSyncOperationDto"
-            }
-          }
-        }
-      },
-      "KeycloakProtocolMapperDesiredStateDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "mapperType": {
-            "type": "string"
-          },
-          "includedClientAudience": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "addToAccessToken": {
-            "type": "boolean"
-          },
-          "addToIdToken": {
-            "type": "boolean"
-          }
-        }
-      },
-      "KeycloakRealmDesiredStateDto": {
-        "type": "object",
-        "properties": {
-          "realm": {
-            "type": "string"
-          },
-          "blazorClientId": {
-            "type": "string"
-          },
-          "apiClientId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "destructiveOperationsSupported": {
-            "type": "boolean"
-          },
-          "requiredRealmRoles": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "roleComposites": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakRoleCompositeDesiredStateDto"
-            }
-          },
-          "clientScopes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakClientScopeDesiredStateDto"
-            }
-          },
-          "clients": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakClientDesiredStateDto"
-            }
-          }
-        }
-      },
-      "KeycloakRealmDoctorCheckDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "remediation": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "KeycloakRealmDoctorRequestDto": {
-        "type": "object",
-        "properties": {
-          "useTemporaryAdminCredentials": {
-            "type": "boolean"
-          },
-          "bootstrapAdminUsername": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "bootstrapAdminPassword": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "apiClientId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "KeycloakRealmDoctorResultDto": {
-        "type": "object",
-        "properties": {
-          "overallStatus": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "realm": {
             "type": "string"
           },
           "authority": {
-            "type": "string"
-          },
-          "clientId": {
-            "type": "string"
-          },
-          "apiClientId": {
             "type": [
               "null",
               "string"
             ]
-          },
-          "checks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakRealmDoctorCheckDto"
-            }
-          }
-        }
-      },
-      "KeycloakRealmSyncApplyRequestDto": {
-        "type": "object",
-        "properties": {
-          "backupConfirmed": {
-            "type": "boolean"
-          },
-          "bootstrapAdminUsername": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "bootstrapAdminPassword": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "apiClientId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "blazorRedirectUris": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "blazorWebOrigins": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "KeycloakRealmSyncOperationDto": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "targetType": {
-            "type": "string"
-          },
-          "target": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "summary": {
-            "type": "string"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "changes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "requiresBackupBeforeApply": {
-            "type": "boolean"
-          }
-        }
-      },
-      "KeycloakRealmSyncPlanDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
           },
           "realm": {
-            "type": "string"
-          },
-          "authority": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "clientId": {
-            "type": "string"
-          },
-          "apiClientId": {
             "type": [
               "null",
               "string"
             ]
           },
-          "destructiveOperationsSupported": {
+          "available": {
             "type": "boolean"
           },
-          "requiresBackupBeforeApply": {
+          "credentialOwnership": {
+            "type": "string"
+          },
+          "credentialStatus": {
+            "type": "string"
+          },
+          "requiresCoordinatedRestart": {
             "type": "boolean"
           },
-          "desiredState": {
-            "$ref": "#/components/schemas/KeycloakRealmDesiredStateDto"
+          "operatorGuidance": {
+            "type": "string"
+          }
+        }
+      },
+      "KeycloakInspectionCredentials": {
+        "type": "object",
+        "properties": {
+          "administratorUsername": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
-          "operations": {
+          "administratorPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "KeycloakInspectionDto": {
+        "required": [
+          "status",
+          "reasonCode",
+          "authority",
+          "realm",
+          "clientId",
+          "findings"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authority": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "realm": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "findings": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/KeycloakRealmSyncOperationDto"
-            }
-          },
-          "diagnostics": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KeycloakRealmDoctorCheckDto"
+              "type": "string"
             }
           }
         }
       },
-      "KeycloakRealmSyncPreviewRequestDto": {
+      "KeycloakOperationCredentials": {
         "type": "object",
         "properties": {
-          "useTemporaryAdminCredentials": {
+          "administratorUsername": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "administratorPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "KeycloakOperationDto": {
+        "required": [
+          "id",
+          "state",
+          "digest",
+          "createdAtUtc",
+          "expiresAtUtc",
+          "settledAtUtc",
+          "isCancellationRequested",
+          "steps",
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settledAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isCancellationRequested": {
             "type": "boolean"
           },
-          "bootstrapAdminUsername": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "bootstrapAdminPassword": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "apiClientId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "blazorRedirectUris": {
+          "steps": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "blazorWebOrigins": {
+          "outcomes": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/KeycloakStepOutcomeDto"
             }
           }
         }
       },
-      "KeycloakRoleCompositeDesiredStateDto": {
+      "KeycloakOperationIntent": {
+        "type": "integer"
+      },
+      "KeycloakOperationPlanInput": {
         "type": "object",
         "properties": {
-          "roleName": {
+          "intent": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/KeycloakOperationIntent"
+              }
+            ]
+          },
+          "administratorUsername": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "administratorPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "KeycloakStepOutcomeDto": {
+        "required": [
+          "stepId",
+          "outcome",
+          "providerResourceId",
+          "observedFingerprint"
+        ],
+        "type": "object",
+        "properties": {
+          "stepId": {
             "type": "string"
           },
-          "compositeRoleNames": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "outcome": {
+            "type": "string"
+          },
+          "providerResourceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "observedFingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -184467,6 +184264,9 @@
     },
     {
       "name": "InstanceGovernanceSettings"
+    },
+    {
+      "name": "InstanceKeycloakOperations"
     },
     {
       "name": "InstanceMessagingSettings"

@@ -72,6 +72,95 @@ does not repair an existing realm or change issued tokens. Keep the existing API
 mapper and email-verification mapping. Do not add a hard-coded subject or mark an
 email verified to work around sign-in failures.
 
+## Safe Keycloak Connection And Inspection
+
+A correctly configured deployment connects with its existing runtime BFF
+credential. The application resolves the Keycloak endpoint, realm, client ID and
+client secret from the deployment's selected secret authority; it does not copy
+the secret into the application database or ask an administrator to re-enter it.
+If that authority is unavailable or unauthorized, repair the selected authority
+and restart the affected replicas rather than adding a fallback value.
+
+Basic discovery is read-only and needs no Keycloak administrator account.
+Advanced inspection is a separate request and requires credentials entered
+freshly in that form. Those credentials are used only for the foreground
+request and are not read from deployment configuration, retained as a session,
+or written to logs and support artifacts.
+
+For an existing realm, Event does not change realm settings, users, roles,
+shared client scopes, sessions, existing-client flow/type settings, or client
+secrets. It recognizes effective native and inherited subject/audience mappings
+without creating duplicates. Ordinary browser refresh does not require
+`offline_access`; missing offline-token policy is not treated as a launch
+failure. Unsupported prerequisites are shown as manual Keycloak steps.
+
+### Create-only provisioning and credential rotation
+
+Event can create a realm or client only when an advanced inspection proves the
+resource absent. You must explicitly choose **Create realm**, **Create clients**
+or **Repair client** and review the generated receipt before Apply. Existing
+realms and clients are never adopted, replaced or synchronized. Realm/client
+name races stop with a conflict, and an interrupted create remains **outcome
+unknown** until read-only reconciliation verifies the captured provider ID.
+
+For a new confidential BFF client, Event reads the runtime secret from the
+selected deployment authority and sends it directly to Keycloak for that
+one-time create. The API client is bearer-only and receives no secret. The
+browser never submits or receives the runtime client secret.
+
+Rotate an existing BFF client secret outside Event:
+
+1. Update Keycloak and the selected Infisical/environment secret together.
+2. Restart every affected API and BFF replica.
+3. Run connection and advanced inspection again.
+4. Complete a fresh user sign-in.
+
+Event does not rotate, persist, copy, retry or roll back provider credentials.
+The retired bootstrap, realm-sync and client-secret rotation routes have no
+compatibility aliases.
+
+Event never creates Keycloak users, passwords, MFA enrollment or realm roles.
+After provisioning an absent realm/client, create the first identity in
+Keycloak through the provider's native administration flow, then complete the
+Event setup flow to bind the platform administrator.
+
+Starting or restarting Event never reconciles an existing Keycloak realm. A
+new managed-local Keycloak database starts without the sample realm; provision
+absent resources through the same explicit inspection and receipt workflow.
+Do not delete or reimport an existing realm to apply Event configuration.
+
+### Approved operations and interrupted requests
+
+Before Event sends an approved Keycloak change, it stores a credential-free
+operation receipt. The receipt binds the exact instance, authority, realm,
+client targets, reviewed change digest and either the verified administrator who
+created it or the server-derived setup generation. It expires after 15 minutes;
+a changed target, approval, setup generation, or administrator cannot reuse it.
+
+The operator API has seven private, no-store routes under
+`/api/instance/keycloak`: connection, inspect, plans, receipt read, apply,
+reconcile, and cancel. Each request requires current setup or instance
+administrator authority. Inspect and apply prompt for administrator credentials
+only in the advanced form for that request. They are never saved in a browser
+session or receipt, and the receipt contains no credentials, tokens, or provider
+response body. These routes do not use generic idempotency response replay.
+
+The same operator panel appears during setup and in instance authentication
+settings. Buttons are shown only when the server includes the matching HAL
+affordance. Applying requires reviewing the receipt and typing the explicit
+confirmation phrase; credentials and confirmation are cleared after every
+attempt.
+
+If the response is lost, Event reports **outcome unknown** and blocks another
+operation for that realm. Do not click Apply again or repeat the change
+manually. Run read-only reconciliation first. Cancellation can prevent work
+that has not been sent; after transmission it records your request but cannot
+undo Keycloak. Event never automatically retries or rolls back a provider write.
+
+Back up the application database together with Keycloak before an approved
+change. Settled receipts are retained for at least 30 days. Unresolved receipts
+are retained until reconciliation and are never replayed automatically.
+
 ## Passwordless AT Protocol Onboarding
 
 1. Start first-run setup and choose **AT Protocol** as the primary provider.

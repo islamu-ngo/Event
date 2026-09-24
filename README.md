@@ -167,8 +167,12 @@ For Docker-only local development:
 ```bash
 cp .env.example .env
 docker compose config
-docker compose up -d postgres redis keycloak-db keycloak keycloak-init islamu-event-api islamu-event-ui
+docker compose up -d postgres redis keycloak-db keycloak islamu-event-api islamu-event-ui
 ```
+
+Bundled Keycloak starts without importing the repository sample realm. Use the
+setup-time operator panel to inspect and explicitly create absent realm/client
+resources.
 
 ### Contributor Onboarding Path
 1. Review our [Contribution Guidelines](CONTRIBUTING.md) and [Local Getting Started](docs/internal/GETTING_STARTED.md).

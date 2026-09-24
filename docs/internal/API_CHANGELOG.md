@@ -64,6 +64,48 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
   return 409. Responses are private/no-store and writes never replay generic
   idempotency responses. Activation does not publish resource metadata or content.
 
+## 2026-09-22
+
+- **Breaking: retired Keycloak startup reconciliation.**
+  AppHost and Docker Compose no longer launch `keycloak-init` or accept
+  callback/API-secret synchronization variables. They also no longer mount or
+  automatically import the sample realm. New and existing deployments use the
+  explicit, reviewed operator workflow; provider volumes and existing realms
+  remain untouched.
+
+- **Reviewed Keycloak operator experience.**
+  Initial setup and instance authentication settings now share one HAL-driven
+  operator panel for connection, inspection, planning, apply, reconciliation
+  and cancellation. The panel clears request credentials after every attempt,
+  requires explicit receipt confirmation before Apply, suppresses replay after
+  an ambiguous response, and gives step-level partial/unknown-outcome recovery
+  guidance.
+
+- **Breaking: create-only Keycloak provisioning and deployment-owned credentials.**
+  Legacy Keycloak bootstrap, realm-wide sync and application-managed secret
+  rotation routes are removed; runtime credentials remain deployment-owned.
+  `POST /api/instance/keycloak/plans` now requires a closed
+  `RepairClient`, `CreateClients` or `CreateRealm` intent. Creation is allowed
+  only for fresh, proven-absent resources; races and existing names conflict
+  without adoption. Inspection, apply and reconciliation use distinct
+  write-only credential inputs. The connection projection publishes value-free
+  deployment ownership and restart guidance, never a client secret.
+
+- **Breaking: reviewed Keycloak operator operations.**
+  Keycloak repairs use approved operation receipts instead of unrestricted bootstrap or sync requests.
+  The seven private, no-store routes are `GET /api/instance/keycloak/connection`,
+  `POST /api/instance/keycloak/inspect`, `POST /api/instance/keycloak/plans`,
+  `GET /api/instance/keycloak/operations/{id}`, and `POST`
+  `/api/instance/keycloak/operations/{id}/apply`, `/reconcile`, and `/cancel`.
+  Every request requires current setup or instance-administrator authority.
+  Receipts expire after 15 minutes and are bound to their verified administrator
+  creator or server-derived setup generation. Inspect and apply accept advanced
+  administrator credentials only for the submitted request; no receipt includes
+  credentials. Receipt reads remain private, reconciliation only inspects provider
+  state, and the service performs neither automatic mutating retry nor rollback.
+  These routes and their credential-bearing requests bypass generic idempotency
+  response storage, so a prior response cannot replay current authority.
+
 ## 2026-09-21
 
 - **Internal public-address establishment.** Setup has no URL field, confirmation

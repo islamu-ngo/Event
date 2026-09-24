@@ -2,6 +2,7 @@ namespace Explore.Infrastructure.Tests.Settings;
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Documents;
@@ -237,6 +238,7 @@ public sealed class TypedSettingsDocumentResolverTests : IDisposable
         services.AddSingleton<ITenantContext>(fixture);
         services.AddSingleton(fixture.MutationLock);
         services.AddScoped<IEmailDeliverySettingsWriter>(_ => fixture.Writer);
+        services.AddScoped<IEventResourceSettingsWriter>(_ => Substitute.For<IEventResourceSettingsWriter>());
         services.AddScoped<ITenantSettingsDocumentRepository>(_ => new TenantSettingsDocumentRepository(fixture.Context));
 
         services.ConfigureInfrastructureServices(configuration);

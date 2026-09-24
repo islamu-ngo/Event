@@ -88,9 +88,6 @@ public sealed class KeycloakTokenClient : IDisposable
     public Task<string> GetUserTokenAsync(CancellationToken cancellationToken = default)
         => GetAccessTokenAsync(username: "test-user", password: _userPasswords["test-user"], cancellationToken: cancellationToken);
 
-    public Task<string> GetUserTokenWithOfflineAccessAsync(CancellationToken cancellationToken = default)
-        => GetAccessTokenAsync(username: "test-user", password: _userPasswords["test-user"], scope: "openid profile email offline_access", cancellationToken: cancellationToken);
-
     /// <summary>
     /// Acquires the default test tenant admin token.
     /// </summary>

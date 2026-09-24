@@ -555,19 +555,18 @@ public static class InfrastructureServicesRegistration
         // Configuration audit logging
         services.AddScoped<IConfigurationChangeLogService, ConfigurationChangeLogService>();
         services.AddScoped<IAuthorizationProviderConfigurationService, AuthorizationProviderConfigurationService>();
-        services.Configure<KeycloakBootstrapOptions>(configuration.GetSection(KeycloakBootstrapOptions.SectionName));
-        services.AddHttpClient(KeycloakBootstrapService.HttpClientName, client =>
+        services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(45);
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.MaxResponseContentBufferSize = 1024 * 1024;
         })
-            .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
-        services.AddScoped<IKeycloakBootstrapService, KeycloakBootstrapService>();
+            .ConfigurePrimaryHttpMessageHandler(CreateKeycloakAdminHttpHandler);
         services.Configure<KeycloakLifecycleEmailOptions>(configuration.GetSection(KeycloakLifecycleEmailOptions.SectionName));
         services.AddHttpClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(45);
         })
-        .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
+        .ConfigurePrimaryHttpMessageHandler(CreateKeycloakAdminHttpHandler);
         services.AddScoped<IAccountAuthorityLifecycleEmailProvider, KeycloakAccountAuthorityLifecycleEmailService>();
         services.AddScoped<IAccountAuthorityLifecycleEmailProvider, LocalIdentityLifecycleEmailService>();
         services.AddScoped<ILocalIdentityLifecycleSmtpTransport, LocalIdentityLifecycleSmtpTransport>();
@@ -882,13 +881,15 @@ public static class InfrastructureServicesRegistration
         return providerId == AiProviderSettings.ProviderAzureOpenAi;
     }
 
-    private static SocketsHttpHandler CreateKeycloakBootstrapHttpHandler()
+    private static SocketsHttpHandler CreateKeycloakAdminHttpHandler()
     {
         // Keep bootstrap aligned with runtime OIDC backchannels: this deployment's Keycloak
         // host publishes AAAA records, but IPv6 is unreachable from some developer machines.
         // Forcing IPv4 avoids a 60s API request timeout while requesting the admin token.
         return new SocketsHttpHandler
         {
+            AllowAutoRedirect = false,
+            UseCookies = false,
             ConnectTimeout = TimeSpan.FromSeconds(10),
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
             PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),

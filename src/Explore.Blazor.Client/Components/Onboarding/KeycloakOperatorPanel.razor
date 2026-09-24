@@ -1,0 +1,790 @@
+@using Explore.Blazor.Client.Contracts.Services
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@using Explore.Blazor.Client.Services
+@inject ITranslationService TranslationService
+@inject IAccessibilityAnnouncerService AccessibilityAnnouncer
+
+<section class="keycloak-operator-panel"
+         aria-labelledby="@HeadingId"
+         data-testid="keycloak-operator-panel">
+    <MudPaper Outlined="true" Class="pa-4">
+        <MudStack Spacing="2">
+            <MudText Id="@HeadingId" Typo="Typo.h6" HtmlTag="h3">
+                @T("ui.keycloak.operator.heading", "Keycloak operator workflow")
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                @T(
+                    "ui.keycloak.operator.summary",
+                    "Inspect first, review a credential-free receipt, then apply only the exact HAL-authorized operation.")
+            </MudText>
+            <MudAlert Severity="Severity.Info"
+                      Dense="true"
+                      data-testid="keycloak-account-recovery-guidance">
+                @T(
+                    "ui.keycloak.operator.accountRecovery",
+                    "User and account recovery remains Keycloak-owned. Use the identity provider's account lifecycle tools; this workflow never changes users, passwords, roles, sessions, or recovery actions.")
+            </MudAlert>
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true"
+                                   aria-label="@T("ui.keycloak.operator.loading", "Loading Keycloak connection")" />
+            }
+            else if (_connection is not null)
+            {
+                <dl class="keycloak-operator-panel__facts"
+                    aria-label="@T("ui.keycloak.operator.connection", "Keycloak connection")">
+                    <div>
+                        <dt>@T("ui.keycloak.operator.status", "Status")</dt>
+                        <dd>@Display(_connection.Status)</dd>
+                    </div>
+                    <div>
+                        <dt>@T("ui.keycloak.operator.authority", "Authority")</dt>
+                        <dd>@Display(_connection.Authority)</dd>
+                    </div>
+                    <div>
+                        <dt>@T("ui.keycloak.operator.realm", "Realm")</dt>
+                        <dd>@Display(_connection.Realm)</dd>
+                    </div>
+                    <div>
+                        <dt>@T("ui.keycloak.operator.client", "BFF client")</dt>
+                        <dd>@Display(_connection.ClientId)</dd>
+                    </div>
+                    <div>
+                        <dt>@T("ui.keycloak.operator.credentialOwnership", "Credential ownership")</dt>
+                        <dd>@Display(_connection.CredentialOwnership)</dd>
+                    </div>
+                </dl>
+
+                @if (_connection.RequiresCoordinatedRestart)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        @T(
+                            "ui.keycloak.operator.rotationGuidance",
+                            "Rotate credentials in Keycloak and the selected deployment authority, restart affected replicas, reinspect, then verify a fresh sign-in.")
+                    </MudAlert>
+                }
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error"
+                          Dense="true"
+                          role="alert"
+                          data-testid="keycloak-operator-error">
+                    @_error
+                </MudAlert>
+            }
+
+            @if (CanInspect || CanPlan || CanApply || CanReconcile)
+            {
+                <fieldset class="keycloak-operator-panel__credentials">
+                    <legend>
+                        @T(
+                            "ui.keycloak.operator.credentials",
+                            "Fresh Keycloak administrator credentials")
+                    </legend>
+                    <MudTextField T="string"
+                                  Label="@T("ui.keycloak.operator.username", "Administrator username")"
+                                  Value="@_administratorUsername"
+                                  ValueChanged="UpdateAdministratorUsername"
+                                  Variant="Variant.Outlined"
+                                  autocomplete="username"
+                                  OnBlur="@(_ => ClearConfirmation())"
+                                  data-testid="keycloak-admin-username" />
+                    <MudTextField T="string"
+                                  Label="@T("ui.keycloak.operator.password", "Administrator password")"
+                                  Value="@_administratorPassword"
+                                  ValueChanged="UpdateAdministratorPassword"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password"
+                                  autocomplete="current-password"
+                                  OnBlur="@(_ => ClearConfirmation())"
+                                  data-testid="keycloak-admin-password" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @T(
+                            "ui.keycloak.operator.credentialsHelp",
+                            "Credentials are sent only for this foreground request and are cleared after every attempt.")
+                    </MudText>
+                </fieldset>
+            }
+
+            <MudStack Row="true" Spacing="1" Class="keycloak-operator-panel__actions">
+                @if (CanInspect)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Disabled="@(!HasCredentials || _busy)"
+                               OnClick="InspectAsync"
+                               data-testid="keycloak-inspect-action">
+                        @T("ui.keycloak.operator.inspect", "Inspect")
+                    </MudButton>
+                }
+                @if (HasLink(_connection, "self"))
+                {
+                    <MudButton Variant="Variant.Text"
+                               Disabled="@_busy"
+                               OnClick="LoadConnectionAsync"
+                               data-testid="keycloak-refresh-connection">
+                        @T("ui.keycloak.operator.refresh", "Refresh")
+                    </MudButton>
+                }
+            </MudStack>
+
+            @if (_inspection is not null)
+            {
+                <section aria-labelledby="@InspectionHeadingId"
+                         class="keycloak-operator-panel__inspection"
+                         data-testid="keycloak-inspection-result">
+                    <MudText Id="@InspectionHeadingId"
+                             Typo="Typo.subtitle1"
+                             HtmlTag="h4">
+                        @T("ui.keycloak.operator.inspectionHeading", "Inspection result")
+                    </MudText>
+                    <MudAlert Severity="@InspectionSeverity" Dense="true">
+                        @Display(_inspection.Status)
+                        @if (!string.IsNullOrWhiteSpace(_inspection.ReasonCode))
+                        {
+                            <span> (@_inspection.ReasonCode)</span>
+                        }
+                    </MudAlert>
+                    @if (_inspection.Findings.Count > 0)
+                    {
+                        <ul>
+                            @foreach (string finding in _inspection.Findings)
+                            {
+                                <li>@finding</li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+
+            @if (CanPlan)
+            {
+                <fieldset class="keycloak-operator-panel__plan">
+                    <legend>
+                        @T("ui.keycloak.operator.planLegend", "Reviewed operation intent")
+                    </legend>
+                    <MudSelect T="int?"
+                               Label="@T("ui.keycloak.operator.intent", "Operation intent")"
+                               Value="@_intent"
+                               ValueChanged="ChangeIntent"
+                               Variant="Variant.Outlined"
+                               data-testid="keycloak-operation-intent">
+                        <MudSelectItem T="int?" Value="@((int?)0)">
+                            @T("ui.keycloak.operator.repairClient", "Repair client mappers")
+                        </MudSelectItem>
+                        <MudSelectItem T="int?" Value="@((int?)1)">
+                            @T("ui.keycloak.operator.createClients", "Create absent clients")
+                        </MudSelectItem>
+                        <MudSelectItem T="int?" Value="@((int?)2)">
+                            @T("ui.keycloak.operator.createRealm", "Create absent realm and clients")
+                        </MudSelectItem>
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@(!HasCredentials || _busy || !_intent.HasValue)"
+                               OnClick="PlanAsync"
+                               data-testid="keycloak-plan-action">
+                        @T("ui.keycloak.operator.plan", "Create review receipt")
+                    </MudButton>
+                </fieldset>
+            }
+
+            @if (_operation is not null)
+            {
+                <section aria-labelledby="@ReceiptHeadingId"
+                         class="keycloak-operator-panel__receipt"
+                         data-testid="keycloak-operation-receipt">
+                    <MudText Id="@ReceiptHeadingId"
+                             Typo="Typo.subtitle1"
+                             HtmlTag="h4">
+                        @T("ui.keycloak.operator.receipt", "Operation receipt")
+                    </MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudChip T="string"
+                                 Color="@OperationSeverityColor"
+                                 Variant="Variant.Outlined">
+                            @_operation.State
+                        </MudChip>
+                        <MudText Typo="Typo.caption">
+                            @T("ui.keycloak.operator.expires", "Expires")
+                            @_operation.ExpiresAtUtc.ToLocalTime().ToString("g")
+                        </MudText>
+                    </MudStack>
+
+                    <ol class="keycloak-operator-panel__steps">
+                        @foreach (string step in _operation.Steps)
+                        {
+                            KeycloakStepOutcomeDto? outcome = OutcomeFor(step);
+                            <li>
+                                <span>@step</span>
+                                <strong>@(outcome?.Outcome ?? T("ui.keycloak.operator.pending", "Pending"))</strong>
+                                @if (outcome is not null)
+                                {
+                                    <small>@OutcomeGuidance(outcome)</small>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(outcome?.ProviderResourceId))
+                                {
+                                    <code>@outcome.ProviderResourceId</code>
+                                }
+                            </li>
+                        }
+                    </ol>
+
+                    @if (HasUnknownOutcome
+                        || _ambiguousApplyFailure)
+                    {
+                        <MudAlert Severity="Severity.Warning"
+                                  Dense="true"
+                                  data-testid="keycloak-outcome-unknown-guidance">
+                            @T(
+                                "ui.keycloak.operator.unknownGuidance",
+                                "The provider outcome is unknown. Do not apply again; enter fresh credentials and reconcile this receipt.")
+                        </MudAlert>
+                    }
+                    @if (IsPartiallyApplied)
+                    {
+                        <MudAlert Severity="Severity.Warning"
+                                  Dense="true"
+                                  data-testid="keycloak-partial-outcome-guidance">
+                            @T(
+                                "ui.keycloak.operator.partialGuidance",
+                                "Only part of the reviewed operation settled. Do not replay it. Review each step, reconcile unknown outcomes, then create a new plan only for remaining work.")
+                        </MudAlert>
+                    }
+
+                    @if (CanApply)
+                    {
+                        <MudTextField T="string"
+                                      Label="@T("ui.keycloak.operator.confirmation", "Type APPLY to confirm")"
+                                      Value="@_confirmation"
+                                      ValueChanged="UpdateConfirmation"
+                                      Variant="Variant.Outlined"
+                                      autocomplete="off"
+                                      data-testid="keycloak-apply-confirmation" />
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Warning"
+                                   Disabled="@(!CanSubmitApply)"
+                                   OnClick="ApplyAsync"
+                                   data-testid="keycloak-apply-action">
+                            @T("ui.keycloak.operator.apply", "Apply reviewed operation")
+                        </MudButton>
+                    }
+                    @if (CanReconcile)
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Warning"
+                                   Disabled="@(!HasCredentials || _busy)"
+                                   OnClick="ReconcileAsync"
+                                   data-testid="keycloak-reconcile-action">
+                            @T("ui.keycloak.operator.reconcile", "Reconcile outcome")
+                        </MudButton>
+                    }
+                    @if (CanCancel)
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Error"
+                                   Disabled="@_busy"
+                                   OnClick="CancelAsync"
+                                   data-testid="keycloak-cancel-action">
+                            @T("ui.keycloak.operator.cancel", "Cancel unsent work")
+                        </MudButton>
+                    }
+                    @if (HasLink(_operation, "self"))
+                    {
+                        <MudButton Variant="Variant.Text"
+                                   Disabled="@_busy"
+                                   OnClick="RefreshReceiptAsync"
+                                   data-testid="keycloak-refresh-receipt">
+                            @T("ui.keycloak.operator.refreshReceipt", "Refresh receipt")
+                        </MudButton>
+                    }
+                </section>
+            }
+        </MudStack>
+    </MudPaper>
+</section>
+
+@code {
+    private const string ApplyConfirmation = "APPLY";
+
+    [Parameter, EditorRequired]
+    public IInstanceOnboardingService Service { get; set; } = null!;
+
+    [Parameter]
+    public string HeadingId { get; set; } = "keycloak-operator-heading";
+
+    private string InspectionHeadingId => $"{HeadingId}-inspection";
+    private string ReceiptHeadingId => $"{HeadingId}-receipt";
+    private HalResourceOfKeycloakConnectionDto? _connection;
+    private HalResourceOfKeycloakInspectionDto? _inspection;
+    private HalResourceOfKeycloakOperationDto? _operation;
+    private string _administratorUsername = string.Empty;
+    private string _administratorPassword = string.Empty;
+    private string _confirmation = string.Empty;
+    private string? _error;
+    private int? _intent = 0;
+    private bool _loading = true;
+    private bool _busy;
+    private bool _ambiguousApplyFailure;
+
+    private bool HasCredentials =>
+        !string.IsNullOrWhiteSpace(_administratorUsername)
+        && !string.IsNullOrWhiteSpace(_administratorPassword);
+
+    private bool CanInspect => HasLink(_connection, "inspect");
+    private bool CanPlan => HasLink(_inspection, "plan");
+    private bool CanApply =>
+        !_ambiguousApplyFailure
+        && HasLink(_operation, "apply");
+    private bool CanReconcile => HasLink(_operation, "reconcile");
+    private bool CanCancel => HasLink(_operation, "cancel");
+    private bool CanSubmitApply =>
+        CanApply
+        && HasCredentials
+        && !_busy
+        && string.Equals(
+            _confirmation,
+            ApplyConfirmation,
+            StringComparison.Ordinal);
+
+    private bool HasUnknownOutcome =>
+        _operation?.Outcomes.Any(outcome =>
+            string.Equals(
+                outcome.Outcome,
+                "OutcomeUnknown",
+                StringComparison.OrdinalIgnoreCase)) == true;
+
+    private bool IsPartiallyApplied =>
+        string.Equals(
+            _operation?.State,
+            "PartiallyApplied",
+            StringComparison.OrdinalIgnoreCase);
+
+    private Severity InspectionSeverity =>
+        string.Equals(
+            _inspection?.Status,
+            "healthy",
+            StringComparison.OrdinalIgnoreCase)
+        || string.Equals(
+            _inspection?.Status,
+            "ready",
+            StringComparison.OrdinalIgnoreCase)
+            ? Severity.Success
+            : Severity.Warning;
+
+    private Color OperationSeverityColor =>
+        _operation?.State?.ToLowerInvariant() switch
+        {
+            "verified" =>
+                Color.Success,
+            "partiallyapplied"
+                or "outcomeunknown"
+                or "conflict"
+                or "expired" =>
+                Color.Warning,
+            "failedbeforewrite" => Color.Error,
+            "cancelled" => Color.Default,
+            _ => Color.Info
+        };
+
+    protected override Task OnInitializedAsync() =>
+        LoadConnectionAsync();
+
+    private async Task LoadConnectionAsync()
+    {
+        _loading = true;
+        _error = null;
+        ClearContext();
+        _connection = null;
+        try
+        {
+            _connection =
+                await Service.GetKeycloakConnectionAsync();
+        }
+        catch
+        {
+            await ReportFailureAsync(
+                T(
+                    "ui.keycloak.operator.connectionFailed",
+                    "Keycloak connection could not be loaded."));
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task InspectAsync()
+    {
+        if (!CanInspect || !HasCredentials || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _inspection = await Service.InspectKeycloakAsync(
+                CredentialsForInspection());
+            _operation = null;
+            _ambiguousApplyFailure = false;
+            ClearConfirmation();
+            await AccessibilityAnnouncer.AnnouncePoliteAsync(
+                T(
+                    "ui.keycloak.operator.inspectionComplete",
+                    "Keycloak inspection completed."));
+        }
+        catch
+        {
+            await ReportFailureAsync(
+                T(
+                    "ui.keycloak.operator.inspectionFailed",
+                    "Keycloak inspection failed. Re-enter credentials and retry."));
+        }
+        finally
+        {
+            ClearCredentials();
+            _busy = false;
+        }
+    }
+
+    private async Task PlanAsync()
+    {
+        if (!CanPlan || !HasCredentials || !_intent.HasValue || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _operation =
+                await Service.PlanKeycloakOperationAsync(new()
+                {
+                    Intent = _intent,
+                    AdministratorUsername =
+                        _administratorUsername,
+                    AdministratorPassword =
+                        _administratorPassword
+                });
+            _ambiguousApplyFailure = false;
+            ClearConfirmation();
+            await AccessibilityAnnouncer.AnnouncePoliteAsync(
+                T(
+                    "ui.keycloak.operator.planComplete",
+                    "Keycloak review receipt created."));
+        }
+        catch
+        {
+            await ReportFailureAsync(
+                T(
+                    "ui.keycloak.operator.planFailed",
+                    "Keycloak plan could not be created. Reinspect and retry."));
+        }
+        finally
+        {
+            ClearCredentials();
+            _busy = false;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (_operation is null || !CanSubmitApply)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _operation =
+                await Service.ApplyKeycloakOperationAsync(
+                    _operation.Id,
+                    CredentialsForOperation());
+            _ambiguousApplyFailure = false;
+            await AccessibilityAnnouncer.AnnouncePoliteAsync(
+                T(
+                    "ui.keycloak.operator.receiptUpdated",
+                    "Keycloak operation receipt updated."));
+        }
+        catch
+        {
+            _ambiguousApplyFailure = true;
+            bool receiptReloaded =
+                await TryReloadReceiptAsync();
+            await ReportFailureAsync(
+                receiptReloaded
+                    ? T(
+                        "ui.keycloak.operator.applyResponseLost",
+                        "The Apply response may have been lost. Do not apply again. Refresh or reconcile this receipt.")
+                    : T(
+                        "ui.keycloak.operator.applyResponseAndReceiptLost",
+                        "The Apply response may have been lost and the receipt could not be refreshed. Do not apply again; retry receipt refresh before taking further action."));
+        }
+        finally
+        {
+            ClearCredentials();
+            ClearConfirmation();
+            _busy = false;
+        }
+    }
+
+    private async Task ReconcileAsync()
+    {
+        if (_operation is null
+            || !CanReconcile
+            || !HasCredentials
+            || _busy)
+        {
+            return;
+        }
+
+        await ExecuteReceiptActionAsync(
+            credentials => Service.ReconcileKeycloakOperationAsync(
+                _operation.Id,
+                credentials),
+            T(
+                "ui.keycloak.operator.reconcileFailed",
+                "The provider outcome could not be reconciled."));
+    }
+
+    private async Task ExecuteReceiptActionAsync(
+        Func<KeycloakOperationCredentials, Task<HalResourceOfKeycloakOperationDto>> action,
+        string failure)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _operation = await action(CredentialsForOperation());
+            await AccessibilityAnnouncer.AnnouncePoliteAsync(
+                T(
+                    "ui.keycloak.operator.receiptUpdated",
+                    "Keycloak operation receipt updated."));
+        }
+        catch
+        {
+            await ReportFailureAsync(failure);
+        }
+        finally
+        {
+            ClearCredentials();
+            ClearConfirmation();
+            _busy = false;
+        }
+    }
+
+    private async Task CancelAsync()
+    {
+        if (_operation is null || !CanCancel || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _operation =
+                await Service.CancelKeycloakOperationAsync(
+                    _operation.Id);
+        }
+        catch
+        {
+            await ReportFailureAsync(
+                T(
+                    "ui.keycloak.operator.cancelFailed",
+                    "The operation could not be cancelled."));
+        }
+        finally
+        {
+            ClearCredentials();
+            ClearConfirmation();
+            _busy = false;
+        }
+    }
+
+    private async Task RefreshReceiptAsync()
+    {
+        if (_operation is null
+            || !HasLink(_operation, "self")
+            || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _operation =
+                await Service.GetKeycloakOperationAsync(
+                    _operation.Id);
+            if (!HasLink(_operation, "apply"))
+            {
+                _ambiguousApplyFailure = false;
+            }
+        }
+        catch
+        {
+            await ReportFailureAsync(
+                T(
+                    "ui.keycloak.operator.refreshReceiptFailed",
+                    "The operation receipt could not be refreshed."));
+        }
+        finally
+        {
+            ClearCredentials();
+            ClearConfirmation();
+            _busy = false;
+        }
+    }
+
+    private async Task<bool> TryReloadReceiptAsync()
+    {
+        if (_operation is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            _operation =
+                await Service.GetKeycloakOperationAsync(
+                    _operation.Id);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private KeycloakInspectionCredentials CredentialsForInspection() =>
+        new()
+        {
+            AdministratorUsername = _administratorUsername,
+            AdministratorPassword = _administratorPassword
+        };
+
+    private KeycloakOperationCredentials CredentialsForOperation() =>
+        new()
+        {
+            AdministratorUsername = _administratorUsername,
+            AdministratorPassword = _administratorPassword
+        };
+
+    private void UpdateAdministratorUsername(string? value)
+    {
+        _administratorUsername = value ?? string.Empty;
+        ClearConfirmation();
+    }
+
+    private void UpdateAdministratorPassword(string? value)
+    {
+        _administratorPassword = value ?? string.Empty;
+        ClearConfirmation();
+    }
+
+    private void UpdateConfirmation(string? value) =>
+        _confirmation = value ?? string.Empty;
+
+    private void ChangeIntent(int? value)
+    {
+        _intent = value;
+        _operation = null;
+        _ambiguousApplyFailure = false;
+        ClearConfirmation();
+    }
+
+    private void ClearContext()
+    {
+        _inspection = null;
+        _operation = null;
+        ClearCredentials();
+        ClearConfirmation();
+    }
+
+    private void ClearCredentials()
+    {
+        _administratorUsername = string.Empty;
+        _administratorPassword = string.Empty;
+    }
+
+    private void ClearConfirmation() =>
+        _confirmation = string.Empty;
+
+    private async Task ReportFailureAsync(string message)
+    {
+        _error = message;
+        await AccessibilityAnnouncer.AnnounceAssertiveAsync(
+            message);
+    }
+
+    private KeycloakStepOutcomeDto? OutcomeFor(string step) =>
+        _operation?.Outcomes.FirstOrDefault(outcome =>
+            string.Equals(
+                outcome.StepId,
+                step,
+                StringComparison.Ordinal));
+
+    private string OutcomeGuidance(
+        KeycloakStepOutcomeDto outcome) =>
+        outcome.Outcome?.ToLowerInvariant() switch
+        {
+            "outcomeunknown" =>
+                T(
+                    "ui.keycloak.operator.outcomeUnknown",
+                    "Do not apply again. Reconcile with fresh credentials."),
+            "conflict" =>
+                T(
+                    "ui.keycloak.operator.outcomeConflict",
+                    "The provider no longer matches the approved precondition. Inspect and create a new plan."),
+            "failedbeforewrite" =>
+                T(
+                    "ui.keycloak.operator.outcomeFailedBeforeWrite",
+                    "No provider write was accepted. Correct the cause, inspect, and create a new plan."),
+            "skippedcancelled" =>
+                T(
+                    "ui.keycloak.operator.outcomeCancelled",
+                    "This step was not sent because cancellation was requested."),
+            "applied" or "verified" or "nochange" =>
+                T(
+                    "ui.keycloak.operator.outcomeVerified",
+                    "This step has a settled provider outcome."),
+            _ =>
+                T(
+                    "ui.keycloak.operator.outcomeRecorded",
+                    "This provider outcome is recorded in the receipt.")
+        };
+
+    private static bool HasLink(
+        HalResourceOfKeycloakConnectionDto? resource,
+        string relation) =>
+        resource?._links?.ContainsKey(relation) == true;
+
+    private static bool HasLink(
+        HalResourceOfKeycloakInspectionDto? resource,
+        string relation) =>
+        resource?._links?.ContainsKey(relation) == true;
+
+    private static bool HasLink(
+        HalResourceOfKeycloakOperationDto? resource,
+        string relation) =>
+        resource?._links?.ContainsKey(relation) == true;
+
+    private string T(string key, string fallback) =>
+        TranslationService.T(key, fallback);
+
+    private string Display(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? T("ui.keycloak.operator.notAvailable", "Not available")
+            : value;
+}

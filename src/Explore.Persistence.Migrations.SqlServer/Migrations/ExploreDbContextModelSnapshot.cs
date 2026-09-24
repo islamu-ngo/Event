@@ -16322,6 +16322,96 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.ToTable("integration_sync_outbox", "islamu_event");
                 });
 
+            modelBuilder.Entity("Explore.Domain.Keycloak.KeycloakOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("ChangeSet")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("change_set");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("digest");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<bool>("IsCancellationRequested")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_cancellation_requested");
+
+                    b.Property<DateTimeOffset?>("SettledAtUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("settled_at_utc");
+
+                    b.Property<long?>("SettledAtUtcTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settled_at_utc_ticks");
+
+                    b.Property<long>("SetupGeneration")
+                        .HasColumnType("bigint")
+                        .HasColumnName("setup_generation");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StepOutcomes")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("step_outcomes");
+
+                    b.HasKey("Id")
+                        .HasName("pk_keycloak_operation_receipts");
+
+                    b.HasIndex("SettledAtUtcTicks")
+                        .HasDatabaseName("ix_keycloakoperationreceipts_settled_at_utc_ticks");
+
+                    b.HasIndex("State")
+                        .HasDatabaseName("ix_keycloakoperationreceipts_state");
+
+                    b.ToTable("KeycloakOperationReceipts", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_Expiry", "expires_at_utc > created_at_utc")
+                                .HasName("ck_keycloakoperationreceipts_expiry");
+
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_Settlement", "((state IN ('Previewed','Applying','OutcomeUnknown') AND settled_at_utc IS NULL AND settled_at_utc_ticks IS NULL) OR (state NOT IN ('Previewed','Applying','OutcomeUnknown') AND settled_at_utc IS NOT NULL AND settled_at_utc_ticks IS NOT NULL))")
+                                .HasName("ck_keycloakoperationreceipts_settlement");
+
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_SetupGeneration", "setup_generation > 0")
+                                .HasName("ck_keycloakoperationreceipts_setupgeneration");
+
+                            t.HasCheckConstraint("CK_KeycloakOperationReceipts_State", "state IN ('Previewed','Applying','Verified','PartiallyApplied','OutcomeUnknown','Conflict','FailedBeforeWrite','Cancelled','Expired')")
+                                .HasName("ck_keycloakoperationreceipts_state");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.Language", b =>
                 {
                     b.Property<int>("Id")
@@ -41912,6 +42002,58 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Explore.Domain.Keycloak.KeycloakOperation", b =>
+                {
+                    b.OwnsOne("Explore.Domain.Keycloak.KeycloakTarget", "Target", b1 =>
+                        {
+                            b1.Property<Guid>("KeycloakOperationId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Authority")
+                                .IsRequired()
+                                .HasMaxLength(2048)
+                                .HasColumnType("nvarchar(2048)")
+                                .HasColumnName("target_authority");
+
+                            b1.Property<string>("AuthorityKey")
+                                .IsRequired()
+                                .HasMaxLength(64)
+                                .HasColumnType("nvarchar(64)")
+                                .HasColumnName("target_authority_key");
+
+                            b1.Property<string>("Client")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("target_client");
+
+                            b1.Property<Guid>("InstanceId")
+                                .HasColumnType("uniqueidentifier")
+                                .HasColumnName("target_instance_id");
+
+                            b1.Property<string>("Realm")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("nvarchar(256)")
+                                .HasColumnName("target_realm");
+
+                            b1.HasKey("KeycloakOperationId");
+
+                            b1.HasIndex("InstanceId", "AuthorityKey", "Realm")
+                                .HasDatabaseName("ix_keycloakoperationreceipts_target_instance_id_target_authority_key_target_realm");
+
+                            b1.ToTable("KeycloakOperationReceipts", "islamu_event");
+
+                            b1.WithOwner()
+                                .HasForeignKey("KeycloakOperationId")
+                                .HasConstraintName("fk_keycloakoperationreceipts_keycloakoperationreceipts_id");
+                        });
+
+                    b.Navigation("Target")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Explore.Domain.LegalDocumentLocalizedSource", b =>

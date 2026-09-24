@@ -132,10 +132,16 @@ Use Compose when you want the self-hosting topology locally:
 ```bash
 cp .env.example .env
 docker compose config
-docker compose up -d postgres redis mailpit keycloak-db keycloak keycloak-init
+docker compose up -d postgres redis mailpit keycloak-db keycloak
 docker compose run --rm event-migrationservice
 docker compose up -d islamu-event-api islamu-event-ui
 ```
+
+Keycloak starts without importing the repository sample realm. During setup,
+configure deployment-owned runtime values, open the advanced operator panel,
+inspect with fresh Keycloak administrator credentials, and explicitly create
+an absent realm/clients if needed. Existing realms are never reconciled at
+startup.
 
 The repository Compose default is PostgreSQL. For SQLite, SQL Server, MariaDB,
 or MySQL, set the structured `DATABASE_*` fields described in

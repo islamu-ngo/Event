@@ -8207,3 +8207,36 @@ Ref: "admission_targets".("tenant_id", "event_id") > "events".("tenant_id", "id"
 Ref: "admission_targets".("tenant_id", "event_id", "event_day_id") > "event_days".("tenant_id", "event_id", "id") [delete: restrict]
 Ref: "admission_targets".("tenant_id", "event_id", "event_session_id") > "event_sessions".("tenant_id", "event_id", "id") [delete: restrict]
 Ref: "event_resource_audit_entries".("tenant_id", "event_resource_id") > "event_resources".("tenant_id", "id") [delete: restrict]
+
+// ============================================================
+// Keycloak Operator Safety Receipts
+// ============================================================
+
+Table "KeycloakOperationReceipts" {
+  "id" uuid [pk, not null, note: 'Application-generated UUIDv7 operation identity.']
+  "change_set" varchar(4096) [not null, note: 'Typed application-owned JSON containing only allowlisted step projections, target identifiers, preconditions and fingerprints.']
+  "target_instance_id" uuid [not null]
+  "target_authority" varchar(2048) [not null]
+  "target_authority_key" varchar(64) [not null, note: 'SHA-256 lookup/coordination key derived from the canonical authority.']
+  "target_realm" varchar(256) [not null]
+  "target_client" varchar(256) [not null]
+  "actor" varchar(256) [not null, note: 'Opaque actor/setup authority binding; never a credential.']
+  "setup_generation" bigint [not null]
+  "digest" varchar(128) [not null]
+  "created_at_utc" timestamptz [not null]
+  "expires_at_utc" timestamptz [not null]
+  "settled_at_utc" timestamptz
+  "settled_at_utc_ticks" bigint [note: 'Provider-portable retention ordering projection.']
+  "concurrency_stamp" uuid [not null]
+  "state" varchar(32) [not null]
+  "is_cancellation_requested" boolean [not null]
+  "step_outcomes" varchar(8192) [not null, note: 'Typed application-owned JSON containing ordered nonsecret recovery outcomes and fingerprints.']
+
+  indexes {
+    (target_instance_id, target_authority_key, target_realm) [name: 'ix_keycloakoperationreceipts_target_instance_authority_realm']
+    settled_at_utc_ticks [name: 'ix_keycloakoperationreceipts_settled_at_utc_ticks']
+    state [name: 'ix_keycloakoperationreceipts_state']
+  }
+
+  Note: 'Intent-before-send receipt. Applying and OutcomeUnknown are unresolved and never auto-replay or age into deletion. Settled receipts become retention-eligible after 30 days.'
+}

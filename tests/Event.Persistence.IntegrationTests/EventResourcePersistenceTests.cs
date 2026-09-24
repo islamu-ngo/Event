@@ -116,10 +116,23 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
         var staleRepository = new EventResourceRepository(staleContext);
         EventResource first = (await firstRepository.GetByIdForUpdateAsync(scope.TenantAId, scope.EventAId, resourceId, default))!;
         EventResource stale = (await staleRepository.GetByIdForUpdateAsync(scope.TenantAId, scope.EventAId, resourceId, default))!;
+        Guid resourceVersion = first.ConcurrencyStamp;
+        await using (ExploreDbContext unrelated = database.CreateContext())
+        {
+            DomainEvent sibling = await unrelated.Events.SingleAsync(item => item.Id == scope.EventCId);
+            sibling.Description = "Independent event edit";
+            await unrelated.SaveChangesAsync();
+        }
+        await Assert.That(first.ConcurrencyStamp).IsEqualTo(resourceVersion);
         first.UpdateMetadata(Metadata("First"), first.ConcurrencyStamp, scope.ActorId, UtcNow.AddMinutes(1));
         await firstContext.SaveChangesAsync();
         stale.UpdateMetadata(Metadata("Stale"), stale.ConcurrencyStamp, scope.ActorId, UtcNow.AddMinutes(2));
         await Assert.That(() => staleContext.SaveChangesAsync()).Throws<DbUpdateConcurrencyException>();
+        await using ExploreDbContext verify = database.CreateContext();
+        await Assert.That((await verify.EventResources.AsNoTracking().SingleAsync(item => item.Id == resourceId)).Title)
+            .IsEqualTo("First");
+        await Assert.That((await verify.Events.AsNoTracking().SingleAsync(item => item.Id == scope.EventCId)).Description)
+            .IsEqualTo("Independent event edit");
     }
 
     [Test]

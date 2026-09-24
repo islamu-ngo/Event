@@ -40,7 +40,6 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
             Substitute.For<ICommandHandler<SaveInstanceOnboardingProfileCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<ICommandHandler<CompleteInstanceOnboardingCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<ICommandHandler<CompleteLocalInstanceOnboardingCommand, BaseCommandResponse<Guid>>>(),
-            Substitute.For<ICommandHandler<BootstrapKeycloakRealmCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<ICommandHandler<SyncAuthorizationPolicyPackageCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<ICommandHandler<VerifyCerbosEndpointCommand, BaseCommandResponse<Guid>>>(),
             scope.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>(),

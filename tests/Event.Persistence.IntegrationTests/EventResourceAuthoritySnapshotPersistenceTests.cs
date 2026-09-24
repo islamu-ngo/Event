@@ -130,6 +130,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         Guid userId;
         Guid checkedTicketId;
         Guid checkedEligibilityId;
+        Guid firstEligibilityId;
         Guid resourceId = Guid.CreateVersion7();
         EventResource resource;
         await using (var seed = database.CreateContext())
@@ -145,6 +146,10 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
             parent.VisibilityTypeId = (int)VisibilityTypeEnum.Public;
+            var session = await seed.EventSessions.SingleAsync(value => value.Id == scope.SessionAId);
+            session.StartTime = new DateTimeOffset(Now.AddMinutes(-5));
+            session.EndTime = new DateTimeOffset(Now.AddHours(1));
+            session.Publish(EventStatusEnum.Published, Now);
             var catalog = await seed.EventTicketCatalogVersions.Include(value => value.TicketTypes)
                 .SingleAsync(value => value.Id == scope.CatalogAId);
             var type = catalog.TicketTypes.Single(value => value.Id == scope.TicketTypeAId);
@@ -179,6 +184,7 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
                 scope.TenantAId, scope.EventAId, assignments[index], participant, false, false, Now)).ToArray();
             eligibility[0].RecordSubjectCompletion(participants[0], userId, null, Now, Guid.CreateVersion7());
             eligibility[0].Approve(scope.ActorId, Now, Guid.CreateVersion7());
+            firstEligibilityId = eligibility[0].Id;
             checkedTicketId = tickets[1].Id;
             checkedEligibilityId = eligibility[1].Id;
 
@@ -206,6 +212,16 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             seed.AddRange(order, policy, checkIn.Event!, checkIn.NextState, resource);
             seed.AddRange(tickets);
             seed.AddRange(eligibility);
+            seed.EventRegistrations.AddRange(participants.Select(participant => new EventRegistration
+            {
+                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
+                EventId = scope.EventAId, Event = parent,
+                EventSessionId = scope.SessionAId, EventSession = session,
+                LinkedUserId = userId, RegistrationOrderId = order.Id,
+                RegistrationOrderLineId = line.Id,
+                RegistrationParticipantId = participant.Id, RegistrationParticipant = participant,
+                CoverageEstablishedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+            }));
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
@@ -241,6 +257,51 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
         }
         var reversed = (await reader.ReadAsync(request, new(Now), default))!;
         await Assert.That(EventResourceAccessRules.Evaluate(resource, reversed.Access, new(Now)).DisclosePrivateMetadata).IsFalse();
+
+        await using (var writer = database.CreateContext())
+        {
+            var current = await writer.EventResources.Include(value => value.AudienceRules)
+                .SingleAsync(value => value.Id == resourceId);
+            current.ReplacePolicy(EventResourceAvailability.Create(),
+                [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, resourceId,
+                    EventResourceAudienceKindEnum.SessionRegistrant, sessionId: scope.SessionAId,
+                    requireApproval: true, requireCompletion: true)],
+                current.ConcurrencyStamp, userId, Now);
+            await writer.SaveChangesAsync();
+            await writer.ParticipantAdmissionEligibilities.Where(value => value.Id == firstEligibilityId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.RequirementsCompletedAt, (DateTime?)null));
+        }
+        await using var currentContext = database.CreateContext();
+        var registrant = await currentContext.EventResources.Include(value => value.AudienceRules)
+            .SingleAsync(value => value.Id == resourceId);
+        var split = (await reader.ReadAsync(request, new(Now), default))!;
+        var splitRows = split.Access.Audience.Where(value =>
+            value.Kind == EventResourceAudienceKindEnum.SessionRegistrant).ToArray();
+        await Assert.That(splitRows.Length).IsEqualTo(2);
+        await Assert.That(splitRows.Count(value => value.ApprovedSubjectUserId == userId
+            && value.CompletedSubjectUserId is null)).IsEqualTo(1);
+        await Assert.That(splitRows.Count(value => value.CompletedSubjectUserId == userId
+            && value.ApprovedSubjectUserId is null)).IsEqualTo(1);
+        await Assert.That(EventResourceAccessRules.Evaluate(registrant, split.Access, new(Now)).DisclosePrivateMetadata).IsFalse();
+
+        await using (var writer = database.CreateContext())
+            await writer.ParticipantAdmissionEligibilities.Where(value => value.Id == firstEligibilityId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.RequirementsCompletedAt, (DateTime?)Now));
+        var united = (await reader.ReadAsync(request, new(Now), default))!;
+        await Assert.That(EventResourceAccessRules.Evaluate(registrant, united.Access, new(Now)).DisclosePrivateMetadata).IsTrue();
+        await using (var writer = database.CreateContext())
+            await writer.ParticipantAdmissionEligibilities.Where(value => value.Id == firstEligibilityId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ApprovedAt, (DateTime?)null)
+                    .SetProperty(value => value.ApprovedByActorId, (Guid?)null));
+        var approvalRevoked = (await reader.ReadAsync(request, new(Now), default))!;
+        await Assert.That(EventResourceAccessRules.Evaluate(registrant, approvalRevoked.Access, new(Now)).DisclosePrivateMetadata).IsFalse();
+        await using (var writer = database.CreateContext())
+            await writer.ParticipantAdmissionEligibilities.Where(value => value.Id == firstEligibilityId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.ApprovedAt, (DateTime?)Now)
+                    .SetProperty(value => value.ApprovedByActorId, (Guid?)scope.ActorId)
+                    .SetProperty(value => value.RequirementsCompletedAt, (DateTime?)null));
+        var completionRevoked = (await reader.ReadAsync(request, new(Now), default))!;
+        await Assert.That(EventResourceAccessRules.Evaluate(registrant, completionRevoked.Access, new(Now)).DisclosePrivateMetadata).IsFalse();
     }
 
     [Test]

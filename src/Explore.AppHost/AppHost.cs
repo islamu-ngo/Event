@@ -80,8 +80,6 @@ var appHostConfigRoot = Path.Combine(repositoryRoot, "src", "Explore.AppHost", "
 var cerbosPolicyPackagePath = Path.Combine(repositoryRoot, "cerbos", "policies");
 var cerbosConfigPath = Path.Combine(repositoryRoot, "cerbos", "config", ".cerbos.yaml");
 var cerbosSchemaPath = Path.Combine(repositoryRoot, "cerbos", "init", "cerbos-schema.sql");
-var keycloakRealmExportPath = Path.Combine(repositoryRoot, "docker", "keycloak", "realm-export.json");
-var keycloakInitScriptPath = Path.Combine(repositoryRoot, "docker", "keycloak", "keycloak-init.sh");
 var coopNginxConfigPath = Path.Combine(appHostConfigRoot, "coop", "nginx.conf");
 var localStorageRootPath = Path.Combine(repositoryRoot, "storage-data", "aspire-local");
 var embeddedPrivacyErasureAuthorityPath = Path.Combine(
@@ -155,9 +153,6 @@ if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
         cerbosConfigPath,
         cerbosPolicyPackagePath,
         cerbosSchemaPath,
-        keycloakRealmExportPath,
-        keycloakInitScriptPath,
-        mailpit,
         coopNginxConfigPath,
         prometheusConfigPath,
         admissionCheckInAlertRulesPath,
@@ -400,17 +395,6 @@ if (hostingTopology == HostingTopology.Split)
             "60"))
         .WithEnvironment("Storage__Local__RootPath", localStorageRootPath);
 
-    if (localPlatformResources is not null)
-    {
-        localPlatformResources = localPlatformResources with
-        {
-            KeycloakInit = ConfigureLocalKeycloakCallbacks(
-                localPlatformResources.KeycloakInit,
-                exploreBlazor,
-                builder.Configuration)
-        };
-    }
-
     exploreBlazor = exploreBlazor
         .WithReference(migrations)
         .WaitForCompletion(migrations);
@@ -556,14 +540,6 @@ else
 
     if (localPlatformResources is not null)
     {
-        localPlatformResources = localPlatformResources with
-        {
-            KeycloakInit = ConfigureLocalKeycloakCallbacks(
-                localPlatformResources.KeycloakInit,
-                eventStandalone,
-                builder.Configuration)
-        };
-
         eventStandalone = ConfigureLocalPlatformApi(
                 eventStandalone,
                 localPlatformResources,
@@ -589,9 +565,6 @@ static LocalPlatformResources AddLocalPlatform(
     string cerbosConfigPath,
     string cerbosPolicyPackagePath,
     string cerbosSchemaPath,
-    string keycloakRealmExportPath,
-    string keycloakInitScriptPath,
-    IResourceBuilder<ContainerResource> mailpit,
     string coopNginxConfigPath,
     string prometheusConfigPath,
     string admissionCheckInAlertRulesPath,
@@ -628,7 +601,6 @@ static LocalPlatformResources AddLocalPlatform(
     var keycloak = builder.AddContainer("keycloak", "quay.io/phasetwo/phasetwo-keycloak", "26")
         .WithArgs(
             "start",
-            "--import-realm",
             "--verbose",
             "--spi-email-template-provider=freemarker-plus-mustache",
             "--spi-email-template-freemarker-plus-mustache-enabled=true",
@@ -655,32 +627,10 @@ static LocalPlatformResources AddLocalPlatform(
         .WithEnvironment("KC_METRICS_ENABLED", "true")
         .WithEnvironment("KC_LOG_LEVEL", "INFO,io.phasetwo:DEBUG")
         .WithVolume("islamu-event-keycloak-data", "/opt/keycloak/data")
-        .WithBindMount(keycloakRealmExportPath, "/opt/keycloak/data/import/realm-export.json", isReadOnly: true)
         .WithHttpEndpoint(targetPort: 8080, port: 8080, name: "http")
         .WithHttpEndpoint(targetPort: 9000, port: 9000, name: "mgmt")
         .WithHttpHealthCheck("/auth/health/ready", endpointName: "mgmt")
         .WaitFor(crdb);
-
-    var keycloakInit = builder.AddContainer("keycloak-init", "quay.io/phasetwo/phasetwo-keycloak", "26")
-        .WithEntrypoint("/bin/bash")
-        .WithArgs("/opt/keycloak/bin/keycloak-init.sh")
-        .WithEnvironment("KEYCLOAK_INTERNAL_URL", BuildHttpUri("keycloak", 8080, "/auth"))
-        .WithEnvironment("KEYCLOAK_REALM", configuration["KEYCLOAK_REALM"] ?? "ISLAMU")
-        .WithEnvironment("KEYCLOAK_ADMIN", configuration["KEYCLOAK_ADMIN"] ?? string.Empty)
-        .WithEnvironment("KEYCLOAK_ADMIN_PASSWORD", configuration["KEYCLOAK_ADMIN_PASSWORD"] ?? string.Empty)
-        .WithEnvironment("KEYCLOAK_BLAZOR_CLIENT_ID", configuration["KEYCLOAK_BLAZOR_CLIENT_ID"] ?? "islamu-event-blazor")
-        .WithEnvironment("KEYCLOAK_BLAZOR_CLIENT_SECRET", keycloakBlazorClientSecret)
-        .WithEnvironment("KEYCLOAK_API_CLIENT_ID", configuration["KEYCLOAK_API_CLIENT_ID"] ?? "islamu-event-api")
-        .WithEnvironment("KEYCLOAK_SMTP_HOST", "mailpit")
-        .WithEnvironment("KEYCLOAK_SMTP_PORT", "1025")
-        .WithEnvironment("KEYCLOAK_SMTP_FROM", configuration["KEYCLOAK_SMTP_FROM"] ?? "noreply@openislamu.org")
-        .WithEnvironment("KEYCLOAK_SMTP_FROM_DISPLAY_NAME", configuration["KEYCLOAK_SMTP_FROM_DISPLAY_NAME"] ?? "ISLAMU Event Dev")
-        .WithEnvironment("KEYCLOAK_SMTP_AUTH", configuration["KEYCLOAK_SMTP_AUTH"] ?? "false")
-        .WithEnvironment("KEYCLOAK_SMTP_SSL", configuration["KEYCLOAK_SMTP_SSL"] ?? "false")
-        .WithEnvironment("KEYCLOAK_SMTP_STARTTLS", configuration["KEYCLOAK_SMTP_STARTTLS"] ?? "false")
-        .WithBindMount(keycloakInitScriptPath, "/opt/keycloak/bin/keycloak-init.sh", isReadOnly: true)
-        .WaitFor(keycloak)
-        .WaitFor(mailpit);
 
     var cerbosDb = builder.AddContainer("cerbos-db", "postgres", "18-alpine")
         .WithEnvironment("POSTGRES_USER", cerbosPostgresUser)
@@ -968,7 +918,6 @@ static LocalPlatformResources AddLocalPlatform(
 
     return new LocalPlatformResources(
         Keycloak: keycloak,
-        KeycloakInit: keycloakInit,
         KeycloakBlazorClientSecret: keycloakBlazorClientSecret,
         Cerbos: cerbos,
         Minio: minio,
@@ -1218,10 +1167,13 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
         .WithEnvironment("Keycloak__Authority", keycloakAuthority)
         .WithEnvironment("Keycloak__MetadataAddress", keycloakMetadataAddress)
         .WithEnvironment("Keycloak__RequireHttpsMetadata", "false")
+        .WithEnvironment("Keycloak__AllowManagedLocalHttp", "true")
+        .WithEnvironment(
+            "Keycloak__ManagedLocalHttpOrigin",
+            keycloakBaseUrl)
         .WithEnvironment("Keycloak__Audience", keycloakApiClientId)
         .WithEnvironment("Keycloak__ValidAudiences__0", keycloakApiClientId)
         .WithEnvironment("Keycloak__ValidAudiences__1", keycloakBlazorClientId)
-        .WithEnvironment("KeycloakBootstrap__AllowLocalUrls", "true")
         .WithEnvironment("AUTHORIZATION_PROVIDER", authorizationProvider)
         .WithEnvironment("Cerbos__GrpcEndpoint", cerbosGrpcEndpoint)
         .WithEnvironment("CERBOS_GRPC_ENDPOINT", cerbosGrpcEndpoint)
@@ -1277,7 +1229,6 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformApi(
 
     api = api
         .WaitFor(resources.Cerbos)
-        .WaitForCompletion(resources.KeycloakInit)
         .WaitForCompletion(resources.MinioBootstrap);
 
     if (resources.Svix is not null)
@@ -1323,42 +1274,7 @@ static IResourceBuilder<ProjectResource> ConfigureLocalPlatformBlazor(
         .WithEnvironment("Keycloak__ClientId", keycloakClientId)
         .WithEnvironment("Keycloak__ClientSecret", resources.KeycloakBlazorClientSecret)
         .WithEnvironment("Keycloak__RequireHttpsMetadata", "false")
-        .WaitFor(resources.Keycloak)
-        .WaitForCompletion(resources.KeycloakInit);
-}
-
-static IResourceBuilder<ContainerResource> ConfigureLocalKeycloakCallbacks(
-    IResourceBuilder<ContainerResource> keycloakInit,
-    IResourceBuilder<ProjectResource> exploreBlazor,
-    IConfiguration configuration)
-{
-    var httpPort = exploreBlazor
-        .GetEndpoint("http", KnownNetworkIdentifiers.LocalhostNetwork)
-        .Property(EndpointProperty.Port);
-    var httpsPort = exploreBlazor
-        .GetEndpoint("https", KnownNetworkIdentifiers.LocalhostNetwork)
-        .Property(EndpointProperty.Port);
-
-    var redirectUris = configuration["KEYCLOAK_BLAZOR_REDIRECT_URIS"];
-    keycloakInit = string.IsNullOrWhiteSpace(redirectUris)
-        ? keycloakInit.WithEnvironment(
-            "KEYCLOAK_BLAZOR_REDIRECT_URIS",
-            ReferenceExpression.Create($"[\"http://localhost:{httpPort}/signin-oidc\",\"http://admin.localhost:{httpPort}/signin-oidc\",\"https://localhost:{httpsPort}/signin-oidc\",\"https://admin.localhost:{httpsPort}/signin-oidc\"]"))
-        : keycloakInit.WithEnvironment("KEYCLOAK_BLAZOR_REDIRECT_URIS", redirectUris);
-
-    var webOrigins = configuration["KEYCLOAK_BLAZOR_WEB_ORIGINS"];
-    keycloakInit = string.IsNullOrWhiteSpace(webOrigins)
-        ? keycloakInit.WithEnvironment(
-            "KEYCLOAK_BLAZOR_WEB_ORIGINS",
-            ReferenceExpression.Create($"[\"http://localhost:{httpPort}\",\"http://admin.localhost:{httpPort}\",\"https://localhost:{httpsPort}\",\"https://admin.localhost:{httpsPort}\"]"))
-        : keycloakInit.WithEnvironment("KEYCLOAK_BLAZOR_WEB_ORIGINS", webOrigins);
-
-    var logoutRedirectUris = configuration["KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS"];
-    return string.IsNullOrWhiteSpace(logoutRedirectUris)
-        ? keycloakInit.WithEnvironment(
-            "KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS",
-            ReferenceExpression.Create($"http://localhost:{httpPort}/signout-callback-oidc##http://admin.localhost:{httpPort}/signout-callback-oidc##https://localhost:{httpsPort}/signout-callback-oidc##https://admin.localhost:{httpsPort}/signout-callback-oidc"))
-        : keycloakInit.WithEnvironment("KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS", logoutRedirectUris);
+        .WaitFor(resources.Keycloak);
 }
 
 static ReferenceExpression EndpointUrl(
@@ -1810,7 +1726,6 @@ internal static class AspireRunModeExtensions
 
 internal sealed record LocalPlatformResources(
     IResourceBuilder<ContainerResource> Keycloak,
-    IResourceBuilder<ContainerResource> KeycloakInit,
     IResourceBuilder<ParameterResource> KeycloakBlazorClientSecret,
     IResourceBuilder<ContainerResource> Cerbos,
     IResourceBuilder<ContainerResource> Minio,

@@ -145,6 +145,35 @@ public sealed class EventResourceGovernanceHttpTests
                        [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "40"
                    } }, Token))
             await Assert.That(tenantOptions.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await tenantOptions.Content.ReadAsStringAsync(Token));
+        foreach (var (key, widening) in new (string Key, string Value)[]
+                 {
+                     (GovernanceSettingKeys.EventResources.EnabledAudiences, "[\"Public\",\"Organizer\",\"TicketHolder\"]"),
+                     (GovernanceSettingKeys.EventResources.PermittedFileTypes,
+                         "[\"application/pdf\",\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\",\"image/png\"]"),
+                     (GovernanceSettingKeys.EventResources.MaxUploadBytes, "20000001"),
+                     (GovernanceSettingKeys.EventResources.ExternalOrigins,
+                         "[\"https://a.example.org\",\"https://not-approved.example.org\"]")
+                 })
+        {
+            using var rejected = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
+            {
+                Values = new Dictionary<string, string>
+                {
+                    [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "5",
+                    [key] = widening
+                }
+            }, Token);
+            await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.BadRequest)
+                .Because($"{key}: {await rejected.Content.ReadAsStringAsync(Token)}");
+        }
+        await using (var database = factory.CreateDatabase())
+        {
+            database.EnableTenantFilterBypass("Assert every rejected resource-policy batch left its valid companion unchanged.");
+            var persisted = await database.TenantSettingOverrides.AsNoTracking()
+                .SingleAsync(row => row.TenantId == PlatformDefaults.DefaultTenantId
+                    && row.SettingKey == GovernanceSettingKeys.EventResources.AuditRetentionDays, Token);
+            await Assert.That(persisted.Value).IsEqualTo("40");
+        }
         using (var tighten = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
                { Values = new Dictionary<string, string>
                    {

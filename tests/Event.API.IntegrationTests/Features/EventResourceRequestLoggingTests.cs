@@ -94,6 +94,36 @@ public sealed class EventResourceRequestLoggingTests
         await Assert.That(emitted).DoesNotContain(credential);
     }
 
+    [Test]
+    public async Task UnmatchedResourcePathDoesNotExportCallerSelectedSegments()
+    {
+        Guid identifier = Guid.CreateVersion7();
+        string privateSegment = $"private-token-{Guid.CreateVersion7():N}";
+        string credential = $"credential-{Guid.CreateVersion7():N}";
+        var diagnostics = new HttpDiagnosticsCapture(string.Empty);
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(logCapture: diagnostics);
+        var exporter = new SensitiveRouteActivityExporter(null);
+        using var hosted = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddOpenTelemetry().WithTracing(tracing =>
+                tracing.AddProcessor(new SimpleActivityExportProcessor(exporter)))));
+        using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+        });
+        var logObserved = diagnostics.Observed;
+        var spanObserved = exporter.Observed;
+
+        using var response = await client.GetAsync(
+            $"/api/eventresource/{identifier}/content/{privateSegment}?token={credential}");
+        await Task.WhenAll(logObserved, spanObserved).WaitAsync(TimeSpan.FromSeconds(10));
+
+        await Assert.That((int)response.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+        string emitted = string.Join('\n', diagnostics.Values.Concat(exporter.Values));
+        await Assert.That(emitted).DoesNotContain(identifier.ToString("D"));
+        await Assert.That(emitted).DoesNotContain(privateSegment);
+        await Assert.That(emitted).DoesNotContain(credential);
+    }
+
     private sealed class Capture : ILogger<RequestLoggingMiddleware>
     {
         public List<string> Entries { get; } = [];
@@ -129,7 +159,7 @@ public sealed class EventResourceRequestLoggingTests
         }
     }
 
-    private sealed class SensitiveRouteActivityExporter(string routeTemplate) : BaseExporter<Activity>
+    private sealed class SensitiveRouteActivityExporter(string? routeTemplate) : BaseExporter<Activity>
     {
         private readonly ConcurrentQueue<string> _values = new();
         private readonly TaskCompletionSource _observed = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -153,8 +183,8 @@ public sealed class EventResourceRequestLoggingTests
                         _values.Enqueue($"event:{tag.Key}={tag.Value}");
                 }
                 if (activity.Source.Name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal)
-                    && activity.TagObjects.Any(tag => string.Equals(tag.Value?.ToString(),
-                        "/" + routeTemplate, StringComparison.OrdinalIgnoreCase)))
+                    && (routeTemplate is null || activity.TagObjects.Any(tag => string.Equals(tag.Value?.ToString(),
+                        "/" + routeTemplate, StringComparison.OrdinalIgnoreCase))))
                     _observed.TrySetResult();
             }
             return ExportResult.Success;

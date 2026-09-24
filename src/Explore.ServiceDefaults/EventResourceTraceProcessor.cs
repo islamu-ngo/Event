@@ -42,9 +42,19 @@ internal sealed class EventResourceTraceProcessor : BaseProcessor<Activity>
             identity = -1;
         else return;
 
-        if (identity >= 0 && !segments[identity].StartsWith('{'))
-            segments[identity] = "{id}";
-        string route = "/" + string.Join('/', segments);
+        string route;
+        if (activity.Kind == ActivityKind.Server && identity >= 0 && !segments[identity].StartsWith('{'))
+        {
+            route = activity.GetTagItem("http.route") is string template
+                ? "/" + template.TrimStart('/')
+                : "route-unresolved";
+        }
+        else
+        {
+            if (identity >= 0 && !segments[identity].StartsWith('{'))
+                segments[identity] = "{id}";
+            route = "/" + string.Join('/', segments);
+        }
         activity.DisplayName = $"{activity.GetTagItem("http.request.method") ?? activity.GetTagItem("http.method") ?? "HTTP"} {route}";
         activity.SetTag("url.path", route);
         activity.SetTag("http.target", route);

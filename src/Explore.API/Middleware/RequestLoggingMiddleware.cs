@@ -49,6 +49,9 @@ public sealed class RequestLoggingMiddleware
             }
             else
             {
+                string safePath = SafeRouteMetadata.GetRouteIdentityOrClassification(context);
+                if (safePath == SafeRouteMetadata.UnresolvedRouteClassification)
+                    RedactSensitiveRouteActivity(Activity.Current, safePath);
                 var platformIdentityPresent = context.User.GetPlatformUserId().HasValue;
                 var tenantPresent = tenantContextAccessor.TenantId.HasValue;
                 var tenantSlugPresent = context.Request.Headers.ContainsKey(
@@ -59,7 +62,7 @@ public sealed class RequestLoggingMiddleware
                 _logger.LogInformation(
                     "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs:0.00}ms | PlatformIdentityPresent={PlatformIdentityPresent} Authenticated={IsAuthenticated} AuthHeaderPresent={AuthHeaderPresent} TenantPresent={TenantPresent} TenantSlugPresent={TenantSlugPresent} CorrelationId={CorrelationId}",
                     context.Request.Method,
-                    context.Request.Path.Value,
+                    safePath,
                     context.Response.StatusCode,
                     elapsed.TotalMilliseconds,
                     platformIdentityPresent,

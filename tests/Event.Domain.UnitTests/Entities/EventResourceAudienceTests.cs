@@ -135,12 +135,32 @@ public sealed class EventResourceAudienceTests
         resource.ReplacePolicy(EventResourceAvailability.Create(), rules, resource.ConcurrencyStamp, subject, EventResourceTestData.Now);
         rules.Clear();
         List<EventResourceAudienceFact> evidence = [Fact(resource, subject, EventResourceAudienceKindEnum.AuthenticatedTenantMember)];
-        var frozen = new EventResourceAccessFacts(resource.TenantId, subject, false, parent, evidence, true);
+        var frozen = new EventResourceAccessFacts(resource.TenantId, subject, false, parent, evidence, true,
+            EventResourceGovernancePolicy.Default(long.MaxValue));
         evidence.Clear();
         await Assert.That(resource.AudienceRules.Count).IsEqualTo(2);
         var exposed = (ICollection<EventResourceAudienceRule>)resource.AudienceRules;
         await Assert.That(() => exposed.Add(member)).Throws<NotSupportedException>();
         await Assert.That(EventResourceAccessRules.Evaluate(resource, frozen, new DateTimeOffset(EventResourceTestData.Now)).CanAccess).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task DisabledDeliveryOrAudienceHidesPreviouslyPublishedMetadataAndContent(bool disableAudience)
+    {
+        var (resource, parent, subject) = EventResourceTestData.CreatePublished();
+        var defaults = EventResourceGovernancePolicy.Default(long.MaxValue);
+        var governance = EventResourceGovernancePolicy.Create(
+            disableAudience ? defaults.EnabledDeliveryTypes : [],
+            disableAudience ? [] : defaults.EnabledAudiences,
+            defaults.PermittedFileTypes, defaults.MaxUploadBytes, false, [],
+            defaults.AuditRetentionDays, defaults.MaxActiveResources, long.MaxValue);
+        var facts = new EventResourceAccessFacts(resource.TenantId, subject, false, parent, [], true, governance);
+        var decision = EventResourceAccessRules.Evaluate(resource, facts, new DateTimeOffset(EventResourceTestData.Now));
+        await Assert.That(decision.DiscloseMetadata).IsFalse();
+        await Assert.That(decision.DisclosePrivateMetadata).IsFalse();
+        await Assert.That(decision.CanAccess).IsFalse();
     }
 
     [Test]

@@ -2,6 +2,7 @@ namespace Explore.Application.Features.ConfigurationManifest.Validation;
 
 using System.Globalization;
 using System.Text.Json;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
@@ -718,6 +719,12 @@ public static class ConfigurationManifestValidator
         if (!typeAndConstraintValid)
             return false;
 
+        if (EventResourceSettingMutationGuard.Handles(definition.Key)
+            && !IsValidEventResourceValue(definition.Key, value))
+        {
+            return false;
+        }
+
         bool isBrandingUrl =
             string.Equals(
                 definition.Key,
@@ -732,6 +739,29 @@ public static class ConfigurationManifestValidator
                 BrandingSettingDefinitions.CustomCssUrl.Key,
                 StringComparison.Ordinal);
         return !isBrandingUrl || IsOptionalHttpsUrl(value.GetString()!);
+    }
+
+    private static bool IsValidEventResourceValue(
+        string key,
+        JsonElement value)
+    {
+        Dictionary<string, string> values = EventResourceSettingDefinitions.All
+            .ToDictionary(
+                definition => definition.Key,
+                definition => definition.DefaultValue,
+                StringComparer.Ordinal);
+        values[key] = value.GetRawText();
+        try
+        {
+            _ = EventResourceGovernancePolicyValues.Parse(values, long.MaxValue);
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            JsonException or ArgumentException or InvalidOperationException
+                or OverflowException)
+        {
+            return false;
+        }
     }
 
     private static bool IsValidString(

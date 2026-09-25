@@ -230,6 +230,7 @@ internal static class EventResourceTestData
     internal static EventResourceAccessDecision Decision(EventResource resource, EventResourceParentFacts parent,
         Guid? subject, IEnumerable<EventResourceAudienceFact>? audience = null, bool machine = false,
         bool payloadSafe = true) => EventResourceAccessRules.Evaluate(resource,
-            new EventResourceAccessFacts(resource.TenantId, subject, machine, parent, audience ?? [], payloadSafe),
+            new EventResourceAccessFacts(resource.TenantId, subject, machine, parent, audience ?? [], payloadSafe,
+                EventResourceGovernancePolicy.Default(long.MaxValue)),
             new DateTimeOffset(Now));
 }

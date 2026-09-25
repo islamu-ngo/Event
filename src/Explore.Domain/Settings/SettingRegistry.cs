@@ -22,6 +22,7 @@ public static class SettingRegistry
         all.AddRange(AdminPortalSettingDefinitions.All);
         all.AddRange(RoutingSettingDefinitions.All);
         all.AddRange(EventSettingDefinitions.All);
+        all.AddRange(EventResourceSettingDefinitions.All);
         all.AddRange(EventReportingIntakeSettingDefinitions.All);
         all.AddRange(OrganizationSettingDefinitions.All);
         all.AddRange(GroupSettingDefinitions.All);

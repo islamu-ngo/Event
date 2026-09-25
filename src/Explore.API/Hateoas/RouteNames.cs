@@ -6,6 +6,11 @@ namespace Explore.API.Hateoas;
 /// </summary>
 public static class RouteNames
 {
+    public const string GetEventResourceProviderBindings = nameof(GetEventResourceProviderBindings);
+    public const string BindEventResourceProvider = nameof(BindEventResourceProvider);
+    public const string BeginEventResourceProviderOperation = nameof(BeginEventResourceProviderOperation);
+    public const string ActivateEventResourceProvider = nameof(ActivateEventResourceProvider);
+
     public const string GetInstanceKeycloakConnection = nameof(GetInstanceKeycloakConnection);
     public const string InspectInstanceKeycloak = nameof(InspectInstanceKeycloak);
     public const string PlanInstanceKeycloak = nameof(PlanInstanceKeycloak);

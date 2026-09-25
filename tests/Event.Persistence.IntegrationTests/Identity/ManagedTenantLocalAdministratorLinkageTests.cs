@@ -28,6 +28,7 @@ using Explore.Infrastructure.Identity;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Services;
 using Explore.Persistence.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -281,7 +282,8 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var hierarchy = new HierarchicalSettingsResolver(settings, tenantSettings, new OrganizationSettingRepository(app),
                 new GroupSettingRepository(app), new GroupTenantRepository(app), new UserPreferenceRepository(app), tenantContext,
                 mutation, cache, NullLogger<HierarchicalSettingsResolver>.Instance,
-                EmailDispatchSqliteFixture.CreateEmailSettingsWriter(app, mutation));
+                EmailDispatchSqliteFixture.CreateEmailSettingsWriter(app, mutation),
+                new EventResourceSettingsWriter(app, mutation, unit));
             return new(tenants, new UserRepository(app), new ActorRepository(app), new UserExternalLoginRepository(app),
                 new TenantUserRepository(app), new TenantUserProfileRepository(app), new TenantUserRoleGrantRepository(app),
                 new RoleRepository(app), new OrganizationRepository(app), new OrganizationTenantRepository(app),

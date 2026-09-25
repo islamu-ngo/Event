@@ -59,6 +59,19 @@ public static class ResourceDescriptors
 {
     #region Core resources with unique resource kinds
 
+    public static readonly ResourceDescriptor<EventResource> EventResourceAuthorizationTarget = new(
+        ResourceKinds.EventResource,
+        resource => resource.Id.ToString("D"),
+        resource => new EventResourceTargetAuthorizationFacts(resource.TenantId, resource.Id),
+        resource => new AuthorizationScope(TenantId: resource.TenantId.ToString("D")));
+
+    /// <summary>Creation targets an existing Event; it does not invent a resource aggregate identity.</summary>
+    public static readonly ResourceDescriptor<EventDto> EventResourceCreationTarget = new(
+        ResourceKinds.EventResource,
+        dto => dto.Id.ToString("D"),
+        dto => new EventResourceTargetAuthorizationFacts(dto.TenantId, dto.Id),
+        dto => new AuthorizationScope(TenantId: dto.TenantId.ToString("D")));
+
     public static readonly ResourceDescriptor<EventDto> Event = new(
         ResourceKinds.Event,
         dto => dto.Id.ToString(),

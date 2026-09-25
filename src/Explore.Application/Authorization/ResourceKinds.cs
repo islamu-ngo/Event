@@ -11,6 +11,7 @@ namespace Explore.Application.Authorization;
 public static class ResourceKinds
 {
     public const string Event = "islamuevent_event";
+    public const string EventResource = "islamuevent_event_resource";
     public const string EventSession = "islamuevent_event_session";
     public const string EventSessionGroup = "islamuevent_event_session_group";
     public const string EventSessionAgendaItem = "islamuevent_event_session_agenda_item";

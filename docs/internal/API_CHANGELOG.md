@@ -3,6 +3,28 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-23
+
+- **Native resource governance.** The `event_resources.*` setting family is
+  available through native settings and configuration manifests. Tenant writes
+  cannot widen instance ceilings or set the instance-only unscanned-document
+  opt-in; malformed and rejected tenant setting updates return validation
+  ProblemDetails. Coordinated batches and manifest imports preserve atomicity.
+  Current instance locks apply in SingleTenant mode, and resource authorization
+  rereads effective policy rather than relying on cached setting values.
+  See [resource governance](EVENT_RESOURCES.md#native-resource-governance).
+
+- **Resource-policy deployment activation.** Current instance administrators can
+  read and bind deployment aliases at
+  `GET/PUT /api/event-resource-provider-activation/bindings`, begin a closed
+  operation at `POST /api/event-resource-provider-activation/begin`, and attest
+  convergence at `POST /api/event-resource-provider-activation/activate`.
+  Activation requires matching operation/epoch, scope/version, complete replica
+  evidence and explicit `frozenParentPolicyContractConfirmed`. Invalid binding
+  shapes return 400 ProblemDetails; stale revisions or rejected activation
+  return 409. Responses are private/no-store and writes never replay generic
+  idempotency responses. Activation does not publish resource metadata or content.
+
 ## 2026-09-22
 
 - **Breaking: retired Keycloak startup reconciliation.**

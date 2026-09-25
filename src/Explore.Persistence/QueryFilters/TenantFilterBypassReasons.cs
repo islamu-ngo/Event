@@ -2,6 +2,9 @@ namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons
 {
+    public const string EventResourceGovernanceMutation =
+        "Resource governance mutation reads only canonical policy keys for the exact tenant ids in the authorized batch.";
+
     public const string ConfigurationManifestOperationReplay =
         "Manifest retry reconstructs post-commit effects for one exact operation id across its bounded tenant results.";
 

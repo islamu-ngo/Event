@@ -7,6 +7,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -316,7 +317,8 @@ public sealed class TenantAuthorityMembershipParityTests
             return new RuntimeAuthorizationProvider(cerbos, local, Substitute.For<ICerbosConfigResolver>(),
                 new SystemSettingRepository(Context, new RelationalSettingMutationLock(Context, new EfCoreUnitOfWork(Context))),
                 cache, NullLogger<RuntimeAuthorizationProvider>.Instance,
-                Options.Create(new AuthorizationProviderDeploymentOptions { Provider = providerName }));
+                Options.Create(new AuthorizationProviderDeploymentOptions { Provider = providerName }),
+                Substitute.For<IEventResourceCapabilityAuthorizer>());
         }
 
         public async ValueTask DisposeAsync()

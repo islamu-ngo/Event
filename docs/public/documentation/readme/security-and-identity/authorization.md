@@ -123,6 +123,25 @@ When `AUTHORIZATION_PROVIDER=cerbos` is set:
 - Requires Cerbos policies and schemas to be uploaded via `cerbosctl` (see [Coolify with Cerbos & Traefik](../self-hosting/coolify-cerbos-traefik.md)).
 - **Fail-Closed Guarantee**: If Cerbos becomes unreachable or returns an error, ISLAMU Event denies access immediately. It will **never** silently fall back to local RBAC, preventing accidental security elevation during infrastructure outages.
 
+### Event resource access
+
+Resource actions are checked against current tenant, event, audience and subject
+facts. Purchasing a ticket for someone else does not itself grant the purchaser
+that participant's resource access. Administrative status and API-key scopes do
+not substitute for resource authority. A remote policy may restrict a permitted
+action but cannot override the platform's resource eligibility rules.
+
+Resource checks do not reuse a previous allow after policy, membership or
+entitlement changes. A final fresh read occurs after the provider response;
+revocations committed before that read starts take effect. A revocation concurrent
+with the final read may overlap delivery. Links are current affordances, not
+download credentials or permission to replay an earlier response.
+
+Cerbos-backed resource access also requires explicit deployment activation.
+Register all endpoint aliases, announce policy writers and attest convergence
+before reopening access. Upload success alone is insufficient. See
+[Resource-policy deployment activation](../administration-and-branding/admin-guide.md#resource-policy-deployment-activation-operator-api).
+
 ### Provider credential operation retries
 
 Existing credential-bearing Keycloak and Cerbos management POST operations return

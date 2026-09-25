@@ -10258,6 +10258,58 @@ namespace Explore.Persistence.Migrations
                     b.ToTable("event_resource_kinds", "islamu_event");
                 });
 
+            modelBuilder.Entity("Explore.Domain.EventResourceProviderActivation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CurrentOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_operation_id");
+
+                    b.Property<long>("Epoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_resource_provider_activations");
+
+                    b.ToTable("event_resource_provider_activations", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_event_resource_provider_activation_epoch", "epoch >= 0");
+
+                            t.HasCheckConstraint("ck_event_resource_provider_activation_owner", "(epoch = 0 AND state = 3 AND current_operation_id = '00000000-0000-0000-0000-000000000000') OR (epoch > 0 AND current_operation_id <> '00000000-0000-0000-0000-000000000000')");
+
+                            t.HasCheckConstraint("ck_event_resource_provider_activation_state", "state BETWEEN 1 AND 3");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.EventRoleAssignment", b =>
                 {
                     b.Property<Guid>("Id")

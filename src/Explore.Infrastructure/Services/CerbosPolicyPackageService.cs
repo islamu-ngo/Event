@@ -7,6 +7,7 @@ using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Models;
 using Explore.Domain.Secrets;
 using Microsoft.Extensions.Logging;
@@ -43,6 +44,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
     private readonly CerbosAdminEndpointValidator _adminEndpointValidator;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CerbosPolicyPackageService> _logger;
+    private readonly IEventResourcePolicyPublicationFence _resourcePublicationFence;
+    private readonly CerbosSettings _instanceCerbosSettings;
 
     public CerbosPolicyPackageService(
         IOptions<CerbosPolicyPackageOptions> options,
@@ -51,7 +54,9 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         ISecretResolver secretResolver,
         CerbosAdminEndpointValidator adminEndpointValidator,
         IHttpClientFactory httpClientFactory,
-        ILogger<CerbosPolicyPackageService> logger)
+        ILogger<CerbosPolicyPackageService> logger,
+        IEventResourcePolicyPublicationFence resourcePublicationFence,
+        IOptions<CerbosSettings> instanceCerbosSettings)
     {
         _options = options.Value;
         _adminApiSettings = adminApiSettings.Value;
@@ -60,6 +65,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         _adminEndpointValidator = adminEndpointValidator;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _resourcePublicationFence = resourcePublicationFence;
+        _instanceCerbosSettings = instanceCerbosSettings.Value;
     }
 
     /// <inheritdoc />
@@ -173,6 +180,10 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             var schemas = await BuildSchemaDefinitionsAsync(packageRoot, manifest, cancellationToken);
             var policies = await BuildPolicyDocumentsAsync(packageRoot, manifest, cancellationToken);
 
+            // This commit precedes the first remote write. Upload/reload success is not evidence
+            // that older writers stopped or every reachable PDP serves the declared policy.
+            await _resourcePublicationFence.BeginPublicationAsync(target.GrpcEndpoint, cancellationToken);
+
             if (schemas.Count > 0)
                 await PushSchemasAsync(target, schemas, cancellationToken);
 
@@ -205,7 +216,7 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 Succeeded: true,
                 PackageId: manifest.PackageId,
                 ContentHash: manifest.ContentHash,
-                Message: "Policy package uploaded and Cerbos instances reloaded successfully.",
+                Message: "Policy package uploaded and Cerbos instances reloaded successfully. Bound resource deployments remain closed until coordinated activation.",
                 PublishedAt: DateTimeOffset.UtcNow,
                 Warnings: []);
         }
@@ -529,7 +540,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
                 Endpoints: [endpoint],
                 AdminUsername: username,
                 AdminPassword: password,
-                Source: AdminApiTargetSource.Byo));
+                Source: AdminApiTargetSource.Byo,
+                GrpcEndpoint: configuration.Endpoint));
         }
 
         return await ResolveInstanceAdminApiTargetAsync(oneTimeCredentials, cancellationToken);
@@ -588,7 +600,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             Endpoints: endpoints,
             AdminUsername: username,
             AdminPassword: password,
-            Source: AdminApiTargetSource.Instance));
+            Source: AdminApiTargetSource.Instance,
+            GrpcEndpoint: _instanceCerbosSettings.GrpcEndpoint));
     }
 
     private string ResolvePolicyRoot()
@@ -1021,7 +1034,8 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
         IReadOnlyList<Uri> Endpoints,
         string? AdminUsername,
         string? AdminPassword,
-        AdminApiTargetSource Source)
+        AdminApiTargetSource Source,
+        string GrpcEndpoint)
     {
         public Uri PrimaryEndpoint => Endpoints[0];
 

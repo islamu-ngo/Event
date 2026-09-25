@@ -3,11 +3,13 @@ namespace Explore.Application.Features.ConfigurationManifest.Importing;
 using System.Collections.Immutable;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using Explore.Application.Features.ConfigurationManifest.Compilation;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.PaidEventPolicies;
+using Explore.Application.Notifications;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
@@ -17,13 +19,14 @@ public sealed class ConfigurationImportSectionApplier(
     IConfigurationManifestTenantSettingMutationBoundary tenantSettings,
     IConfigurationImportTenantIdentityMutationBoundary tenantIdentity,
     IPublicationPolicyMutationBoundary publicationPolicy,
+    IEventResourceSettingsWriter eventResourceSettingsWriter,
     IPaidEventPolicyMutationBoundary paidEventPolicy,
     IPaidEventPolicyRepository paidEventPolicies,
     ITenantRepository tenants,
     ITenantSettingsDocumentRepository tenantDocuments,
     ILegalDocumentRepository legalDocuments)
 {
-    public async Task ApplyAsync(
+    public async Task<ImmutableArray<SettingChangedNotification>> ApplyAsync(
         ConfigurationImportTarget target,
         ReadOnlyMemory<byte> sourceBytes,
         ConfigurationImportPreviewRequest request,
@@ -37,6 +40,8 @@ public sealed class ConfigurationImportSectionApplier(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(parser);
         var selected = request.SelectedSectionKeys.ToHashSet(StringComparer.Ordinal);
+        var deferredNotifications =
+            ImmutableArray.CreateBuilder<SettingChangedNotification>();
         if (target.Scope == ConfigurationImportScope.Instance)
         {
             ConfigurationManifestV1Alpha2 manifest = parser.Parse(sourceBytes).Manifest;
@@ -46,6 +51,7 @@ public sealed class ConfigurationImportSectionApplier(
                 actorUserId,
                 occurredAt,
                 artifactDigest,
+                deferredNotifications,
                 cancellationToken);
             await ApplyManifestTenantsAsync(
                 manifest.Spec.Tenants,
@@ -54,8 +60,9 @@ public sealed class ConfigurationImportSectionApplier(
                 actorUserId,
                 occurredAt,
                 artifactDigest,
+                deferredNotifications,
                 cancellationToken);
-            return;
+            return deferredNotifications.ToImmutable();
         }
 
         TenantConfigurationPackageV1Alpha2 package =
@@ -72,7 +79,9 @@ public sealed class ConfigurationImportSectionApplier(
             actorUserId,
             occurredAt,
             artifactDigest,
+            deferredNotifications,
             cancellationToken);
+        return deferredNotifications.ToImmutable();
     }
 
     public async Task<IReadOnlyList<IReadOnlyList<string>>> CompileLockGroupsAsync(
@@ -89,7 +98,12 @@ public sealed class ConfigurationImportSectionApplier(
         {
             ConfigurationManifestV1Alpha2 manifest = parser.Parse(sourceBytes).Manifest;
             if (selected.Contains("instance.settings"))
+            {
                 resources.UnionWith(manifest.Spec.Instance.Settings.Keys);
+                AddResourceSettingLocks(
+                    resources,
+                    manifest.Spec.Instance.Settings.Keys);
+            }
             if (selected.Contains("instance.documents"))
                 resources.Add(PaidEventPolicyMutationLockKeys.Instance);
             AddLegalLocks(
@@ -154,22 +168,50 @@ public sealed class ConfigurationImportSectionApplier(
         Guid actorUserId,
         DateTime occurredAt,
         string artifactDigest,
+        ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
         CancellationToken cancellationToken)
     {
         if (selected.Contains("instance.settings") && source.Settings.Count > 0)
         {
-            ConfigurationManifestInstanceSettingMutationResult result =
-                await instanceSettings.ApplyInCurrentTransactionAsync(
-                    new ConfigurationManifestInstanceSettingMutationInput(
-                        [.. source.Settings.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                            .Select(pair =>
-                                new ConfigurationManifestInstanceSettingMutation(
-                                    pair.Key,
-                                    pair.Value.GetRawText()))],
+            KeyValuePair<string, JsonElement>[] resourceSettings = source.Settings
+                .Where(pair => EventResourceSettingMutationGuard.Handles(pair.Key))
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .ToArray();
+            if (resourceSettings.Length > 0)
+            {
+                EventResourceSettingsWriteResult resourceResult =
+                    await eventResourceSettingsWriter.ApplyAsync(
+                        [.. resourceSettings.Select(pair =>
+                            new EventResourceSettingMutation(
+                                TenantId: null,
+                                pair.Key,
+                                EventResourceSettingMutationKind.SetValue,
+                                pair.Value.GetRawText()))],
                         actorUserId,
-                        occurredAt),
-                    cancellationToken);
-            Ensure(result.Success, result.FailureCode, result.Message);
+                        cancellationToken);
+                EnsureResourceAccepted(resourceResult);
+                deferredNotifications.AddRange(
+                    resourceResult.DeferredNotifications);
+            }
+
+            ConfigurationManifestInstanceSettingMutation[] remaining =
+            [.. source.Settings
+                .Where(pair => !EventResourceSettingMutationGuard.Handles(pair.Key))
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new ConfigurationManifestInstanceSettingMutation(
+                    pair.Key,
+                    pair.Value.GetRawText()))];
+            if (remaining.Length > 0)
+            {
+                ConfigurationManifestInstanceSettingMutationResult result =
+                    await instanceSettings.ApplyInCurrentTransactionAsync(
+                        new ConfigurationManifestInstanceSettingMutationInput(
+                            remaining,
+                            actorUserId,
+                            occurredAt),
+                        cancellationToken);
+                Ensure(result.Success, result.FailureCode, result.Message);
+            }
         }
 
         if (selected.Contains("instance.documents")
@@ -210,6 +252,7 @@ public sealed class ConfigurationImportSectionApplier(
         Guid actorUserId,
         DateTime occurredAt,
         string artifactDigest,
+        ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
         CancellationToken cancellationToken)
     {
         if (!selected.Any(section => section.StartsWith("tenant.", StringComparison.Ordinal)))
@@ -238,6 +281,7 @@ public sealed class ConfigurationImportSectionApplier(
                 actorUserId,
                 occurredAt,
                 artifactDigest,
+                deferredNotifications,
                 cancellationToken);
         }
     }
@@ -252,6 +296,7 @@ public sealed class ConfigurationImportSectionApplier(
         Guid actorUserId,
         DateTime occurredAt,
         string artifactDigest,
+        ImmutableArray<SettingChangedNotification>.Builder deferredNotifications,
         CancellationToken cancellationToken)
     {
         if (selected.Contains("tenant.settings"))
@@ -264,7 +309,8 @@ public sealed class ConfigurationImportSectionApplier(
                 cancellationToken);
             ConfigurationManifestTenantSettingMutation[] guarded = settings
                 .Where(pair => ConfigurationManifestCatalog.TenantSettings[pair.Key]
-                    .Definition.RequiresCoordinatedMutation)
+                    .Definition.RequiresCoordinatedMutation
+                    && !EventResourceSettingMutationGuard.Handles(pair.Key))
                 .Select(Mutation)
                 .ToArray();
             if (guarded.Length > 0)
@@ -285,6 +331,27 @@ public sealed class ConfigurationImportSectionApplier(
                             PublicationPolicyLockedSystemBehavior.Reject),
                         cancellationToken);
                 Ensure(result.Success, result.FailureCode, result.Message);
+            }
+
+            EventResourceSettingMutation[] resourceMutations = settings
+                .Where(pair => EventResourceSettingMutationGuard.Handles(pair.Key))
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new EventResourceSettingMutation(
+                    tenantId,
+                    pair.Key,
+                    EventResourceSettingMutationKind.SetValue,
+                    pair.Value.GetRawText()))
+                .ToArray();
+            if (resourceMutations.Length > 0)
+            {
+                EventResourceSettingsWriteResult resourceResult =
+                    await eventResourceSettingsWriter.ApplyAsync(
+                        [.. resourceMutations],
+                        actorUserId,
+                        cancellationToken);
+                EnsureResourceAccepted(resourceResult);
+                deferredNotifications.AddRange(
+                    resourceResult.DeferredNotifications);
             }
 
             ConfigurationManifestTenantSettingMutation[] ordinary = settings
@@ -496,7 +563,10 @@ public sealed class ConfigurationImportSectionApplier(
         Guid? targetTenantId = null)
     {
         if (selected.Contains("tenant.settings"))
+        {
             resources.UnionWith(source.Settings.Keys);
+            AddResourceSettingLocks(resources, source.Settings.Keys);
+        }
         if (selected.Contains("tenant.documents"))
         {
             resources.UnionWith(TenantBrandingGovernanceMutationLockKeys.All);
@@ -535,6 +605,14 @@ public sealed class ConfigurationImportSectionApplier(
             selected,
             targetTenantId);
 
+    private static void AddResourceSettingLocks(
+        ISet<string> resources,
+        IEnumerable<string> settingKeys)
+    {
+        if (settingKeys.Any(EventResourceSettingMutationGuard.Handles))
+            resources.UnionWith(EventResourceSettingMutationGuard.Keys);
+    }
+
     private static void AddLegalLocks(
         ISet<string> resources,
         string authority,
@@ -551,6 +629,17 @@ public sealed class ConfigurationImportSectionApplier(
     {
         if (!success)
             throw Blocked(failureCode ?? ConfigurationImportFailureCodes.ApplyBlocked, message);
+    }
+
+    private static void EnsureResourceAccepted(
+        EventResourceSettingsWriteResult result)
+    {
+        if (!result.Success)
+        {
+            throw Blocked(
+                result.FailureCode ?? ConfigurationImportFailureCodes.ApplyBlocked,
+                "The event-resource settings conflict with current governance ceilings or locks.");
+        }
     }
 
     private static ConfigurationImportSessionException Blocked(

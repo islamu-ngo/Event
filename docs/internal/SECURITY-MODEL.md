@@ -111,6 +111,22 @@ provider-neutral:
 - `Explore.API` isolates Local/Keycloak bearer validation and AT Protocol bootstrap/session schemes before applying resource-level authorization.
 - `ISLAMU Event Domain` remains authoritative for tenant memberships, legal entities, and event access control.
 
+### Event resource authority boundary
+
+Event resource policy authority uses a separate frozen-input protocol. Generic
+administrator, machine-scope and provider safe-mode shortcuts cannot authorize a
+resource action. Current subject lineage and parent eligibility remain Domain
+ceilings even when a remote PDP allows the action. Identifier-only HAL facts do
+not carry grants; the native resource boundary resolves its own fresh snapshots.
+
+For a bound remote deployment, policy publication first closes its durable
+activation fence. Only an explicit, operation-owned convergence attestation can
+reopen it. Aliases share one deployment epoch; a stale publisher cannot activate
+a newer operation. An epoch does not prove a remote policy revision, and
+unannounced external writers are outside this announced-writer protocol. The
+snapshot boundary and operator duties are specified in
+[Authorization](AUTHORIZATION.md#resource-policy-deployment-activation).
+
 ### Provider credential HTTP response boundary
 
 All seven `/api/instance/keycloak` routes are `private, no-store` and bypass

@@ -33,9 +33,22 @@ public static class CerbosSettingDefinitions
         Description: "Custom Cerbos Admin API endpoint URL",
         MaxScope: SettingScope.Tenant);
 
+    public static readonly SettingDefinition ResourceDeploymentBindings = new(
+        Key: "cerbos.resource_deployment_bindings",
+        ValueType: SettingValueType.Json,
+        DefaultValue: "null",
+        Category: "Cerbos",
+        Description: "Instance-owned resource authorization deployment aliases and policy declarations",
+        MinScope: SettingScope.Instance,
+        MaxScope: SettingScope.Instance,
+        IsLockable: false)
+    {
+        RequiresCoordinatedMutation = true
+    };
+
     public static IReadOnlyList<SettingDefinition> All =>
     [
         TenantCustomizationEnabled, Mode, CustomEndpoint,
-        CustomAdminEndpoint
+        CustomAdminEndpoint, ResourceDeploymentBindings
     ];
 }

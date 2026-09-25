@@ -29,6 +29,7 @@ public class UpdateSettingCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
 
     public UpdateSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -42,6 +43,7 @@ public class UpdateSettingCommandHandler
         IUnitOfWork unitOfWork,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -58,6 +60,7 @@ public class UpdateSettingCommandHandler
         _unitOfWork = unitOfWork;
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -122,6 +125,17 @@ public class UpdateSettingCommandHandler
                 [new(tenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
                 resolvedUserId, cancellationToken);
             return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, tenantId ?? Guid.Empty);
+        }
+
+        if (EventResourceSettingMutationGuard.Handles(request.Key))
+        {
+            Guid? tenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null;
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(tenantId, request.Key,
+                    EventResourceSettingMutationKind.SetValue, serializedValue)],
+                resolvedUserId, cancellationToken);
+            return await result.CompleteAsync(
+                _resolver, _notificationHandlers, request.Scope, tenantId ?? Guid.Empty);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

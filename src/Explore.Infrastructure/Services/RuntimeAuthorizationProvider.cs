@@ -4,6 +4,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Organizations.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Models;
@@ -51,6 +52,7 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
     private readonly ILogger<RuntimeAuthorizationProvider> _logger;
     private readonly AuthorizationProviderDeploymentOptions _deploymentOptions;
     private readonly BusinessMetrics? _metrics;
+    private readonly IEventResourceCapabilityAuthorizer _eventResourceAuthorizer;
 
     private const string InstanceModeCacheKey = "AuthorizationProvider_Mode";
     private static readonly TimeSpan InstanceModeCacheDuration = TimeSpan.FromMinutes(1);
@@ -63,6 +65,7 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         IMemoryCache cache,
         ILogger<RuntimeAuthorizationProvider> logger,
         IOptions<AuthorizationProviderDeploymentOptions> deploymentOptions,
+        IEventResourceCapabilityAuthorizer eventResourceAuthorizer,
         ISupportAccessSessionService? supportAccessSessionService = null,
         BusinessMetrics? metrics = null)
     {
@@ -75,6 +78,7 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         _logger = logger;
         _deploymentOptions = deploymentOptions.Value;
         _metrics = metrics;
+        _eventResourceAuthorizer = eventResourceAuthorizer;
     }
 
     public async Task<AuthorizationDecision> AuthorizeAsync(
@@ -162,13 +166,46 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         if (supportBoundary.EffectiveChecks.Count == 0)
             return supportBoundary.Results;
 
-        var effectiveChecks = supportBoundary.EffectiveChecks;
+        return supportBoundary.Complete(await EvaluateSelectedBatchAsync(
+            supportBoundary.EffectiveChecks, cancellationToken));
+    }
+
+    private async Task<IReadOnlyList<AuthorizationDecision>> EvaluateSelectedBatchAsync(
+        IReadOnlyList<AuthorizationRequest> effectiveChecks, CancellationToken cancellationToken)
+    {
+        // Resource authority owns fresh routing and frozen facts. Generic cached BYO configuration,
+        // machine scopes and emergency administrator paths must never evaluate these targets.
+        var resourcePositions = Enumerable.Range(0, effectiveChecks.Count)
+            .Where(index => effectiveChecks[index].ResourceKind == ResourceKinds.EventResource).ToArray();
+        if (resourcePositions.Length != 0)
+        {
+            var results = effectiveChecks.Select(_ => AuthorizationDecision.Deny(
+                AuthorizationProviderMetadata.Runtime, AuthorizationDecisionReasonCodes.ProviderError)).ToArray();
+            var resourceChecks = resourcePositions.Select(index => effectiveChecks[index]).ToArray();
+            var resourceResults = await _eventResourceAuthorizer.AuthorizeBatchAsync(resourceChecks, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (resourceResults.Count == resourcePositions.Length)
+                for (int index = 0; index < resourceResults.Count; index++)
+                    results[resourcePositions[index]] = resourceResults[index];
+            var genericPositions = Enumerable.Range(0, effectiveChecks.Count)
+                .Where(index => effectiveChecks[index].ResourceKind != ResourceKinds.EventResource).ToArray();
+            if (genericPositions.Length != 0)
+            {
+                var genericResults = await EvaluateSelectedBatchAsync(
+                    genericPositions.Select(index => effectiveChecks[index]).ToArray(), cancellationToken);
+                if (genericResults.Count == genericPositions.Length)
+                    for (int index = 0; index < genericResults.Count; index++)
+                        results[genericPositions[index]] = genericResults[index];
+            }
+            return results;
+        }
+
         IReadOnlyList<AuthorizationDecision> evaluatedResults;
 
         if (UsesSettingAuthorization(effectiveChecks))
         {
             evaluatedResults = await ExecuteInstanceProviderAsync(effectiveChecks, cancellationToken);
-            return supportBoundary.Complete(evaluatedResults);
+            return evaluatedResults;
         }
 
         // Step 1: Check if the tenant has a BYO Cerbos configuration (works regardless of instance mode)
@@ -184,20 +221,20 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
                 effectiveChecks.Count,
                 ex.GetType().Name);
             evaluatedResults = await ExecuteSafeModeAsync(effectiveChecks, cancellationToken);
-            return supportBoundary.Complete(evaluatedResults);
+            return evaluatedResults;
         }
 
         if (byoConfig is not null)
         {
             evaluatedResults = await ExecuteByoAsync(byoConfig, effectiveChecks, cancellationToken);
-            return supportBoundary.Complete(evaluatedResults);
+            return evaluatedResults;
         }
 
         // The selected instance provider decides the whole batch. There is no third "both" mode: splitting
         // a batch between Local and Cerbos would make the local evaluator a second production authority,
         // and a tightened Cerbos rule would then have no effect on the capabilities routed around it.
         evaluatedResults = await ExecuteInstanceProviderAsync(effectiveChecks, cancellationToken);
-        return supportBoundary.Complete(evaluatedResults);
+        return evaluatedResults;
     }
 
     private async Task<IReadOnlyList<AuthorizationDecision>> ExecuteInstanceProviderAsync(
@@ -363,6 +400,7 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
             ResourceKinds.Group or
             ResourceKinds.GroupMember or
             ResourceKinds.Event or
+            ResourceKinds.EventResource or
             ResourceKinds.EventSession or
             ResourceKinds.EventSessionGroup or
             ResourceKinds.EventSessionAgendaItem or

@@ -298,7 +298,9 @@ public class AuthorizationProviderConfigurationService : IAuthorizationProviderC
                             : publishResult.Message);
                 }
 
-                const string message = "Cerbos endpoint verification and policy synchronization completed.";
+                // PublishInstanceAsync fences bound resource deployments before writing. Bootstrap
+                // readiness preserves non-resource behavior; it never grants resource activation.
+                const string message = "Cerbos endpoint verification and policy synchronization completed. Bound resource deployments require separate coordinated activation.";
                 _bootstrapState.MarkReady(provider, endpointVerified: true, policiesSynchronized: true, message);
                 _cerbosConfigResolver.InvalidateCache();
                 _providerModeCacheInvalidator.InvalidateInstanceMode();

@@ -151,6 +151,7 @@ public partial class ExploreDbContext
     public DbSet<EventResourceAuditEntry> EventResourceAuditEntries { get; set; }
     public DbSet<EventResourceKind> EventResourceKinds { get; set; }
     public DbSet<EventResourceDeliveryType> EventResourceDeliveryTypes { get; set; }
+    public DbSet<EventResourceProviderActivation> EventResourceProviderActivations { get; set; }
     public DbSet<EventParticipationConfiguration> EventParticipationConfigurations { get; set; }
     internal DbSet<AnonymousChallengeTenantQuota> AnonymousChallengeTenantQuotas => Set<AnonymousChallengeTenantQuota>();
     internal DbSet<AnonymousChallengeEventQuota> AnonymousChallengeEventQuotas => Set<AnonymousChallengeEventQuota>();

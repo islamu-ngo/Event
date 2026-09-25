@@ -637,6 +637,7 @@ public partial class FallbackAuthorizationService
             tenantId,
             userId.Value,
             [eventId],
+            DateTime.UtcNow,
             cancellationToken);
         if (!snapshot.Events.TryGetValue(eventId, out EventAuthorityForUser? authority)
             || !HasAdmissionCheckInRole(authority))
@@ -806,6 +807,7 @@ public partial class FallbackAuthorizationService
             tenantId,
             userId.Value,
             [eventId],
+            DateTime.UtcNow,
             cancellationToken);
 
         if (snapshot is null)

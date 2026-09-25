@@ -3,6 +3,7 @@ namespace Explore.Infrastructure.Tests.Settings;
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
@@ -53,7 +54,8 @@ public class HierarchicalSettingsResolverTests : IDisposable
             ImmediateSettingMutationLock.Instance,
             _cache,
             _logger,
-            emailSettingsWriter: RejectingEmailDeliverySettingsWriter.Instance);
+            emailSettingsWriter: RejectingEmailDeliverySettingsWriter.Instance,
+            eventResourceSettingsWriter: RejectingEventResourceSettingsWriter.Instance);
     }
 
     public void Dispose()
@@ -96,6 +98,18 @@ public class HierarchicalSettingsResolverTests : IDisposable
 
     private sealed class MutationLockReachedException : Exception;
     private sealed class EmailSettingsWriterReachedException : Exception;
+    private sealed class EventResourceSettingsWriterReachedException : Exception;
+
+    private sealed class RejectingEventResourceSettingsWriter : IEventResourceSettingsWriter
+    {
+        internal static readonly RejectingEventResourceSettingsWriter Instance = new();
+
+        public Task<EventResourceSettingsWriteResult> ApplyAsync(
+            ImmutableArray<EventResourceSettingMutation> mutations,
+            Guid? actorUserId,
+            CancellationToken cancellationToken = default) =>
+            throw new EventResourceSettingsWriterReachedException();
+    }
 
     private sealed class RejectingEmailDeliverySettingsWriter : IEmailDeliverySettingsWriter
     {
@@ -563,7 +577,8 @@ public class HierarchicalSettingsResolverTests : IDisposable
             RejectingSettingMutationLock.Instance,
             _cache,
             _logger,
-            emailSettingsWriter: RejectingEmailDeliverySettingsWriter.Instance);
+            emailSettingsWriter: RejectingEmailDeliverySettingsWriter.Instance,
+            eventResourceSettingsWriter: RejectingEventResourceSettingsWriter.Instance);
         string guardedKey = PublicationPolicySettingKeys.All[0];
         Guid tenantId = Guid.NewGuid();
         Guid actorId = Guid.NewGuid();
@@ -589,6 +604,33 @@ public class HierarchicalSettingsResolverTests : IDisposable
         await _tenantRepo.DidNotReceive().RemoveOverrideAsync(tenantId, guardedKey, Arg.Any<CancellationToken>());
         await _tenantRepo.DidNotReceive().LockAsync(tenantId, guardedKey, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         await _tenantRepo.DidNotReceive().UnlockAsync(tenantId, guardedKey, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    [Arguments(GuardedResolverMutation.Set)]
+    [Arguments(GuardedResolverMutation.Remove)]
+    [Arguments(GuardedResolverMutation.Lock)]
+    [Arguments(GuardedResolverMutation.Unlock)]
+    public async Task ResourceGovernanceMutationsUseCoordinatedWriter(
+        GuardedResolverMutation mutation)
+    {
+        string key = GovernanceSettingKeys.EventResources.MaxActiveResources;
+        Guid tenantId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
+        Func<Task> action = mutation switch
+        {
+            GuardedResolverMutation.Set => () => _resolver.SetValueAsync(
+                key, "10", SettingScope.Tenant, tenantId, actorId),
+            GuardedResolverMutation.Remove => () => _resolver.RemoveOverrideAsync(
+                key, SettingScope.Tenant, tenantId, actorId),
+            GuardedResolverMutation.Lock => () => _resolver.LockAsync(
+                key, SettingScope.Tenant, tenantId, actorId),
+            GuardedResolverMutation.Unlock => () => _resolver.UnlockAsync(
+                key, SettingScope.Tenant, tenantId, actorId),
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
+        };
+
+        await Assert.ThrowsAsync<EventResourceSettingsWriterReachedException>(action);
     }
 
     [Test]

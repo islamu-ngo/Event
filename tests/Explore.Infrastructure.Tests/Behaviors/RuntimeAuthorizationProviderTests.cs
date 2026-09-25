@@ -36,6 +36,66 @@ public class RuntimeAuthorizationProviderTests
     private static readonly Guid TestTenantId = Guid.Parse("d1b8e7d4-5c1f-4d1d-9f1b-6f5a6f6e9c21");
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Resource_batch_uses_fresh_native_authority_despite_generic_admin_and_provider_failure(bool machine)
+    {
+        var native = Substitute.For<IEventResourceCapabilityAuthorizer>();
+        native.AuthorizeBatchAsync(Arg.Any<IReadOnlyList<AuthorizationRequest>>(), Arg.Any<CancellationToken>())
+            .Returns(call => ((IReadOnlyList<AuthorizationRequest>)call[0]).Select(request =>
+                request.Action == AuthorizationActions.View
+                    ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
+                    : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local)).ToArray());
+        var fixture = CreateRuntimeProviderFixture(eventResourceAuthorizer: native);
+        fixture.AdminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
+        fixture.MachinePrincipalAccessor.IsMachineCaller.Returns(machine);
+        fixture.CerbosConfigResolver.ResolveAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<CerbosConfiguration?>>(_ => throw new InvalidOperationException("Generic cached route unavailable"));
+        var id = Guid.CreateVersion7().ToString("D");
+        var decisions = await fixture.RuntimeProvider.AuthorizeBatchAsync(
+            [new(ResourceKinds.EventResource, id, AuthorizationActions.View),
+                new(ResourceKinds.EventResource, id, AuthorizationActions.Delete)]);
+        await Assert.That(decisions.Select(value => value.IsAllowed)).IsEquivalentTo([true, false]);
+        await Assert.That(decisions[0].IsAllowed).IsTrue();
+        await Assert.That(decisions[1].IsAllowed).IsFalse();
+    }
+
+    [Test]
+    public async Task Resource_batch_preserves_positions_when_native_and_generic_decisions_are_mixed()
+    {
+        var native = Substitute.For<IEventResourceCapabilityAuthorizer>();
+        native.AuthorizeBatchAsync(Arg.Any<IReadOnlyList<AuthorizationRequest>>(), Arg.Any<CancellationToken>())
+            .Returns(call => ((IReadOnlyList<AuthorizationRequest>)call[0]).Select(request =>
+                request.Action == AuthorizationActions.EventResources.Download
+                    ? AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)
+                    : AuthorizationDecision.Deny(AuthorizationProviderMetadata.Local)).ToArray());
+        var fixture = CreateRuntimeProviderFixture(eventResourceAuthorizer: native);
+        fixture.AdminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
+        var id = Guid.CreateVersion7().ToString("D");
+        var decisions = await fixture.RuntimeProvider.AuthorizeBatchAsync(
+            [new(ResourceKinds.EventResource, id, AuthorizationActions.Delete),
+                new(ResourceKinds.Tenant, TestTenantId.ToString("D"), AuthorizationActions.View),
+                new(ResourceKinds.EventResource, id, AuthorizationActions.EventResources.Download)]);
+        await Assert.That(decisions[0].IsAllowed).IsFalse();
+        await Assert.That(decisions[1].IsAllowed).IsTrue();
+        await Assert.That(decisions[2].IsAllowed).IsTrue();
+    }
+
+    [Test]
+    public async Task Resource_batch_cannot_accept_an_incomplete_native_result()
+    {
+        var native = Substitute.For<IEventResourceCapabilityAuthorizer>();
+        native.AuthorizeBatchAsync(Arg.Any<IReadOnlyList<AuthorizationRequest>>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        var fixture = CreateRuntimeProviderFixture(eventResourceAuthorizer: native);
+        fixture.AdminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
+        var decisions = await fixture.RuntimeProvider.AuthorizeBatchAsync(
+            [new(ResourceKinds.EventResource, Guid.CreateVersion7().ToString("D"), AuthorizationActions.View)]);
+        await Assert.That(decisions.Count).IsEqualTo(1);
+        await Assert.That(decisions[0].IsAllowed).IsFalse();
+    }
+
+    [Test]
     public async Task CheckSettingAccessAsync_WithJsonSerializedCerbosMode_RoutesToCerbosProviderAfterInvalidation()
     {
         var adminContext = Substitute.For<IAdminContext>();
@@ -102,7 +162,8 @@ public class RuntimeAuthorizationProviderTests
             repository,
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<ILogger<RuntimeAuthorizationProvider>>(),
-            Options.Create(new AuthorizationProviderDeploymentOptions()));
+            Options.Create(new AuthorizationProviderDeploymentOptions()),
+            Substitute.For<IEventResourceCapabilityAuthorizer>());
 
         runtimeProvider.InvalidateInstanceMode();
 
@@ -1009,7 +1070,8 @@ public class RuntimeAuthorizationProviderTests
     private static RuntimeProviderFixture CreateRuntimeProviderFixture(
         string? deploymentProvider = null,
         BusinessMetrics? metrics = null,
-        ILogger<RuntimeAuthorizationProvider>? runtimeLogger = null)
+        ILogger<RuntimeAuthorizationProvider>? runtimeLogger = null,
+        IEventResourceCapabilityAuthorizer? eventResourceAuthorizer = null)
     {
         var adminContext = Substitute.For<IAdminContext>();
         adminContext.GetAdminTenantIdsAsync(Arg.Any<CancellationToken>()).Returns([]);
@@ -1078,6 +1140,7 @@ public class RuntimeAuthorizationProviderTests
             {
                 Provider = deploymentProvider
             }),
+            eventResourceAuthorizer ?? Substitute.For<IEventResourceCapabilityAuthorizer>(),
             supportAccessSessionService,
             metrics);
 

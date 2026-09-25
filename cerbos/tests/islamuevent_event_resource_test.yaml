@@ -1,0 +1,99 @@
+name: EventResourceFrozenPolicyTests
+description: "Frozen resource inputs preserve tenant isolation and the application authority ceiling."
+principals:
+  authorized_subject:
+    id: "subject"
+    roles: ["islamuevent_authenticated_user"]
+    attr: &subject_attributes
+      tenantId: "tenant-a"
+      isTenantMember: true
+      controlsOrganizer: true
+      hasEventUpdate: true
+      hasEventPublish: true
+      canModerate: true
+  other_tenant:
+    id: "other-subject"
+    roles: ["islamuevent_authenticated_user"]
+    attr:
+      <<: *subject_attributes
+      tenantId: "tenant-b"
+  machine:
+    id: "machine"
+    roles: ["islamuevent_machine"]
+    attr: *subject_attributes
+resources:
+  permitted:
+    kind: "islamuevent_event_resource"
+    id: "resource"
+    attr: &resource_attributes
+      tenantId: "tenant-a"
+      eventId: "event"
+      sessionId: null
+      publicationStateId: 2
+      disclosureModeId: 1
+      kindId: 1
+      deliveryTypeId: 1
+      discloseMetadata: true
+      disclosePrivateMetadata: true
+      canAccess: true
+      managementCeiling: true
+      publicationCeiling: true
+      isCreation: false
+      domainAllowed: true
+  forbidden:
+    kind: "islamuevent_event_resource"
+    id: "forbidden-resource"
+    attr:
+      <<: *resource_attributes
+      domainAllowed: false
+tests:
+  - name: "Every registered action remains inside the frozen ceiling"
+    input:
+      principals: ["authorized_subject"]
+      resources: ["permitted", "forbidden"]
+      actions: &actions ["view", "view-management", "create", "update", "publish", "unpublish", "archive", "delete", "access", "download", "view-audit", "export", "moderate"]
+    expected:
+      - principal: "authorized_subject"
+        resource: "permitted"
+        actions:
+          view: EFFECT_ALLOW
+          view-management: EFFECT_ALLOW
+          create: EFFECT_ALLOW
+          update: EFFECT_ALLOW
+          publish: EFFECT_ALLOW
+          unpublish: EFFECT_ALLOW
+          archive: EFFECT_ALLOW
+          delete: EFFECT_ALLOW
+          access: EFFECT_ALLOW
+          download: EFFECT_ALLOW
+          view-audit: EFFECT_ALLOW
+          export: EFFECT_ALLOW
+          moderate: EFFECT_ALLOW
+      - principal: "authorized_subject"
+        resource: "forbidden"
+        actions: &denied
+          view: EFFECT_DENY
+          view-management: EFFECT_DENY
+          create: EFFECT_DENY
+          update: EFFECT_DENY
+          publish: EFFECT_DENY
+          unpublish: EFFECT_DENY
+          archive: EFFECT_DENY
+          delete: EFFECT_DENY
+          access: EFFECT_DENY
+          download: EFFECT_DENY
+          view-audit: EFFECT_DENY
+          export: EFFECT_DENY
+          moderate: EFFECT_DENY
+  - name: "Foreign tenant and machine principals gain no resource rights"
+    input:
+      principals: ["other_tenant", "machine"]
+      resources: ["permitted"]
+      actions: *actions
+    expected:
+      - principal: "other_tenant"
+        resource: "permitted"
+        actions: *denied
+      - principal: "machine"
+        resource: "permitted"
+        actions: *denied

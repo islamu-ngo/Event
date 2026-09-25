@@ -21,6 +21,18 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
         new(
+            "Explore.Application.Features.EventResourceProviderActivation.BindEventResourceProviderCommand",
+            "handler-current-instance-administrator",
+            "EventResourceProviderControlPlane checks current persisted instance administrator authority inside the native setting lock and ReadCommitted transaction before binding aliases and closing deployment authority. EventResourceProviderActivationHttpTests verifies authenticated non-admin denial, binding revision conflict and private responses; EventResourceProviderControlPlaneTests verifies atomic binding and fence persistence."),
+        new(
+            "Explore.Application.Features.EventResourceProviderActivation.BeginEventResourceProviderOperationCommand",
+            "handler-current-instance-administrator",
+            "EventResourceProviderControlPlane rechecks current persisted instance administrator authority inside the setting lock and transaction before advancing the deployment operation and epoch. EventResourceProviderActivationHttpTests verifies that persisted administrator revocation rejects a repeated Idempotency-Key rather than replaying its earlier operation receipt."),
+        new(
+            "Explore.Application.Features.EventResourceProviderActivation.ActivateEventResourceProviderCommand",
+            "handler-current-instance-administrator",
+            "Current persisted instance administrator authority, exact operation/epoch ownership and complete convergence attestation gate activation inside one setting-locked transaction. EventResourceProviderActivationHttpTests verifies stale operation and epoch rejection, incomplete attestation remaining closed and explicit recovery; generic response replay is suppressed on every activation write."),
+        new(
             "Explore.Application.Features.TenantSettingsDocuments.Requests.Commands.EnsureTenantBrandingSettingsDocumentCommand",
             "authenticated-ambient-tenant-provisioning",
             "The existing authenticated branding GET and post-patch reload retain their ambient tenant authority. The no-input command reads or provisions the default non-secret branding row without accepting a tenant target. TenantSettingsDocumentsControllerTests verifies anonymous denial, authenticated-member provisioning, repeated reads, concurrent uniqueness and retry; both patches retain separate persisted tenant grants."),

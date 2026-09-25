@@ -8,10 +8,15 @@ internal static class PublicEventEligibilityQueryExtensions
     internal static IQueryable<Event> WherePubliclyEligible(
         this IQueryable<Event> query,
         ExploreDbContext dbContext) =>
+        query.WherePublishedWithEligibleSource(dbContext)
+            .Where(@event => @event.VisibilityTypeId == (int)VisibilityTypeEnum.Public);
+
+    internal static IQueryable<Event> WherePublishedWithEligibleSource(
+        this IQueryable<Event> query,
+        ExploreDbContext dbContext) =>
         query.Where(@event =>
             !@event.IsDeleted
             && @event.EventStatusId == (int)EventStatusEnum.Published
-            && @event.VisibilityTypeId == (int)VisibilityTypeEnum.Public
             && @event.Actor != null
             && !@event.Actor.IsDeleted
             && !@event.Actor.IsSuspended

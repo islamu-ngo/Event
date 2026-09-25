@@ -21,6 +21,7 @@ public static class AuthorizationFactAttributeProjection
         },
         PreCreateAuthorizationFacts value => PreCreate(value),
         TenantScopedAuthorizationFacts value => TenantScoped(value),
+        EventResourceTargetAuthorizationFacts value => TenantOnly(value.TenantId),
         TenantSettingAuthorizationFacts value => TenantSetting(value),
         OrganizationAuthorizationFacts value => Organization(value),
         OrganizationMemberAuthorizationFacts value => OrganizationMember(value),

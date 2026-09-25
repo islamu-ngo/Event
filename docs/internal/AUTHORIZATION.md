@@ -213,6 +213,86 @@ The actual logic of "is this user allowed to do this?" is delegated to a runtime
     -   `CerbosAuthorizationService`: Offloads decision-making to an external Cerbos Policy Decision Point (PDP).
     -   `FallbackAuthorizationService`: Uses a local, database-backed RBAC implementation when local authorization is selected.
 
+### Event resource authority
+
+`RuntimeAuthorizationProvider` partitions `islamuevent_event_resource` checks
+before generic cached provider selection, safe mode, or administrator shortcuts.
+`EventResourceCapabilityAuthorizer` binds the tenant, authenticated subject and
+machine status from server contexts. `EventResourceTargetAuthorizationFacts`
+contains identifiers only: mismatched identifiers or generic authority facts
+cannot supply permissions. Management decorators and HAL capability batches
+enter this boundary; audience disclosure and content transport retain their
+handler-owned response and preparation protocol.
+
+`EventResourceAuthorityOrchestrator` owns separate serializable reads A and B.
+Repositories return fresh entities; Application freezes facts and evaluates the
+Domain policy using one UTC instant per read. The resource provider consumes only
+that frozen projection and its `DomainAllowed` ceiling. It performs no secondary
+membership lookup, clock sampling, secret resolution or grant caching. Native
+batches share category reads and grouped provider calls rather than repeating
+the single-resource decision for each link.
+
+Provider I/O and private content preparation occur after A commits and before B
+starts. B compares the route, complete provider input, resource version, storage
+identity and attachment generation. A change permits at most one complete retry,
+under the original request cancellation/deadline. Final time checks reject grants
+that expire before capability return or response headers. Mutation handlers
+recheck inside their transaction; every execution-strategy replay samples fresh
+authority time rather than reusing the mutation's stable data timestamp.
+
+B's **start**, not its completion or a later commit, is the revocation boundary.
+A concurrent revocation may overlap delivery. These decisions are not reusable
+capabilities. Provider deactivation and failures remain non-enumerating for
+restricted EligibleOnly reads. Generic Cerbos and local provider entry points
+reject this resource kind; only its frozen adapter may evaluate it.
+
+Resource moderation has a paired parent prerequisite. Application freezes native
+platform/tenant administrator eligibility, parent event attributes, all native
+non-clock principal maps and permission lists, and timed event assignments.
+Local evaluation requires the exact native scoped administrator gate. Remote
+evaluation additionally requires a complete parent-event response permitting
+`moderate-light` or `moderate-heavy`, and a resource-policy allow for `moderate`.
+Neither decision grants content, export or republish authority.
+
+Parent checks use native `UsePolicyScope` semantics and the default event policy
+version, not the resource binding's scope/version. They share its endpoint and
+deployment fence. Frozen collection equality is structural; assignment windows
+are projected again at the final clock gate. The adapter neither enriches a
+principal nor emits the legacy raw `nowUtc` field.
+
+#### Resource-policy deployment activation
+
+Remote resource authority additionally requires an Active deployment fence.
+`EventResourceProviderActivation` is global to an explicitly bound deployment
+UUIDv7, not scoped to a tenant alias. Its epoch is a local concurrency fence,
+**not** a remote policy-store revision.
+
+The instance-owned `cerbos.resource_deployment_bindings` document binds normalized
+gRPC aliases to deployment identity, explicit scope and policy version. Empty
+scope means Cerbos root policy. Aliases cannot be removed or reassigned. Binding
+changes and announced policy writers start a new operation and close authority
+before Admin mutation. Generic settings writes and portable manifests cannot
+replace this coordinated document.
+
+`EventResourceProviderControlPlane` uses the native setting mutation lock and
+ReadCommitted unit of work to commit document revision and activation together.
+Only current instance administrators may bind, begin or activate. Activation
+requires the matching operation and epoch, matching scope/version, all previous
+writers stopped, a positive reachable-replica count equal to the count with
+the declared policy, and `FrozenParentPolicyContractConfirmed`. The latter is
+an explicit operator attestation covering the parent event policies and their
+derived-role dependencies, including migration away from raw-clock predicates
+to the frozen derived-time contract. It is not inferred from the replica counts.
+Upload success, elapsed time, failure or cancellation cannot
+activate a deployment. Recovery starts a new operation and attests convergence.
+All three write actions suppress generic idempotency response storage and replay;
+a cached receipt must not bypass a revoked administrator or a newer operation.
+
+This protocol depends on truthful endpoint associations and participation by
+every remote writer. It cannot detect unannounced external policy edits or infer
+fleet convergence from an Admin response. See the public
+[operator procedure](../public/documentation/readme/administration-and-branding/admin-guide.md#resource-policy-deployment-activation-operator-api).
+
 ### 3.4. HATEOAS Link Authorization
 
 The API uses a Hypermedia as the Engine of Application State (HATEOAS) model. HAL `_links` are the browser/client source of truth for action availability; Blazor and other clients must not recreate action gates from roles, claims, or cached local state.

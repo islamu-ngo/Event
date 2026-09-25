@@ -1,8 +1,10 @@
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Validation;
+using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Documents;
@@ -21,7 +23,9 @@ public sealed class ConfigurationImportEffectDelivery(
     IConfigurationImportOperationRepository operations,
     IHierarchicalSettingsResolver settings,
     ITypedSettingsDocumentResolver documents,
-    ITenantRepository tenants) : IConfigurationImportEffectDelivery
+    ITenantRepository tenants,
+    IEnumerable<INotificationHandler<SettingChangedNotification>>
+        notificationHandlers) : IConfigurationImportEffectDelivery
 {
     public async Task DrainPendingAsync(CancellationToken cancellationToken)
     {
@@ -57,6 +61,13 @@ public sealed class ConfigurationImportEffectDelivery(
             ?? throw new InvalidOperationException(
                 "Configuration import operation was not found.");
         await InvalidateAsync(operation, cancellationToken);
+        foreach (SettingChangedNotification notification in
+                 ConfigurationImportEffectOutbox.ReadNotifications(message.Payload))
+        {
+            await notificationHandlers.HandleAsync(
+                notification,
+                cancellationToken);
+        }
     }
 
     private async Task DeliverAsync(

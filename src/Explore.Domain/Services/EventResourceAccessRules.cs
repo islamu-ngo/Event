@@ -6,16 +6,21 @@ namespace Explore.Domain.Services;
 public static class EventResourceAccessRules
 {
     public static EventResourceAccessDecision Evaluate(
-        EventResource resource, EventResourceAccessFacts facts, DateTimeOffset nowUtc)
+        EventResource resource, EventResourceAccessFacts facts, DateTimeOffset nowUtc) =>
+        Evaluate(EventResourcePolicySnapshot.Capture(resource), facts, nowUtc);
+
+    public static EventResourceAccessDecision Evaluate(
+        EventResourcePolicySnapshot resource, EventResourceAccessFacts facts, DateTimeOffset nowUtc)
     {
         ArgumentNullException.ThrowIfNull(resource);
         ArgumentNullException.ThrowIfNull(facts);
         if (resource.IsDeleted || resource.TenantId != facts.TenantId
             || resource.PublicationStateId != (int)EventResourcePublicationStateEnum.Published
+            || !IsGovernanceEligible(resource, facts.GovernancePolicy)
             || !IsParentEligible(resource, facts.Parent)
             || !Enum.IsDefined((EventResourceDisclosureModeEnum)resource.DisclosureModeId)
             || resource.AudienceRules.Count == 0
-            || resource.AudienceRules.Any(rule => !rule.IsValid() || rule.TenantId != resource.TenantId
+            || resource.AudienceRules.Any(rule => !rule.IsValid || rule.TenantId != resource.TenantId
                 || rule.EventId != resource.EventId || rule.EventResourceId != resource.Id
                 || resource.EventSessionId.HasValue && rule.EventSessionId.HasValue && rule.EventSessionId != resource.EventSessionId)
             || resource.AudienceRules.Count > 1 && resource.AudienceRules.Any(rule =>
@@ -29,10 +34,19 @@ public static class EventResourceAccessRules
         bool publicMetadata = resource.DisclosureModeId is (int)EventResourceDisclosureModeEnum.Teaser
             or (int)EventResourceDisclosureModeEnum.Public && !string.IsNullOrWhiteSpace(resource.PublicTitle);
         return new(eligible || publicMetadata, eligible,
-            eligible && facts.PayloadSafetySatisfied && resource.HasPublishablePayload());
+            eligible && facts.PayloadSafetySatisfied && resource.HasPublishablePayload);
     }
 
     public static bool IsParentEligible(EventResource resource, EventResourceParentFacts parent) =>
+        IsParentEligible(EventResourcePolicySnapshot.Capture(resource), parent);
+
+    public static bool IsGovernanceEligible(EventResourcePolicySnapshot resource, EventResourceGovernancePolicy? policy) =>
+        policy is not null
+        && policy.EnabledDeliveryTypes.Contains((EventResourceDeliveryTypeEnum)resource.EventResourceDeliveryTypeId)
+        && resource.AudienceRules.Count > 0
+        && resource.AudienceRules.All(rule => policy.EnabledAudiences.Contains((EventResourceAudienceKindEnum)rule.AudienceKindId));
+
+    public static bool IsParentEligible(EventResourcePolicySnapshot resource, EventResourceParentFacts parent) =>
         parent.TenantId == resource.TenantId && parent.EventId == resource.EventId
         && !parent.EventDeleted && parent.EventEligible && parent.EventStatus == EventStatusEnum.Published
         && parent.EventSessionId == resource.EventSessionId
@@ -44,7 +58,7 @@ public static class EventResourceAccessRules
                 && resource.Availability.EndAnchor is not EventResourceAvailabilityAnchorEnum.SessionStart
                     and not EventResourceAvailabilityAnchorEnum.SessionEnd);
 
-    private static bool Matches(EventResourceAudienceRule rule, EventResourceAccessFacts facts, DateTimeOffset nowUtc)
+    private static bool Matches(EventResourceAudiencePolicySnapshot rule, EventResourceAccessFacts facts, DateTimeOffset nowUtc)
     {
         var kind = (EventResourceAudienceKindEnum)rule.AudienceKindId;
         if (kind == EventResourceAudienceKindEnum.Public)
@@ -71,6 +85,52 @@ public static class EventResourceAccessRules
                 || (int?)fact.AdmissionTargetType == rule.AdmissionTargetTypeId && fact.AdmissionTargetId == rule.AdmissionTargetId));
     }
 }
+
+/// <summary>A capture-only projection: neither aggregate mutations nor collection aliases can change an evaluation.</summary>
+public sealed class EventResourcePolicySnapshot
+{
+    public Guid Id { get; }
+    public Guid TenantId { get; }
+    public Guid EventId { get; }
+    public Guid? EventSessionId { get; }
+    public int PublicationStateId { get; }
+    public int DisclosureModeId { get; }
+    public int EventResourceKindId { get; }
+    public int EventResourceDeliveryTypeId { get; }
+    public bool IsDeleted { get; }
+    public string? PublicTitle { get; }
+    public bool HasPublishablePayload { get; }
+    public EventResourceAvailability Availability { get; }
+    public IReadOnlyList<EventResourceAudiencePolicySnapshot> AudienceRules { get; }
+
+    private EventResourcePolicySnapshot(EventResource resource)
+    {
+        Id = resource.Id;
+        TenantId = resource.TenantId;
+        EventId = resource.EventId;
+        EventSessionId = resource.EventSessionId;
+        PublicationStateId = resource.PublicationStateId;
+        DisclosureModeId = resource.DisclosureModeId;
+        EventResourceKindId = resource.EventResourceKindId;
+        EventResourceDeliveryTypeId = resource.EventResourceDeliveryTypeId;
+        IsDeleted = resource.IsDeleted;
+        PublicTitle = resource.PublicTitle;
+        HasPublishablePayload = resource.HasPublishablePayload();
+        Availability = resource.Availability;
+        AudienceRules = Array.AsReadOnly(resource.AudienceRules.Select(rule => new EventResourceAudiencePolicySnapshot(
+            rule.TenantId, rule.EventId, rule.EventResourceId, rule.AudienceKindId, rule.EventSessionId,
+            rule.EventTicketTypeId, rule.AdmissionTargetTypeId, rule.AdmissionTargetId,
+            rule.RequireConfirmedOrder, rule.RequireParticipantApproval, rule.RequireParticipantCompletion,
+            rule.IsValid())).ToArray());
+    }
+
+    public static EventResourcePolicySnapshot Capture(EventResource resource) => new(resource);
+}
+
+public sealed record EventResourceAudiencePolicySnapshot(
+    Guid TenantId, Guid EventId, Guid EventResourceId, int AudienceKindId, Guid? EventSessionId,
+    Guid? EventTicketTypeId, int? AdmissionTargetTypeId, Guid? AdmissionTargetId,
+    bool RequireConfirmedOrder, bool RequireParticipantApproval, bool RequireParticipantCompletion, bool IsValid);
 
 public sealed record EventResourceParentFacts(
     Guid TenantId,
@@ -109,10 +169,11 @@ public sealed record EventResourceAccessFacts
     public EventResourceParentFacts Parent { get; }
     public IReadOnlyList<EventResourceAudienceFact> Audience { get; }
     public bool PayloadSafetySatisfied { get; }
+    public EventResourceGovernancePolicy? GovernancePolicy { get; }
 
     public EventResourceAccessFacts(Guid tenantId, Guid? subjectUserId, bool isMachineCaller,
         EventResourceParentFacts parent, IEnumerable<EventResourceAudienceFact> audience,
-        bool payloadSafetySatisfied)
+        bool payloadSafetySatisfied, EventResourceGovernancePolicy? governancePolicy)
     {
         TenantId = tenantId;
         SubjectUserId = subjectUserId;
@@ -120,6 +181,7 @@ public sealed record EventResourceAccessFacts
         Parent = parent;
         Audience = Array.AsReadOnly(audience.ToArray());
         PayloadSafetySatisfied = payloadSafetySatisfied;
+        GovernancePolicy = governancePolicy;
     }
 }
 

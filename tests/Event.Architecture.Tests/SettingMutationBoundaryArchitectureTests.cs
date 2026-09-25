@@ -13,6 +13,7 @@ using Explore.Domain.Settings;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Explore.Secrets.Database;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -300,21 +301,36 @@ public sealed class SettingMutationBoundaryArchitectureTests
     }
 
     [Test]
-    public async Task PublicationPolicyKeyRegistryMustContainExactlyTheFiveCoordinatedKeys()
+    public async Task PublicationPolicyKeyRegistryMustContainExactlyTheFivePublicationKeys()
     {
         string[] guardedKeys = PublicationPolicySettingKeys.All.ToArray();
-        string[] registryKeys = SettingRegistry.All
-            .Where(definition => definition.RequiresCoordinatedMutation)
-            .Select(definition => definition.Key)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
 
         await Assert.That(guardedKeys.Length).IsEqualTo(CanonicalPublicationPolicyKeys.Length);
         await Assert.That(guardedKeys.Order(StringComparer.Ordinal).SequenceEqual(
             CanonicalPublicationPolicyKeys.Order(StringComparer.Ordinal))).IsTrue();
-        await Assert.That(registryKeys.SequenceEqual(CanonicalPublicationPolicyKeys.Order(StringComparer.Ordinal))).IsTrue();
         await Assert.That(guardedKeys.All(key => SettingRegistry.Get(key)?.RequiresCoordinatedMutation == true))
             .IsTrue();
+    }
+
+    [Test]
+    public async Task EventResourceSettingsServicesAreRequiredScopedRegistrations()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureApplicationServices(new ConfigurationBuilder().Build());
+        services.ConfigurePersistenceServices(
+            new ConfigurationBuilder().Build(),
+            skipDbContextRegistration: true,
+            skipLookupCacheInitializer: true);
+
+        ServiceDescriptor writer = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(IEventResourceSettingsWriter));
+        ServiceDescriptor reader = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(IEventResourceGovernancePolicyReader));
+
+        await Assert.That(writer.ImplementationType).IsEqualTo(typeof(EventResourceSettingsWriter));
+        await Assert.That(writer.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
+        await Assert.That(reader.ImplementationType).IsEqualTo(typeof(EventResourceGovernancePolicyReader));
+        await Assert.That(reader.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
     }
 
     [Test]

@@ -133,6 +133,7 @@ public class ProviderNeutralAuthorizationParityTests
                 Arg.Any<Guid>(),
                 Arg.Any<Guid>(),
                 Arg.Any<IReadOnlyCollection<Guid>>(),
+                Arg.Any<DateTime>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => new EventAuthoritySnapshot(
                 call.ArgAt<Guid>(0),

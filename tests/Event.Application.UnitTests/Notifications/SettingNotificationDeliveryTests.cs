@@ -1,6 +1,7 @@
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Notifications;
 using Explore.Application.Notifications.Handlers;
 using Explore.Application.Settings;
@@ -150,7 +151,8 @@ public sealed class SettingNotificationDeliveryTests
             .BuildServiceProvider();
         var service = new SettingUpsertService(repository,
             provider.GetServices<INotificationHandler<SettingChangedNotification>>(),
-            Substitute.For<IPublicationPolicyMutationBoundary>(), Substitute.For<IEmailDeliverySettingsWriter>());
+            Substitute.For<IPublicationPolicyMutationBoundary>(), Substitute.For<IEmailDeliverySettingsWriter>(),
+            Substitute.For<IEventResourceSettingsWriter>());
         Exception? observed = null;
         try
         {
@@ -204,7 +206,8 @@ public sealed class SettingNotificationDeliveryTests
         var repository = new CommittedSettings(() => committed = true);
         var service = new SettingUpsertService(repository,
             [new Consumer((_, _) => { notified = true; return Task.CompletedTask; })],
-            Substitute.For<IPublicationPolicyMutationBoundary>(), Substitute.For<IEmailDeliverySettingsWriter>());
+            Substitute.For<IPublicationPolicyMutationBoundary>(), Substitute.For<IEmailDeliverySettingsWriter>(),
+            Substitute.For<IEventResourceSettingsWriter>());
         await Assert.ThrowsAsync<OperationCanceledException>(() => service.UpsertValueAsync(
             GovernanceSettingKeys.Federation.AtprotoEventsEnabled, "true", cancellationToken: cancellation.Token));
         await Assert.That(committed).IsFalse();

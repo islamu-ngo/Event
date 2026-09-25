@@ -65,6 +65,9 @@ public static class ConfigurationManifestCatalog
         [
             TenantSetting(TenantSettingDefinitions.WhiteLabelingEnabled),
             TenantSetting(EventReportingIntakeSettingDefinitions.IntakeEnabled),
+            .. EventResourceSettingDefinitions.All
+                .Where(definition => definition.MaxScope >= SettingScope.Tenant)
+                .Select(definition => TenantSetting(definition)),
             TenantSetting(EventSettingDefinitions.UserSubmissionEnabled),
             TenantSetting(EventSettingDefinitions.OrganizationSubmissionEnabled),
             TenantSetting(EventSettingDefinitions.GroupSubmissionEnabled),
@@ -102,12 +105,15 @@ public static class ConfigurationManifestCatalog
             .Order(StringComparer.Ordinal)
             .ToArray();
         string[] expectedCoordinatedKeys = PublicationPolicySettingKeys.All
+            .Concat(EventResourceSettingDefinitions.All
+                .Where(definition => definition.MaxScope >= SettingScope.Tenant)
+                .Select(definition => definition.Key))
             .Order(StringComparer.Ordinal)
             .ToArray();
         if (!coordinatedKeys.SequenceEqual(expectedCoordinatedKeys, StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
-                "The configuration manifest publication-policy catalog is incomplete.");
+                "The configuration manifest coordinated-setting catalog is incomplete.");
         }
 
         return entries.ToFrozenDictionary(
@@ -134,6 +140,8 @@ public static class ConfigurationManifestCatalog
             InstanceSetting(
                 BrandingSettingDefinitions.LogoUrl,
                 maximumStringLength: 2048),
+            .. EventResourceSettingDefinitions.All.Select(definition =>
+                InstanceSetting(definition)),
             InstanceSetting(EventSettingDefinitions.GroupSubmissionEnabled),
             InstanceSetting(EventSettingDefinitions.OrganizationSubmissionEnabled),
             InstanceSetting(EventSettingDefinitions.RequireApproval),
@@ -182,7 +190,8 @@ public static class ConfigurationManifestCatalog
             EventSettingDefinitions.GroupSubmissionEnabled.Key,
             EventSettingDefinitions.OrganizationSubmissionEnabled.Key,
             EventSettingDefinitions.RequireApproval.Key,
-            EventSettingDefinitions.UserSubmissionEnabled.Key
+            EventSettingDefinitions.UserSubmissionEnabled.Key,
+            .. EventResourceSettingDefinitions.All.Select(definition => definition.Key)
         ];
         if (!coordinatedKeys.SequenceEqual(
                 expectedCoordinatedKeys.Order(StringComparer.Ordinal),

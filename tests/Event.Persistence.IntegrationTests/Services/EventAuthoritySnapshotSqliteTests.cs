@@ -10,6 +10,8 @@ namespace Event.Persistence.IntegrationTests.Services;
 
 public sealed class EventAuthoritySnapshotSqliteTests
 {
+    private static readonly DateTime EvaluationTimeUtc = new(2040, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
     [Test]
     public async Task Snapshot_UnionsActivePermissionScalarsWithoutLosingRolesOrOwnership()
     {
@@ -37,7 +39,7 @@ public sealed class EventAuthoritySnapshotSqliteTests
 
         var service = fixture.Services.GetRequiredService<IEventAuthoritySnapshotService>();
         var snapshot = await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId,
-            [target.Id, roleOnly.Id, target.Id], CancellationToken.None);
+            [target.Id, roleOnly.Id, target.Id], EvaluationTimeUtc, CancellationToken.None);
         await Assert.That(snapshot.TenantId).IsEqualTo(fixture.TenantId);
         await Assert.That(snapshot.UserId).IsEqualTo(fixture.UserId);
         await Assert.That(snapshot.Events.Count).IsEqualTo(2);
@@ -67,13 +69,13 @@ public sealed class EventAuthoritySnapshotSqliteTests
         var notRequested = await fixture.SeedEventAsync();
         var activeAssignment = Assignment(fixture, active.Id, RoleEnum.EventOwner);
         var futureAssignment = Assignment(fixture, future.Id, RoleEnum.EventOwner);
-        futureAssignment.StartsAtUtc = DateTime.UtcNow.AddDays(30);
+        futureAssignment.StartsAtUtc = EvaluationTimeUtc.AddDays(30);
         var expiredAssignment = Assignment(fixture, expired.Id, RoleEnum.EventOwner);
-        expiredAssignment.ExpiresAtUtc = DateTime.UtcNow.AddDays(-1);
+        expiredAssignment.ExpiresAtUtc = EvaluationTimeUtc.AddDays(-1);
         var pendingAssignment = Assignment(fixture, pending.Id, RoleEnum.EventOwner);
         pendingAssignment.Status = EventRoleAssignmentStatus.Pending;
         var revokedAssignment = Assignment(fixture, revoked.Id, RoleEnum.EventOwner);
-        revokedAssignment.Revoke(fixture.UserId, DateTime.UtcNow.AddDays(-1));
+        revokedAssignment.Revoke(fixture.UserId, EvaluationTimeUtc.AddDays(-1));
         fixture.Context.EventRoleAssignments.AddRange(activeAssignment, futureAssignment, expiredAssignment,
             pendingAssignment, revokedAssignment, Assignment(fixture, notRequested.Id, RoleEnum.EventOwner));
         await fixture.Context.SaveChangesAsync();
@@ -81,7 +83,7 @@ public sealed class EventAuthoritySnapshotSqliteTests
         var service = fixture.Services.GetRequiredService<IEventAuthoritySnapshotService>();
         var missing = Guid.CreateVersion7();
         Guid[] ids = [active.Id, future.Id, expired.Id, pending.Id, revoked.Id, missing];
-        var snapshot = await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId, ids, default);
+        var snapshot = await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId, ids, EvaluationTimeUtc, default);
         await Assert.That(snapshot.Events.Keys).IsEquivalentTo(ids);
         await Assert.That(snapshot.Events[active.Id].IsOwner).IsTrue();
         await Assert.That(snapshot.Events[active.Id].PermissionCodes).Contains(PermissionCodes.EventUpdate);
@@ -91,16 +93,40 @@ public sealed class EventAuthoritySnapshotSqliteTests
             await Assert.That(snapshot.Events[id].PermissionCodes).IsEmpty();
             await Assert.That(snapshot.Events[id].IsOwner).IsFalse();
         }
-        var otherUser = await service.GetForUserAndEventsAsync(fixture.TenantId, Guid.CreateVersion7(), ids, default);
+        var otherUser = await service.GetForUserAndEventsAsync(fixture.TenantId, Guid.CreateVersion7(), ids, EvaluationTimeUtc, default);
         await Assert.That(otherUser.Events.Values.All(authority => authority.PermissionCodes.Count == 0 && !authority.IsOwner)).IsTrue();
-        var otherTenant = await service.GetForUserAndEventsAsync(Guid.CreateVersion7(), fixture.UserId, ids, default);
+        var otherTenant = await service.GetForUserAndEventsAsync(Guid.CreateVersion7(), fixture.UserId, ids, EvaluationTimeUtc, default);
         await Assert.That(otherTenant.Events.Values.All(authority => authority.RoleCodes.Count == 0 && !authority.IsOwner)).IsTrue();
-        await Assert.That((await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId, [], default)).Events).IsEmpty();
+        await Assert.That((await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId, [], EvaluationTimeUtc, default)).Events).IsEmpty();
+    }
+
+    [Test]
+    public async Task Snapshot_UsesSuppliedInstantAtBothAssignmentBoundaries()
+    {
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        var target = await fixture.SeedEventAsync();
+        var assignment = Assignment(fixture, target.Id, RoleEnum.EventOwner);
+        assignment.StartsAtUtc = EvaluationTimeUtc;
+        assignment.ExpiresAtUtc = EvaluationTimeUtc.AddHours(1);
+        fixture.Context.EventRoleAssignments.Add(assignment);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+        var service = fixture.Services.GetRequiredService<IEventAuthoritySnapshotService>();
+
+        var before = await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId,
+            [target.Id], EvaluationTimeUtc.AddTicks(-1), default);
+        var atStart = await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId,
+            [target.Id], EvaluationTimeUtc, default);
+        var atEnd = await service.GetForUserAndEventsAsync(fixture.TenantId, fixture.UserId,
+            [target.Id], EvaluationTimeUtc.AddHours(1), default);
+        await Assert.That(before.Events[target.Id].IsOwner).IsFalse();
+        await Assert.That(atStart.Events[target.Id].IsOwner).IsTrue();
+        await Assert.That(atEnd.Events[target.Id].IsOwner).IsFalse();
     }
 
     private static EventRoleAssignment Assignment(EventVisitorCapabilitySqliteFixture fixture, Guid eventId, RoleEnum role) =>
         EventRoleAssignment.Create(fixture.TenantId, eventId, fixture.UserId, (int)role,
-            EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddDays(-30), null, fixture.UserId);
+            EventRoleAssignmentStatus.Active, EvaluationTimeUtc.AddDays(-30), null, fixture.UserId);
 
     private static RolePermission Grant(RoleEnum role, int permissionId) => new()
     {
@@ -108,6 +134,6 @@ public sealed class EventAuthoritySnapshotSqliteTests
         Role = null!,
         PermissionId = permissionId,
         Permission = null!,
-        GrantedAt = DateTime.UtcNow
+        GrantedAt = EvaluationTimeUtc
     };
 }

@@ -23,6 +23,14 @@ public sealed class ConfigurationManifestInstanceAuthorityTests
         "branding.display_name",
         "branding.favicon_url",
         "branding.logo_url",
+        "event_resources.allow_unscanned_documents",
+        "event_resources.audit_retention_days",
+        "event_resources.enabled_audiences",
+        "event_resources.enabled_delivery_types",
+        "event_resources.external_origins",
+        "event_resources.max_active_resources",
+        "event_resources.max_upload_bytes",
+        "event_resources.permitted_file_types",
         "events.group_submission_enabled",
         "events.organization_submission_enabled",
         "events.require_approval",
@@ -266,6 +274,40 @@ public sealed class ConfigurationManifestInstanceAuthorityTests
 
         await Assert.That(scalarMethod).IsNotNull();
         await Assert.That(publicationMethod).IsNotNull();
+    }
+
+    [Test]
+    public async Task Validate_ResourceValuesUseStrictNativePolicyDecoding()
+    {
+        ConfigurationManifestValidationResult malformed =
+            ConfigurationManifestValidator.Validate(
+                ConfigurationManifestTestData.Valid(
+                    instanceSettings: new Dictionary<string, JsonElement>(
+                        StringComparer.Ordinal)
+                    {
+                        ["event_resources.external_origins"] =
+                            ConfigurationManifestTestData.Json(
+                                "[\"https://example.test/path\"]")
+                    }));
+        ConfigurationManifestValidationResult wrongScope =
+            ConfigurationManifestValidator.Validate(
+                ConfigurationManifestTestData.Valid(
+                    settings: new Dictionary<string, JsonElement>(
+                        StringComparer.Ordinal)
+                    {
+                        ["event_resources.allow_unscanned_documents"] =
+                            ConfigurationManifestTestData.Json("true")
+                    }));
+
+        await Assert.That(malformed.Errors.Any(error =>
+            error.Code == ConfigurationManifestFailureCodes.ValueInvalid
+            && error.Path ==
+                "$.spec.instance.settings.event_resources.external_origins"))
+            .IsTrue();
+        await Assert.That(wrongScope.Errors.Any(error =>
+            error.Code == ConfigurationManifestFailureCodes.KeyNotAllowed
+            && error.ReasonCode == WrongScopeReasonCode))
+            .IsTrue();
     }
 
     [Test]

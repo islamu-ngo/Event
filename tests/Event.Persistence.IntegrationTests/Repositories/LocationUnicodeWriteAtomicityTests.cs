@@ -13,6 +13,7 @@ using Explore.Infrastructure.Identity;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +48,8 @@ internal static class LocationUnicodeWriteAtomicityTests
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
             new GroupTenantRepository(context), new UserPreferenceRepository(context),
             context.TenantContext!, mutationLock, cache, NullLogger<HierarchicalSettingsResolver>.Instance,
-            EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, mutationLock));
+            EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, mutationLock),
+            new EventResourceSettingsWriter(context, mutationLock, new EfCoreUnitOfWork(context)));
         // Cerbos is the external authorization boundary; all local policy and persistence behavior is real.
         var authorization = Substitute.For<IAuthorizationProvider>();
         authorization.AuthorizeAsync(Arg.Any<AuthorizationRequest>(), Arg.Any<CancellationToken>())

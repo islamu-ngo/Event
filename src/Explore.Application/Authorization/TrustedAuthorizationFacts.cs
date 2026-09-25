@@ -28,6 +28,12 @@ public sealed record PreCreateAuthorizationFacts(
 /// <summary>Facts for resources whose authority is the owning tenant and nothing narrower.</summary>
 public sealed record TenantScopedAuthorizationFacts(Guid TenantId) : IAuthorizationFacts;
 
+/// <summary>
+/// Identifier-only resource target, never a grant or a policy snapshot. Native authorization validates
+/// these identifiers against the current tenant and resolves all authority in shared fresh reads.
+/// </summary>
+public sealed record EventResourceTargetAuthorizationFacts(Guid TenantId, Guid ResourceId) : IAuthorizationFacts;
+
 /// <summary>Facts for hierarchical tenant settings, including document identity and instance lock state.</summary>
 public sealed record TenantSettingAuthorizationFacts(
     Guid TenantId,

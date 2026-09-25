@@ -181,6 +181,7 @@ public class EventRoleAuthorityCeilingServiceTests
                 TenantId,
                 AssignerUserId,
                 Arg.Any<IReadOnlyCollection<Guid>>(),
+                Arg.Any<DateTime>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new EventAuthoritySnapshot(
                 TenantId,

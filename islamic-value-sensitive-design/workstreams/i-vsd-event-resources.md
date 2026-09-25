@@ -14,7 +14,7 @@ Last Updated: 2026-09-22
 - Report status: current
 - Disposition: plan-aligned
 - Evidence cutoff: 2026-09-22
-- Reviewed input: 2026-09-22 plan-review revision of `dev/active/event-resources/{event-resources-plan,event-resources-tasks,event-resources-context}.md` at repository source revision `0dca286c6e3d8d8d95fac2e78c8a7b29c4b2374a`
+- Reviewed input: 2026-09-22 plan-review revision, supplemented by the execution-time D5 coordinated remote-activation clarification and P4 ownership amendment at source revision `f34f6318c5000afe5d10c3fa4aca96c1967f4de1`
 - Supersedes: none. This is a planning assessment of the [standalone consultancy](../consultations/i-vsd-event-resource-consultancy-report.md), not a rewrite of its historical evidence.
 
 ## Scope
@@ -62,6 +62,18 @@ All IDs preserve their identity from the consultancy. The lifecycle below is **a
 **Governance and sequence:** Native instance ceilings, upload ownership and HAL checks precede delivery, rather than waiting for a UI group. The four delivery groups remain, with additional atomic phases that keep independently useful concerns reviewable.
 
 ## Recommendations
+
+**Execution-time activation revalidation:** IVSD-F003/M003, F010/M010 and F015/M015
+remain accepted for implementation with a durable resource-specific activation
+fence. Missing, uncertain or changing remote policy deployments deny resource
+access; no request-time Admin API observation or cached grant is introduced.
+Operators and external policy writers must announce transitions and establish
+replica convergence before activation. Unannounced remote edits are outside the
+enforceable guarantee and must not be advertised as automatically detected.
+This makes the deployment duty explicit, preserves the local self-hosting floor
+and avoids an availability-first bypass of resource rights. It adds no attendee
+history or new content disclosure. These are design conclusions, not evidence
+that the activation protocol has already been implemented or operated.
 
 **Plan-review revalidation, 2026-09-22:** the prior stale binding was substantively re-evaluated, not refreshed by metadata alone. The current plan preserves all fifteen finding/mitigation identities while refining S35–S42, native CQS authority, provider-input freezing, disclosure status behavior, audit-retention sequencing, delivery-track independence and HAL-only UI proof. Hidden/nonexistent/cross-tenant resources remain indistinguishable 404; intentionally disclosed known metadata uses 401 for anonymous authentication-required access and 403 for authenticated ineligibility. Denial produces bounded aggregate telemetry only, never identified attendee access history or a content-bearing audit event.
 
@@ -118,6 +130,16 @@ Strategic, design, technical, operational, governance and evaluation domains all
 These are deployment/future-feature ownership gates. They do not claim that a separate authority has approved the plan.
 
 ## Evidence Reviewed
+
+Activation clarification evidence at `f34f6318c5000afe5d10c3fa4aca96c1967f4de1`:
+`RuntimeAuthorizationProvider.cs` caches provider selection;
+`CerbosConfigResolver.cs` caches settings-derived routing and resolves optional
+Admin secrets; `CerbosAuthorizationService.ExecuteCheckAsync` enriches the
+principal after receiving facts; `AUTHORIZATION.md` section 4.7 excludes Admin
+HTTP observations from runtime authority. The independent architecture consultation
+confirmed there is no reusable durable activation fence. D5 and P4 now own that
+missing mechanism and its failure/ABA/stale-writer tests. This source/design
+evidence supplements, rather than replaces, the historical manifest below.
 
 Repository source revision inspected for this review: `0dca286c6e3d8d8d95fac2e78c8a7b29c4b2374a`. The source consultancy's current file SHA-256 is `05faaf7af7b67ff9db6e0f1bf43d62bf787c2db05c3c5a3f2fb2e8dc7ff35aef`; its internal historical evidence digest is not the hash of the current file.
 
@@ -187,10 +209,10 @@ Available: current repository source, policy, tests, docs, local workstream cont
 - Findings and mitigations: IVSD-F001→IVSD-M001 through IVSD-F015→IVSD-M015, same identities as the source consultancy
 - Required mappings: plan §9 maps every pair to S01–S42 and tasks 1.1–8.3. Deferred features have named persistent backlog targets in tasks.
 - Escalations: explicit execution request before implementation; actual security/provider/restore evidence before delivery; separate privacy/provider/scholarly gates only for their named future claims/features
-- Current completed-triad binding: SHA-256 values below bind the 2026-09-22 plan-review revision
+- Current binding: D5 coordinated remote-activation clarification and P4 ownership amendment above supplement the historical plan-review hashes below; execution status is not bound to those historical hashes.
 - Refresh triggers: changes to default audience/disclosure, scanner/unscanned policy, audit identity/retention, ownership, revocation timing, secret/key authority, guest/dependent access, export/import, federation/templates, provider integrations, or a material CTO rewrite
 
-| Reviewed artifact | SHA-256 |
+| Historical plan-review artifact | SHA-256 |
 | --- | --- |
 | `dev/active/event-resources/event-resources-plan.md` | `a5309071e0d42ea72e14cf2fe405074db6919405e5ab482cd5726541bbfa6591` |
 | `dev/active/event-resources/event-resources-tasks.md` | `77ac58154a50d79d2b510446f30804285d72b8356cf1e3c94a66f8c9a65cc379` |
@@ -206,5 +228,6 @@ These hashes bind the reviewed plan, not execution status forever. Status-only t
 | 2026-09-06 | Draft | Current / plan-aligned | Historical completed-triad mapping and integrity review | Historical revision: 34 scenarios, 22 implementation tasks, nine phases and all fifteen finding/mitigation pairs |
 | 2026-09-06 | Current / plan-aligned | Stale / changes-required | Historical user-requested CTO rewrite changed revocation/discovery/retention promises and mitigation sequencing | Historical revision: S35–S42, D5/D8/D9 and six PR boundaries; planning-mode revalidation was required |
 | 2026-09-22 | Stale / changes-required | Current / plan-aligned | Senior CTO rebase against native CQS and current authorization/storage/release seams; security and architecture findings applied | 42 scenarios, 21 implementation tasks, eight phases/seven PRs, current §9 mapping and corrected artifact links |
+| 2026-09-22 | Current / plan-aligned | Current / plan-aligned with activation clarification | Re-evaluated coordinated remote policy deployment duties and the limit of detecting unannounced changes | D5/P4 amendment, source revision `f34f6318c5000afe5d10c3fa4aca96c1967f4de1`, IVSD-F003/F010/F015; implementation evidence remains required |
 
 All accepted findings remain unimplemented until their scenarios have actual evidence. Plan alignment is a mapping decision, not a declaration that mitigations are complete.

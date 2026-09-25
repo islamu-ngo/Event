@@ -1,0 +1,33 @@
+# Native resource governance and its generated commit identity.
+Change-Id: CHG-01M365YRNNNA1D0382VNSRPQFH
+Title: "bound resource policy by instance governance"
+Type: feat
+Scope: access
+Summary: "Apply native resource settings, non-widening instance ceilings and fresh policy checks to tenant mutation and manifest import before protected delivery is enabled."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Additive native settings introduce no replacement API or compatibility surface.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Coordinated policy writes reject tenant widening and scope bypasses; fresh immutable policy snapshots invalidate stale resource leases without disabling authorized repair.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Definitions and values use existing system and tenant setting tables; committed resource migrations are unchanged.
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Eight event_resources settings govern delivery, audience, MIME types, upload bytes, instance-only unscanned opt-in, HTTPS origins, retention and active capacity through native settings and manifests.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Existing settings routes and string-valued update DTOs remain the wire contract.
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Configure explicit HTTPS origins and instance ceilings; tenant restrictions cannot expand them, and SingleTenant mode does not bypass resource setting locks.

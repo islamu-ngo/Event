@@ -1,6 +1,9 @@
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
+using System.Collections.Immutable;
+using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Notifications;
 using Explore.Domain;
 
 public interface IConfigurationImportEffectOutboxRepository
@@ -38,7 +41,8 @@ public static class ConfigurationImportEffectOutbox
     public static OutboxMessage Create(
         Guid messageId,
         Guid operationId,
-        DateTime occurredAt)
+        DateTime occurredAt,
+        ImmutableArray<SettingChangedNotification> deferredNotifications = default)
     {
         if (messageId == Guid.Empty || messageId.Version != 7
             || operationId == Guid.Empty || operationId.Version != 7)
@@ -53,10 +57,19 @@ public static class ConfigurationImportEffectOutbox
             AggregateType = AggregateType,
             AggregateId = operationId,
             EventType = EventType,
-            Payload = null,
+            Payload = deferredNotifications.IsDefaultOrEmpty
+                ? null
+                : JsonSerializer.Serialize(deferredNotifications),
             Status = OutboxMessageStatus.Pending,
             CreatedAt = occurredAt,
             MaxRetries = 5
         };
     }
+
+    public static ImmutableArray<SettingChangedNotification> ReadNotifications(
+        string? payload) => string.IsNullOrEmpty(payload)
+        ? []
+        : [.. JsonSerializer.Deserialize<SettingChangedNotification[]>(payload)
+            ?? throw new JsonException(
+                "Configuration import effect notifications are invalid.")];
 }

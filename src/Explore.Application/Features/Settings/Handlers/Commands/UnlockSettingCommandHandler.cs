@@ -26,6 +26,7 @@ public class UnlockSettingCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly IEventResourceSettingsWriter _eventResourceSettingsWriter;
 
     public UnlockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -38,6 +39,7 @@ public class UnlockSettingCommandHandler
         IUnitOfWork unitOfWork,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         IVisitorAccessSettingsWriter visitorSettings,
+        IEventResourceSettingsWriter eventResourceSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -51,6 +53,7 @@ public class UnlockSettingCommandHandler
         _unitOfWork = unitOfWork;
         _emailSettingsWriter = emailSettingsWriter;
         _visitorSettings = visitorSettings;
+        _eventResourceSettingsWriter = eventResourceSettingsWriter;
     }
 
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
@@ -88,6 +91,17 @@ public class UnlockSettingCommandHandler
                 [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
                     VisitorAccessSettingMutationKind.SetLock, IsLocked: false)], actorId, cancellationToken);
             return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, scopeId);
+        }
+
+        if (EventResourceSettingMutationGuard.Handles(request.Key))
+        {
+            EventResourceSettingsWriteResult result = await _eventResourceSettingsWriter.ApplyAsync(
+                [new EventResourceSettingMutation(
+                    request.Scope == SettingScope.Tenant ? scopeId : null,
+                    request.Key, EventResourceSettingMutationKind.SetLock, IsLocked: false)],
+                actorId, cancellationToken);
+            return await result.CompleteAsync(
+                _resolver, _notificationHandlers, request.Scope, scopeId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

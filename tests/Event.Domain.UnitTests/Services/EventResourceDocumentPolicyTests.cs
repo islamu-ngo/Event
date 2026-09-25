@@ -108,6 +108,7 @@ public sealed class EventResourceDocumentPolicyTests
     [Arguments("dtd")]
     [Arguments("malformed-xml")]
     [Arguments("deep-xml")]
+    [Arguments("duplicate-default")]
     [Arguments("duplicate-override")]
     [Arguments("encrypted")]
     [Arguments("unsupported-compression")]
@@ -181,6 +182,7 @@ public sealed class EventResourceDocumentPolicyTests
             case "dtd": Replace(parts, main, "<!DOCTYPE x [<!ENTITY e SYSTEM 'file:///nonexistent'>]><x>&e;</x>"); break;
             case "malformed-xml": Replace(parts, main, "<document>"); break;
             case "deep-xml": Replace(parts, main, parts[2].Text.Replace("<w:body/>", string.Concat(Enumerable.Repeat("<x>", 70)) + string.Concat(Enumerable.Repeat("</x>", 70)), StringComparison.Ordinal)); break;
+            case "duplicate-default": Replace(parts, "[Content_Types].xml", parts[0].Text.Replace("</Types>", "<Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>", StringComparison.Ordinal)); break;
             case "duplicate-override": Replace(parts, "[Content_Types].xml", parts[0].Text.Replace("</Types>", $"<Override PartName=\"/{main}\" ContentType=\"application/xml\"/></Types>", StringComparison.Ordinal)); break;
             case "zip-only": parts.Clear(); parts.Add(("anything.xml", "<anything/>")); break;
             case "expansion-ratio": parts.Add(("word/large.xml", "<x>" + new string('x', 100_000) + "</x>")); break;

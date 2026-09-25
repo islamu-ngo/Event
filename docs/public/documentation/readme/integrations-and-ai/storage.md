@@ -100,6 +100,22 @@ a timeout elapsed. Missing mounts/buckets and S3 delete markers are not proof
 that the required bytes were removed. Restore the original target/reference
 before retrying an availability failure.
 
+### External Destination Key Recovery
+
+The API encrypts event-resource destinations with its existing database-backed
+Data Protection keyring, scoped to the tenant, resource and protection
+version. Keep retired keys while any stored destination ciphertext depends
+on them, including withdrawn or archived links. Withdrawal hides a link
+without removing its ciphertext; republishing must decrypt it. Retire a
+key only after every dependent destination is replaced or removed.
+Missing keys fail closed without returning a destination. Backing up the
+database together with **unwrapped** key XML does not protect links against
+a full database/backup compromise; use the deployment's approved
+key-wrapping authority where configured and protect backups accordingly.
+BFF cookie-key storage is not an alternative authority for API destination
+decryption; Combined hosting retains the API database keyring even when
+optional BFF Redis is configured.
+
 ## Organization Evidence PDF Uploads
 
 With local authorization, an organization administrator can reserve an evidence PDF upload for a pending, active organization participation. Only the account that reserved that tenant-local session can finalize its bytes; tenant-administrator status alone does not transfer ownership. Losing the organization role after reservation does not itself revoke the session. Cancellation, expiry, content validation, quota enforcement and privacy-erasure fences remain authoritative. Retrying a completed upload returns the same stored document without another write.

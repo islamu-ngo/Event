@@ -151,6 +151,21 @@ public sealed class EventResourceGovernancePolicyTests
     }
 
     [Test]
+    [Arguments("https://127.0.0.1")]
+    [Arguments("https://[::1]")]
+    [Arguments("https://localhost")]
+    [Arguments("https://files.localhost")]
+    [Arguments("https://files.local")]
+    [Arguments("https://files.internal")]
+    [Arguments("https://intranet")]
+    [Arguments("https://xn--bcher-kva.example.com")]
+    [Arguments("https://b\u00FCcher.example.com")]
+    public async Task ExternalOriginPolicyRejectsLiteralAndLocalHosts(string origin)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => Task.FromResult(Create(origins: [origin])));
+    }
+
+    [Test]
     public async Task Create_EnforcesNumericBoundsAndStorageCeiling()
     {
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Task.FromResult(Create(maxUploadBytes: 0)));

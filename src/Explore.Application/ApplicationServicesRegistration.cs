@@ -335,6 +335,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<EventResourceManagementWorkflow>();
         services.AddScoped<EventResourceFileUploadWorkflow>();
         services.AddScoped<EventResourceContentService>();
+        services.AddScoped<EventResourceAccessService>();
         services.AddScoped<IEventResourceStorageCleanupService, EventResourceStorageCleanupService>();
         services.AddScoped<EventResourceStorageLifecycleService>();
         services.AddScoped<EventResourceAudienceWorkflow>();

@@ -1271,6 +1271,66 @@
           "type": "string",
           "maxLength": 2048
         },
+        "event_resources.allow_unscanned_documents": {
+          "type": "boolean"
+        },
+        "event_resources.audit_retention_days": {
+          "type": "integer"
+        },
+        "event_resources.enabled_audiences": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "AnyEventSessionSpeaker",
+              "AuthenticatedTenantMember",
+              "CheckedInParticipant",
+              "EventStaff",
+              "Organizer",
+              "Public",
+              "SessionRegistrant",
+              "SessionSpeaker",
+              "TicketHolder"
+            ]
+          }
+        },
+        "event_resources.enabled_delivery_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "ExternalLink",
+              "StoredFile"
+            ]
+          }
+        },
+        "event_resources.external_origins": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "event_resources.max_active_resources": {
+          "type": "integer"
+        },
+        "event_resources.max_upload_bytes": {
+          "type": "integer"
+        },
+        "event_resources.permitted_file_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ]
+          }
+        },
         "events.group_submission_enabled": {
           "type": "boolean"
         },
@@ -2699,6 +2759,63 @@
         },
         "event_reporting.intake_enabled": {
           "type": "boolean"
+        },
+        "event_resources.audit_retention_days": {
+          "type": "integer"
+        },
+        "event_resources.enabled_audiences": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "AnyEventSessionSpeaker",
+              "AuthenticatedTenantMember",
+              "CheckedInParticipant",
+              "EventStaff",
+              "Organizer",
+              "Public",
+              "SessionRegistrant",
+              "SessionSpeaker",
+              "TicketHolder"
+            ]
+          }
+        },
+        "event_resources.enabled_delivery_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "ExternalLink",
+              "StoredFile"
+            ]
+          }
+        },
+        "event_resources.external_origins": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "event_resources.max_active_resources": {
+          "type": "integer"
+        },
+        "event_resources.max_upload_bytes": {
+          "type": "integer"
+        },
+        "event_resources.permitted_file_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ]
+          }
         },
         "events.group_submission_enabled": {
           "type": "boolean"

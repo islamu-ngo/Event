@@ -1,0 +1,33 @@
+# Resource external-link encryption, controlled redirect and key recovery.
+Change-Id: CHG-01M3817GRSH4E8VJB6XX1GGE9D
+Title: "protect external resource destinations until access"
+Type: feat
+Scope: events
+Summary: "Keep external destinations in tenant-and-resource-bound encrypted envelopes and reveal them only through a freshly authorized temporary redirect using the existing durable key authority."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Adds protected resource destination write and access operations in pre-release development.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Encrypts full links under tenant/resource/version purposes and rechecks current access before a no-store/no-referrer 302; origin validation does not control DNS or later browser hops.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Uses existing event-resource ciphertext/origin columns and API Data Protection key table; no new EF migration.
+  Configuration:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Requires explicit effective HTTPS origin allow-list and retains existing key-wrapping authority.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Adds write-only destination request, safe-origin read fields and 302 access route with generated client updates.
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Retain retired destination keys through rotation, and protect backups containing encrypted rows together with unwrapped key XML.

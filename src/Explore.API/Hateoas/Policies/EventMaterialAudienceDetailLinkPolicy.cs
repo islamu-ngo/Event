@@ -21,6 +21,12 @@ public sealed class EventMaterialAudienceDetailLinkPolicy(ITenantContext tenant)
                 .RequirePermission(AuthorizationActions.EventResources.Download, ResourceKinds.EventResource,
                     dto.Id.ToString("D"), new AuthorizationScope(TenantId: tenant.TenantId.ToString("D")),
                     new EventResourceTargetAuthorizationFacts(tenant.TenantId, dto.Id));
+        if (!dto.IsTeaser && dto.ExternalDestinationSafeOrigin is not null && dto.Availability == "available")
+            yield return LinkDefinition.Action("access", RouteNames.GetEventResourceAccess,
+                    HttpMethods.Get, new { id = dto.Id }, requiresAuth: false)
+                .RequirePermission(AuthorizationActions.EventResources.Access, ResourceKinds.EventResource,
+                    dto.Id.ToString("D"), new AuthorizationScope(TenantId: tenant.TenantId.ToString("D")),
+                    new EventResourceTargetAuthorizationFacts(tenant.TenantId, dto.Id));
         yield return LinkDefinition.Action(LinkRelations.Management, RouteNames.GetEventResourceManagementDetail,
                 HttpMethods.Get, new { id = dto.Id }).Authenticated()
             .RequirePermission(AuthorizationActions.EventResources.ViewManagement, ResourceKinds.EventResource,

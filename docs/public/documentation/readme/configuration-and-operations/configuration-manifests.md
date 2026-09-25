@@ -14,6 +14,33 @@ Only allowlisted instance/tenant settings and approved typed documents belong in
 
 ---
 
+## Event-Resource Policy Arrays
+
+Instance manifests and tenant configuration packages accept these settings as
+JSON arrays of strings, not JSON encoded inside a string:
+
+| Setting | Accepted items |
+|---|---|
+| `event_resources.enabled_delivery_types` | `StoredFile`, `ExternalLink` |
+| `event_resources.enabled_audiences` | `Public`, `AuthenticatedTenantMember`, `SessionRegistrant`, `TicketHolder`, `CheckedInParticipant`, `AnyEventSessionSpeaker`, `SessionSpeaker`, `EventStaff`, `Organizer` |
+| `event_resources.permitted_file_types` | `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.presentationml.presentation` |
+| `event_resources.external_origins` | Canonical HTTPS origins such as `https://resources.example.org`; no path, trailing slash, credentials, query, or fragment |
+
+For example, `"event_resources.enabled_delivery_types": ["StoredFile"]` permits
+only stored-file delivery. Names and MIME types are case-sensitive; whitespace,
+numeric enum values, and comma-combined names are not accepted. Use separate
+array items for multiple values. Null, objects, and non-string items are rejected.
+
+An empty array explicitly permits nothing; it does not restore defaults.
+Duplicate items are accepted but count only once. Omitting a setting preserves
+the normal default/inheritance behavior. External origins default to an empty
+set and must pass the native safety checks, which also reject local, IP-literal,
+and wildcard hosts. The shipped JSON schemas describe the array types and closed
+item sets; importing still checks origin safety and tenant policy ceilings.
+Tenant choices can only narrow the instance policy, never broaden it.
+
+---
+
 ## What is Strictly Excluded
 
 Manifests deliberately exclude:

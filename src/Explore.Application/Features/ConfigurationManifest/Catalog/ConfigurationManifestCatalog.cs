@@ -3,13 +3,29 @@ namespace Explore.Application.Features.ConfigurationManifest.Catalog;
 using System.Collections.Frozen;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Settings;
+using Explore.Domain.Enums;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Domain.ValueObjects;
 
 public static class ConfigurationManifestCatalog
 {
+    private static readonly FrozenDictionary<string, ConfigurationManifestStringArrayDescriptor>
+        StringArrayDescriptors = new Dictionary<string, ConfigurationManifestStringArrayDescriptor>(StringComparer.Ordinal)
+        {
+            [EventResourceSettingDefinitions.EnabledDeliveryTypes.Key] = new(Enum.GetNames<EventResourceDeliveryTypeEnum>()),
+            [EventResourceSettingDefinitions.EnabledAudiences.Key] = new(Enum.GetNames<EventResourceAudienceKindEnum>()),
+            [EventResourceSettingDefinitions.PermittedFileTypes.Key] = new(
+            [
+                EventResourceGovernancePolicy.PdfMediaType,
+                EventResourceGovernancePolicy.WordDocumentMediaType,
+                EventResourceGovernancePolicy.PowerPointPresentationMediaType
+            ]),
+            [EventResourceSettingDefinitions.ExternalOrigins.Key] = new()
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
     private static readonly FrozenDictionary<string, ConfigurationManifestSettingCatalogEntry>
         TenantSettingEntries =
         CreateTenantSettings();
@@ -257,7 +273,8 @@ public static class ConfigurationManifestCatalog
         new(
             ConfigurationManifestScope.Tenant,
             definition,
-            maximumStringLength);
+            maximumStringLength,
+            StringArrayDescriptors.GetValueOrDefault(definition.Key));
 
     private static ConfigurationManifestSettingCatalogEntry InstanceSetting(
         SettingDefinition definition,
@@ -265,5 +282,6 @@ public static class ConfigurationManifestCatalog
         new(
             ConfigurationManifestScope.Instance,
             definition,
-            maximumStringLength);
+            maximumStringLength,
+            StringArrayDescriptors.GetValueOrDefault(definition.Key));
 }

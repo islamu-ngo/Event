@@ -36,6 +36,16 @@ public sealed class ConfigurationManifestCatalogTests
     ];
 
     [Test]
+    public async Task StringArrayDescriptor_SnapshotsCallerOwnedAllowedValues()
+    {
+        string[] values = ["StoredFile"];
+        var descriptor = new ConfigurationManifestStringArrayDescriptor(values);
+        values[0] = "invented";
+
+        await Assert.That(descriptor.AllowedValues!.Value.ToArray()).IsEquivalentTo(["StoredFile"]);
+    }
+
+    [Test]
     public async Task SettingCatalog_ContainsExactlyApprovedKeys()
     {
         string[] actual = ConfigurationManifestCatalog.TenantSettings.Keys

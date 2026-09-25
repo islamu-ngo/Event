@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventResources.Requests.Commands;
 using Explore.Application.Features.EventResources.Validators;
 using Explore.Application.Responses;
@@ -28,14 +29,16 @@ public sealed class UpdateEventResourceCommandHandler(EventResourceManagementWor
     }
 }
 
-public sealed class PublishEventResourceCommandHandler(EventResourceManagementWorkflow workflow)
+public sealed class PublishEventResourceCommandHandler(
+    EventResourceManagementWorkflow workflow, IEventResourceDestinationProtector destinationProtector)
     : ICommandHandler<PublishEventResourceCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> ExecuteAsync(PublishEventResourceCommand command, CancellationToken cancellationToken = default)
     {
         var validation = await new EventResourceVersionValidator().ValidateAsync((command.ResourceId, command.ExpectedVersion), cancellationToken);
         return !validation.IsValid ? BaseCommandResponse.Validation<Guid>(validation.Errors.Select(error => error.ErrorMessage))
-            : await workflow.ChangeStateAsync(command.ResourceId, command.ExpectedVersion, EventResourceManagementAction.Publish, cancellationToken);
+            : await workflow.ChangeStateAsync(command.ResourceId, command.ExpectedVersion,
+                EventResourceManagementAction.Publish, cancellationToken, destinationProtector);
     }
 }
 

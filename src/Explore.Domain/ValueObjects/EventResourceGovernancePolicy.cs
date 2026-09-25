@@ -192,6 +192,15 @@ public sealed class EventResourceGovernancePolicy : IEquatable<EventResourceGove
             || !Uri.TryCreate(origin, UriKind.Absolute, out Uri? uri)
             || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
             || string.IsNullOrEmpty(uri.Host)
+            || uri.HostNameType != UriHostNameType.Dns
+            || uri.IsLoopback
+            || !uri.IdnHost.Contains('.')
+            || uri.IdnHost.EndsWith(".", StringComparison.Ordinal)
+            || uri.IdnHost.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+            || uri.IdnHost.EndsWith(".local", StringComparison.OrdinalIgnoreCase)
+            || uri.IdnHost.EndsWith(".internal", StringComparison.OrdinalIgnoreCase)
+            || uri.IdnHost.Split('.').Any(label => label.StartsWith("xn--", StringComparison.OrdinalIgnoreCase))
+            || origin.Any(character => character > 127)
             || !string.IsNullOrEmpty(uri.UserInfo))
         {
             return false;

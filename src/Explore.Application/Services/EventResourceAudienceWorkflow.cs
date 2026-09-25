@@ -192,7 +192,10 @@ public sealed class EventResourceAudienceWorkflow(
             row.AudienceRules.Any(rule => rule.AudienceKindId == (int)EventResourceAudienceKindEnum.Public)
                 ? "public" : "eligibility-required",
             privateMetadata ? row.Description : null, privateMetadata ? row.LanguageCode : null,
-            privateMetadata ? row.AccessibilityNote : null, alternative, privateMetadata ? file : null);
+            privateMetadata ? row.AccessibilityNote : null, alternative, privateMetadata ? file : null,
+            privateMetadata && disclosure.CanAccess
+                && row.EventResourceDeliveryTypeId == (int)EventResourceDeliveryTypeEnum.ExternalLink
+                ? row.ExternalDestinationSafeOrigin : null);
     }
 
     private static EventResourceAudienceFailure Failure(EventResourceAuthorityOutcome outcome) => outcome switch

@@ -29,6 +29,7 @@ var apiHost = builder.AddApiHostServices(
     () => shutdownState.IsShuttingDown,
     ownsDevelopmentMigrations: false);
 builder.AddBlazorHostServices(hostProfile, shutdownState);
+builder.Services.AddCombinedApiDataProtection();
 builder.Services.AddCombinedApiBridge();
 builder.AddStandaloneSchedulerDashboard();
 

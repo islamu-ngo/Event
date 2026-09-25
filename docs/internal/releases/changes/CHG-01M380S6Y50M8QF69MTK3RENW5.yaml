@@ -1,0 +1,33 @@
+# Resource configuration portability and administrator read authority.
+Change-Id: CHG-01M380S6Y50M8QF69MTK3RENW5
+Title: "enforce native resource configuration contracts"
+Type: fix
+Scope: events
+Summary: "Classify resource handlers and privacy fields, secure administrator binding reads, and make governed JSON settings portable through typed schemas."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Anonymous administrator binding reads now receive 401 before the fresh instance-admin check rather than handler-level 403.
+  Security:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Admin endpoint authentication is explicit; resource manager attribution is classified and resource configuration arrays reject noncanonical enum tokens and unsafe origins.
+  Migration:
+    Reference: docs/internal/CONFIGURATION_MANIFEST.md
+    Disposition: not-applicable
+    Detail: No persistence model or database migration changes.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Instance and tenant resource JSON arrays have typed closed manifest schemas and require exact enum names without silently widening defaults.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: The GET route already advertised 401 and 403; request and response schemas do not change.
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Sign in with current instance-administrator authority before reading deployment bindings and keep configured resource origin arrays canonical.

@@ -8,6 +8,8 @@ public static class RouteNames
 {
     public const string GetEventResourceAudienceDetail = nameof(GetEventResourceAudienceDetail);
     public const string GetEventResourceContent = nameof(GetEventResourceContent);
+    public const string GetEventResourceAccess = nameof(GetEventResourceAccess);
+    public const string SetEventResourceDestination = nameof(SetEventResourceDestination);
     public const string CreateEventResourceUploadSession = nameof(CreateEventResourceUploadSession);
     public const string ListEventResources = nameof(ListEventResources);
     public const string ExportEventResourceMetadata = nameof(ExportEventResourceMetadata);

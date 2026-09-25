@@ -223,7 +223,34 @@ The manifest catalogs are independent allowlists:
 - tenant catalog membership does not imply instance catalog membership;
 - adding a definition to `SettingRegistry` does not expose it to a manifest;
 - a sensitive setting is rejected even before the generic allowlist error;
-- free-form JSON settings are not admitted through the scalar catalog.
+- free-form JSON settings are not admitted: JSON entries require an explicit
+  `ConfigurationManifestStringArrayDescriptor` in the Application catalog.
+
+### Event-resource policy arrays
+
+Both instance and tenant settings (including `TenantConfigurationPackage`) accept
+these four JSON arrays. Their immutable catalog descriptors are shared by
+`ConfigurationManifestValidator` and the native schema generator; no shape is
+inferred from a default value or added to the Domain setting registry.
+
+| Key | String items |
+|---|---|
+| `event_resources.enabled_delivery_types` | Exact `EventResourceDeliveryTypeEnum` names: `StoredFile`, `ExternalLink` |
+| `event_resources.enabled_audiences` | Exact `EventResourceAudienceKindEnum` names |
+| `event_resources.permitted_file_types` | The closed PDF, DOCX, and PPTX MIME constants on `EventResourceGovernancePolicy` |
+| `event_resources.external_origins` | Canonical HTTPS origin strings, validated by the native Domain policy |
+
+The schemas emit `type: array` and string `items`, with ordinal `enum` values for
+the first three settings. Origins remain typed strings in the schema: native
+validation additionally rejects unsafe or noncanonical authorities, paths,
+credentials, queries, and fragments. Schema validation alone is not a substitute
+for native policy validation or coordinated non-widening tenant mutation.
+
+Empty arrays are valid explicit empty permissions, not a request for defaults.
+Duplicate items are accepted and collapse to sets in the native policy. Null,
+objects, scalar values, and non-string items are rejected. The native parser
+accepts only exact enum names, never case-folded, whitespace-padded, numeric, or
+comma-combined tokens. Defaults and policy ceilings are unchanged.
 
 ### Instance settings
 

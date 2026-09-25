@@ -9,5 +9,5 @@ public sealed record GetEventResourceContentQuery(Guid ResourceId, DateTimeOffse
     public override string ToString() => nameof(GetEventResourceContentQuery);
 }
 
-public sealed record CompleteEventResourceContentQuery(EventResourceAuthorityLease Lease)
+public sealed record GetEventResourceContentHeadersQuery(EventResourceAuthorityLease Lease)
     : IQuery<EventResourceHeaderResult>;

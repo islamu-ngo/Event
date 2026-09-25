@@ -12,10 +12,10 @@ public sealed class GetEventResourceContentQueryHandler(EventResourceContentServ
         content.PrepareAsync(query.ResourceId, query.DeadlineUtc, cancellationToken);
 }
 
-public sealed class CompleteEventResourceContentQueryHandler(EventResourceAuthorityOrchestrator authority)
-    : IQueryHandler<CompleteEventResourceContentQuery, EventResourceHeaderResult>
+public sealed class GetEventResourceContentHeadersQueryHandler(EventResourceAuthorityOrchestrator authority)
+    : IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult>
 {
-    public Task<EventResourceHeaderResult> QueryAsync(CompleteEventResourceContentQuery query,
+    public Task<EventResourceHeaderResult> QueryAsync(GetEventResourceContentHeadersQuery query,
         CancellationToken cancellationToken = default) =>
         authority.CompleteHeadersAsync(query.Lease, cancellationToken);
 }

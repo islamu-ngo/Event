@@ -137,7 +137,7 @@ public static class HttpClientExtensions
         .AddHttpMessageHandler<TenantHeaderForwardingHandler>()
         .AddHttpMessageHandler<SetupSecretForwardingHandler>()
         .AddHttpMessageHandler<SupportAccessForwardingHandler>()
-        .ConfigureApiTransport(environment, profile);
+        .ConfigureApiTransport(environment, profile, allowAutoRedirect: interfaceType != typeof(IEventResourcesClient));
     }
 
     private static IHttpClientBuilder ConfigureApiTransport(

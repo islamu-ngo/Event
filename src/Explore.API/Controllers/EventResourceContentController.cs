@@ -36,7 +36,7 @@ namespace Explore.API.Controllers;
 public sealed class EventResourceContentController(
     ICommandHandler<CreateEventResourceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> upload,
     IQueryHandler<GetEventResourceContentQuery, EventResourceAuthorityResult> content,
-    IQueryHandler<CompleteEventResourceContentQuery, EventResourceHeaderResult> completion,
+    IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult> completion,
     IOptions<RequestTimeoutOptions> timeouts,
     TimeProvider clock) : ControllerBase
 {

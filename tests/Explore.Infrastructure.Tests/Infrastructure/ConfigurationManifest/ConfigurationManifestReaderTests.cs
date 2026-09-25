@@ -84,6 +84,35 @@ public sealed class ConfigurationManifestReaderTests
     }
 
     [Test]
+    [Arguments("[]", true)]
+    [Arguments("[\"StoredFile\",\"StoredFile\"]", true)]
+    [Arguments("[\"storedfile\"]", false)]
+    [Arguments("[\" StoredFile\"]", false)]
+    [Arguments("[\"StoredFile,StoredFile\"]", false)]
+    [Arguments("[\"1\"]", false)]
+    [Arguments("[1]", false)]
+    [Arguments("[null]", false)]
+    [Arguments("{}", false)]
+    public async Task ReadStreamAsync_ResourceArrayUsesStrictNativeContract(string value, bool accepted)
+    {
+        string json = ValidManifest.Replace("\"settings\": {}",
+            $"\"settings\": {{\"event_resources.enabled_delivery_types\":{value}}}", StringComparison.Ordinal);
+        await using var stream = Utf8(json);
+        if (accepted)
+        {
+            var result = await _reader.ReadStreamAsync(stream, ConfigurationManifestMode.ValidateOnly, CancellationToken.None);
+            await Assert.That(result.Manifest.Spec.Instance.Settings["event_resources.enabled_delivery_types"].GetRawText())
+                .IsEqualTo(value);
+        }
+        else
+        {
+            var exception = await CaptureIngestionAsync(() => _reader.ReadStreamAsync(
+                stream, ConfigurationManifestMode.ValidateOnly, CancellationToken.None));
+            await Assert.That(exception.FailureCode).IsEqualTo(ConfigurationManifestFailureCodes.ValueInvalid);
+        }
+    }
+
+    [Test]
     public async Task ReadStreamAsync_EmptyStream_FailsClosed()
     {
         await using var stream = new MemoryStream();

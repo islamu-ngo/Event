@@ -46,7 +46,7 @@ public sealed class EventResourceProviderActivationHttpTests
         using var anonymous = CreateClient(factory);
 
         using (HttpResponseMessage read = await anonymous.GetAsync(BindingsPath, Token))
-            await AssertDeniedAsync(read, HttpStatusCode.Forbidden);
+            await AssertDeniedAsync(read, HttpStatusCode.Unauthorized);
         using (HttpResponseMessage write = await anonymous.PostAsJsonAsync(BeginPath,
                    new { deploymentId = Guid.CreateVersion7() }, Token))
             await AssertDeniedAsync(write, HttpStatusCode.Unauthorized);

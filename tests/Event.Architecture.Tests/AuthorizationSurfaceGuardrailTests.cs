@@ -21,15 +21,15 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
         new(
-            "Explore.Application.Features.EventResourceProviderActivation.BindEventResourceProviderCommand",
+            "Explore.Application.Features.EventResourceProviderActivation.Requests.Commands.BindEventResourceProviderCommand",
             "handler-current-instance-administrator",
             "EventResourceProviderControlPlane checks current persisted instance administrator authority inside the native setting lock and ReadCommitted transaction before binding aliases and closing deployment authority. EventResourceProviderActivationHttpTests verifies authenticated non-admin denial, binding revision conflict and private responses; EventResourceProviderControlPlaneTests verifies atomic binding and fence persistence."),
         new(
-            "Explore.Application.Features.EventResourceProviderActivation.BeginEventResourceProviderOperationCommand",
+            "Explore.Application.Features.EventResourceProviderActivation.Requests.Commands.BeginEventResourceProviderOperationCommand",
             "handler-current-instance-administrator",
             "EventResourceProviderControlPlane rechecks current persisted instance administrator authority inside the setting lock and transaction before advancing the deployment operation and epoch. EventResourceProviderActivationHttpTests verifies that persisted administrator revocation rejects a repeated Idempotency-Key rather than replaying its earlier operation receipt."),
         new(
-            "Explore.Application.Features.EventResourceProviderActivation.ActivateEventResourceProviderCommand",
+            "Explore.Application.Features.EventResourceProviderActivation.Requests.Commands.ActivateEventResourceProviderCommand",
             "handler-current-instance-administrator",
             "Current persisted instance administrator authority, exact operation/epoch ownership and complete convergence attestation gate activation inside one setting-locked transaction. EventResourceProviderActivationHttpTests verifies stale operation and epoch rejection, incomplete attestation remaining closed and explicit recovery; generic response replay is suppressed on every activation write."),
         new(

@@ -121,7 +121,7 @@ public static class ConfigurationManifestJsonSchemaGenerator
                     "The ConfigurationManifest tenant-section setting catalog is not safe.");
             }
 
-            if (definition.ValueType == SettingValueType.Json)
+            if (definition.ValueType == SettingValueType.Json && entry.StringArray is null)
             {
                 throw new InvalidOperationException(
                     "JSON settings require an explicit typed schema descriptor.");
@@ -630,6 +630,8 @@ public static class ConfigurationManifestJsonSchemaGenerator
                 new JsonObject { ["type"] = "integer" },
             SettingValueType.Boolean => new JsonObject { ["type"] = "boolean" },
             SettingValueType.Decimal => new JsonObject { ["type"] = "number" },
+            SettingValueType.Json when entry.StringArray is { } descriptor =>
+                StringArraySchema(descriptor),
             SettingValueType.DateTime => new JsonObject
             {
                 ["type"] = "string",
@@ -648,6 +650,15 @@ public static class ConfigurationManifestJsonSchemaGenerator
         }
 
         return schema;
+    }
+
+    private static JsonObject StringArraySchema(ConfigurationManifestStringArrayDescriptor descriptor)
+    {
+        var items = new JsonObject { ["type"] = "string", ["minLength"] = 1 };
+        if (descriptor.AllowedValues is { } allowedValues)
+            items["enum"] = Strings(allowedValues.Order(StringComparer.Ordinal));
+
+        return new JsonObject { ["type"] = "array", ["items"] = items };
     }
 
     private static JsonObject TenantDocumentsSchema(

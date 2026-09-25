@@ -133,5 +133,6 @@ public sealed partial class EventResourceManagementWorkflow
                 rule.EventTicketTypeId, (AdmissionTargetTypeEnum?)rule.AdmissionTargetTypeId, rule.AdmissionTargetId,
                 rule.AdmissionTargetScopeId, rule.RequireConfirmedOrder, rule.RequireParticipantApproval,
                 rule.RequireParticipantCompletion)).ToImmutableArray()
-        }, resource.CreatedAt, resource.UpdatedAt);
+        }, resource.CreatedAt, resource.UpdatedAt,
+        ExternalDestinationSafeOrigin: resource.ExternalDestinationSafeOrigin);
 }

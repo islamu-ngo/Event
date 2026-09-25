@@ -8,7 +8,7 @@ namespace Explore.API.Models;
 /// <summary>Completes the native lease at result execution, after asynchronous action/result preparation.</summary>
 public sealed class EventResourceFileResult(
     EventResourceAuthorityResult pending,
-    IQueryHandler<CompleteEventResourceContentQuery, EventResourceHeaderResult> completion,
+    IQueryHandler<GetEventResourceContentHeadersQuery, EventResourceHeaderResult> completion,
     Func<EventResourceAuthorityOutcome, IActionResult> failure) : IActionResult
 {
     public async Task ExecuteResultAsync(ActionContext context)

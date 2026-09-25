@@ -33,6 +33,25 @@ public sealed partial class EventResourceManagementPersistenceTests
     }
 
     [Test]
+    public async Task ForeignSessionDraftIsRejectedWithoutResourceRulesOrAudit()
+    {
+        var (scope, actor) = await SeedAsync();
+        Guid resourceId = Guid.CreateVersion7();
+        await using (var context = database.CreateContext())
+        {
+            var result = await Workflow(context, scope.TenantAId, actor)
+                .CreateAsync(scope.EventAId, resourceId, Draft() with { EventSessionId = scope.SessionBId }, default);
+            await Assert.That(result.IsSuccess).IsFalse();
+        }
+
+        await using var verify = database.CreateContext();
+        await Assert.That(await verify.EventResources.AnyAsync(value => value.Id == resourceId)).IsFalse();
+        await Assert.That(await verify.Set<EventResourceAudienceRule>()
+            .AnyAsync(value => value.EventResourceId == resourceId)).IsFalse();
+        await Assert.That(await verify.EventResourceAuditEntries.AnyAsync(value => value.EventResourceId == resourceId)).IsFalse();
+    }
+
+    [Test]
     public async Task RequiredAuditFailureRollsBackMetadataAndPolicyReplacement()
     {
         var (scope, actor) = await SeedAsync();

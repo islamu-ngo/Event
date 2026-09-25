@@ -254,6 +254,15 @@ separate approval under the optional-service distribution boundary.
 
 ### Persistent Keys And Backup Boundaries
 
+Standalone `appsettings.json` binds `Storage:Local:RootPath` to
+`/app/data/storage`, within the same durable mount as the default SQLite database.
+Explicit configuration overrides remain authoritative and require a separately
+preserved mount when outside `/app/data`. `LocalFileStorageOptions` keeps its
+generic-host default; this is a Standalone composition decision, not a new storage
+provider or runtime migration. Earlier relative-root uploads must be copied and
+reconciled with writes stopped before replacing their container; follow
+[Storage relocation](STORAGE.md#relocating-earlier-standalone-uploads).
+
 `AddApiHostServices` persists Data Protection keys through
 `DataProtectionKeyContext` in the selected primary database. Combined Standalone
 reuses that registration when no Redis cache connection is supplied; it does

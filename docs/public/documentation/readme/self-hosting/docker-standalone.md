@@ -62,6 +62,12 @@ on an abandoned lock. This does not change the one-replica requirement.
 
 ISLAMU Event Standalone requires persistent storage mounted at `/app/data` to retain the primary database, privacy-erasure authority, Data Protection keys, and uploaded media:
 
+Local upload bytes default to `/app/data/storage`, even without an explicit root
+setting. A deployment override uses `Storage__Local__RootPath` and still wins;
+mount and back up that directory too if it is outside `/app/data`. The
+`LOCAL_STORAGE_ROOT_PATH` alias is translated by Docker Compose, not by
+Standalone's direct `docker run --env-file` invocation.
+
 ```bash
 docker volume create event_standalone_data
 ```
@@ -90,7 +96,7 @@ ASPNETCORE_ENVIRONMENT=Production
 SECRET_PROVIDER=Environment
 DATABASE_PROVIDER=sqlite
 DEPLOYMENT_MODE=SingleTenant
-LOCAL_STORAGE_ROOT_PATH=/app/data/storage
+Storage__Local__RootPath=/app/data/storage
 
 # Bounded SQLite profile: optional processing stays off
 Webhooks__Enabled=false
@@ -314,6 +320,35 @@ server {
 ---
 
 ## 6. Backup and Recovery
+
+### Relocating uploads from an earlier default
+
+Older Standalone images without an explicit root stored uploads in
+`storage-data/local` relative to the application's working directory, outside
+the default data volume. Changing the default does not move those files.
+
+1. Before removing the old container, stop incoming writes and all workers that
+   can change or delete storage. Record the old effective root and take a
+   coordinated database, object and key-authority backup.
+2. With the old container stopped but retained, copy its entire local-storage
+   directory to `storage` inside the durable `/app/data` volume, or to your
+   explicitly configured durable root. Preserve every relative path: stored
+   object keys do not change. Use host-side/container-volume tools; the chiseled
+   application image has no shell.
+3. Compare the copied file counts, sizes and checksums. Resolve conflicting files
+   rather than overwriting them blindly, and ensure the non-root container user
+   can read and write the destination.
+4. Start the replacement with the chosen root while normal traffic remains
+   closed. Reconcile metadata and bytes in dry-run mode and verify representative
+   authorized downloads before reopening writes or enabling cleanup.
+
+Keep the source copy and backup until verification succeeds. If bytes are
+missing, stop and repair the copy or select the preserved durable root explicitly;
+do not delete database records to make reconciliation appear healthy. An existing
+explicit root remains in effect and needs no relocation solely because this
+default changed.
+
+### Coordinated backup
 
 Back up the primary database (including Local Identity and Data Protection keys),
 media and independent privacy-erasure authority consistently. Preserve the

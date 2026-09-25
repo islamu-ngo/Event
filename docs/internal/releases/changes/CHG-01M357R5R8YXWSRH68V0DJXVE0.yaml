@@ -1,0 +1,27 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M357R5R8YXWSRH68V0DJXVE0
+Title: "Preserve local uploads across standalone restarts"
+Type: fix
+Scope: self-hosting
+Summary: "Store standalone local file bytes beneath the durable data volume and document coordinated database and object backup with safe relocation of existing uploads."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+  Configuration:
+    Reference: docs/internal/SELF_HOSTING.md
+    Disposition: documented
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented

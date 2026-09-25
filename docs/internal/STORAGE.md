@@ -34,7 +34,7 @@ Local storage is the default provider. Its filesystem root is deployment-managed
 
 | Purpose | Key Shape | Notes |
 |---|---|---|
-| Local provider root | `Storage:Local:RootPath` / `Storage__Local__RootPath` | Deployment-managed filesystem directory or mounted volume used by the API process. Compose defaults this to `/app/storage-data/local`; Aspire uses `storage-data/aspire-local` under the repository root. |
+| Local provider root | `Storage:Local:RootPath` / `Storage__Local__RootPath` | Deployment-managed filesystem directory or mounted volume used by the API process. Standalone defaults to `/app/data/storage` within its durable data volume; Compose defaults to `/app/storage-data/local`; Aspire uses `storage-data/aspire-local` under the repository root. Explicit deployment configuration overrides the Standalone default. |
 | Local root creation | `Storage:Local:CreateRootIfMissing` / `Storage__Local__CreateRootIfMissing` | Allows the local provider to create the root directory during startup/health checks when the deployment intentionally grants that permission. |
 | Persisted settings | `s3.endpoint`, `s3.public_endpoint`, `s3.bucket_name`, `s3.region`, `s3.force_path_style`, `s3.upload_url_expiration_minutes` | Defined by storage setting definitions and surfaced through admin settings. |
 | Secrets | `storage.s3.access_key_id`, `storage.s3.secret_access_key` | External-authority bindings only; see [SECRETS.md](SECRETS.md). |
@@ -127,6 +127,7 @@ HAL links are the client source of truth for storage UI affordances. Storage obj
 Object storage is always part of the backup set when users can upload files.
 
 - Back up local object data from the Compose `local_storage_data` volume or the deployment-managed `Storage:Local:RootPath`.
+- Standalone stores local bytes at `/app/data/storage` by default alongside its primary database, which includes Data Protection keys. Capture these as coordinated backup units with the selected secret authority; preserve newer privacy-erasure authority independently of any primary rollback. An overridden root needs its own durable mount and backup.
 - Back up Aspire development object data from `storage-data/aspire-local` when preserving a local developer environment matters.
 - Back up optional S3-compatible object data from `minio_data` when the Compose `storage` profile is enabled, or from the external provider bucket when S3-compatible storage is selected.
 - Back up storage secrets and environment configuration with the same release manifest as the database backup.
@@ -134,6 +135,25 @@ Object storage is always part of the backup set when users can upload files.
 - During rollback, verify the application version still understands the stored `StorageObject` metadata and key layout.
 
 See [BACKUP_RESTORE_UPGRADE.md](BACKUP_RESTORE_UPGRADE.md) for the full operational runbook.
+
+### Relocating Earlier Standalone Uploads
+
+The new Standalone default does not move existing bytes. Before replacing an
+older container, stop application writes and reconciliation/deletion workers.
+Identify its effective local root; an unconfigured older host used
+`storage-data/local` relative to its working directory. Preserve that container
+until its bytes have been captured. Copy the complete root to the durable
+destination without changing relative object keys, compare file counts, sizes
+and checksums, and grant the non-root application process access. Do not overwrite
+conflicting destination files blindly. Keep the source and coordinated database
+backup until recovery has been verified.
+
+Start with the selected root, reconcile metadata against bytes in dry-run mode,
+and verify representative authorized downloads before reopening writes or enabling
+cleanup mutations. If validation fails, stop the host and repair the copy or
+explicitly select the preserved durable root; never delete metadata to hide drift.
+The public [Standalone recovery guide](../public/documentation/readme/self-hosting/docker-standalone.md#relocating-uploads-from-an-earlier-default)
+owns the operator procedure.
 
 ## Reconciliation And Quarantine
 

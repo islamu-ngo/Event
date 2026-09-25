@@ -22,7 +22,8 @@ Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-an
 
 | Storage Provider | Configuration | Best Fit | Operational Considerations |
 |---|---|---|---|
-| **`local`** (Default) | `STORAGE_LOCAL_ROOTPATH=/app/storage-data/local` | Single-node Docker Compose or [Standalone](../self-hosting/docker-standalone.md) | Requires mounting a persistent Docker volume on the host. |
+| **`local`** (Default, Compose) | `LOCAL_STORAGE_ROOT_PATH=/app/storage-data/local` | Single-node Docker Compose | Mount a persistent volume for the selected root. |
+| **`local`** (Default, Standalone) | `Storage__Local__RootPath` (optional; defaults to `/app/data/storage`) | [Standalone](../self-hosting/docker-standalone.md) | The default lives on the durable `/app/data` volume; persist and back up any override separately. |
 | **`s3`** | `STORAGE_S3_ENDPOINT`, `STORAGE_S3_BUCKET_NAME`, `STORAGE_S3_ACCESS_KEY_ID`, `STORAGE_S3_SECRET_ACCESS_KEY` | Multi-replica clusters and high-traffic event media | Decouples media storage from application compute nodes. |
 
 > [!TIP]
@@ -40,10 +41,22 @@ Exact content downloads at `/api/storageobject/{id}/content` use the stored obje
 
 ## 3. Disaster Recovery & Backup Integrity
 
+Standalone defaults to `/app/data/storage`, so the `/app/data` persistent volume
+retains local uploads with the default database and its Data Protection keys.
+Explicit root overrides take precedence and need their own persistent mount and
+backup when outside that volume. Before replacing an older container that used
+the relative `storage-data/local` default, stop writes, preserve and verify its
+bytes, and reconcile the copied root before reopening traffic. Follow the
+[Standalone relocation procedure](../self-hosting/docker-standalone.md#relocating-uploads-from-an-earlier-default);
+changing a root setting never migrates existing files.
+
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):
 * Restoring a database without the corresponding storage volume causes broken image links.
 * Restoring a storage volume without the database leaves orphaned, unreferenced files.
 * [Configuration Manifests](../configuration-and-operations/configuration-manifests.md) deliberately exclude binary media and do not replace storage volume backups.
+* Retain required Data Protection keys and the selected secret authority with the
+  protected data. Preserve newer privacy-erasure authority independently rather
+  than rolling it back with an older primary database.
 
 ---
 

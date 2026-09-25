@@ -45,7 +45,7 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
             return null;
         }
 
-        var storageObject = await _storageObjectRepository.GetById(storageObjectId);
+        var storageObject = await _storageObjectRepository.GetForGenericAccessAsync(storageObjectId, cancellationToken);
         if (storageObject is null)
         {
             _metrics.RecordStorageRead(null, "failed", "metadata_not_found", null);

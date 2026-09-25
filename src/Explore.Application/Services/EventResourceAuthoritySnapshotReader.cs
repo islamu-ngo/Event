@@ -432,15 +432,10 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 && governancePolicy?.AllowsExternalOrigin(resource.ExternalDestinationSafeOrigin ?? string.Empty) == true,
                 Sha256(protectedPayload));
         }
-        if (!storageById.TryGetValue(storageId, out StorageObject? storage)
-            || storage.IsDeleted || storage.LifecycleState != StorageObjectLifecycleStates.Active
-            || storage.OwningResourceId != resource.Id
-            || !string.Equals(storage.OwningResourceKind, "event_resource", StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(storage.Sha256Checksum) || string.IsNullOrWhiteSpace(storage.ObjectKey))
+        if (!storageById.TryGetValue(storageId, out StorageObject? storage))
             return (false, "missing");
-        string generation = Sha256(string.Join('|', storage.Id, storage.ConcurrencyStamp,
-            storage.Provider, storage.ObjectKey, storage.Sha256Checksum, storage.Size));
-        return (false, generation);
+        return (EventResourceFileSafety.IsSafe(storage, resource.TenantId, resource.Id, governancePolicy),
+            EventResourceFileSafety.Generation(storage));
     }
 
     private static EventResourceAudienceFact AudienceFact(

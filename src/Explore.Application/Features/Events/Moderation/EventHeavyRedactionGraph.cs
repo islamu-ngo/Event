@@ -13,4 +13,6 @@ public sealed record EventHeavyRedactionGraph(
     IReadOnlyList<EventCustomPropertyProjection> EventCustomPropertyProjections,
     IReadOnlyList<EventSessionCustomPropertyDefinition> SessionCustomPropertyDefinitions,
     IReadOnlyList<EventSessionCustomPropertyProjection> SessionCustomPropertyProjections,
-    IReadOnlyList<StorageObject> ImageStorageObjects);
+    IReadOnlyList<StorageObject> ImageStorageObjects,
+    IReadOnlyList<EventResource> Resources,
+    IReadOnlyList<StorageObject> ResourceStorageObjects);

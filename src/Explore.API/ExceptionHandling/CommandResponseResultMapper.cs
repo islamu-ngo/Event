@@ -302,6 +302,9 @@ internal static class CommandResponseResultMapper
             detail,
             response.FailureCode ?? ApiProblemCodes.UnexpectedError);
 
+        if (response.QuotaExceeded is not null)
+            problemDetails.Extensions["quota"] = response.QuotaExceeded;
+
         return ApiProblemFactory.ToProblemResult(problemDetails);
     }
 
@@ -395,6 +398,11 @@ internal static class CommandResponseResultMapper
     private static int ResolveStorageUploadStatusCode(string? failureCode)
         => failureCode switch
         {
+            FailureCodes.AuthenticationRequired => StatusCodes.Status401Unauthorized,
+            FailureCodes.NotFound => StatusCodes.Status404NotFound,
+            "event_resource_forbidden" or "resource_upload_policy_denied" => StatusCodes.Status403Forbidden,
+            "event_resource_upload_conflict" => StatusCodes.Status409Conflict,
+            "event_resource_unavailable" => StatusCodes.Status503ServiceUnavailable,
             FailureCodes.StorageUploadTooLarge => StatusCodes.Status413PayloadTooLarge,
             FailureCodes.QuotaExceeded => StatusCodes.Status422UnprocessableEntity,
             FailureCodes.StorageUploadSessionNotFound => StatusCodes.Status404NotFound,
@@ -412,6 +420,11 @@ internal static class CommandResponseResultMapper
     {
         detail = failureCode switch
         {
+            FailureCodes.AuthenticationRequired => "Current upload identity is required.",
+            FailureCodes.NotFound => "Upload session was not found.",
+            "event_resource_forbidden" or "resource_upload_policy_denied" => "Current resource upload authority is required.",
+            "event_resource_upload_conflict" => "Refresh the resource before retrying the upload.",
+            "event_resource_unavailable" => "Resource upload authority could not be established.",
             FailureCodes.StorageUploadTooLarge => "Upload exceeds the configured per-file limit.",
             FailureCodes.QuotaExceeded => "Storage quota has been exceeded.",
             FailureCodes.StorageUploadSessionNotFound => "Upload session was not found.",
@@ -431,6 +444,8 @@ internal static class CommandResponseResultMapper
     private static string ResolveStorageUploadTitle(int statusCode)
         => statusCode switch
         {
+            StatusCodes.Status401Unauthorized => "Upload identity required",
+            StatusCodes.Status403Forbidden => "Resource upload authority required",
             StatusCodes.Status404NotFound => "Storage upload session not found",
             StatusCodes.Status409Conflict => "Storage upload session conflict",
             StatusCodes.Status413PayloadTooLarge => "Storage upload is too large",
@@ -444,6 +459,8 @@ internal static class CommandResponseResultMapper
             ? "/problems/quota_exceeded"
             : statusCode switch
             {
+                StatusCodes.Status401Unauthorized => ApiProblemTypes.Unauthorized,
+                StatusCodes.Status403Forbidden => ApiProblemTypes.Forbidden,
                 StatusCodes.Status404NotFound => ApiProblemTypes.NotFound,
                 StatusCodes.Status409Conflict => ApiProblemTypes.Conflict,
                 StatusCodes.Status413PayloadTooLarge => ApiProblemTypes.PayloadTooLarge,

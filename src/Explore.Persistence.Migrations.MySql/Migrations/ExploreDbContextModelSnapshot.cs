@@ -30105,6 +30105,14 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("deleted_by");
 
+                    b.Property<string>("DocumentSafetyState")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("unavailable")
+                        .HasColumnName("document_safety_state");
+
                     b.Property<string>("Extension")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -30120,6 +30128,15 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)")
                         .HasColumnName("full_name");
+
+                    b.Property<Guid?>("InspectedObjectId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("inspected_object_id");
+
+                    b.Property<string>("InspectedSha256Checksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("inspected_sha256_checksum");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("tinyint(1)")
@@ -30154,6 +30171,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Property<byte[]>("ProviderObjectKeyUniquenessHash")
                         .HasColumnType("binary(32)")
                         .HasColumnName("provider_object_key_uniqueness_hash");
+
+                    b.Property<string>("ProviderVersionId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)")
+                        .HasColumnName("provider_version_id");
 
                     b.Property<string>("Purpose")
                         .IsRequired()
@@ -30192,6 +30214,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Property<long>("Size")
                         .HasColumnType("bigint")
                         .HasColumnName("size");
+
+                    b.Property<Guid?>("StorageProviderBindingId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("storage_provider_binding_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("char(36)")
@@ -30233,6 +30259,9 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_storage_objects_provider_object_key_uniqueness_hash");
 
+                    b.HasIndex("StorageProviderBindingId")
+                        .HasDatabaseName("ix_storage_objects_storage_provider_binding_id");
+
                     b.HasIndex("TenantId", "OwningResourceKind", "OwningResourceId")
                         .HasDatabaseName("ix_ie_storage_objects_tenant_id_owning_resource_kind_ow_fcd295ef")
                         .HasFilter("owning_resource_kind IS NOT NULL AND owning_resource_id IS NOT NULL");
@@ -30245,16 +30274,134 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
 
                     b.ToTable("ie_storage_objects", null, t =>
                         {
+                            t.HasCheckConstraint("ck_storage_objects_document_safety", "document_safety_state IN ('unavailable', 'unscanned', 'rejected')");
+
+                            t.HasCheckConstraint("ck_storage_objects_inspection_binding", "document_safety_state <> 'unscanned' OR (purpose = 'event_resource' AND inspected_object_id IS NOT NULL AND inspected_object_id = id AND inspected_sha256_checksum IS NOT NULL AND sha256_checksum IS NOT NULL AND inspected_sha256_checksum = sha256_checksum)");
+
                             t.HasCheckConstraint("ck_storage_objects_lifecycle_state", "lifecycle_state IN ('pending', 'active', 'quarantined', 'delete_requested', 'deleted')");
 
                             t.HasCheckConstraint("ck_storage_objects_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
 
-                            t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset')");
+                            t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
+
+                            t.HasCheckConstraint("ck_storage_objects_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");
 
                             t.HasCheckConstraint("ck_storage_objects_size_nonnegative", "size >= 0");
 
                             t.HasCheckConstraint("ck_storage_objects_visibility", "visibility IN ('public_image', 'authenticated_tenant', 'private_owner')");
                         });
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageObjectDeletionTombstone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("lease_expires_at_utc");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("ProviderBindingId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("provider_binding_id");
+
+                    b.Property<string>("ProviderObjectVersion")
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)")
+                        .HasColumnName("provider_object_version");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_storage_object_deletion_tombstones");
+
+                    b.HasIndex("ProviderBindingId")
+                        .HasDatabaseName("ix_storage_object_deletion_tombstones_provider_binding_id");
+
+                    b.HasIndex("State", "LeaseExpiresAtUtc", "Id")
+                        .HasDatabaseName("ix_ie_storage_object_deletion_tombstones_state_lease_ex_1a600b07");
+
+                    b.HasIndex("State", "NextAttemptAtUtc", "Id")
+                        .HasDatabaseName("ix_ie_storage_object_deletion_tombstones_state_next_att_a79a8478");
+
+                    b.ToTable("ie_storage_object_deletion_tombstones", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_storage_deletion_identity", "id <> '00000000-0000-0000-0000-000000000000' AND tenant_id <> '00000000-0000-0000-0000-000000000000' AND concurrency_stamp <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_storage_deletion_provider", "provider IN ('local', 's3_compatible') AND object_key <> ''");
+
+                            t.HasCheckConstraint("ck_storage_deletion_state", "(state = 1 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL) OR (state = 2 AND next_attempt_at_utc IS NOT NULL AND lease_expires_at_utc IS NULL) OR (state = 3 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NOT NULL) OR (state = 4 AND next_attempt_at_utc IS NULL AND lease_expires_at_utc IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BucketName")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("bucket_name");
+
+                    b.Property<string>("Endpoint")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<bool>("ForcePathStyle")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("force_path_style");
+
+                    b.Property<string>("LocalRootPath")
+                        .HasMaxLength(4096)
+                        .HasColumnType("varchar(4096)")
+                        .HasColumnName("local_root_path");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)")
+                        .HasColumnName("region");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_storage_provider_bindings");
+
+                    b.ToTable("ie_storage_provider_bindings", (string)null);
                 });
 
             modelBuilder.Entity("Explore.Domain.StorageUploadSession", b =>
@@ -30287,6 +30434,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("created_by");
 
+                    b.Property<Guid?>("ExpectedResourceVersion")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("expected_resource_version");
+
                     b.Property<long>("ExpectedSizeBytes")
                         .HasColumnType("bigint")
                         .HasColumnName("expected_size_bytes");
@@ -30317,6 +30468,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Property<DateTime?>("FinalizedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("finalized_at");
+
+                    b.Property<Guid?>("FinalizedResourceVersion")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("finalized_resource_version");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(128)
@@ -30351,11 +30506,20 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("varchar(64)")
                         .HasColumnName("policy_version");
 
+                    b.Property<bool>("ProducerSettled")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("producer_settled");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)")
                         .HasColumnName("provider");
+
+                    b.Property<string>("ProviderVersionId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("varchar(1024)")
+                        .HasColumnName("provider_version_id");
 
                     b.Property<string>("Purpose")
                         .IsRequired()
@@ -30394,6 +30558,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("storage_object_id");
 
+                    b.Property<Guid?>("StorageProviderBindingId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("storage_provider_binding_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("char(36)")
                         .HasColumnName("tenant_id");
@@ -30423,8 +30591,8 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.HasKey("Id")
                         .HasName("pk_ie_storage_upload_sessions");
 
-                    b.HasIndex("StorageObjectId")
-                        .HasDatabaseName("ix_storage_upload_sessions_storage_object_id");
+                    b.HasIndex("StorageProviderBindingId")
+                        .HasDatabaseName("ix_storage_upload_sessions_storage_provider_binding_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_storage_upload_sessions_user_id");
@@ -30438,6 +30606,9 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_storage_upload_sessions_tenant_id_idempotency_key")
                         .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.HasIndex("TenantId", "StorageObjectId")
+                        .HasDatabaseName("ix_storage_upload_sessions_tenant_id_storage_object_id");
 
                     b.HasIndex("TenantId", "OwningResourceKind", "OwningResourceId")
                         .HasDatabaseName("ix_ie_storage_upload_sessions_tenant_id_owning_resource_a6a3308f")
@@ -30454,9 +30625,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
 
-                            t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset')");
+                            t.HasCheckConstraint("ck_storage_upload_sessions_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_reserved_bytes_nonnegative", "reserved_bytes >= 0");
+
+                            t.HasCheckConstraint("ck_storage_upload_sessions_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND user_id IS NOT NULL AND expected_resource_version IS NOT NULL AND expected_resource_version <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");
 
                             t.HasCheckConstraint("ck_storage_upload_sessions_route_key", "route_key IN ('images', 'documents', 'general')");
 
@@ -47347,6 +47520,12 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_storage_objects_file_types_file_type_id");
 
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("StorageProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ie_storage_objects_ie_storage_provider_bindings_stor_e20817d1");
+
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -47361,13 +47540,188 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Explore.Domain.StorageObjectDeletionTombstone", b =>
+                {
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ProviderBindingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_storage_object_deletion_tombstones_ie_storage_pro_fcd33d88");
+                });
+
+            modelBuilder.Entity("Explore.Domain.StorageProviderBinding", b =>
+                {
+                    b.OwnsOne("Explore.Domain.Secrets.RetainedSecretReference", "AccessKeyReference", b1 =>
+                        {
+                            b1.Property<Guid>("StorageProviderBindingId")
+                                .HasColumnType("char(36)")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Authority")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("varchar(32)")
+                                .HasColumnName("access_key_reference_authority");
+
+                            b1.Property<string>("AuthorityEndpoint")
+                                .HasMaxLength(2048)
+                                .HasColumnType("varchar(2048)")
+                                .HasColumnName("access_key_reference_authority_endpoint");
+
+                            b1.Property<string>("AuthorityProject")
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("access_key_reference_authority_project");
+
+                            b1.Property<Guid?>("BindingId")
+                                .HasColumnType("char(36)")
+                                .HasColumnName("access_key_reference_binding_id");
+
+                            b1.Property<string>("EnvironmentVariableName")
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("access_key_reference_environment_variable_name");
+
+                            b1.Property<string>("InfisicalEnvironment")
+                                .HasMaxLength(64)
+                                .HasColumnType("varchar(64)")
+                                .HasColumnName("access_key_reference_infisical_environment");
+
+                            b1.Property<string>("InfisicalKey")
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("access_key_reference_infisical_key");
+
+                            b1.Property<string>("InfisicalPath")
+                                .HasMaxLength(512)
+                                .HasColumnType("varchar(512)")
+                                .HasColumnName("access_key_reference_infisical_path");
+
+                            b1.Property<string>("Qualifier")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("varchar(128)")
+                                .HasColumnName("access_key_reference_qualifier");
+
+                            b1.Property<int>("Scope")
+                                .HasColumnType("int")
+                                .HasColumnName("access_key_reference_scope");
+
+                            b1.Property<Guid?>("ScopeId")
+                                .HasColumnType("char(36)")
+                                .HasColumnName("access_key_reference_scope_id");
+
+                            b1.Property<string>("SettingKey")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("access_key_reference_setting_key");
+
+                            b1.Property<int>("SourceType")
+                                .HasColumnType("int")
+                                .HasColumnName("access_key_reference_source_type");
+
+                            b1.HasKey("StorageProviderBindingId");
+
+                            b1.ToTable("ie_storage_provider_bindings");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StorageProviderBindingId")
+                                .HasConstraintName("fk_storage_provider_bindings_storage_provider_bindings_id");
+                        });
+
+                    b.OwnsOne("Explore.Domain.Secrets.RetainedSecretReference", "SecretKeyReference", b1 =>
+                        {
+                            b1.Property<Guid>("StorageProviderBindingId")
+                                .HasColumnType("char(36)")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Authority")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("varchar(32)")
+                                .HasColumnName("secret_key_reference_authority");
+
+                            b1.Property<string>("AuthorityEndpoint")
+                                .HasMaxLength(2048)
+                                .HasColumnType("varchar(2048)")
+                                .HasColumnName("secret_key_reference_authority_endpoint");
+
+                            b1.Property<string>("AuthorityProject")
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("secret_key_reference_authority_project");
+
+                            b1.Property<Guid?>("BindingId")
+                                .HasColumnType("char(36)")
+                                .HasColumnName("secret_key_reference_binding_id");
+
+                            b1.Property<string>("EnvironmentVariableName")
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("secret_key_reference_environment_variable_name");
+
+                            b1.Property<string>("InfisicalEnvironment")
+                                .HasMaxLength(64)
+                                .HasColumnType("varchar(64)")
+                                .HasColumnName("secret_key_reference_infisical_environment");
+
+                            b1.Property<string>("InfisicalKey")
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("secret_key_reference_infisical_key");
+
+                            b1.Property<string>("InfisicalPath")
+                                .HasMaxLength(512)
+                                .HasColumnType("varchar(512)")
+                                .HasColumnName("secret_key_reference_infisical_path");
+
+                            b1.Property<string>("Qualifier")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("varchar(128)")
+                                .HasColumnName("secret_key_reference_qualifier");
+
+                            b1.Property<int>("Scope")
+                                .HasColumnType("int")
+                                .HasColumnName("secret_key_reference_scope");
+
+                            b1.Property<Guid?>("ScopeId")
+                                .HasColumnType("char(36)")
+                                .HasColumnName("secret_key_reference_scope_id");
+
+                            b1.Property<string>("SettingKey")
+                                .IsRequired()
+                                .HasMaxLength(256)
+                                .HasColumnType("varchar(256)")
+                                .HasColumnName("secret_key_reference_setting_key");
+
+                            b1.Property<int>("SourceType")
+                                .HasColumnType("int")
+                                .HasColumnName("secret_key_reference_source_type");
+
+                            b1.HasKey("StorageProviderBindingId");
+
+                            b1.ToTable("ie_storage_provider_bindings");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StorageProviderBindingId")
+                                .HasConstraintName("fk_storage_provider_bindings_storage_provider_bindings_id");
+                        });
+
+                    b.Navigation("AccessKeyReference");
+
+                    b.Navigation("SecretKeyReference");
+                });
+
             modelBuilder.Entity("Explore.Domain.StorageUploadSession", b =>
                 {
-                    b.HasOne("Explore.Domain.StorageObject", "StorageObject")
+                    b.HasOne("Explore.Domain.StorageProviderBinding", null)
                         .WithMany()
-                        .HasForeignKey("StorageObjectId")
+                        .HasForeignKey("StorageProviderBindingId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_ie_storage_upload_sessions_ie_storage_objects_storag_bd352737");
+                        .HasConstraintName("fk_ie_storage_upload_sessions_ie_storage_provider_bindi_e5a80ab3");
 
                     b.HasOne("Explore.Domain.Tenant", "Tenant")
                         .WithMany()
@@ -47381,6 +47735,13 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_storage_upload_sessions_users_user_id");
+
+                    b.HasOne("Explore.Domain.StorageObject", "StorageObject")
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StorageObjectId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ie_storage_upload_sessions_ie_storage_objects_tenant_a20534e6");
 
                     b.Navigation("StorageObject");
 

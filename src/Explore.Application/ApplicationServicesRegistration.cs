@@ -333,6 +333,10 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IEventResourceGovernancePolicyReader, EventResourceGovernancePolicyReader>();
         services.AddScoped<EventResourceAuditRetentionService>();
         services.AddScoped<EventResourceManagementWorkflow>();
+        services.AddScoped<EventResourceFileUploadWorkflow>();
+        services.AddScoped<EventResourceContentService>();
+        services.AddScoped<IEventResourceStorageCleanupService, EventResourceStorageCleanupService>();
+        services.AddScoped<EventResourceStorageLifecycleService>();
         services.AddScoped<EventResourceAudienceWorkflow>();
         services.AddScoped<SettingUpsertService>();
         services.AddScoped<ManagedTenantProvisioningPreflight>();

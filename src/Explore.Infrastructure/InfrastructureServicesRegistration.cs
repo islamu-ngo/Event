@@ -358,6 +358,7 @@ public static class InfrastructureServicesRegistration
         services.AddSingleton<IFileStorageProvider, LocalFileStorageProvider>();
         services.AddScoped<IFileStorageProvider, S3FileStorageProvider>();
         services.AddScoped<IFileStorageProviderResolver, FileStorageProviderResolver>();
+        services.AddScoped<IStorageProviderBindingService, StorageProviderBindingService>();
         services.AddScoped<IStorageObjectDeletionService, StorageObjectDeletionService>();
 
         // Identity services

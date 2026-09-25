@@ -244,6 +244,34 @@ public sealed class CommandResponseResultMapperTests
     }
 
     [Test]
+    [Arguments("event_resource_upload_conflict", 409)]
+    [Arguments("resource_upload_policy_denied", 403)]
+    [Arguments("event_resource_forbidden", 403)]
+    [Arguments("event_resource_unavailable", 503)]
+    [Arguments(FailureCodes.NotFound, 404)]
+    [Arguments(FailureCodes.AuthenticationRequired, 401)]
+    public async Task ResourceUploadFailuresKeepTheirNativeStatusWithoutDiagnosticEcho(string code, int status)
+    {
+        const string diagnostic = "private-provider-diagnostic";
+        var result = CreateController().ToStorageUploadProblem(StorageFailure(code, diagnostic));
+        var problem = (ProblemDetails)((ObjectResult)result).Value!;
+        await Assert.That(problem.Status).IsEqualTo(status);
+        await Assert.That(problem.Extensions["code"]).IsEqualTo(code);
+        await Assert.That(problem.Detail).DoesNotContain(diagnostic);
+    }
+
+    [Test]
+    public async Task StorageUploadQuotaPreservesStructuredLimitInformation()
+    {
+        var quota = CreateQuotaDetails();
+        var result = CreateController().ToStorageUploadProblem(
+            StorageFailure(FailureCodes.QuotaExceeded, null, quotaExceeded: quota));
+        var problem = (ProblemDetails)((ObjectResult)result).Value!;
+        await Assert.That(problem.Status).IsEqualTo(422);
+        await Assert.That(problem.Extensions["quota"]).IsSameReferenceAs(quota);
+    }
+
+    [Test]
     [Arguments(EventReportFailureCodes.UserUnresolved, 401, UnauthorizedType, "event_report_user_unresolved")]
     [Arguments(EventReportFailureCodes.ReporterActorUnresolved, 403, ForbiddenType, "event_report_actor_unresolved")]
     [Arguments(EventReportFailureCodes.ModeratorUnavailable, 403, ForbiddenType,

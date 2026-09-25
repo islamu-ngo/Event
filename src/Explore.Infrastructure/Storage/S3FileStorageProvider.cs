@@ -5,6 +5,7 @@ using Amazon.S3.Model;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models.Storage;
 using Explore.Domain;
+using OpenTelemetry;
 
 namespace Explore.Infrastructure.Storage;
 
@@ -13,15 +14,18 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
     private readonly IS3ConfigResolver _configResolver;
     private readonly IS3ClientFactory _clientFactory;
     private readonly IS3PreflightVerifier _preflightVerifier;
+    private readonly bool _boundTarget;
 
     public S3FileStorageProvider(
         IS3ConfigResolver configResolver,
         IS3ClientFactory clientFactory,
-        IS3PreflightVerifier preflightVerifier)
+        IS3PreflightVerifier preflightVerifier,
+        bool boundTarget = false)
     {
         _configResolver = configResolver;
         _clientFactory = clientFactory;
         _preflightVerifier = preflightVerifier;
+        _boundTarget = boundTarget;
     }
 
     public string Provider => StorageProviders.S3Compatible;
@@ -30,6 +34,7 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         FileStorageExistsInput input,
         CancellationToken cancellationToken)
     {
+        using var instrumentation = _boundTarget ? SuppressInstrumentationScope.Begin() : default;
         ArgumentNullException.ThrowIfNull(input);
 
         if (string.IsNullOrWhiteSpace(input.ObjectKey))
@@ -40,13 +45,15 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         var config = await ResolveRequiredConfigAsync(cancellationToken);
         var client = _clientFactory.CreateDataClient(config);
 
+        await RequireAddressableVersionAsync(client, config.BucketName, input.ProviderVersionId, cancellationToken);
         try
         {
             await client.GetObjectMetadataAsync(
                 new GetObjectMetadataRequest
                 {
                     BucketName = config.BucketName,
-                    Key = input.ObjectKey
+                    Key = input.ObjectKey,
+                    VersionId = input.ProviderVersionId
                 },
                 cancellationToken);
 
@@ -54,6 +61,8 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
+            if (!await ConfirmObjectAbsenceAsync(client, config.BucketName, ex, cancellationToken))
+                throw;
             return false;
         }
     }
@@ -62,6 +71,7 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         FileStorageWriteInput input,
         CancellationToken cancellationToken)
     {
+        using var instrumentation = _boundTarget ? SuppressInstrumentationScope.Begin() : default;
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(input.Content);
 
@@ -103,20 +113,22 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         }
 
         var client = _clientFactory.CreateDataClient(config);
-        await client.PutObjectAsync(request, cancellationToken);
+        var response = await client.PutObjectAsync(request, cancellationToken);
 
         return new FileStorageWriteResult(
             Provider,
             objectKey,
             hashingStream.BytesRead,
             input.ContentType,
-            hashingStream.GetChecksum());
+            hashingStream.GetChecksum(),
+            response.VersionId);
     }
 
     public async Task<FileStorageReadResult> OpenReadAsync(
         FileStorageReadInput input,
         CancellationToken cancellationToken)
     {
+        using var instrumentation = _boundTarget ? SuppressInstrumentationScope.Begin() : default;
         ArgumentNullException.ThrowIfNull(input);
 
         if (string.IsNullOrWhiteSpace(input.ObjectKey))
@@ -127,13 +139,15 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         var config = await ResolveRequiredConfigAsync(cancellationToken);
         var client = _clientFactory.CreateDataClient(config);
 
+        await RequireAddressableVersionAsync(client, config.BucketName, input.ProviderVersionId, cancellationToken);
         try
         {
             var response = await client.GetObjectAsync(
                 new GetObjectRequest
                 {
                     BucketName = config.BucketName,
-                    Key = input.ObjectKey
+                    Key = input.ObjectKey,
+                    VersionId = input.ProviderVersionId
                 },
                 cancellationToken);
 
@@ -145,10 +159,13 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
                 response.ResponseStream,
                 contentType,
                 response.Headers.ContentLength,
-                response.LastModified == default ? null : response.LastModified);
+                response.LastModified == default ? null : response.LastModified,
+                response.VersionId);
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
+            if (!await ConfirmObjectAbsenceAsync(client, config.BucketName, ex, cancellationToken))
+                throw;
             throw new FileNotFoundException("Stored S3 object was not found.", input.ObjectKey, ex);
         }
     }
@@ -157,6 +174,7 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
         FileStorageDeleteInput input,
         CancellationToken cancellationToken)
     {
+        using var instrumentation = _boundTarget ? SuppressInstrumentationScope.Begin() : default;
         ArgumentNullException.ThrowIfNull(input);
 
         if (string.IsNullOrWhiteSpace(input.ObjectKey))
@@ -166,21 +184,26 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
 
         var config = await ResolveRequiredConfigAsync(cancellationToken);
         var client = _clientFactory.CreateDataClient(config);
-        await client.DeleteObjectAsync(
+        await RequireAddressableVersionAsync(client, config.BucketName, input.ProviderVersionId, cancellationToken);
+        var response = await client.DeleteObjectAsync(
             new DeleteObjectRequest
             {
                 BucketName = config.BucketName,
-                Key = input.ObjectKey
+                Key = input.ObjectKey,
+                VersionId = input.ProviderVersionId
             },
             cancellationToken);
 
-        return new FileStorageDeleteResult(Provider, input.ObjectKey, Deleted: true);
+        var marker = string.Equals(response.DeleteMarker, "true", StringComparison.OrdinalIgnoreCase);
+        return new FileStorageDeleteResult(Provider, input.ObjectKey, Deleted: !marker,
+            ProviderVersionId: response.VersionId ?? input.ProviderVersionId, DeleteMarkerCreated: marker);
     }
 
     public async Task<FileStorageProviderStatus> TestAsync(
         CancellationToken cancellationToken,
         bool testWritePermissions = false)
     {
+        using var instrumentation = _boundTarget ? SuppressInstrumentationScope.Begin() : default;
         var preflight = await _preflightVerifier.VerifyAsync(
             new S3PreflightRequest { TestWritePermissions = testWritePermissions },
             cancellationToken);
@@ -203,6 +226,30 @@ public sealed class S3FileStorageProvider : IFileStorageProvider
     {
         var config = await _configResolver.ResolveAsync(cancellationToken);
         return config ?? throw new InvalidOperationException("S3-compatible storage is not configured.");
+    }
+
+    private static async Task<bool> ConfirmObjectAbsenceAsync(
+        IAmazonS3 client, string bucket, AmazonS3Exception exception, CancellationToken cancellationToken)
+    {
+        if (exception.ErrorCode is "NoSuchKey" or "NoSuchVersion")
+            return true;
+        if (exception.ErrorCode is not (null or "NotFound" or "404"))
+            return false;
+        // Native HEAD responses have no error body. Verify the bucket is still available,
+        // rather than converting a retired/missing bucket's generic 404 into object absence.
+        await client.HeadBucketAsync(new HeadBucketRequest { BucketName = bucket }, cancellationToken);
+        return true;
+    }
+
+    private async Task RequireAddressableVersionAsync(
+        IAmazonS3 client, string bucket, string? versionId, CancellationToken cancellationToken)
+    {
+        if (!_boundTarget || versionId is not null)
+            return;
+        var versioning = await client.GetBucketVersioningAsync(
+            new GetBucketVersioningRequest { BucketName = bucket }, cancellationToken);
+        if (versioning.VersioningConfig.Status != VersionStatus.Off)
+            throw new InvalidOperationException("storage_object_version_required");
     }
 
     private static string BuildObjectKey(Guid tenantId, string? extension)

@@ -1,0 +1,33 @@
+# Private anonymous-access posture for the optional sample storage bucket.
+Change-Id: CHG-01M37454QV8C82D16N65WNR8M7
+Title: "keep the sample object bucket private"
+Type: fix
+Scope: storage
+Summary: "Remove anonymous sample-bucket reads and document private storage requirements while retaining public image delivery through authorized application endpoints."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Direct anonymous sample-bucket URLs stop working; public images and authenticated files use application content routes.
+  Security:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+    Detail: The optional initializer removes anonymous access from new and existing buckets while preserving authenticated provider reads.
+  Migration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+    Detail: No database schema or object-key migration; existing bucket objects and volumes are preserved.
+  Configuration:
+    Reference: docs/internal/STORAGE.md
+    Disposition: documented
+    Detail: Operators rerun the optional storage-profile initializer after upgrade or restore; this change does not modify live deployment buckets.
+  OpenAPI:
+    Reference: docs/internal/STORAGE.md
+    Disposition: not-applicable
+    Detail: Existing application content routes and generated contracts are unchanged.
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Keep the sample bucket and volume, rerun minio-init, and enforce equivalent private policy for external S3-compatible providers.

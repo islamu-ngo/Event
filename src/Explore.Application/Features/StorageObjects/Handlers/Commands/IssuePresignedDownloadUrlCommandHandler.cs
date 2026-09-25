@@ -55,11 +55,11 @@ public class IssuePresignedDownloadUrlCommandHandler : ICommandHandler<IssuePres
             return null;
         }
 
-        var storageObject = await _storageObjectRepository.GetById(request.Id);
+        var storageObject = await _storageObjectRepository.GetForGenericAccessAsync(request.Id, cancellationToken);
 
         if (storageObject == null)
         {
-            _logger.LogWarning("Storage object metadata was not found for presigned download. StorageObjectId={StorageObjectId}", request.Id);
+            _logger.LogWarning("Storage object is unavailable for generic presigned download.");
             return null;
         }
 

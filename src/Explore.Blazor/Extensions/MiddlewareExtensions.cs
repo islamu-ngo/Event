@@ -226,7 +226,7 @@ public static class MiddlewareExtensions
                 headers[HeaderNames.Expires] = "0";
                 headers["Referrer-Policy"] = "no-referrer";
             }
-            else
+            else if (!headers.ContainsKey("Referrer-Policy"))
             {
                 headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             }

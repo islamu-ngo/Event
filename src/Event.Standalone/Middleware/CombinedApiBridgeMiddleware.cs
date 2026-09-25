@@ -22,6 +22,10 @@ public sealed class CombinedApiBridgeMiddleware(RequestDelegate next)
             return;
         }
 
+        var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (session.Succeeded)
+            context.User = session.Principal!;
+
         if (EventBffRequestPolicy.RequiresAntiforgeryValidation(context.Request))
         {
             try
@@ -36,7 +40,6 @@ public sealed class CombinedApiBridgeMiddleware(RequestDelegate next)
             }
         }
 
-        var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         if (!session.Succeeded)
         {
             if (context.Items.ContainsKey(EventBffAuthenticationConstants.TokenRefreshRejectedItemKey))

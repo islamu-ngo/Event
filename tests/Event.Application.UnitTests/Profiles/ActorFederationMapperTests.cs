@@ -572,6 +572,10 @@ public sealed class ActorFederationMapperTests
     {
         public List<StorageObject> Items { get; } = items;
         public override Task<StorageObject?> GetById(Guid id) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
+        public Task<StorageObject?> GetForGenericAccessAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(Items.FirstOrDefault(item => item.Id == id
+                && item.Purpose != StorageObjectPurposes.EventResource
+                && item.OwningResourceKind != StorageOwningResourceKinds.EventResource));
         public override Task<bool> Exists(Guid id) => Task.FromResult(Items.Any(item => item.Id == id));
         public Task<(List<StorageObject> Items, int TotalCount)> GetFilesWithDetailsPaged(int pageNumber, int pageSize) =>
             Task.FromResult((Items.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList(), Items.Count));

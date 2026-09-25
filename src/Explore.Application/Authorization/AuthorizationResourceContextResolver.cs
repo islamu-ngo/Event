@@ -97,6 +97,14 @@ public sealed class AuthorizationResourceContextResolver(
                 await ResolveStorageUploadFinalizationFactsAsync(finalization.UploadSessionId, cancellationToken));
         }
 
+        if (request is CancelStorageUploadSessionCommand cancellation
+            && resourceKind == ResourceKinds.StorageObject && action == AuthorizationActions.Delete)
+        {
+            var uploadFacts = await ResolveStorageUploadFinalizationFactsAsync(cancellation.UploadSessionId, cancellationToken);
+            return new AuthorizationContext(cancellation.UploadSessionId.ToString("D"),
+                uploadFacts is EventResourceUploadAuthorizationFacts ? uploadFacts : declaredFacts);
+        }
+
         if (request is GetStorageObjectContentRequest download
             && resourceKind == ResourceKinds.StorageObject
             && action == AuthorizationActions.StorageObjects.Download)
@@ -341,6 +349,17 @@ public sealed class AuthorizationResourceContextResolver(
         if (session is null || session.TenantId != tenantContext.TenantId)
             return null;
 
+        if (session.Purpose == StorageObjectPurposes.EventResource || session.OwningResourceKind == StorageOwningResourceKinds.EventResource
+            || session.ExpectedResourceVersion is not null)
+        {
+            if (session.Purpose != StorageObjectPurposes.EventResource || session.Visibility != StorageObjectVisibilities.PrivateOwner
+                || session.OwningResourceKind != StorageOwningResourceKinds.EventResource
+                || session.OwningResourceId is not { } resourceId || resourceId == Guid.Empty
+                || session.ExpectedResourceVersion is null || session.UserId is null)
+                throw new AuthorizationException(ResourceKinds.EventResource, "update");
+            return new EventResourceUploadAuthorizationFacts(session.TenantId, session.Id, resourceId);
+        }
+
         // Only OrganizationTenant reservations use the evidence-specific authorization contract.
         // Non-OrganizationTenant reservations retain their existing Cerbos create policy and handler checks.
         if (session.OwningResourceKind != StorageOwningResourceKinds.OrganizationTenant)
@@ -369,7 +388,7 @@ public sealed class AuthorizationResourceContextResolver(
         if (storageObjectRepository is null || !Guid.TryParse(resourceId, out var storageObjectId))
             return declaredFacts;
 
-        var storageObject = await storageObjectRepository.GetById(storageObjectId);
+        var storageObject = await storageObjectRepository.GetForGenericAccessAsync(storageObjectId, cancellationToken);
         if (!IsInCurrentTenant(storageObject?.TenantId))
             return null;
 

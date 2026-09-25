@@ -28,6 +28,7 @@ public class FinalizeStorageUploadSessionCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly BusinessMetrics _metrics;
+    private readonly EventResourceFileUploadWorkflow? _resourceUploads;
 
     public FinalizeStorageUploadSessionCommandHandler(
         IFileStorageProviderResolver providerResolver,
@@ -39,7 +40,8 @@ public class FinalizeStorageUploadSessionCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        EventResourceFileUploadWorkflow? resourceUploads = null)
     {
         _providerResolver = providerResolver;
         _storagePolicyResolver = storagePolicyResolver;
@@ -51,6 +53,7 @@ public class FinalizeStorageUploadSessionCommandHandler
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
         _metrics = metrics;
+        _resourceUploads = resourceUploads;
     }
 
     public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
@@ -78,6 +81,12 @@ public class FinalizeStorageUploadSessionCommandHandler
         }
 
         var tenantId = _tenantContext.TenantId;
+        var target = await _uploadSessionRepository.GetForAuthorizationAsync(request.UploadSessionId, cancellationToken);
+        if (target?.Purpose == StorageObjectPurposes.EventResource || target?.OwningResourceKind == StorageOwningResourceKinds.EventResource
+            || target?.ExpectedResourceVersion is not null)
+            return _resourceUploads is null
+                ? BaseCommandResponse.Failure<StorageUploadSessionDto>("event_resource_unavailable")
+                : await _resourceUploads.FinalizeAsync(request, cancellationToken);
 
         var sessionResponse = await _unitOfWork.ExecuteInTransactionAsync(
             async ct => await MarkUploadingAsync(request, tenantId, ct),

@@ -15,7 +15,8 @@ public sealed class StorageReconciliationService(
     IEnumerable<IFileStorageProvider> storageProviders,
     IOptions<StorageReconciliationSettings> settings,
     BusinessMetrics metrics,
-    ILogger<StorageReconciliationService> logger) : IStorageReconciliationService
+    ILogger<StorageReconciliationService> logger,
+    IEventResourceStorageCleanupService resourceCleanup) : IStorageReconciliationService
 {
     private const string MissingBackingObjectReason = "backing_object_missing";
     private const string MissingMetadataRecordReason = "metadata_record_missing";
@@ -33,6 +34,11 @@ public sealed class StorageReconciliationService(
 
         try
         {
+            var resourceResult = await resourceCleanup.ProcessDueAsync(
+                Math.Min(_settings.BatchSize, 1000), _settings.DryRun, cancellationToken);
+            logger.LogInformation(
+                "Resource deletion reconciliation scanned {ScannedCount}, confirmed {DeletedCount}, failed {FailedCount}.",
+                resourceResult.ScannedCount, resourceResult.DeletedCount, resourceResult.FailedCount);
             await ReconcileMetadataAsync(utcNow, counts, cancellationToken);
             await ReconcileBackingObjectsAsync(utcNow, counts, cancellationToken);
 

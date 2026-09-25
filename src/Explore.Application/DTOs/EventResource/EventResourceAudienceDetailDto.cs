@@ -7,7 +7,8 @@ public sealed record EventResourceAudienceDetailDto(
     Guid Id, Guid EventId, string Title, EventResourceKindEnum Kind,
     bool IsTeaser, string Availability, string Requirements,
     string? Description = null, string? LanguageCode = null,
-    string? AccessibilityNote = null, Guid? AccessibleAlternativeEventResourceId = null)
+    string? AccessibilityNote = null, Guid? AccessibleAlternativeEventResourceId = null,
+    EventResourceFileMetadataDto? File = null)
 {
     public override string ToString() => nameof(EventResourceAudienceDetailDto);
 }

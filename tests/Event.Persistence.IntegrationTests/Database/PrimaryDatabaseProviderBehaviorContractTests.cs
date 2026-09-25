@@ -153,6 +153,27 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
     }
 
     [Test]
+    public Task EventResourceRevocationPrecedesFinalSnapshot()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceFileProviderContractAssertions.AssertRevocationPrecedesFinalSnapshotAsync(fixture);
+    }
+
+    [Test]
+    public Task EventResourceAttachmentHasOneOwner()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceFileProviderContractAssertions.AssertAttachmentHasOneOwnerAsync(fixture);
+    }
+
+    [Test]
+    public Task EventResourcePolicyTighteningDeniesNewAccess()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceFileProviderContractAssertions.AssertPolicyTighteningDeniesNewAccessAsync(fixture);
+    }
+
+    [Test]
     public Task DataProtectionKeyRingSurvivesProviderRecreation()
     {
         var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();

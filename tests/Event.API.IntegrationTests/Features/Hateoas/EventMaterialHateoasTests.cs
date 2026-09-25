@@ -27,6 +27,32 @@ public sealed class EventMaterialHateoasTests
     }
 
     [Test]
+    [Arguments(EventResourcePublicationStateEnum.Draft, EventResourceDeliveryTypeEnum.StoredFile, true)]
+    [Arguments(EventResourcePublicationStateEnum.Withdrawn, EventResourceDeliveryTypeEnum.StoredFile, true)]
+    [Arguments(EventResourcePublicationStateEnum.Published, EventResourceDeliveryTypeEnum.StoredFile, true)]
+    [Arguments(EventResourcePublicationStateEnum.Archived, EventResourceDeliveryTypeEnum.StoredFile, false)]
+    [Arguments(EventResourcePublicationStateEnum.Draft, EventResourceDeliveryTypeEnum.ExternalLink, false)]
+    public async Task FileUploadRequiresExactUpdateAuthorityAndMutableStoredFileIntent(
+        EventResourcePublicationStateEnum state, EventResourceDeliveryTypeEnum delivery, bool expected)
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        var tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(tenantId);
+        var resource = Resource(state);
+        resource = resource with { Draft = resource.Draft with { DeliveryType = delivery } };
+        var uploads = new EventMaterialDetailLinkPolicy(tenant).GetLinks(resource, null)
+            .Where(link => link.Rel == "upload-file").ToArray();
+        await Assert.That(uploads.Length).IsEqualTo(expected ? 1 : 0);
+        if (expected)
+        {
+            await Assert.That(uploads[0].PermissionAction).IsEqualTo("update");
+            await Assert.That(uploads[0].PermissionFacts)
+                .IsEqualTo(new EventResourceTargetAuthorizationFacts(tenantId, resource.Id));
+            await Assert.That(uploads[0].RequiresAuth).IsTrue();
+        }
+    }
+
+    [Test]
     public async Task ArchivedResourcesKeepReadAndDeleteButNeverMutableOrDeliveryAffordances()
     {
         var tenant = Substitute.For<ITenantContext>();

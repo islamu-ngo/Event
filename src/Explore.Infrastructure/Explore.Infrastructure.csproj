@@ -39,6 +39,7 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="OpenFeature" />
+    <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="RabbitMQ.Client" />
     <PackageReference Include="Refit.HttpClientFactory" />
     <PackageReference Include="Svix" />

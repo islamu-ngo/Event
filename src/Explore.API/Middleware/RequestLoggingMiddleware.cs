@@ -37,6 +37,7 @@ public sealed class RequestLoggingMiddleware
             var correlationId = context.Items["CorrelationId"] as string;
             if (SafeRouteMetadata.TryGetSensitiveRouteIdentity(context, out string routeIdentity))
             {
+                RedactSensitiveRouteActivity(Activity.Current, routeIdentity);
                 _logger.LogInformation(
                     "HTTP {Method} {Route} responded {StatusCode} in {ElapsedMs:0.00}ms | CorrelationId={CorrelationId} RequestPath={RequestPath}",
                     context.Request.Method,
@@ -48,6 +49,9 @@ public sealed class RequestLoggingMiddleware
             }
             else
             {
+                string safePath = SafeRouteMetadata.GetRouteIdentityOrClassification(context);
+                if (safePath == SafeRouteMetadata.UnresolvedRouteClassification)
+                    RedactSensitiveRouteActivity(Activity.Current, safePath);
                 var platformIdentityPresent = context.User.GetPlatformUserId().HasValue;
                 var tenantPresent = tenantContextAccessor.TenantId.HasValue;
                 var tenantSlugPresent = context.Request.Headers.ContainsKey(
@@ -58,7 +62,7 @@ public sealed class RequestLoggingMiddleware
                 _logger.LogInformation(
                     "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs:0.00}ms | PlatformIdentityPresent={PlatformIdentityPresent} Authenticated={IsAuthenticated} AuthHeaderPresent={AuthHeaderPresent} TenantPresent={TenantPresent} TenantSlugPresent={TenantSlugPresent} CorrelationId={CorrelationId}",
                     context.Request.Method,
-                    context.Request.Path.Value,
+                    safePath,
                     context.Response.StatusCode,
                     elapsed.TotalMilliseconds,
                     platformIdentityPresent,
@@ -73,6 +77,17 @@ public sealed class RequestLoggingMiddleware
 
     internal static bool TryGetAdmissionRouteIdentity(HttpContext context, out string routeIdentity) =>
         SafeRouteMetadata.TryGetSensitiveRouteIdentity(context, out routeIdentity);
+
+    private static void RedactSensitiveRouteActivity(Activity? activity, string routeIdentity)
+    {
+        if (activity is null) return;
+        activity.DisplayName = $"{activity.GetTagItem("http.request.method") ?? activity.GetTagItem("http.method") ?? "HTTP"} {routeIdentity}";
+        activity.SetTag("url.path", routeIdentity);
+        activity.SetTag("url.query", null);
+        activity.SetTag("url.full", null);
+        activity.SetTag("http.url", null);
+        activity.SetTag("http.target", routeIdentity);
+    }
 }
 
 internal static class SafeRouteMetadata
@@ -111,8 +126,12 @@ internal static class SafeRouteMetadata
         if (selectedEndpoint is not RouteEndpoint endpoint)
             return false;
 
-        string pattern = endpoint.RoutePattern.RawText ?? string.Empty;
-        if (!pattern.Contains("/admission/", StringComparison.OrdinalIgnoreCase))
+        string pattern = (endpoint.RoutePattern.RawText ?? string.Empty).Trim('/');
+        bool resource = pattern.StartsWith("api/eventresource/", StringComparison.OrdinalIgnoreCase)
+            || pattern.StartsWith("api/event/", StringComparison.OrdinalIgnoreCase)
+                && pattern.Contains("/resources", StringComparison.OrdinalIgnoreCase);
+        bool storage = pattern.StartsWith("api/storageobject/", StringComparison.OrdinalIgnoreCase);
+        if (!resource && !storage && !pattern.Contains("/admission/", StringComparison.OrdinalIgnoreCase))
             return false;
 
         routeIdentity = "/" + pattern.Trim('/').ToLowerInvariant();

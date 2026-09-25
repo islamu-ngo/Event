@@ -309,6 +309,8 @@ public sealed class CombinedApiBridgeMiddlewareTests
         {
             if (context.Request.Path == "/xsrf")
             {
+                var session = await context.AuthenticateAsync(TestAuthenticationHandler.CookieScheme);
+                if (session.Succeeded) context.User = session.Principal!;
                 var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
                 await context.Response.WriteAsync(antiforgery.GetAndStoreTokens(context).RequestToken!);
                 return;
@@ -340,7 +342,9 @@ public sealed class CombinedApiBridgeMiddlewareTests
 
     private static async Task<AntiforgeryPair> IssueAntiforgeryAsync(HttpClient client)
     {
-        using var response = await client.GetAsync("/xsrf");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/xsrf");
+        request.Headers.Add("X-Test-Cookie", "valid");
+        using var response = await client.SendAsync(request);
         var token = await response.Content.ReadAsStringAsync();
         var cookieHeader = string.Join(
             "; ",

@@ -16,6 +16,8 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         RequireId(subjectId, nameof(subjectId));
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
         var candidates = new List<PrivacyErasureProviderCandidate>();
+        IQueryable<Guid> resourceStorageObjectIds = ResourceStorageObjectIds(reason);
+        IQueryable<Guid> resourceUploadSessionIds = ResourceUploadSessionIds(reason);
 
         candidates.AddRange(await dbContext.UserExternalLogins
             .IgnoreAllFilters(reason)
@@ -59,7 +61,8 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
             .AsNoTracking()
             .Where(value => value.Actor != null
                 && value.Actor.UserId == subjectId
-                && value.ObjectKey != null)
+                && value.ObjectKey != null
+                && !resourceStorageObjectIds.Contains(value.Id))
             .Select(value => new PrivacyErasureProviderCandidate(
                 PrivacyErasureProviderKind.ObjectStorage,
                 PrivacyErasureProviderAction.DeleteOwnedObject,
@@ -72,7 +75,9 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         candidates.AddRange(await dbContext.StorageObjects
             .IgnoreAllFilters(reason)
             .AsNoTracking()
-            .Where(value => registrationFileStorageIds.Contains(value.Id) && value.ObjectKey != null)
+            .Where(value => registrationFileStorageIds.Contains(value.Id)
+                && value.ObjectKey != null
+                && !resourceStorageObjectIds.Contains(value.Id))
             .Select(value => new PrivacyErasureProviderCandidate(
                 PrivacyErasureProviderKind.ObjectStorage,
                 PrivacyErasureProviderAction.DeleteOwnedObject,
@@ -84,7 +89,9 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
         candidates.AddRange(await dbContext.StorageUploadSessions
             .IgnoreAllFilters(reason)
             .AsNoTracking()
-            .Where(value => value.UserId == subjectId && value.ObjectKey != null)
+            .Where(value => value.UserId == subjectId
+                && value.ObjectKey != null
+                && !resourceUploadSessionIds.Contains(value.Id))
             .Select(value => new PrivacyErasureProviderCandidate(
                 PrivacyErasureProviderKind.ObjectStorage,
                 PrivacyErasureProviderAction.DeleteOwnedObject,
@@ -155,10 +162,46 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
             .Where(value => value.OwnerUserId == subjectId)
             .Select(value => value.Id)
             .ToArrayAsync(cancellationToken);
+        Guid[] subjectActorIds = await dbContext.Actors
+            .IgnoreAllFilters(reason)
+            .Where(value => value.UserId == subjectId)
+            .Select(value => value.Id)
+            .ToArrayAsync(cancellationToken);
+        IQueryable<Guid> resourceStorageObjectIds = ResourceStorageObjectIds(reason);
+        IQueryable<Guid> resourceUploadSessionIds = ResourceUploadSessionIds(reason);
+        var stagedSources = await (
+            from session in dbContext.StorageUploadSessions.IgnoreAllFilters(reason)
+            join source in dbContext.StorageObjects.IgnoreAllFilters(reason)
+                on session.StorageObjectId equals (Guid?)source.Id
+            where session.UserId == subjectId && session.Status != StorageUploadSessionStates.Finalized
+                && session.TenantId == source.TenantId
+                && session.Purpose == StorageObjectPurposes.EventResource
+                && session.OwningResourceKind == StorageOwningResourceKinds.EventResource
+                && source.Purpose == StorageObjectPurposes.EventResource
+                && source.OwningResourceKind == StorageOwningResourceKinds.EventResource
+                && source.LifecycleState == StorageObjectLifecycleStates.DeleteRequested
+                && session.OwningResourceId == source.OwningResourceId
+                && session.Provider == source.Provider && session.ObjectKey == source.ObjectKey
+                && session.StorageProviderBindingId == source.StorageProviderBindingId
+                && !dbContext.EventResources.IgnoreAllFilters(reason).Any(resource => resource.StorageObjectId == source.Id)
+                && !dbContext.OrganizationTenantEvidence.IgnoreAllFilters(reason)
+                    .Any(evidence => evidence.DocumentStorageObjectId == source.Id)
+            select new { source.Id, source.TenantId }).Distinct().ToArrayAsync(cancellationToken);
+        // Composition stays inside the erasure caller's existing transaction and DbContext.
+        var resourceLifecycle = new EventResourceStorageLifecycleRepository(dbContext);
+        foreach (var tenant in stagedSources.GroupBy(source => source.TenantId))
+            foreach (var objectIds in tenant.Select(source => source.Id).Chunk(500))
+            {
+                await resourceLifecycle.RetireAsync(tenant.Key, [], objectIds, utcNow, cancellationToken);
+                await resourceLifecycle.RemoveTransferredSourcesAsync(tenant.Key, [], objectIds, cancellationToken);
+            }
         var uploadReservations = await dbContext.StorageUploadSessions
             .IgnoreAllFilters(reason)
             .Where(value => value.UserId == subjectId
                 && value.ReservedBytes > 0
+                && (!resourceUploadSessionIds.Contains(value.Id)
+                    || value.Status == StorageUploadSessionStates.Reserved
+                        && value.StorageObjectId == null && value.ObjectKey == null)
                 && (value.Status == StorageUploadSessionStates.Reserved
                     || value.Status == StorageUploadSessionStates.Uploading))
             .GroupBy(value => new { value.TenantId, value.Provider })
@@ -213,7 +256,16 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
             .ExecuteDeleteAsync(cancellationToken);
         await dbContext.StorageUploadSessions
             .IgnoreAllFilters(reason)
-            .Where(value => value.UserId == subjectId)
+            .Where(value => value.UserId == subjectId
+                && (value.Status == StorageUploadSessionStates.Finalized
+                    || value.StorageObjectId == null && value.ObjectKey == null
+                        && value.Status != StorageUploadSessionStates.Uploading)
+                && resourceUploadSessionIds.Contains(value.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+        await dbContext.StorageUploadSessions
+            .IgnoreAllFilters(reason)
+            .Where(value => value.UserId == subjectId
+                && !resourceUploadSessionIds.Contains(value.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.UserId, (Guid?)null)
                 .SetProperty(value => value.ReservedBytes, 0L)
@@ -226,10 +278,34 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
                 .SetProperty(value => value.CreatedBy, (Guid?)null)
                 .SetProperty(value => value.UpdatedAt, utcNow)
                 .SetProperty(value => value.UpdatedBy, (Guid?)null), cancellationToken);
+        Guid resourceStorageErasureStamp = Guid.CreateVersion7();
+        await dbContext.StorageObjects
+            .IgnoreAllFilters(reason)
+            .Where(value => resourceStorageObjectIds.Contains(value.Id)
+                && ((value.ActorId.HasValue && subjectActorIds.Contains(value.ActorId.Value))
+                    || value.CreatedBy == subjectId
+                    || value.UpdatedBy == subjectId
+                    || value.DeletedBy == subjectId
+                    || value.QuarantinedBy == subjectId))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(value => value.ActorId,
+                    value => value.ActorId.HasValue && subjectActorIds.Contains(value.ActorId.Value)
+                        ? (Guid?)null : value.ActorId)
+                .SetProperty(value => value.CreatedBy,
+                    value => value.CreatedBy == subjectId ? (Guid?)null : value.CreatedBy)
+                .SetProperty(value => value.UpdatedBy,
+                    value => value.UpdatedBy == subjectId ? (Guid?)null : value.UpdatedBy)
+                .SetProperty(value => value.DeletedBy,
+                    value => value.DeletedBy == subjectId ? (Guid?)null : value.DeletedBy)
+                .SetProperty(value => value.QuarantinedBy,
+                    value => value.QuarantinedBy == subjectId ? (Guid?)null : value.QuarantinedBy)
+                .SetProperty(value => value.UpdatedAt, utcNow)
+                .SetProperty(value => value.ConcurrencyStamp, resourceStorageErasureStamp), cancellationToken);
         await dbContext.StorageObjects
             .IgnoreAllFilters(reason)
             .Where(value => value.Actor != null
-                && value.Actor.UserId == subjectId)
+                && value.Actor.UserId == subjectId
+                && !resourceStorageObjectIds.Contains(value.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.Uri, string.Empty)
                 .SetProperty(value => value.ObjectKey, (string?)null)
@@ -570,9 +646,11 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
 
         Guid[] fileIds = files.Select(file => file.Id).ToArray();
         Guid[] storageIds = files.Select(file => file.StorageObjectId).Distinct().ToArray();
+        IQueryable<Guid> resourceStorageObjectIds = ResourceStorageObjectIds(reason);
         StorageObject[] storageObjects = await dbContext.StorageObjects
             .IgnoreAllFilters(reason)
-            .Where(storage => storageIds.Contains(storage.Id))
+            .Where(storage => storageIds.Contains(storage.Id)
+                && !resourceStorageObjectIds.Contains(storage.Id))
             .ToArrayAsync(cancellationToken);
         DateTime utcNow = DateTime.UtcNow;
         foreach (StorageObject storage in storageObjects)
@@ -608,6 +686,28 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
 
     private IQueryable<Guid> OwnedRegistrationFileStorageIds(Guid subjectId, string reason)
         => OwnedRegistrationFiles(subjectId, reason).Select(file => file.StorageObjectId);
+
+    private IQueryable<Guid> ResourceStorageObjectIds(string reason)
+        => dbContext.StorageObjects
+            .IgnoreAllFilters(reason)
+            .Where(storage => storage.Purpose == StorageObjectPurposes.EventResource
+                || storage.OwningResourceKind == StorageOwningResourceKinds.EventResource
+                || dbContext.EventResources.IgnoreAllFilters(reason).Any(resource =>
+                    resource.TenantId == storage.TenantId && resource.StorageObjectId == storage.Id))
+            .Select(storage => storage.Id);
+
+    private IQueryable<Guid> ResourceUploadSessionIds(string reason)
+        => dbContext.StorageUploadSessions
+            .IgnoreAllFilters(reason)
+            .Where(session => session.Purpose == StorageObjectPurposes.EventResource
+                || session.OwningResourceKind == StorageOwningResourceKinds.EventResource
+                || session.StorageObjectId.HasValue && dbContext.StorageObjects.IgnoreAllFilters(reason).Any(storage =>
+                    storage.TenantId == session.TenantId && storage.Id == session.StorageObjectId
+                    && (storage.Purpose == StorageObjectPurposes.EventResource
+                        || storage.OwningResourceKind == StorageOwningResourceKinds.EventResource
+                        || dbContext.EventResources.IgnoreAllFilters(reason).Any(resource =>
+                            resource.TenantId == storage.TenantId && resource.StorageObjectId == storage.Id))))
+            .Select(session => session.Id);
 
     public async Task EraseMembershipsAndPreferencesAsync(
         Guid subjectId,

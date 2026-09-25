@@ -19,13 +19,26 @@ public static class EventHeavyRedactionApplicator
         ArgumentNullException.ThrowIfNull(graph);
 
         var utcNow = redactedAt.UtcDateTime;
-        var redactedImageObjectIds = graph.ImageStorageObjects
+        var imageStorageObjects = graph.ImageStorageObjects
+            .Where(storageObject => storageObject.Purpose != StorageObjectPurposes.EventResource
+                && storageObject.OwningResourceKind != StorageOwningResourceKinds.EventResource
+                && !graph.ResourceStorageObjects.Any(resourceObject => resourceObject.Id == storageObject.Id)
+                && !graph.Resources.Any(resource => resource.StorageObjectId == storageObject.Id))
+            .ToArray();
+        var redactedImageObjectIds = imageStorageObjects
             .Where(storageObject => storageObject.ObjectKey is not null)
             .Select(storageObject => storageObject.Id)
             .Distinct()
             .ToArray();
 
         RedactRootEvent(graph.Event, moderatorUserId, utcNow);
+        foreach (var resource in graph.Resources)
+            resource.ApplyParentModeration(EventRedactionSentinelPolicy.DisplayText, moderatorUserId, utcNow);
+        foreach (var storageObject in graph.ResourceStorageObjects)
+        {
+            storageObject.RequestDelete();
+            Touch(storageObject, moderatorUserId, utcNow);
+        }
 
         foreach (var session in graph.Sessions)
         {
@@ -87,7 +100,7 @@ public static class EventHeavyRedactionApplicator
         RedactEventCustomProperties(graph.EventCustomPropertyDefinitions, graph.EventCustomPropertyProjections, moderatorUserId, utcNow);
         RedactSessionCustomProperties(graph.SessionCustomPropertyDefinitions, graph.SessionCustomPropertyProjections, moderatorUserId, utcNow);
 
-        foreach (var storageObject in graph.ImageStorageObjects)
+        foreach (var storageObject in imageStorageObjects)
         {
             storageObject.RequestDelete();
             storageObject.OwningResourceKind = ResourceKinds.Event;

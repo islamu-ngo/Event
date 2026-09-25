@@ -92,6 +92,7 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddProcessor(new EventResourceTraceProcessor())
                     .AddSource("Explore.Authorization")
                     .AddSource("Explore.Ai.Provider")
                     .AddSource("Explore.Hateoas.Authorization")

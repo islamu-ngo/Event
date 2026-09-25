@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Models.Storage;
 using Explore.Application.Telemetry;
 using Explore.Domain;
@@ -137,6 +138,9 @@ public sealed class StorageReconciliationServiceTests
     {
         var meterFactory = Substitute.For<IMeterFactory>();
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter(BusinessMetrics.MeterName));
+        var resourceCleanup = Substitute.For<IEventResourceStorageCleanupService>();
+        resourceCleanup.ProcessDueAsync(Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(new StorageObjectDeletionResult(0, 0, 0, 0));
 
         return new StorageReconciliationService(
             repository,
@@ -144,7 +148,8 @@ public sealed class StorageReconciliationServiceTests
             providers,
             Options.Create(settings),
             new BusinessMetrics(meterFactory),
-            NullLogger<StorageReconciliationService>.Instance);
+            NullLogger<StorageReconciliationService>.Instance,
+            resourceCleanup);
     }
 
     private static IStorageObjectRepository CreateRepository(

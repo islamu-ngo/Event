@@ -14,12 +14,18 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
 
         builder.Property(e => e.Uri).HasMaxLength(1000).IsRequired();
         builder.Property(e => e.ObjectKey).HasMaxLength(1024);
+        builder.Property(e => e.ProviderVersionId).HasMaxLength(1024);
+        builder.HasOne<StorageProviderBinding>().WithMany()
+            .HasForeignKey(e => e.StorageProviderBindingId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(e => e.Provider).HasMaxLength(50).IsRequired();
         builder.Property(e => e.FullName).HasMaxLength(500).IsRequired();
         builder.Property(e => e.SafeDisplayName).HasMaxLength(500).IsRequired();
         builder.Property(e => e.Extension).HasMaxLength(50).IsRequired();
         builder.Property(e => e.ContentType).HasMaxLength(255);
         builder.Property(e => e.Sha256Checksum).HasColumnName("sha256_checksum").HasMaxLength(64);
+        builder.Property(e => e.DocumentSafetyState).HasMaxLength(32).HasDefaultValue(StorageDocumentSafetyStates.Unavailable).IsRequired();
+        builder.Property(e => e.InspectedSha256Checksum).HasColumnName("inspected_sha256_checksum").HasMaxLength(64);
+        builder.Ignore(e => e.HasBoundDocumentInspection);
         builder.Property(e => e.Visibility).HasMaxLength(50).IsRequired();
         builder.Property(e => e.Purpose).HasMaxLength(100).IsRequired();
         builder.Property(e => e.LifecycleState).HasMaxLength(50).IsRequired();
@@ -63,7 +69,10 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
             t.HasCheckConstraint("ck_storage_objects_size_nonnegative", "size >= 0");
             t.HasCheckConstraint("ck_storage_objects_provider", "provider IN ('local', 's3_compatible', 'legacy_external')");
             t.HasCheckConstraint("ck_storage_objects_visibility", "visibility IN ('public_image', 'authenticated_tenant', 'private_owner')");
-            t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset')");
+            t.HasCheckConstraint("ck_storage_objects_purpose", "purpose IN ('legacy_image', 'profile_image', 'event_image', 'attachment', 'document', 'system_asset', 'event_resource')");
+            t.HasCheckConstraint("ck_storage_objects_resource_owner", "(purpose <> 'event_resource' AND (owning_resource_kind IS NULL OR owning_resource_kind <> 'event_resource')) OR (purpose = 'event_resource' AND owning_resource_kind IS NOT NULL AND owning_resource_kind = 'event_resource' AND owning_resource_id IS NOT NULL AND owning_resource_id <> '00000000-0000-0000-0000-000000000000' AND visibility = 'private_owner')");
+            t.HasCheckConstraint("ck_storage_objects_document_safety", "document_safety_state IN ('unavailable', 'unscanned', 'rejected')");
+            t.HasCheckConstraint("ck_storage_objects_inspection_binding", "document_safety_state <> 'unscanned' OR (purpose = 'event_resource' AND inspected_object_id IS NOT NULL AND inspected_object_id = id AND inspected_sha256_checksum IS NOT NULL AND sha256_checksum IS NOT NULL AND inspected_sha256_checksum = sha256_checksum)");
             t.HasCheckConstraint("ck_storage_objects_lifecycle_state", "lifecycle_state IN ('pending', 'active', 'quarantined', 'delete_requested', 'deleted')");
         });
 

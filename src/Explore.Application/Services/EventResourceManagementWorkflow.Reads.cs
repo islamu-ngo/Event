@@ -15,7 +15,10 @@ public sealed partial class EventResourceManagementWorkflow
         async (facts, ct) =>
         {
             var resource = await resources.GetByIdAsync(facts.Access.TenantId, facts.Access.Parent.EventId, resourceId, ct);
-            return resource is null ? null : Map(resource);
+            if (resource is null) return null;
+            var storage = resource.StorageObjectId is { } storageId
+                ? await resources.GetStorageObjectAsync(resource.TenantId, storageId, ct) : null;
+            return Map(resource) with { File = EventResourceFileSafety.Describe(resource, storage) };
         }, cancellationToken);
 
     public async Task<EventResourceManagementReadResult<EventResourceManagementPageDto>> ListAsync(
@@ -33,7 +36,13 @@ public sealed partial class EventResourceManagementWorkflow
         var prepared = await unitOfWork.ExecuteSerializableAsync(async ct =>
         {
             var rows = await resources.ListManagementAsync(parent.TenantId, eventId, (page - 1) * pageSize, pageSize, ct);
-            return new EventResourceManagementPageDto(rows.Select(Map).ToImmutableArray(), page, pageSize);
+            var storageIds = rows.Select(row => row.StorageObjectId).OfType<Guid>().Distinct().ToArray();
+            var storage = (await resources.GetStorageObjectsAsync(parent.TenantId, storageIds, ct))
+                .ToDictionary(item => item.Id);
+            return new EventResourceManagementPageDto(rows.Select(row => Map(row) with
+            {
+                File = EventResourceFileSafety.Describe(row, storage.GetValueOrDefault(row.StorageObjectId ?? Guid.Empty))
+            }).ToImmutableArray(), page, pageSize);
         }, cancellationToken);
         var denial = await AuthorizeDisclosureAsync(eventId, prepared.Items, cancellationToken);
         return denial == EventResourceAuthorityOutcome.Allowed
@@ -50,7 +59,7 @@ public sealed partial class EventResourceManagementWorkflow
                 || (collectionEventId is { } eventId && item.EventId != eventId)))
             throw new BadRequestException("Invalid management disclosure scope.");
         var checks = items.Select(item => Request(item.Id, "view-management") with
-            { ExpectedResourceVersion = item.Version }).ToList();
+            { ExpectedResourceVersion = item.Version, ExpectedAttachmentGeneration = item.File?.AttachmentGeneration }).ToList();
         if (collectionEventId is { } parentId)
             checks.Insert(0, Request(parentId, "view-management", collection: true));
         var decisions = await authority.AuthorizeCapabilitiesAsync(checks, cancellationToken);

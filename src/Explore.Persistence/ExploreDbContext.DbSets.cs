@@ -400,6 +400,8 @@ public partial class ExploreDbContext
 
     // ===== Storage =====
     public DbSet<StorageObject> StorageObjects { get; set; }
+    public DbSet<StorageProviderBinding> StorageProviderBindings { get; set; }
+    public DbSet<StorageObjectDeletionTombstone> StorageObjectDeletionTombstones { get; set; }
     public DbSet<StorageUploadSession> StorageUploadSessions { get; set; }
     public DbSet<StorageUsageCounter> StorageUsageCounters { get; set; }
     public DbSet<FileType> FileTypes { get; set; }

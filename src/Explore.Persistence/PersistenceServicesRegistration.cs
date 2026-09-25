@@ -535,6 +535,9 @@ public static class PersistenceServicesRegistration
 
         // Storage Repository
         services.AddScoped<IStorageObjectRepository, StorageObjectRepository>();
+        services.AddScoped<IStorageProviderBindingRepository, StorageProviderBindingRepository>();
+        services.AddScoped<IStorageObjectDeletionTombstoneRepository, StorageObjectDeletionTombstoneRepository>();
+        services.AddScoped<IEventResourceStorageLifecycleRepository, EventResourceStorageLifecycleRepository>();
         services.AddScoped<IStorageUploadSessionRepository, StorageUploadSessionRepository>();
         services.AddScoped<IStorageUsageCounterRepository, StorageUsageCounterRepository>();
 

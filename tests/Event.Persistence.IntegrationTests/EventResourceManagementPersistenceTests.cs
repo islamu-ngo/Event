@@ -110,7 +110,8 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         user.IsAuthenticated.Returns(true);
         user.UserId.Returns(actor);
         var machine = Substitute.For<IMachinePrincipalAccessor>();
-        return new(repository, unit, new(unit,
+        return new(repository, unit, new EventResourceStorageLifecycleService(
+            new EventResourceStorageLifecycleRepository(context), unit, new Clock()), new(unit,
             new EventResourceAuthoritySnapshotReader(repository, new EventAuthoritySnapshotService(context), governance),
             routes, provider, new Clock()), tenant, user, machine, new Clock());
     }

@@ -29,13 +29,82 @@ Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-an
 > [!TIP]
 > To evaluate self-hosted S3 locally, launch Docker Compose with the `storage` profile (`docker compose --profile storage up -d`) to start a co-located **MinIO** container (see [Docker Compose Profiles](../self-hosting/docker-compose.md#optional-service-profiles)).
 
+### Private Bucket Requirement
+
+S3-compatible buckets must deny anonymous object access. The optional Compose
+MinIO initializer now enforces a private policy for both new and existing sample
+buckets. This is a breaking change for deployments that linked directly to sample
+bucket objects: those anonymous URLs no longer work.
+
+After upgrading an existing Compose deployment, preserve the `minio_data` volume
+and run:
+
+```bash
+docker compose --profile storage run --rm minio-init
+```
+
+The command keeps existing objects and reapplies the private posture; do not
+delete or recreate the bucket. External S3-compatible providers need the
+equivalent private bucket policy configured through their own administration
+surface.
+
+Public images remain available through the application-managed
+`/api/storageobject/{id}/public` URL. The application checks the stored metadata,
+lifecycle, image type, and public-image visibility before reading private provider
+bytes. Authenticated files likewise use their ID-based application content route,
+not a raw bucket URL or object key.
+
 ---
+
+## Governed Event Resource Files
+
+Event resource files use their resource's upload and download actions, not
+generic storage-object routes or presigned URLs. The uploader has no exception
+to current resource access checks. Provider objects remain private even for a
+public audience. PDF/DOCX/PPTX inspection does not provide a malware verdict;
+the default policy denies unscanned publication and access. See the
+[resource upload and download guide](../events-and-ticketing/README.md#uploading-and-downloading-resource-files)
+for the separate workflow and instance-only opt-in.
+
+### Resource Deletion and Provider Recovery
+
+Deleting a resource or applying heavy parent moderation denies new access
+before physical cleanup. Ordinary withdrawal remains reversible and keeps its
+files. Erasing an uploader removes personal attribution, not shared organizer
+materials; unfinished uploads transfer their cleanup responsibility before
+their metadata disappears. Independently retained organization evidence is
+not deleted by the ordinary resource cleanup path when parent moderation
+withdraws the associated resource.
+
+Resource cleanup uses the existing storage reconciliation schedule and its
+`Enabled`/`DryRun` controls. The default dry-run does not delete bytes. When
+enabled for mutation, committed resource deletions do not depend on the
+separate quarantined-file deletion switch or its grace period. Failed cleanup
+retains a private retry record; audit expiry and parent removal cannot discard
+that responsibility.
+
+Each upload records its original storage target and external secret references.
+Changing the current local root, S3 bucket, endpoint or credential binding does
+not redirect existing files or pending cleanup. Keep the original namespace and
+secret references available. Credentials may rotate at the retained reference,
+but removing that reference or changing its selected authority can prevent
+reads and cleanup. For local disk relocation, preserve the captured absolute
+mount path; changing a setting alone does not move a bound resource.
+
+An interrupted producer can remain pending even if no object is currently
+visible. Expiry or cancellation does not prove that an in-flight write cannot
+finish later. A late acknowledged write settles its retained cleanup record.
+For a lost acknowledgement or unknown version, retain the record and reconcile
+the original producer and exact provider version; do not clear it merely because
+a timeout elapsed. Missing mounts/buckets and S3 delete markers are not proof
+that the required bytes were removed. Restore the original target/reference
+before retrying an availability failure.
 
 ## Organization Evidence PDF Uploads
 
 With local authorization, an organization administrator can reserve an evidence PDF upload for a pending, active organization participation. Only the account that reserved that tenant-local session can finalize its bytes; tenant-administrator status alone does not transfer ownership. Losing the organization role after reservation does not itself revoke the session. Cancellation, expiry, content validation, quota enforcement and privacy-erasure fences remain authoritative. Retrying a completed upload returns the same stored document without another write.
 
-This repair does not broadly grant storage creation or change the selected authorization provider. Non-OrganizationTenant uploads retain their existing Cerbos authorization for images, documents, attachments and system assets; generic local finalization is not a newly granted right. OrganizationTenant reservation and finalization remain denied with instance or tenant-managed Cerbos until the required typed policies are securely supported. Those unsupported checks stay denied during provider outages or configuration-resolution failure, including for instance-administrator owners; unrelated safe-mode exceptions are unchanged. No new storage credentials or database migration are required.
+This repair does not broadly grant storage creation or change the selected authorization provider. Ordinary uploads outside the separate OrganizationTenant and event-resource workflows retain their existing Cerbos authorization for images, documents, attachments and system assets; generic local finalization is not a newly granted right. OrganizationTenant reservation and finalization remain denied with instance or tenant-managed Cerbos until the required typed policies are securely supported. Those unsupported checks stay denied during provider outages or configuration-resolution failure, including for instance-administrator owners; unrelated safe-mode exceptions are unchanged. No new storage credentials or database migration are required for the organization-evidence workflow.
 
 Exact content downloads at `/api/storageobject/{id}/content` use the stored object's tenant, creator, visibility and lifecycle, not a caller's ownership claims. An uploader retains PrivateOwner access after losing an organization role, subject to the selected authorization provider and existing privacy/lifecycle checks. Tenant reviewers can review evidence metadata, but that role alone does not grant another account's PrivateOwner bytes. PDFs remain attachments with sanitized filenames; anonymous public-image access and other storage visibility rules are unchanged. Authorization uses an untracked metadata snapshot; the byte reader reloads the object after the policy decision. Quarantine, deletion, creator erasure or visibility restrictions committed while policy evaluation is pending therefore block the read before storage is opened. During tenant-managed Cerbos transport or configuration failure, owner/public-visibility facts do not confer new emergency access: the existing tenant-authority check still applies, and instance-admin status alone is not a tenant-admin grant. No new generic download or outage-only owner right is granted.
 
@@ -53,6 +122,7 @@ changing a root setting never migrates existing files.
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):
 * Restoring a database without the corresponding storage volume causes broken image links.
 * Restoring a storage volume without the database leaves orphaned, unreferenced files.
+* After restoring the Compose MinIO volume, rerun `minio-init` before reopening traffic so the existing bucket is private.
 * [Configuration Manifests](../configuration-and-operations/configuration-manifests.md) deliberately exclude binary media and do not replace storage volume backups.
 * Retain required Data Protection keys and the selected secret authority with the
   protected data. Preserve newer privacy-erasure authority independently rather

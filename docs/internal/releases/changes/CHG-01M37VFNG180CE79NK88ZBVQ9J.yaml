@@ -1,0 +1,33 @@
+# Resource withdrawal, retained provider identity, and fenced deletion recovery.
+Change-Id: CHG-01M37VFNG180CE79NK88ZBVQ9J
+Title: "retain resource withdrawal through cleanup failures"
+Type: feat
+Scope: privacy
+Summary: "Keep deleted or moderated resources inaccessible while fenced storage deletion retries survive parent removal and privacy erasure."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Adds retention and cleanup authority for resource-owned files without removing an existing external contract.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Denies access at withdrawal, preserves retained evidence, fences upload expiry and byte deletion, keeps untrusted provider write errors out of HTTP diagnostics, and never treats a missing provider target as confirmed absence.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Apply generated RetainEventResourceStorageAuthority forward migration for the selected provider before resource cleanup; MariaDB shares the MySQL history.
+  Configuration:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: not-applicable
+    Detail: Uses the existing reconciliation schedule and selected secret authority without adding settings or embedding credentials.
+  OpenAPI:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: No route or serialized resource contract is added by storage retirement.
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: Keep original local mounts, S3 targets and external secret references available until provider absence is confirmed; dry-run does not delete bytes.

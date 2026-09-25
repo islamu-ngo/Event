@@ -193,7 +193,9 @@ public sealed class EventResourceRepository : IEventResourceRepository
         CancellationToken cancellationToken) =>
         _dbContext.StorageObjects.AsNoTracking()
             .SingleOrDefaultAsync(storage => storage.TenantId == tenantId
-                && storage.Id == storageObjectId, cancellationToken);
+                && storage.Id == storageObjectId
+                && !_dbContext.OrganizationTenantEvidence.Any(evidence =>
+                    evidence.DocumentStorageObjectId == storage.Id), cancellationToken);
 
     public async Task<IReadOnlyList<StorageObject>> GetStorageObjectsAsync(
         Guid tenantId,
@@ -202,7 +204,9 @@ public sealed class EventResourceRepository : IEventResourceRepository
     {
         Guid[] ids = NormalizeIds(storageObjectIds, EventResourceAuthorityRequest.MaximumBatchResources);
         return ids.Length == 0 ? [] : await _dbContext.StorageObjects.AsNoTracking()
-            .Where(storage => storage.TenantId == tenantId && ids.Contains(storage.Id))
+            .Where(storage => storage.TenantId == tenantId && ids.Contains(storage.Id)
+                && !_dbContext.OrganizationTenantEvidence.Any(evidence =>
+                    evidence.DocumentStorageObjectId == storage.Id))
             .ToListAsync(cancellationToken);
     }
 

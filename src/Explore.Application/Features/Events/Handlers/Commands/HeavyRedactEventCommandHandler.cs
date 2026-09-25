@@ -34,7 +34,8 @@ public sealed class HeavyRedactEventCommandHandler(
     ILogger<HeavyRedactEventCommandHandler> logger,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
     TimeProvider timeProvider,
-    ISettingMutationLock mutationLock)
+    ISettingMutationLock mutationLock,
+    EventResourceStorageLifecycleService resourceStorageLifecycle)
     : ICommandHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
 {
     private const int ImmediateDeletionBatchSize = 100;
@@ -133,6 +134,10 @@ public sealed class HeavyRedactEventCommandHandler(
                         "event_heavy_redaction_source_report_decision_invalid");
                 }
 
+                foreach (var resourceIds in graph.Resources.Select(resource => resource.Id).Chunk(500))
+                    await resourceStorageLifecycle.RetireAsync(@event.TenantId, resourceIds, [],
+                        redactedAt.UtcDateTime, token);
+
                 EventHeavyRedactionApplicator.Apply(graph, moderatorUserId, redactedAt);
 
                 await redactionRepository.SaveChangesAsync(token);
@@ -149,6 +154,12 @@ public sealed class HeavyRedactEventCommandHandler(
                 await moderationRecordRepository.Create(moderationRecord);
 
                 shouldInvalidateCache = true;
+            }
+
+            foreach (var resourceIds in graph.Resources.Select(resource => resource.Id).Chunk(500))
+            {
+                await resourceStorageLifecycle.RemoveTransferredSourcesAsync(
+                    @event.TenantId, resourceIds, [], token);
             }
 
             await EnsureHeavyModerationFanoutOccurrenceAsync(

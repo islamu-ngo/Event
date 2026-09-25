@@ -24,8 +24,13 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
     public required string Visibility { get; set; }
     public string? OwningResourceKind { get; set; }
     public Guid? OwningResourceId { get; set; }
+    public Guid? ExpectedResourceVersion { get; private set; }
+    public Guid? FinalizedResourceVersion { get; private set; }
     public required string Status { get; set; }
     public string? ObjectKey { get; set; }
+    public Guid? StorageProviderBindingId { get; set; }
+    public string? ProviderVersionId { get; set; }
+    public bool ProducerSettled { get; private set; }
     public string? Sha256Checksum { get; set; }
     public Guid? StorageObjectId { get; set; }
     public StorageObject? StorageObject { get; set; }
@@ -43,6 +48,48 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
     public DateTime? UpdatedAt { get; set; }
     public Guid? UpdatedBy { get; set; }
     public Guid ConcurrencyStamp { get; set; }
+
+    public void BindEventResourceVersion(Guid expectedVersion)
+    {
+        if (ExpectedResourceVersion.HasValue || expectedVersion == Guid.Empty
+            || Status != StorageUploadSessionStates.Reserved
+            || Purpose != StorageObjectPurposes.EventResource || Visibility != StorageObjectVisibilities.PrivateOwner
+            || OwningResourceKind != StorageOwningResourceKinds.EventResource || OwningResourceId is null
+            || OwningResourceId == Guid.Empty || UserId is null || UserId == Guid.Empty)
+            throw new InvalidOperationException("Resource reservations require immutable resource, subject and version binding.");
+        ExpectedResourceVersion = expectedVersion;
+    }
+
+    public void StageEventResourceObject(Guid objectId)
+    {
+        if (!ExpectedResourceVersion.HasValue || Status != StorageUploadSessionStates.Uploading
+            || StorageProviderBindingId is null || StorageProviderBindingId == Guid.Empty
+            || StorageObjectId.HasValue || objectId == Guid.Empty || string.IsNullOrWhiteSpace(ObjectKey))
+            throw new InvalidOperationException("Only a bound upload can stage its durable cleanup identity.");
+        StorageObjectId = objectId;
+    }
+
+    public void RecordFinalizedResourceVersion(Guid version)
+    {
+        if (!ExpectedResourceVersion.HasValue || Status != StorageUploadSessionStates.Finalized
+            || FinalizedResourceVersion.HasValue || version == Guid.Empty)
+            throw new InvalidOperationException("Only a committed resource attachment can bind its replay version.");
+        FinalizedResourceVersion = version;
+    }
+
+    /// <summary>Acknowledges an exact completed write without reopening a canceled or failed session.</summary>
+    public void RecordProducerSettlement(Guid objectId, Guid bindingId, string objectKey, string? providerVersion)
+    {
+        if (Purpose != StorageObjectPurposes.EventResource || !ExpectedResourceVersion.HasValue
+            || objectId == Guid.Empty || bindingId == Guid.Empty
+            || StorageObjectId != objectId || StorageProviderBindingId != bindingId
+            || !string.Equals(ObjectKey, objectKey, StringComparison.Ordinal)
+            || providerVersion is { Length: 0 or > 1024 }
+            || ProducerSettled && !string.Equals(ProviderVersionId, providerVersion, StringComparison.Ordinal))
+            throw new InvalidOperationException("Producer settlement must match its original bound object identity.");
+        ProviderVersionId = providerVersion;
+        ProducerSettled = true;
+    }
 
     public void ReserveObjectKey(string objectKey)
     {
@@ -81,6 +128,11 @@ public class StorageUploadSession : ITenantEntity, IAuditableEntity, IConcurrenc
         {
             throw new ArgumentException("Finalized storage sessions require a provider object key.", nameof(objectKey));
         }
+
+        if (Purpose == StorageObjectPurposes.EventResource
+            && (!ProducerSettled || StorageObjectId != storageObjectId
+                || !string.Equals(ObjectKey, objectKey, StringComparison.Ordinal)))
+            throw new InvalidOperationException("Resource attachment requires the exact settled producer identity.");
 
         StorageObjectId = storageObjectId;
         ObjectKey = objectKey;

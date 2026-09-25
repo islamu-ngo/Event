@@ -18,7 +18,7 @@ namespace Explore.Application.Services;
 /// </summary>
 public sealed partial class EventResourceManagementWorkflow(
     IEventResourceRepository resources, IUnitOfWork unitOfWork,
-    EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
+    EventResourceStorageLifecycleService lifecycle, EventResourceAuthorityOrchestrator authority, ITenantContext tenant,
     ICurrentUserService user, IMachinePrincipalAccessor machine, TimeProvider clock)
 {
     public async Task<BaseCommandResponse<Guid>> CreateAsync(Guid eventId, Guid resourceId,
@@ -87,6 +87,8 @@ public sealed partial class EventResourceManagementWorkflow(
         if (policy is null) return Failure(EventResourceAuthorityOutcome.Unavailable, resourceId, cancellationToken);
         var eventId = lease.Snapshot.Facts.Access.Parent.EventId;
         var now = clock.GetUtcNow().UtcDateTime;
+        if (action == "publish" && lease.Snapshot.Facts.Policy?.PublicationStateId == (int)EventResourcePublicationStateEnum.Withdrawn)
+            auditAction = EventResourceAuditAction.Republish;
         var audit = Audit(request, resourceId, auditAction, now);
         try
         {
@@ -99,8 +101,8 @@ public sealed partial class EventResourceManagementWorkflow(
                 if (resource.ConcurrencyStamp != expectedVersion || resource.IsDeleted
                     || resource.PublicationStateId == (int)EventResourcePublicationStateEnum.Archived && action != "delete")
                     return BaseCommandResponse.Conflict(resourceId);
-                // No delivery track has graduated. This is unconditional, even for seeded payloads.
-                if (action == "publish") return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
+                if (action == "publish" && resource.EventResourceDeliveryTypeId != (int)EventResourceDeliveryTypeEnum.StoredFile)
+                    return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
                 EventResourceAudienceRule[]? rules = null;
                 if (draft is not null)
                 {
@@ -111,8 +113,6 @@ public sealed partial class EventResourceManagementWorkflow(
                     rules = BuildRules(draft, request.TenantId, eventId, resourceId);
                     if (!await ValidLineageAsync(draft, rules, request.TenantId, eventId, resourceId, ct)) return Invalid();
                 }
-                if (action == "delete" && resource.StorageObjectId.HasValue)
-                    return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.Unavailable);
                 outcome = await authority.RecheckMutationAsync(lease, expectedVersion, ct);
                 if (outcome != EventResourceAuthorityOutcome.Allowed) return Failure(outcome, resourceId, ct);
                 if (action is "unpublish" or "moderate" && resource.PublicationStateId != (int)EventResourcePublicationStateEnum.Published
@@ -121,6 +121,14 @@ public sealed partial class EventResourceManagementWorkflow(
                 // Domain rejection must roll back, including partially applied metadata/policy.
                 switch (action)
                 {
+                    case "publish":
+                        if (resource.PublicationStateId == (int)EventResourcePublicationStateEnum.Withdrawn)
+                            resource.Republish(lease.Snapshot.Facts.Access.Parent, lease.Snapshot.Facts.Access.PayloadSafetySatisfied,
+                                expectedVersion, request.SubjectUserId!.Value, now);
+                        else
+                            resource.Publish(lease.Snapshot.Facts.Access.Parent, lease.Snapshot.Facts.Access.PayloadSafetySatisfied,
+                                expectedVersion, request.SubjectUserId!.Value, now);
+                        break;
                     case "update":
                         resource.UpdateMetadata(draft!.ToMetadata(), expectedVersion, request.SubjectUserId!.Value, now);
                         resource.ReplacePolicy(draft.Availability.ToDomain(), rules!, expectedVersion, request.SubjectUserId.Value, now);
@@ -128,7 +136,10 @@ public sealed partial class EventResourceManagementWorkflow(
                     case "unpublish":
                     case "moderate": resource.Withdraw(expectedVersion, request.SubjectUserId!.Value, now); break;
                     case "archive": resource.Archive(expectedVersion, request.SubjectUserId!.Value, now); break;
-                    case "delete": resource.Delete(expectedVersion, request.SubjectUserId!.Value, now); break;
+                    case "delete":
+                        resource.Delete(expectedVersion, request.SubjectUserId!.Value, now);
+                        await lifecycle.RetireAsync(request.TenantId, [resource.Id], [], now, ct);
+                        break;
                     default: throw new InvalidOperationException("Unsupported resource mutation.");
                 }
                 resources.Update(resource);

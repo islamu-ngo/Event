@@ -21,7 +21,7 @@ public class GetStorageObjectDetailsRequestHandler : IQueryHandler<GetStorageObj
 
     public async Task<StorageObjectDto?> QueryAsync(GetStorageObjectDetailsRequest request, CancellationToken cancellationToken)
     {
-        var storageObject = await _storageObjectRepository.GetById(request.Id);
+        var storageObject = await _storageObjectRepository.GetForGenericAccessAsync(request.Id, cancellationToken);
         if (storageObject is null) return null;
         var eligibility = await StorageObjectContentEligibilityDto.ResolveAsync(
             storageObject, _storageObjectRepository, _timeProvider, cancellationToken);

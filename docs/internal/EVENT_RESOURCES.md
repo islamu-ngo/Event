@@ -1,12 +1,12 @@
 ---
 title: Governed event resources
-status: implemented-draft-management
+status: implemented-private-file-intake
 last_updated: 2026-09-23
 ---
 
 # Governed Event Resources
 
-`EventResource` is an independent tenant/event-owned aggregate for governed event materials. Management authors semantic drafts; audience reads expose only currently authorized metadata. Delivery is not enabled by either metadata surface.
+`EventResource` is an independent tenant/event-owned aggregate for governed event materials. Management authors semantic drafts; audience reads expose only currently authorized metadata. Metadata never substitutes for the separate delivery decision.
 
 ## P5.A draft-management API
 
@@ -27,8 +27,8 @@ audit result. Organizer clients follow only the server-authored HAL links; a
 link is an affordance for the current decision, not a durable permission. The
 management detail and collection expose `self`, collection, audit, create,
 edit, archive, delete, unpublish, and moderation relations only when applicable
-and authorized. They deliberately expose no delivery, access, download, or
-publish affordance.
+and authorized. Stored-file management additionally offers `upload-file` and,
+when current policy and inspected ownership permit it, `publish`.
 
 Management pages contain only the requested page number/size, authorized HAL
 items and collection actions. They expose no total count, total pages or
@@ -47,8 +47,9 @@ no suppression bypass for this controller.
 P5.A drafts carry only semantic metadata, audience rules, availability intent,
 and a governed delivery *type* placeholder. They accept no storage reference,
 external destination, encryption material, file input, or other delivery
-payload. `publish` remains a reserved route and rejects incomplete drafts in
-this phase; it must not be treated as a way to publish a placeholder.
+payload. Delivery is configured through its separate operation. `publish`
+rejects incomplete or disallowed files and every external-link placeholder;
+it must not be treated as a way to publish a placeholder.
 Archiving is terminal and never publishes content. It is available from draft
 or withdrawn state; deletion remains permitted for an archived resource when
 the current HAL action is granted.
@@ -86,7 +87,7 @@ handler-owned native queries, explicit safe projections and private/no-store HAL
 Audience DTOs never carry management notes, audience-rule objects, resource
 versions, backing identities or destination material. Teasers use the public
 title with closed availability/requirement values; protected description,
-language, accessibility and alternative references are omitted.
+language, accessibility, file metadata and alternative references are omitted.
 
 Discovery evaluates the complete governed active set, capped at 500 resources,
 using category-bounded authority reads and provider batches. It returns at most
@@ -121,17 +122,142 @@ The explicit immutable projection preserves kind, publication state, authorized
 public/private metadata (including management notes), audience qualifiers,
 relative availability intent and same-event semantic references. It excludes
 concurrency stamps, audit history, manager attribution, storage identity,
-provider keys, protected envelopes, origins and destinations. Delivery
-descriptors or download references are not emitted before their owning delivery
-capability exists.
+provider keys, protected envelopes, origins and destinations. A privately owned
+file may contribute its display name, MIME type, byte size and safety state.
+A separate exact `download` decision controls the optional application-route
+reference; export or moderation permission never implies download authority.
 
 Pages default to 20 and are capped at 100. There are no totals or inferred final
 page links. Rows are projected in a bounded serializable read, then exact
-resource versions are bound to a fresh parent-plus-row A/provider/B export
+resource versions and attachment generations are bound to a fresh parent-plus-row A/provider/B export
 decision immediately before returning JSON. A stale projection or any denied
 row discards the entire prepared page. Cancellation remains caller-owned;
 infrastructure failure carries no metadata. This is not bulk ZIP export or
 resource import, and the document is not an authorization grant.
+
+## Private file intake and delivery
+
+`POST /api/eventresource/{id}/upload-sessions` accepts the expected resource
+version, declared size, closed MIME type, safe display name, extension and
+replay identity. The native command delegates to
+`EventResourceFileUploadWorkflow`. Existing storage-session finalize/cancel
+routes resolve resource ownership server-side and call that same workflow:
+they neither require generic-storage create permission nor bypass resource
+update authority. Their HTTP replay filters reauthorize committed results.
+
+Reservation retains the resource version. Finalization spools a bounded,
+delete-on-close inspection snapshot, persists an inaccessible delete-requested
+staging identity, and writes the selected provider outside a transaction.
+Fresh authority, version, policy and quota checks then atomically attach the
+new object, record the success audit, finalize the session and retire the old
+attachment. A failed commit leaves durable cleanup state rather than relying
+on in-memory compensation. A replacement does not remove the old attachment
+before the new one commits.
+
+`EventResourceDocumentInspection` and `EventResourceDocumentPolicy` accept only
+PDF, non-macro DOCX and non-macro PPTX declarations. PDF validation is signature
+checking, not active-content or malware scanning. OOXML checks package
+structure, CRCs, content types and relationships; it rejects unsupported active,
+embedded, encrypted or externally related content and enforces entry, expansion
+and XML bounds. This is deliberately a conservative subset, not a scanner.
+The immutable object identity and SHA-256 bind an `unscanned` verdict; lifecycle
+success never means `clean`. Default governance denies unscanned publication
+and access. Only the instance authority can opt into this supported subset.
+
+Generic storage access excludes resource purpose, resource owner discriminator
+or any retained resource attachment independently, including malformed tuples.
+The exclusion precedes list counts and applies to public-image, presign and
+internal readers as well as direct content and mutation endpoints. The uploader
+receives no generic access exception. Resource objects remain `PrivateOwner`
+even when their audience is public.
+
+`GET /api/eventresource/{id}/content` uses
+`EventResourceContentService` for A/provider/private preparation/B and
+`EventResourceFileResult` for the final clock/freshness gate immediately before
+headers. The response owns the pending lease, so cancelled MVC result execution
+also disposes prepared streams. File metadata disclosure binds the full
+ownership, inspection and content generation after HAL assembly, not merely a
+resource concurrency stamp. Audience `download` links require exact native
+download authority; teasers never carry file descriptors.
+
+Responses are full binary attachments with private/no-store, nosniff and
+restrictive content policy. There are no resource presigns, conditional 304
+responses, ETags, Last-Modified validators or range responses. Binary OpenAPI
+media schemas generate `FileResponse`, not JSON MVC-result types. BFF uploads
+bind opaque sessions to the current subject and resource; successful browser
+completion returns only the resource ID, never a generic storage locator.
+Split forwarding and Combined in-process transport use server-held identity;
+the Combined integration fixture exercises production BFF login, SQLite and
+the real local-file provider.
+
+Combined hosting registers top-level authentication/authorization explicitly
+after the cookie bridge so framework auto-insertion cannot reject the request
+before trusted enrichment. The bridge validates antiforgery against the actual
+cookie principal, then clears that principal for API-token authentication.
+HTTP request events use normalized route templates; raw framework
+request-start/finish messages are kept below the native logging threshold
+because they contain URLs before routing. Warnings and errors remain enabled.
+`EventResourceTraceProcessor` in shared ServiceDefaults removes resource and
+upload-session identities from matching server and outbound HTTP span URLs
+before exporters run. This also covers the separate Split BFF process; native
+API middleware alone cannot sanitize a different host's client spans.
+
+The forward `BindEventResourceFiles` migrations add explicit inspection binding
+and upload version facts, private-owner constraints and the tenant-qualified
+session/object relationship. Their PostgreSQL, SQLite, SQL Server and MySQL
+histories are generated artifacts.
+
+### Retirement and producer settlement
+
+`EventResourceStorageLifecycleRepository` serializes activation, producer
+acknowledgement and retirement through a conditional source-row fence. Uploads
+commit an immutable `StorageProviderBinding` before provider writes. Successful
+receipts commit independently of attachment and required-success audit; a late
+receipt may settle a matching tombstone after source removal, never recreate a
+resource. Content reads use the captured binding and exact object version, which
+also participate in delivery generation checks.
+Provider resolution/write failures return a closed storage-upload failure without
+logging or serializing untrusted provider exception text. Without a confirmed
+write receipt, the staged object's producer remains unsettled and its deletion
+authority stays non-executable until an exact later acknowledgement.
+
+Retirement transfers deletion authority and settles logical quota once in the
+native caller transaction. Heavy moderation retires before overwriting the
+storage lifecycle, then saves redaction/detachment and removes transferred
+sources. This ordering does not depend on finalized sessions remaining after
+subject erasure. Erasure preserves shared live materials; only the erased
+subject's exact detached staging objects enter retirement. Evidence-backed
+objects and their upload sessions are excluded from both ordinary retirement
+and source handoff; parent moderation withdraws their resource affordance
+without deleting the independently retained evidence. Expiry conditionally
+fences the observed Uploading session before retiring its staged object, so a
+concurrent finalization invalidates the entire transaction.
+
+`StorageObjectDeletionTombstone` retains identifiers, the machine key, binding
+and version, state, claim stamp and scheduling times, without tenant/resource/
+user foreign keys or content/attribution. `AwaitingProducer` is not executable:
+expiry, cancellation and elapsed time cannot prove producer settlement.
+`Ready` work needs a conditional lease before external deletion. Absence and
+retry updates require the matching unexpired fence; a stale worker cannot
+complete newer work. Audit-row expiry remains independent.
+
+The existing storage reconciliation job invokes
+`EventResourceStorageCleanupService`. Its bounded transactional passes retire
+expired resource reservations and remove transferred metadata, including
+unknown-producer sources. Claims and terminal purge require source rows to be
+absent. Provider I/O stays outside transactions; deletion acknowledgements alone
+are insufficient without confirmed absence. Generic reconciliation, image
+deletion and inventory cannot take over resource-owned or tombstoned keys.
+Dry-run performs no mutation. No second scheduler or outbox is introduced.
+
+Bindings retain original non-secret target coordinates and external secret
+references, not credential values or a fallback to current provider settings.
+S3 operations address exact versions; delete markers, unavailable buckets and
+missing/inaccessible local roots do not establish absence. Unknown receipts or
+versions remain pending for operator reconciliation; see the
+[operator recovery guidance](../public/documentation/readme/integrations-and-ai/storage.md#resource-deletion-and-provider-recovery).
+Only a bound local write may initialize its captured root for the first upload;
+read, inventory validation and cleanup cannot recreate a missing old root.
 
 ## Relational ownership
 

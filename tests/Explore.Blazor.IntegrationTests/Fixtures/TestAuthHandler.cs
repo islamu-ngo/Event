@@ -46,10 +46,25 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
                 return Task.FromResult(AuthenticateResult.NoResult());
             }
 
-            var claims = claimDtos.Select(c => new Claim(c.Type, c.Value)).ToList();
+            const string accessTokenClaim = "test:access_token";
+            var claims = claimDtos
+                .Where(c => !string.Equals(c.Type, accessTokenClaim, StringComparison.Ordinal))
+                .Select(c => new Claim(c.Type, c.Value))
+                .ToList();
             var identity = new ClaimsIdentity(claims, "Cookies");
             var principal = new ClaimsPrincipal(identity);
-            var ticket = new AuthenticationTicket(principal, SchemeName);
+            var properties = new AuthenticationProperties();
+            var accessToken = claimDtos.FirstOrDefault(c =>
+                string.Equals(c.Type, accessTokenClaim, StringComparison.Ordinal))?.Value;
+            if (!string.IsNullOrWhiteSpace(accessToken))
+            {
+                properties.StoreTokens([new AuthenticationToken
+                {
+                    Name = "access_token",
+                    Value = accessToken
+                }]);
+            }
+            var ticket = new AuthenticationTicket(principal, properties, SchemeName);
 
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }

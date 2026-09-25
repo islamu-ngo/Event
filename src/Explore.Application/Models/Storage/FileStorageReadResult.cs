@@ -4,4 +4,5 @@ public sealed record FileStorageReadResult(
     Stream Content,
     string ContentType,
     long Length,
-    DateTimeOffset? LastModified);
+    DateTimeOffset? LastModified,
+    string? ProviderVersionId = null);

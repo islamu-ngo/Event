@@ -567,7 +567,7 @@ services:
       /bin/sh -c "
       mc alias set local http://minio:9000 ${STORAGE_S3_ACCESS_KEY_ID:-} ${STORAGE_S3_SECRET_ACCESS_KEY:-};
       mc mb --ignore-existing local/${STORAGE_S3_BUCKET_NAME:-explore};
-      mc anonymous set public local/${STORAGE_S3_BUCKET_NAME:-explore};
+      mc anonymous set private local/${STORAGE_S3_BUCKET_NAME:-explore};
       "
 
   cerbos-db:

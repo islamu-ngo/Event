@@ -25,7 +25,7 @@ public class DeleteStorageObjectCommandHandler : ICommandHandler<DeleteStorageOb
 
     public async Task<bool> ExecuteAsync(DeleteStorageObjectCommand request, CancellationToken cancellationToken)
     {
-        var entity = await _storageObjectRepository.GetById(request.Id);
+        var entity = await _storageObjectRepository.GetForGenericAccessAsync(request.Id, cancellationToken);
 
         if (entity == null)
         {

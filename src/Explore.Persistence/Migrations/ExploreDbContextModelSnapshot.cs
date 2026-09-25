@@ -3119,7 +3119,9 @@ namespace Explore.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("did");
+                        .HasColumnName("did")
+                        .UseCollation("C")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<int>("Direction")
                         .HasColumnType("integer")

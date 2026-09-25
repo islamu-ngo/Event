@@ -2,7 +2,9 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 using Blazouter.Services;
+using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.EventReporting;
+using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Events;
 using Explore.Blazor.Client.Services;
@@ -142,6 +144,34 @@ public sealed class EventDetailTests : IDisposable
 
         await Assert.That(cut.Markup).DoesNotContain("event-registration-card");
         await Assert.That(cut.Markup).DoesNotContain("Register now");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Render_ResourcesSectionRequiresParentEventRelation(bool advertised)
+    {
+        var eventDto = CreateEventDto("PUBLISHED", "Published", advertised ? "resources" : "self");
+        RegisterEventDetailServices(eventDto);
+        var resources = _ctx.AddMockService<IEventResourceService>();
+        resources.AudienceAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EventResourceAudiencePageResource
+            {
+                _links = new Dictionary<string, HalLink>(),
+                _embedded = new HalCollectionEmbeddedOfEventResourceAudienceDetailDto { Items = [] }
+            });
+
+        var cut = _ctx.RenderMudComponent<EventDetail>();
+
+        if (advertised)
+            cut.WaitForElement("#event-resources-title");
+        else
+        {
+            cut.WaitForElement(".event-detail-wrapper");
+            await Assert.That(cut.FindAll("#event-resources-title")).IsEmpty();
+            await resources.DidNotReceive().AudienceAsync(Arg.Any<Guid>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>());
+        }
     }
 
     [Test]

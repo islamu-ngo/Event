@@ -2529,3 +2529,28 @@ References: `InstanceOnboardingGenerationReader`,
 `docs/internal/CONFIGURATION.md#guided-setup-configuration-boundary`.
 
 ---
+
+[2026-09-24 Europe/Brussels] — Invalid resource keys empty embedded localization bundles
+
+**Context**: The event-resources UI regression surfaced during combined-tree PR verification after adding English, French and Arabic resource labels.
+
+**Symptom / Observation**: `OfflineTranslationProviderTests` failed three English fallback checks on the combined tree while the same class passed 7/7 on untouched develop. The export lacked `ui.common.appName` and `ui.common.loading`, even though both keys were present in the JSON file.
+
+**Root Cause**: `BundleSchema.Read` rejects any key outside the `ui.`, `lookup.` and `payment.` namespaces. New `admin.resources.*` and `event.resources.*` labels violated that contract. `OfflineTranslationProvider.LoadEmbeddedBundle` catches the resulting `JsonException` and returns an empty dictionary for the entire language, not just the offending key.
+
+**Resolution**: Rename the resource keys to `ui.admin.resources.*` and `ui.event.resources.*` in all three embedded bundles, and align the three Blazor translation helpers. Commit `1b088b5daf23ab577c2538e74894b31cd8a8761e` includes a regression check for both machine-consumed resource keys in every language. The feature branch passed `dotnet build --configuration Release --verbosity quiet`, then `dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet --no-build -- --treenode-filter "/*/*/*OfflineTranslationProviderTests/*" --minimum-expected-tests 10` (10/10). The attendee, studio and governance component classes passed 39/39, 24/24 and 9/9 (`mon_386Z6BG2A27FX17H`, `mon_CDVT1WPGQX5GVG1N`).
+
+**Why This Matters for Future Work**: A single invalid key silently removes every embedded label in that language. Validate new keys against `BundleSchema` and cover every shipped language, rather than relying on component fallbacks that mask broken bundles.
+
+**References**:
+- `src/Explore.Infrastructure/Localization/BundleSchema.cs:9`
+- `src/Explore.Infrastructure/Localization/OfflineTranslationProvider.cs:146`
+- `src/Explore.Infrastructure/Localization/Bundles/en.json:2`
+- `tests/Explore.Infrastructure.Tests/Infrastructure/Localization/OfflineTranslationProviderTests.cs:58`
+- `src/Explore.Blazor.Client/Components/Event/EventResources.razor:55`
+- Fix commit: `1b088b5daf23ab577c2538e74894b31cd8a8761e`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the schema and focused regression now guard the contract)
+
+---

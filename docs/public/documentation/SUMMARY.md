@@ -30,6 +30,7 @@
     * [White-Labeling](readme/administration-and-branding/white-labeling.md)
     * [Custom Domains & SEO](readme/administration-and-branding/custom-domains-and-seo.md)
   * [Events & Ticketing](readme/events-and-ticketing/README.md)
+    * [Protected Event Resources](readme/events-and-ticketing/README.md#resources-in-the-browser)
     * [Modular Event Aspects](readme/events-and-ticketing/modular-event-aspects.md)
     * [Custom Properties](readme/events-and-ticketing/custom-properties.md)
     * [Ticketing & Check-In](readme/events-and-ticketing/ticketing-and-check-in.md)

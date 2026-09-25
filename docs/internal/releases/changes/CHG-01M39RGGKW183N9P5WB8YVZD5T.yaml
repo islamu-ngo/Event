@@ -1,0 +1,34 @@
+# Attendee event-resource privacy and download withdrawal guidance.
+# Records the reviewed release impact of the localized browser correction.
+Change-Id: CHG-01M39RGGKW183N9P5WB8YVZD5T
+Title: "conceal private teaser fields and explain download withdrawal"
+Type: fix
+Scope: events
+Summary: "Keep private fields out of teaser markup even for inconsistent detail records and explain that active downloads may finish after withdrawal."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: No server contract or backward-compatibility boundary changes.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Teaser cards suppress private detail fields even when an inconsistent client record includes them; HAL remains the sole action authority.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: No persistence schema, key material or provider binding changes.
+  Configuration:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: not-applicable
+    Detail: No environment, resource policy or deployment option changes.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Browser presentation changes only; API responses and generated clients are unchanged.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: not-applicable
+    Detail: No operator action is needed; attendee guidance explains withdrawal of active downloads.

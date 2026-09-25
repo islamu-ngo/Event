@@ -936,6 +936,8 @@ public static class RouteNames
     public const string UpdateUserSettingsBatch = nameof(UpdateUserSettingsBatch);
     public const string UpdateUserSetting = nameof(UpdateUserSetting);
     public const string ResetUserSetting = nameof(ResetUserSetting);
+    public const string GetInstanceEventResourceSettings = nameof(GetInstanceEventResourceSettings);
+    public const string UpdateInstanceEventResourceSettings = nameof(UpdateInstanceEventResourceSettings);
     public const string GetTenantScopedSettings = nameof(GetTenantScopedSettings);
     public const string UpdateTenantSettingsBatch = nameof(UpdateTenantSettingsBatch);
     public const string UpdateTenantSetting = nameof(UpdateTenantSetting);

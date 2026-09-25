@@ -5,6 +5,7 @@
 @using Explore.Blazor.Client.Contracts.Services.Federation
 @using Explore.Blazor.Client.Helpers
 @using Explore.Blazor.Client.Services
+@using Explore.Blazor.Client.Pages.Admin.Instance.Components
 @inject IAtprotoFederationSettingsService AtprotoFederationSettingsService
 @inject ITenantOnboardingService TenantOnboardingService
 @inject IAccessibilityAnnouncerService Announcer
@@ -18,6 +19,7 @@
         </MudText>
     </div>
     <TenantReportingIntakePolicySection />
+    <EventResourceGovernanceSection />
     <MudStack Spacing="3">
         <MudSwitch T="bool?"
                    Value="@PolicyDisplayValue(EventsUserSubmissionEnabledKey)"

@@ -110,6 +110,30 @@ outside the platform's control. A link cannot be recalled from a third-party
 service; withdraw/replace it here and rotate the third-party credential when
 responding to an incident.
 
+## Resources in the browser
+
+An eligible event page lists the resources the current reader may discover,
+including teaser-only entries, availability requirements, language and
+accessibility notes, and file type, size and unscanned state where disclosure
+permits them. Use **Download**, **Open resource**, or **Accessible alternative**
+only when that resource displays the corresponding action. Downloads and link
+access begin on this site's own address; an external link then leaves for
+the configured origin. The page shows the origin as text before navigation,
+not as an embedded preview.
+
+Organizers can open **Studio → Resources** when the event's current resource
+collection offers **Manage resources**. The collection and each resource
+grant separate actions. A draft editor supplies title, audience, kind,
+disclosure and accessibility metadata; choose file or external
+delivery at creation. For an external resource, enter a complete HTTPS URL
+in its separate write-only form. After saving, only its safe origin remains
+visible; copy the original link elsewhere if you need to retain it.
+Publication, withdrawal, archival, deletion, moderation, audit and metadata
+export are shown only when their individual actions are currently offered.
+When an action has gone stale, the server denies it and the list refreshes;
+the browser does not reveal private denial details. Exported metadata may
+contain organizer notes and should be handled as a private document.
+
 ## Uploading and downloading resource files
 
 Follow the management representation's `upload-file` action to reserve a file
@@ -133,6 +157,9 @@ response headers. An old link or uploader identity cannot bypass withdrawal,
 expiry, changed membership or tighter policy. Responses are private/no-store
 and do not support resumable ranges or cached conditional responses. Files
 remain private in the storage provider even for a public resource audience.
+Withdrawal denies new download requests, including attempts to reuse a saved
+link, but a download that already started may finish. A teaser never reveals
+private descriptions, file details or the external destination's origin.
 
 Browser uploads use a subject/resource-bound opaque session. Their completion
 response identifies the resource only; refresh its representation to obtain

@@ -17,15 +17,18 @@ namespace Event.Standalone.IntegrationTests.Fixtures;
 internal sealed class NativeEmailOptionalStandaloneFixture : IDisposable
 {
     private readonly Dictionary<string, string?> _previousEnvironment = new(StringComparer.Ordinal);
-    private readonly string _directory = Directory.CreateTempSubdirectory("email-optional-standalone-").FullName;
+    private readonly string _directory;
 
     public Guid Subject { get; } = Guid.CreateVersion7();
     public string InitialPassword { get; } = NewPassword();
     public string DatabasePath => Path.Combine(_directory, "event.db");
     public SmtpDiagnosticTransport Transport { get; } = new();
 
-    public NativeEmailOptionalStandaloneFixture()
+    public NativeEmailOptionalStandaloneFixture(string? temporaryDirectory = null)
     {
+        _directory = temporaryDirectory is null
+            ? Directory.CreateTempSubdirectory("email-optional-standalone-").FullName
+            : Directory.CreateDirectory(Path.Combine(temporaryDirectory, $"email-optional-standalone-{Guid.CreateVersion7():N}")).FullName;
         // The fixture is serialized: the production secret authority reads the process environment,
         // not an in-memory configuration provider or a fallback secret resolver.
         foreach (string prefix in new[] { "Database__", "DATABASE_", "IdentityDatabase__", "IDENTITY_DATABASE_",

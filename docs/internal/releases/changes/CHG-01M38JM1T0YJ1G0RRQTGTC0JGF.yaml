@@ -1,0 +1,28 @@
+# Operator focus restoration after resource-policy reload.
+Change-Id: CHG-01M38JM1T0YJ1G0RRQTGTC0JGF
+Title: "Restore resource policy editor focus"
+Type: fix
+Scope: accessibility
+Summary: "Operators regain keyboard focus after a resource policy update refresh or denial."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Policy save and denial refresh the controls; focus returns to the saved control or falls back to the resource-policy heading.

@@ -19,6 +19,26 @@ The draft HTTP API version is `0.1`. In pre-release development before v1, break
 
 ## Recent externally visible themes
 
+### Protected resource links and operator limits (2026-09-24)
+
+`PUT /api/eventresource/{id}/destination` writes a validated HTTPS
+destination for an authorized manager using an idempotency key and the current
+resource version. The full destination is write-only: management and audience
+responses expose at most its safe origin. An eligible visitor follows the
+resource's `access` HAL action at `GET /api/eventresource/{id}/access`, which
+rechecks current authority and returns a temporary, no-store redirect without
+an application bearer token. Show the origin and warn visitors before they
+leave the platform. Withdrawing platform access denies later platform
+navigation but cannot recall a link already revealed by an external provider;
+rotate or revoke that link at the provider when necessary.
+
+Instance administrators use `GET/PUT /api/settings/instance/event-resources`
+for private, no-store resource ceilings and the explicit unscanned-document
+exception. Tenant administrators use the `EventResources` tenant setting group
+and its advertised `edit` HAL relation to narrow inherited limits; a tenant
+cannot widen the effective instance policy. Re-read the effective settings
+after a rejected or successful mutation instead of trusting an old form.
+
 ### Portable resource metadata (2026-09-23)
 
 `GET /api/event/{eventId}/resources/export` adds private/no-store semantic JSON

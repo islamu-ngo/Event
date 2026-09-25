@@ -6,6 +6,10 @@ last_updated: 2026-09-23
 
 # Governed Event Resources
 
+The permanent delivery and revocation decision is
+[ADR-033](adr/ADR-033-governed-event-resource-delivery.md). Operator and
+attendee guidance is linked from the public documentation navigation.
+
 `EventResource` is an independent tenant/event-owned aggregate for governed event materials. Management authors semantic drafts; audience reads expose only currently authorized metadata. Metadata never substitutes for the separate delivery decision.
 
 ## P5.A draft-management API
@@ -91,6 +95,68 @@ it. Retire a key only after every dependent destination is replaced or
 removed. A backup containing both encrypted rows and unwrapped Data
 Protection key XML is not confidential against full backup compromise; use
 the deployment's existing key-wrapping authority where configured.
+
+### Browser resource affordances
+
+`EventResources` and `StudioEventResources` use the scoped
+`IEventResourceService` over generated per-tag clients, never component-side
+role checks or destination readback. The attendee surface loads audience
+collection and fresh item details; only a root-relative, exact `download`,
+`access` or `accessible-alternative` HAL relation produces a delivery anchor.
+Teaser cards render the public title and availability requirements, never
+private description, language, accessibility notes, file details or safe
+origin, even if a client detail record contains inconsistent private fields.
+The file safety state remains truthful metadata when a private detail is
+visible without a current `download` relation; only that relation creates
+the action. The associated download explanation states that withdrawal can
+deny the next request but cannot stop a response already streaming.
+The safe origin is plain text, not a preview/fetch target. The Studio
+navigation obtains `manage-resources` from the fresh audience collection,
+including for a private event whose public parent `resources` link is absent.
+Collection `create-resource`/`export` and each item's management relations
+gate distinct controls. A mutation rereads the item/version and relation,
+uses a generated client with a new idempotency key, and refreshes after a
+denial without reflecting server error details. The external-destination
+form clears its URL after submission and shows only safe-origin metadata.
+Blazor components rely on the service and server authority independently:
+HAL hides an affordance; it does not grant a write.
+
+### Native resource policy surfaces
+
+`GET/PUT /api/settings/instance/event-resources` fixes the native
+`EventResources` category at instance scope and requires current instance
+administrator authority for both reads and writes. The private/no-store GET
+resolves all eight effective `SettingGroupResponseDto` entries with value,
+source, lock, editability and reason. The PUT accepts only registered resource
+keys, forces strict `UpdateSettingBatchCommand` mode and delegates to the
+coordinated setting writer rather than directly updating rows. Invalid
+private values are not reflected in API validation responses.
+
+The existing `GET/PUT /api/settings/tenant/EventResources` resolves the same
+category for the current tenant. Tenant GET replaces each raw merged value
+with the current `EventResourceGovernancePolicyReader` intersection of instance,
+tenant and storage ceilings; it fails closed when that policy is unavailable.
+`source` still identifies the stored setting's provenance, which can differ
+from the authority behind a tighter effective `value`. Its generated HAL
+group emits `self`; an
+`edit` relation for either scope requires at least one currently editable
+setting and the corresponding scoped permission. A missing `edit` link makes
+the entire client form read-only; `CanEdit` additionally gates each field.
+`allow_unscanned_documents` is instance-only. Tenant collection controls
+offer only subsets of current effective values, and numeric controls cannot
+exceed the currently displayed effective ceiling. Server-side coordinated
+mutation and policy intersection remain authoritative: a stale browser may
+be denied and must reload the group before another write. Instance locks
+remain active even in SingleTenant mode.
+After either a save or denial, the form reloads current policy, restores
+keyboard focus to its heading when the original control was replaced, and
+announces the result through a status or alert without duplicating that text
+in the focus target.
+
+The AT Protocol event source-field manifest explicitly excludes private
+stored-document inspection state and storage-provider identifiers. Its
+completeness test guards future additions to `StorageObject` against
+unreviewed federation projections.
 
 The audit page contains only a closed action/outcome/reason, timestamp, and
 retained responsible-manager identity. A successful mutation writes that
@@ -244,6 +310,16 @@ The forward `BindEventResourceFiles` migrations add explicit inspection binding
 and upload version facts, private-owner constraints and the tenant-qualified
 session/object relationship. Their PostgreSQL, SQLite, SQL Server and MySQL
 histories are generated artifacts.
+
+The generated `AlignAtprotoRecordDidCollation` forward histories make
+`AtprotoRecord.Did` use the same provider-appropriate ordinal ASCII collation
+as `AtprotoIdentity.Did`. Public event eligibility compares those persisted
+identifiers when evaluating resource authority; a SQL Server database with
+the mismatched old collations fails that query closed instead of granting a
+resource. Apply the selected provider history before serving resource reads.
+MariaDB uses the shared MySQL catalog. The SQLite generated reverse operation,
+all four model snapshots and all five real-engine behavior contracts were
+verified without editing migration files by hand.
 
 ### Retirement and producer settlement
 

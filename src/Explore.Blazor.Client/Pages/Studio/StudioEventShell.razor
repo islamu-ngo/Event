@@ -8,6 +8,7 @@
 @page "/studio/events/{EventId:guid}/forms"
 @page "/studio/events/{EventId:guid}/analytics"
 @page "/studio/events/{EventId:guid}/publication"
+@page "/studio/events/{EventId:guid}/resources"
 @using Blazouter.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
@@ -86,6 +87,10 @@
                                                       OnSaved="ReloadEventAsync"
                                                       OnReloadRequested="ReloadEventAsync" />
                 }
+            }
+            else if (Section == "resources")
+            {
+                <StudioEventResources EventId="EventId" />
             }
             else if (Section == "orders")
             {
@@ -172,6 +177,7 @@
         "tickets" => "Tickets",
         "promotions" => "Promotions",
         "orders" => "Orders",
+        "resources" => "Resources",
         "integrations" => "Integrations",
         "forms" => "Forms",
         "analytics" => "Analytics",
@@ -185,6 +191,7 @@
         "tickets" => "Define ticket types, shared capacity pools, prices, limits, and admission entitlements.",
         "promotions" => "Create and manage event promotion codes when the server advertises the required affordances.",
         "orders" => "Review registration order status and server-calculated commercial snapshots.",
+        "resources" => "Manage event materials with current resource permissions.",
         "integrations" => "Connect registration providers, monitor health, and reconcile provider submissions.",
         "forms" => "Author versioned registration questions, conditional rules, and publication readiness.",
         "analytics" => "Review privacy-bounded aggregates for governed registration answers.",
@@ -231,6 +238,7 @@
             : path.EndsWith("/integrations", StringComparison.OrdinalIgnoreCase) ? "integrations"
             : path.EndsWith("/forms", StringComparison.OrdinalIgnoreCase) ? "forms"
             : path.EndsWith("/analytics", StringComparison.OrdinalIgnoreCase) ? "analytics"
+            : path.EndsWith("/resources", StringComparison.OrdinalIgnoreCase) ? "resources"
             : path.EndsWith("/publication", StringComparison.OrdinalIgnoreCase) ? "publication"
             : "details";
     }

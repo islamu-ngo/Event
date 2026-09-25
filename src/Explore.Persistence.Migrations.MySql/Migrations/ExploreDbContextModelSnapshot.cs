@@ -3114,7 +3114,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
-                        .HasColumnName("did");
+                        .HasColumnName("did")
+                        .UseCollation("ascii_bin")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("Did"), "ascii");
 
                     b.Property<int>("Direction")
                         .HasColumnType("int")

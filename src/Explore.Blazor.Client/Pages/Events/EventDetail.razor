@@ -10,6 +10,7 @@
 @using Explore.Blazor.Client.Contracts.Services.Events
 @using Explore.Blazor.Client.Components.EventReporting
 @using Explore.Blazor.Client.Components.Events
+@using Explore.Blazor.Client.Components.Event
 
 <PageTitle>@(_eventDetails?.Title ?? "Event Detail")</PageTitle>
 
@@ -501,6 +502,11 @@
                             }
                         </div>
                     </div>
+                    }
+
+                    @if (_eventDetails.HasHalLink("resources"))
+                    {
+                        <EventResources EventId="EventId" />
                     }
 
                     @* About Section *@

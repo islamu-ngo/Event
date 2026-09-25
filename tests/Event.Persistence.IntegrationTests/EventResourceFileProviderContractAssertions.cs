@@ -32,6 +32,51 @@ internal static class EventResourceFileProviderContractAssertions
         await AssertRevocationPrecedesFinalSnapshotAsync(() => fixture.CreateSystemContext());
     }
 
+    public static async Task AssertFinalReadDoesNotReuseTrackedAuthorityAsync(
+        PrimaryDatabaseProviderBehaviorFixture fixture)
+    {
+        await fixture.PrepareAsync();
+        PublishedFile seed = await SeedPublishedFileAsync(
+            () => fixture.CreateSystemContext(), EventResourceAudienceKindEnum.Public);
+        await SetUnscannedPolicyAsync(() => fixture.CreateSystemContext(), allowed: true);
+
+        await using var read = fixture.CreateSystemContext();
+        await using var writer = fixture.CreateSystemContext();
+        EventResource trackedResource = await read.EventResources.SingleAsync(row => row.Id == seed.ResourceId);
+        var providerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProvider = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var opened = new TrackingStream(Pdf);
+        EventResourceContentService service = ContentService(read, seed, async cancellationToken =>
+        {
+            providerEntered.TrySetResult();
+            await releaseProvider.Task.WaitAsync(cancellationToken);
+            return new FileStorageReadResult(opened, "application/pdf", Pdf.Length, null);
+        });
+        using var deadline = new CancellationTokenSource(Timeout);
+        Task<EventResourceAuthorityResult> pending = service.PrepareAsync(
+            seed.ResourceId, new DateTimeOffset(Now.AddMinutes(1)), deadline.Token);
+        try
+        {
+            await providerEntered.Task.WaitAsync(Timeout, deadline.Token);
+            await Assert.That(read.Database.CurrentTransaction).IsNull();
+            EventResource current = await writer.EventResources.SingleAsync(
+                row => row.Id == seed.ResourceId, deadline.Token);
+            current.Withdraw(current.ConcurrencyStamp, seed.SubjectUserId, Now.AddSeconds(30));
+            await writer.SaveChangesAsync(deadline.Token);
+        }
+        finally
+        {
+            releaseProvider.TrySetResult();
+        }
+
+        await using EventResourceAuthorityResult result = await pending.WaitAsync(Timeout, deadline.Token);
+        await Assert.That(trackedResource.PublicationStateId)
+            .IsEqualTo((int)EventResourcePublicationStateEnum.Published);
+        await Assert.That(result.Outcome).IsEqualTo(EventResourceAuthorityOutcome.NotFound);
+        await Assert.That(result.Lease).IsNull();
+        await Assert.That(opened.WasDisposed).IsTrue();
+    }
+
     public static async Task AssertAttachmentHasOneOwnerAsync(
         PrimaryDatabaseProviderBehaviorFixture fixture)
     {
@@ -74,6 +119,7 @@ internal static class EventResourceFileProviderContractAssertions
         try
         {
             await providerEntered.Task.WaitAsync(Timeout, deadline.Token);
+            await Assert.That(read.Database.CurrentTransaction).IsNull();
             TenantUser membership = await writer.TenantUsers.SingleAsync(row =>
                 row.TenantId == seed.TenantId && row.UserId == seed.SubjectUserId, deadline.Token);
             membership.StatusId = (int)TenantUserStatusEnum.Suspended;
@@ -102,8 +148,14 @@ internal static class EventResourceFileProviderContractAssertions
         await using (ExploreDbContext reserve = contextFactory())
         {
             EventResourceFileUploadWorkflow workflow = UploadWorkflow(reserve, contextFactory, seed);
-            firstSessionId = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
-            secondSessionId = (await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default)).Id!.Id;
+            var firstReservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
+            if (firstReservation.Id is null)
+                throw new InvalidOperationException($"First upload reservation failed: {firstReservation.FailureCode}.");
+            firstSessionId = firstReservation.Id.Id;
+            var secondReservation = await workflow.ReserveAsync(seed.ResourceId, Intent(seed.Version), default);
+            if (secondReservation.Id is null)
+                throw new InvalidOperationException($"Second upload reservation failed: {secondReservation.FailureCode}.");
+            secondSessionId = secondReservation.Id.Id;
         }
 
         var firstProviderEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -129,12 +181,15 @@ internal static class EventResourceFileProviderContractAssertions
         await Assert.That(winner.IsSuccess).IsTrue();
         await Assert.That(loser.IsSuccess).IsFalse();
         await Assert.That((await FinalizeAsync(firstWorkflow, firstSessionId, deadline.Token)).IsSuccess).IsFalse();
+        if (winner.Id?.StorageObjectId is not { } winnerObjectId)
+            throw new InvalidOperationException(
+                $"Second finalize did not return a storage object (success={winner.IsSuccess}, code={winner.FailureCode}).");
 
         await using (ExploreDbContext conflictingOwner = contextFactory())
         {
             EventResource secondResource = await conflictingOwner.EventResources.SingleAsync(row => row.Id == seed.SecondResourceId,
                 deadline.Token);
-            secondResource.SetStoredFile(winner.Id!.StorageObjectId!.Value, secondResource.ConcurrencyStamp, seed.UserId, Now);
+            secondResource.SetStoredFile(winnerObjectId, secondResource.ConcurrencyStamp, seed.UserId, Now);
             await Assert.That(() => conflictingOwner.SaveChangesAsync(deadline.Token)).Throws<DbUpdateException>();
         }
 

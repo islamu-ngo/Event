@@ -1,4 +1,12 @@
 using System.Data.Common;
+using System.Text.Json;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.LocationPrivacy;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Features.Events.Handlers.Queries;
+using Explore.Application.Features.Events.Requests.Queries;
+using Explore.Application.Features.Federation.Atproto.Services;
+using Explore.Application.Services;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
@@ -8,8 +16,10 @@ using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
+using Explore.Infrastructure.Services.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using NSubstitute;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -58,8 +68,38 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
         await Assert.That(graph.CustomPropertyDefinitions.Single().Values).IsNotEmpty();
         await Assert.That(graph.SessionCustomPropertyDefinitions.Single().Options).IsNotEmpty();
         await Assert.That(graph.SessionCustomPropertyDefinitions.Single().Values).IsNotEmpty();
+        ILocationPrivacyGovernanceService governance = Substitute.For<ILocationPrivacyGovernanceService>();
+        governance.ResolveAsync(tenantId, Arg.Any<CancellationToken>()).Returns(new EffectiveLocationPrivacyGovernance(
+            true, LocationPrivacyGovernanceReasonCode.Resolved, true, true, true,
+            LocationDisclosureAudienceEnum.AnyCurrentRegistrant, TimeSpan.FromDays(30)));
+        var snapshotFactory = new AtprotoEventPublicationSnapshotFactory(
+            new PublicEventLocationDisclosureEvaluator(governance, new EventLocationDisclosureEvaluator()));
+        var payload = await new AtprotoPublicationPayloadBuilder(snapshotFactory)
+            .BuildEventAsync(graph, DateTimeOffset.UtcNow, CancellationToken.None);
+        await Assert.That(payload.IsValid).IsTrue().Because(payload.FailureCode ?? "Publication payload was invalid");
+        await Assert.That(payload.Payload!.Json).Contains("Bounded publication graph");
+        await Assert.That(payload.Payload.Json).DoesNotContain("PRIVATE_RESOURCE_TITLE_CANARY");
+        await Assert.That(payload.Payload.Json).DoesNotContain("https://resource-only.example.test");
         await Assert.That(context.ChangeTracker.Entries()).IsEmpty();
         await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(MaximumPublicationQueryCount);
+
+        ITenantLifecycleAccessService lifecycle = Substitute.For<ITenantLifecycleAccessService>();
+        lifecycle.IsPublicAsync(tenantId, Arg.Any<CancellationToken>()).Returns(true);
+        IEventLocationDisclosureService disclosure = Substitute.For<IEventLocationDisclosureService>();
+        disclosure.ResolveManyAsync(Arg.Any<IReadOnlyCollection<EventLocationDisclosureRequest>>(),
+            Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyDictionary<Guid, EventLocationDisclosureResult>>(
+            new Dictionary<Guid, EventLocationDisclosureResult>()));
+        ITenantContext tenant = Substitute.For<ITenantContext>();
+        tenant.TenantId.Returns(tenantId);
+        await using var tenantContext = fixture.CreateTenantFilteredDbContext(tenant);
+        var calendar = await new GetEventCalendarExportRequestHandler(
+            new EventRepository(tenantContext), new EventSessionRepository(tenantContext), disclosure, lifecycle)
+            .QueryAsync(new GetEventCalendarExportRequest(eventId), CancellationToken.None);
+        await Assert.That(calendar).IsNotNull();
+        string calendarJson = JsonSerializer.Serialize(calendar);
+        await Assert.That(calendarJson).Contains("Bounded publication graph");
+        await Assert.That(calendarJson).DoesNotContain("PRIVATE_RESOURCE_TITLE_CANARY");
+        await Assert.That(calendarJson).DoesNotContain("https://resource-only.example.test");
     }
 
     private async Task<(Guid TenantId, Guid EventId)> SeedEventAsync()
@@ -89,6 +129,17 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
         context.Actors.Add(actor);
         SetForeignKeyIfPresent(context, actor, "TenantId", tenant.Id);
         await context.SaveChangesAsync();
+        context.TenantUsers.Add(new TenantUser
+        {
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
+            ActorId = actor.Id,
+            Actor = actor,
+            StatusId = (int)TenantUserStatusEnum.Active
+        });
+        await context.SaveChangesAsync();
 
         var eventEntity = new Explore.Domain.Event(EventStatusEnum.Published)
         {
@@ -109,6 +160,27 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
         };
         context.Events.Add(eventEntity);
         SetForeignKeyIfPresent(context, eventEntity, "EventProvenanceTypeId", 1);
+        await context.SaveChangesAsync();
+
+        context.EventParticipationConfigurations.Add(EventParticipationConfiguration.Create(
+            eventEntity.Id, tenant.Id, (int)ParticipationHandlingModeEnum.InformationOnly,
+            (int)AdvanceRegistrationObligationEnum.NotApplicable, null, null, DateTime.UtcNow));
+        var resourceId = Guid.CreateVersion7();
+        var resource = EventResource.CreateDraft(resourceId, tenant.Id, eventEntity.Id, null,
+            new EventResourceMetadata
+            {
+                Title = "PRIVATE_RESOURCE_TITLE_CANARY",
+                Kind = EventResourceKindEnum.GeneralDocument,
+                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+            }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
+            [EventResourceAudienceRule.Create(tenant.Id, eventEntity.Id, resourceId,
+                EventResourceAudienceKindEnum.Public)], actor.Id, DateTime.UtcNow);
+        resource.SetExternalDestination(Guid.CreateVersion7().ToString("N"), 1,
+            "https://resource-only.example.test", resource.ConcurrencyStamp, actor.Id, DateTime.UtcNow);
+        resource.Publish(new(tenant.Id, eventEntity.Id, null, EventStatusEnum.Published, false, true,
+            null, false, new(new(DateTime.UtcNow), new(DateTime.UtcNow.AddHours(1)), null, null)),
+            true, resource.ConcurrencyStamp, actor.Id, DateTime.UtcNow);
+        context.EventResources.Add(resource);
         await context.SaveChangesAsync();
 
         DateTimeOffset start = DateTimeOffset.UtcNow.AddDays(7);

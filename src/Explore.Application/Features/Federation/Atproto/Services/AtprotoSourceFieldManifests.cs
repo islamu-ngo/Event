@@ -321,6 +321,15 @@ public static class AtprotoEventSourceFieldManifest
         Description("StorageObject.Size"),
         Description("StorageObject.Purpose"),
         Excluded("StorageObject.RegistrationContentRetentionUntilUtc", "private registration-content retention deadline, never public payload"),
+        .. ExcludedMany(
+            [
+                "StorageObject.DocumentSafetyState", "StorageObject.HasBoundDocumentInspection",
+                "StorageObject.InspectedObjectId", "StorageObject.InspectedSha256Checksum"
+            ],
+            "private resource inspection and document-safety state, never federation metadata"),
+        .. ExcludedMany(
+            ["StorageObject.ProviderVersionId", "StorageObject.StorageProviderBindingId"],
+            "internal storage provider identity, never a federation reference"),
         Description("StorageObject.FileType.MasterCode"),
         Description("StorageObject.FileType.FullName"),
         Description("StorageObject.FileType.Description"),

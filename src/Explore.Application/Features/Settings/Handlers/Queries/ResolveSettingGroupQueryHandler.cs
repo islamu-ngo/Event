@@ -1,5 +1,6 @@
 namespace Explore.Application.Features.Settings.Handlers.Queries;
 
+using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -7,8 +8,11 @@ using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Queries;
 using Explore.Application.Lookups;
 using Explore.Application.Settings;
+using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
+using Explore.Domain.ValueObjects;
 using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +26,7 @@ public class ResolveSettingGroupQueryHandler
     private readonly IPlatformUserRoleRepository _platformRoles;
     private readonly ITenantUserRoleGrantRepository _tenantRoles;
     private readonly ILogger<ResolveSettingGroupQueryHandler> _logger;
+    private readonly IEventResourceGovernancePolicyReader _resourcePolicy;
 
     public ResolveSettingGroupQueryHandler(
         IHierarchicalSettingsResolver resolver,
@@ -30,7 +35,8 @@ public class ResolveSettingGroupQueryHandler
         IAdminContext adminContext,
         ILogger<ResolveSettingGroupQueryHandler> logger,
         IPlatformUserRoleRepository platformRoles,
-        ITenantUserRoleGrantRepository tenantRoles)
+        ITenantUserRoleGrantRepository tenantRoles,
+        IEventResourceGovernancePolicyReader resourcePolicy)
     {
         _resolver = resolver;
         _tenantContext = tenantContext;
@@ -38,6 +44,7 @@ public class ResolveSettingGroupQueryHandler
         _adminContext = adminContext;
         _platformRoles = platformRoles;
         _tenantRoles = tenantRoles;
+        _resourcePolicy = resourcePolicy;
         _logger = logger;
     }
 
@@ -71,6 +78,12 @@ public class ResolveSettingGroupQueryHandler
 
         var keys = definitions.Select(d => d.Key);
         var resolved = await _resolver.ResolveBatchAsync(keys, context, cancellationToken);
+        EventResourceGovernancePolicy? resourcePolicy = null;
+        if (request.Category == EventResourceSettingDefinitions.Category && request.Scope == SettingScope.Tenant)
+        {
+            resourcePolicy = await _resourcePolicy.ReadAsync(_tenantContext.TenantId, cancellationToken)
+                ?? throw new InvalidOperationException("Effective event-resource governance policy is unavailable.");
+        }
 
         // Email affordances must use the same persisted grants as preview/confirmation, not cached admin claims.
         var isAuthorized = request.Category == "Email" && request.Scope == SettingScope.Tenant
@@ -97,7 +110,9 @@ public class ResolveSettingGroupQueryHandler
             effectiveSettings.Add(new EffectiveSettingDto
             {
                 Key = definition.Key,
-                Value = setting.Value ?? definition.DefaultValue,
+                Value = resourcePolicy is null
+                    ? setting.Value ?? definition.DefaultValue
+                    : ResourcePolicyValue(definition.Key, resourcePolicy),
                 SettingValueTypeId = (int)setting.ValueType,
                 SettingValueTypeCode = NormalizedLookupMetadata.SettingValueType((int)setting.ValueType).Code,
                 SettingValueTypeName = NormalizedLookupMetadata.SettingValueType((int)setting.ValueType).Name,
@@ -120,6 +135,27 @@ public class ResolveSettingGroupQueryHandler
             Settings = effectiveSettings
         };
     }
+
+    private static string ResourcePolicyValue(string key, EventResourceGovernancePolicy policy) => key switch
+    {
+        var value when value == GovernanceSettingKeys.EventResources.EnabledDeliveryTypes =>
+            JsonSerializer.Serialize(policy.EnabledDeliveryTypes.Select(type => type.ToString())),
+        var value when value == GovernanceSettingKeys.EventResources.EnabledAudiences =>
+            JsonSerializer.Serialize(policy.EnabledAudiences.Select(audience => audience.ToString())),
+        var value when value == GovernanceSettingKeys.EventResources.PermittedFileTypes =>
+            JsonSerializer.Serialize(policy.PermittedFileTypes),
+        var value when value == GovernanceSettingKeys.EventResources.MaxUploadBytes =>
+            policy.MaxUploadBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        var value when value == GovernanceSettingKeys.EventResources.AllowUnscannedDocuments =>
+            policy.AllowUnscannedDocuments ? "true" : "false",
+        var value when value == GovernanceSettingKeys.EventResources.ExternalOrigins =>
+            JsonSerializer.Serialize(policy.ExternalOrigins),
+        var value when value == GovernanceSettingKeys.EventResources.AuditRetentionDays =>
+            policy.AuditRetentionDays.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        var value when value == GovernanceSettingKeys.EventResources.MaxActiveResources =>
+            policy.MaxActiveResources.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        _ => throw new ArgumentOutOfRangeException(nameof(key))
+    };
 
     private static (bool CanEdit, string? Reason) ComputeEditability(
         ResolvedSetting resolved, SettingDefinition definition,

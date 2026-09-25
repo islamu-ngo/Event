@@ -1,0 +1,33 @@
+# Native event-resource governance controls and scoped administrator API.
+Change-Id: CHG-01M3877NFPFGYTFPXMJNDW2XBW
+Title: "expose governed resource settings to operators"
+Type: feat
+Scope: access
+Summary: "Show native resource limits and effective locks without allowing tenant controls to widen instance policy."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Adds resource-scoped instance settings routes in pre-release development without replacing existing operations.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Requires fresh instance administrator authority, conditional HAL edit links and server-enforced tenant ceilings and locks.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Apply generated AlignAtprotoRecordDidCollation histories before resource access; MariaDB shares the MySQL catalog, and SQL Server requires matching ordinal DID comparisons for public eligibility.
+  Configuration:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Instance policy sets upper limits and the unscanned opt-in; tenant controls only narrow current effective limits.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Adds instance resource settings GET/PUT and a conditional tenant category edit relation to the generated client.
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Explains the instance and tenant governance controls, inherited locks and refresh-after-denial behavior.

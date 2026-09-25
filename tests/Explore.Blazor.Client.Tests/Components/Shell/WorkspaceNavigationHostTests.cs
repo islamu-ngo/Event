@@ -29,6 +29,13 @@ public sealed class WorkspaceNavigationHostTests : IDisposable
         _ctx.AddMockService<IStudioContextService>();
         _ctx.AddMockService<IEventTicketingService>();
         _ctx.AddMockService<IEventPromotionService>();
+        var resources = _ctx.AddMockService<IEventResourceService>();
+        resources.AudienceAsync(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EventResourceAudiencePageResource
+            {
+                _links = new Dictionary<string, HalLink>(),
+                _embedded = new HalCollectionEmbeddedOfEventResourceAudienceDetailDto { Items = [] }
+            });
 
         var publicExperience = Substitute.For<IPublicExperienceService>();
         publicExperience.GetCachedSettingsAsync().Returns(new PublicExperienceSettingsDto());

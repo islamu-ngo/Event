@@ -1,0 +1,251 @@
+@using System.Globalization
+@using System.Text.Json
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Contracts.Services
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@implements IDisposable
+@inject IEventResourceGovernanceService Governance
+@inject ITranslationService Translations
+@inject IAccessibilityFocusService Focus
+@inject ILogger<EventResourceGovernanceSection> Logger
+
+<section class="event-resource-governance" aria-labelledby="resource-policy-title">
+    <h2 id="resource-policy-title" tabindex="-1">@T("admin.resources.heading", "Event resource policy")</h2>
+    <p>@(InstanceScope
+        ? T("admin.resources.instanceSummary", "Set instance resource limits, allowed delivery options and the explicit unscanned-document exception.")
+        : T("admin.resources.tenantSummary", "Effective resource limits and allowed delivery options. Tenant changes can only narrow the current policy. The configured source shows where an override is stored; effective values may be lower after instance tightening."))</p>
+    @if (_loading)
+    {
+        <p role="status">@T("admin.resources.loading", "Loading resource policy…")</p>
+    }
+    else if (_settings is null)
+    {
+        <p role="alert">@T("admin.resources.loadError", "Resource policy is unavailable.")</p>
+        <button type="button" @onclick="LoadAsync">@T("admin.resources.retry", "Retry")</button>
+    }
+    else
+    {
+        @foreach (var field in Fields.Where(f => InstanceScope || f.Key != UnscannedKey))
+        {
+            var setting = Find(field.Key);
+            if (setting is null) continue;
+            var editable = CanEdit(setting);
+            <div class="event-resource-governance__field" @key="field.Key">
+                @if (field.Kind != "array" || (field.Key == OriginsKey && InstanceScope))
+                {
+                    <label for="@field.Key">@T("admin.resources." + field.Name, field.Label)</label>
+                }
+                @if (field.Kind == "number")
+                {
+                    <input id="@field.Key" data-resource-field="@field.Key" type="number" min="@(field.Key == UploadKey ? 1 : 0)"
+                           max="@Maximum(field, setting)" step="1" value="@Draft(field.Key, setting.Value)"
+                           aria-describedby="@DescribedBy(field)"
+                           disabled="@(!editable)" @onchange="e => Change(field, setting, e.Value?.ToString())" />
+                }
+                else if (field.Kind == "bool")
+                {
+                    <input id="@field.Key" data-resource-field="@field.Key" type="checkbox" checked="@(Draft(field.Key, setting.Value) == "true")"
+                           aria-describedby="@DescribedBy(field)"
+                           disabled="@(!editable)" @onchange="e => Change(field, setting, e.Value?.ToString()?.ToLowerInvariant())" />
+                    <p id="@(field.Key + "-hint")">@T("admin.resources.unscannedWarning", "Explicit opt-in: unscanned documents may be published and accessed without a malware scan. Leave off unless your operator accepts this risk.")</p>
+                }
+                else if (field.Key == OriginsKey && InstanceScope)
+                {
+                    <textarea id="@field.Key" data-resource-field="@field.Key" disabled="@(!editable)" rows="3"
+                              aria-describedby="@DescribedBy(field)"
+                              @onchange="e => Change(field, setting, e.Value?.ToString())">@Draft(field.Key, setting.Value)</textarea>
+                    <p id="@(field.Key + "-hint")">@T("admin.resources.originsHint", "JSON array of canonical HTTPS origins only (no paths or credentials).")</p>
+                }
+                else
+                {
+                    <fieldset disabled="@(!editable)" aria-describedby="@DescribedBy(field)">
+                        <legend>@T("admin.resources." + field.Name, field.Label)</legend>
+                        @foreach (var option in Options(field, setting))
+                        {
+                            <label><input type="checkbox" data-resource-field="@field.Key" checked="@Selected(field.Key, setting.Value, option)"
+                                          @onchange="e => Toggle(field, setting, option, e.Value is true)" /> @option</label>
+                        }
+                    </fieldset>
+                }
+                <p>@T("admin.resources.source", "Configured source"): @SourceLabel(setting.Source) · @T("admin.resources.lock", "Lock"): @(setting.IsLocked == true ? T("admin.resources.locked", "Locked") : T("admin.resources.unlocked", "Unlocked"))</p>
+                @if (!editable)
+                {
+                    <p role="status">@(string.IsNullOrWhiteSpace(setting.Reason) ? T("admin.resources.readOnly", "Read-only under current policy or permissions.") : setting.Reason)</p>
+                }
+                @if (_errors.TryGetValue(field.Key, out var error))
+                {
+                    <p id="@(field.Key + "-error")" role="alert">@error</p>
+                }
+            </div>
+        }
+        <button type="button" data-resource-save disabled="@(_saving || !HasEdit || _draft.Count == 0 || _errors.Count > 0)" @onclick="SaveAsync">@T("admin.resources.save", "Save resource policy")</button>
+    }
+    @if (_message is not null) { <p role="@(_failed ? "alert" : "status")">@_message</p> }
+</section>
+
+@code {
+    [Parameter] public bool InstanceScope { get; set; }
+    private const string Prefix = "event_resources.";
+    private const string UploadKey = Prefix + "max_upload_bytes";
+    private const string OriginsKey = Prefix + "external_origins";
+    private const string UnscannedKey = Prefix + "allow_unscanned_documents";
+    private sealed record Field(string Key, string Name, string Label, string Kind, long Limit = 0);
+    private static readonly Field[] Fields =
+    [
+        new(Prefix + "enabled_delivery_types", "delivery", "Enabled delivery types", "array"),
+        new(Prefix + "enabled_audiences", "audiences", "Enabled audiences", "array"),
+        new(Prefix + "permitted_file_types", "fileTypes", "Permitted file types", "array"),
+        new(UploadKey, "upload", "Maximum upload bytes", "number", long.MaxValue),
+        new(UnscannedKey, "unscanned", "Allow unscanned documents", "bool"),
+        new(OriginsKey, "origins", "Allowed external origins", "array"),
+        new(Prefix + "audit_retention_days", "retention", "Audit retention days", "number", 90),
+        new(Prefix + "max_active_resources", "active", "Maximum active resources per event", "number", 500)
+    ];
+    private static readonly string[] Delivery = ["StoredFile", "ExternalLink"];
+    private static readonly string[] Audiences = ["Public", "AuthenticatedTenantMember", "SessionRegistrant", "TicketHolder", "CheckedInParticipant", "AnyEventSessionSpeaker", "SessionSpeaker", "EventStaff", "Organizer"];
+    private static readonly string[] FileTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.presentationml.presentation"];
+    private readonly Dictionary<string, string> _draft = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
+    private HalResourceOfSettingGroupResponseDto? _settings;
+    private bool _loading = true, _saving, _failed, _restoreFocus;
+    private string? _message;
+    private bool HasEdit => _settings?._links?.ContainsKey("edit") == true;
+    private string T(string key, string fallback) => Translations.T($"ui.{key}", fallback);
+    private string SourceLabel(SettingSource? source) => source switch
+    {
+        SettingSource.SystemDefault => T("admin.resources.systemDefault", "System default"),
+        SettingSource.SystemLocked => T("admin.resources.systemLocked", "System locked"),
+        SettingSource.TenantOverride => T("admin.resources.tenantOverride", "Tenant override"),
+        SettingSource.TenantLocked => T("admin.resources.tenantLocked", "Tenant locked"),
+        _ => T("admin.resources.inherited", "Inherited")
+    };
+    protected override async Task OnInitializedAsync()
+    {
+        Translations.OnLanguageChanged += LanguageChanged;
+        await LoadAsync();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_restoreFocus && !_loading)
+        {
+            _restoreFocus = false;
+            await Focus.RestoreFocusAsync("#resource-policy-title");
+        }
+    }
+    private void LanguageChanged(string language) => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Translations.OnLanguageChanged -= LanguageChanged;
+    private EffectiveSettingDto? Find(string key) => _settings?.Settings.FirstOrDefault(s => s.Key == key);
+    private bool CanEdit(EffectiveSettingDto setting) => HasEdit && !_saving && setting.CanEdit == true;
+    private string? DescribedBy(Field field)
+    {
+        var hint = field.Key == UnscannedKey || (field.Key == OriginsKey && InstanceScope)
+            ? field.Key + "-hint" : null;
+        var error = _errors.ContainsKey(field.Key) ? field.Key + "-error" : null;
+        return string.Join(' ', new[] { hint, error }.Where(value => value is not null));
+    }
+    private string Draft(string key, string value) => _draft.GetValueOrDefault(key, value);
+    private long Maximum(Field field, EffectiveSettingDto setting) =>
+        InstanceScope ? field.Limit : Math.Min(field.Limit, long.TryParse(setting.Value, CultureInfo.InvariantCulture, out var current) ? current : 0);
+    private static string[] ParseArray(string value)
+    {
+        try { return JsonSerializer.Deserialize<string[]>(value) ?? []; }
+        catch (JsonException) { return []; }
+    }
+    private IEnumerable<string> Options(Field field, EffectiveSettingDto setting) =>
+        !InstanceScope || field.Key == OriginsKey ? ParseArray(setting.Value) : field.Key switch
+        {
+            Prefix + "enabled_delivery_types" => Delivery,
+            Prefix + "enabled_audiences" => Audiences,
+            _ => FileTypes
+        };
+    private bool Selected(string key, string value, string option) => ParseArray(Draft(key, value)).Contains(option, StringComparer.Ordinal);
+    private void Toggle(Field field, EffectiveSettingDto setting, string option, bool selected)
+    {
+        if (!CanEdit(setting)) return;
+        var values = ParseArray(Draft(field.Key, setting.Value)).ToHashSet(StringComparer.Ordinal);
+        if (selected) values.Add(option); else values.Remove(option);
+        Change(field, setting, JsonSerializer.Serialize(values.Order(StringComparer.Ordinal).ToArray()));
+    }
+    private void Change(Field field, EffectiveSettingDto setting, string? value)
+    {
+        if (!CanEdit(setting)) return;
+        value ??= "";
+        var valid = field.Kind switch
+        {
+            "number" => long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+                && number >= (field.Key == UploadKey ? 1 : 0) && number <= Maximum(field, setting),
+            "bool" => InstanceScope && bool.TryParse(value, out _),
+            _ => ValidArray(field, setting, value)
+        };
+        _draft[field.Key] = value;
+        if (valid) _errors.Remove(field.Key);
+        else _errors[field.Key] = T("admin.resources.invalid", "Invalid value or value exceeds the effective limit.");
+    }
+    private bool ValidArray(Field field, EffectiveSettingDto setting, string value)
+    {
+        string[] values;
+        try { values = JsonSerializer.Deserialize<string[]>(value) ?? []; }
+        catch (JsonException) { return false; }
+        if (values.Any(string.IsNullOrWhiteSpace) || values.Distinct(StringComparer.Ordinal).Count() != values.Length) return false;
+        if (!InstanceScope) return values.All(Options(field, setting).Contains);
+        if (field.Key != OriginsKey) return values.All(Options(field, setting).Contains);
+        return values.All(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps && uri.HostNameType == UriHostNameType.Dns
+            && uri.IdnHost.Contains('.') && !uri.IsLoopback && uri.UserInfo.Length == 0
+            && origin.All(c => c < 128) && !origin.Contains('*')
+            && uri.GetLeftPart(UriPartial.Authority) == origin);
+    }
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _settings = await Governance.GetAsync(InstanceScope);
+            _draft.Clear(); _errors.Clear();
+        }
+        catch (Exception)
+        {
+            Logger.LogWarning("Failed to load event resource governance settings.");
+            _settings = null;
+        }
+        finally { _loading = false; }
+    }
+    private async Task SaveAsync()
+    {
+        if (!HasEdit || _saving || _errors.Count > 0 || _draft.Count == 0 || _draft.Any(pair =>
+            Fields.FirstOrDefault(f => f.Key == pair.Key) is not { } field || Find(pair.Key) is not { } setting
+            || !CanEdit(setting) || !Validate(field, setting, pair.Value))) return;
+        await Focus.SaveFocusAsync();
+        _saving = true;
+        _message = null;
+        try
+        {
+            var response = await Governance.UpdateAsync(InstanceScope, new UpdateSettingBatchDto
+            {
+                Mode = BatchUpdateMode.Strict,
+                Values = new Dictionary<string, string>(_draft)
+            });
+            _failed = response.Success != true;
+            _message = _failed ? T("admin.resources.denied", "Policy update denied. Current policy refreshed.") : T("admin.resources.saved", "Resource policy saved.");
+        }
+        catch (Exception)
+        {
+            Logger.LogWarning("Event resource policy update denied or failed.");
+            _failed = true;
+            _message = T("admin.resources.denied", "Policy update denied. Current policy refreshed.");
+        }
+        finally
+        {
+            await LoadAsync();
+            _saving = false;
+            _restoreFocus = true;
+        }
+    }
+    private bool Validate(Field field, EffectiveSettingDto setting, string value) => field.Kind switch
+    {
+        "number" => long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n)
+            && n >= (field.Key == UploadKey ? 1 : 0) && n <= Maximum(field, setting),
+        "bool" => InstanceScope && bool.TryParse(value, out _),
+        _ => ValidArray(field, setting, value)
+    };
+}

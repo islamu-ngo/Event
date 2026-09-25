@@ -3102,7 +3102,9 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("TEXT")
-                        .HasColumnName("did");
+                        .HasColumnName("did")
+                        .UseCollation("BINARY")
+                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
 
                     b.Property<int>("Direction")
                         .HasColumnType("INTEGER")

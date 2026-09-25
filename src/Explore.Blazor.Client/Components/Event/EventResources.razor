@@ -1,0 +1,92 @@
+@using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Contracts.Services
+@inject IEventResourceService Resources
+@inject ITranslationService Translation
+
+<section class="event-resources" aria-labelledby="event-resources-title" dir="@(Translation.CurrentLanguage == "ar" ? "rtl" : null)">
+    <h2 id="event-resources-title">@T("heading", "Resources")</h2>
+    @if (_loading) { <p role="status">@T("loading", "Loading resources…")</p> }
+    else if (_error) { <p role="alert">@T("unavailable", "Resources are unavailable. Please try again.")</p> }
+    else
+    {
+        @if (_items.Count == 0) { <p>@T("empty", "No resources available yet.")</p> }
+        <div class="event-resources__list">
+            @foreach (var item in _items)
+            {
+                <article class="event-resources__card" @key="item.Id">
+                    <h3 data-testid="event-resource-title">@item.Title</h3>
+                    @if (item.IsTeaser) { <p>@T("teaser", "Preview only")</p> }
+                    <p>@item.Availability · @item.Requirements</p>
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.Description)) { <p>@item.Description</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.LanguageCode)) { <p>@T("language", "Language"): @item.LanguageCode</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.AccessibilityNote)) { <p>@item.AccessibilityNote</p> }
+                    @if (Href(item._links, "accessible-alternative") is { } alternative)
+                    { <p><a href="@alternative" data-testid="resource-accessible-alternative">@T("alternative", "Accessible alternative")</a></p> }
+                    @if (!item.IsTeaser && item.File is { } file) { <p>@file.FileName · @T("fileType", "File type"): @file.ContentType · @file.SizeBytes @T("bytes", "bytes") · @file.SafetyState</p> }
+                    @if (!item.IsTeaser && !string.IsNullOrWhiteSpace(item.ExternalDestinationSafeOrigin)) { <p>@T("origin", "Destination origin"): @item.ExternalDestinationSafeOrigin</p> }
+                    @if (Href(item._links, "download") is { } download)
+                    {
+                        <p id="@($"resource-download-limitation-{item.Id:N}")">@T("downloadLimitation", "A download already in progress may finish after access is withdrawn. New download requests are denied.")</p>
+                        <a href="@download" aria-describedby="@($"resource-download-limitation-{item.Id:N}")" data-testid="resource-download">@T("download", "Download")</a>
+                    }
+                    @if (Href(item._links, "access") is { } access)
+                    {
+                        <p id="@($"resource-external-warning-{item.Id:N}")">@T("externalWarning", "This link opens an external service. The provider may retain a revealed link; withdrawing platform access cannot revoke it. Ask the provider to rotate the link if access must stop.")</p>
+                        <a href="@access" rel="noopener noreferrer" aria-describedby="@($"resource-external-warning-{item.Id:N}")" data-testid="resource-access">@T("access", "Open resource")</a>
+                    }
+                </article>
+            }
+        </div>
+        @if (Href(_links, "manage-resources") is not null)
+        { <a href="@($"/studio/events/{EventId}/resources")" data-testid="resource-manage-resources">@T("manage", "Manage resources")</a> }
+        @if (_nextCursor is not null)
+        { <button type="button" @onclick="MoreAsync">@T("more", "Load more")</button> }
+    }
+</section>
+
+@code {
+    [Parameter] public Guid EventId { get; set; }
+    private Guid _loadedEvent;
+    private bool _loading = true;
+    private bool _error;
+    private string? _nextCursor;
+    private IDictionary<string, HalLink>? _links;
+    private readonly List<HalResourceOfEventResourceAudienceDetailDto> _items = [];
+    private string T(string key, string fallback) => Translation.T($"ui.event.resources.{key}", fallback);
+
+    // Only root-relative links are browser destinations; never turn a safe-origin label into an href.
+    public static string? Href(IDictionary<string, HalLink>? links, string relation) =>
+        links is not null && links.TryGetValue(relation, out var link)
+        && link.Href is { } href && href.StartsWith('/') && !href.StartsWith("//", StringComparison.Ordinal)
+        && !href.Contains('\\') ? href : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedEvent == EventId) return;
+        _loadedEvent = EventId;
+        _items.Clear();
+        _nextCursor = null;
+        await LoadAsync(null);
+    }
+
+    private Task MoreAsync() => LoadAsync(_nextCursor);
+
+    private async Task LoadAsync(string? cursor)
+    {
+        _loading = true;
+        _error = false;
+        try
+        {
+            var page = await Resources.AudienceAsync(EventId, cursor);
+            _links = page._links;
+            _nextCursor = page.NextCursor;
+            foreach (var embedded in page._embedded.Items)
+            {
+                var detail = await Resources.AudienceDetailAsync(embedded.Id);
+                if (detail.EventId == EventId) _items.Add(detail);
+            }
+        }
+        catch (ApiException) { _error = true; _items.Clear(); _links = null; _nextCursor = null; }
+        finally { _loading = false; }
+    }
+}

@@ -24,7 +24,7 @@ public sealed class StandaloneResourceDurabilityTests
     [Test]
     public async Task ExplicitDurableRootPreservesBytesAcrossProviderReconstruction()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"standalone-resources-{Guid.CreateVersion7():N}");
+        var root = Path.Join(Path.GetTempPath(), $"standalone-resources-{Guid.CreateVersion7():N}");
         Directory.CreateDirectory(root);
 
         try
@@ -67,7 +67,7 @@ public sealed class StandaloneResourceDurabilityTests
     private static ServiceProvider ComposeStorage(string? rootOverride = null)
     {
         var configurationBuilder = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(FindRepositoryRoot(), "src", "Event.Standalone", "appsettings.json"));
+            .AddJsonFile(Path.Join(FindRepositoryRoot(), "src", "Event.Standalone", "appsettings.json"));
         if (rootOverride is not null)
         {
             configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
@@ -92,7 +92,7 @@ public sealed class StandaloneResourceDurabilityTests
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "src", "Event.Standalone", "Dockerfile")))
+            if (File.Exists(Path.Join(directory.FullName, "src", "Event.Standalone", "Dockerfile")))
             {
                 return directory.FullName;
             }

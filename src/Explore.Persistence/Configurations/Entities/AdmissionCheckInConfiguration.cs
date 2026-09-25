@@ -25,6 +25,14 @@ public sealed class AdmissionTargetConfiguration : IEntityTypeConfiguration<Admi
             .HasDefaultValue((int)Explore.Domain.Enums.AdmissionOperationalStatusEnum.Active);
         builder.HasAlternateKey(target => new { target.TenantId, target.Id });
         builder.HasAlternateKey(target => new { target.TenantId, target.EventId, target.Id });
+        builder.HasAlternateKey(target => new
+        {
+            target.TenantId,
+            target.EventId,
+            target.AdmissionTargetTypeId,
+            target.Id,
+            target.ScopeId
+        });
         builder.HasIndex(target => new
         {
             target.TenantId,

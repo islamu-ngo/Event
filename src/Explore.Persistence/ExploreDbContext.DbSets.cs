@@ -146,6 +146,11 @@ public partial class ExploreDbContext
 
     // ===== Events =====
     public DbSet<Event> Events { get; set; }
+    public DbSet<EventResource> EventResources { get; set; }
+    public DbSet<EventResourceAudienceRule> EventResourceAudienceRules { get; set; }
+    public DbSet<EventResourceAuditEntry> EventResourceAuditEntries { get; set; }
+    public DbSet<EventResourceKind> EventResourceKinds { get; set; }
+    public DbSet<EventResourceDeliveryType> EventResourceDeliveryTypes { get; set; }
     public DbSet<EventParticipationConfiguration> EventParticipationConfigurations { get; set; }
     internal DbSet<AnonymousChallengeTenantQuota> AnonymousChallengeTenantQuotas => Set<AnonymousChallengeTenantQuota>();
     internal DbSet<AnonymousChallengeEventQuota> AnonymousChallengeEventQuotas => Set<AnonymousChallengeEventQuota>();

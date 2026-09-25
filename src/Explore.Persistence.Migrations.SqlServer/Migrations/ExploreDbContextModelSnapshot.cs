@@ -1389,6 +1389,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.HasAlternateKey("TenantId", "EventId", "Id")
                         .HasName("ak_admission_targets_tenant_id_event_id_id");
 
+                    b.HasAlternateKey("TenantId", "EventId", "AdmissionTargetTypeId", "Id", "ScopeId")
+                        .HasName("ak_admission_targets_tenant_id_event_id_admission_target_type_id_id_scope_id");
+
                     b.HasIndex("TenantId", "EventId", "EventDayId")
                         .HasDatabaseName("ix_admission_targets_tenant_id_event_id_event_day_id");
 
@@ -9804,6 +9807,436 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.EventResource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccessibilityNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("accessibility_note");
+
+                    b.Property<Guid?>("AccessibleAlternativeEventResourceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("accessible_alternative_event_resource_id");
+
+                    b.Property<DateTimeOffset?>("AvailabilityAbsoluteEndUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("availability_absolute_end_utc");
+
+                    b.Property<DateTimeOffset?>("AvailabilityAbsoluteStartUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("availability_absolute_start_utc");
+
+                    b.Property<int?>("AvailabilityEndAnchorId")
+                        .HasColumnType("int")
+                        .HasColumnName("availability_end_anchor_id");
+
+                    b.Property<long?>("AvailabilityEndOffsetTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("availability_end_offset_ticks");
+
+                    b.Property<int?>("AvailabilityStartAnchorId")
+                        .HasColumnType("int")
+                        .HasColumnName("availability_start_anchor_id");
+
+                    b.Property<long?>("AvailabilityStartOffsetTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("availability_start_offset_ticks");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("DisclosureModeId")
+                        .HasColumnType("int")
+                        .HasColumnName("disclosure_mode_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_id");
+
+                    b.Property<int>("EventResourceDeliveryTypeId")
+                        .HasColumnType("int")
+                        .HasColumnName("event_resource_delivery_type_id");
+
+                    b.Property<int>("EventResourceKindId")
+                        .HasColumnType("int")
+                        .HasColumnName("event_resource_kind_id");
+
+                    b.Property<Guid?>("EventSessionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_session_id");
+
+                    b.Property<string>("ExternalDestinationCiphertext")
+                        .HasMaxLength(8192)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("external_destination_ciphertext");
+
+                    b.Property<int?>("ExternalDestinationProtectionVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("external_destination_protection_version");
+
+                    b.Property<string>("ExternalDestinationSafeOrigin")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("external_destination_safe_origin");
+
+                    b.Property<int>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("LanguageCode")
+                        .HasMaxLength(35)
+                        .HasColumnType("nvarchar(35)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("PublicTitle")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("public_title");
+
+                    b.Property<int>("PublicationStateId")
+                        .HasColumnType("int")
+                        .HasColumnName("publication_state_id");
+
+                    b.Property<string>("SensitiveNotes")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("sensitive_notes");
+
+                    b.Property<Guid>("SessionScopeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("session_scope_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid?>("StorageObjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("storage_object_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_resources");
+
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ak_event_resources_tenant_id_id");
+
+                    b.HasAlternateKey("TenantId", "EventId", "Id")
+                        .HasName("ak_event_resources_tenant_id_event_id_id");
+
+                    b.HasAlternateKey("TenantId", "EventId", "Id", "SessionScopeId")
+                        .HasName("ak_event_resources_tenant_id_event_id_id_session_scope_id");
+
+                    b.HasIndex("EventResourceDeliveryTypeId")
+                        .HasDatabaseName("ix_event_resources_event_resource_delivery_type_id");
+
+                    b.HasIndex("EventResourceKindId")
+                        .HasDatabaseName("ix_event_resources_event_resource_kind_id");
+
+                    b.HasIndex("TenantId", "StorageObjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resources_tenant_id_storage_object_id")
+                        .HasFilter("[storage_object_id] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "EventId", "AccessibleAlternativeEventResourceId")
+                        .HasDatabaseName("ix_event_resources_tenant_id_event_id_accessible_alternative_event_resource_id");
+
+                    b.HasIndex("TenantId", "EventId", "EventSessionId")
+                        .HasDatabaseName("ix_event_resources_tenant_id_event_id_event_session_id");
+
+                    b.HasIndex("TenantId", "EventId", "IsDeleted", "SortOrder", "Id")
+                        .HasDatabaseName("ix_event_resources_tenant_id_event_id_is_deleted_sort_order_id");
+
+                    b.ToTable("event_resources", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_event_resources_alternative", "accessible_alternative_event_resource_id IS NULL OR accessible_alternative_event_resource_id <> id");
+
+                            t.HasCheckConstraint("ck_event_resources_availability_end", "(availability_absolute_end_utc IS NULL AND availability_end_anchor_id IS NULL AND availability_end_offset_ticks IS NULL) OR (availability_absolute_end_utc IS NOT NULL AND availability_end_anchor_id IS NULL AND availability_end_offset_ticks IS NULL) OR (availability_absolute_end_utc IS NULL AND availability_end_anchor_id IS NOT NULL AND availability_end_anchor_id BETWEEN 1 AND 4 AND availability_end_offset_ticks IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_event_resources_availability_order", "availability_absolute_start_utc IS NULL OR availability_absolute_end_utc IS NULL OR availability_absolute_end_utc > availability_absolute_start_utc");
+
+                            t.HasCheckConstraint("ck_event_resources_availability_start", "(availability_absolute_start_utc IS NULL AND availability_start_anchor_id IS NULL AND availability_start_offset_ticks IS NULL) OR (availability_absolute_start_utc IS NOT NULL AND availability_start_anchor_id IS NULL AND availability_start_offset_ticks IS NULL) OR (availability_absolute_start_utc IS NULL AND availability_start_anchor_id IS NOT NULL AND availability_start_anchor_id BETWEEN 1 AND 4 AND availability_start_offset_ticks IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_event_resources_disclosure", "disclosure_mode_id = 1 OR (public_title IS NOT NULL AND TRIM(public_title) <> '')");
+
+                            t.HasCheckConstraint("ck_event_resources_identity", "sort_order >= 0 AND is_deleted IN (0, 1) AND TRIM(title) <> '' AND session_scope_id <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("ck_event_resources_payload", "(is_deleted = 1 AND (storage_object_id IS NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL)) OR (is_deleted = 0 AND ((publication_state_id IN (1, 4) AND ((storage_object_id IS NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 1 AND storage_object_id IS NOT NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 2 AND storage_object_id IS NULL AND external_destination_ciphertext IS NOT NULL AND TRIM(external_destination_ciphertext) <> '' AND external_destination_protection_version IS NOT NULL AND external_destination_protection_version > 0 AND external_destination_safe_origin IS NOT NULL AND TRIM(external_destination_safe_origin) <> ''))) OR (publication_state_id IN (2, 3) AND ((event_resource_delivery_type_id = 1 AND storage_object_id IS NOT NULL AND external_destination_ciphertext IS NULL AND external_destination_protection_version IS NULL AND external_destination_safe_origin IS NULL) OR (event_resource_delivery_type_id = 2 AND storage_object_id IS NULL AND external_destination_ciphertext IS NOT NULL AND TRIM(external_destination_ciphertext) <> '' AND external_destination_protection_version IS NOT NULL AND external_destination_protection_version > 0 AND external_destination_safe_origin IS NOT NULL AND TRIM(external_destination_safe_origin) <> '')))))");
+
+                            t.HasCheckConstraint("ck_event_resources_session_scope", "(event_session_id IS NULL AND session_scope_id = event_id) OR (event_session_id IS NOT NULL AND session_scope_id = event_session_id)");
+
+                            t.HasCheckConstraint("ck_event_resources_values", "event_resource_kind_id BETWEEN 1 AND 13 AND event_resource_delivery_type_id IN (1, 2) AND publication_state_id BETWEEN 1 AND 4 AND disclosure_mode_id BETWEEN 1 AND 3");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceAudienceRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AdmissionTargetId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("admission_target_id");
+
+                    b.Property<Guid?>("AdmissionTargetScopeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("admission_target_scope_id");
+
+                    b.Property<int?>("AdmissionTargetTypeId")
+                        .HasColumnType("int")
+                        .HasColumnName("admission_target_type_id");
+
+                    b.Property<int>("AudienceKindId")
+                        .HasColumnType("int")
+                        .HasColumnName("audience_kind_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<Guid?>("EventSessionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_session_id");
+
+                    b.Property<Guid?>("EventTicketCatalogVersionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_ticket_catalog_version_id");
+
+                    b.Property<Guid?>("EventTicketTypeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_ticket_type_id");
+
+                    b.Property<int>("RequireConfirmedOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("require_confirmed_order");
+
+                    b.Property<int>("RequireParticipantApproval")
+                        .HasColumnType("int")
+                        .HasColumnName("require_participant_approval");
+
+                    b.Property<int>("RequireParticipantCompletion")
+                        .HasColumnType("int")
+                        .HasColumnName("require_participant_completion");
+
+                    b.Property<Guid?>("ResourceEventSessionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("resource_event_session_id");
+
+                    b.Property<Guid>("ResourceSessionScopeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("resource_session_scope_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_resource_audience_rules");
+
+                    b.HasIndex("TenantId", "EventId", "EventSessionId")
+                        .HasDatabaseName("ix_event_resource_audience_rules_tenant_id_event_id_event_session_id");
+
+                    b.HasIndex("TenantId", "EventId", "EventTicketCatalogVersionId")
+                        .HasDatabaseName("ix_event_resource_audience_rules_tenant_id_event_id_event_ticket_catalog_version_id");
+
+                    b.HasIndex("TenantId", "EventTicketCatalogVersionId", "EventTicketTypeId")
+                        .HasDatabaseName("ix_event_resource_audience_rules_tenant_id_event_ticket_catalog_version_id_event_ticket_type_id");
+
+                    b.HasIndex("TenantId", "EventId", "EventResourceId", "ResourceSessionScopeId")
+                        .HasDatabaseName("ix_event_resource_audience_rules_tenant_id_event_id_event_resource_id_resource_session_scope_id");
+
+                    b.HasIndex("TenantId", "EventId", "AdmissionTargetTypeId", "AdmissionTargetId", "AdmissionTargetScopeId")
+                        .HasDatabaseName("ix_event_resource_audience_rules_tenant_id_event_id_admission_target_type_id_admission_target_id_admission_target_scope_id");
+
+                    b.HasIndex("TenantId", "EventResourceId", "AudienceKindId", "EventSessionId", "AdmissionTargetId")
+                        .HasDatabaseName("ix_event_resource_audience_rules_tenant_id_event_resource_id_audience_kind_id_event_session_id_admission_target_id");
+
+                    b.ToTable("event_resource_audience_rules", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_event_resource_audience_rules_kind", "audience_kind_id BETWEEN 1 AND 9");
+
+                            t.HasCheckConstraint("ck_event_resource_audience_rules_owner_session", "(resource_event_session_id IS NULL AND resource_session_scope_id = event_id) OR (resource_event_session_id IS NOT NULL AND resource_session_scope_id = resource_event_session_id AND (event_session_id IS NULL OR event_session_id = resource_event_session_id))");
+
+                            t.HasCheckConstraint("ck_event_resource_audience_rules_participant", "audience_kind_id = 3 OR (require_confirmed_order = 0 AND require_participant_approval = 0 AND require_participant_completion = 0)");
+
+                            t.HasCheckConstraint("ck_event_resource_audience_rules_session", "(audience_kind_id IN (3, 4, 7) AND event_session_id IS NOT NULL) OR audience_kind_id = 5 OR (audience_kind_id IN (1, 2, 6, 8, 9) AND event_session_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_event_resource_audience_rules_target", "(audience_kind_id = 5 AND admission_target_type_id IS NOT NULL AND admission_target_type_id IN (1, 2, 3) AND admission_target_id IS NOT NULL AND admission_target_scope_id IS NOT NULL AND ((admission_target_type_id = 1 AND admission_target_scope_id = event_id) OR admission_target_type_id = 2 OR (admission_target_type_id = 3 AND event_session_id IS NOT NULL AND admission_target_scope_id = event_session_id))) OR (audience_kind_id <> 5 AND admission_target_type_id IS NULL AND admission_target_id IS NULL AND admission_target_scope_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_event_resource_audience_rules_ticket", "((event_ticket_catalog_version_id IS NULL AND event_ticket_type_id IS NULL) OR (event_ticket_catalog_version_id IS NOT NULL AND event_ticket_type_id IS NOT NULL AND audience_kind_id IN (4, 5)))");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceAuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("int")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("EventResourceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("event_resource_id");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int")
+                        .HasColumnName("outcome");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("int")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("ResponsibleManagerUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("responsible_manager_user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("timestamp");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_resource_audit_entries");
+
+                    b.HasIndex("TenantId", "Timestamp", "Id")
+                        .HasDatabaseName("ix_event_resource_audit_entries_tenant_id_timestamp_id");
+
+                    b.HasIndex("TenantId", "EventResourceId", "Timestamp", "Id")
+                        .HasDatabaseName("ix_event_resource_audit_entries_tenant_id_event_resource_id_timestamp_id");
+
+                    b.ToTable("event_resource_audit_entries", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_event_resource_audit_entries_action", "action BETWEEN 1 AND 10");
+
+                            t.HasCheckConstraint("ck_event_resource_audit_entries_outcome", "outcome BETWEEN 1 AND 3");
+
+                            t.HasCheckConstraint("ck_event_resource_audit_entries_reason", "reason BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceDeliveryType", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("MasterCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("master_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_resource_delivery_types");
+
+                    b.HasIndex("MasterCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resource_delivery_types_master_code");
+
+                    b.ToTable("event_resource_delivery_types", "islamu_event");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceKind", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("MasterCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("master_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_resource_kinds");
+
+                    b.HasIndex("MasterCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_resource_kinds_master_code");
+
+                    b.ToTable("event_resource_kinds", "islamu_event");
+                });
+
             modelBuilder.Entity("Explore.Domain.EventRoleAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12371,6 +12804,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.HasAlternateKey("TenantId", "Id")
                         .HasName("ak_event_ticket_catalog_versions_tenant_id_id");
 
+                    b.HasAlternateKey("TenantId", "EventId", "Id")
+                        .HasName("ak_event_ticket_catalog_versions_tenant_id_event_id_id");
+
                     b.HasIndex("TicketCatalogStatusId")
                         .HasDatabaseName("ix_event_ticket_catalog_versions_ticket_catalog_status_id");
 
@@ -12509,6 +12945,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.HasAlternateKey("TenantId", "Id")
                         .HasName("ak_event_ticket_types_tenant_id_id");
+
+                    b.HasAlternateKey("TenantId", "CatalogId", "Id")
+                        .HasName("ak_event_ticket_types_tenant_id_catalog_id_id");
 
                     b.HasIndex("ParticipantDataCollectionModeId")
                         .HasDatabaseName("ix_event_ticket_types_participant_data_collection_mode_id");
@@ -39753,6 +40192,109 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Explore.Domain.EventResource", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResourceDeliveryType", null)
+                        .WithMany()
+                        .HasForeignKey("EventResourceDeliveryTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resources_event_resource_delivery_types_event_resource_delivery_type_id");
+
+                    b.HasOne("Explore.Domain.EventResourceKind", null)
+                        .WithMany()
+                        .HasForeignKey("EventResourceKindId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resources_event_resource_kinds_event_resource_kind_id");
+
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resources_tenants_tenant_id");
+
+                    b.HasOne("Explore.Domain.Event", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resources_events_tenant_id_event_id");
+
+                    b.HasOne("Explore.Domain.StorageObject", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StorageObjectId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resources_storage_objects_tenant_id_storage_object_id");
+
+                    b.HasOne("Explore.Domain.EventResource", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId", "AccessibleAlternativeEventResourceId")
+                        .HasPrincipalKey("TenantId", "EventId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resources_event_resources_tenant_id_event_id_accessible_alternative_event_resource_id");
+
+                    b.HasOne("Explore.Domain.EventSession", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId", "EventSessionId")
+                        .HasPrincipalKey("TenantId", "EventId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resources_event_sessions_tenant_id_event_id_event_session_id");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceAudienceRule", b =>
+                {
+                    b.HasOne("Explore.Domain.EventSession", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId", "EventSessionId")
+                        .HasPrincipalKey("TenantId", "EventId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resource_audience_rules_event_sessions_tenant_id_event_id_event_session_id");
+
+                    b.HasOne("Explore.Domain.EventTicketCatalogVersion", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId", "EventTicketCatalogVersionId")
+                        .HasPrincipalKey("TenantId", "EventId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resource_audience_rules_event_ticket_catalog_versions_tenant_id_event_id_event_ticket_catalog_version_id");
+
+                    b.HasOne("Explore.Domain.EventTicketType", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventTicketCatalogVersionId", "EventTicketTypeId")
+                        .HasPrincipalKey("TenantId", "CatalogId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resource_audience_rules_event_ticket_types_tenant_id_event_ticket_catalog_version_id_event_ticket_type_id");
+
+                    b.HasOne("Explore.Domain.EventResource", null)
+                        .WithMany("AudienceRules")
+                        .HasForeignKey("TenantId", "EventId", "EventResourceId", "ResourceSessionScopeId")
+                        .HasPrincipalKey("TenantId", "EventId", "Id", "SessionScopeId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_audience_rules_event_resources_tenant_id_event_id_event_resource_id_resource_session_scope_id");
+
+                    b.HasOne("Explore.Domain.AdmissionTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId", "AdmissionTargetTypeId", "AdmissionTargetId", "AdmissionTargetScopeId")
+                        .HasPrincipalKey("TenantId", "EventId", "AdmissionTargetTypeId", "Id", "ScopeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_event_resource_audience_rules_admission_targets_tenant_id_event_id_admission_target_type_id_admission_target_id__0b292b29daac");
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResourceAuditEntry", b =>
+                {
+                    b.HasOne("Explore.Domain.EventResource", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventResourceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_resource_audit_entries_event_resources_tenant_id_event_resource_id");
+                });
+
             modelBuilder.Entity("Explore.Domain.EventRoleAssignment", b =>
                 {
                     b.HasOne("Explore.Domain.Role", "Role")
@@ -49173,6 +49715,11 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                 {
                     b.Navigation("Execution")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Explore.Domain.EventResource", b =>
+                {
+                    b.Navigation("AudienceRules");
                 });
 
             modelBuilder.Entity("Explore.Domain.EventSeries", b =>

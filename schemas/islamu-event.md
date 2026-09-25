@@ -4504,6 +4504,7 @@ Table "event_ticket_catalog_versions" {
 
   indexes {
     (tenant_id, id) [unique, name: 'ak_event_ticket_catalog_versions_tenant_id_id']
+    (tenant_id, event_id, id) [unique, note: 'Resource audience catalog lineage']
     ticket_catalog_status_id [name: 'ix_event_ticket_catalog_versions_ticket_catalog_status_id']
     (tenant_id, event_id) [unique, name: 'ix_event_ticket_catalog_versions_tenant_id_event_id', note: 'filter: ticket_catalog_status_id = 2 AND is_deleted = false']
     (tenant_id, event_id, version_number) [unique, name: 'ix_event_ticket_catalog_versions_tenant_id_event_id_version_nu', note: 'filter: is_deleted = false']
@@ -4543,6 +4544,7 @@ Table "event_ticket_types" {
 
   indexes {
     (tenant_id, id) [unique, name: 'ak_event_ticket_types_tenant_id_id']
+    (tenant_id, catalog_id, id) [unique, note: 'Resource audience ticket-type lineage']
     participant_data_collection_mode_id [name: 'ix_event_ticket_types_participant_data_collection_mode_id']
     ticket_pricing_mode_id [name: 'ix_event_ticket_types_ticket_pricing_mode_id']
     (tenant_id, capacity_pool_id) [name: 'ix_event_ticket_types_tenant_id_capacity_pool_id']
@@ -8068,6 +8070,143 @@ Ref: "secret_bindings"."setting_scope_id" > "setting_scopes"."id" [delete: restr
 Ref: "secret_bindings"."secret_source_type_id" > "secret_source_types"."id" [delete: restrict]
 Ref: "secret_bindings"."secret_validation_status_id" > "secret_validation_statuses"."id" [delete: restrict]
 Ref: "payment_reconciliation_effects".("tenant_id", "checkout_dispatch_effect_id") > "checkout_dispatch_effects".("tenant_id", "id") [delete: restrict]
+
+// Governed event resources
+Table "event_resource_kinds" {
+  "id" int [pk, not null]
+  "master_code" varchar(100) [not null, unique]
+  "full_name" varchar(200) [not null]
+  "description" varchar(500)
+}
+
+Table "event_resource_delivery_types" {
+  "id" int [pk, not null]
+  "master_code" varchar(100) [not null, unique]
+  "full_name" varchar(200) [not null]
+  "description" varchar(500)
+}
+
+Table "event_resources" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null]
+  "event_id" uuid [not null]
+  "event_session_id" uuid
+  "session_scope_id" uuid [not null, note: 'EventSessionId when session-owned; otherwise EventId']
+  "event_resource_kind_id" int [not null]
+  "event_resource_delivery_type_id" int [not null]
+  "publication_state_id" int [not null]
+  "disclosure_mode_id" int [not null]
+  "title" varchar(500) [not null]
+  "public_title" varchar(500)
+  "description" varchar(5000)
+  "sensitive_notes" varchar(5000)
+  "language_code" varchar(35)
+  "accessibility_note" varchar(2000)
+  "sort_order" int [not null]
+  "accessible_alternative_event_resource_id" uuid
+  "storage_object_id" uuid
+  "external_destination_ciphertext" text
+  "external_destination_protection_version" int
+  "external_destination_safe_origin" varchar(2048)
+  "availability_absolute_start_utc" timestamptz
+  "availability_absolute_end_utc" timestamptz
+  "availability_start_anchor_id" int
+  "availability_start_offset_ticks" bigint
+  "availability_end_anchor_id" int
+  "availability_end_offset_ticks" bigint
+  "created_at" timestamptz [not null]
+  "created_by" uuid
+  "updated_at" timestamptz
+  "updated_by" uuid
+  "is_deleted" boolean [not null, default: false]
+  "deleted_at" timestamptz
+  "deleted_by" uuid
+  "concurrency_stamp" uuid [not null]
+
+  Indexes {
+    (tenant_id, id) [unique]
+    (tenant_id, event_id, id) [unique]
+    (tenant_id, event_id, id, session_scope_id) [unique]
+    (tenant_id, event_id, is_deleted, sort_order, id)
+    (tenant_id, storage_object_id) [unique, note: 'Filtered to non-null on SQL Server; other engines permit multiple NULL values natively']
+  }
+}
+
+Table "admission_targets" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null]
+  "event_id" uuid [not null]
+  "admission_target_type_id" int [not null]
+  "admission_operational_status_id" int [not null]
+  "scope_id" uuid [not null]
+  "event_day_id" uuid
+  "event_session_id" uuid
+  "concurrency_stamp" uuid [not null]
+
+  Indexes {
+    (tenant_id, id) [unique]
+    (tenant_id, event_id, id) [unique]
+    (tenant_id, event_id, admission_target_type_id, id, scope_id) [unique]
+    (tenant_id, event_id, admission_target_type_id, scope_id) [unique]
+  }
+
+  Note: 'Existing admission target. ScopeId is the Event, EventDay or EventSession identity selected by target type; it is not the target primary key.'
+}
+
+Table "event_resource_audience_rules" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null]
+  "event_id" uuid [not null]
+  "event_resource_id" uuid [not null]
+  "audience_kind_id" int [not null]
+  "resource_event_session_id" uuid
+  "resource_session_scope_id" uuid [not null]
+  "event_session_id" uuid
+  "event_ticket_catalog_version_id" uuid
+  "event_ticket_type_id" uuid
+  "admission_target_type_id" int
+  "admission_target_id" uuid
+  "admission_target_scope_id" uuid
+  "require_confirmed_order" boolean [not null]
+  "require_participant_approval" boolean [not null]
+  "require_participant_completion" boolean [not null]
+
+  Indexes {
+    (tenant_id, event_resource_id, audience_kind_id, event_session_id, admission_target_id)
+  }
+}
+
+Table "event_resource_audit_entries" {
+  "id" uuid [pk, not null]
+  "tenant_id" uuid [not null]
+  "event_resource_id" uuid [not null]
+  "responsible_manager_user_id" uuid
+  "action" int [not null]
+  "outcome" int [not null]
+  "reason" int [not null]
+  "timestamp" timestamptz [not null]
+
+  Indexes {
+    (tenant_id, event_resource_id, timestamp, id)
+    (tenant_id, timestamp, id)
+  }
+}
+
+Ref: "event_resources".("tenant_id", "event_id") > "events".("tenant_id", "id") [delete: restrict]
+Ref: "event_resources".("tenant_id", "event_id", "event_session_id") > "event_sessions".("tenant_id", "event_id", "id") [delete: restrict]
+Ref: "event_resources".("tenant_id", "storage_object_id") > "storage_objects".("tenant_id", "id") [delete: restrict]
+Ref: "event_resources".("tenant_id", "event_id", "accessible_alternative_event_resource_id") > "event_resources".("tenant_id", "event_id", "id") [delete: restrict]
+Ref: "event_resources"."event_resource_kind_id" > "event_resource_kinds"."id" [delete: restrict]
+Ref: "event_resources"."event_resource_delivery_type_id" > "event_resource_delivery_types"."id" [delete: restrict]
+Ref: "event_resource_audience_rules".("tenant_id", "event_id", "event_resource_id", "resource_session_scope_id") > "event_resources".("tenant_id", "event_id", "id", "session_scope_id") [delete: cascade]
+Ref: "event_resource_audience_rules".("tenant_id", "event_id", "event_ticket_catalog_version_id") > "event_ticket_catalog_versions".("tenant_id", "event_id", "id") [delete: restrict]
+Ref: "event_resource_audience_rules".("tenant_id", "event_ticket_catalog_version_id", "event_ticket_type_id") > "event_ticket_types".("tenant_id", "catalog_id", "id") [delete: restrict]
+Ref: "event_resource_audience_rules".("tenant_id", "event_id", "admission_target_type_id", "admission_target_id", "admission_target_scope_id") > "admission_targets".("tenant_id", "event_id", "admission_target_type_id", "id", "scope_id") [delete: restrict]
+Ref: "admission_targets"."tenant_id" > "tenants"."id" [delete: restrict]
+Ref: "admission_targets".("tenant_id", "event_id") > "events".("tenant_id", "id") [delete: restrict]
+Ref: "admission_targets".("tenant_id", "event_id", "event_day_id") > "event_days".("tenant_id", "event_id", "id") [delete: restrict]
+Ref: "admission_targets".("tenant_id", "event_id", "event_session_id") > "event_sessions".("tenant_id", "event_id", "id") [delete: restrict]
+Ref: "event_resource_audit_entries".("tenant_id", "event_resource_id") > "event_resources".("tenant_id", "id") [delete: restrict]
 
 // ============================================================
 // Keycloak Operator Safety Receipts

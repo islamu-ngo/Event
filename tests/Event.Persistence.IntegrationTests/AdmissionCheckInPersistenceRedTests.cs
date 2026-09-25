@@ -54,7 +54,9 @@ public sealed class AdmissionCheckInPersistenceRedTests
         await Assert.That(scopeId.ClrType).IsEqualTo(typeof(Guid));
         await Assert.That(entities.Target.GetIndexes().Any(index =>
             index.Properties.Contains(scopeId))).IsTrue();
-        await Assert.That(entities.Target.GetKeys().Any(key => key.Properties.Contains(scopeId))).IsFalse();
+        await Assert.That(entities.Target.GetKeys().Any(key => Phase21PersistenceSurface.HasProperties(
+            key.Properties, nameof(AdmissionTarget.TenantId), nameof(AdmissionTarget.EventId),
+            nameof(AdmissionTarget.AdmissionTargetTypeId), nameof(AdmissionTarget.Id), nameof(AdmissionTarget.ScopeId)))).IsTrue();
         await Assert.That(entities.Target.GetForeignKeys().Any(foreignKey =>
             foreignKey.Properties.Contains(scopeId))).IsFalse();
         await Assert.That(entities.Target.FindProperty(nameof(AdmissionTarget.ConcurrencyStamp))!.IsConcurrencyToken).IsTrue();

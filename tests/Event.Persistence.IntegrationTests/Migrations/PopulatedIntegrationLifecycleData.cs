@@ -3,7 +3,6 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -18,7 +17,24 @@ internal sealed record PopulatedIntegrationLifecycleData(
 
     internal static async Task<PopulatedIntegrationLifecycleData> SeedAsync(ExploreDbContext context)
     {
-        await LookupTableSeeder.SeedAsync(context);
+        // This fixture intentionally targets retained Init, not today's complete schema.
+        context.AddRange(
+            new TenantStatus { Id = (int)TenantStatusEnum.Active, MasterCode = "ACTIVE", FullName = "Active", IsActiveState = true },
+            new ActorType { Id = (int)ActorTypeEnum.Bot, MasterCode = "BOT", FullName = "Bot" },
+            new EventProvenanceType { Id = (int)EventProvenanceTypeEnum.OrganizerCreated, MasterCode = "ORGANIZER_CREATED", FullName = "Organizer created" },
+            new VisibilityType { Id = (int)VisibilityTypeEnum.Public, MasterCode = "PUBLIC", FullName = "Public" },
+            new EventStatus { Id = (int)EventStatusEnum.Published, MasterCode = "PUBLISHED", FullName = "Published" },
+            new EventFormat { Id = (int)EventFormatEnum.Local, MasterCode = "LOCAL", FullName = "Local" },
+            new TicketCatalogStatus { Id = (int)TicketCatalogStatusEnum.Draft, MasterCode = "DRAFT", FullName = "Draft" },
+            new BookingPartyType { Id = (int)BookingPartyTypeEnum.Individual, MasterCode = "INDIVIDUAL", FullName = "Individual" },
+            new RegistrationOrderStatus { Id = (int)RegistrationOrderStatusEnum.Draft, MasterCode = "DRAFT", FullName = "Draft" },
+            new FileType { Id = 2, MasterCode = "DOCUMENT", FullName = "Document" },
+            new NotificationCategory { Id = (int)NotificationCategoryEnum.EventLifecycle, MasterCode = "EVENT_LIFECYCLE", FullName = "Event lifecycle" },
+            new NotificationOwnershipType { Id = (int)NotificationOwnershipTypeEnum.IslamuEvent, MasterCode = "ISLAMU_EVENT", FullName = "ISLAMU Event" },
+            new NotificationIntentStatus { Id = (int)NotificationIntentStatusEnum.Pending, MasterCode = "PENDING", FullName = "Pending" },
+            new NotificationRecipientKind { Id = (int)NotificationRecipientKindEnum.User, MasterCode = "USER", FullName = "User" },
+            new NotificationDeliveryPolicy { Id = (int)NotificationDeliveryPolicyEnum.CriticalEventUpdateOptional, MasterCode = "CRITICAL_EVENT_UPDATE_OPTIONAL", FullName = "Critical event update optional" });
+        await context.SaveChangesAsync();
         var data = new PopulatedIntegrationLifecycleData(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
             Guid.CreateVersion7(), Guid.CreateVersion7());

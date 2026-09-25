@@ -17,6 +17,7 @@ public sealed class EventTicketCatalogVersionConfiguration : IEntityTypeConfigur
         builder.Property(catalog => catalog.IsDeleted).HasDefaultValue(false);
         builder.Property(catalog => catalog.ConcurrencyStamp).IsConcurrencyToken();
         builder.HasAlternateKey(catalog => new { catalog.TenantId, catalog.Id });
+        builder.HasAlternateKey(catalog => new { catalog.TenantId, catalog.EventId, catalog.Id });
 
         builder.HasOne<Tenant>().WithMany().HasForeignKey(catalog => catalog.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Event>().WithMany(@event => @event.TicketCatalogVersions)

@@ -49,7 +49,8 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await Assert.That(migrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
             .HasSingleItem();
         await Assert.That(migrations[0]).EndsWith("_Init");
-        await Assert.That(migrations.Length).IsEqualTo(2);
+        string integrationMigration = migrations.Single(id =>
+            id.EndsWith("_EmailOptionalSelfHostingIntegration", StringComparison.Ordinal));
         string initialMigration = migrations[0];
         await Assert.That(initialMigration).IsEqualTo(databaseOptions.Provider switch
         {
@@ -60,7 +61,6 @@ public sealed class SqliteApplicationInitialLifecycleTests
             _ => throw new ArgumentOutOfRangeException(nameof(databaseOptions))
         });
         string latestMigration = migrations[^1];
-        await Assert.That(latestMigration).EndsWith("_EmailOptionalSelfHostingIntegration");
 
         await migrator.MigrateAsync(initialMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
@@ -93,9 +93,12 @@ public sealed class SqliteApplicationInitialLifecycleTests
             .IsFalse();
 
         // This is deliberately last: a rejected Down need not leave every provider's DDL atomic.
+        // Isolate the integration guard from newer migrations that can legitimately roll back first.
+        await migrator.MigrateAsync(integrationMigration);
         await PopulatedIntegrationLifecycleData.AssertLocalBootstrapRollbackRejectedAsync(context, initialMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
+            .IsEquivalentTo(migrations.Take(Array.IndexOf(migrations, integrationMigration) + 1),
+                TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 
     internal static async Task AssertDataProtectionLifecycleAsync(

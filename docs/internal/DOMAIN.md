@@ -109,8 +109,8 @@ are never rewritten when any authority changes.
    `Tenant`, `TenantUser`, `TenantUserRoleGrant`, `TenantSetting`, `TenantSettingsDocument`, `TenantNavigationLink`, `TenantInvitation`, `TenantLifecycleLog`
 2. Identity and actor model:
    `User`, `Actor`, `ActorSubscription`, `Group`, `Organization`, `Role`, `Permission`, `RolePermission`, `PlatformUserRole`
-3. Events, registration, and admission ticketing:
-   `Event`, `EventParticipationConfiguration`, `EventPublicAction`, `EventSession`, `RegistrationOrder`, `RegistrationOrderLine`, `RegistrationParticipant`, `RegistrationTicketAssignment`, `EventRegistration`, `AdmissionTicket`, `AdmissionTicketCredential`, `AdmissionRecoveryCapability`, `EventTicketCatalogVersion`, `EventTicketType`, `EventCapacityPool`, `TicketTypeEntitlement`, `CapacityOversellPolicy`, `PlatformFeePolicy`, `PlatformFeeFixedCharge`, `PlatformContributionOption`, `PlatformContributionSetting`, `PromotionDefinition`, `PromotionCode`, `PromotionReservation`, `EventSessionSpeaker`, `EventSessionLanguage`, `EventSessionAgendaItem`, `Notification`, `NotificationFanoutRun` (see [ADMISSION_AND_REGISTRATION.md](ADMISSION_AND_REGISTRATION.md) for architecture & zero-knowledge credentialing)
+3. Events, resources, registration, and admission ticketing:
+   `Event`, `EventParticipationConfiguration`, `EventPublicAction`, `EventSession`, `EventResource`, `EventResourceAudienceRule`, `EventResourceAuditEntry`, `RegistrationOrder`, `RegistrationOrderLine`, `RegistrationParticipant`, `RegistrationTicketAssignment`, `EventRegistration`, `AdmissionTicket`, `AdmissionTicketCredential`, `AdmissionRecoveryCapability`, `EventTicketCatalogVersion`, `EventTicketType`, `EventCapacityPool`, `TicketTypeEntitlement`, `CapacityOversellPolicy`, `PlatformFeePolicy`, `PlatformFeeFixedCharge`, `PlatformContributionOption`, `PlatformContributionSetting`, `PromotionDefinition`, `PromotionCode`, `PromotionReservation`, `EventSessionSpeaker`, `EventSessionLanguage`, `EventSessionAgendaItem`, `Notification`, `NotificationFanoutRun` (see [ADMISSION_AND_REGISTRATION.md](ADMISSION_AND_REGISTRATION.md) for architecture & zero-knowledge credentialing)
 4. Event reporting and moderation review:
    `EventReport`, `EventReportTarget`, `EventReportEvidence`, `EventReportCase`, `EventReportSignal`, `EventReportDecision`, `EventReportDecisionExecution`, `EventReportExternalLink`, `EventModerationRecord`, `ActorModerationRecord`, `AtprotoIdentityModerationRecord`
 5. Privacy erasure saga & compliance:
@@ -658,6 +658,7 @@ Specialized variants: `PdsSyncOutbox` (federation), `PolicyChangeOutbox` (govern
 - `Event.EventTimeZoneId`: Optional, max 100; blank strings rejected.
 - `Event`: Schedule rollups reject inverted first/last local date and UTC start ranges.
 - `EventSession`: `EventSessionStatusId` is required; schedule and local projection fields are nullable for drafts; if a schedule is present, UTC end must be after UTC start and local minute projections must match local time projections.
+- `EventResource`: tenant/event/session, storage, accessible-alternative, ticket-catalog, admission-target, payload, qualifier, and unique attachment constraints are relationally enforced. Availability is persisted as scalar leaves, and `AudienceRules` is rehydrated through a private backing collection. See [Event Resource Persistence](EVENT_RESOURCES.md).
 - `EventAgendaItem`: UTC end must be after UTC start; local minute projections must match local time projections.
 - `AppSetting`: Blocks high-value secret keys (e.g., `Database:`, `ConnectionStrings:`) via DB constraint.
 - `Actor`: Unique nullable owner FKs (exactly one of UserId, OrganizationId, or GroupId).

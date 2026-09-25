@@ -25,6 +25,9 @@ public sealed class EventTicketTypeConfiguration : IEntityTypeConfiguration<Even
         builder.Property(ticketType => ticketType.IsDeleted).HasDefaultValue(false);
         builder.Property(ticketType => ticketType.ConcurrencyStamp).IsConcurrencyToken();
         builder.HasAlternateKey(ticketType => new { ticketType.TenantId, ticketType.Id });
+        builder.HasAlternateKey(ticketType => new { ticketType.TenantId, ticketType.CatalogId, ticketType.Id });
+        // The live catalog FK needs its supporting index while additional lineage keys are installed.
+        builder.HasIndex(ticketType => new { ticketType.TenantId, ticketType.CatalogId });
 
         builder.HasOne<EventTicketCatalogVersion>().WithMany(catalog => catalog.TicketTypes)
             .HasForeignKey(ticketType => new { ticketType.TenantId, ticketType.CatalogId })

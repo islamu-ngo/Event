@@ -22,7 +22,8 @@ Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-an
 
 | Storage Provider | Configuration | Best Fit | Operational Considerations |
 |---|---|---|---|
-| **`local`** (Default) | `STORAGE_LOCAL_ROOTPATH=/app/storage-data/local` | Single-node Docker Compose or [Standalone](../self-hosting/docker-standalone.md) | Requires mounting a persistent Docker volume on the host. |
+| **`local`** (Default, Compose) | `LOCAL_STORAGE_ROOT_PATH=/app/storage-data/local` | Single-node Docker Compose | Mount a persistent volume for the selected root. |
+| **`local`** (Default, Standalone) | `Storage__Local__RootPath` (optional; defaults to `/app/data/storage`) | [Standalone](../self-hosting/docker-standalone.md) | The default lives on the durable `/app/data` volume; persist and back up any override separately. |
 | **`s3`** | `STORAGE_S3_ENDPOINT`, `STORAGE_S3_BUCKET_NAME`, `STORAGE_S3_ACCESS_KEY_ID`, `STORAGE_S3_SECRET_ACCESS_KEY` | Multi-replica clusters and high-traffic event media | Decouples media storage from application compute nodes. |
 
 > [!TIP]

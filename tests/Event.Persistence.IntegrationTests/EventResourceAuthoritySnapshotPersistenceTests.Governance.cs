@@ -44,7 +44,11 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
             new EventResourceRepository(context), new EventAuthoritySnapshotService(context), governance);
         EventResourceAuthorityRequest update = new(scope.TenantAId, resource.Id, userId, false, "update");
         EventResourceAuthorityRequest create = new(scope.TenantAId, scope.EventAId, userId, false, "create");
-        var facts = await reader.ReadBatchAsync([update, create], new(Now), default);
+        EventResourceAuthorityRequest collection = new(scope.TenantAId, scope.EventAId, userId, false, "view-management")
+        {
+            IsEventCollection = true
+        };
+        var facts = await reader.ReadBatchAsync([update, create, collection], new(Now), default);
         var route = new EventResourceProviderSnapshot(EventResourceProviderMode.Local, "", "default");
         var routes = Substitute.For<IEventResourceProviderSnapshotReader>();
         routes.ReadAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(route);
@@ -53,8 +57,11 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
             .Returns(call => call.Arg<IReadOnlyList<EventResourceProviderInput>>()
                 .Select(_ => EventResourceProviderDecision.Allow).ToArray());
         var service = new EventResourceAuthorityOrchestrator(new EfCoreUnitOfWork(context), reader, routes, provider, new AuthorityClock());
-        var outcomes = await service.AuthorizeCapabilitiesAsync([update, create]);
-        await Assert.That(outcomes).IsEquivalentTo([EventResourceAuthorityOutcome.Allowed, EventResourceAuthorityOutcome.NotFound]);
+        var outcomes = await service.AuthorizeCapabilitiesAsync([update, create, collection]);
+        await Assert.That(outcomes).IsEquivalentTo(
+            [EventResourceAuthorityOutcome.Allowed, EventResourceAuthorityOutcome.NotFound, EventResourceAuthorityOutcome.Allowed]);
         await Assert.That(facts[0]!.Access.GovernancePolicy).IsEqualTo(disabled);
+        await Assert.That(facts[2]!.Policy).IsNull();
+        await Assert.That(facts[2]!.ResourceId).IsEqualTo(scope.EventAId);
     }
 }

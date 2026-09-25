@@ -5,6 +5,32 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-23
 
+- **Portable resource metadata.** A private/no-store export query uses exact
+  parent and per-resource `export` authority with version-bound final checks.
+  The explicit bounded projection preserves semantic metadata, audience rules
+  and relative timing without delivery material, audit rows or attribution.
+  The management collection gains a scoped export action; generated consumers
+  retain the typed JSON contract. See [metadata portability](EVENT_RESOURCES.md#authorized-metadata-portability).
+
+- **Audience resource disclosure.** Two private/no-store native read routes add
+  explicit safe metadata and teaser projections, complete bounded discovery at
+  the 500-active-resource ceiling and purpose-bound 15-minute continuation.
+  Pagination contains no global counts; each response revalidates versions,
+  disclosure level, alternative references and any continuation witness after
+  HAL assembly. Cursor failures are bounded 400 and hidden resources remain 404.
+  No delivery surface is enabled. See [audience discovery](EVENT_RESOURCES.md#audience-discovery-boundary).
+
+- **Governed resource draft management.** Native resource commands and queries
+  expose private/no-store management detail, event collections, and bounded
+  audit reads. Client-retained UUIDv7 create IDs, required idempotency keys with
+  replay revalidation, and expected versions protect mutation intent. After
+  asynchronous HAL assembly, a final version-bound native authority check
+  guards metadata disclosure. Semantic drafts accept no delivery references
+  and expose no publication, access, or download affordance. Resource mutation
+  and minimal audit commit atomically; hourly retention deletes complete rows,
+  retention zero suppresses collection, and subject erasure clears attribution.
+  See [draft management](EVENT_RESOURCES.md#p5a-draft-management-api).
+
 - **Native resource governance.** The `event_resources.*` setting family is
   available through native settings and configuration manifests. Tenant writes
   cannot widen instance ceilings or set the instance-only unscanned-document

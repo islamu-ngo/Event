@@ -9,8 +9,25 @@ public sealed partial class EventResourceAuthorityOrchestrator
     /// their request cancellation deadline; an explicit earlier deadline is never reset on retry.
     /// Mutation handlers still recheck authority inside their own transaction.
     /// </summary>
-    public async Task<IReadOnlyList<EventResourceAuthorityOutcome>> AuthorizeCapabilitiesAsync(
-        IReadOnlyList<EventResourceAuthorityRequest> requests, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<EventResourceAuthorityOutcome>> AuthorizeCapabilitiesAsync(
+        IReadOnlyList<EventResourceAuthorityRequest> requests, CancellationToken cancellationToken = default) =>
+        AuthorizeBatchAsync(requests, null, cancellationToken);
+
+    /// <summary>Captures only final accepted disclosures; denied rows carry no facts or identifiers.</summary>
+    internal async Task<IReadOnlyList<EventResourceAudienceDecision>> AuthorizeAudienceAsync(
+        IReadOnlyList<EventResourceAuthorityRequest> requests, CancellationToken cancellationToken)
+    {
+        var accepted = new EventResourceAuthoritySnapshot?[requests.Count];
+        var outcomes = await AuthorizeBatchAsync(requests, (index, snapshot) => accepted[index] = snapshot,
+            cancellationToken);
+        return outcomes.Select((outcome, index) => new EventResourceAudienceDecision(outcome,
+            outcome == EventResourceAuthorityOutcome.Allowed ? accepted[index]?.Facts.ResourceVersion : null,
+            outcome == EventResourceAuthorityOutcome.Allowed ? accepted[index]?.Evaluation.Disclosure : null)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<EventResourceAuthorityOutcome>> AuthorizeBatchAsync(
+        IReadOnlyList<EventResourceAuthorityRequest> requests,
+        Action<int, EventResourceAuthoritySnapshot>? accept, CancellationToken cancellationToken)
     {
         if (requests.Count == 0) return [];
         if (requests.Count > EventResourceAuthorityRequest.MaximumBatchChecks)
@@ -113,6 +130,8 @@ public sealed partial class EventResourceAuthorityOrchestrator
                         || final.Disclosure != snapshot.Evaluation.Disclosure)
                         outcomes[index] = conceal[index]
                             ? EventResourceAuthorityOutcome.NotFound : EventResourceAuthorityOutcome.Forbidden;
+                    else
+                        accept?.Invoke(index, snapshot);
                 }
                 return outcomes;
             }

@@ -1,0 +1,33 @@
+# Bounded authorized resource metadata portability.
+Change-Id: CHG-01M3718BYGSH8SKKFF48RWQ5F2
+Title: "export portable resource metadata safely"
+Type: feat
+Scope: events
+Summary: "Export authorized semantic metadata, audience rules and timing intent without external destinations, encryption envelopes, provider keys or attendee history."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: Adds one export endpoint and a management HAL action without replacing an existing wire contract.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Export requires fresh parent and per-resource export decisions bound to projected versions; explicit projection excludes delivery material, attribution and audit history.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Reads existing resource entities and introduces no persisted schema or migration.
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Uses current native authority and page limits without new settings, secrets or dependencies.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: A named private JSON export route, explicit immutable item/page DTOs, inventory and typed per-tag consumer are generated together.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Follow the current export affordance for bounded pages; documents contain authorized management notes but no files, destinations, attendee history or reusable access grant.

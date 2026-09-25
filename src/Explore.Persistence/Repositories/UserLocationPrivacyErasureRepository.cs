@@ -305,6 +305,25 @@ public sealed class UserLocationPrivacyErasureRepository(ExploreDbContext dbCont
     {
         RequireId(subjectId, nameof(subjectId));
         string reason = TenantFilterBypassReasons.UserPrivacyErasure;
+        var resourceAudits = dbContext.Set<EventResourceAuditEntry>()
+            .IgnoreAllFilters(reason)
+            .Where(entry => entry.ResponsibleManagerUserId == subjectId);
+        Guid resourceErasureStamp = Guid.CreateVersion7();
+        // Management snapshots must be invalidated even when only a child audit identifier changes.
+        await dbContext.EventResources.IgnoreAllFilters(reason)
+            .Where(resource => resource.CreatedBy == subjectId || resource.UpdatedBy == subjectId
+                || resource.DeletedBy == subjectId || resourceAudits.Any(entry =>
+                    entry.TenantId == resource.TenantId && entry.EventResourceId == resource.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(resource => resource.CreatedBy,
+                    resource => resource.CreatedBy == subjectId ? (Guid?)null : resource.CreatedBy)
+                .SetProperty(resource => resource.UpdatedBy,
+                    resource => resource.UpdatedBy == subjectId ? (Guid?)null : resource.UpdatedBy)
+                .SetProperty(resource => resource.DeletedBy,
+                    resource => resource.DeletedBy == subjectId ? (Guid?)null : resource.DeletedBy)
+                .SetProperty(resource => resource.ConcurrencyStamp, resourceErasureStamp), cancellationToken);
+        await resourceAudits.ExecuteUpdateAsync(setters => setters
+            .SetProperty(entry => entry.ResponsibleManagerUserId, (Guid?)null), cancellationToken);
         Guid[] tenantUserIds = await dbContext.TenantUsers
             .IgnoreAllFilters(reason)
             .Where(value => value.UserId == subjectId)

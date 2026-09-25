@@ -15,20 +15,24 @@ public sealed partial class EventResourceAuthorityOrchestrator(
     /// <summary>
     /// Owns A and a new B transaction; callers must not supply an ambient transaction.
     /// Preparation remains private until CompleteHeadersAsync succeeds. A failing preparation factory
-    /// owns cleanup of anything it has not returned. All attempts share the original caller deadline.
+    /// owns cleanup of anything it has not returned. Content requires an explicit deadline; native
+    /// metadata and mutation operations retain caller cancellation without inventing a delivery TTL.
     /// </summary>
     public async Task<EventResourceAuthorityResult> AuthorizeAsync(EventResourceAuthorityRequest request,
         Func<EventResourceAuthorizationFacts, CancellationToken, Task<IEventResourcePrivatePreparation>> prepare,
         CancellationToken cancellationToken = default)
     {
         var initialTime = timeProvider.GetUtcNow();
-        if (request.DeadlineUtc is not { } deadlineUtc || deadlineUtc <= initialTime)
+        if (request.DeadlineUtc is { } expiredAt && expiredAt <= initialTime
+            || request.DeadlineUtc is null && request.Action is "access" or "download")
             return new(EventResourceAuthorityOutcome.Expired);
         if (request.TenantId == Guid.Empty || request.ResourceId == Guid.Empty || request.SubjectUserId == Guid.Empty)
             return new(EventResourceAuthorityOutcome.NotFound);
-        using var deadline = new CancellationTokenSource(deadlineUtc - initialTime, timeProvider);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
-        var ct = linked.Token;
+        using var deadline = request.DeadlineUtc is { } deadlineUtc
+            ? new CancellationTokenSource(deadlineUtc - initialTime, timeProvider) : null;
+        using var linked = deadline is null
+            ? null : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+        var ct = linked?.Token ?? cancellationToken;
         bool concealFailure = false;
         try
         {
@@ -80,7 +84,8 @@ public sealed partial class EventResourceAuthorityOrchestrator(
         catch (OperationCanceledException)
         {
             return new(cancellationToken.IsCancellationRequested
-                ? EventResourceAuthorityOutcome.Cancelled : EventResourceAuthorityOutcome.Expired);
+                ? EventResourceAuthorityOutcome.Cancelled
+                : request.DeadlineUtc.HasValue ? EventResourceAuthorityOutcome.Expired : EventResourceAuthorityOutcome.Unavailable);
         }
         catch (Exception)
         {

@@ -2,6 +2,9 @@ namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons
 {
+    public const string EventResourceAuditRetention =
+        "Resource audit maintenance traverses bounded tenant pages and deletes bounded expired rows under an exact tenant predicate.";
+
     public const string EventResourceGovernanceMutation =
         "Resource governance mutation reads only canonical policy keys for the exact tenant ids in the authorized batch.";
 

@@ -44,13 +44,20 @@ public sealed class AuthorizationResourceContextResolver(
         if (resourceKind == ResourceKinds.EventResource)
         {
             if (tenantContext is null || tenantContext.TenantId == Guid.Empty
-                || !Guid.TryParse(resourceId, out Guid targetId) || targetId == Guid.Empty
-                || declaredFacts is not null && (declaredFacts is not EventResourceTargetAuthorizationFacts target
-                    || target.TenantId != tenantContext.TenantId || target.ResourceId != targetId))
+                || !Guid.TryParse(resourceId, out Guid targetId) || targetId == Guid.Empty)
                 throw new AuthorizationException(resourceKind, action);
+            bool validTarget = declaredFacts switch
+            {
+                null => true,
+                EventResourceTargetAuthorizationFacts target => target.TenantId == tenantContext.TenantId && target.ResourceId == targetId,
+                EventResourceCollectionAuthorizationFacts collection => collection.TenantId == tenantContext.TenantId
+                    && collection.EventId == targetId && action is "view-management" or "export",
+                _ => false
+            };
+            if (!validTarget) throw new AuthorizationException(resourceKind, action);
             // Keep database resolution inside the resource authority A/B protocol, not the decorator.
             return new AuthorizationContext(targetId.ToString("D"),
-                new EventResourceTargetAuthorizationFacts(tenantContext.TenantId, targetId));
+                declaredFacts ?? new EventResourceTargetAuthorizationFacts(tenantContext.TenantId, targetId));
         }
 
         if (resourceKind == ResourceKinds.Webhook && request is IWebhookPersistedOwnerRequest persistedOwnerRequest)

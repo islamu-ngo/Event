@@ -1932,6 +1932,7 @@ The scheduler job catalog is Application-owned through `IScheduledJobRegistry`. 
 | `idempotency-cleanup` | Interval, `IdempotencyCleanup:PollingIntervalMinutes` | None | Expired `idempotency_records` |
 | `atproto-transient-cleanup` | Interval, fixed 1 minute | None | Expired ATProto transient records and assertion-replay claims; remains enabled when ATProto login is disabled |
 | `ai-retention-cleanup` | Interval, `AiRetentionCleanup:PollingIntervalMinutes` | None | Per-tenant `ai_assistant.retention_days` |
+| `event-resource-audit-retention-cleanup` | Interval, fixed 1 hour | None | Fresh `event_resources.audit_retention_days`; complete row expiry and retention-zero purge |
 | `email-dispatch-retention-cleanup` | Interval, `EmailDispatchRetention:PollingIntervalMinutes` | None | Email dispatch content retention horizon |
 | `webhook-retention-cleanup` | Interval, `WebhookRetention:PollingIntervalMinutes` | None | Webhook message/attempt retention horizon |
 | `registration-retention-cleanup` | Interval, fixed 1 day | None | Immutable per-tenant registration retention deadlines |
@@ -1952,6 +1953,14 @@ The scheduler job catalog is Application-owned through `IScheduledJobRegistry`. 
 | `pds-sync-drain` | Interval, `Atproto:PdsSync:PollingIntervalSeconds` | None | Fenced AT Protocol PDS delivery |
 
 Planned-only jobs are `dead-letter-summary`, `waitlist-promotion-scan`, and `tenant-maintenance-scan`. General outbox remains the explicit hosted-service exception and has no Quartz catalog identity.
+
+`event-resource-audit-retention-cleanup` remains scheduled even when resource
+delivery is disabled. Each pass traverses tenant IDs in pages of 100 and deletes
+at most 1,000 audit rows per transaction, rereading current governance for every
+delete batch. Retention zero purges all existing rows. The job stores no tenant,
+manager, title or destination data in Quartz and uses the standard
+`Scheduled job {JobName} completed.` event. Keep the scheduler enabled until
+retained audit rows have expired or been purged.
 
 `payment-reconciliation-drain` performs a dispatch/reconcile/dispatch pass. Missing or invalid `PublicBaseUrl` defers only new Checkout handoff; provider reconciliation still runs. Keep the scheduler enabled after disabling paid sales so retained attempts and late signed evidence can settle.
 

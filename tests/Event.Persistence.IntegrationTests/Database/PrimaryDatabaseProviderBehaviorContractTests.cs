@@ -139,6 +139,13 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
     }
 
     [Test]
+    public Task EventResourceCursorDiscoveryIsBounded()
+    {
+        var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();
+        return EventResourceProviderContractAssertions.AssertCursorDiscoveryIsBoundedAsync(fixture);
+    }
+
+    [Test]
     public Task EventResourcesRejectInvalidPersistedOwnership()
     {
         var fixture = PrimaryDatabaseProviderBehaviorFixture.Create();

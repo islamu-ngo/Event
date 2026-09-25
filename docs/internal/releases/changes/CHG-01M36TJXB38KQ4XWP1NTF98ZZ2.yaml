@@ -1,0 +1,33 @@
+# Governed draft authoring and management audit.
+Change-Id: CHG-01M36TJXB38KQ4XWP1NTF98ZZ2
+Title: "manage governed resource drafts"
+Type: feat
+Scope: events
+Summary: "Expose draft resource authoring and management through explicit private HAL contracts with minimal management audit and bounded retention."
+Group: event-resources
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: New management routes are additive; no existing adopter contract is replaced.
+  Security:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: documented
+    Detail: Native authority and projected versions are rechecked after HAL assembly; writes require current replay authority, and bounded pages reveal no counts for undisclosed rows.
+  Migration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: The committed resource and activation histories are unchanged; no schema migration is introduced.
+  Configuration:
+    Reference: docs/internal/EVENT_RESOURCES.md
+    Disposition: not-applicable
+    Detail: Existing native resource governance settings are consumed without adding configuration keys or secrets.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Ten named management routes use semantic-only DTOs, typed HAL, required mutation replay keys, and generated OpenAPI, endpoint inventory and per-tag client contracts.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Organizers retain create IDs and expected versions; the hourly audit sweep removes expired rows while subject erasure clears attribution without deleting shared resources.

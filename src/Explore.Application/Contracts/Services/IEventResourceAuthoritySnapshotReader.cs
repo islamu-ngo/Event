@@ -23,4 +23,14 @@ public sealed record EventResourceAuthorityRequest(
 {
     public const int MaximumBatchResources = 500;
     public const int MaximumBatchChecks = MaximumBatchResources * 13;
+
+    /// <summary>Server-selected parent-event authority for management collection and export reads.</summary>
+    public bool IsEventCollection { get; init; }
+    public bool TargetsParentEvent => Action == "create" || IsEventCollection;
+
+    /// <summary>Binds an already prepared metadata projection to the exact persisted resource version.</summary>
+    public Guid? ExpectedResourceVersion { get; init; }
+
+    /// <summary>Binds prepared audience metadata to its exact disclosure, not merely an unchanged row stamp.</summary>
+    public Explore.Domain.Services.EventResourceAccessDecision? ExpectedDisclosure { get; init; }
 }

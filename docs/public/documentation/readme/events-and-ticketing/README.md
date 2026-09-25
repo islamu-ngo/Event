@@ -26,7 +26,77 @@ Before publishing a paid or controlled-entry event, verify module policy, regist
 
 Deleting a session, session group, or agenda item removes that item's venue and room references together. It does not delete the shared venue or another scheduled item's location assignment.
 
+## Organizer resource drafts (API)
+
+Authorized organizers manage event-resource drafts through private, no-store
+API representations. Use the HAL links returned by `GET
+/api/event/{eventId}/resources/management` or `GET
+/api/eventresource/{id}/management`; do not retain an action URL as a standing
+permission. The collection may offer create, and an item may offer edit,
+archive, delete, audit, unpublish, or moderation according to current authority.
+
+Management lists accept `page` and `pageSize` (at most 100). They do not return
+global totals or count-derived navigation, because other resources may be
+undisclosed. An empty page does not reveal whether other pages contain resources.
+
+Create with `POST /api/event/{eventId}/resources` and a client-generated UUIDv7
+`resourceId`. Retain that ID when retrying. Send an `Idempotency-Key` on every
+write; replayed requests are authorized again, so a prior success does not
+bypass a revoked or changed organizer role. Updates and state changes use the
+current resource `version` as `expectedVersion`; refresh the representation
+after a conflict.
+
+These are semantic drafts only: title, description, kind, disclosure choice,
+audience rules, timing intent, and a delivery-type placeholder. Do not send a
+file, external destination, download/access instruction, or other delivery
+data. Publishing is not available in this phase, even though a reserved API
+route exists. Archiving is terminal and does not publish anything; an archived
+draft can still be deleted when its HAL action is present.
+
+The optional audit read is private and contains only the retained management
+action, outcome, reason, time, and manager attribution. Retention zero collects
+no new management audit entries and removes existing ones; expiry cleanup and
+subject-erasure attribution clearing do not remove the shared draft. Administrators
+set the governing limits through the existing
+[event-resource governance](../administration-and-branding/admin-guide.md#event-resource-governance)
+workflow.
+
+## Reading event resources (API)
+
+Use `GET /api/event/{eventId}/resources` and follow each item's `self` link.
+Responses are private/no-store even for explicitly public materials. Eligible
+readers receive the permitted metadata; other readers may see an organizer's
+public teaser. Hidden and nonexistent resources both return 404. Audience reads
+never expose management notes or delivery references.
+
+Lists accept `pageSize` (20 by default, at most 100) and an opaque `cursor`.
+Follow the returned `next` HAL link instead of constructing a continuation.
+There are no global totals. A continuation exists only when another authorized
+item was observed; it is not a saved permission. Cursors expire after 15 minutes
+and are bound to the event, tenant and reader context. After signing in,
+switching reader context, expiry or reordering, start again without the cursor.
+Invalid cursor state returns 400 without including the token in the error.
+
+Accessible-alternative links appear only when that alternative is independently
+visible to the reader. File download and external-link navigation remain
+separate capabilities; these metadata routes do not publish drafts or grant
+delivery.
+
 ---
+
+## Exporting resource metadata
+
+An authorized manager may follow the management collection's `export` link to
+`GET /api/event/{eventId}/resources/export`. The private/no-store JSON contains
+semantic metadata, audience rules and original relative timing intent. It can
+include private organizer notes, so handle the exported document accordingly.
+It contains no stored-file locator, destination, encryption envelope, manager
+attribution or attendee history.
+
+Use `page` and `pageSize` (20 by default, at most 100) for bounded pages.
+No global count is returned. Every page requires current event and per-resource
+export authority; an old link cannot bypass revocation. This exports metadata,
+not file bytes, a ZIP archive, or an importable access grant.
 
 ## Related Guides & Next Steps
 

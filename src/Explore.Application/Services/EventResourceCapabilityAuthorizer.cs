@@ -35,12 +35,22 @@ public sealed class EventResourceCapabilityAuthorizer(
                 || request.Tenant?.TenantId is { } declaredTenant && declaredTenant != tenantId
                 || request.Tenant?.OrganizationId is not null || request.Scope?.OrganizationId is not null
                 || request.Scope?.TenantId is { } scope
-                    && (!Guid.TryParse(scope, out Guid scopedTenant) || scopedTenant != tenantId)
-                || request.Facts is not null && (request.Facts is not EventResourceTargetAuthorizationFacts facts
-                    || facts.TenantId != tenantId || facts.ResourceId != resourceId))
+                    && (!Guid.TryParse(scope, out Guid scopedTenant) || scopedTenant != tenantId))
                 continue;
+            bool validTarget = request.Facts switch
+            {
+                null => true,
+                EventResourceTargetAuthorizationFacts target => target.TenantId == tenantId && target.ResourceId == resourceId,
+                EventResourceCollectionAuthorizationFacts collection => collection.TenantId == tenantId
+                    && collection.EventId == resourceId && request.Action is "view-management" or "export",
+                _ => false
+            };
+            if (!validTarget) continue;
             positions.Add(index);
-            targets.Add(new(tenantId, resourceId, userId, machine, request.Action));
+            targets.Add(new(tenantId, resourceId, userId, machine, request.Action)
+            {
+                IsEventCollection = request.Facts is EventResourceCollectionAuthorizationFacts
+            });
         }
         if (targets.Count == 0) return results;
         var decisions = await authority.AuthorizeCapabilitiesAsync(targets, cancellationToken);

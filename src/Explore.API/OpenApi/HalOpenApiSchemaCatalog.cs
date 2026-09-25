@@ -12,6 +12,17 @@ internal static class HalOpenApiSchemaCatalog
         // Event DTOs
         typeof(Explore.Application.DTOs.Event.EventDto),
         typeof(Explore.Application.DTOs.Event.EventListDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceManagementDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceMetadataExportDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceMetadataExportPageDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAudienceDetailDto),
+        typeof(Explore.API.Models.EventResourceAudiencePageResource),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceManagementCollectionDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceDraftDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAudienceDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceTimeIntentDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAuditDto),
+        typeof(Explore.Application.DTOs.EventResource.EventResourceAuditPageDto),
         typeof(Explore.Application.DTOs.EventSeries.EventSeriesDto),
         typeof(Explore.Application.DTOs.EventSeries.EventSeriesListDto),
         typeof(Explore.Application.DTOs.Event.EventPublicActionDto),
@@ -303,6 +314,8 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfEventResourceManagementDto"] = typeof(Explore.Application.DTOs.EventResource.EventResourceManagementDto),
+        ["HalResourceOfEventResourceAudienceDetailDto"] = typeof(Explore.Application.DTOs.EventResource.EventResourceAudienceDetailDto),
         ["HalResourceOfVisitorAccessCapabilityDto"] = typeof(Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto),
         ["HalResourceOfVisitorSignupDestinationDto"] = typeof(Explore.Application.DTOs.PublicExperience.VisitorSignupDestinationDto),
         ["HalResourceOfPublicExperienceSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.PublicExperienceSettingsDto),
@@ -510,6 +523,8 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, string> CollectionEmbeddedItemResourceMappings { get; } = new Dictionary<string, string>
     {
+        ["HalCollectionEmbeddedOfEventResourceManagementDto"] = "HalResourceOfEventResourceManagementDto",
+        ["HalCollectionEmbeddedOfEventResourceAudienceDetailDto"] = "HalResourceOfEventResourceAudienceDetailDto",
         ["HalCollectionEmbeddedOfLocalIdentitySummary"] = "HalResourceOfLocalIdentitySummary",
         ["HalCollectionEmbeddedOfSetupSecretBindingReadinessItem"] =
             "HalResourceOfSetupSecretBindingReadinessItem",

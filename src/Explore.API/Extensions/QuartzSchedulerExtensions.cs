@@ -500,6 +500,15 @@ public static class QuartzSchedulerExtensions
             aiRetention.PollingIntervalMinutes,
             desiredRecurringJobs);
 
+        AddSweepJob<EventResourceAuditRetentionCleanupJob>(
+            quartz,
+            QuartzSchedulerKeys.EventResourceAuditRetentionCleanup,
+            "Removes complete expired resource-management audit rows under current tenant governance.",
+            enabled: true,
+            initialDelaySeconds: 60,
+            TimeSpan.FromHours(1),
+            desiredRecurringJobs);
+
         var emailRetention = Bind<EmailDispatchRetentionSettings>(configuration, EmailDispatchRetentionSettings.SectionName);
         AddSweepJob<EmailDispatchRetentionCleanupJob>(
             quartz,

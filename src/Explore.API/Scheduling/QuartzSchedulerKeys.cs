@@ -50,6 +50,9 @@ public static class QuartzSchedulerKeys
     public static readonly JobKey AiRetentionCleanup =
         new(ScheduledJobNames.AiRetentionCleanup, RecurringGroup);
 
+    public static readonly JobKey EventResourceAuditRetentionCleanup =
+        new(ScheduledJobNames.EventResourceAuditRetentionCleanup, RecurringGroup);
+
     public static readonly JobKey AtprotoTransientCleanup =
         new(ScheduledJobNames.AtprotoTransientCleanup, RecurringGroup);
 
@@ -117,6 +120,7 @@ public static class QuartzSchedulerKeys
         IdempotencyCleanup,
         AtprotoTransientCleanup,
         AiRetentionCleanup,
+        EventResourceAuditRetentionCleanup,
         EmailDispatchRetentionCleanup,
         WebhookRetentionCleanup,
         PrivacyErasureCredentialCleanup,

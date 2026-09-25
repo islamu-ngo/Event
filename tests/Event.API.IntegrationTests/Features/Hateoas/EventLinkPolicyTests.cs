@@ -16,6 +16,20 @@ using TUnit.Core;
 public sealed class EventLinkPolicyTests
 {
     [Test]
+    public async Task ResourceDiscoveryLinkRequiresPublicParentEligibility()
+    {
+        var dto = CreateEventDto(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
+        dto.IsPubliclyEligible = false;
+        var policy = new EventDetailLinkPolicy();
+        await Assert.That(policy.GetLinks(dto, null).Any(link => link.Rel == LinkRelations.Resources)).IsFalse();
+        dto.IsPubliclyEligible = true;
+        var resource = policy.GetLinks(dto, null).Single(link => link.Rel == LinkRelations.Resources);
+        await Assert.That(resource.RouteName).IsEqualTo(RouteNames.ListEventResources);
+        await Assert.That(new RouteValueDictionary(resource.RouteValues)["eventId"]).IsEqualTo(dto.Id);
+        await Assert.That(resource.Method).IsEqualTo(HttpMethods.Get);
+    }
+
+    [Test]
     public async Task ManagedCollectionItem_UsesManagementRoutesAndOmitsPublicReports()
     {
         var dto = new EventListDto

@@ -631,6 +631,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IEventResourceAuthoritySnapshotReader, EventResourceAuthoritySnapshotReader>();
         services.AddScoped<EventResourceAuthorityOrchestrator>();
         services.AddScoped<IEventResourceCapabilityAuthorizer, EventResourceCapabilityAuthorizer>();
+        services.AddScoped<IEventResourceCursorProtector, EventResourceCursorProtector>();
         services.AddScoped<RuntimeAuthorizationProvider>();
         services.AddScoped<IAuthorizationProvider>(sp => sp.GetRequiredService<RuntimeAuthorizationProvider>());
         services.AddScoped<IAuthorizationProviderModeCacheInvalidator>(sp => sp.GetRequiredService<RuntimeAuthorizationProvider>());

@@ -19,6 +19,62 @@ The draft HTTP API version is `0.1`. In pre-release development before v1, break
 
 ## Recent externally visible themes
 
+### Portable resource metadata (2026-09-23)
+
+`GET /api/event/{eventId}/resources/export` adds private/no-store semantic JSON
+for currently authorized managers. Parent and per-resource `export` decisions
+are distinct from management visibility. Pages default to 20, are capped at 100
+and expose no totals. Stale resource revisions or denied rows release no page.
+
+The document preserves authorized metadata, audience qualifiers and timing
+intent, while excluding backing locations, destinations, protected envelopes,
+audit/attendee history and manager attribution. The management collection
+offers the scoped `export` HAL action. No file delivery or import is enabled.
+
+### Audience resource metadata (2026-09-23)
+
+Private/no-store `GET /api/event/{eventId}/resources` and
+`GET /api/eventresource/{id}` expose currently authorized resource metadata,
+safe public teasers and independently visible alternative links. Lists return
+HAL items and protected continuation, not global totals. Page size defaults
+to 20 and is limited to 100. Cursors expire after 15 minutes and cannot move
+between tenants, events or reader contexts; invalid state returns 400.
+
+Every request and continuation rechecks current authority, with a final
+disclosure check after HAL work. Hidden/nonexistent resources share 404.
+Management notes, audience rules, backing keys and destinations are excluded.
+No download, access or publication capability is enabled by this addition.
+
+### Event-resource management drafts (2026-09-23)
+
+The authenticated management API adds private/no-store HAL representations for
+semantic event-resource drafts: `GET /api/eventresource/{id}/management`,
+`GET /api/event/{eventId}/resources/management`, and `GET
+/api/eventresource/{id}/audit`, plus create, update, archive, delete,
+unpublish, moderation, and reserved publish state routes beneath `/api/event`
+and `/api/eventresource`.
+
+`POST /api/event/{eventId}/resources` requires a client-retained UUIDv7
+`resourceId`. Every management write requires `Idempotency-Key`; a replay is
+authorized against current authority rather than receiving an authorization
+bypass. Update and state bodies require `expectedVersion`, so stale requests
+conflict. Follow only current HAL actions: archive is terminal but an archived
+resource may still expose deletion. The publish route rejects incomplete drafts;
+no publish relation is emitted.
+
+Management pages expose no global count, total pages or count-derived links;
+parent authority cannot reveal provider-denied resources on other pages.
+
+Drafts contain semantic metadata, audience rules, availability intent, and a
+delivery-type placeholder only. They do not accept delivery inputs and expose
+no delivery, access, or download affordance. Audit records are minimal
+action/outcome/reason/time/retained-manager entries committed with mutations.
+Retention zero suppresses new audit rows and purges existing rows; normal expiry
+removes complete rows, while subject erasure clears manager attribution without
+deleting the shared resource. This is organizer/API guidance; the native CQS,
+provider A/B authorization snapshots, and serializable mutation protocol remain
+internal implementation details.
+
 ### Operator form choices (2026-09-21)
 
 Authenticated clients can read `GET /api/operator-identity-metadata` through the

@@ -20,8 +20,10 @@ public sealed class OnboardingWireContractTests
             AdministrationAccessMode = "Embedded",
             SiteProfile = new()
             {
-                SiteName = "Community", CanonicalUrl = "https://events.example.test",
-                Locale = "en", TimeZone = "UTC"
+                SiteName = "Community",
+                CanonicalUrl = "https://events.example.test",
+                Locale = "en",
+                TimeZone = "UTC"
             }
         };
         var json = JsonSerializer.Serialize(request, ClientOptions);
@@ -36,7 +38,8 @@ public sealed class OnboardingWireContractTests
 
         var localJson = JsonSerializer.Serialize(new Client.CompleteLocalInstanceOnboardingRequestDto
         {
-            OperationId = Guid.CreateVersion7(), Settings = request
+            OperationId = Guid.CreateVersion7(),
+            Settings = request
         }, ClientOptions);
         var local = JsonSerializer.Deserialize<Server.CompleteLocalInstanceOnboardingRequestDto>(localJson, ApiOptions);
         await Assert.That(local!.Settings.SiteProfile.SiteName).IsEqualTo("Community");

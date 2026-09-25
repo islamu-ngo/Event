@@ -36,7 +36,8 @@ public class SelfHostOnboardingProfileDtoValidatorTests
     {
         var result = await _validator.ValidateAsync(new SelfHostOnboardingProfileDto
         {
-            SiteName = "Community Events", CanonicalUrl = url
+            SiteName = "Community Events",
+            CanonicalUrl = url
         });
         await Assert.That(result.IsValid).IsEqualTo(valid);
     }

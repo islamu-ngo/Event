@@ -32,8 +32,11 @@ public sealed class AdmissionRecoveryEmailDeliveryChannelTests
             .Build();
         var settings = Substitute.For<ISystemSettingRepository>();
         settings.GetByKey(GovernanceSettingKeys.Domains.PublicBaseUrl, Arg.Any<CancellationToken>())
-            .Returns(new SystemSetting { SettingKey = GovernanceSettingKeys.Domains.PublicBaseUrl,
-                Value = JsonSerializer.Serialize("https://events.example.test:9443/community") });
+            .Returns(new SystemSetting
+            {
+                SettingKey = GovernanceSettingKeys.Domains.PublicBaseUrl,
+                Value = JsonSerializer.Serialize("https://events.example.test:9443/community")
+            });
         var channel = new AdmissionRecoveryEmailDeliveryChannel(email, configuration, settings);
         Guid intentId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000471");
         Guid requestId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000472");

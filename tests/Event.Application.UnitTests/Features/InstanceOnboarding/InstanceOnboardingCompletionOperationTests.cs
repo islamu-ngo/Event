@@ -36,10 +36,14 @@ public sealed class InstanceOnboardingCompletionOperationTests
     {
         var scenario = new OnboardingCompletionScenario(interactive: true);
         scenario.HostConfiguration["PUBLIC_BASE_URL"] = "ftp://invalid.example.test";
-        var response = await scenario.SaveProfile.ExecuteAsync(new() { Profile = new()
+        var response = await scenario.SaveProfile.ExecuteAsync(new()
         {
-            SiteName = "Community", CanonicalUrl = "https://request.example.test/community"
-        } }, CancellationToken.None);
+            Profile = new()
+            {
+                SiteName = "Community",
+                CanonicalUrl = "https://request.example.test/community"
+            }
+        }, CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
         var address = await Explore.Application.Configuration.PublicAddressResolver.ResolveAsync(
@@ -94,7 +98,10 @@ public sealed class InstanceOnboardingCompletionOperationTests
         var validator = new Explore.Application.DTOs.Onboarding.Validators.ResolverConfigurationDtoValidator();
         var result = await validator.ValidateAsync(new ResolverConfigurationDto
         {
-            HeaderEnabled = true, PathEnabled = true, PathPrefix = "/t", SubdomainEnabled = subdomain
+            HeaderEnabled = true,
+            PathEnabled = true,
+            PathPrefix = "/t",
+            SubdomainEnabled = subdomain
         });
         await Assert.That(result.IsValid).IsEqualTo(valid);
     }

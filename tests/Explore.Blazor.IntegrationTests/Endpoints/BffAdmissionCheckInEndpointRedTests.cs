@@ -90,9 +90,9 @@ public sealed class BffAdmissionCheckInEndpointRedTests
             StaffBatchRoute(eventId),
             StaffUndoRoute(eventId, Guid.CreateVersion7()),
             StaffUndoRoute(eventId, Guid.NewGuid()),
-            "/t/masjid-central" + StaffBatchRoute(eventId),
-            "/t/masjid-central" + StaffUndoRoute(eventId, Guid.CreateVersion7()),
-            "/t/masjid-central" + StaffUndoRoute(eventId, Guid.NewGuid())
+            "/masjid-central" + StaffBatchRoute(eventId),
+            "/masjid-central" + StaffUndoRoute(eventId, Guid.CreateVersion7()),
+            "/masjid-central" + StaffUndoRoute(eventId, Guid.NewGuid())
         ];
 
         foreach (string route in routes)
@@ -118,9 +118,9 @@ public sealed class BffAdmissionCheckInEndpointRedTests
             ScannerBatchRoute,
             ScannerUndoRoute(Guid.CreateVersion7()),
             ScannerUndoRoute(Guid.NewGuid()),
-            "/t/masjid-central" + ScannerBatchRoute,
-            "/t/masjid-central" + ScannerUndoRoute(Guid.CreateVersion7()),
-            "/t/masjid-central" + ScannerUndoRoute(Guid.NewGuid())
+            "/masjid-central" + ScannerBatchRoute,
+            "/masjid-central" + ScannerUndoRoute(Guid.CreateVersion7()),
+            "/masjid-central" + ScannerUndoRoute(Guid.NewGuid())
         ];
 
         foreach (string route in routes)
@@ -149,13 +149,13 @@ public sealed class BffAdmissionCheckInEndpointRedTests
             StaffOperationRoute(eventId, "stop"),
             StaffOperationRoute(eventId, "restore"),
             StaffOperationRoute(eventId, "reconcile"),
-            "/t/masjid-central" + StaffDetailRoute(eventId, Guid.NewGuid()),
-            "/t/masjid-central" + StaffSummaryRoute(eventId),
-            "/t/masjid-central" + StaffAuditRoute(eventId),
-            "/t/masjid-central" + StaffHealthRoute(eventId),
-            "/t/masjid-central" + StaffOperationRoute(eventId, "stop"),
-            "/t/masjid-central" + StaffOperationRoute(eventId, "restore"),
-            "/t/masjid-central" + StaffOperationRoute(eventId, "reconcile")
+            "/masjid-central" + StaffDetailRoute(eventId, Guid.NewGuid()),
+            "/masjid-central" + StaffSummaryRoute(eventId),
+            "/masjid-central" + StaffAuditRoute(eventId),
+            "/masjid-central" + StaffHealthRoute(eventId),
+            "/masjid-central" + StaffOperationRoute(eventId, "stop"),
+            "/masjid-central" + StaffOperationRoute(eventId, "restore"),
+            "/masjid-central" + StaffOperationRoute(eventId, "reconcile")
         ];
 
         foreach (string route in routes)
@@ -170,7 +170,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
             await Assert.That(BearerMatches(observed.Authorization, secrets.ServerAccessToken)).IsTrue();
             await Assert.That(string.IsNullOrEmpty(observed.ScannerCapability)).IsTrue();
             await Assert.That(observed.PathAndQuery)
-                .IsEqualTo(route.Replace("/t/masjid-central", string.Empty, StringComparison.Ordinal));
+                .IsEqualTo(route.Replace("/masjid-central", string.Empty, StringComparison.Ordinal));
             await AssertPrivateAdmissionResponseAsync(response);
         }
     }
@@ -290,7 +290,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
         string apiRoute = StaffCheckInRoute(eventId) + "?mode=hid&sequence=17";
         using HttpRequestMessage request = CreateStaffMutation(
             session,
-            "/t/masjid-central" + apiRoute,
+            "/masjid-central" + apiRoute,
             targetId,
             secrets.ScannedCredential);
         request.Headers.Authorization = new AuthenticationHeaderValue(
@@ -365,7 +365,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
         string[] staffOutageRoutes =
         [
             StaffBatchRoute(Guid.CreateVersion7()),
-            "/t/masjid-central" + StaffUndoRoute(Guid.CreateVersion7(), Guid.CreateVersion7())
+            "/masjid-central" + StaffUndoRoute(Guid.CreateVersion7(), Guid.CreateVersion7())
         ];
         foreach (string route in staffOutageRoutes)
         {
@@ -380,7 +380,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
 
         using (var readOutageRequest = new HttpRequestMessage(
                    HttpMethod.Get,
-                   "/t/masjid-central" + StaffSummaryRoute(Guid.CreateVersion7())))
+                   "/masjid-central" + StaffSummaryRoute(Guid.CreateVersion7())))
         {
             readOutageRequest.Headers.Add(TestAuthHandler.AuthHeaderName, session.Authentication);
             readOutageRequest.Headers.Add(ScannerCapabilityHeader, secrets.ScannerCapability);
@@ -391,7 +391,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
         string[] scannerOutageRoutes =
         [
             ScannerBatchRoute,
-            "/t/masjid-central" + ScannerUndoRoute(Guid.CreateVersion7())
+            "/masjid-central" + ScannerUndoRoute(Guid.CreateVersion7())
         ];
         foreach (string route in scannerOutageRoutes)
         {
@@ -484,7 +484,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
         await Assert.That(BearerMatches(observed.Authorization, secrets.ServerAccessToken)).IsTrue();
         await Assert.That(string.IsNullOrEmpty(observed.ScannerCapability)).IsTrue();
         await Assert.That(observed.PathAndQuery)
-            .IsEqualTo(route.Replace("/t/masjid-central", string.Empty, StringComparison.Ordinal));
+            .IsEqualTo(route.Replace("/masjid-central", string.Empty, StringComparison.Ordinal));
         await AssertPrivateAdmissionResponseAsync(response);
     }
 
@@ -514,7 +514,7 @@ public sealed class BffAdmissionCheckInEndpointRedTests
             observed.ScannerCapability,
             secrets.ScannerCapability)).IsTrue();
         await Assert.That(observed.PathAndQuery)
-            .IsEqualTo(route.Replace("/t/masjid-central", string.Empty, StringComparison.Ordinal));
+            .IsEqualTo(route.Replace("/masjid-central", string.Empty, StringComparison.Ordinal));
         await AssertPrivateAdmissionResponseAsync(response);
     }
 

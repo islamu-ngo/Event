@@ -32,16 +32,16 @@ function browser({ fragment = '', query = '', prefix = '', script = shipped } = 
 
 test('initial execution scrubs before any consumer and restores only the exact route once', () => {
     const token = secret();
-    const b = browser({ fragment: '#capability=' + token, prefix: '/t/community' });
+    const b = browser({ fragment: '#capability=' + token, prefix: '/community' });
     expect(b.window.location.hash).toBe('');
-    expect(b.calls).toEqual([{ type: 'scrub', url: route('/t/community') }]);
+    expect(b.calls).toEqual([{ type: 'scrub', url: route('/community') }]);
     expect(b.api.take(eventId, orderId)).toBe(token);
     expect(b.api.take(eventId, orderId)).toBeNull();
     const foreign = browser({ fragment: '#capability=' + token });
     expect(foreign.api.take(eventId, crypto.randomUUID())).toBe('');
     expect(foreign.api.take(eventId, orderId)).toBeNull();
     const changedTenant = browser({ fragment: '#capability=' + token });
-    changedTenant.window.location.pathname = route('/t/other');
+    changedTenant.window.location.pathname = route('/other');
     expect(changedTenant.api.take(eventId, orderId)).toBe('');
 });
 
@@ -87,9 +87,9 @@ test('ordinary clean navigation has no fragment authority', () => {
 
 test('explicit copy builds PathBase-aware URL transiently without changing location or DOM attributes', async () => {
     const token = secret();
-    const b = browser({ prefix: '/t/community' });
+    const b = browser({ prefix: '/community' });
     expect(await b.api.save('copy', eventId, orderId, token)).toBe(true);
-    expect(b.calls).toEqual([{ type: 'copy', value: `https://event.test${route('/t/community')}#capability=${token}` }]);
+    expect(b.calls).toEqual([{ type: 'copy', value: `https://event.test${route('/community')}#capability=${token}` }]);
     expect(b.window.location.href).not.toContain(token);
     expect(JSON.stringify(b.anchor)).not.toContain(token);
 });

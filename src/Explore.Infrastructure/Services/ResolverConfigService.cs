@@ -38,7 +38,8 @@ public class ResolverConfigService : IResolverConfigService
             SubdomainEnabled = DeserializeBoolean((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Routing.ResolverSubdomainEnabled, cancellationToken))?.Value, false),
             CustomDomainEnabled = DeserializeBoolean((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Routing.ResolverCustomDomainEnabled, cancellationToken))?.Value, false),
             PathEnabled = DeserializeBoolean((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Routing.ResolverPathEnabled, cancellationToken))?.Value, true),
-            PathPrefix = NormalizePathPrefix(DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Routing.PathPrefix, cancellationToken))?.Value, "/t")),
+            PathPrefix = NormalizePathPrefix(DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Routing.PathPrefix, cancellationToken))?.Value, string.Empty)),
+            ReservedSlugs = ReservedTenantSlugs.All.OrderBy(slug => slug, StringComparer.OrdinalIgnoreCase).ToArray(),
             InstanceBaseDomain = NormalizeHost(DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Domains.InstanceBaseDomain, cancellationToken))?.Value, string.Empty)),
             AllowTenantCustomDomains = DeserializeBoolean((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Domains.AllowTenantCustomDomain, cancellationToken))?.Value, true)
         };
@@ -167,6 +168,7 @@ public class ResolverConfigService : IResolverConfigService
             CustomDomainEnabled = source.CustomDomainEnabled,
             PathEnabled = source.PathEnabled,
             PathPrefix = source.PathPrefix,
+            ReservedSlugs = source.ReservedSlugs.ToArray(),
             InstanceBaseDomain = source.InstanceBaseDomain,
             AllowTenantCustomDomains = source.AllowTenantCustomDomains
         };
@@ -216,7 +218,7 @@ public class ResolverConfigService : IResolverConfigService
     {
         if (string.IsNullOrWhiteSpace(pathPrefix))
         {
-            return "/t";
+            return string.Empty;
         }
 
         var normalized = pathPrefix.Trim();

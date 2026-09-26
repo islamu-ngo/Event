@@ -9,14 +9,17 @@ internal static class TenantRoutePathMatcher
         string? configuredPathPrefix,
         out string tenantSlug,
         out PathString matchedPathBase,
-        out PathString remainingPath)
+        out PathString remainingPath,
+        IReadOnlyCollection<string>? reservedSlugs = null)
     {
         tenantSlug = string.Empty;
         matchedPathBase = PathString.Empty;
         remainingPath = requestPath;
 
         var pathPrefix = NormalizePathPrefix(configuredPathPrefix);
-        if (!requestPath.StartsWithSegments(pathPrefix, out var remainingAfterPrefix))
+        var remainingAfterPrefix = requestPath;
+        if (pathPrefix is not null &&
+            !requestPath.StartsWithSegments(pathPrefix, out remainingAfterPrefix))
         {
             return false;
         }
@@ -24,6 +27,14 @@ internal static class TenantRoutePathMatcher
         var pathSegments = (remainingAfterPrefix.Value ?? string.Empty)
             .Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (pathSegments.Length == 0)
+        {
+            return false;
+        }
+
+        if (pathPrefix is null &&
+            (reservedSlugs is null ||
+             reservedSlugs.Count == 0 ||
+             reservedSlugs.Contains(pathSegments[0], StringComparer.OrdinalIgnoreCase)))
         {
             return false;
         }
@@ -39,11 +50,11 @@ internal static class TenantRoutePathMatcher
         return true;
     }
 
-    private static string NormalizePathPrefix(string? pathPrefix)
+    private static string? NormalizePathPrefix(string? pathPrefix)
     {
         if (string.IsNullOrWhiteSpace(pathPrefix))
         {
-            return "/t";
+            return null;
         }
 
         var normalized = pathPrefix.Trim();
@@ -52,6 +63,7 @@ internal static class TenantRoutePathMatcher
             normalized = "/" + normalized;
         }
 
-        return normalized.TrimEnd('/');
+        var prefix = normalized.TrimEnd('/');
+        return prefix.Length == 0 ? null : prefix;
     }
 }

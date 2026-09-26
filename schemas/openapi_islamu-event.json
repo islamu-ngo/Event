@@ -174195,6 +174195,12 @@
           "pathPrefix": {
             "type": "string"
           },
+          "reservedSlugs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "instanceBaseDomain": {
             "type": "string"
           },

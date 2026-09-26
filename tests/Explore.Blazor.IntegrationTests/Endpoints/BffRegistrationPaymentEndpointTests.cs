@@ -344,9 +344,9 @@ public sealed class BffRegistrationPaymentEndpointTests
             AllowAutoRedirect = false,
             HandleCookies = false
         });
-        BrowserSession firstSession = await IssueBrowserSessionAsync(firstClient, "/t/acme/auth/status");
-        BrowserSession secondSession = await IssueBrowserSessionAsync(secondClient, "/t/acme/auth/status");
-        const string issuePath = "/t/acme/bff/registration-payments/events/018e4e5c-7f00-7000-8000-000000000101/orders/018e4e5c-7f00-7000-8000-000000000201/checkout-ticket";
+        BrowserSession firstSession = await IssueBrowserSessionAsync(firstClient, "/acme/auth/status");
+        BrowserSession secondSession = await IssueBrowserSessionAsync(secondClient, "/acme/auth/status");
+        const string issuePath = "/acme/bff/registration-payments/events/018e4e5c-7f00-7000-8000-000000000101/orders/018e4e5c-7f00-7000-8000-000000000201/checkout-ticket";
         using HttpResponseMessage issued = await IssueCheckoutAsync(firstClient, issuePath, firstSession);
         BffRegistrationPaymentCheckoutTicketResponseDto? response = await issued.Content.ReadFromJsonAsync<BffRegistrationPaymentCheckoutTicketResponseDto>();
         string checkoutCookie = GetCheckoutCookie(issued);
@@ -354,7 +354,7 @@ public sealed class BffRegistrationPaymentEndpointTests
         using var wrongSessionRequest = new HttpRequestMessage(HttpMethod.Get, response!.CheckoutPath);
         AddBrowserSession(wrongSessionRequest, secondSession, ReplaceCheckoutSession(checkoutCookie));
         using HttpResponseMessage wrongSession = await secondClient.SendAsync(wrongSessionRequest);
-        using var wrongTenantRequest = new HttpRequestMessage(HttpMethod.Get, "/t/other/bff/registration-payments/checkout");
+        using var wrongTenantRequest = new HttpRequestMessage(HttpMethod.Get, "/other/bff/registration-payments/checkout");
         AddBrowserSession(wrongTenantRequest, firstSession, checkoutCookie);
         using HttpResponseMessage wrongTenant = await firstClient.SendAsync(wrongTenantRequest);
         using var wrongHostRequest = new HttpRequestMessage(HttpMethod.Get, "https://other.example" + response.CheckoutPath);
@@ -367,9 +367,9 @@ public sealed class BffRegistrationPaymentEndpointTests
         AddBrowserSession(correctRequest, firstSession, checkoutCookie);
         using HttpResponseMessage correct = await firstClient.SendAsync(correctRequest);
 
-        await Assert.That(response.CheckoutPath).IsEqualTo("/t/acme/bff/registration-payments/checkout");
+        await Assert.That(response.CheckoutPath).IsEqualTo("/acme/bff/registration-payments/checkout");
         await Assert.That(issued.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Secure-islamu-registration-payment-checkout=", StringComparison.Ordinal)))
-            .Contains("path=/t/acme/bff/registration-payments/checkout").IgnoringCase();
+            .Contains("path=/acme/bff/registration-payments/checkout").IgnoringCase();
         await Assert.That(wrongSession.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await Assert.That(wrongTenant.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await Assert.That(wrongHost.StatusCode).IsEqualTo(HttpStatusCode.NotFound);

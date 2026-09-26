@@ -14,10 +14,10 @@ public class RouteConfigurationPathBaseTests
             new() { Path = "/settings/admin", Component = typeof(Routes) },
         };
 
-        RouteConfigurationPathBase.Apply(routes, "https://event.test/t/acme/");
+        RouteConfigurationPathBase.Apply(routes, "https://event.test/acme/");
 
-        await Assert.That(routes[0].Path).IsEqualTo("/t/acme");
-        await Assert.That(routes[1].Path).IsEqualTo("/t/acme/settings/admin");
+        await Assert.That(routes[0].Path).IsEqualTo("/acme");
+        await Assert.That(routes[1].Path).IsEqualTo("/acme/settings/admin");
     }
 
     [Test]
@@ -41,9 +41,9 @@ public class RouteConfigurationPathBaseTests
             new() { Path = "/settings", Component = typeof(Routes) },
         };
 
-        RouteConfigurationPathBase.Apply(routes, "https://event.test/t/acme/");
-        RouteConfigurationPathBase.Apply(routes, "https://event.test/t/acme/");
+        RouteConfigurationPathBase.Apply(routes, "https://event.test/acme/");
+        RouteConfigurationPathBase.Apply(routes, "https://event.test/acme/");
 
-        await Assert.That(routes[0].Path).IsEqualTo("/t/acme/settings");
+        await Assert.That(routes[0].Path).IsEqualTo("/acme/settings");
     }
 }

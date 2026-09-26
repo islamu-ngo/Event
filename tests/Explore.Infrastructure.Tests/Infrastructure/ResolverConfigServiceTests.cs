@@ -63,11 +63,15 @@ public sealed class ResolverConfigServiceTests
         var first = await service.GetConfigurationAsync();
         first.PathPrefix = "/mutated";
         first.AllowTenantCustomDomains = false;
+        first.ReservedSlugs = ["mutated"];
 
         var second = await service.GetConfigurationAsync();
 
         await Assert.That(ReferenceEquals(first, second)).IsFalse();
-        await Assert.That(second.PathPrefix).IsEqualTo("/t");
+        await Assert.That(second.PathEnabled).IsTrue();
+        await Assert.That(second.PathPrefix).IsEqualTo(string.Empty);
+        await Assert.That(second.ReservedSlugs).Contains("admin");
+        await Assert.That(second.ReservedSlugs).DoesNotContain("mutated");
         await Assert.That(second.AllowTenantCustomDomains).IsTrue();
     }
 }

@@ -182,7 +182,7 @@
                     var redirection = await UserService.ResolveUserTenantRedirectionAsync();
                     if (redirection != null && !string.IsNullOrWhiteSpace(redirection.TenantSlug))
                     {
-                        var tenantUrl = $"/t/{redirection.TenantSlug}/";
+                        var tenantUrl = $"/{redirection.TenantSlug}/";
                         Navigation.NavigateTo(tenantUrl, forceLoad: true);
                         return;
                     }

@@ -33,8 +33,8 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var firstHasLock = NewSignal();
         var releaseFirst = NewSignal();
-        var secondAttemptedLock = NewSignal();
-        var secondInterceptor = new BootstrapLockAttemptInterceptor(secondAttemptedLock);
+        var secondStartedTransaction = NewSignal();
+        var secondInterceptor = new BootstrapTransactionStartedInterceptor(secondStartedTransaction);
 
         Task first = RunClaimAsync(
             userId,
@@ -53,7 +53,7 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
             release: null,
             timeout.Token,
             secondInterceptor);
-        await secondAttemptedLock.Task.WaitAsync(timeout.Token);
+        await secondStartedTransaction.Task.WaitAsync(timeout.Token);
         await Assert.That(second.IsCompleted).IsFalse();
 
         releaseFirst.TrySetResult();
@@ -71,7 +71,7 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var firstHasLock = NewSignal();
         var releaseFirst = NewSignal();
-        var secondAttemptedLock = NewSignal();
+        var secondStartedTransaction = NewSignal();
 
         Task<ClaimDisposition> first = RunClaimAsync(
             userId, ExactIdentityFingerprint, 7,
@@ -80,8 +80,8 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         Task<ClaimDisposition> second = RunClaimAsync(
             userId, ExactIdentityFingerprint, 7,
             null, null, timeout.Token,
-            new BootstrapLockAttemptInterceptor(secondAttemptedLock));
-        await secondAttemptedLock.Task.WaitAsync(timeout.Token);
+            new BootstrapTransactionStartedInterceptor(secondStartedTransaction));
+        await secondStartedTransaction.Task.WaitAsync(timeout.Token);
         releaseFirst.TrySetResult();
 
         ClaimDisposition[] outcomes = await Task.WhenAll(first, second)
@@ -112,7 +112,7 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var exactHasLock = NewSignal();
         var releaseExact = NewSignal();
-        var attackerAttemptedLock = NewSignal();
+        var attackerStartedTransaction = NewSignal();
 
         Task<ClaimDisposition> exact = RunClaimAsync(
             exactUserId, ExactIdentityFingerprint, 7,
@@ -121,8 +121,8 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         Task<ClaimDisposition> attacker = RunClaimAsync(
             attackerUserId, AttackerIdentityFingerprint, 7,
             null, null, timeout.Token,
-            new BootstrapLockAttemptInterceptor(attackerAttemptedLock));
-        await attackerAttemptedLock.Task.WaitAsync(timeout.Token);
+            new BootstrapTransactionStartedInterceptor(attackerStartedTransaction));
+        await attackerStartedTransaction.Task.WaitAsync(timeout.Token);
         releaseExact.TrySetResult();
 
         await Assert.That(await exact.WaitAsync(timeout.Token))
@@ -393,19 +393,17 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         GenerationMismatch
     }
 
-    private sealed class BootstrapLockAttemptInterceptor(TaskCompletionSource attempted)
-        : DbCommandInterceptor
+    // The advisory lock uses raw ADO commands, so EF command interceptors cannot observe it.
+    private sealed class BootstrapTransactionStartedInterceptor(TaskCompletionSource started)
+        : DbTransactionInterceptor
     {
-        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<DbDataReader> result,
+        public override ValueTask<DbTransaction> TransactionStartedAsync(
+            DbConnection connection,
+            TransactionEndEventData eventData,
+            DbTransaction result,
             CancellationToken cancellationToken = default)
         {
-            if (command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase))
-            {
-                attempted.TrySetResult();
-            }
+            started.TrySetResult();
             return ValueTask.FromResult(result);
         }
     }

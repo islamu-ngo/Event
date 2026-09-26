@@ -436,7 +436,8 @@ public sealed class ConfigurationImportSessionControllerTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = provider
+            AuthorizationProviderOverride = provider,
+            SeedActiveDefaultTenant = true
         };
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(

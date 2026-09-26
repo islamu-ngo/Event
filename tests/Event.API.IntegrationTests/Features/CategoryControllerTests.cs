@@ -135,7 +135,7 @@ public class CategoryControllerTests
     [Test]
     public async Task UpdatePatch_WhenAuthenticatedWithoutIfMatch_ShouldReturnBadRequest()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var categoryId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -154,7 +154,9 @@ public class CategoryControllerTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        Console.WriteLine($"Category PATCH without If-Match returned HTTP {(int)response.StatusCode}.");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest)
+            .Because($"Actual status: {(int)response.StatusCode} {response.StatusCode}");
     }
 
     #endregion

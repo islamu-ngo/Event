@@ -17,7 +17,8 @@ public class ContractApiFixture : IAsyncInitializer, IAsyncDisposable
     {
         Factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider()
+            AuthorizationProviderOverride = new StubAuthorizationProvider(),
+            SeedActiveDefaultTenant = true
         };
         Client = Factory.CreateClient();
         return Task.CompletedTask;

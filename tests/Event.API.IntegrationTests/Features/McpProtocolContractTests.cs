@@ -450,7 +450,10 @@ public sealed class McpProtocolContractTests
     private static McpProtocolContractFactory CreateFactory(
         bool mcpEnabled,
         StubAuthorizationProvider? authorizationProvider = null)
-        => new(mcpEnabled, authorizationProvider);
+        => new(mcpEnabled, authorizationProvider)
+        {
+            SeedActiveDefaultTenant = true
+        };
 
     private static async Task<Guid> CreateConversationAsync(
         HttpClient client,

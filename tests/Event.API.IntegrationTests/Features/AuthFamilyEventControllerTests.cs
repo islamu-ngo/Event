@@ -24,6 +24,11 @@ public class AuthFamilyEventControllerTests(RealRuntimeApiFixture fixture)
     public async Task Anonymous_GetAll_ReturnsOk()
     {
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var response = await _fixture.Client.GetAsync("/api/event");
 
@@ -34,6 +39,11 @@ public class AuthFamilyEventControllerTests(RealRuntimeApiFixture fixture)
     public async Task Anonymous_GetById_NonExistent_ReturnsNotFound()
     {
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var response = await _fixture.Client.GetAsync($"/api/event/{Guid.NewGuid()}");
 
@@ -142,6 +152,11 @@ public class AuthFamilyEventControllerTests(RealRuntimeApiFixture fixture)
     public async Task InstanceAdmin_GetAll_ReturnsOk()
     {
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var request = _fixture.CreateInstanceAdminRequest(HttpMethod.Get, "/api/event");
         var response = await _fixture.Client.SendAsync(request);

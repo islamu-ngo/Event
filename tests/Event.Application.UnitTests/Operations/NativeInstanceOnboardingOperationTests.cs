@@ -6,6 +6,7 @@ using Explore.Application.DTOs.Analytics;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Commands;
+using Explore.Application.Features.InstanceOnboarding.Requests;
 using Explore.Application.Features.InstanceOnboarding.Queries;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
@@ -78,7 +79,7 @@ public sealed class NativeInstanceOnboardingOperationTests
 
     private static readonly Type[] Requests =
     [
-        // Commands (29)
+        // Commands (30)
         typeof(SaveInstanceOperatorIdentityCommand),
         typeof(ClaimConfiguredInstanceAdministratorCommand),
         typeof(CompleteInstanceOnboardingCommand),
@@ -105,8 +106,12 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(UpdateMcpGovernanceSettingsCommand),
         typeof(UpdateAiAssistantGovernanceSettingsCommand),
         typeof(UpdateRenderPolicySettingsCommand),
+        typeof(PlanKeycloakOperationCommand),
+        typeof(ApplyKeycloakOperationCommand),
+        typeof(ReconcileKeycloakOperationCommand),
+        typeof(CancelKeycloakOperationCommand),
 
-        // Queries (19)
+        // Queries (21)
         typeof(GetInstanceOnboardingJourneyQuery),
         typeof(GetInstanceOperatorIdentityQuery),
         typeof(DownloadAuthorizationPolicyPackageQuery),
@@ -123,7 +128,11 @@ public sealed class NativeInstanceOnboardingOperationTests
         typeof(GetResolverConfigurationQuery),
         typeof(GetSystemOnboardingStatusQuery),
         typeof(TestInstanceSmtpConnectionQuery),
-        typeof(TestInstanceStorageProviderQuery)
+        typeof(TestInstanceStorageProviderQuery),
+        typeof(GetOperatorIdentityFormOptionsQuery),
+        typeof(GetKeycloakConnectionQuery),
+        typeof(InspectKeycloakOperationQuery),
+        typeof(GetKeycloakOperationQuery)
     ];
 
     [Test]
@@ -154,6 +163,10 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Arguments(typeof(UpdateMcpGovernanceSettingsCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UpdateAiAssistantGovernanceSettingsCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UpdateRenderPolicySettingsCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
+    [Arguments(typeof(PlanKeycloakOperationCommand), typeof(ICommand<KeycloakOperationDto>))]
+    [Arguments(typeof(ApplyKeycloakOperationCommand), typeof(ICommand<KeycloakOperationDto>))]
+    [Arguments(typeof(ReconcileKeycloakOperationCommand), typeof(ICommand<KeycloakOperationDto>))]
+    [Arguments(typeof(CancelKeycloakOperationCommand), typeof(ICommand<KeycloakOperationDto>))]
     [Arguments(typeof(DownloadAuthorizationPolicyPackageQuery), typeof(IQuery<PolicyPackageArchive>))]
     [Arguments(typeof(GetActiveTenantCountQuery), typeof(IQuery<int>))]
     [Arguments(typeof(GetAnalyticsGovernanceSettingsQuery), typeof(IQuery<AnalyticsGovernanceSettingsDto>))]
@@ -170,6 +183,10 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Arguments(typeof(GetSystemOnboardingStatusQuery), typeof(IQuery<SystemOnboardingStatusDto>))]
     [Arguments(typeof(TestInstanceSmtpConnectionQuery), typeof(IQuery<EmailResult>))]
     [Arguments(typeof(TestInstanceStorageProviderQuery), typeof(IQuery<InstanceStorageProviderStatusDto>))]
+    [Arguments(typeof(GetOperatorIdentityFormOptionsQuery), typeof(IQuery<OperatorIdentityFormOptionsDto>))]
+    [Arguments(typeof(GetKeycloakConnectionQuery), typeof(IQuery<KeycloakConnectionDto>))]
+    [Arguments(typeof(InspectKeycloakOperationQuery), typeof(IQuery<KeycloakInspectionDto>))]
+    [Arguments(typeof(GetKeycloakOperationQuery), typeof(IQuery<KeycloakOperationDto>))]
     public async Task Requests_ExposeOnlyTheirExactNativeOperation(Type request, Type port)
     {
         await Assert.That(request.GetInterfaces()).Contains(port);
@@ -182,7 +199,15 @@ public sealed class NativeInstanceOnboardingOperationTests
     [Test]
     public async Task Requests_HaveOneNativeShapeAndNoLegacyDispatchEscapeHatch()
     {
-        await Assert.That(Requests.Length).IsEqualTo(48);
+        var discovered = typeof(CompleteInstanceOnboardingCommand).Assembly.GetTypes()
+            .Where(type => type.IsClass && !type.IsAbstract &&
+                type.Namespace?.StartsWith("Explore.Application.Features.InstanceOnboarding.", StringComparison.Ordinal) == true &&
+                type.GetInterfaces().Any(contract => contract.IsGenericType &&
+                    (contract.GetGenericTypeDefinition() == typeof(ICommand<>) ||
+                     contract.GetGenericTypeDefinition() == typeof(IQuery<>))))
+            .ToArray();
+        await Assert.That(Requests).IsEquivalentTo(discovered);
+        await Assert.That(Requests.Length).IsEqualTo(51);
 
         foreach (var request in Requests)
         {
@@ -202,7 +227,9 @@ public sealed class NativeInstanceOnboardingOperationTests
         var ports = services.Where(descriptor => !descriptor.IsKeyedService &&
             OperationServicesRegistration.IsHandlerContract(descriptor.ServiceType) &&
             Requests.Contains(descriptor.ServiceType.GenericTypeArguments[0])).ToArray();
-        await Assert.That(ports.Length).IsEqualTo(48);
+        await Assert.That(ports.Length).IsEqualTo(Requests.Length);
+        await Assert.That(ports.Select(port => port.ServiceType.GenericTypeArguments[0]))
+            .IsEquivalentTo(Requests);
         services.ValidateNativeOperationRegistrations();
         await Assert.That(ports.All(port => port.Lifetime == ServiceLifetime.Scoped)).IsTrue();
         await Assert.That(ports.All(port => port.ImplementationFactory is not null)).IsTrue();

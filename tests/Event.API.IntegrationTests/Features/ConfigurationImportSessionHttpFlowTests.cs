@@ -68,12 +68,10 @@ public sealed class ConfigurationImportSessionHttpFlowTests
     private static AuthenticatedWebApplicationFactory CreateFactory(
         IAuthorizationProvider? authorizationProvider = null)
     {
-        Environment.SetEnvironmentVariable(
-            "SETUP_SECRET",
-            "integration-setup-secret");
         return new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = authorizationProvider
+            AuthorizationProviderOverride = authorizationProvider,
+            SeedActiveDefaultTenant = true
         };
     }
 

@@ -14,7 +14,8 @@ public class SingleTenantAuthenticatedApiTestFixture : IAsyncInitializer, IAsync
     {
         Factory = new SingleTenantAuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = AuthorizationProvider
+            AuthorizationProviderOverride = AuthorizationProvider,
+            SeedActiveDefaultTenant = true
         };
         Client = Factory.CreateClient();
 

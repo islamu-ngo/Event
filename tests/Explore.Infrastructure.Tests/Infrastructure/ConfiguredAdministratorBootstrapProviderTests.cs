@@ -12,7 +12,9 @@ using Explore.Domain.ValueObjects;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Services;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
+using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -386,7 +388,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         var runner = new ConfiguredAdministratorBootstrapStartupRunner(
             provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
         await runner.PrepareAsync();
-        InstanceBootstrapState current = (await database.Repository.GetCurrentForUpdate())!;
+        InstanceBootstrapState current = (await database.Repository.GetCurrent())!;
         _ = current.CompleteConfiguredAdministrator(
             AuthenticationProviderKind.Keycloak,
             1,
@@ -434,7 +436,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
             var runner = new ConfiguredAdministratorBootstrapStartupRunner(
                 provider, database.Repository, database.UnitOfWork, new FixedTimeProvider(PreparedAt));
             await runner.PrepareAsync();
-            InstanceBootstrapState current = (await database.Repository.GetCurrentForUpdate())!;
+            InstanceBootstrapState current = (await database.Repository.GetCurrent())!;
             _ = current.CompleteConfiguredAdministrator(
                 AuthenticationProviderKind.Keycloak,
                 1,
@@ -721,10 +723,14 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         {
             var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
-            var options = new DbContextOptionsBuilder<ExploreDbContext>()
-                .UseSqlite(connection)
-                .UseSnakeCaseNamingConvention()
-                .Options;
+            var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(builder, new PrimaryDatabaseConnectionOptions
+            {
+                Role = PrimaryDatabaseRole.Runtime,
+                Provider = PrimaryDatabaseProvider.Sqlite,
+                Database = Path.Combine(Path.GetTempPath(), $"bootstrap-fixture-{Guid.NewGuid():N}.db")
+            });
+            var options = builder.UseSqlite(connection).UseSnakeCaseNamingConvention().Options;
             var context = new ExploreDbContext(options);
             await context.Database.EnsureCreatedAsync();
             return new BootstrapDatabase(

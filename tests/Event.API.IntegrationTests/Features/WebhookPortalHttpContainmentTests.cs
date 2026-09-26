@@ -173,7 +173,8 @@ public sealed class WebhookPortalHttpContainmentTests
 
         var factory = new PortalFactory(svixClient, auditWriter)
         {
-            AuthorizationProviderOverride = authorizationProvider
+            AuthorizationProviderOverride = authorizationProvider,
+            SeedActiveDefaultTenant = true
         };
         factory.AdditionalConfiguration["Webhooks:Provider"] = WebhookOptions.ProviderSvix;
         factory.AdditionalConfiguration["Webhooks:Svix:BaseUrl"] = "http://svix.test";

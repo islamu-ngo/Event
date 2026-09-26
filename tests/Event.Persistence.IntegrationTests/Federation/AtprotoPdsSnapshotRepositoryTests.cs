@@ -103,7 +103,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         const string did = "did:plc:snapshot-owner";
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(Tenant(tenantId));
-        AtprotoRecord canonical = Record(did, "3mcanonical222", 200, now);
+        AtprotoRecord canonical = Record(did, "3mcanonical22", 200, now);
         context.AtprotoRecords.Add(canonical);
         context.AtprotoEventProjections.Add(Projection(canonical, 200, now));
         context.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, canonical, 200, now));
@@ -155,8 +155,8 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         const string did = "did:plc:snapshot-owner";
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(Tenant(tenantId));
-        AtprotoRecord present = Record(did, "3mpresent222", 100, now);
-        AtprotoRecord missing = Record(did, "3mmissing222", 100, now);
+        AtprotoRecord present = Record(did, "3mpresent2222", 100, now);
+        AtprotoRecord missing = Record(did, "3mmissing2222", 100, now);
         context.AtprotoRecords.AddRange(present, missing);
         context.AtprotoEventProjections.AddRange(
             Projection(present, 100, now),
@@ -213,10 +213,12 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         const string did = "did:plc:snapshot-owner";
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(Tenant(tenantId));
-        AtprotoRecord tombstoned = Record(did, "3mtombstoned222", 300, now);
+        AtprotoRecord tombstoned = Record(did, "3mtombstone22", 300, now);
         tombstoned.TombstonedAt = now;
         context.AtprotoRecords.Add(tombstoned);
-        context.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, tombstoned, 300, now));
+        AtprotoRecordTenantPresentation hidden = Presentation(tenantId, tombstoned, 300, now);
+        hidden.IsVisible = false;
+        context.AtprotoRecordTenantPresentations.Add(hidden);
         await context.SaveChangesAsync();
         AtprotoRecord older = Record(did, tombstoned.RecordKey, 0, now);
         older.Cid = "bafy-revived";
@@ -379,7 +381,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         Guid leaseToken = Guid.CreateVersion7();
         const string service = "https://jetstream.example/cancelled-reconcile";
         const string did = "did:plc:snapshot-cancel";
-        AtprotoRecord canonical = Record(did, "3mcancelrec222", 100, now);
+        AtprotoRecord canonical = Record(did, "3mcancelrec22", 100, now);
 
         await using (ExploreDbContext seedContext = fixture.CreateDbContext())
         {

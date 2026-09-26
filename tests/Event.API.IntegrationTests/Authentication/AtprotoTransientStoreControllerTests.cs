@@ -132,7 +132,9 @@ public sealed class AtprotoTransientStoreControllerTests(AtprotoTransientApiFixt
     [Test]
     public async Task PublishedHalLinks_DoNotAdvertisePrivateTransientOperations()
     {
+        Guid tenantId = await fixture.SeedTenantAsync();
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/event?pageSize=1");
+        request.Headers.Add("X-Tenant-Slug", "transient-" + tenantId.ToString("N"));
         request.Headers.Accept.ParseAdd("application/hal+json");
         using var response = await fixture.Client.SendAsync(request);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);

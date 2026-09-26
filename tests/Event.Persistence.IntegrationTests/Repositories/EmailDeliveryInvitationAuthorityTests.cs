@@ -13,6 +13,7 @@ using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -171,6 +172,9 @@ public sealed class EmailDeliveryInvitationAuthorityTests
             services.AddSingleton<BusinessMetrics>();
             services.AddScoped(_ => CreateContext(databasePath));
             services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+            services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+            services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
+            services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
             services.AddScoped<IEmailDispatchEligibilityEvaluator>(provider => CreateEvaluator(provider.GetRequiredService<ExploreDbContext>()));
             services.AddScoped<ITenantContextAccessor, TenantContextAccessor>();
             services.AddSingleton<IEmailService>(transport);

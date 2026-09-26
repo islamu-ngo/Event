@@ -336,6 +336,7 @@ public sealed class AiAssistantApiFlowTests
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            SeedActiveDefaultTenant = true;
             AuthorizationProviderOverride = new StubAuthorizationProvider();
             base.ConfigureWebHost(builder);
 

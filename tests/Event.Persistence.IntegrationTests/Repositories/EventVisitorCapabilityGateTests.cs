@@ -7,6 +7,7 @@ using Explore.Application.Features.EventParticipation.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Responses;
+using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,23 @@ public sealed class EventVisitorCapabilityGateTests
     public async Task AccountRequiredCommands_RequireAllowedPublicOnboardingEvenWithLocalLogin(string command, bool onboardingAllowed)
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        if (command == "approve-publish")
+        {
+            var membership = await fixture.Context.TenantUsers.SingleAsync(value => value.UserId == fixture.UserId);
+            fixture.Context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant
+            });
+            await fixture.Context.SaveChangesAsync();
+            fixture.Context.ChangeTracker.Clear();
+        }
         if (onboardingAllowed)
         {
             var changed = await fixture.Services.GetRequiredService<IVisitorAccessSettingsWriter>().ApplyAsync(

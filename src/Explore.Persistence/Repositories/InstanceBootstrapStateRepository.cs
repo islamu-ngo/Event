@@ -28,10 +28,10 @@ public class InstanceBootstrapStateRepository : GenericRepository<InstanceBootst
     public async Task<InstanceBootstrapState?> GetCurrentForUpdate(
         CancellationToken cancellationToken = default)
     {
-        var current = await RelationalInstanceBootstrapStateLock.LoadCurrentAsync(_dbContext, cancellationToken);
-        // Preserve the row-lock ordering and additionally fence the empty first-setup state.
+        // Fence empty-state reads before acquiring provider row and gap locks.
         await using var lease = await RelationalNamedLock.AcquireTransactionAsync(
             _dbContext, "explore:instance-onboarding", cancellationToken);
-        return current;
+        return await RelationalInstanceBootstrapStateLock.LoadCurrentAsync(
+            _dbContext, cancellationToken);
     }
 }

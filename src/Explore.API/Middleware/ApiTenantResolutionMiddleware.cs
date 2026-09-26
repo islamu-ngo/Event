@@ -31,7 +31,8 @@ public sealed class ApiTenantResolutionMiddleware
         ITenantContextAccessor tenantContextAccessor,
         IProblemDetailsService problemDetailsService,
         IDeploymentModeProvider deploymentModeProvider,
-        IOptions<McpAdapterSettings> mcpAdapterOptions)
+        IOptions<McpAdapterSettings> mcpAdapterOptions,
+        ITenantLifecycleAccessService lifecycle)
     {
         var isMcpPath = IsEnabledMcpPath(context, mcpAdapterOptions.Value);
         if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) && !isMcpPath)
@@ -70,6 +71,16 @@ public sealed class ApiTenantResolutionMiddleware
         resolvedTenantId ??= await ResolveFromHostAsync(context, configuration, tenantSlugCache);
 
         var hasApiKeyHeader = ApiKeyHeaderReader.HasNonEmptyApiKey(context.Request);
+        // The public routing cache intentionally excludes unpublished tenants. Bind only an
+        // explicitly named bootstrap directory for these session endpoints; this grants no authority.
+        string? requestedSlug = context.Request.Headers[TenantHeaderNames.TenantSlug].FirstOrDefault();
+        if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
+            && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
+                || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
+        {
+            resolvedTenantId = await lifecycle.ResolveConfiguredAdministratorTenantAsync(requestedSlug, context.RequestAborted);
+        }
+
         if (hasApiKeyHeader && !isMcpPath)
         {
             if (resolvedTenantId is Guid requestedTenantId && requestedTenantId != Guid.Empty)
@@ -100,6 +111,7 @@ public sealed class ApiTenantResolutionMiddleware
         }
 
         context.Response.StatusCode = StatusCodes.Status404NotFound;
+        context.Response.Headers.CacheControl = "no-store";
 
         await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {

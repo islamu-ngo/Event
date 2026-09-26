@@ -207,7 +207,10 @@ public sealed class ActorDidIngressHttpRedTests
         var tenantContext = Substitute.For<Explore.Application.Contracts.Services.ITenantContextAccessor>();
         var requestLoggingMiddleware = new RequestLoggingMiddleware(_ => Task.CompletedTask, requestLogger);
 
-        await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory()
+        await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory
+        {
+            SeedActiveDefaultTenant = true
+        }
             .WithWebHostBuilder(builder =>
             {
                 builder.ConfigureTestServices(services =>
@@ -329,7 +332,10 @@ public sealed class ActorDidIngressHttpRedTests
                 return Task.FromResult<Actor?>(null);
             });
 
-        await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory()
+        await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory
+        {
+            SeedActiveDefaultTenant = true
+        }
             .WithWebHostBuilder(builder =>
             {
                 builder.ConfigureTestServices(services =>

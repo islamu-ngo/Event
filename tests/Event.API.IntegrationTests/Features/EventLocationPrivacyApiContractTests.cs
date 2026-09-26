@@ -83,7 +83,10 @@ public sealed class EventLocationPrivacyApiMetadataTests
     [Test]
     public async Task PublicEventFilter_RejectsExplicitPhysicalLocationIds()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory
+        {
+            SeedActiveDefaultTenant = true
+        };
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync($"/api/event?locationIds={Guid.CreateVersion7()}");
@@ -126,7 +129,10 @@ public sealed class EventLocationPrivacyApiMetadataTests
     {
         // ELP-430 contraction: these enumerated exact venue addresses, including private homes, for any
         // caller holding tenant-wide location view and with no disclosure evaluation at all.
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory
+        {
+            SeedActiveDefaultTenant = true
+        };
         using var client = factory.CreateClient();
         string[] removedRoutes =
         [
@@ -163,7 +169,8 @@ public sealed class EventLocationPrivacyApiMetadataTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false },
+            SeedActiveDefaultTenant = true
         };
         using var client = factory.CreateClient();
         string[] routes =
@@ -196,7 +203,8 @@ public sealed class EventLocationPrivacyApiMetadataTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true },
+            SeedActiveDefaultTenant = true
         };
         using var client = factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/location");

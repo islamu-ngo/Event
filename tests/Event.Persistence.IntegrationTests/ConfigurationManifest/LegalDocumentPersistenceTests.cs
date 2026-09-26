@@ -214,7 +214,8 @@ public sealed class LegalDocumentPersistenceTests
             new FixedInstanceIdentityEvaluator(identity),
             new Explore.Application.Services.TenantLifecycleAccessService(
                 new TenantRepository(context),
-                NSubstitute.Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>()));
+                NSubstitute.Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
+                new InstanceBootstrapStateRepository(context)));
 
         PublicLegalDocumentQueryResult result = await handler.QueryAsync(
             new GetPublicLegalDocumentQuery("terms-of-service", "en"),

@@ -64,8 +64,10 @@ public class CerbosFailClosedTests : IAsyncDisposable
 
         var response = await _client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("when Cerbos is down and configured as the authz provider, " +
-        "even instance admin must be denied — fail-closed is absolute");
+        Console.WriteLine($"Cerbos outage request returned HTTP {(int)response.StatusCode}.");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because(
+            $"Actual status: {(int)response.StatusCode} {response.StatusCode}; when Cerbos is down and configured as the authz provider, " +
+            "even instance admin must be denied — fail-closed is absolute");
     }
 
     [Test]

@@ -29,7 +29,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
         string databasePath = Path.Combine(
             Path.GetTempPath(),
             $"configured-bootstrap-{Guid.NewGuid():N}.db");
-        var coordination = new EmptyBootstrapRaceCoordination();
+        var openingBarrier = new BootstrapConnectionBarrier();
 
         try
         {
@@ -44,10 +44,10 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
 
             await using ExploreDbContext firstContext = CreateContext(
                 databasePath,
-                new FirstEmptyBootstrapReadBarrier(coordination));
+                openingBarrier);
             await using ExploreDbContext secondContext = CreateContext(
                 databasePath,
-                new SecondConnectionBarrier(coordination));
+                openingBarrier);
             ConfiguredAdministratorBootstrapStartupRunner first = CreateRunner(firstContext, configuration);
             ConfiguredAdministratorBootstrapStartupRunner second = CreateRunner(secondContext, configuration);
 
@@ -135,70 +135,31 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
         var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
+            .AddInterceptors(
+                SqliteNamedLockTransactionInterceptor.Instance,
+                SqliteProjectionLockTransactionInterceptor.Instance)
             .AddInterceptors(interceptors)
             .Options;
         return new ExploreDbContext(options);
     }
 
-    private sealed class EmptyBootstrapRaceCoordination
+    internal sealed class BootstrapConnectionBarrier : DbConnectionInterceptor
     {
-        public TaskCompletionSource FirstRead { get; } =
+        private readonly TaskCompletionSource _bothOpened =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource SecondAttemptCompleted { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-    }
-
-    private sealed class FirstEmptyBootstrapReadBarrier(
-        EmptyBootstrapRaceCoordination coordination) : DbCommandInterceptor
-    {
-        private int _entered;
-
-        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
-            DbCommand command,
-            CommandExecutedEventData eventData,
-            DbDataReader result,
-            CancellationToken cancellationToken = default)
-        {
-            if (Interlocked.Exchange(ref _entered, 1) != 0
-                || !command.CommandText.Contains(
-                    "instance_bootstrap_states",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return result;
-            }
-
-            coordination.FirstRead.TrySetResult();
-            await coordination.SecondAttemptCompleted.Task.WaitAsync(cancellationToken);
-            return result;
-        }
-    }
-
-    private sealed class SecondConnectionBarrier(
-        EmptyBootstrapRaceCoordination coordination) : DbConnectionInterceptor
-    {
-        private int _entered;
+        private int _opened;
 
         public override async Task ConnectionOpenedAsync(
             DbConnection connection,
             ConnectionEndEventData eventData,
             CancellationToken cancellationToken = default)
         {
-            if (Interlocked.Exchange(ref _entered, 1) != 0)
+            if (Interlocked.Increment(ref _opened) == 2)
             {
-                return;
+                _bothOpened.TrySetResult();
             }
 
-            await coordination.FirstRead.Task.WaitAsync(cancellationToken);
-            await using DbCommand command = connection.CreateCommand();
-            command.CommandText = "BEGIN IMMEDIATE;";
-            try
-            {
-                await command.ExecuteNonQueryAsync(cancellationToken);
-            }
-            finally
-            {
-                coordination.SecondAttemptCompleted.TrySetResult();
-            }
+            await _bothOpened.Task.WaitAsync(cancellationToken);
         }
     }
 
@@ -226,7 +187,7 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
 
         // Bound the bootstrap race, not provisioning the full application schema.
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        var barrier = new EmptyReadBarrier(participantCount: 2);
+        var barrier = new ConfiguredAdministratorBootstrapStartupConcurrencyTests.BootstrapConnectionBarrier();
         IConfiguration configuration =
             ConfiguredAdministratorBootstrapStartupConcurrencyTests.CreateConfiguration();
         await using ExploreDbContext firstContext = CreateContext(fixture.CreateOptions(provider), barrier);
@@ -254,6 +215,29 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
         await Assert.That(states[0].Generation).IsEqualTo(1L);
     }
 
+    [Test]
+    [Arguments(PrimaryDatabaseProvider.MariaDb)]
+    [Arguments(PrimaryDatabaseProvider.MySql)]
+    public async Task CommittedBootstrapTransactionReleasesNamedLockBeforeNextAttempt(
+        PrimaryDatabaseProvider provider)
+    {
+        string resource = $"explore:instance-onboarding:{Guid.CreateVersion7():N}";
+        await using ExploreDbContext first = CreateContext(fixture.CreateOptions(provider));
+        await using (var transaction = await first.Database.BeginTransactionAsync())
+        {
+            await using var lease = await RelationalNamedLock.AcquireTransactionAsync(
+                first, resource, CancellationToken.None);
+            await transaction.CommitAsync();
+        }
+
+        await using ExploreDbContext second = CreateContext(fixture.CreateOptions(provider));
+        await using var nextTransaction = await second.Database.BeginTransactionAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var nextLease = await RelationalNamedLock.AcquireTransactionAsync(
+            second, resource, timeout.Token);
+        await nextTransaction.RollbackAsync();
+    }
+
     private static ExploreDbContext CreateContext(
         PrimaryDatabaseConnectionOptions options,
         params IInterceptor[] interceptors)
@@ -262,34 +246,5 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         builder.AddInterceptors(interceptors);
         return new ExploreDbContext(builder.Options);
-    }
-
-    private sealed class EmptyReadBarrier(int participantCount) : DbCommandInterceptor
-    {
-        private readonly TaskCompletionSource _allRead =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _readers;
-
-        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
-            DbCommand command,
-            CommandExecutedEventData eventData,
-            DbDataReader result,
-            CancellationToken cancellationToken = default)
-        {
-            if (!command.CommandText.Contains(
-                    "instance_bootstrap_states",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return result;
-            }
-
-            if (Interlocked.Increment(ref _readers) == participantCount)
-            {
-                _allRead.TrySetResult();
-            }
-
-            await _allRead.Task.WaitAsync(cancellationToken);
-            return result;
-        }
     }
 }

@@ -1056,6 +1056,7 @@ public sealed class AdmissionCheckInHttpHalRedTests(ContractApiFixture fixture)
 
         public AdmissionRateLimitFactory()
         {
+            SeedActiveDefaultTenant = true;
             AdditionalConfiguration["RateLimiting:DisableInTesting"] = "false";
             AdditionalConfiguration["RateLimiting:AdmissionScannerCheckIn:PermitLimit"] = "1";
             AdditionalConfiguration["RateLimiting:AdmissionScannerCheckIn:WindowSeconds"] = "60";
@@ -1077,7 +1078,11 @@ public sealed class AdmissionCheckInHttpHalRedTests(ContractApiFixture fixture)
 
     private sealed class AdmissionUnavailableFactory : AuthenticatedWebApplicationFactory
     {
-        public AdmissionUnavailableFactory() => AuthorizationProviderOverride = new StubAuthorizationProvider();
+        public AdmissionUnavailableFactory()
+        {
+            AuthorizationProviderOverride = new StubAuthorizationProvider();
+            SeedActiveDefaultTenant = true;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -1100,7 +1105,11 @@ public sealed class AdmissionCheckInHttpHalRedTests(ContractApiFixture fixture)
 
     private sealed class AdmissionReportingFactory : AuthenticatedWebApplicationFactory
     {
-        public AdmissionReportingFactory() => AuthorizationProviderOverride = new StubAuthorizationProvider();
+        public AdmissionReportingFactory()
+        {
+            AuthorizationProviderOverride = new StubAuthorizationProvider();
+            SeedActiveDefaultTenant = true;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {

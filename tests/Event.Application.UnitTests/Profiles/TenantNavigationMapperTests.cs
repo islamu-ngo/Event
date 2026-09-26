@@ -45,7 +45,8 @@ public sealed class TenantNavigationMapperTests
         repository.GetByTenantIdOrderedAsync(TenantId, default).Returns(rows);
         var tenants = Substitute.For<ITenantRepository>();
         tenants.GetByIdAsNoTrackingAsync(TenantId, default).Returns(tenant);
-        var lifecycle = new TenantLifecycleAccessService(tenants, Substitute.For<IAdminContext>());
+        var lifecycle = new TenantLifecycleAccessService(tenants, Substitute.For<IAdminContext>(),
+            Substitute.For<IInstanceBootstrapStateRepository>());
         var handler = new GetTenantNavLinksQueryHandler(repository, Context(), lifecycle);
 
         var result = await handler.QueryAsync(new(), default);

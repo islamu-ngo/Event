@@ -244,7 +244,8 @@ public sealed class EventManagementMcpPublicReadTests
     {
         var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider()
+            AuthorizationProviderOverride = new StubAuthorizationProvider(),
+            SeedActiveDefaultTenant = true
         };
         factory.AdditionalConfiguration["Mcp:Enabled"] = "true";
         factory.AdditionalConfiguration["Mcp:EndpointPath"] = "/mcp";

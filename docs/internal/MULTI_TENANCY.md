@@ -92,6 +92,20 @@ The existing control-plane tenant detail and activation routes are the narrow ex
 
 Provisioning identity and branding documents remain private, authorized tenant-management resources. Completing identity does not activate a directory. Explicit activation rechecks the persisted identity under the shared mutation lock; identity document resolution bypasses the node-local cache so a prior ready revision cannot publish a now-incomplete directory. See [ADR-032](adr/ADR-032-progressive-instance-onboarding.md).
 
+The public tenant slug cache deliberately excludes Provisioning rows. For
+configured-administrator bootstrap only, `ApiTenantResolutionMiddleware` may
+resolve an explicitly supplied `X-Tenant-Slug` against the persisted slug of
+`PlatformDefaults.DefaultTenantId` when its bootstrap is configured Pending
+or Completed. This fallback applies solely to `UserController.SyncUser` and
+private current-user/admin-authority reads, never to API-key requests or other
+tenants. `TenantLifecycleAccessMiddleware` admits authenticated SyncUser
+attempts for that same Provisioning tenant; `SyncUserCommandHandler` separately
+checks private external synchronization eligibility before any account write,
+and the configured claim validates the exact provider account inside the
+onboarding transaction. SyncUser bypasses cached idempotency responses, returns
+the platform user ID rather than the onboarding receipt ID, and keeps private
+responses no-store. Activation remains a distinct operation.
+
 ## Data Isolation Enforcement
 
 Isolation is enforced in `ExploreDbContext` with named global filters:

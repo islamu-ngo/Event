@@ -235,6 +235,7 @@ public sealed class EmailDispatchRepositoriesSqliteTests
             services.AddSingleton<NotificationDeliveryPolicyResolver>();
             services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
             services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
+            services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
             services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
             await using ServiceProvider provider = services.BuildServiceProvider();
             using var drain = new EmailDispatchDrainService(

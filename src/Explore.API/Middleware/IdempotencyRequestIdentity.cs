@@ -43,9 +43,10 @@ internal static class IdempotencyRequestIdentityFactory
         var userId = context.User.GetPlatformUserId()?.ToString("D");
         var principalFingerprint = ComputeSha256Hex(
             $"{ResolvePrincipalScope(context.User, identity, userId)}|capabilities:{CapabilityScope(context.Request)}");
-        var bodyHash = await ComputeBodyHashAsync(context.Request, streamManager, cancellationToken,
+        var bodyHash = await ComputeBodyHashAsync(context.Request, streamManager,
             preserveAmbiguousMemberOrder || context.GetEndpoint()?.Metadata
-                .GetMetadata<RequireAnonymousRegistrationChallengeAttribute>() is not null);
+                .GetMetadata<RequireAnonymousRegistrationChallengeAttribute>() is not null,
+            cancellationToken);
 
         return new IdempotencyRequestIdentity(
             method,
@@ -93,8 +94,8 @@ internal static class IdempotencyRequestIdentityFactory
     private static async Task<string> ComputeBodyHashAsync(
         HttpRequest request,
         RecyclableMemoryStreamManager streamManager,
-        CancellationToken cancellationToken,
-        bool preserveAmbiguousMemberOrder)
+        bool preserveAmbiguousMemberOrder,
+        CancellationToken cancellationToken)
     {
         request.EnableBuffering();
 

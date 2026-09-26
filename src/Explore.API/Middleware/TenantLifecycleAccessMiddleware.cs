@@ -45,10 +45,13 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             : await lifecycle.IsPublicAsync(tenantContext.TenantId, context.RequestAborted)
                 || IsPrivateAdministratorSessionRead(context.GetEndpoint())
                     && context.User.Identity?.IsAuthenticated == true
-                    && await lifecycle.CanManageAsync(tenantContext.TenantId, context.RequestAborted);
+                    && await lifecycle.CanManageAsync(tenantContext.TenantId, context.RequestAborted)
+                || IsUserSynchronization(context.GetEndpoint())
+                    && context.User.Identity?.IsAuthenticated == true
+                    && await lifecycle.CanAttemptConfiguredAdministratorSyncAsync(tenantContext.TenantId, context.RequestAborted);
         if (allowed)
         {
-            if (management || IsPrivateAdministratorSessionRead(context.GetEndpoint()))
+            if (management || IsPrivateAdministratorSessionRead(context.GetEndpoint()) || IsUserSynchronization(context.GetEndpoint()))
                 context.Response.Headers.CacheControl = "no-store";
             await next(context);
             return;
@@ -68,7 +71,15 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         });
     }
 
-    private static bool IsPrivateAdministratorSessionRead(Endpoint? endpoint)
+    internal static bool IsUserSynchronization(Endpoint? endpoint)
+    {
+        var action = endpoint?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        return action is not null
+            && action.ControllerTypeInfo.AsType() == typeof(UserController)
+            && action.MethodInfo.Name == nameof(UserController.SyncUser);
+    }
+
+    internal static bool IsPrivateAdministratorSessionRead(Endpoint? endpoint)
     {
         var action = endpoint?.Metadata.GetMetadata<ControllerActionDescriptor>();
         if (action is null) return false;

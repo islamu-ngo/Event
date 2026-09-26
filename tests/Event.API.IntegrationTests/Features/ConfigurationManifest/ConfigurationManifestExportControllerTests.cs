@@ -104,7 +104,8 @@ public sealed class ConfigurationManifestExportControllerTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false },
+            SeedActiveDefaultTenant = true
         };
         using HttpClient client = factory.CreateClient();
 
@@ -141,7 +142,8 @@ public sealed class ConfigurationManifestExportControllerTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new ProviderUnavailableAuthorizationProvider()
+            AuthorizationProviderOverride = new ProviderUnavailableAuthorizationProvider(),
+            SeedActiveDefaultTenant = true
         };
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(
@@ -225,9 +227,27 @@ public sealed class ConfigurationManifestExportControllerTests
                     }
                 })
                 .ToArray());
+        tenants.GetByIdAsNoTrackingAsync(
+                Explore.Domain.Constants.PlatformDefaults.DefaultTenantId,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Tenant?>(new Tenant
+            {
+                Id = Explore.Domain.Constants.PlatformDefaults.DefaultTenantId,
+                Slug = "default",
+                FullName = "Default",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = new TenantStatus
+                {
+                    Id = (int)TenantStatusEnum.Active,
+                    MasterCode = "active",
+                    FullName = "Active",
+                    IsActiveState = true
+                }
+            }));
         await using var baseFactory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true },
+            SeedActiveDefaultTenant = true
         };
         await using var factory = baseFactory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -261,7 +281,8 @@ public sealed class ConfigurationManifestExportControllerTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider()
+            AuthorizationProviderOverride = new StubAuthorizationProvider(),
+            SeedActiveDefaultTenant = true
         };
         using HttpClient client = factory.CreateClient();
         string[] obsoleteRoutes =

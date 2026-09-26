@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Authentication;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
@@ -22,7 +23,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     private readonly IUserRepository _userRepository;
     private readonly IUserExternalLoginRepository _userExternalLoginRepository;
     private readonly IActorRepository _actorRepository;
-    private readonly ITenantRepository _tenantRepository;
+    private readonly ITenantContextAccessor _tenantContext;
+    private readonly ITenantLifecycleAccessService _lifecycle;
     private readonly IInstanceBootstrapStateRepository _bootstrapRepository;
     private readonly InstanceOnboardingCompletionOperation _onboardingCompletion;
     private readonly HybridCache _cache;
@@ -33,7 +35,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         IUserRepository userRepository,
         IUserExternalLoginRepository userExternalLoginRepository,
         IActorRepository actorRepository,
-        ITenantRepository tenantRepository,
+        ITenantContextAccessor tenantContext,
+        ITenantLifecycleAccessService lifecycle,
         IInstanceBootstrapStateRepository bootstrapRepository,
         InstanceOnboardingCompletionOperation onboardingCompletion,
         HybridCache cache,
@@ -43,7 +46,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         _userRepository = userRepository;
         _userExternalLoginRepository = userExternalLoginRepository;
         _actorRepository = actorRepository;
-        _tenantRepository = tenantRepository;
+        _tenantContext = tenantContext;
+        _lifecycle = lifecycle;
         _bootstrapRepository = bootstrapRepository;
         _onboardingCompletion = onboardingCompletion;
         _cache = cache;
@@ -85,6 +89,21 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
             }
 
             InstanceBootstrapState? bootstrap = await _bootstrapRepository.GetCurrent(cancellationToken);
+            // Local synchronization has already proved a current explicit binding above; its login
+            // and lifecycle callbacks remain available privately. External signup has no such authority.
+            if (providerKind != AuthenticationProviderKind.Local
+                && !await _lifecycle.IsPublicAsync(_tenantContext.TenantId, cancellationToken)
+                && (bootstrap is not
+                {
+                    Mode: InstanceBootstrapMode.ConfiguredAdministrator,
+                    Status: InstanceBootstrapStatus.Pending or InstanceBootstrapStatus.Completed
+                }
+                || !await _lifecycle.CanAttemptConfiguredAdministratorSyncAsync(_tenantContext.TenantId, cancellationToken)))
+            {
+                return BaseCommandResponse.Failure<Guid>(
+                    "tenant_lifecycle_unavailable", "Tenant is not available for user synchronization.");
+            }
+
             if (request.LocalLifecycleSynchronization is null && bootstrap is
                 {
                     Mode: InstanceBootstrapMode.ConfiguredAdministrator
@@ -112,7 +131,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                     cancellationToken);
                 if (bootstrap.Status == InstanceBootstrapStatus.Pending)
                 {
-                    return claim;
+                    // The onboarding operation returns its receipt ID; SyncUser returns the account ID.
+                    return claim.IsSuccess ? BaseCommandResponse.Success(claimUserId, claim.Message) : claim;
                 }
 
                 if (!claim.IsSuccess

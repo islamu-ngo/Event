@@ -97,7 +97,8 @@ public sealed class EventMaterialHateoasTests
         Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), state,
         new EventResourceDraftDto
         {
-            Title = "Private resource", Kind = EventResourceKindEnum.GeneralDocument,
+            Title = "Private resource",
+            Kind = EventResourceKindEnum.GeneralDocument,
             DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
             DeliveryType = EventResourceDeliveryTypeEnum.StoredFile
         }, DateTime.UtcNow, null);

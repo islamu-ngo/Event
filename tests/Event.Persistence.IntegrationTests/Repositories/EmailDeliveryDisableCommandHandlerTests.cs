@@ -146,26 +146,17 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             command = Command(await issuer.PreviewAsync(target));
         using var session = scenario.Open(tenantActor: tenantTarget);
         var reachedLock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        session.BeforeLock = (key, _) =>
-        {
-            if (key == GovernanceSettingKeys.Email.DeliveryEnabled) reachedLock.TrySetResult();
-            return Task.CompletedTask;
-        };
-        var ownsLock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var holderContext = CreateContext(scenario.Path);
-        var holderLock = new RelationalSettingMutationLock(holderContext, new EfCoreUnitOfWork(holderContext));
-        Task holder = holderLock.ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All], async token =>
+        session.BeforeLock = async (key, token) =>
         {
-            ownsLock.SetResult();
+            if (key != GovernanceSettingKeys.Email.DeliveryEnabled) return;
+            reachedLock.TrySetResult();
             await release.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
-            return true;
-        }, cancellation.Token);
+        };
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         Task<string?>? action = null;
         try
         {
-            await ownsLock.Task.WaitAsync(TimeSpan.FromSeconds(15));
             action = session.FailureAsync(preview, command, cancellation.Token);
             var observed = await Task.WhenAny(reachedLock.Task, session.Transactions.Started.Task, action)
                 .WaitAsync(TimeSpan.FromSeconds(15));
@@ -175,7 +166,6 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             await scenario.RevokeAsync(tenantTarget);
             string before = await scenario.StateAsync();
             release.TrySetResult();
-            await holder;
             await Assert.That(await action.WaitAsync(TimeSpan.FromSeconds(15))).IsEqualTo(FailureCodes.AdminRequired);
             await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
             await session.AssertNoEffectsAsync();
@@ -184,7 +174,6 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         finally
         {
             release.TrySetResult();
-            await holder;
             if (action is not null) await action;
         }
     }

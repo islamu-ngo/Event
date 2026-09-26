@@ -178,7 +178,8 @@ public sealed class EventParticipationControllerTests
     {
         var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true },
+            SeedActiveDefaultTenant = true
         };
 
         return factory.WithWebHostBuilder(builder =>

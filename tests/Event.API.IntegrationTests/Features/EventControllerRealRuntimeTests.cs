@@ -32,9 +32,14 @@ public class EventControllerRealRuntimeTests(RealRuntimeApiFixture fixture)
     private readonly RealRuntimeApiFixture _fixture = fixture;
 
     [Test]
-    public async Task GetAll_WithEmptyDatabase_ReturnsOk()
+    public async Task GetAll_WithPublishedTenantWithoutEvents_ReturnsOk()
     {
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var response = await _fixture.Client.GetAsync("/api/event");
 
@@ -463,6 +468,11 @@ public class EventControllerRealRuntimeTests(RealRuntimeApiFixture fixture)
     public async Task Update_WithoutIfMatch_ReturnsBadRequest()
     {
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var userId = Guid.CreateVersion7();
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Patch, $"/api/event/{Guid.CreateVersion7()}", userId);
@@ -480,6 +490,11 @@ public class EventControllerRealRuntimeTests(RealRuntimeApiFixture fixture)
     public async Task Update_WithOldPutRoute_ReturnsMethodNotAllowed()
     {
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var userId = Guid.CreateVersion7();
         using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Put, $"/api/event/{Guid.CreateVersion7()}", userId);
@@ -515,6 +530,11 @@ public class EventControllerRealRuntimeTests(RealRuntimeApiFixture fixture)
 
         // Reset wipes all non-lookup data
         await _fixture.ResetDatabaseAsync();
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context);
+        }
 
         var response = await _fixture.Client.GetAsync("/api/event");
         var content = await response.Content.ReadAsStringAsync();

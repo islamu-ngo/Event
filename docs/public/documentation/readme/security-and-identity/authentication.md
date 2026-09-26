@@ -33,6 +33,14 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
 * Direct Google sign-in and Google sign-in brokered by Keycloak use separate provider account namespaces. A brokered login remains bound to the Keycloak issuer and subject; a provider hint does not turn it into a direct Google account. Keep the configured issuer stable when diagnosing account-linking failures.
 
+During configured-administrator setup, the default tenant remains unpublished
+until activation. Only the authenticated account matching the configured
+provider identity can synchronize at `POST /api/user/sync` while the tenant is
+Provisioning. In multi-tenant deployments, that request needs the default
+tenant's exact slug in `X-Tenant-Slug`; other slugs and unrelated accounts
+remain denied. The administrator can read their private session and authority
+after claiming, but this does not make public tenant pages available.
+
 After authentication or signout, the application returns only to a local path
 beginning with `/`. Invalid return destinations fall back to the home page;
 external destinations and literal control characters are not accepted. Normal
@@ -214,6 +222,15 @@ Set `AUTHENTICATION_PROVIDER=keycloak` and provide the documented `KEYCLOAK_*` a
 Lifecycle-email failure logs report the action and HTTP status without account
 identifiers, credentials or provider response bodies. Use authorized operation
 results and delegation records when investigating a particular account.
+
+Direct Keycloak operator API clients submit planning `intent` as `RepairClient`,
+`CreateClients`, or `CreateRealm`, together with fresh `administratorUsername` and
+`administratorPassword` fields. Regenerate typed clients after upgrading: the
+credential request schemas now use the `Dto` suffix. JSON field names and routes
+are unchanged. Provider credentials do not replace current setup or instance-admin
+authority, and receipt operations remain bound to their actor and setup generation.
+Never capture credential request bodies in logs; redacted diagnostic text does not
+redact explicit JSON serialization.
 
 #### Provider credential retries
 

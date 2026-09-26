@@ -268,7 +268,8 @@ public sealed class AdminRoleEndpointParityTests
 
         return new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider()
+            AuthorizationProviderOverride = new StubAuthorizationProvider(),
+            SeedActiveDefaultTenant = true
         }.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IRegistrationAnswerFileRepository>();

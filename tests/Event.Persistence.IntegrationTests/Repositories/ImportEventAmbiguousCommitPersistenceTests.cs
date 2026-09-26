@@ -85,7 +85,8 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
             new TenantSettingRepository(context, mutationLock),
             new VisitorAccessProviderReader(systemSettings, new ConfigurationBuilder().Build()),
             new TenantLifecycleAccessService(new TenantRepository(context),
-                Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>()));
+                Substitute.For<Explore.Application.Contracts.Identity.IAdminContext>(),
+                new InstanceBootstrapStateRepository(context)));
         var handler = new ImportEventCommandHandler(
             repository,
             Substitute.For<IStorageObjectRepository>(),

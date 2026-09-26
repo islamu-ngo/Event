@@ -21,7 +21,8 @@ public class AuthenticatedApiTestFixture : IAsyncInitializer, IAsyncDisposable
     {
         Factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = AuthorizationProvider
+            AuthorizationProviderOverride = AuthorizationProvider,
+            SeedActiveDefaultTenant = true
         };
         Client = Factory.CreateClient();
 

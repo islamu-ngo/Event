@@ -152,6 +152,19 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
     {
         await using ExploreDbContext context = CreateDbContext();
         DateTime now = DateTime.UtcNow;
+        context.SystemSettings.Add(new SystemSetting
+        {
+            Id = Guid.CreateVersion7(),
+            SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+            Value = "true",
+            ValueType = SettingValueType.Boolean,
+            Category = "Email",
+            CreatedAt = now
+        });
+        (await context.SystemSettings.SingleAsync(setting =>
+            setting.SettingKey == GovernanceSettingKeys.Email.SmtpHost)).Value = "\"smtp.cluster.example.test\"";
+        (await context.SystemSettings.SingleAsync(setting =>
+            setting.SettingKey == GovernanceSettingKeys.Email.FromAddress)).Value = "\"notifications@cluster.example.test\"";
         string email = $"cluster-{Guid.CreateVersion7():N}@example.test";
         string subject = $"subject-{Guid.CreateVersion7():N}";
         string body = $"body-{Guid.CreateVersion7():N}";
@@ -404,6 +417,8 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
             ConsumerId = "cluster-recovery-test"
         }));
         services.AddPostgreSqlExploreDbContext(ApplicationConnectionString);
+        services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
         services.AddScoped<EmailDispatchOutboxRepository>();
         services.AddScoped<IEmailDispatchOutboxRepository>(provider =>
             new SettlementLossRepository(provider.GetRequiredService<EmailDispatchOutboxRepository>(), coordinator));
@@ -508,7 +523,8 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
                 cancellationToken);
             if (admitted.Outcome != EmailDispatchEligibilityOutcome.Eligible)
             {
-                throw new InvalidOperationException($"The real provider-handoff gate returned {admitted.Outcome}.");
+                throw new InvalidOperationException(
+                    $"The real provider-handoff gate returned {admitted.Outcome}: {admitted.SkipReason}.");
             }
 
             await transport.SendAsync(new EmailMessage

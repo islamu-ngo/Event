@@ -80,6 +80,7 @@ public class UserController : EventControllerBase
     /// </summary>
     [HttpPost("sync", Name = RouteNames.SyncUser)]
     [Authorize]
+    [SuppressIdempotencyResponseStorage]
     [EndpointSummary("Sync user from identity provider")]
     [EndpointDescription("Creates or updates the user in the local database and ensures external provider linkage. Also creates the user's personal Actor if new user. Call this after login/registration.")]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> SyncUser(CancellationToken cancellationToken = default)

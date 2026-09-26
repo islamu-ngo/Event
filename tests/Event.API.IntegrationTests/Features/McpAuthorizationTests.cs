@@ -98,7 +98,8 @@ public sealed class McpAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
-            AuthorizationProviderOverride = new StubAuthorizationProvider()
+            AuthorizationProviderOverride = new StubAuthorizationProvider(),
+            SeedActiveDefaultTenant = true
         };
         using var client = factory.CreateClient();
         using var request = CreateMcpRequest();

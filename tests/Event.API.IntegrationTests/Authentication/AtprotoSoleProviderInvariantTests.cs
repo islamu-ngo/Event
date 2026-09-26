@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
@@ -35,6 +36,8 @@ public sealed class AtprotoSoleProviderInvariantTests(
     public async Task UnlinkedDidOnFreshAtprotoInstanceCreatesOnePasswordlessPlatformAccount()
     {
         await fixture.ResetDatabaseAsync();
+        // Fresh means no accounts, not an unpublished or unprovisioned directory.
+        await fixture.SeedVisitorSignupAsync(TenantStatusEnum.Active);
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
         var bootstrapHandler = scope.ServiceProvider
@@ -46,15 +49,19 @@ public sealed class AtprotoSoleProviderInvariantTests(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
-        await Assert.That(result.Success).IsTrue();
+        await Assert.That(result.Success).IsTrue().Because(result.FailureCode);
         await Assert.That(result.UserId).IsNotNull();
         await Assert.That(result.ActorId).IsNotNull();
+        await Assert.That(result.ParticipationId).IsNotNull();
 
         ExploreDbContext dbContext =
             scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         dbContext.ChangeTracker.Clear();
         await Assert.That(await dbContext.Users.CountAsync()).IsEqualTo(1);
         await Assert.That(await dbContext.Actors.CountAsync()).IsEqualTo(1);
+        await Assert.That(await dbContext.TenantUsers.CountAsync()).IsEqualTo(1);
+        await Assert.That(await dbContext.PlatformUserRoles.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.TenantUserRoleGrants.CountAsync()).IsEqualTo(0);
         await Assert.That(await dbContext.UserExternalLogins.CountAsync(login =>
                 login.AuthenticationProviderId
                     == (int)AuthenticationProviderKind.Atproto
@@ -63,7 +70,50 @@ public sealed class AtprotoSoleProviderInvariantTests(
         await Assert.That(await dbContext.LocalIdentityUsers.CountAsync())
             .IsEqualTo(0);
         await Assert.That(fixture.PersistedAtprotoSessionCount)
-            .IsEqualTo(0);
+            .IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(null, false)]
+    [Arguments(TenantStatusEnum.Provisioning, false)]
+    [Arguments(TenantStatusEnum.Suspended, false)]
+    [Arguments(TenantStatusEnum.Archived, false)]
+    [Arguments(TenantStatusEnum.Purged, false)]
+    [Arguments(TenantStatusEnum.Active, true)]
+    public async Task UnlinkedDidWithoutPublishedTargetTenantCannotCreateAccount(
+        TenantStatusEnum? tenantStatus, bool foreignTenant)
+    {
+        await fixture.ResetDatabaseAsync();
+        // A usable provider (even on a published foreign tenant) is not target-tenant authority.
+        await fixture.SeedVisitorSignupAsync(tenantStatus,
+            foreignTenant ? Guid.CreateVersion7() : PlatformDefaults.DefaultTenantId);
+        await using AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope();
+        var handler = scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        AtprotoDid did = AtprotoDid.Parse(
+            $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
+
+        AtprotoSessionBootstrapResult result = await handler.ExecuteAsync(
+            CreateBootstrapCommand(did), CancellationToken.None);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.FailureCode).IsEqualTo("account_not_linked");
+        await Assert.That(result.UserId).IsNull();
+        await Assert.That(result.ActorId).IsNull();
+        await Assert.That(result.ParticipationId).IsNull();
+        await Assert.That(result.Token is null).IsTrue();
+        ExploreDbContext dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        dbContext.ChangeTracker.Clear();
+        await Assert.That(await dbContext.Users.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.UserPii.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.Actors.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.UserExternalLogins.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.AtprotoIdentities.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.TenantUsers.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.PlatformUserRoles.CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.TenantUserRoleGrants.IgnoreQueryFilters().CountAsync()).IsEqualTo(0);
+        await Assert.That(await dbContext.LocalIdentityUsers.CountAsync()).IsEqualTo(0);
+        await Assert.That(fixture.PersistedAtprotoSessionCount).IsEqualTo(0);
     }
 
     [Test]
@@ -105,6 +155,7 @@ public sealed class AtprotoSoleProviderInvariantTests(
     public async Task DistinctUnlinkedDidsCanOwnDistinctAccountsWithoutEmailAddresses()
     {
         await fixture.ResetDatabaseAsync();
+        await fixture.SeedVisitorSignupAsync(TenantStatusEnum.Active);
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();
         var bootstrapHandler = scope.ServiceProvider
@@ -136,13 +187,21 @@ public sealed class AtprotoSoleProviderInvariantTests(
         await Assert.That(await dbContext.LocalIdentityUsers.CountAsync())
             .IsEqualTo(0);
         await Assert.That(fixture.PersistedAtprotoSessionCount)
-            .IsEqualTo(0);
+            .IsEqualTo(2);
     }
 
     [Test]
     public async Task ConcurrentFirstLoginForSameDidConvergesToOneAccount()
     {
         await fixture.ResetDatabaseAsync();
+        await fixture.SeedVisitorSignupAsync(TenantStatusEnum.Active);
+        var bothVerifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int arrivals = 0;
+        fixture.BeforeOAuthVerification = cancellationToken =>
+        {
+            if (Interlocked.Increment(ref arrivals) == 2) bothVerifying.TrySetResult();
+            return bothVerifying.Task.WaitAsync(TimeSpan.FromSeconds(20), cancellationToken);
+        };
         AtprotoDid did = AtprotoDid.Parse(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
         await using AsyncServiceScope firstScope =
@@ -190,6 +249,7 @@ public sealed class AtprotoSoleProviderInvariantTests(
             seedDb.Tenants.Add(new TenantBuilder()
                 .WithId(PlatformDefaults.DefaultTenantId)
                 .WithSlug("default")
+                .WithStatus(TenantStatusEnum.Provisioning)
                 .Build());
             seedDb.InstanceBootstrapStates.Add(
                 InstanceBootstrapState.CreateConfiguredAdministratorPending(
@@ -207,14 +267,32 @@ public sealed class AtprotoSoleProviderInvariantTests(
             fixture.Factory.Services.CreateAsyncScope();
         var bootstrapHandler = scope.ServiceProvider
             .GetRequiredService<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
+        var capabilities = scope.ServiceProvider.GetRequiredService<IVisitorAccessCapabilityResolver>();
+        await Assert.That((await capabilities.ResolveAsync(PlatformDefaults.DefaultTenantId)).SignupDestinations).IsEmpty();
+        AtprotoDid unrelatedDid = AtprotoDid.Parse(
+            $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
+        AtprotoSessionBootstrapResult pendingVisitor = await bootstrapHandler.ExecuteAsync(
+            CreateBootstrapCommand(unrelatedDid), CancellationToken.None);
+        await Assert.That(pendingVisitor.Success).IsFalse();
+        await Assert.That(pendingVisitor.FailureCode).IsEqualTo("account_not_linked");
+
         AtprotoSessionBootstrapResult result = await bootstrapHandler.ExecuteAsync(
             CreateBootstrapCommand(did),
             CancellationToken.None);
 
-        await Assert.That(result.Success).IsTrue();
+        await Assert.That(result.Success).IsTrue().Because(result.FailureCode);
+        // Completing configured setup must not publish the directory or admit unrelated visitors.
+        AtprotoSessionBootstrapResult completedVisitor = await bootstrapHandler.ExecuteAsync(
+            CreateBootstrapCommand(unrelatedDid), CancellationToken.None);
+        await Assert.That(completedVisitor.Success).IsFalse();
+        await Assert.That(completedVisitor.FailureCode).IsEqualTo("account_not_linked");
         ExploreDbContext dbContext =
             scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         dbContext.ChangeTracker.Clear();
+        await Assert.That(await dbContext.Users.CountAsync()).IsEqualTo(1);
+        await Assert.That((await dbContext.Tenants.SingleAsync()).TenantStatusId)
+            .IsEqualTo((int)TenantStatusEnum.Provisioning);
+        await Assert.That((await capabilities.ResolveAsync(PlatformDefaults.DefaultTenantId)).SignupDestinations).IsEmpty();
         await Assert.That(await dbContext.PlatformUserRoles.CountAsync())
             .IsEqualTo(1);
         await Assert.That(await dbContext.InstanceBootstrapStates.CountAsync(
@@ -261,6 +339,7 @@ public sealed class AtprotoSoleProviderInvariantTests(
     public async Task EmergencyProvisionerPromotesExactLinkedDidIdempotently()
     {
         await fixture.ResetDatabaseAsync();
+        await fixture.SeedVisitorSignupAsync(TenantStatusEnum.Active);
         AtprotoDid did = AtprotoDid.Parse(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
         await using AsyncServiceScope scope =
@@ -292,6 +371,7 @@ public sealed class AtprotoSoleProviderInvariantTests(
     public async Task EmergencyProvisionerCanReassignExclusiveInstanceAuthority()
     {
         await fixture.ResetDatabaseAsync();
+        await fixture.SeedVisitorSignupAsync(TenantStatusEnum.Active);
         AtprotoDid did = AtprotoDid.Parse(
             $"did:plc:{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}");
         await using AsyncServiceScope scope =
@@ -370,6 +450,36 @@ public sealed class AtprotoSoleProviderFixture : PostgreSqlApiFixtureBase
     public void ConfigureAdministrator(AtprotoDid did) =>
         _configuredAdministratorProvider.Configure(did);
 
+    public Func<CancellationToken, Task>? BeforeOAuthVerification
+    {
+        set => _securityGateway.BeforeVerification = value;
+    }
+
+    public async Task SeedVisitorSignupAsync(TenantStatusEnum? tenantStatus, Guid? tenantId = null)
+    {
+        await using AsyncServiceScope scope = Factory.Services.CreateAsyncScope();
+        ExploreDbContext dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        if (tenantStatus is { } status)
+        {
+            dbContext.Tenants.Add(new TenantBuilder()
+                .WithId(tenantId ?? PlatformDefaults.DefaultTenantId)
+                .WithSlug("default")
+                .WithStatus(status)
+                .Build());
+        }
+        // Provider selection alone does not establish usable public signup metadata.
+        dbContext.SystemSettings.Add(new SystemSetting
+        {
+            Id = Guid.CreateVersion7(),
+            SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
+            Value = JsonSerializer.Serialize("https://events.example.test"),
+            ValueType = SettingValueType.String,
+            Category = "Authentication",
+            CreatedAt = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+    }
+
     public new async Task ResetDatabaseAsync()
     {
         _securityGateway.Reset();
@@ -406,20 +516,28 @@ internal sealed class TestAtprotoOAuthSecurityGateway
     public int PersistedSessionCount =>
         Volatile.Read(ref _persistedSessionCount);
 
-    public void Reset() => Interlocked.Exchange(
-        ref _persistedSessionCount,
-        0);
+    public Func<CancellationToken, Task>? BeforeVerification { get; set; }
 
-    public Task<AtprotoOAuthVerificationResult> VerifyAsync(
+    public void Reset()
+    {
+        Interlocked.Exchange(ref _persistedSessionCount, 0);
+        BeforeVerification = null;
+    }
+
+    public async Task<AtprotoOAuthVerificationResult> VerifyAsync(
         AtprotoOAuthVerificationInput request,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(AtprotoOAuthVerificationResult.Verified(
+        CancellationToken cancellationToken)
+    {
+        if (BeforeVerification is { } beforeVerification)
+            await beforeVerification(cancellationToken);
+        return AtprotoOAuthVerificationResult.Verified(
             new AtprotoVerifiedOAuthSession(
                 request.ExpectedDid,
                 "verified.example.test",
                 request.ExpectedPdsUri,
                 request.OAuthClientKeyId,
-                request.OAuthSessionPayload)));
+                request.OAuthSessionPayload));
+    }
 
     public Task<AtprotoPreparedOAuthSession> PreparePersistenceAsync(
         AtprotoVerifiedOAuthSession verifiedSession,

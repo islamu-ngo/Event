@@ -113,6 +113,22 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "handler-active-setup-secret-bootstrap",
             "Authenticated SetupSecret principal, durable active setup mode, active Local primary, server deployment mode, manual validation and preflight precede native bootstrap convergence. Evidence: LocalInstanceOnboardingHttpTests; LocalBootstrapConvergenceTests; LocalBootstrapSecretContractTests."),
         new(
+            "Explore.Application.Features.InstanceOnboarding.Requests.Commands.PlanKeycloakOperationCommand",
+            "handler-current-setup-or-instance-administrator",
+            "IKeycloakOperatorAuthority requires authenticated SetupSecret or current instance administrator authority before resolving deployment-owned bindings, inspecting the provider or creating a receipt bound to actor, instance and setup generation. The HTTP setup scheme validates the active setup secret on exact routes; ordinary users cannot substitute provider credentials. Evidence: KeycloakOperatorContractTests.MutatingCommands_RejectMissingAuthorityBeforeSideEffects; KeycloakOperationHttpTests.PlanCreateRealm_UsesServerBindingAndClosedCreateSteps."),
+        new(
+            "Explore.Application.Features.InstanceOnboarding.Requests.Commands.ApplyKeycloakOperationCommand",
+            "handler-current-setup-or-instance-administrator-owned-receipt",
+            "Fresh operator authority and exact instance, actor and setup-generation receipt ownership precede provider access; the operation service then verifies expiry, deployment binding and reviewed digest. Evidence: KeycloakOperatorContractTests.MutatingCommands_RejectMissingAuthorityBeforeSideEffects; KeycloakOperationHttpTests.ReceiptMutations_WhenSetupGenerationChanges_AreForbiddenBeforeProviderContact and Apply_WhenReceiptExpires_ReturnsConflictWithoutProviderContact."),
+        new(
+            "Explore.Application.Features.InstanceOnboarding.Requests.Commands.ReconcileKeycloakOperationCommand",
+            "handler-current-setup-or-instance-administrator-owned-receipt",
+            "Reconciliation repeats current operator authority and exact receipt ownership before provider inspection and local outcome persistence; it never gains Keycloak write authority from a receipt identifier. Evidence: KeycloakOperatorContractTests.MutatingCommands_RejectMissingAuthorityBeforeSideEffects; KeycloakOperationHttpTests.ReceiptMutations_WhenSetupGenerationChanges_AreForbiddenBeforeProviderContact."),
+        new(
+            "Explore.Application.Features.InstanceOnboarding.Requests.Commands.CancelKeycloakOperationCommand",
+            "handler-current-setup-or-instance-administrator-owned-receipt",
+            "Cancellation requires current operator authority and exact instance, actor and setup-generation receipt ownership before the coordinator records cancellation; a pointer alone grants no mutation authority. Evidence: KeycloakOperatorContractTests.MutatingCommands_RejectMissingAuthorityBeforeSideEffects; KeycloakOperationHttpTests.ReceiptMutations_WhenSetupGenerationChanges_AreForbiddenBeforeProviderContact."),
+        new(
             "Explore.Application.Features.InstanceOnboarding.Commands.SaveInstanceOperatorIdentityCommand",
             "controller-active-setup-secret-or-current-instance-administrator",
             "The dedicated controller admits only an authenticated active SetupSecret principal or a freshly resolved platform administrator before dispatch. SetupSecretAuthenticationHandler restricts setup-secret authentication to the exact GET/PUT route and returns Gone after bootstrap completion. Evidence: InstanceOperatorIdentityControllerTests."),

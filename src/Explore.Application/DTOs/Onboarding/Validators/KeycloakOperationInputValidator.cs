@@ -3,7 +3,7 @@ using FluentValidation;
 namespace Explore.Application.DTOs.Onboarding.Validators;
 
 public sealed class KeycloakInspectionCredentialsValidator
-    : AbstractValidator<KeycloakInspectionCredentials>
+    : AbstractValidator<KeycloakInspectionCredentialsDto>
 {
     public KeycloakInspectionCredentialsValidator()
     {
@@ -19,7 +19,7 @@ public sealed class KeycloakInspectionCredentialsValidator
 }
 
 public sealed class KeycloakOperationCredentialsValidator
-    : AbstractValidator<KeycloakOperationCredentials>
+    : AbstractValidator<KeycloakOperationCredentialsDto>
 {
     public KeycloakOperationCredentialsValidator()
     {
@@ -33,7 +33,7 @@ public sealed class KeycloakOperationCredentialsValidator
 }
 
 public sealed class KeycloakOperationPlanInputValidator
-    : AbstractValidator<KeycloakOperationPlanInput>
+    : AbstractValidator<KeycloakOperationPlanInputDto>
 {
     public KeycloakOperationPlanInputValidator()
     {

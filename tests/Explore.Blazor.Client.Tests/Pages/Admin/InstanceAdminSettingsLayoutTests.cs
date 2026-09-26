@@ -287,7 +287,8 @@ public sealed class InstanceAdminSettingsLayoutTests : IDisposable
         await Assert.That(cut.Markup).Contains("Authentication Providers", StringComparison.OrdinalIgnoreCase);
         await Assert.That(cut.Markup).Contains("Authorization Providers", StringComparison.OrdinalIgnoreCase);
         await Assert.That(cut.Markup).Contains("Keycloak", StringComparison.OrdinalIgnoreCase);
-        await Assert.That(cut.Markup).Contains("Keycloak client-secret rotation", StringComparison.OrdinalIgnoreCase);
+        await Assert.That(cut.FindAll("input[type='password']")).IsEmpty()
+            .Because("Deployment-managed Keycloak credentials must not be editable in the browser.");
         await Assert.That(cut.Markup).Contains("Local (Built-in RBAC)", StringComparison.OrdinalIgnoreCase);
         await Assert.That(cut.Markup).Contains("Cerbos (External PDP)", StringComparison.OrdinalIgnoreCase);
         await Assert.That(cut.Markup).Contains("Enable Cerbos Authorization", StringComparison.OrdinalIgnoreCase);

@@ -268,7 +268,10 @@ public sealed class KeycloakOperationHttpTests
     }
 
     [Test]
-    public async Task Apply_WhenSetupGenerationChanges_IsForbiddenBeforeProviderContact()
+    [Arguments("apply")]
+    [Arguments("reconcile")]
+    [Arguments("cancel")]
+    public async Task ReceiptMutations_WhenSetupGenerationChanges_AreForbiddenBeforeProviderContact(string action)
     {
         await using var factory = new KeycloakOperationFactory();
         using HttpClient client = factory.CreateClient();
@@ -284,7 +287,7 @@ public sealed class KeycloakOperationHttpTests
         factory.Authority.SetupGeneration++;
 
         using HttpResponseMessage response = await client.PostAsJsonAsync(
-            $"/api/instance/keycloak/operations/{operationId:D}/apply",
+            $"/api/instance/keycloak/operations/{operationId:D}/{action}",
             credentials);
         string body = await response.Content.ReadAsStringAsync();
 
@@ -293,6 +296,7 @@ public sealed class KeycloakOperationHttpTests
             .Because(body);
         await Assert.That(factory.Repository.Operation!.State)
             .IsEqualTo(KeycloakOperationState.Previewed);
+        await Assert.That(factory.Repository.Operation.IsCancellationRequested).IsFalse();
         await Assert.That(factory.AdminClient.ApplyCount).IsEqualTo(0);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
     }

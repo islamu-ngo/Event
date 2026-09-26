@@ -176,6 +176,17 @@ or provider response body. An uncertain or partial provider result remains visib
 until an operator performs inspect-only reconciliation. The service neither retries
 mutating provider calls automatically nor rolls them back.
 
+The request schemas are `KeycloakInspectionCredentialsDto`,
+`KeycloakOperationPlanInputDto`, and `KeycloakOperationCredentialsDto`. These
+Application records retain write-only credential fields and sealed redacted
+`ToString()` diagnostics, including through derived records and enclosing native
+requests. Planning `intent` is the catalogued string enum `KeycloakOperationIntent`
+(`RepairClient`, `CreateClients`, `CreateRealm`), not an integer schema. The four
+mutating native ports and handlers reside in their `Requests.Commands` and
+`Handlers.Commands` namespaces. Authorization inventory dispositions name only
+those four commands and their existing handler-owned authority checks; they do
+not add a pipeline bypass or require an already-existing administrator during setup.
+
 ### Generated C# Client Shape
 
 The OpenAPI document defines wire shape; repository generation policy defines the checked-in C# shape. Pinned NSwag first emits POCO syntax, then `eng/tools/Explore.GeneratedContracts` converts structurally eligible response/value schemas into nominal records without changing JSON names, requiredness, nullability, HAL relations, operation methods, or wire payloads. Protocol inputs, nested request graphs, HAL resources, inherited schemas, clients, exceptions, file wrappers, and explicitly mutable UI/service contracts remain classes. Generated record properties are init-only except `[JsonExtensionData] AdditionalProperties`, which stays settable for System.Text.Json AOT compatibility.

@@ -11,6 +11,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests;
+using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Hateoas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -73,7 +74,7 @@ public sealed class InstanceKeycloakOperationsController(
         typeof(HalResource<KeycloakInspectionDto>),
         StatusCodes.Status200OK)]
     public async Task<ActionResult<HalResource<KeycloakInspectionDto>>> Inspect(
-        [FromBody] KeycloakInspectionCredentials input,
+        [FromBody] KeycloakInspectionCredentialsDto input,
         [FromServices] IResourceAssembler<
             KeycloakInspectionDto,
             KeycloakInspectionDto> assembler,
@@ -103,7 +104,7 @@ public sealed class InstanceKeycloakOperationsController(
         typeof(HalResource<KeycloakOperationDto>),
         StatusCodes.Status200OK)]
     public async Task<ActionResult<HalResource<KeycloakOperationDto>>> Plan(
-        [FromBody] KeycloakOperationPlanInput input,
+        [FromBody] KeycloakOperationPlanInputDto input,
         [FromServices] IResourceAssembler<
             KeycloakOperationDto,
             KeycloakOperationDto> assembler,
@@ -168,7 +169,7 @@ public sealed class InstanceKeycloakOperationsController(
         StatusCodes.Status200OK)]
     public Task<ActionResult<HalResource<KeycloakOperationDto>>> Apply(
         Guid operationId,
-        [FromBody] KeycloakOperationCredentials input,
+        [FromBody] KeycloakOperationCredentialsDto input,
         [FromServices] IResourceAssembler<
             KeycloakOperationDto,
             KeycloakOperationDto> assembler,
@@ -195,7 +196,7 @@ public sealed class InstanceKeycloakOperationsController(
         StatusCodes.Status200OK)]
     public Task<ActionResult<HalResource<KeycloakOperationDto>>> Reconcile(
         Guid operationId,
-        [FromBody] KeycloakOperationCredentials input,
+        [FromBody] KeycloakOperationCredentialsDto input,
         [FromServices] IResourceAssembler<
             KeycloakOperationDto,
             KeycloakOperationDto> assembler,

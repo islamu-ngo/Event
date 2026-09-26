@@ -85134,7 +85134,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakInspectionCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakInspectionCredentialsDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -85142,7 +85142,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationPlanInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationPlanInputDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -85158,7 +85158,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentialsDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -85166,7 +85166,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentialsDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -85299,7 +85299,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakInspectionCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakInspectionDto> InspectInstanceKeycloakAsync(KeycloakInspectionCredentialsDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -85389,7 +85389,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationPlanInput body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> PlanInstanceKeycloakAsync(KeycloakOperationPlanInputDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -85576,7 +85576,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ApplyInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentialsDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (operationId == null)
                 throw new System.ArgumentNullException("operationId");
@@ -85671,7 +85671,7 @@ namespace Explore.Blazor.Client.Clients
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentials body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<HalResourceOfKeycloakOperationDto> ReconcileInstanceKeycloakOperationAsync(System.Guid operationId, KeycloakOperationCredentialsDto body, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (operationId == null)
                 throw new System.ArgumentNullException("operationId");
@@ -187403,7 +187403,7 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakInspectionCredentials
+    public partial class KeycloakInspectionCredentialsDto
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("administratorUsername")]
@@ -187464,7 +187464,7 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakOperationCredentials
+    public partial class KeycloakOperationCredentialsDto
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("administratorUsername")]
@@ -187539,11 +187539,27 @@ namespace Explore.Blazor.Client.Clients
 }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class KeycloakOperationPlanInput
+    public enum KeycloakOperationIntent
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"RepairClient")]
+        RepairClient = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"CreateClients")]
+        CreateClients = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"CreateRealm")]
+        CreateRealm = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class KeycloakOperationPlanInputDto
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("intent")]
-        public int? Intent { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<KeycloakOperationIntent>))]
+        public KeycloakOperationIntent? Intent { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("administratorUsername")]
         public string? AdministratorUsername { get; set; } = default!;

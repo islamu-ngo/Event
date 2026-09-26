@@ -4,7 +4,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
-using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Features.InstanceOnboarding.Requests;
 using Explore.Domain.Keycloak;
 
 namespace Explore.Application.Features.InstanceOnboarding.Services;

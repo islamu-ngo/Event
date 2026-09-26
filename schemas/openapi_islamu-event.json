@@ -63194,12 +63194,12 @@
           "content": {
             "application/json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakInspectionCredentials"
+                "$ref": "#/components/schemas/KeycloakInspectionCredentialsDto"
               }
             },
             "application/*+json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakInspectionCredentials"
+                "$ref": "#/components/schemas/KeycloakInspectionCredentialsDto"
               }
             }
           },
@@ -63255,12 +63255,12 @@
           "content": {
             "application/json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakOperationPlanInput"
+                "$ref": "#/components/schemas/KeycloakOperationPlanInputDto"
               }
             },
             "application/*+json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakOperationPlanInput"
+                "$ref": "#/components/schemas/KeycloakOperationPlanInputDto"
               }
             }
           },
@@ -63396,12 +63396,12 @@
           "content": {
             "application/json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+                "$ref": "#/components/schemas/KeycloakOperationCredentialsDto"
               }
             },
             "application/*+json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+                "$ref": "#/components/schemas/KeycloakOperationCredentialsDto"
               }
             }
           },
@@ -63466,12 +63466,12 @@
           "content": {
             "application/json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+                "$ref": "#/components/schemas/KeycloakOperationCredentialsDto"
               }
             },
             "application/*+json; v=0.1": {
               "schema": {
-                "$ref": "#/components/schemas/KeycloakOperationCredentials"
+                "$ref": "#/components/schemas/KeycloakOperationCredentialsDto"
               }
             }
           },
@@ -158334,7 +158334,7 @@
           }
         }
       },
-      "KeycloakInspectionCredentials": {
+      "KeycloakInspectionCredentialsDto": {
         "type": "object",
         "properties": {
           "administratorUsername": {
@@ -158397,7 +158397,7 @@
           }
         }
       },
-      "KeycloakOperationCredentials": {
+      "KeycloakOperationCredentialsDto": {
         "type": "object",
         "properties": {
           "administratorUsername": {
@@ -158471,9 +158471,14 @@
         }
       },
       "KeycloakOperationIntent": {
-        "type": "integer"
+        "enum": [
+          "RepairClient",
+          "CreateClients",
+          "CreateRealm"
+        ],
+        "type": "string"
       },
-      "KeycloakOperationPlanInput": {
+      "KeycloakOperationPlanInputDto": {
         "type": "object",
         "properties": {
           "intent": {

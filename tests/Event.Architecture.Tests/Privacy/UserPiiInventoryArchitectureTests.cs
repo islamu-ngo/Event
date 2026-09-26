@@ -260,12 +260,12 @@ public sealed class UserPiiInventoryArchitectureTests
             || entry.OwnershipKey.Contains("Organization.OwnerUserId", StringComparison.Ordinal))).IsFalse();
 
         UserPiiInventoryEntry omittedProvider = UserPiiInventory.Entries
-            .Single(entry => entry.Copy == "provider:keycloak:platform-managed-account");
+            .Single(entry => entry.Copy == "provider:keycloak:upstream-session");
         string[] providerOmissionErrors = Validate(
             UserPiiInventory.Entries.Where(entry => entry != omittedProvider).ToArray(),
             expectedEntries: UserPiiInventory.Entries);
         await Assert.That(providerOmissionErrors)
-            .IsEquivalentTo(["missing: provider:keycloak:platform-managed-account"]);
+            .IsEquivalentTo(["missing: provider:keycloak:upstream-session"]);
 
         UserPiiInventoryEntry valid = UserPiiInventory.Entries[0];
         UserPiiInventoryEntry[] malformed =

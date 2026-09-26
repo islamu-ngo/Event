@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json.Serialization;
+using Explore.Application.Features.InstanceOnboarding.Requests;
 
 namespace Explore.Application.DTOs.Onboarding;
 
@@ -41,15 +43,8 @@ public sealed record KeycloakOperationDto(
     IReadOnlyList<string> Steps,
     IReadOnlyList<KeycloakStepOutcomeDto> Outcomes);
 
-public enum KeycloakOperationIntent
-{
-    RepairClient,
-    CreateClients,
-    CreateRealm
-}
-
 /// <summary>Write-only inspection credentials. This type must never be returned or logged.</summary>
-public class KeycloakInspectionCredentials
+public record KeycloakInspectionCredentialsDto
 {
     [JsonPropertyName("administratorUsername")]
     public string? AdministratorUsername { get; init; }
@@ -57,15 +52,17 @@ public class KeycloakInspectionCredentials
     [JsonPropertyName("administratorPassword")]
     public string? AdministratorPassword { get; init; }
 
-    public override string ToString() => GetType().Name;
+    public sealed override string ToString() => GetType().Name;
+
+    protected virtual bool PrintMembers(StringBuilder builder) => false;
 }
 
 /// <summary>Closed reviewed intent plus fresh inspection credentials.</summary>
-public sealed class KeycloakOperationPlanInput : KeycloakInspectionCredentials
+public sealed record KeycloakOperationPlanInputDto : KeycloakInspectionCredentialsDto
 {
     [JsonPropertyName("intent")]
     public KeycloakOperationIntent? Intent { get; init; }
 }
 
 /// <summary>Write-only credentials used to apply or reconcile a persisted receipt.</summary>
-public sealed class KeycloakOperationCredentials : KeycloakInspectionCredentials;
+public sealed record KeycloakOperationCredentialsDto : KeycloakInspectionCredentialsDto;

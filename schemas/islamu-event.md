@@ -8212,7 +8212,7 @@ Ref: "event_resource_audit_entries".("tenant_id", "event_resource_id") > "event_
 // Keycloak Operator Safety Receipts
 // ============================================================
 
-Table "KeycloakOperationReceipts" {
+Table "keycloak_operation_receipts" {
   "id" uuid [pk, not null, note: 'Application-generated UUIDv7 operation identity.']
   "change_set" varchar(4096) [not null, note: 'Typed application-owned JSON containing only allowlisted step projections, target identifiers, preconditions and fingerprints.']
   "target_instance_id" uuid [not null]

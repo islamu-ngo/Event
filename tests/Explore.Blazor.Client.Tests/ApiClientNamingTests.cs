@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Extensions;
@@ -98,8 +99,15 @@ public class ApiClientNamingTests
 
         await Assert.That(clientTypes).IsNotEmpty()
             .Because("Reflection target GeneratedEventApiClients.ClientTypes must resolve from the Explore.Blazor.Client assembly.");
-        await Assert.That(clientTypes.Count).IsEqualTo(175)
-            .Because("Generated client registry should reflect all 175 OpenAPI tag client pairs.");
+        using var schema = JsonDocument.Parse(File.ReadAllText(GetOpenApiSchemaPath()));
+        var tagCount = schema.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Where(operation => operation.Value.TryGetProperty("operationId", out _))
+            .Select(operation => operation.Value.GetProperty("tags")[0].GetString())
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        await Assert.That(clientTypes.Count).IsEqualTo(tagCount)
+            .Because("Every first-tag OpenAPI client must be discoverable from the generated assembly.");
 
         foreach (var pair in clientTypes)
         {
@@ -285,6 +293,10 @@ public class ApiClientNamingTests
             .Select(m => m.Name)
             .Distinct(StringComparer.Ordinal)
             .ToList();
+
+    private static string GetOpenApiSchemaPath() => Path.GetFullPath(Path.Combine(
+        AppContext.BaseDirectory,
+        "../../../../../schemas/openapi_islamu-event.json"));
 
     private static string GetGeneratedClientSource()
     {

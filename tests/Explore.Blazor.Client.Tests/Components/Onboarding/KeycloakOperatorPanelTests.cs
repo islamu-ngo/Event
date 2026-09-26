@@ -1,4 +1,5 @@
 using AngleSharp.Dom;
+using System.Text.Json;
 using Explore.Blazor.Client.Components.Onboarding;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Tests.Common;
@@ -118,7 +119,7 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(Connection("inspect"));
         _service.InspectKeycloakAsync(
-                Arg.Any<KeycloakInspectionCredentials>(),
+                Arg.Any<KeycloakInspectionCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Inspection("plan"));
         var cut = Render();
@@ -133,7 +134,7 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
         cut.WaitForElement(
             "[data-testid=keycloak-plan-action]");
         await _service.Received(1).InspectKeycloakAsync(
-            Arg.Is<KeycloakInspectionCredentials>(input =>
+            Arg.Is<KeycloakInspectionCredentialsDto>(input =>
                 input.AdministratorUsername == username
                 && input.AdministratorPassword == password),
             Arg.Any<CancellationToken>());
@@ -143,24 +144,73 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
     }
 
     [Test]
+    public async Task SelectingIntentSendsStringEnumAndKeepsCredentialsOutOfReceipt()
+    {
+        _service.GetKeycloakConnectionAsync(Arg.Any<CancellationToken>())
+            .Returns(Connection("inspect"));
+        _service.InspectKeycloakAsync(
+                Arg.Any<KeycloakInspectionCredentialsDto>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Inspection("plan"));
+        KeycloakOperationPlanInputDto? sent = null;
+        _service.PlanKeycloakOperationAsync(
+                Arg.Do<KeycloakOperationPlanInputDto>(input => sent = input),
+                Arg.Any<CancellationToken>())
+            .Returns(Operation("Previewed"));
+        var cut = Render();
+        cut.WaitForElement("[data-testid=keycloak-inspect-action]");
+        await SetCredentialsAsync(cut, "admin", "inspect-secret");
+        await cut.Find("[data-testid=keycloak-inspect-action]")
+            .ClickAsync(new MouseEventArgs());
+
+        var options = cut.FindComponents<MudSelectItem<KeycloakOperationIntent?>>()
+            .Select(item => item.Instance.Value)
+            .ToArray();
+        await Assert.That(options).IsEquivalentTo(new KeycloakOperationIntent?[]
+        {
+            KeycloakOperationIntent.RepairClient,
+            KeycloakOperationIntent.CreateClients,
+            KeycloakOperationIntent.CreateRealm
+        });
+        var selector = cut.FindComponent<MudSelect<KeycloakOperationIntent?>>().Instance;
+        await Assert.That(selector.Value).IsEqualTo(KeycloakOperationIntent.RepairClient);
+        await cut.InvokeAsync(() => selector.ValueChanged.InvokeAsync(KeycloakOperationIntent.CreateRealm));
+        await SetCredentialsAsync(cut, "admin", "plan-secret");
+        await cut.Find("[data-testid=keycloak-plan-action]")
+            .ClickAsync(new MouseEventArgs());
+
+        await Assert.That(sent).IsNotNull();
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(sent!));
+        await Assert.That(payload.RootElement.GetProperty("intent").GetString())
+            .IsEqualTo("CreateRealm");
+        await Assert.That(payload.RootElement.GetProperty("administratorUsername").GetString())
+            .IsEqualTo("admin");
+        await Assert.That(payload.RootElement.GetProperty("administratorPassword").GetString())
+            .IsEqualTo("plan-secret");
+        await Assert.That(CredentialValues(cut))
+            .IsEquivalentTo([string.Empty, string.Empty]);
+        await Assert.That(cut.Markup).DoesNotContain("plan-secret");
+    }
+
+    [Test]
     public async Task ApplyRequiresConfirmationAndUnknownOutcomeOffersReconcile()
     {
         _service.GetKeycloakConnectionAsync(
                 Arg.Any<CancellationToken>())
             .Returns(Connection("inspect"));
         _service.InspectKeycloakAsync(
-                Arg.Any<KeycloakInspectionCredentials>(),
+                Arg.Any<KeycloakInspectionCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Inspection("plan"));
         _service.PlanKeycloakOperationAsync(
-                Arg.Any<KeycloakOperationPlanInput>(),
+                Arg.Any<KeycloakOperationPlanInputDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Operation(
                 "Previewed",
                 links: ["apply", "cancel"]));
         _service.ApplyKeycloakOperationAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<KeycloakOperationCredentials>(),
+                Arg.Any<KeycloakOperationCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Operation(
                 "OutcomeUnknown",
@@ -231,7 +281,7 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(Connection("inspect"));
         _service.InspectKeycloakAsync(
-                Arg.Any<KeycloakInspectionCredentials>(),
+                Arg.Any<KeycloakInspectionCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns<Task<HalResourceOfKeycloakInspectionDto>>(_ =>
                 throw new HttpRequestException(
@@ -264,7 +314,7 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(Connection("inspect"));
         _service.InspectKeycloakAsync(
-                Arg.Any<KeycloakInspectionCredentials>(),
+                Arg.Any<KeycloakInspectionCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Inspection("plan"));
         HalResourceOfKeycloakOperationDto preview =
@@ -272,12 +322,12 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
                 "Previewed",
                 links: ["apply", "cancel", "self"]);
         _service.PlanKeycloakOperationAsync(
-                Arg.Any<KeycloakOperationPlanInput>(),
+                Arg.Any<KeycloakOperationPlanInputDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(preview);
         _service.ApplyKeycloakOperationAsync(
                 Arg.Any<Guid>(),
-                Arg.Any<KeycloakOperationCredentials>(),
+                Arg.Any<KeycloakOperationCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns<Task<HalResourceOfKeycloakOperationDto>>(_ =>
                 throw new HttpRequestException(
@@ -333,11 +383,11 @@ public sealed class KeycloakOperatorPanelTests : IDisposable
                 Arg.Any<CancellationToken>())
             .Returns(Connection("inspect"));
         _service.InspectKeycloakAsync(
-                Arg.Any<KeycloakInspectionCredentials>(),
+                Arg.Any<KeycloakInspectionCredentialsDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Inspection("plan"));
         _service.PlanKeycloakOperationAsync(
-                Arg.Any<KeycloakOperationPlanInput>(),
+                Arg.Any<KeycloakOperationPlanInputDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(Operation(
                 "PartiallyApplied",

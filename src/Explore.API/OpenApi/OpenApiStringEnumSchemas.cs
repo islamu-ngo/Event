@@ -19,6 +19,7 @@ using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.EventReporting.Models;
+using Explore.Application.Features.InstanceOnboarding.Requests;
 using Explore.Application.Models;
 using Explore.Application.Models.PublicExperience;
 using Explore.Application.Onboarding;
@@ -132,6 +133,7 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(HomeDiscoveryMode),
         typeof(HomeDiscoverySectionStatus),
         typeof(IntegrationSyncRecoveryDecision),
+        typeof(KeycloakOperationIntent),
         typeof(LocationAddressSourceEnum),
         typeof(LocationAddressVisibilityEnum),
         typeof(ManagedProviderOrganizerKindDto),

@@ -166,19 +166,19 @@
                     <legend>
                         @T("ui.keycloak.operator.planLegend", "Reviewed operation intent")
                     </legend>
-                    <MudSelect T="int?"
+                    <MudSelect T="KeycloakOperationIntent?"
                                Label="@T("ui.keycloak.operator.intent", "Operation intent")"
                                Value="@_intent"
                                ValueChanged="ChangeIntent"
                                Variant="Variant.Outlined"
                                data-testid="keycloak-operation-intent">
-                        <MudSelectItem T="int?" Value="@((int?)0)">
+                        <MudSelectItem T="KeycloakOperationIntent?" Value="@(KeycloakOperationIntent.RepairClient)">
                             @T("ui.keycloak.operator.repairClient", "Repair client mappers")
                         </MudSelectItem>
-                        <MudSelectItem T="int?" Value="@((int?)1)">
+                        <MudSelectItem T="KeycloakOperationIntent?" Value="@(KeycloakOperationIntent.CreateClients)">
                             @T("ui.keycloak.operator.createClients", "Create absent clients")
                         </MudSelectItem>
-                        <MudSelectItem T="int?" Value="@((int?)2)">
+                        <MudSelectItem T="KeycloakOperationIntent?" Value="@(KeycloakOperationIntent.CreateRealm)">
                             @T("ui.keycloak.operator.createRealm", "Create absent realm and clients")
                         </MudSelectItem>
                     </MudSelect>
@@ -325,7 +325,7 @@
     private string _administratorPassword = string.Empty;
     private string _confirmation = string.Empty;
     private string? _error;
-    private int? _intent = 0;
+    private KeycloakOperationIntent? _intent = KeycloakOperationIntent.RepairClient;
     private bool _loading = true;
     private bool _busy;
     private bool _ambiguousApplyFailure;
@@ -556,7 +556,7 @@
     }
 
     private async Task ExecuteReceiptActionAsync(
-        Func<KeycloakOperationCredentials, Task<HalResourceOfKeycloakOperationDto>> action,
+        Func<KeycloakOperationCredentialsDto, Task<HalResourceOfKeycloakOperationDto>> action,
         string failure)
     {
         _busy = true;
@@ -667,14 +667,14 @@
         }
     }
 
-    private KeycloakInspectionCredentials CredentialsForInspection() =>
+    private KeycloakInspectionCredentialsDto CredentialsForInspection() =>
         new()
         {
             AdministratorUsername = _administratorUsername,
             AdministratorPassword = _administratorPassword
         };
 
-    private KeycloakOperationCredentials CredentialsForOperation() =>
+    private KeycloakOperationCredentialsDto CredentialsForOperation() =>
         new()
         {
             AdministratorUsername = _administratorUsername,
@@ -696,7 +696,7 @@
     private void UpdateConfirmation(string? value) =>
         _confirmation = value ?? string.Empty;
 
-    private void ChangeIntent(int? value)
+    private void ChangeIntent(KeycloakOperationIntent? value)
     {
         _intent = value;
         _operation = null;

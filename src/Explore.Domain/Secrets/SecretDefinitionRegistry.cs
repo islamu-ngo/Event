@@ -132,6 +132,11 @@ public static class SecretDefinitionRegistry
             public const string AgentBrowserPersonaPassword = "authentication.local.agent_browser_persona_password";
         }
 
+        public static class Redis
+        {
+            public const string AgentBrowserPassword = "redis.agent_browser_password";
+        }
+
         public static class IdentityDatabase
         {
             public const string ConnectionString = "identity_database.connection_string";
@@ -307,6 +312,17 @@ public static class SecretDefinitionRegistry
                 DefaultEnvironmentVariableName = "AGENT_BROWSER_PERSONA_PASSWORD",
                 IsBootstrapSecret = true,
                 Description = "Final Local credential for unfinished development agent personas.",
+            },
+            new()
+            {
+                Key = Keys.Redis.AgentBrowserPassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/api",
+                DefaultInfisicalKey = "AGENT_BROWSER_REDIS_PASSWORD",
+                DefaultEnvironmentVariableName = "AGENT_BROWSER_REDIS_PASSWORD",
+                IsBootstrapSecret = true,
+                Description = "Dedicated cache credential for the isolated development agent profile.",
             },
 
             // --- storage/STORAGE_S3_* ---

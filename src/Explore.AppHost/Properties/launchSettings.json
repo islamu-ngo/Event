@@ -1,6 +1,32 @@
 {
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
+    "local-agent": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:17075;http://localhost:15186",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ISLAMU_ASPIRE_MODE": "AgentBrowser",
+        "AGENT_BROWSER_SEED_ENABLED": "true",
+        "Hosting__Topology": "Split",
+        "IDENTITY_DATABASE_TOPOLOGY": "colocated",
+        "AUTHENTICATION_PROVIDER": "local",
+        "AUTHORIZATION_PROVIDER": "local",
+        "DATABASE_PROVIDER": "PostgreSql",
+        "DATABASE_NAME": "islamu_event_agent",
+        "CONFIGURATION_MANIFEST_MODE": "Off",
+        "ERASURE_DATABASE_TOPOLOGY": "EmbeddedSqlite",
+        "WEBHOOKS_PROVIDER": "Local",
+        "DEPLOYMENT_MODE": "multi_tenant",
+        "CONTROL_PLANE_PUBLIC_ORIGIN": "http://admin.localhost:5200",
+        "PUBLIC_BASE_URL": "http://default.localhost:5200",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21221",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22157"
+      }
+    },
     "local-default": {
       "commandName": "Project",
       "dotnetRunMessages": true,

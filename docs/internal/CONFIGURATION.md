@@ -285,6 +285,66 @@ an activated CLI, browser, desktop, or shared-presentation workflow.
 
 ## Aspire Hosting Topology
 
+### Isolated local agent browser profile
+
+`local-agent` is an explicit Development-only Aspire launch profile for real
+Local Identity browser sign-in and permission checks. It is not a deployment
+mode and is inert unless `AGENT_BROWSER_SEED_ENABLED=true` and
+`ISLAMU_ASPIRE_MODE=AgentBrowser` agree. Admission rejects non-Development,
+Standalone, external Identity, non-Local authentication or authorization,
+another database descriptor, and configuration-manifest import before AppHost
+registers child resources. The profile never chooses a secret authority: the
+operator must select Environment, Development User Secrets, or Infisical using
+the existing `SecretProvider` contract.
+
+Run it from the repository root:
+
+```bash
+dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj \
+  --launch-profile local-agent
+```
+
+The resource graph is intentionally small: PostgreSQL, Redis, Mailpit, migration
+service, API, and Blazor BFF. It does not register Keycloak, CockroachDB, Cerbos,
+the Cerbos database, RabbitMQ, MinIO, Svix, Formbricks, or heavy platform extras.
+Service discovery remains the BFF-to-API authority, and the API/BFF retain their
+migration and health dependencies. The artificial 30-second compatibility
+health delay is omitted; readiness reflects actual database, migration, API, and
+BFF state.
+
+| Surface or durable unit | Agent profile value |
+|---|---|
+| API | `http://localhost:5100` |
+| BFF discovery host | `http://localhost:5200` |
+| Default tenant | `http://default.localhost:5200` |
+| Instance administration | `http://admin.localhost:5200` |
+| Negative-control tenant | `http://agent-negative.localhost:5200` |
+| Mailpit SMTP / UI | `localhost:51025` / `http://localhost:58025` |
+| Primary database | PostgreSQL database `islamu_event_agent`, volume `islamu-event-agent-postgres-data` |
+| Cache | volume `islamu-event-agent-redis-data` |
+| Local object storage | `storage-data/aspire-agent` |
+| Embedded erasure authority | `privacy-erasure-authority-data/aspire-agent/privacy_erasure_authority.db` |
+
+The profile uses Local authentication, Local authorization, colocated Identity,
+embedded privacy-erasure authority, Local file storage, Local webhooks, and
+multi-tenant host resolution. Configuration-manifest mode is fixed off. Its
+PostgreSQL, Redis, Mailpit, storage, and erasure data do not share ordinary
+Aspire profile storage. The four existing launch profiles and their ports remain
+unchanged.
+
+Required credentials stay in the selected authority, never in launch settings:
+`AUTHENTICATION_LOCAL_JWT_KEY`, `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD`,
+`AGENT_BROWSER_PERSONA_PASSWORD`, `POSTGRESQL_USERNAME`,
+`POSTGRESQL_PASSWORD`, and `AGENT_BROWSER_REDIS_PASSWORD`. The two initialization passwords are required
+only while their owned credential transitions are incomplete; the Local JWT key
+is required on every launch. AppHost exposes the persona, bootstrap, and JWT
+secrets only to the API process. The migration service and BFF receive explicit
+empty overrides and no Infisical coordinates; PostgreSQL and Redis receive only
+their dedicated secret parameters. Port conflicts fail startup instead of selecting a
+new browser origin. Stopping the profile preserves all named volumes and local
+paths. Deleting its database, cache, storage, Mailpit, or erasure data is a
+separate destructive recovery action and requires explicit operator approval.
+
 `Hosting:Topology` is an AppHost-only setting for local Aspire composition; it
 does not change a deployed application's configuration source or migrate data.
 Its environment form is `Hosting__Topology`.

@@ -355,11 +355,14 @@ public sealed class EnvironmentCatalogueInvariantTests
     {
         EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
         EnvironmentVariableDefinition password = catalogue.Lookup("AGENT_BROWSER_PERSONA_PASSWORD")!;
+        EnvironmentVariableDefinition cachePassword = catalogue.Lookup("AGENT_BROWSER_REDIS_PASSWORD")!;
         EnvironmentVariableDefinition optIn = catalogue.Lookup("AGENT_BROWSER_SEED_ENABLED")!;
 
         await Assert.That(optIn.SafeDefault).IsEqualTo("false");
         await Assert.That(password.Sensitivity).IsEqualTo(EnvironmentVariableSensitivity.Secret);
         await Assert.That(password.SafeDefault).IsNull();
+        await Assert.That(cachePassword.Sensitivity).IsEqualTo(EnvironmentVariableSensitivity.Secret);
+        await Assert.That(cachePassword.SafeDefault).IsNull();
 
         string[] ordinary = catalogue.Relevant(new EnvironmentActivationContext(
             "split", ["identity", "deployment"], ["local"]))
@@ -375,9 +378,11 @@ public sealed class EnvironmentCatalogueInvariantTests
             .Select(item => item.Key).ToArray();
 
         await Assert.That(ordinary).DoesNotContain(password.Key);
+        await Assert.That(ordinary).DoesNotContain(cachePassword.Key);
         await Assert.That(wrongTopology).DoesNotContain(password.Key);
         await Assert.That(wrongProvider).DoesNotContain(password.Key);
         await Assert.That(agent).Contains(password.Key);
+        await Assert.That(agent).Contains(cachePassword.Key);
     }
 
     [Test]

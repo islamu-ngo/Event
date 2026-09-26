@@ -60,6 +60,12 @@ personas are complete, startup does not reread initialization passwords or
 restore changed credentials. Production Setup neither activates nor exports
 the agent-only credential.
 
+The agent profile's dedicated Redis container also resolves
+`redis.agent_browser_password` (`AGENT_BROWSER_REDIS_PASSWORD`) from the selected
+authority's `/api` Infisical folder, explicit environment injection, or
+Development User Secrets. It is a separate instance-scoped secret, not a
+derivative of the persona or database password, and has no source default.
+
 Diagnostics stay value-free. Logs, health output, and support evidence carry
 status and reason codes, never the configured subject, DID, email, profile
 names, or any fingerprint value.

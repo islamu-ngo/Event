@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Explore.Domain;
+using Explore.Domain.Secrets;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -64,6 +65,10 @@ internal static partial class PortableRelationalModelPolicy
             else if (providerName == MySqlProvider && entityType.ClrType == typeof(WebhookConsumerProviderBinding))
             {
                 ConfigureMySqlWebhookProviderBindingUniqueness(entityType);
+            }
+            else if (providerName == MySqlProvider && entityType.ClrType == typeof(SecretBinding))
+            {
+                ConfigureMySqlSecretBindingUniqueness(entityType);
             }
 
             NormalizeProperties(entityType, providerName);
@@ -400,6 +405,27 @@ internal static partial class PortableRelationalModelPolicy
                 index.SetFilter(NormalizeBooleanLiterals(filter, providerName));
             }
         }
+    }
+
+    private static void ConfigureMySqlSecretBindingUniqueness(IMutableEntityType entityType)
+    {
+        var instanceIndex = entityType.GetIndexes().Single(index =>
+            index.GetDatabaseName() == "ix_secret_bindings_setting_key_instance_unique");
+        entityType.RemoveIndex(instanceIndex);
+
+        // These engines ignore index filters. NULL slots exempt tenant rows while
+        // the existing scope consistency CHECK binds this integer scope to ScopeId.
+        // Avoid CHAR ScopeId expressions: MariaDB rejects their sql_mode dependency.
+        var slot = entityType.AddProperty("InstanceSlot", typeof(int?));
+        slot.IsNullable = true;
+        slot.SetColumnName("instance_slot");
+        slot.SetComputedColumnSql("CASE WHEN setting_scope_id = 1 THEN 1 ELSE NULL END");
+        slot.SetIsStored(true);
+        slot.ValueGenerated = ValueGenerated.OnAddOrUpdate;
+
+        var index = entityType.AddIndex([.. instanceIndex.Properties, slot]);
+        index.IsUnique = true;
+        index.SetDatabaseName("ix_secret_bindings_setting_key_instance_unique");
     }
 
     private static void ConfigureMySqlExternalBindingUniqueness(IMutableEntityType entityType)

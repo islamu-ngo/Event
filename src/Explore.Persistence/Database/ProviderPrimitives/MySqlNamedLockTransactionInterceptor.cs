@@ -7,22 +7,24 @@ namespace Explore.Persistence.Database;
 
 internal sealed class MySqlNamedLockTransactionInterceptor : DbTransactionInterceptor, IDbConnectionInterceptor
 {
-    private readonly ConcurrentDictionary<DbTransaction, HashSet<string>> _locks = new();
+    private readonly ConcurrentDictionary<DbTransaction, (DbConnection Connection, HashSet<string> Resources)> _locks = new();
 
     public static MySqlNamedLockTransactionInterceptor Instance { get; } = new();
 
     public bool IsTracked(DbTransaction transaction, string resource)
     {
-        return _locks.TryGetValue(transaction, out HashSet<string>? resources)
-            && Contains(resources, resource);
+        return _locks.TryGetValue(transaction, out var locks)
+            && Contains(locks.Resources, resource);
     }
 
     public void Track(DbTransaction transaction, string resource)
     {
-        HashSet<string> resources = _locks.GetOrAdd(transaction, static _ => new(StringComparer.Ordinal));
-        lock (resources)
+        var locks = _locks.GetOrAdd(transaction, static owner => (
+            Connection: owner.Connection ?? throw new InvalidOperationException("Named locks require an active transaction."),
+            Resources: new HashSet<string>(StringComparer.Ordinal)));
+        lock (locks.Resources)
         {
-            resources.Add(resource);
+            locks.Resources.Add(resource);
         }
     }
 
@@ -85,24 +87,26 @@ internal sealed class MySqlNamedLockTransactionInterceptor : DbTransactionInterc
     }
 
     private DbTransaction[] TransactionsFor(DbConnection connection) =>
-        _locks.Keys.Where(transaction => ReferenceEquals(transaction.Connection, connection)).ToArray();
+        _locks.Where(entry => ReferenceEquals(entry.Value.Connection, connection))
+            .Select(entry => entry.Key)
+            .ToArray();
 
     internal void ReleaseTracked(DbTransaction transaction)
     {
-        if (!_locks.TryRemove(transaction, out HashSet<string>? resources))
+        if (!_locks.TryRemove(transaction, out var locks))
         {
             return;
         }
 
-        DbConnection? connection = transaction.Connection;
-        if (connection is null || connection.State != ConnectionState.Open)
+        DbConnection connection = locks.Connection;
+        if (connection.State != ConnectionState.Open)
         {
             return;
         }
 
         try
         {
-            foreach (string resource in Snapshot(resources))
+            foreach (string resource in Snapshot(locks.Resources))
             {
                 RelationalNamedLock.ReleaseMySql(connection, resource);
             }
@@ -116,13 +120,13 @@ internal sealed class MySqlNamedLockTransactionInterceptor : DbTransactionInterc
 
     private async Task ReleaseAsync(DbTransaction transaction)
     {
-        if (!_locks.TryRemove(transaction, out HashSet<string>? resources))
+        if (!_locks.TryRemove(transaction, out var locks))
         {
             return;
         }
 
-        DbConnection? connection = transaction.Connection;
-        if (connection is null || connection.State != ConnectionState.Open)
+        DbConnection connection = locks.Connection;
+        if (connection.State != ConnectionState.Open)
         {
             return;
         }
@@ -130,7 +134,7 @@ internal sealed class MySqlNamedLockTransactionInterceptor : DbTransactionInterc
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            foreach (string resource in Snapshot(resources))
+            foreach (string resource in Snapshot(locks.Resources))
             {
                 await RelationalNamedLock.ReleaseMySqlAsync(connection, resource, timeout.Token)
                     .ConfigureAwait(false);

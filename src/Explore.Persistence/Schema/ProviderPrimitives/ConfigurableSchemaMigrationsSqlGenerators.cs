@@ -3,6 +3,7 @@ using System.Reflection;
 using Explore.Persistence.Database;
 using Microting.EntityFrameworkCore.MySql.Infrastructure.Internal;
 using Microting.EntityFrameworkCore.MySql.Migrations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -81,6 +82,43 @@ internal sealed class ConfigurableSqliteMigrationsSqlGenerator(
             sqlite: true);
         executableOperations =
             ConfigurableSchemaMigrationOperations.RemoveRedundantForeignKeyDrops(executableOperations);
+        if (executableOperations.Any(operation => operation is RenameIndexOperation))
+        {
+            var relationalModel = (model ?? throw new InvalidOperationException(
+                "SQLite index renames require the migration target model.")).GetRelationalModel();
+            var rewritten = new List<MigrationOperation>(executableOperations.Count);
+            foreach (MigrationOperation operation in executableOperations)
+            {
+                if (operation is not RenameIndexOperation rename)
+                {
+                    rewritten.Add(operation);
+                    continue;
+                }
+
+                ITableIndex index = relationalModel.FindTable(rename.Table, rename.Schema)?.Indexes
+                    .SingleOrDefault(value => value.Name == rename.NewName)
+                    // Earlier Down target models omit the receipt table, but the source index
+                    // remains in the current design-time model with the inverse rename's name.
+                    ?? Dependencies.CurrentContext.Context.GetService<IDesignTimeModel>().Model
+                        .GetRelationalModel().Tables
+                        .SelectMany(table => table.Indexes)
+                        .SingleOrDefault(value => value.Name == rename.Name)
+                    ?? throw new InvalidOperationException(
+                        $"SQLite migration target is missing index '{rename.NewName}' on '{rename.Table}'.");
+                rewritten.Add(new DropIndexOperation
+                {
+                    Name = rename.Name,
+                    Table = rename.Table,
+                    Schema = rename.Schema
+                });
+                CreateIndexOperation create = CreateIndexOperation.CreateFrom(index);
+                create.Name = rename.NewName;
+                create.Table = rename.Table;
+                create.Schema = rename.Schema;
+                rewritten.Add(create);
+            }
+            executableOperations = rewritten;
+        }
         IReadOnlyList<MigrationCommand> commands =
             base.Generate(executableOperations, model, options);
         commands = ConfigurableSchemaMigrationOperations.WrapSqliteTableDrops(

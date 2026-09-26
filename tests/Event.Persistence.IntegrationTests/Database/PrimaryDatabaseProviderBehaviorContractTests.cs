@@ -919,6 +919,11 @@ public sealed class ContainerizedPrimaryDatabaseProviderBehaviorContractTests(
             .AssertDataProtectionKeyRingSurvivesProviderRecreationAsync(fixture);
         await PrimaryDatabaseProviderBehaviorContractTests
             .AssertUnicodeAddressSuggestionContractAsync(fixture);
+        if (provider is PrimaryDatabaseProvider.MariaDb or PrimaryDatabaseProvider.MySql)
+        {
+            await SecretBindingProviderContractTests.AssertScopeUniquenessAsync(fixture, string.Empty);
+            await SecretBindingProviderContractTests.AssertScopeUniquenessAsync(fixture, "provider-a");
+        }
     }
 
     private static async Task MigrateAsync(

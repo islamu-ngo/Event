@@ -1,6 +1,7 @@
 using System;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;
+using Explore.Domain.Constants;
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Tenant.Validators;
@@ -39,7 +40,9 @@ public class UpdateTenantSlugDtoValidator : AbstractValidator<UpdateTenantSlugDt
     {
         RuleFor(dto => dto.Value)
             .NotEmpty().WithMessage("Slug is required")
+            .MinimumLength(3).WithMessage("Slug must be at least 3 characters")
             .MaximumLength(500).WithMessage("Slug cannot exceed 500 characters")
-            .Matches("^[a-z0-9-]+$").WithMessage("Slug must contain only lowercase letters, numbers, and hyphens");
+            .Must(slug => slug is null || !ReservedTenantSlugs.IsReserved(slug)).WithMessage("Slug is reserved")
+            .Matches("^[a-z0-9]+(-[a-z0-9]+)*$").WithMessage("Slug must contain only lowercase letters, numbers, and single hyphens between segments");
     }
 }

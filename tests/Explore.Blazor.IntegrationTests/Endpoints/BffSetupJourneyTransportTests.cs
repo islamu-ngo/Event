@@ -46,7 +46,7 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         var ct = timeout.Token;
         string secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         Guid userId = Guid.CreateVersion7();
-        var captures = new System.Collections.Concurrent.ConcurrentQueue<(bool Bearer, bool Setup, bool Cookie)>();
+        var captures = new System.Collections.Concurrent.ConcurrentQueue<(bool Bearer, bool Setup, bool SetupHeader, bool Cookie)>();
         var circuitResult = new TaskCompletionSource<CircuitIdentityObservation>(TaskCreationOptions.RunContinuationsAsynchronously);
         var syncTokens = new System.Collections.Concurrent.ConcurrentQueue<string>();
         ClaimsPrincipal? callbackPrincipal = null;
@@ -57,10 +57,11 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         await using var upstream = builder.Build();
         upstream.MapGet("/api/instanceonboarding/journey", (HttpContext context) =>
         {
-            bool bearer = context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.Ordinal);
+            bool bearer = providerAccessToken is not null
+                && context.Request.Headers.Authorization.ToString() == "Bearer " + providerAccessToken;
             bool setup = context.Request.Headers["X-Setup-Secret"] == secret;
-            captures.Enqueue((bearer, setup, context.Request.Headers.ContainsKey("Cookie")));
-            return setup ? Results.Json(new
+            captures.Enqueue((bearer, setup, context.Request.Headers.ContainsKey("X-Setup-Secret"), context.Request.Headers.ContainsKey("Cookie")));
+            return bearer && setup ? Results.Json(new
             {
                 state = "Available",
                 generation = "transport-test",
@@ -70,7 +71,7 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
                 authorization = new { provider = "local", state = "Ready" },
                 preflight = new { isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>() },
                 _links = new { refresh = new { href = "/api/instanceonboarding/journey" } }
-            }) : Results.Problem(statusCode: 403);
+            }) : Results.Problem(statusCode: bearer ? 403 : 401);
         });
         foreach (string path in new[] { "/api/events", "/api/instanceonboarding/journey/details", "/api/instanceonboarding/journey-report" })
             upstream.MapGet(path, (HttpContext context) => Results.Json(new
@@ -222,6 +223,7 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
         }
         using var proxyRequest = new HttpRequestMessage(HttpMethod.Get, "/api/instanceonboarding/journey");
         proxyRequest.Headers.Add("X-Setup-Secret", Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+        proxyRequest.Headers.Add("Authorization", "Bearer " + Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
         using var proxy = await SendAsync(proxyRequest);
         var final = captures.Last();
         await Assert.That(final.Bearer).IsTrue();
@@ -255,8 +257,18 @@ public sealed class BffSetupJourneyTransportTests(BffKeycloakFixture keycloak)
             using var denied = await SendAsync(deniedRequest);
             await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
             var rejected = captures.Last();
-            await Assert.That(rejected.Bearer && !rejected.Setup && !rejected.Cookie).IsTrue();
+            await Assert.That(rejected.Bearer && !rejected.Setup && !rejected.SetupHeader && !rejected.Cookie).IsTrue();
         }
+        // A well-formed protected cookie is transport provenance, not proof that its secret is active.
+        string wrongSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string protectedWrongSecret = factory.Services.GetRequiredService<ISetupSecretCookieProtector>().Protect(wrongSecret);
+        cookies.Add(browser.BaseAddress!, new Cookie("setup-secret", protectedWrongSecret, "/") { Secure = true });
+        using var staleRequest = new HttpRequestMessage(HttpMethod.Get, "/api/instanceonboarding/journey");
+        staleRequest.Headers.Add("X-Setup-Secret", secret);
+        using var stale = await SendAsync(staleRequest);
+        await Assert.That(stale.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        var staleCapture = captures.Last();
+        await Assert.That(staleCapture.Bearer && !staleCapture.Setup && staleCapture.SetupHeader && !staleCapture.Cookie).IsTrue();
     }
 
     private sealed record CircuitIdentityObservation(ClaimsPrincipal Principal, string? Token, bool Journey);

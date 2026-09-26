@@ -48,10 +48,15 @@ kind/country selectors; document HAL and revision still own editing. The generat
 `HalResourceOfOperatorIdentityFormOptionsDto` is registered in
 `AppJsonSerializerContext`, including unknown extension-data round-tripping.
 
-For exact authenticated GET status/journey calls, the server-side
-`SetupSecretForwardingHandler` strips stale setup authority and retains the
-forwarded bearer, matching the shared BFF request enricher. Anonymous setup reads
-and completion writes keep their existing setup-secret requirements. No token is
+For exact authenticated GET status calls, the server-side
+`SetupSecretForwardingHandler` omits setup authority and retains the forwarded
+bearer, matching the shared BFF request enricher. Exact GET journey calls retain
+both the bearer and independently resolved setup credential: a signed-in
+pre-administrator still needs setup authority. The API selects bearer authentication
+for that read and independently checks active setup or persisted administrator
+authority, so a stale setup cookie cannot replace the ordinary principal after
+completion. Credential forwarding is not a setup-lifecycle decision. Anonymous
+setup reads and completion writes keep their existing requirements; no token is
 exposed to a browser component.
 
 ## Project Roles
@@ -222,7 +227,7 @@ Setup-secret handling is intentionally BFF-owned:
 5. Setup-secret validation is rate-limited at the BFF edge and again at the API edge.
 6. Completed Interactive and ConfiguredAdministrator states retain their canonical Local, Keycloak, or Atproto provider. The BFF admits fresh sign-in for those completed states without reopening setup authority; unknown providers and inconsistent status remain closed.
 7. A fresh Local sign-in with server-verified instance-administrator authority and completed setup defaults to `/settings/instance?section=getting-started` instead of loading the public shell. Explicit safe return URLs and non-administrator destinations remain unchanged.
-8. Browser-proxied exact `GET /api/instanceonboarding/status` and `GET /api/instanceonboarding/journey` retain the BFF-owned bearer identity when present. Those authenticated reads omit setup-secret authority so an old setup cookie cannot shadow the ordinary session after completion. Anonymous bootstrap requests and other onboarding routes keep their existing treatment; browser-supplied authority headers remain stripped.
+8. Browser-proxied exact `GET /api/instanceonboarding/status` and `GET /api/instanceonboarding/journey` retain the BFF-owned bearer identity when present. Authenticated status omits the setup credential; journey may carry an independently resolved setup credential alongside the bearer. The BFF has no authoritative completion snapshot in this forwarding path and must not infer one from sign-in or roles. On journey, API bearer validation takes precedence and active setup or persisted administrator authority is checked independently ([API contract](API.md#canonical-instance-onboarding-journey)). After completion a retained setup credential grants nothing: the administrator can still read, but another authenticated account cannot. Browser-supplied authority headers remain stripped.
 6. The BFF limiter partitions requests by authenticated user when available, then antiforgery/session cookie state, then IP as the final fallback.
 
 When debugging onboarding, check both BFF setup-secret endpoints and API setup-secret validation rather than adding client-side storage shortcuts.

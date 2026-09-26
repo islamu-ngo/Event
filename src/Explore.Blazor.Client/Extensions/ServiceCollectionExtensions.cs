@@ -20,6 +20,7 @@ using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Contracts.Services.SupportAccess;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;
 using Explore.Blazor.Client.Contracts.Services.Waitlist;
+using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Pages.Studio;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Admissions;
@@ -56,6 +57,10 @@ public static class ServiceCollectionExtensions
         Action<IServiceProvider, HttpClient>? configureBffRefitClient = null,
         Action<IHttpClientBuilder>? configureBffRefitClientBuilder = null)
     {
+        // The server supplies the scoped request snapshot; components consume its interface.
+        services.AddScoped<IOnboardingRequestOrigin>(provider =>
+            provider.GetRequiredService<OnboardingRequestOrigin>());
+
         // Domain services backed by specific NSwag per-tag clients
         services.AddScoped<IApiClientExecutor, ApiClientExecutor>();
         services.AddScoped<AdmissionScannerCapabilityState>();

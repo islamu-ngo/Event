@@ -1,13 +1,17 @@
 using System.Net;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using Event.Standalone.Middleware;
 using Event.Web.BffHosting.Abstractions;
 using Event.Web.BffHosting.Security;
 using Explore.Application.Constants;
+using Explore.Blazor.Extensions;
+using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
@@ -38,23 +42,78 @@ public sealed class CombinedApiBridgeMiddlewareTests
     }
 
     [Test]
-    [Arguments("/api/instanceonboarding/status")]
-    [Arguments("/api/instanceonboarding/journey")]
-    public async Task AuthenticatedOnboardingReadPreservesOnlyServerOwnedBearer(string path)
+    [Arguments("/api/instanceonboarding/status", false)]
+    [Arguments("/api/instanceonboarding/journey", true)]
+    public async Task AuthenticatedOnboardingReadPreservesIndependentServerOwnedAuthorities(string path, bool forwardsSetup)
     {
-        string token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         await using var app = await CreateApplicationAsync(cookieToken: token);
         using var client = app.GetTestClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Add("X-Test-Cookie", "valid");
-        request.Headers.Add("Authorization", "Bearer " + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+        request.Headers.Add("Authorization", "Bearer " + Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+        request.Headers.Add(EventBffHeaderNames.SetupSecret, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+        request.Headers.Add("Cookie", "setup-secret=" + Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
 
         using var response = await client.SendAsync(request);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single()).IsEqualTo($"Bearer {token}");
-        // Old setup cookies must not shadow the ordinary identity after setup locks.
-        await Assert.That(response.Headers.Contains("X-Seen-Setup")).IsFalse();
+        // Journey needs the independently resolved setup capability before administrator creation.
+        // Header presence is not active setup authority: the API independently checks setup lifecycle.
+        await Assert.That(response.Headers.Contains("X-Seen-Setup")).IsEqualTo(forwardsSetup);
+        if (forwardsSetup)
+            await Assert.That(response.Headers.GetValues("X-Seen-Setup").Single())
+                .IsEqualTo(app.Services.GetRequiredService<TestSetupState>().Secret);
+        await Assert.That(response.Headers.GetValues("X-Seen-User").Single()).IsEqualTo("api-user");
+        await Assert.That(response.Headers.GetValues("X-Seen-Auth-Type").Single()).IsEqualTo(ApiAuthenticationSchemeNames.MultiAuth);
+        await Assert.That(response.Headers.Contains("X-Seen-Cookie")).IsFalse();
+    }
+
+    [Test]
+    [Arguments("missing", false)]
+    [Arguments("other-subject", false)]
+    [Arguments("other-scheme", false)]
+    [Arguments("protected", true)]
+    [Arguments("forged", false)]
+    [Arguments("expired", false)]
+    public async Task JourneyCannotAcquireSetupAuthorityFromBrowserHeadersOrAnotherPrincipal(string source, bool forwardsSetup)
+    {
+        string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await using var app = await CreateApplicationAsync(cookieToken: token, hasSetupSession: false);
+        string secret = app.Services.GetRequiredService<TestSetupState>().Secret;
+        var sessions = app.Services.GetRequiredService<ISetupSecretSessionService>();
+        var otherPrincipal = CreatePrincipal(source == "other-subject" ? "other-user" : "cookie-user",
+            source == "other-scheme" ? "Keycloak" : TestAuthenticationHandler.CookieScheme);
+        await Assert.That(otherPrincipal.TryGetSetupSessionIdentity(out var otherIdentity)).IsTrue();
+        if (source is "other-subject" or "other-scheme")
+            sessions.SetForUser(otherIdentity.PartitionKey, secret);
+
+        var protection = app.Services.GetRequiredService<IDataProtectionProvider>();
+        string? cookie = source switch
+        {
+            "protected" => app.Services.GetRequiredService<ISetupSecretCookieProtector>().Protect(secret),
+            "forged" => secret,
+            "expired" => protection.CreateProtector("Explore.Blazor.SetupSecretCookie.v1")
+                .ToTimeLimitedDataProtector().Protect(secret, DateTimeOffset.UtcNow.AddMinutes(-1)),
+            _ => null
+        };
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/instanceonboarding/journey");
+        request.Headers.Add("X-Test-Cookie", "valid");
+        request.Headers.Add(EventBffHeaderNames.SetupSecret, secret);
+        request.Headers.Add("Authorization", "Bearer " + Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+        if (cookie is not null) request.Headers.Add("Cookie", "setup-secret=" + cookie);
+
+        using var response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.GetValues(SeenAuthorizationHeader).Single()).IsEqualTo($"Bearer {token}");
+        await Assert.That(response.Headers.Contains("X-Seen-Setup")).IsEqualTo(forwardsSetup);
+        if (forwardsSetup)
+            await Assert.That(response.Headers.GetValues("X-Seen-Setup").Single()).IsEqualTo(secret);
+        await Assert.That(response.Headers.GetValues("X-Seen-User").Single()).IsEqualTo("api-user");
+        await Assert.That(response.Headers.Contains("X-Seen-Cookie")).IsFalse();
     }
 
     [Test]
@@ -99,7 +158,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         await Assert.That(response.Headers.GetValues("X-Seen-Tenant").Single())
             .IsEqualTo("trusted-tenant");
         await Assert.That(response.Headers.GetValues("X-Seen-Setup").Single())
-            .IsEqualTo("trusted-setup-cookie-user");
+            .IsEqualTo(app.Services.GetRequiredService<TestSetupState>().Secret);
         await Assert.That(response.Headers.GetValues("X-Seen-Support").Single())
             .IsEqualTo("11111111-1111-1111-1111-111111111111");
         await Assert.That(response.Headers.GetValues("X-Seen-Auth-Type").Single())
@@ -166,7 +225,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         var enricher = new EventBffRequestEnricher(
             new NullAccessTokenProvider(),
             new TrustedTenantProvider(),
-            new PrincipalSetupSecretProvider(),
+            new NoSetupSecretProvider(),
             throwingProvider);
         Exception? caught = null;
 
@@ -196,7 +255,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         var enricher = new EventBffRequestEnricher(
             new NullAccessTokenProvider(),
             new TrustedTenantProvider(),
-            new PrincipalSetupSecretProvider(),
+            new NoSetupSecretProvider(),
             cancellingProvider);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -278,7 +337,7 @@ public sealed class CombinedApiBridgeMiddlewareTests
         await Assert.That(response.Headers.Contains("X-Next-Reached")).IsFalse();
     }
 
-    private static async Task<WebApplication> CreateApplicationAsync(string? cookieToken)
+    private static async Task<WebApplication> CreateApplicationAsync(string? cookieToken, bool hasSetupSession = true)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -299,8 +358,22 @@ public sealed class CombinedApiBridgeMiddlewareTests
         builder.Services.AddSingleton(new TestTokenState(cookieToken));
         builder.Services.AddSingleton<IEventBffAccessTokenProvider, NullAccessTokenProvider>();
         builder.Services.AddSingleton<IEventBffTenantHintProvider, TrustedTenantProvider>();
-        builder.Services.AddSingleton<IEventBffSetupSecretProvider, PrincipalSetupSecretProvider>();
         builder.Services.AddSingleton<IEventBffSupportAccessProvider, PrincipalSupportAccessProvider>();
+        var setupState = new TestSetupState(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+        var setupSessions = new SetupSecretSessionService();
+        if (hasSetupSession)
+        {
+            CreatePrincipal("cookie-user", TestAuthenticationHandler.CookieScheme).TryGetSetupSessionIdentity(out var identity);
+            setupSessions.SetForUser(identity.PartitionKey, setupState.Secret);
+        }
+        builder.Services.AddSingleton(setupState);
+        builder.Services.AddSingleton<ISetupSecretSessionService>(setupSessions);
+        builder.Services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
+        builder.Services.AddSingleton<ISetupSecretCookieProtector, SetupSecretCookieProtector>();
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.Configure<SetupSecretResolverOptions>(_ => { });
+        builder.Services.AddScoped<ISetupSecretResolver, SetupSecretResolver>();
+        builder.Services.AddBffTrustedRequestEnrichment();
         builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
         builder.Services.AddCombinedApiBridge();
 
@@ -328,6 +401,9 @@ public sealed class CombinedApiBridgeMiddlewareTests
             CopyHeader(context, "X-Control-Plane-Key", "X-Seen-Control-Plane-Key");
             CopyHeader(context, EventBffHeaderNames.TenantSlug, "X-Seen-Tenant");
             CopyHeader(context, EventBffHeaderNames.SetupSecret, "X-Seen-Setup");
+            CopyHeader(context, "Cookie", "X-Seen-Cookie");
+            if (context.User.Identity?.Name is { } name)
+                context.Response.Headers["X-Seen-User"] = name;
             CopyHeader(context, EventBffHeaderNames.SupportAccessSessionId, "X-Seen-Support");
             if (!string.IsNullOrEmpty(context.User.Identity?.AuthenticationType))
             {
@@ -361,9 +437,11 @@ public sealed class CombinedApiBridgeMiddlewareTests
     }
 
     private static ClaimsPrincipal CreatePrincipal(string name, string authenticationType) =>
-        new(new ClaimsIdentity([new Claim(ClaimTypes.Name, name)], authenticationType));
+        new(new ClaimsIdentity([new Claim(ClaimTypes.Name, name), new Claim("sub", name)], authenticationType));
 
     private sealed record TestTokenState(string? Token);
+
+    private sealed record TestSetupState(string Secret);
 
     private sealed record AntiforgeryPair(string Token, string CookieHeader);
 
@@ -400,16 +478,16 @@ public sealed class CombinedApiBridgeMiddlewareTests
                 return Task.FromResult(Success("cookie-user", properties));
             }
 
-            return Task.FromResult(Request.Headers.Authorization.ToString() == "Bearer server-token"
+            return Task.FromResult(tokenState.Token is not null
+                && Request.Headers.Authorization.ToString() == $"Bearer {tokenState.Token}"
                 ? Success("api-user", new AuthenticationProperties())
                 : AuthenticateResult.NoResult());
         }
 
         private AuthenticateResult Success(string name, AuthenticationProperties properties)
         {
-            var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, name)], Scheme.Name);
             return AuthenticateResult.Success(
-                new AuthenticationTicket(new ClaimsPrincipal(identity), properties, Scheme.Name));
+                new AuthenticationTicket(CreatePrincipal(name, Scheme.Name), properties, Scheme.Name));
         }
     }
 
@@ -424,12 +502,10 @@ public sealed class CombinedApiBridgeMiddlewareTests
         public string ResolveTenantSlug(HttpContext httpContext) => "trusted-tenant";
     }
 
-    private sealed class PrincipalSetupSecretProvider : IEventBffSetupSecretProvider
+    private sealed class NoSetupSecretProvider : IEventBffSetupSecretProvider
     {
         public ValueTask<string?> ResolveSetupSecretAsync(HttpContext httpContext, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(httpContext.User.Identity?.Name == "cookie-user"
-                ? "trusted-setup-cookie-user"
-                : null);
+            ValueTask.FromResult<string?>(null);
     }
 
     private sealed class PrincipalSupportAccessProvider : IEventBffSupportAccessProvider

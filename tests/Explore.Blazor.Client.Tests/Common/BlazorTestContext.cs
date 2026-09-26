@@ -74,6 +74,8 @@ public class BlazorTestContext : BunitContext
         Services.AddSingleton(Substitute.For<IHttpClientFactory>());
         Services.AddSingleton(Substitute.For<IBffAuthApi>());
         Services.AddSingleton(new Explore.Blazor.Client.Models.OnboardingRequestOrigin(null));
+        Services.AddSingleton<Explore.Blazor.Client.Models.IOnboardingRequestOrigin>(provider =>
+            provider.GetRequiredService<Explore.Blazor.Client.Models.OnboardingRequestOrigin>());
         Services.AddSingleton(Substitute.For<IUiShellClient>());
         Services.AddSingleton(Substitute.For<
             Explore.Blazor.Client.Contracts.Services.ITicketPurchaseGovernanceService>());

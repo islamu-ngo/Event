@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Explore.Application.Features.AiAssistant.Tools;
 
@@ -73,12 +74,12 @@ public sealed class AiAgentContractInventoryGenerator
         foreach (var definition in _registry.Definitions.OrderBy(definition => definition.Name, StringComparer.Ordinal))
         {
             var metadata = definition.EffectiveAgentMetadata;
-            builder.AppendLine($"### {definition.Name}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"### {definition.Name}");
             builder.AppendLine();
-            builder.AppendLine($"- Availability: {metadata.AvailabilityReason}");
-            builder.AppendLine($"- Follow-up policy: {metadata.FollowUpPolicy}");
-            builder.AppendLine($"- Safe action instructions: {metadata.SafeActionInstructions}");
-            builder.AppendLine($"- Result card: {metadata.ResultPresentation.CardKind}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"- Availability: {metadata.AvailabilityReason}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"- Follow-up policy: {metadata.FollowUpPolicy}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"- Safe action instructions: {metadata.SafeActionInstructions}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"- Result card: {metadata.ResultPresentation.CardKind}");
             builder.AppendLine();
         }
 

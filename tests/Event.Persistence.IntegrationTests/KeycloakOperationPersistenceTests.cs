@@ -25,7 +25,7 @@ public sealed class KeycloakOperationPersistenceTests
         var target = context.Model.FindEntityType(typeof(KeycloakTarget))!;
 
         await Assert.That(operation.GetTableName())
-            .IsEqualTo("ie_KeycloakOperationReceipts");
+            .IsEqualTo("ie_keycloak_operation_receipts");
         await Assert.That(operation
                 .FindProperty(nameof(KeycloakOperation.ConcurrencyStamp))!
                 .IsConcurrencyToken)

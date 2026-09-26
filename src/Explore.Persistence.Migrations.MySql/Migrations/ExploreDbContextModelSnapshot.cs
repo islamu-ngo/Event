@@ -16424,12 +16424,12 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasName("pk_ie_keycloak_operation_receipts");
 
                     b.HasIndex("SettledAtUtcTicks")
-                        .HasDatabaseName("ix_keycloakoperationreceipts_settled_at_utc_ticks");
+                        .HasDatabaseName("ix_keycloak_operation_receipts_settled_at_utc_ticks");
 
                     b.HasIndex("State")
-                        .HasDatabaseName("ix_keycloakoperationreceipts_state");
+                        .HasDatabaseName("ix_keycloak_operation_receipts_state");
 
-                    b.ToTable("ie_KeycloakOperationReceipts", null, t =>
+                    b.ToTable("ie_keycloak_operation_receipts", null, t =>
                         {
                             t.HasCheckConstraint("CK_KeycloakOperationReceipts_Expiry", "expires_at_utc > created_at_utc")
                                 .HasName("ck_keycloakoperationreceipts_expiry");
@@ -29508,6 +29508,12 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("varchar(512)")
                         .HasColumnName("infisical_path");
 
+                    b.Property<int?>("InstanceSlot")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("int")
+                        .HasColumnName("instance_slot")
+                        .HasComputedColumnSql("CASE WHEN setting_scope_id = 1 THEN 1 ELSE NULL END", true);
+
                     b.Property<bool>("IsLocked")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
@@ -29576,13 +29582,12 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.HasIndex("SecretValidationStatusId")
                         .HasDatabaseName("ix_secret_bindings_secret_validation_status_id");
 
-                    b.HasIndex("SettingKey", "Qualifier")
-                        .IsUnique()
-                        .HasDatabaseName("ix_secret_bindings_setting_key_qualifier")
-                        .HasFilter("scope_id IS NULL");
-
                     b.HasIndex("SettingScopeId", "ScopeId")
                         .HasDatabaseName("ix_secret_bindings_setting_scope_id_scope_id");
+
+                    b.HasIndex("SettingKey", "Qualifier", "InstanceSlot")
+                        .IsUnique()
+                        .HasDatabaseName("ix_secret_bindings_setting_key_qualifier_instance_slot");
 
                     b.HasIndex("SettingKey", "ScopeId", "Qualifier")
                         .IsUnique()
@@ -42126,13 +42131,13 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                             b1.HasKey("KeycloakOperationId");
 
                             b1.HasIndex("InstanceId", "AuthorityKey", "Realm")
-                                .HasDatabaseName("ix_ie_KeycloakOperationReceipts_target_instance_id_targ_31394dd3");
+                                .HasDatabaseName("ix_ie_keycloak_operation_receipts_target_instance_id_ta_53fb9b41");
 
-                            b1.ToTable("ie_KeycloakOperationReceipts");
+                            b1.ToTable("ie_keycloak_operation_receipts");
 
                             b1.WithOwner()
                                 .HasForeignKey("KeycloakOperationId")
-                                .HasConstraintName("fk_keycloakoperationreceipts_keycloakoperationreceipts_id");
+                                .HasConstraintName("fk_ie_keycloak_operation_receipts_ie_keycloak_operation_2b125006");
                         });
 
                     b.Navigation("Target")

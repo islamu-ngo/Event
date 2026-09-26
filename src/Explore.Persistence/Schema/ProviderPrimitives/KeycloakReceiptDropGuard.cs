@@ -77,5 +77,7 @@ internal static class KeycloakReceiptDropGuard
 
     private static bool IsReceiptTable(string table) =>
         table is "KeycloakOperationReceipts"
-            or "ie_KeycloakOperationReceipts";
+            or "ie_KeycloakOperationReceipts"
+            or "keycloak_operation_receipts"
+            or "ie_keycloak_operation_receipts";
 }

@@ -16439,12 +16439,12 @@ namespace Explore.Persistence.Migrations
                         .HasName("pk_keycloak_operation_receipts");
 
                     b.HasIndex("SettledAtUtcTicks")
-                        .HasDatabaseName("ix_keycloakoperationreceipts_settled_at_utc_ticks");
+                        .HasDatabaseName("ix_keycloak_operation_receipts_settled_at_utc_ticks");
 
                     b.HasIndex("State")
-                        .HasDatabaseName("ix_keycloakoperationreceipts_state");
+                        .HasDatabaseName("ix_keycloak_operation_receipts_state");
 
-                    b.ToTable("KeycloakOperationReceipts", "islamu_event", t =>
+                    b.ToTable("keycloak_operation_receipts", "islamu_event", t =>
                         {
                             t.HasCheckConstraint("CK_KeycloakOperationReceipts_Expiry", "expires_at_utc > created_at_utc")
                                 .HasName("ck_keycloakoperationreceipts_expiry");
@@ -42128,13 +42128,13 @@ namespace Explore.Persistence.Migrations
                             b1.HasKey("KeycloakOperationId");
 
                             b1.HasIndex("InstanceId", "AuthorityKey", "Realm")
-                                .HasDatabaseName("ix_keycloakoperationreceipts_target_instance_id_ta_a8dedcddfd6c");
+                                .HasDatabaseName("ix_keycloak_operation_receipts_target_instance_id__3482b22bb85c");
 
-                            b1.ToTable("KeycloakOperationReceipts", "islamu_event");
+                            b1.ToTable("keycloak_operation_receipts", "islamu_event");
 
                             b1.WithOwner()
                                 .HasForeignKey("KeycloakOperationId")
-                                .HasConstraintName("fk_keycloakoperationreceipts_keycloakoperationreceipts_id");
+                                .HasConstraintName("fk_keycloak_operation_receipts_keycloak_operation_receipts_id");
                         });
 
                     b.Navigation("Target")

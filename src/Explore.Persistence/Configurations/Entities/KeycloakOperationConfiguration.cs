@@ -14,7 +14,7 @@ public sealed class KeycloakOperationConfiguration
 
     public void Configure(EntityTypeBuilder<KeycloakOperation> builder)
     {
-        builder.ToTable("KeycloakOperationReceipts", table =>
+        builder.ToTable("keycloak_operation_receipts", table =>
         {
             table.HasCheckConstraint(
                 "CK_KeycloakOperationReceipts_SetupGeneration",

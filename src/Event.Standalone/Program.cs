@@ -15,6 +15,7 @@ const BlazorHostProfile hostProfile = BlazorHostProfile.Combined;
 var shutdownState = new GracefulShutdownState();
 using var shutdownCts = shutdownState.CancellationTokenSource;
 var builder = WebApplication.CreateBuilder(args);
+ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment, isStandaloneHost: true);
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     foreach (var migrationAssembly in Directory.EnumerateFiles(

@@ -36,7 +36,7 @@ public sealed class TestDatabaseReset
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = [applicationSchema],
-            TablesToIgnore = CreateLookupTables(applicationSchema),
+            TablesToIgnore = UnqualifiedLookupTables,
         });
 
         return new TestDatabaseReset(respawner, connectionString);
@@ -57,10 +57,6 @@ public sealed class TestDatabaseReset
     /// Tables preserved across resets: migration history and all lookup/seed tables.
     /// Derived from LookupTableSeeder entity types with snake_case naming convention.
     /// </summary>
-    private static Table[] CreateLookupTables(string schema) => UnqualifiedLookupTables
-        .Select(table => new Table(table.Name, schema))
-        .ToArray();
-
     private static string GetApplicationSchema(string connectionString) =>
         new NpgsqlConnectionStringBuilder(connectionString).SearchPath?
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
@@ -70,6 +66,8 @@ public sealed class TestDatabaseReset
     private static readonly Table[] UnqualifiedLookupTables =
     [
         new("__EFMigrationsHistory"),
+        new("__EFDataProtectionMigrationsHistory"),
+        new("__EFPrivacyErasureAuthorityMigrationsHistory"),
         new("account_authority_kinds"),
         new("ai_conversation_statuses"),
         new("ai_message_roles"),

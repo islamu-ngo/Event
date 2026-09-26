@@ -28,6 +28,9 @@ public static class ApiHostStartupExtensions
         ArgumentNullException.ThrowIfNull(shutdownCts);
         ArgumentNullException.ThrowIfNull(markShuttingDown);
 
+        bool agentBrowser = !state.IsOpenApiGeneration
+            && ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(app.Configuration, app.Environment);
+
         // Before shared API setup, hosted workers or traffic; standalone-owned bootstrap runs earlier.
         // OpenAPI omits runtime dependencies; final descriptors were validated in the provider factory.
         if (!state.IsOpenApiGeneration)
@@ -100,12 +103,15 @@ public static class ApiHostStartupExtensions
                             var seedDevelopmentData =
                                 !app.Configuration.GetValue<bool>(
                                     "Testing:DisableDevelopmentDataSeed");
-                            await DatabaseSeeder.SeedAsync(
-                                db,
-                                app.Environment,
-                                seedDevelopmentData,
-                                app.Configuration,
-                                cancellationToken);
+                            if (agentBrowser)
+                                await LookupTableSeeder.SeedAsync(db, cancellationToken);
+                            else
+                                await DatabaseSeeder.SeedAsync(
+                                    db,
+                                    app.Environment,
+                                    seedDevelopmentData,
+                                    app.Configuration,
+                                    cancellationToken);
                             logger.LogInformation("Database seeding completed.");
                         },
                         shutdownCts.Token);
@@ -130,7 +136,10 @@ public static class ApiHostStartupExtensions
             }
         }
 
-        if (!app.Environment.IsEnvironment("Testing") &&
+        if (agentBrowser)
+            await AgentBrowserPersonaStartup.RunAsync(app.Services, app.Configuration, app.Environment, shutdownCts.Token);
+
+        if (!agentBrowser && !app.Environment.IsEnvironment("Testing") &&
             !state.IsOpenApiGeneration &&
             state.OwnsDevelopmentMigrations)
         {

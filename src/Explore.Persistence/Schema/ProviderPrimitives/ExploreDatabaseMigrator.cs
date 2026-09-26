@@ -13,6 +13,19 @@ namespace Explore.Persistence.Schema;
 
 public static class ExploreDatabaseMigrator
 {
+    public static bool EnsureAgentBrowserAdmission(IConfiguration configuration, IHostEnvironment environment, bool isStandaloneHost = false) =>
+        new AgentBrowserProvisioningOptions(
+            configuration.GetValue<bool>("AGENT_BROWSER_SEED_ENABLED"),
+            environment.EnvironmentName,
+            configuration["ISLAMU_ASPIRE_MODE"] ?? "",
+            configuration["Hosting:Topology"] ?? "",
+            configuration["IdentityDatabase:Topology"] ?? configuration["IDENTITY_DATABASE_TOPOLOGY"] ?? "colocated",
+            configuration["Authentication:Provider"] ?? configuration["AUTHENTICATION_PROVIDER"] ?? "",
+            configuration["Authorization:Provider"] ?? configuration["AUTHORIZATION_PROVIDER"] ?? "",
+            configuration["Database:Provider"] ?? configuration["DATABASE_PROVIDER"] ?? "",
+            configuration["Database:Database"] ?? configuration["DATABASE_NAME"] ?? "",
+            configuration["CONFIGURATION_MANIFEST_MODE"] ?? "Off").EnsureAdmitted(isStandaloneHost);
+
     public static async Task MigrateAndSeedAsync(
         ExploreDbContext runtimeDatabase,
         IHostEnvironment environment,
@@ -26,6 +39,13 @@ public static class ExploreDatabaseMigrator
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(migrationDatabaseOptions);
         ArgumentNullException.ThrowIfNull(logger);
+
+        bool agentBrowser = EnsureAgentBrowserAdmission(configuration, environment);
+        if (agentBrowser && (migrationDatabaseOptions.Provider != PrimaryDatabaseProvider.PostgreSql
+            || migrationDatabaseOptions.Database != "islamu_event_agent"
+            || !runtimeDatabase.Database.IsNpgsql()
+            || runtimeDatabase.Database.GetDbConnection().Database != "islamu_event_agent"))
+            throw new InvalidOperationException("agent_browser_database_binding_mismatch");
 
         PrivacyErasureAuthorityTopology topology =
             PrivacyErasureDurabilityOptions.GetTopology(configuration);
@@ -74,11 +94,14 @@ public static class ExploreDatabaseMigrator
             logger,
             cancellationToken);
 
-        await DatabaseSeeder.SeedAsync(
-            runtimeDatabase,
-            environment,
-            configuration: configuration,
-            cancellationToken: cancellationToken);
+        if (agentBrowser)
+            await LookupTableSeeder.SeedAsync(runtimeDatabase, cancellationToken);
+        else
+            await DatabaseSeeder.SeedAsync(
+                runtimeDatabase,
+                environment,
+                configuration: configuration,
+                cancellationToken: cancellationToken);
         logger.LogInformation("Database migration operation {Operation} completed.", "Seed");
         logger.LogInformation("Database migrations and seeding completed successfully.");
     }

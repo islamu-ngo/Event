@@ -50,11 +50,24 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
 34. **Self-Documenting Code & Retirement of ABOUTME on Code**: Source code (`.cs`, `.razor`, `.css`) relies on Clean Architecture naming, directory structure, and standard C# XML doc comments (`/// <summary>`) for discovery. The legacy `ABOUTME:` comment prefix is officially retired for source code; agents must not generate it in new code. Internal documentation in `docs/internal/` and `.agents/` uses natural Markdown metadata blocks (`> **Audience:** ...`) or frontmatter. See [`docs/internal/GOVERNANCE.md`](GOVERNANCE.md#header--file-metadata-policy-natural-metadata--code-retirement).
 
 ## Multi-Tenancy Reminder
-Runtime tenant resolution:
+Browser tenant routing defaults to `/{slug}`. The BFF extracts the first path
+segment, rewrites the browser request under that tenant base path, and sends the
+resolved slug to the API as trusted `X-Tenant-Slug`. The empty configured path
+prefix means root matching; a nonempty prefix remains supported configuration
+(for example, `/communities/{slug}`), not a compatibility shim. Reserved system,
+framework, authentication, static-asset, and brand-sensitive root segments are
+never tenant slugs and are rejected by tenant create/update validation.
+
+API tenant resolution order:
 1. trusted `X-Tenant-Slug` header from the BFF
 2. custom domain
 3. subdomain
 4. unresolved multi-tenant request fails closed (`404`)
+
+The default browser path strategy requires no wildcard DNS or wildcard TLS.
+Custom-domain and subdomain routing remain optional host-based alternatives.
+Never trust or forward a browser-supplied tenant header: the BFF strips it and
+creates the internal header from resolved route context.
 
 Single-tenant fallback default tenant ID: `018e4e5c-7f00-7000-8000-000000000001`.
 

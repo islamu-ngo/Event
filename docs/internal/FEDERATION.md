@@ -40,7 +40,12 @@ Local discoverability requires an active global Actor plus either an approved vi
 
 The API computes a request-local, non-serialized discoverability marker for Actor HAL assembly. Organization and Group resources advertise `subscribe` and `subscription` only when that marker is true and the normal authorization pipeline also allows the operation. Global collections do not advertise tenant-local subscription actions; clients must use `_links` rather than infer them from Actor kind, participation, roles, or claims.
 
-Blazor renders `/actors/{actorId}` from the canonical detail read and `/t/{tenantId}/actors/{actorId}` from the exact `GET /api/actor/by-tenant/{tenantId}/{id}` contextual read. The contextual endpoint applies the same fail-closed discoverability predicate as the collection, can show approved public participation overrides, and returns `404` for hidden or cross-tenant targets. Subscription controls still appear only when the detail HAL contains `subscribe` or `subscription`; the canonical link always points back to the global URL.
+Blazor renders only `/actors/{actorId}`, backed by the canonical global detail
+read. No tenant-contextual Actor profile page is implemented. The separate exact
+`GET /api/actor/by-tenant/{tenantId}/{id}` API lookup applies the same fail-closed
+discoverability predicate as the tenant collection, can return approved public
+participation overrides, and returns `404` for hidden or cross-tenant targets.
+Consumers render subscription controls only from the returned detail HAL.
 
 Organization legitimacy evidence is not global identity evidence. It is retained private `OrganizationTenant` review input in one tenant, attached through a server-bound PDF upload session and reviewed by tenant authority without changing the global Actor, global Organization, exact DID identity, or any other tenant participation.
 

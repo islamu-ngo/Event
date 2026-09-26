@@ -528,7 +528,10 @@ Interface injection remains the default for application services. The approved c
 
 ### Actor profiles and organization evidence
 
-- `/actors/{actorId}` renders the canonical global Actor profile; `/t/{tenantId}/actors/{actorId}` renders the tenant-contextual projection and links back to the canonical URL.
+- `/actors/{actorId}` is the only Actor profile page and renders the canonical
+  global Actor detail. There is no separate tenant-contextual browser route;
+  tenant-aware consumers use the exact
+  `GET /api/actor/by-tenant/{tenantId}/{id}` API lookup when they need approved public local overrides.
 - `ActorProfile` obtains data through `IActorService`. It does not inspect roles or claims; subscribe controls come only from item/detail HAL.
 - `OrganizationTenantEvidencePanel` is present only when the organization detail HAL contains `legitimacy-evidence`. Upload requires both `prepare-evidence-upload` and `submit-evidence`; item review and protected document actions require `review-evidence` and `document`.
 - Browser PDF upload starts through the organization-specific BFF route. The UI never receives or submits the tenant participation storage owner.

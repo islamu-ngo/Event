@@ -44,6 +44,8 @@ Substantive, deep design investigations into specific product capabilities, ethi
 
 | Domain | Document | Core Scope |
 |---|---|---|
+| **Launch Readiness** | [`consultations/i-vsd-v0-1-launch-consultancy-report.md`](consultations/i-vsd-v0-1-launch-consultancy-report.md) | Public v0.1 and SingleTenant Official Instance readiness: open posting, approved organizations, Keycloak/Maileroo, confirmed gaps, and essential operational evidence. |
+| **Pre-Release Architecture** | [`consultations/i-vsd-pre-release-breaking-change-prevention-consultancy-report.md`](consultations/i-vsd-pre-release-breaking-change-prevention-consultancy-report.md) | High-consequence identity, Asset/storage, ownership, lifecycle and public-contract decisions to settle before v0.1 without premature integrations or compatibility baggage. |
 | **Commerce & Payments** | [`consultations/i-vsd-paid-event-payments-consultation.md`](consultations/i-vsd-paid-event-payments-consultation.md) | Stripe Connect `OrganizerDirect`, non-custodial payouts, anti-riba invariants, and immutable refund fee protections. |
 | **Commerce & Payments** | [`consultations/i-vsd-payment-identity-and-stripe-secrets-consultation.md`](consultations/i-vsd-payment-identity-and-stripe-secrets-consultation.md) | Instance-operator Connect credentials, tenant-secret prohibition, merchant-of-record disclosure, and the full fail-closed Stripe setup inventory. |
 | **Commerce & Payments** | [`consultations/i-vsd-event-ticketing-lifecycle.md`](consultations/i-vsd-event-ticketing-lifecycle.md) | Capacity governance, ticket hold reservations, and purchase allocation truth. |

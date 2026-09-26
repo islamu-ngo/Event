@@ -13,8 +13,25 @@ using Microsoft.Extensions.Options;
 
 namespace Explore.Secrets.UnitTests.Services;
 
-public sealed class SecretResolverBindingTests
+public sealed class SecretResolverBindingTests : IDisposable
 {
+    private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+    private readonly TestMeterFactory _meterFactory = new();
+    private readonly SecretResolverMetrics _metrics;
+
+    public SecretResolverBindingTests()
+    {
+        _metrics = new SecretResolverMetrics(_meterFactory);
+    }
+
+    public void Dispose()
+    {
+        _metrics.Dispose();
+        _meterFactory.Dispose();
+        _cache.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
     [Test]
     public async Task ISecretResolver_RequiresExplicitQualifiedResolutionImplementation()
     {
@@ -124,8 +141,8 @@ public sealed class SecretResolverBindingTests
         var resolver = new SecretResolver(
             new FakeSecretBindingRepository([stale]),
             [environment, infisical],
-            new MemoryCache(new MemoryCacheOptions()),
-            new SecretResolverMetrics(new TestMeterFactory()),
+            _cache,
+            _metrics,
             NullLogger<SecretResolver>.Instance,
             Options.Create(new SecretProviderOptions
             {
@@ -422,26 +439,26 @@ public sealed class SecretResolverBindingTests
         await Assert.That(refreshed.Value).IsEqualTo("after");
     }
 
-    private static SecretResolver Resolver(IReadOnlyList<SecretBinding> bindings, IReadOnlyDictionary<Guid, string> values)
+    private SecretResolver Resolver(IReadOnlyList<SecretBinding> bindings, IReadOnlyDictionary<Guid, string> values)
     {
         return new SecretResolver(
             new FakeSecretBindingRepository(bindings),
             [new FakeSecretSource(values)],
-            new MemoryCache(new MemoryCacheOptions()),
-            new SecretResolverMetrics(new TestMeterFactory()),
+            _cache,
+            _metrics,
             NullLogger<SecretResolver>.Instance,
             Options.Create(new SecretProviderOptions { Provider = SecretProviderType.Environment }));
     }
 
-    private static SecretResolver ResolverWithDefaults(
+    private SecretResolver ResolverWithDefaults(
         SecretProviderType provider,
         ISecretSource source,
         string infisicalEnvironment = "") =>
         new(
             new FakeSecretBindingRepository([]),
             [source],
-            new MemoryCache(new MemoryCacheOptions()),
-            new SecretResolverMetrics(new TestMeterFactory()),
+            _cache,
+            _metrics,
             NullLogger<SecretResolver>.Instance,
             Options.Create(new SecretProviderOptions
             {

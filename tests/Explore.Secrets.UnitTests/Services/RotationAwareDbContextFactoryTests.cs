@@ -342,6 +342,7 @@ public class RotationAwareDbContextFactoryTests : IDisposable
     public void Dispose()
     {
         _factory?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
 

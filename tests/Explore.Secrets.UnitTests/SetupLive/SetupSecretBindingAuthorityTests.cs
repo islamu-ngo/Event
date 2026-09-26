@@ -122,7 +122,7 @@ public sealed class SetupSecretBindingAuthorityTests
         binding.InfisicalKey = keyCanary;
         ISecretBindingRepository repository = Substitute.For<ISecretBindingRepository>();
         repository.GetById(binding.Id).Returns(binding);
-        var logs = new CaptureLoggerProvider();
+        using var logs = new CaptureLoggerProvider();
         var client = new RecordingInfisicalClient
         {
             WriteResult = failure != WriterFailure.FalseResult,
@@ -216,7 +216,7 @@ public sealed class SetupSecretBindingAuthorityTests
         ISecretBindingRepository repository = Substitute.For<ISecretBindingRepository>();
         repository.GetById(binding.Id).Returns(binding);
         var client = new RecordingInfisicalClient();
-        var logs = new CaptureLoggerProvider();
+        using var logs = new CaptureLoggerProvider();
         await using ServiceProvider provider = Services(
             SecretProviderType.Infisical,
             repository,
@@ -554,7 +554,7 @@ public sealed class SetupSecretBindingAuthorityTests
     {
         byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
         byte[] secret = RandomNumberGenerator.GetBytes(64);
-        var logs = new CaptureLoggerProvider();
+        using var logs = new CaptureLoggerProvider();
         using var metrics = new MetricCapture();
         SecretSourceType storedSource = scenario == CommitmentResolverScenario.Mismatch
             ? SecretSourceType.Infisical
@@ -654,7 +654,7 @@ public sealed class SetupSecretBindingAuthorityTests
     [Test]
     public async Task SecretsWriteAndCommitmentPathsEmitNoTelemetry()
     {
-        var logs = new CaptureLoggerProvider();
+        using var logs = new CaptureLoggerProvider();
         string environmentCanary = $"environment-{Guid.CreateVersion7():N}";
         string pathCanary = $"/path-{Guid.CreateVersion7():N}";
         string keyCanary = $"KEY_{Guid.CreateVersion7():N}";

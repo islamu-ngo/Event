@@ -52,7 +52,7 @@ public class SecretRefreshServiceTests : IDisposable
     public async Task ConsecutiveFailures_Initially_ShouldBeZero()
     {
         // Arrange
-        var service = CreateService();
+        using var service = CreateService();
 
         // Assert
         await Assert.That(service.ConsecutiveFailures).IsEqualTo(0);
@@ -62,7 +62,7 @@ public class SecretRefreshServiceTests : IDisposable
     public async Task LastSuccessfulRefresh_Initially_ShouldBeNull()
     {
         // Arrange
-        var service = CreateService();
+        using var service = CreateService();
 
         // Assert
         await Assert.That(service.LastSuccessfulRefresh).IsNull();
@@ -73,7 +73,7 @@ public class SecretRefreshServiceTests : IDisposable
     {
         // Arrange
         var options = new SecretRefreshOptions { Enabled = false };
-        var service = CreateService(options);
+        using var service = CreateService(options);
         using var cts = new CancellationTokenSource();
 
         // Act
@@ -90,7 +90,7 @@ public class SecretRefreshServiceTests : IDisposable
     {
         // Arrange
         _mockProvider.SupportsRefresh.Returns(false);
-        var service = CreateService();
+        using var service = CreateService();
         using var cts = new CancellationTokenSource();
 
         // Act
@@ -111,7 +111,7 @@ public class SecretRefreshServiceTests : IDisposable
             Enabled = true,
             InitialDelay = TimeSpan.FromSeconds(10) // Long delay so we cancel during wait
         };
-        var service = CreateService(options);
+        using var service = CreateService(options);
         using var cts = new CancellationTokenSource();
 
         // Act
@@ -142,7 +142,7 @@ public class SecretRefreshServiceTests : IDisposable
             RefreshInterval = TimeSpan.FromSeconds(10),
             JitterFactor = 0
         };
-        var service = CreateService(options);
+        using var service = CreateService(options);
         using var cts = new CancellationTokenSource();
 
         // Act
@@ -180,7 +180,7 @@ public class SecretRefreshServiceTests : IDisposable
             RefreshInterval = TimeSpan.FromSeconds(10),
             JitterFactor = 0
         };
-        var service = CreateService(options);
+        using var service = CreateService(options);
         using var cts = new CancellationTokenSource();
 
         // Act
@@ -198,5 +198,6 @@ public class SecretRefreshServiceTests : IDisposable
     public void Dispose()
     {
         _metrics.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

@@ -265,7 +265,8 @@ public class RotationAwareHttpClientFactoryTests : IDisposable
         var factory = CreateFactory();
 
         // Act
-        var act = () => factory.ForceRotateAsync("non-existent");
+        Func<Task<SecretRotationLocalAcknowledgement?>> act = async () =>
+            await factory.ForceRotateAsync("non-existent");
 
         // Assert
         await Assert.That(act).Throws<ArgumentException>()
@@ -281,7 +282,8 @@ public class RotationAwareHttpClientFactoryTests : IDisposable
         factory.Dispose();
 
         // Act
-        var act = () => factory.ForceRotateAsync("test-client");
+        Func<Task<SecretRotationLocalAcknowledgement?>> act = async () =>
+            await factory.ForceRotateAsync("test-client");
 
         // Assert
         await Assert.That(act).Throws<ObjectDisposedException>();
@@ -374,5 +376,6 @@ public class RotationAwareHttpClientFactoryTests : IDisposable
     public void Dispose()
     {
         _factory?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

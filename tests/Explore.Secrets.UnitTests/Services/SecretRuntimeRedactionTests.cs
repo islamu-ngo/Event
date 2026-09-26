@@ -118,11 +118,14 @@ public sealed class SecretRuntimeRedactionTests
         source.GetSecretAsync(binding, Arg.Any<CancellationToken>())
             .Returns<Task<SecretResolutionResult>>(_ => throw new InvalidOperationException(ProviderBodyCanary));
         var logger = new CollectingLogger<SecretResolver>();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var meterFactory = new TestMeterFactory();
+        using var metrics = new SecretResolverMetrics(meterFactory);
         var resolver = new SecretResolver(
             bindings,
             [source],
-            new MemoryCache(new MemoryCacheOptions()),
-            new SecretResolverMetrics(new TestMeterFactory()),
+            cache,
+            metrics,
             logger,
             Options.Create(new SecretProviderOptions { Provider = SecretProviderType.Environment }));
 

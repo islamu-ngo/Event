@@ -30,6 +30,7 @@ public class SecretProviderHealthCheckTests : IDisposable
     public void Dispose()
     {
         _metrics.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     [Test]

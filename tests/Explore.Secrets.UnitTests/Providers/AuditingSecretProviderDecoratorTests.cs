@@ -19,7 +19,8 @@ public sealed class AuditingSecretProviderDecoratorTests
         var audit = Substitute.For<ISecretAuditLogger>();
         audit.LogAsync(Arg.Any<SecretAuditEntry>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask)
-            .AndDoes(call => _entries.Add(call.Arg<SecretAuditEntry>()));
+            .AndDoes(call => _entries.Add(call.Arg<SecretAuditEntry>()
+                ?? throw new InvalidOperationException("Audit entry is required.")));
         _decorator = new AuditingSecretProviderDecorator(
             _inner,
             audit,
@@ -120,7 +121,8 @@ public sealed class AuditingSecretProviderDecoratorTests
         var audit = Substitute.For<ISecretAuditLogger>();
         audit.LogAsync(Arg.Any<SecretAuditEntry>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask)
-            .AndDoes(call => _entries.Add(call.Arg<SecretAuditEntry>()));
+            .AndDoes(call => _entries.Add(call.Arg<SecretAuditEntry>()
+                ?? throw new InvalidOperationException("Audit entry is required.")));
         var accessor = new HttpContextAccessor
         {
             HttpContext = new DefaultHttpContext { User = principal }

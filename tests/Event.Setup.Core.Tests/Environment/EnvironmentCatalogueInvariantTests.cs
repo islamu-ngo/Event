@@ -351,6 +351,36 @@ public sealed class EnvironmentCatalogueInvariantTests
     }
 
     [Test]
+    public async Task AgentBrowserSecretIsVisibleOnlyToAnExplicitLocalSplitProfile()
+    {
+        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentVariableDefinition password = catalogue.Lookup("AGENT_BROWSER_PERSONA_PASSWORD")!;
+        EnvironmentVariableDefinition optIn = catalogue.Lookup("AGENT_BROWSER_SEED_ENABLED")!;
+
+        await Assert.That(optIn.SafeDefault).IsEqualTo("false");
+        await Assert.That(password.Sensitivity).IsEqualTo(EnvironmentVariableSensitivity.Secret);
+        await Assert.That(password.SafeDefault).IsNull();
+
+        string[] ordinary = catalogue.Relevant(new EnvironmentActivationContext(
+            "split", ["identity", "deployment"], ["local"]))
+            .Select(item => item.Key).ToArray();
+        string[] agent = catalogue.Relevant(new EnvironmentActivationContext(
+            "split", ["identity", "deployment", "agent-browser"], ["local"]))
+            .Select(item => item.Key).ToArray();
+        string[] wrongTopology = catalogue.Relevant(new EnvironmentActivationContext(
+            "standalone", ["identity", "deployment", "agent-browser"], ["local"]))
+            .Select(item => item.Key).ToArray();
+        string[] wrongProvider = catalogue.Relevant(new EnvironmentActivationContext(
+            "split", ["identity", "deployment", "agent-browser"], ["keycloak"]))
+            .Select(item => item.Key).ToArray();
+
+        await Assert.That(ordinary).DoesNotContain(password.Key);
+        await Assert.That(wrongTopology).DoesNotContain(password.Key);
+        await Assert.That(wrongProvider).DoesNotContain(password.Key);
+        await Assert.That(agent).Contains(password.Key);
+    }
+
+    [Test]
     public async Task ConfiguredBootstrapSetupBoundaryHasNoRuntimeOrNetworkDependency()
     {
         Assembly assembly = typeof(EnvironmentCatalogue).Assembly;

@@ -48,6 +48,18 @@ Completed-state reconciliation does not reread or replay leftover bootstrap
 passwords; use normal credential administration rather than editing this secret
 to reset an established account.
 
+The opt-in Development-only `AgentBrowser` profile resolves
+`authentication.local.agent_browser_persona_password` from
+`AGENT_BROWSER_PERSONA_PASSWORD` through the same selected authority (Infisical
+`/api`, Environment, or Development User Secrets). The instance-scoped,
+bootstrap-classified value is required only while a persona's native first-use
+replacement is unfinished. The configured administrator additionally needs
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` until its own replacement completes, and
+the Local JWT signing authority remains required on every launch. Once all
+personas are complete, startup does not reread initialization passwords or
+restore changed credentials. Production Setup neither activates nor exports
+the agent-only credential.
+
 Diagnostics stay value-free. Logs, health output, and support evidence carry
 status and reason codes, never the configured subject, DID, email, profile
 names, or any fingerprint value.

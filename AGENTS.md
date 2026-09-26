@@ -195,6 +195,18 @@ Whenever an agent prompts for approval, requests architectural direction, report
 
 ---
 
+## Approvals
+
+Generally speaking, I approve of the actions, commands, and tools required to complete the task I requested.
+
+If I ask you to create a UI Pull Request with screenshots, I expect you to upload those screenshots and include them in the description. These are examples, not an exhaustive list. Use your judgment to apply the same principle to similar situations.
+
+Approve the commands and tools needed to complete the task. Ask me first only when there is a real concern about exposing sensitive information or an action goes far beyond what I requested in an irreversible way.
+
+When a step doesn't need my input, keep going. Put status notes in the same message as your next action. Stop and ask only when you can't continue without me, or before anything destructive: deleting data, force-pushing, or changing anything outside this repository.
+
+---
+
 ## Local Configuration Overrides
 
 If an `AGENTS.local.md` file exists in the repository root, inspect and follow all instructions, environment overrides, and system-specific constraints defined in it. Treat rules in `AGENTS.local.md` as overriding or extending the guidelines in this document. When an isolated worktree is spawned (e.g. via `implement-tasks`), `AGENTS.local.md` is copied into the worktree root (never moved), ensuring local environment constraints remain active across isolated executions without git tracking.

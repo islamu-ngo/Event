@@ -80,9 +80,12 @@ public sealed class StorageProviderBindingService(
                 throw new InvalidOperationException("storage_secret_unavailable");
             return new S3Configuration
             {
-                Endpoint = binding.Endpoint!, BucketName = binding.BucketName!, Region = binding.Region!,
+                Endpoint = binding.Endpoint!,
+                BucketName = binding.BucketName!,
+                Region = binding.Region!,
                 ForcePathStyle = binding.ForcePathStyle,
-                AccessKeyId = accessKey.Value, SecretAccessKey = secretKey.Value
+                AccessKeyId = accessKey.Value,
+                SecretAccessKey = secretKey.Value
             };
         }
 

@@ -57,7 +57,7 @@ public sealed class StorageProviderIdentityTests
         try
         {
             var provider = new LocalFileStorageProvider(Options.Create(new LocalFileStorageOptions
-                { RootPath = path, CreateRootIfMissing = false }), NullLogger<LocalFileStorageProvider>.Instance);
+            { RootPath = path, CreateRootIfMissing = false }), NullLogger<LocalFileStorageProvider>.Instance);
             await Assert.ThrowsAsync<IOException>(() => provider.ExistsAsync(new FileStorageExistsInput("key"), CancellationToken.None));
         }
         finally { File.Delete(path); }
@@ -176,7 +176,7 @@ public sealed class StorageProviderIdentityTests
             return bytes.ContainsKey(request.VersionId ?? "newer-version")
                 ? Task.FromResult(new GetObjectMetadataResponse())
                 : Task.FromException<GetObjectMetadataResponse>(new AmazonS3Exception("absent")
-                    { StatusCode = HttpStatusCode.NotFound, ErrorCode = "NoSuchVersion" });
+                { StatusCode = HttpStatusCode.NotFound, ErrorCode = "NoSuchVersion" });
         });
         var service = new StorageProviderBindingService(new BindingRepository(), settings, secrets,
             Options.Create(new LocalFileStorageOptions()), factory, NullLoggerFactory.Instance);
@@ -230,8 +230,11 @@ public sealed class StorageProviderIdentityTests
         using var tracing = Sdk.CreateTracerProviderBuilder().AddHttpClientInstrumentation().AddProcessor(spans).Build();
         var config = new S3Configuration
         {
-            Endpoint = endpoint, BucketName = "original", ForcePathStyle = true,
-            AccessKeyId = Guid.NewGuid().ToString("N"), SecretAccessKey = Guid.NewGuid().ToString("N")
+            Endpoint = endpoint,
+            BucketName = "original",
+            ForcePathStyle = true,
+            AccessKeyId = Guid.NewGuid().ToString("N"),
+            SecretAccessKey = Guid.NewGuid().ToString("N")
         };
         var resolver = Substitute.For<IS3ConfigResolver>();
         resolver.ResolveAsync(Arg.Any<CancellationToken>()).Returns(config);
@@ -301,8 +304,10 @@ public sealed class StorageProviderIdentityTests
     {
         var config = new S3Configuration
         {
-            Endpoint = "https://storage.example.test", BucketName = "original",
-            AccessKeyId = Guid.NewGuid().ToString("N"), SecretAccessKey = Guid.NewGuid().ToString("N")
+            Endpoint = "https://storage.example.test",
+            BucketName = "original",
+            AccessKeyId = Guid.NewGuid().ToString("N"),
+            SecretAccessKey = Guid.NewGuid().ToString("N")
         };
         var resolver = Substitute.For<IS3ConfigResolver>();
         resolver.ResolveAsync(Arg.Any<CancellationToken>()).Returns(config);

@@ -22,8 +22,12 @@ public sealed class StorageObjectDeletionTombstonePersistenceTests(EventResource
         {
             context.Tenants.Add(new Tenant
             {
-                Id = tenantId, FullName = "Retiring resource tenant", Slug = $"retiring-{tenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = Now
+                Id = tenantId,
+                FullName = "Retiring resource tenant",
+                Slug = $"retiring-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = Now
             });
             context.Set<StorageProviderBinding>().Add(binding);
             context.Set<StorageObjectDeletionTombstone>().Add(work);

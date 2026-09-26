@@ -34,13 +34,25 @@ public sealed class StorageResourceReconciliationTests(EventResourceFileUploadTe
 
         StorageObject Object(Guid id, bool resource) => new()
         {
-            Id = id, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-            Provider = StorageProviders.Local, ObjectKey = $"objects/{id:N}", Uri = "/private",
-            FullName = "file.pdf", SafeDisplayName = "file.pdf", Extension = "pdf", ContentType = "application/pdf",
-            Size = 10, Purpose = resource ? StorageObjectPurposes.EventResource : StorageObjectPurposes.Attachment,
+            Id = id,
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Provider = StorageProviders.Local,
+            ObjectKey = $"objects/{id:N}",
+            Uri = "/private",
+            FullName = "file.pdf",
+            SafeDisplayName = "file.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 10,
+            Purpose = resource ? StorageObjectPurposes.EventResource : StorageObjectPurposes.Attachment,
             OwningResourceKind = resource ? StorageOwningResourceKinds.EventResource : null,
-            OwningResourceId = resource ? resourceId : null, Visibility = StorageObjectVisibilities.PrivateOwner,
-            LifecycleState = state, CreatedAt = Now.AddDays(-2)
+            OwningResourceId = resource ? resourceId : null,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            LifecycleState = state,
+            CreatedAt = Now.AddDays(-2)
         };
     }
 

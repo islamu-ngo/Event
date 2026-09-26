@@ -29,11 +29,17 @@ public sealed class RetainedSecretReference
         return new RetainedSecretReference
         {
             BindingId = binding.Id == Guid.Empty ? null : binding.Id,
-            SettingKey = binding.SettingKey, Scope = binding.Scope, ScopeId = binding.ScopeId,
-            Qualifier = binding.Qualifier, SourceType = binding.SourceType, Authority = authority,
-            AuthorityEndpoint = authorityEndpoint, AuthorityProject = authorityProject,
+            SettingKey = binding.SettingKey,
+            Scope = binding.Scope,
+            ScopeId = binding.ScopeId,
+            Qualifier = binding.Qualifier,
+            SourceType = binding.SourceType,
+            Authority = authority,
+            AuthorityEndpoint = authorityEndpoint,
+            AuthorityProject = authorityProject,
             EnvironmentVariableName = binding.EnvironmentVariableName,
-            InfisicalEnvironment = binding.InfisicalEnvironment, InfisicalPath = binding.InfisicalPath,
+            InfisicalEnvironment = binding.InfisicalEnvironment,
+            InfisicalPath = binding.InfisicalPath,
             InfisicalKey = binding.InfisicalKey
         };
     }

@@ -26,7 +26,9 @@ public sealed class StorageProviderBinding
             throw new ArgumentException("Storage binding requires an absolute root.", nameof(absoluteRootPath));
         return new StorageProviderBinding
         {
-            Id = Guid.CreateVersion7(), Provider = StorageProviders.Local, LocalRootPath = absoluteRootPath
+            Id = Guid.CreateVersion7(),
+            Provider = StorageProviders.Local,
+            LocalRootPath = absoluteRootPath
         };
     }
 
@@ -49,9 +51,14 @@ public sealed class StorageProviderBinding
             throw new ArgumentException("Storage binding requires the storage credential references.");
         return new StorageProviderBinding
         {
-            Id = Guid.CreateVersion7(), Provider = StorageProviders.S3Compatible,
-            Endpoint = endpoint, BucketName = bucketName, Region = region, ForcePathStyle = forcePathStyle,
-            AccessKeyReference = accessKeyReference, SecretKeyReference = secretKeyReference
+            Id = Guid.CreateVersion7(),
+            Provider = StorageProviders.S3Compatible,
+            Endpoint = endpoint,
+            BucketName = bucketName,
+            Region = region,
+            ForcePathStyle = forcePathStyle,
+            AccessKeyReference = accessKeyReference,
+            SecretKeyReference = secretKeyReference
         };
     }
 }

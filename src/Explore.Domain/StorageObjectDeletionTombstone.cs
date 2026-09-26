@@ -30,10 +30,15 @@ public sealed class StorageObjectDeletionTombstone
             throw new ArgumentException("Deletion authority requires a complete immutable provider identity.");
         return new()
         {
-            Id = objectId, TenantId = tenantId, Provider = provider, ProviderBindingId = providerBindingId,
-            ObjectKey = objectKey, ProviderObjectVersion = providerObjectVersion,
+            Id = objectId,
+            TenantId = tenantId,
+            Provider = provider,
+            ProviderBindingId = providerBindingId,
+            ObjectKey = objectKey,
+            ProviderObjectVersion = providerObjectVersion,
             State = producerSettled ? StorageObjectDeletionState.Ready : StorageObjectDeletionState.AwaitingProducer,
-            ConcurrencyStamp = Guid.CreateVersion7(), NextAttemptAtUtc = producerSettled ? utcNow : null
+            ConcurrencyStamp = Guid.CreateVersion7(),
+            NextAttemptAtUtc = producerSettled ? utcNow : null
         };
     }
 

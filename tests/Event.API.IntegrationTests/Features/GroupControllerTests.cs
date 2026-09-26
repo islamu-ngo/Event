@@ -154,7 +154,7 @@ public class GroupControllerTests
     [Test]
     public async Task UpdatePatch_WhenAuthenticatedWithoutIfMatch_ShouldReturnBadRequest()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var userId = Guid.NewGuid();
         using var request = new HttpRequestMessage(HttpMethod.Patch, $"{BaseUrl}/{Guid.NewGuid()}")

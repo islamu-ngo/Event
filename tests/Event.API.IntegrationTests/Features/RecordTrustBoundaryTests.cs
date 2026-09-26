@@ -59,6 +59,7 @@ public sealed class RecordTrustBoundaryTests
         var categoryChecks = new ConcurrentQueue<AuthorizationRequest>();
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider
             {
                 CheckPredicate = check =>

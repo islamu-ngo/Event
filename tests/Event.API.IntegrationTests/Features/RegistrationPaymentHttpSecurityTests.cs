@@ -12,6 +12,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -33,7 +34,8 @@ public sealed class RegistrationPaymentHttpSecurityTests
         var freshness = Substitute.For<IPaidOrderAcceptanceFreshnessService>();
         freshness.IsCurrentAsync(Arg.Any<PaymentAttempt>(), Arg.Any<CancellationToken>()).Returns(true);
         var timeProvider = new MutableTimeProvider(UtcNow);
-        await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory().WithWebHostBuilder(builder =>
+        await using var baseFactory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
+        await using WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IHostedCheckoutSessionRetriever>();
@@ -146,7 +148,8 @@ public sealed class RegistrationPaymentHttpSecurityTests
             "stripe", "OrganizerDirect", "2026-07-29.dahlia", "test", "instance-operator"));
         var freshness = Substitute.For<IPaidOrderAcceptanceFreshnessService>();
         freshness.IsCurrentAsync(Arg.Any<PaymentAttempt>(), Arg.Any<CancellationToken>()).Returns(false);
-        await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory().WithWebHostBuilder(builder =>
+        await using var baseFactory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
+        await using WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IEventRepository>();
@@ -167,6 +170,11 @@ public sealed class RegistrationPaymentHttpSecurityTests
         using (IServiceScope scope = factory.Services.CreateScope())
         {
             ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var tenant = await db.Tenants.FindAsync(TenantId);
+            if (tenant is null)
+                db.Tenants.Add(new TenantBuilder().WithId(TenantId).Build());
+            else
+                tenant.TenantStatusId = (int)TenantStatusEnum.Active;
             IGuestCapabilityTokenService capabilities = scope.ServiceProvider.GetRequiredService<IGuestCapabilityTokenService>();
             GuestCapabilityTokenIssue capability = capabilities.Issue();
             RegistrationOrder order = CreateOrder(eventId, orderId, capability.Hash, UtcNow.AddMinutes(30));

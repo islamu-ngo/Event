@@ -208,6 +208,7 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
     {
         var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = allowAuthorization }
         };
 

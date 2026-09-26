@@ -36,7 +36,7 @@ public class IdempotencyMiddlewareRealRuntimeTests(RealRuntimeApiFixture fixture
     [Test]
     public async Task Get_WithIdempotencyKey_IgnoresKeyAndPassesThrough()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/event");
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
@@ -51,7 +51,7 @@ public class IdempotencyMiddlewareRealRuntimeTests(RealRuntimeApiFixture fixture
     [Test]
     public async Task Post_WithoutIdempotencyKey_PassesThroughNormally()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         // POST without Idempotency-Key header — middleware is opt-in
         var content = new StringContent("""{"title":"No Key Event"}""", Encoding.UTF8, "application/json");
@@ -65,7 +65,7 @@ public class IdempotencyMiddlewareRealRuntimeTests(RealRuntimeApiFixture fixture
     [Test]
     public async Task Post_WithInvalidKey_TooLong_ReturnsBadRequest()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var tooLongKey = new string('x', 129);
         var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/event");
@@ -83,7 +83,7 @@ public class IdempotencyMiddlewareRealRuntimeTests(RealRuntimeApiFixture fixture
     [Test]
     public async Task Post_WithInvalidKey_ContainingWhitespace_ReturnsBadRequest()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Post, "/api/event");
         request.Headers.Add("Idempotency-Key", "invalid key with spaces");
@@ -100,7 +100,7 @@ public class IdempotencyMiddlewareRealRuntimeTests(RealRuntimeApiFixture fixture
     [Test]
     public async Task Post_WhenValidationFailureOccurs_DoesNotReplaySameKeyRetry()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var idempotencyKey = Guid.NewGuid().ToString("N");
 

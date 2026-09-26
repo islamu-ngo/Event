@@ -2,12 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
+using System.Text.Json;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Exceptions;
 using Explore.Application.Models;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -39,7 +42,7 @@ namespace Event.Api.IntegrationTests.Features;
 /// </list>
 /// </summary>
 [Category(TestCategories.Security)]
-[ClassDataSource<KeycloakOnlyFixture>(Shared = SharedType.PerAssembly)]
+[ClassDataSource<KeycloakOnlyFixture>(Shared = SharedType.PerClass)]
 [NotInParallel("SecurityInfra")]
 public class CoverageGovernanceTests : IAsyncDisposable
 {
@@ -124,7 +127,13 @@ public class CoverageGovernanceTests : IAsyncDisposable
     [Test]
     public async Task Governance_InstanceSettings_DeploymentMode_DeniesRegularUser()
     {
-        await AssertRegularUserDenied(HttpMethod.Get, "/api/instance/settings/deployment-mode");
+        var token = await _keycloak.TokenClient.GetUserTokenAsync();
+        using var request = Auth(HttpMethod.Get, "/api/instance/settings/deployment-mode", token);
+        using var response = await _regularUserClient.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(problem.RootElement.GetProperty("code").GetString())
+            .IsEqualTo("tenant_lifecycle_unavailable");
     }
 
     [Test]
@@ -679,6 +688,11 @@ public class CoverageGovernanceTests : IAsyncDisposable
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var tenant = await dbContext.Tenants.FindAsync([DefaultTenantId], cancellationToken);
+            if (tenant is null)
+                dbContext.Tenants.Add(new TenantBuilder().WithId(DefaultTenantId).Build());
+            else
+                tenant.TenantStatusId = (int)TenantStatusEnum.Active;
 
             dbContext.SystemSettings.Add(new Explore.Domain.SystemSetting
             {

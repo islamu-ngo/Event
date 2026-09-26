@@ -2,11 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
+using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -45,6 +49,8 @@ public class CrossTenantIsolationTests : IAsyncDisposable
 
     private static readonly Guid TenantA = PlatformDefaults.DefaultTenantId;
     private static readonly Guid TenantB = Guid.Parse("018e4e5c-7f00-7000-8000-000000000099");
+    private const string TenantASlug = "tenant-a";
+    private const string TenantBSlug = "tenant-b";
 
     private readonly WebApplicationFactory<Program> _tenantAAdminFactory;
     private readonly HttpClient _tenantAAdminClient;
@@ -69,15 +75,19 @@ public class CrossTenantIsolationTests : IAsyncDisposable
 
         _tenantAAdminFactory = CreateFactory(tenantAAdminContext, TenantA);
         _tenantAAdminClient = _tenantAAdminFactory.CreateClient();
+        _tenantAAdminClient.DefaultRequestHeaders.Add(TenantHeaderNames.TenantSlug, TenantASlug);
 
         _tenantBAdminFactory = CreateFactory(tenantBAdminContext, TenantB);
         _tenantBAdminClient = _tenantBAdminFactory.CreateClient();
+        _tenantBAdminClient.DefaultRequestHeaders.Add(TenantHeaderNames.TenantSlug, TenantBSlug);
 
         _instanceAdminFactory = CreateFactory(instanceAdminContext, TenantA);
         _instanceAdminClient = _instanceAdminFactory.CreateClient();
+        _instanceAdminClient.DefaultRequestHeaders.Add(TenantHeaderNames.TenantSlug, TenantASlug);
 
         _regularUserFactory = CreateFactory(regularUserContext, TenantA);
         _regularUserClient = _regularUserFactory.CreateClient();
+        _regularUserClient.DefaultRequestHeaders.Add(TenantHeaderNames.TenantSlug, TenantASlug);
     }
 
     public async ValueTask DisposeAsync()
@@ -432,8 +442,9 @@ public class CrossTenantIsolationTests : IAsyncDisposable
                     ["S3Settings:Region"] = "us-east-1",
                     ["S3Settings:BucketName"] = "test-bucket",
                     ["S3Settings:Endpoint"] = "https://s3.example.com",
-                    ["Deployment:Mode"] = "SingleTenant",
+                    ["Deployment:Mode"] = "MultiTenant",
                     ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
+                    ["Testing:DisableDeploymentModeCache"] = "true",
                     ["Testing:HostProfile"] = TestHostProfile.Security,
                     ["Cerbos:GrpcEndpoint"] = "http://localhost:19999",
                     ["Cerbos:PlaintextMode"] = "true",
@@ -516,6 +527,24 @@ public class CrossTenantIsolationTests : IAsyncDisposable
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+
+            foreach ((Guid tenantId, string slug) in new[] { (TenantA, TenantASlug), (TenantB, TenantBSlug) })
+            {
+                var tenant = await dbContext.Tenants.FindAsync([tenantId], cancellationToken);
+                if (tenant is null)
+                    dbContext.Tenants.Add(new TenantBuilder().WithId(tenantId).WithSlug(slug).Build());
+                else
+                {
+                    tenant.TenantStatusId = (int)TenantStatusEnum.Active;
+                    tenant.Slug = slug;
+                }
+            }
+
+            var bootstrappedAt = DateTime.UtcNow;
+            var bootstrap = InstanceBootstrapState.CreateInteractivePending(
+                Guid.CreateVersion7(), DeploymentMode.MultiTenant, bootstrappedAt);
+            bootstrap.CompleteInteractive(Guid.CreateVersion7(), bootstrappedAt);
+            dbContext.InstanceBootstrapStates.Add(bootstrap);
 
             dbContext.SystemSettings.Add(new Explore.Domain.SystemSetting
             {

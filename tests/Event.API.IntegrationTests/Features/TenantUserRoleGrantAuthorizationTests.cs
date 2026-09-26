@@ -12,6 +12,7 @@ public sealed class TenantUserRoleGrantAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -27,6 +28,7 @@ public sealed class TenantUserRoleGrantAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();

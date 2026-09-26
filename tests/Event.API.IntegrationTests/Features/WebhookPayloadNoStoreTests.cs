@@ -1,7 +1,11 @@
 using System.Net;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
+using Explore.Domain.Constants;
+using Explore.Persistence;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -17,6 +21,12 @@ public sealed class WebhookPayloadNoStoreTests
             .Single();
         await using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            db.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
+            db.SaveChanges();
+        }
 
         using var response = await client.GetAsync($"/api/webhooks/messages/{Guid.CreateVersion7():D}/payload");
 

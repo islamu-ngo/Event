@@ -24,7 +24,7 @@ public class ProblemDetailsRealRuntimeTests(RealRuntimeApiFixture fixture)
     [Test]
     public async Task NotFound_FromRealHandler_ReturnsStandardProblemDetails()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var response = await _fixture.Client.GetAsync($"/api/event/{Guid.NewGuid()}");
 
@@ -35,7 +35,7 @@ public class ProblemDetailsRealRuntimeTests(RealRuntimeApiFixture fixture)
     [Test]
     public async Task NotFound_FromRealHandler_DoesNotLeakStackTrace()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var response = await _fixture.Client.GetAsync($"/api/event/{Guid.NewGuid()}");
         var content = await response.Content.ReadAsStringAsync();
@@ -48,7 +48,7 @@ public class ProblemDetailsRealRuntimeTests(RealRuntimeApiFixture fixture)
     [Test]
     public async Task NotFound_FromRealHandler_ContainsRequiredFields()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var response = await _fixture.Client.GetAsync($"/api/event/{Guid.NewGuid()}");
 
@@ -67,7 +67,7 @@ public class ProblemDetailsRealRuntimeTests(RealRuntimeApiFixture fixture)
     [Test]
     public async Task Unauthorized_Post_ReturnsCorrectStatusCode()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var content = new StringContent("""{"title":"Unauth Event"}""", Encoding.UTF8, "application/json");
         var response = await _fixture.Client.PostAsync("/api/event", content);
@@ -78,7 +78,7 @@ public class ProblemDetailsRealRuntimeTests(RealRuntimeApiFixture fixture)
     [Test]
     public async Task NotFound_ContentType_IsProblemJson()
     {
-        await _fixture.ResetDatabaseAsync();
+        await _fixture.ResetWithActiveDefaultTenantAsync();
 
         var response = await _fixture.Client.GetAsync($"/api/event/{Guid.NewGuid()}");
         var contentType = response.Content.Headers.ContentType?.MediaType;

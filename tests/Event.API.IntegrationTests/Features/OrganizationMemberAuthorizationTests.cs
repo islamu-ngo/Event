@@ -12,6 +12,7 @@ public sealed class OrganizationMemberAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -29,6 +30,7 @@ public sealed class OrganizationMemberAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();

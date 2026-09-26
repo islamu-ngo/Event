@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
@@ -35,7 +36,8 @@ public sealed class OnboardingStatusLinkPolicyTests
             IsCompleted = false
         };
 
-        var links = policy.GetLinks(status, user: null).ToArray();
+        var user = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "Bearer"));
+        var links = policy.GetLinks(status, user).ToArray();
         var authentication = links.Single(link => link.Rel == "manage-authentication");
         var authorization = links.Single(link => link.Rel == "manage-authorization");
         var saveProfile = links.Single(link => link.Rel == "save-profile");

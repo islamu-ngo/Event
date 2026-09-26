@@ -13,7 +13,7 @@ public sealed class WebPushPublicConfigurationContractTests
     [Test]
     public async Task UnconfiguredInstance_PublicReads_ReportDisabledCapabilityWithoutKeyMaterial()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
 
         using var configurationResponse = await client.GetAsync(ConfigurationUrl);
@@ -38,7 +38,7 @@ public sealed class WebPushPublicConfigurationContractTests
     {
         string publicKey = CreateVapidKey(65);
         string privateKey = CreateVapidKey(32);
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         factory.AdditionalConfiguration["WebPush:Enabled"] = "true";
         factory.AdditionalConfiguration["WebPush:VapidSubject"] = "mailto:operator@example.test";
         factory.AdditionalConfiguration["WebPush:VapidPublicKey"] = publicKey;

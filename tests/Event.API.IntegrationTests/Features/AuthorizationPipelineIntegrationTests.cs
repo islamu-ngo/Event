@@ -2,11 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Infrastructure.Services;
+using Explore.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -59,6 +63,7 @@ public class AuthorizationPipelineIntegrationTests : IAsyncDisposable
             AuthorizationProviderOverride = instanceAdminProvider
         };
         _instanceAdminClient = _instanceAdminFactory.CreateClient();
+        PublishDefaultTenant(_instanceAdminFactory);
 
         _instanceAdminControlPlaneFactory = CreateMultiTenantFactory(
             new RoleAwareCerbosProvider(
@@ -82,6 +87,7 @@ public class AuthorizationPipelineIntegrationTests : IAsyncDisposable
             AuthorizationProviderOverride = regularUserProvider
         };
         _regularUserClient = _regularUserFactory.CreateClient();
+        PublishDefaultTenant(_regularUserFactory);
 
         _regularUserControlPlaneFactory = CreateMultiTenantFactory(
             new RoleAwareCerbosProvider(
@@ -99,6 +105,18 @@ public class AuthorizationPipelineIntegrationTests : IAsyncDisposable
 
         _tenantAdminFactory = CreateMultiTenantFactory(tenantAdminProvider);
         _tenantAdminClient = _tenantAdminFactory.CreateClient();
+    }
+
+    private static void PublishDefaultTenant(SecurityWebApplicationFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var tenant = db.Tenants.Find(PlatformDefaults.DefaultTenantId);
+        if (tenant is null)
+            db.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
+        else
+            tenant.TenantStatusId = (int)TenantStatusEnum.Active;
+        db.SaveChanges();
     }
 
     public async ValueTask DisposeAsync()

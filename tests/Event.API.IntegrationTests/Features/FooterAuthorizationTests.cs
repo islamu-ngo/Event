@@ -32,6 +32,7 @@ public sealed class FooterAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         using var client = factory.CreateClient();
@@ -60,6 +61,7 @@ public sealed class FooterAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -79,6 +81,7 @@ public sealed class FooterAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -101,6 +104,7 @@ public sealed class FooterAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         using var client = factory.CreateClient();
@@ -117,6 +121,7 @@ public sealed class FooterAuthorizationTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -140,6 +145,7 @@ public sealed class FooterAuthorizationTests
         var groupRepository = Substitute.For<IFooterLinkGroupRepository>();
         await using var baseFactory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         await using var factory = baseFactory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
@@ -178,6 +184,7 @@ public sealed class FooterAuthorizationTests
             });
         await using var baseFactory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         await using var factory = baseFactory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>

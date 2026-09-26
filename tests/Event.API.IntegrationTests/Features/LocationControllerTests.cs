@@ -133,7 +133,7 @@ public class LocationControllerTests
     [Test]
     public async Task UpdatePatch_WhenAuthenticatedWithoutIfMatch_ShouldReturnBadRequest()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var locationId = Guid.NewGuid();
         var userId = Guid.NewGuid();

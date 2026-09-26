@@ -7,6 +7,7 @@ using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Operations.Decorators;
 using Explore.Application.Responses;
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
@@ -258,6 +259,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeTests(
         using HttpResponseMessage attached = await fixture.AttachAsync(
             scenario, scenario.OrganizerUserId, scenario.ConfigurationStamp);
         await Assert.That(attached.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await fixture.AllowPublicAccountOnboardingAsync(scenario.OrganizerUserId);
 
         string before = await fixture.GetPersistenceFingerprintAsync(scenario);
         Guid attachedStamp = await fixture.GetConfigurationStampAsync(scenario);
@@ -506,6 +508,21 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
 
     private PostgreSqlApiWebApplicationFactory _factory = null!;
     private HttpClient _client = null!;
+
+    public async Task AllowPublicAccountOnboardingAsync(Guid actorUserId)
+    {
+        await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
+        var writer = scope.ServiceProvider.GetRequiredService<IVisitorAccessSettingsWriter>();
+        var result = await writer.ApplyAsync(
+        [
+            new(null, GovernanceSettingKeys.Authentication.GoogleSsoEnabled, VisitorAccessSettingMutationKind.SetValue, "true"),
+            new(null, GovernanceSettingKeys.Authentication.GoogleClientId, VisitorAccessSettingMutationKind.SetValue, "\"public-client\""),
+            new(null, GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, VisitorAccessSettingMutationKind.SetValue, "\"Allowed\""),
+            new(null, GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, VisitorAccessSettingMutationKind.SetValue, "\"https://accounts.example.test/signup\"")
+        ], actorUserId);
+        if (!result.Success)
+            throw new InvalidOperationException($"Visitor onboarding fixture setup failed: {result.FailureCode}");
+    }
 
     public async Task InitializeAsync()
     {

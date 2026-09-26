@@ -112,7 +112,7 @@ public sealed class EventSessionSpeakerControllerTests
     [Arguments("01900000-0000-7000-8000-000000000099")]
     public async Task Update_WhenIfMatchIsInvalid_ReturnsValidationProblemDetails(string? ifMatch)
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using var request = CreateAuthenticatedJsonRequest(
             HttpMethod.Patch,

@@ -139,6 +139,11 @@ public class EventHateoasScenarioTests(RealRuntimeApiFixture fixture)
     public async Task GetOpenGraphImage_WithUnknownSlug_ReturnsGenericNotFound()
     {
         await _fixture.ResetDatabaseAsync();
+        await using (var scope = _fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            await TenantScenarioSeed.SeedActiveTenantWithUserAsync(db);
+        }
 
         using var response = await _fixture.Client.GetAsync(
             "/api/event/public/missing-open-graph-image-test/og-image");

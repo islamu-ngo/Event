@@ -46,6 +46,14 @@ public class CerbosFailClosedTests : IAsyncDisposable
             keycloak.Authority,
             keycloak.MetadataAddress);
         _client = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        if (db.Tenants.Find(PlatformDefaults.DefaultTenantId) is null)
+        {
+            db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()
+                .WithId(PlatformDefaults.DefaultTenantId).Build());
+            db.SaveChanges();
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -64,10 +72,8 @@ public class CerbosFailClosedTests : IAsyncDisposable
 
         var response = await _client.SendAsync(request);
 
-        Console.WriteLine($"Cerbos outage request returned HTTP {(int)response.StatusCode}.");
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because(
-            $"Actual status: {(int)response.StatusCode} {response.StatusCode}; when Cerbos is down and configured as the authz provider, " +
-            "even instance admin must be denied — fail-closed is absolute");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden).Because("when Cerbos is down and configured as the authz provider, " +
+        "even instance admin must be denied — fail-closed is absolute");
     }
 
     [Test]

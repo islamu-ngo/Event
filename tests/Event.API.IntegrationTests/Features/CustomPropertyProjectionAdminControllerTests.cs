@@ -249,6 +249,7 @@ public sealed partial class CustomPropertyProjectionAdminControllerTests
     public async Task EventAndSessionStatusValidationUseProblemDetails()
     {
         await using var factory = await FactoryAsync();
+        factory.SeedActiveDefaultTenant = true;
         // Substitute the external PDP only to reach the handlers' empty-ID validation.
         factory.AuthorizationProviderOverride = new StubAuthorizationProvider();
         using var client = Client(factory, Guid.CreateVersion7());

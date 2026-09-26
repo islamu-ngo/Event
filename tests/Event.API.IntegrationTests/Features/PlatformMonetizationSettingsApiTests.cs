@@ -287,6 +287,7 @@ public sealed class PlatformMonetizationSettingsRuntimeApiTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            SeedActiveDefaultTenant = true;
             AuthorizationProviderOverride = authorizationProvider;
             base.ConfigureWebHost(builder);
             builder.ConfigureTestServices(services =>

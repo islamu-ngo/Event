@@ -217,8 +217,8 @@ public sealed class StorageRetentionHateoasTests
         {
             storage.OwningResourceKind = "registration_submission_sink";
             storage.OwningResourceId = scenario == "missing-lineage" ? Guid.CreateVersion7() : submission.Id;
-            storage.RegistrationContentRetentionUntilUtc = scenario == "missing-artifact-bound" ? null
-                : account ? created : Deadline;
+            storage.RegistrationContentRetentionUntilUtc =
+                scenario == "missing-artifact-bound" || account ? null : Deadline;
         }
         db.AddRange(order, attempt, submission, storage);
         await db.SaveChangesAsync();

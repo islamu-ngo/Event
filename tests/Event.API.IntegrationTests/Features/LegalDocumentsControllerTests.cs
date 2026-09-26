@@ -111,6 +111,7 @@ public sealed class LegalDocumentsControllerTests
             services.AddLogging();
             services.AddHttpContextAccessor();
             services.AddSingleton<ITenantRepository, TenantRepository>();
+            services.AddSingleton<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
             services.AddSingleton<IPlatformUserRoleRepository, PlatformUserRoleRepository>();
             services.AddSingleton<ITenantUserRoleGrantRepository, TenantUserRoleGrantRepository>();
             services.AddSingleton<IOrganizationMemberRepository, OrganizationMemberRepository>();

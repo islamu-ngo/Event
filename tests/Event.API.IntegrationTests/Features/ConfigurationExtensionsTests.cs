@@ -423,13 +423,20 @@ public sealed class ConfigurationExtensionsTests
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
     {
         values.TryAdd("SecretProvider:Provider", "Environment");
-        var previous = values.Keys.ToDictionary(
+        var ambientDatabaseKeys = Environment.GetEnvironmentVariables().Keys.OfType<string>()
+            .Where(key => key.StartsWith("Database__", StringComparison.OrdinalIgnoreCase)
+                || key.StartsWith("DATABASE_", StringComparison.Ordinal))
+            .ToArray();
+        var previous = values.Keys.Concat(ambientDatabaseKeys).Distinct(StringComparer.Ordinal).ToDictionary(
             key => key,
             Environment.GetEnvironmentVariable,
             StringComparer.Ordinal);
 
         try
         {
+            foreach (string key in ambientDatabaseKeys)
+                Environment.SetEnvironmentVariable(key, null);
+
             foreach (var pair in values)
             {
                 Environment.SetEnvironmentVariable(pair.Key, pair.Value);

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Net.Sockets;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Domain.Constants;
 using Explore.Persistence;
@@ -37,6 +38,14 @@ public class NoKeycloakAuthenticationTests : IAsyncDisposable
     {
         _factory = new NoKeycloakWebApplicationFactory();
         _client = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var tenant = db.Tenants.Find(PlatformDefaults.DefaultTenantId);
+        if (tenant is null)
+            db.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
+        else
+            tenant.TenantStatusId = (int)Explore.Domain.Enums.TenantStatusEnum.Active;
+        db.SaveChanges();
     }
 
     public async ValueTask DisposeAsync()

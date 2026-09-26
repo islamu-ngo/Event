@@ -154,9 +154,7 @@ public class CategoryControllerTests
 
         var response = await client.SendAsync(request);
 
-        Console.WriteLine($"Category PATCH without If-Match returned HTTP {(int)response.StatusCode}.");
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest)
-            .Because($"Actual status: {(int)response.StatusCode} {response.StatusCode}");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
 
     #endregion

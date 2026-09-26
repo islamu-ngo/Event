@@ -69,7 +69,7 @@ public class GroupControllerTests
     [Test]
     public async Task Create_WhenAuthenticated_PersistsAuthenticatedUserAsPendingGroupAdmin()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var authenticatedUserId = Guid.CreateVersion7();
         var groupName = $"Creator Binding {Guid.NewGuid():N}";
@@ -106,7 +106,7 @@ public class GroupControllerTests
     [Test]
     public async Task Create_WhenBodyContainsCreatorUserId_ReturnsBadRequestAndPersistsNoMembership()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var authenticatedUserId = Guid.CreateVersion7();
         var hostileCreatorUserId = Guid.CreateVersion7();

@@ -227,7 +227,7 @@ public class InstanceOperatorIdentityControllerTests
     }
 
     [Test]
-    public async Task Put_CompletedBootstrap_RejectsIncompleteReplacementWithBadRequest400()
+    public async Task Put_CompletedBootstrap_AcceptsIncompleteDraftButDeniesCapabilities()
     {
         using var factory = new OnboardingWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -291,10 +291,12 @@ public class InstanceOperatorIdentityControllerTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
-        await Assert.That(problem).IsNotNull();
-        await Assert.That(problem!.Status).IsEqualTo(StatusCodes.Status400BadRequest);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var saved = await response.Content.ReadFromJsonAsync<BaseCommandResponse<InstanceOperatorIdentitySavedDocumentDto>>();
+        await Assert.That(saved).IsNotNull();
+        await Assert.That(saved!.IsSuccess).IsTrue();
+        await Assert.That(saved.Id!.PublicDisclosure.IsReady).IsFalse();
+        await Assert.That(saved.Id.PaidCommerce.IsReady).IsFalse();
     }
 
     [Test]

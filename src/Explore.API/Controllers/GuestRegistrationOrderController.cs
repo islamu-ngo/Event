@@ -53,9 +53,9 @@ public sealed class GuestRegistrationOrderController(
     public async Task<ActionResult<GuestRegistrationOrderStartDto>> StartGuest(
         Guid eventId,
         [FromBody] StartRegistrationOrderRequest? request,
-        CancellationToken cancellationToken = default,
         [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ChallengeHeader)] string? challenge = null,
-        [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ProofHeader)] string? proof = null)
+        [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ProofHeader)] string? proof = null,
+        CancellationToken cancellationToken = default)
     {
         if (request is null)
         {

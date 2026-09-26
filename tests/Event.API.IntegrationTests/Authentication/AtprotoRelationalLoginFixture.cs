@@ -106,6 +106,11 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(async call =>
         {
             string name = call.ArgAt<string>(0);
+            if (name is SecretDefinitionRegistry.Keys.Keycloak.Endpoint
+                or SecretDefinitionRegistry.Keys.Keycloak.Realm
+                or SecretDefinitionRegistry.Keys.Keycloak.ClientId
+                or SecretDefinitionRegistry.Keys.Keycloak.BlazorClientSecret)
+                return SecretResolutionResult.Unconfigured;
             return material.TryGetValue(name, out string? value)
                 ? SecretResolutionResult.Resolved(new ResolvedSecret(name, value, SecretSourceType.Infisical,
                     SecretScope.Instance, null, DateTimeOffset.UtcNow))
@@ -119,6 +124,9 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
             ["Deployment:DefaultTenantId"] = TenantId.ToString("D"),
             ["Authentication:Provider"] = "atproto",
             ["Authorization:Provider"] = "local",
+            ["Keycloak:Authority"] = string.Empty,
+            ["Keycloak:ClientId"] = string.Empty,
+            ["Keycloak:MetadataAddress"] = string.Empty,
             ["Atproto:PublicUrl"] = CanonicalOrigin,
             ["Atproto:CallbackPath"] = "/signin-atproto"
         };
@@ -181,6 +189,9 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                 ["ConnectionStrings:cache"] = string.Empty,
                 ["Authentication:Provider"] = "atproto",
                 ["Authentication:AtprotoLoginEnabled"] = "true",
+                ["Keycloak:Authority"] = string.Empty,
+                ["Keycloak:ClientId"] = string.Empty,
+                ["Keycloak:MetadataAddress"] = string.Empty,
                 ["Atproto:PublicUrl"] = CanonicalOrigin,
                 ["Atproto:CallbackPath"] = "/signin-atproto",
                 ["Atproto:TenantOrigins:0:Origin"] = TenantOrigin,

@@ -200,12 +200,12 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
         return request;
     }
 
-    public async Task<Guid> SeedTenantAsync(bool enabled = true)
+    public async Task<Guid> SeedTenantAsync(bool enabled = true, Guid? tenantId = null)
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var status = await db.TenantStatuses.SingleAsync(status => status.Id == (int)(enabled ? TenantStatusEnum.Active : TenantStatusEnum.Suspended));
-        Guid id = Guid.CreateVersion7();
+        Guid id = tenantId ?? Guid.CreateVersion7();
         db.Tenants.Add(new Explore.Domain.Tenant
         {
             Id = id,

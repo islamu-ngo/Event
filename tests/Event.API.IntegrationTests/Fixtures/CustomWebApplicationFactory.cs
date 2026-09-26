@@ -14,6 +14,8 @@ namespace Event.Api.IntegrationTests.Fixtures;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string _databaseName = $"InMemoryDbForTesting_{Guid.CreateVersion7():N}";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Set environment to "Testing"
@@ -49,7 +51,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Since skipDbContextRegistration=true in "Testing" environment,
             // no Npgsql provider is registered. We simply add InMemory.
-            services.AddInMemoryExploreDbContext("InMemoryDbForTesting");
+            services.AddInMemoryExploreDbContext(_databaseName);
 
             // Override Redis with in-memory distributed cache for tests
             services.RemoveAll<IDistributedCache>();

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Explore.API.Authentication;
+using Explore.API.Hateoas;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -192,7 +193,7 @@ public sealed class AtprotoTransientBoundaryTests(AtprotoTransientApiFixture fix
         string token = fixture.Sign(body);
         string correlationId = Guid.CreateVersion7().ToString("N");
         Task<IReadOnlyDictionary<string, object?>> logged = logs.ExpectRequest(
-            correlationId, "POST", AtprotoTransientApiFixture.Prefix + "read");
+            correlationId, "POST", RouteNames.ReadAtprotoTransient);
         using var request = fixture.Request(body, token);
         request.Headers.Add("X-Correlation-ID", correlationId);
         using var response = await client.SendAsync(request);

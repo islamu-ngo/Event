@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.API.IntegrationTests.Authentication;
@@ -132,9 +134,13 @@ public sealed class AtprotoTransientStoreControllerTests(AtprotoTransientApiFixt
     [Test]
     public async Task PublishedHalLinks_DoNotAdvertisePrivateTransientOperations()
     {
-        Guid tenantId = await fixture.SeedTenantAsync();
+        Guid tenantId = await fixture.SeedTenantAsync(tenantId: PlatformDefaults.DefaultTenantId);
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var lifecycle = scope.ServiceProvider.GetRequiredService<ITenantLifecycleAccessService>();
+            await Assert.That(await lifecycle.IsPublicAsync(tenantId)).IsTrue();
+        }
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/event?pageSize=1");
-        request.Headers.Add("X-Tenant-Slug", "transient-" + tenantId.ToString("N"));
         request.Headers.Accept.ParseAdd("application/hal+json");
         using var response = await fixture.Client.SendAsync(request);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);

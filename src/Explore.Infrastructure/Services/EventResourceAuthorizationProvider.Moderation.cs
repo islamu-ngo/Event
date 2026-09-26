@@ -74,8 +74,8 @@ public sealed partial class EventResourceAuthorizationProvider
                 }
                 if (bound.Count != parents.Count) continue;
                 foreach (var (id, allowed) in bound)
-                foreach (int index in expected[id])
-                    decisions[index] = allowed ? EventResourceProviderDecision.Allow : EventResourceProviderDecision.Deny;
+                    foreach (int index in expected[id])
+                        decisions[index] = allowed ? EventResourceProviderDecision.Allow : EventResourceProviderDecision.Deny;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -100,7 +100,8 @@ public sealed partial class EventResourceAuthorizationProvider
             .ToDictionary(value => value.EventId.ToString("D"), value => AttributeValue.MapValue(new()
             {
                 ["tenantId"] = AttributeValue.StringValue(value.TenantId.ToString("D")),
-                ["roles"] = Codes(value.Roles), ["permissions"] = Codes(value.Permissions)
+                ["roles"] = Codes(value.Roles),
+                ["permissions"] = Codes(value.Permissions)
             }), StringComparer.Ordinal);
         return Principal.NewInstance(principal.UserId.ToString("D"), "islamuevent_authenticated_user")
             .WithAttribute("userId", AttributeValue.StringValue(principal.UserId.ToString("D")))

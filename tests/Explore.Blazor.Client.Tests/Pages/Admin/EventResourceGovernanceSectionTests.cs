@@ -51,7 +51,9 @@ public sealed class EventResourceGovernanceSectionTests : IDisposable
         var settings = Settings(edit: true);
         settings.Settings.Add(new EffectiveSettingDto
         {
-            Key = "event_resources.enabled_delivery_types", Value = "[\"StoredFile\"]", CanEdit = true
+            Key = "event_resources.enabled_delivery_types",
+            Value = "[\"StoredFile\"]",
+            CanEdit = true
         });
         _service.GetAsync(false, Arg.Any<CancellationToken>()).Returns(settings);
         var cut = _ctx.RenderMudComponent<EventResourceGovernanceSection>();

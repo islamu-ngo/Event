@@ -51,9 +51,15 @@ public sealed record EventResourceDraftDto
 
     internal EventResourceMetadata ToMetadata() => new()
     {
-        Title = Title, PublicTitle = PublicTitle, Description = Description, SensitiveNotes = SensitiveNotes,
-        Kind = Kind, DisclosureMode = DisclosureMode, LanguageCode = LanguageCode,
-        AccessibilityNote = AccessibilityNote, SortOrder = SortOrder,
+        Title = Title,
+        PublicTitle = PublicTitle,
+        Description = Description,
+        SensitiveNotes = SensitiveNotes,
+        Kind = Kind,
+        DisclosureMode = DisclosureMode,
+        LanguageCode = LanguageCode,
+        AccessibilityNote = AccessibilityNote,
+        SortOrder = SortOrder,
         AccessibleAlternativeEventResourceId = AccessibleAlternativeEventResourceId
     };
 }

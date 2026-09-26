@@ -70,7 +70,9 @@ public sealed partial class CombinedEventResourceTransportTests
         await using var host = deployment.CreateHost();
         using var client = host.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
         string password = NativeEmailOptionalStandaloneFixture.NewPassword();
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login",
@@ -107,9 +109,14 @@ public sealed partial class CombinedEventResourceTransportTests
             if (!await db.TenantUsers.AnyAsync(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == user.Id))
                 db.TenantUsers.Add(new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    UserId = user.Id, User = user, ActorId = actor.Id,
-                    StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = user.Id,
+                    User = user,
+                    ActorId = actor.Id,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    CreatedAt = DateTime.UtcNow
                 });
             var policy = await db.SystemSettings.SingleOrDefaultAsync(row =>
                 row.SettingKey == GovernanceSettingKeys.EventResources.ExternalOrigins);
@@ -117,23 +124,38 @@ public sealed partial class CombinedEventResourceTransportTests
             if (policy is null)
                 db.SystemSettings.Add(new SystemSetting
                 {
-                    SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins, Value = origins,
-                    ValueType = SettingValueType.Json, Category = "EventResources"
+                    SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
+                    Value = origins,
+                    ValueType = SettingValueType.Json,
+                    Category = "EventResources"
                 });
             else policy.Value = origins;
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Combined external access", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Combined external access",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
-                new EventResourceMetadata { Title = "External resource", PublicTitle = "Visit",
-                    Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.Public },
+                new EventResourceMetadata
+                {
+                    Title = "External resource",
+                    PublicTitle = "Visit",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.Public
+                },
                 EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,
                     EventResourceAudienceKindEnum.Public)], user.Id, DateTime.UtcNow);

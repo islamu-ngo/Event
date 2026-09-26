@@ -553,8 +553,12 @@ public sealed class EventResourcePersistenceTests(EventResourcePersistenceTests.
             context.EventTicketCatalogVersions.AddRange(catalogA, catalogB, catalogC);
             var dayC = new EventDay
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantA.Id, Tenant = tenantA,
-                EventId = eventC.Id, Event = eventC, LocalDate = DateOnly.FromDateTime(UtcNow),
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantA.Id,
+                Tenant = tenantA,
+                EventId = eventC.Id,
+                Event = eventC,
+                LocalDate = DateOnly.FromDateTime(UtcNow),
                 ConcurrencyStamp = Guid.CreateVersion7()
             };
             context.EventDays.Add(dayC);

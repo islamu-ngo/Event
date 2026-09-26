@@ -102,7 +102,7 @@ public sealed class EventResourceAudienceWorkflow(
             ? EventResourceAudienceFailure.NotFound : EventResourceAudienceFailure.Unavailable);
         var rows = prepared.Rows;
         var checks = rows.Select(row => BindVersion(row) with
-            { ExpectedAttachmentGeneration = prepared.Files[row.Id]?.AttachmentGeneration }).ToArray();
+        { ExpectedAttachmentGeneration = prepared.Files[row.Id]?.AttachmentGeneration }).ToArray();
         var decisions = await authority.AuthorizeAudienceAsync(checks, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         // Never return a partial public representation when provider availability is unknown.
@@ -162,14 +162,14 @@ public sealed class EventResourceAudienceWorkflow(
     private EventResourceAuthorityRequest Request(Guid id) => new(tenant.TenantId, id,
         user.IsAuthenticated ? user.UserId : null, machine.IsMachineCaller, "view");
     private EventResourceAuthorityRequest BindVersion(EventResource row) => Request(row.Id) with
-        { ExpectedResourceVersion = row.ConcurrencyStamp };
+    { ExpectedResourceVersion = row.ConcurrencyStamp };
 
     private static Dictionary<Guid, EventResourceAuthorityRequest> Accepted(IReadOnlyList<EventResource> rows,
         EventResourceAuthorityRequest[] checks, IReadOnlyList<EventResourceAudienceDecision> decisions) =>
         rows.Select((row, index) => (row, index))
             .Where(pair => decisions[pair.index].Outcome == EventResourceAuthorityOutcome.Allowed)
             .ToDictionary(pair => pair.row.Id, pair => checks[pair.index] with
-                { ExpectedDisclosure = decisions[pair.index].Disclosure });
+            { ExpectedDisclosure = decisions[pair.index].Disclosure });
 
     private static EventResourceAudienceDetailDto Project(EventResource row,
         IReadOnlyDictionary<Guid, EventResourceAuthorityRequest> accepted, List<EventResourceAuthorityRequest> proof,

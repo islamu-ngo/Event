@@ -41,7 +41,8 @@ public sealed class EventResourceAudienceTests
         var (resource, parent, subject) = EventResourceTestData.CreatePublished(
             EventResourceAudienceKindEnum.SessionRegistrant, requireApproval: true, requireCompletion: true);
         var approved = Fact(resource, subject, EventResourceAudienceKindEnum.SessionRegistrant)
-            with { ApprovedSubjectUserId = subject };
+            with
+        { ApprovedSubjectUserId = subject };
         var otherCompleted = approved with
         {
             SubjectUserId = Guid.CreateVersion7(),
@@ -191,7 +192,8 @@ public sealed class EventResourceAudienceTests
         resource.ReplacePolicy(EventResourceAvailability.Create(), [rule],
             resource.ConcurrencyStamp, subject, EventResourceTestData.Now);
         var fact = Fact(resource, subject, EventResourceAudienceKindEnum.CheckedInParticipant)
-            with { AdmissionTargetId = targetId };
+            with
+        { AdmissionTargetId = targetId };
         await Assert.That(EventResourceTestData.Decision(resource, parent, subject, [fact]).CanAccess).IsTrue();
         await Assert.That(EventResourceTestData.Decision(resource, parent, subject,
             [fact with { AdmissionTargetId = resource.EventSessionId }]).CanAccess).IsFalse();

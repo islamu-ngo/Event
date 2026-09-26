@@ -49,21 +49,36 @@ public sealed class EventResourceUploadHttpTests
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             });
             db.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Resource uploads", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Resource uploads",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
@@ -72,7 +87,8 @@ public sealed class EventResourceUploadHttpTests
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Private draft file", Kind = EventResourceKindEnum.GeneralDocument,
+                    Title = "Private draft file",
+                    Kind = EventResourceKindEnum.GeneralDocument,
                     DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,
@@ -131,7 +147,8 @@ public sealed class EventResourceUploadHttpTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials))
         {
@@ -142,8 +159,12 @@ public sealed class EventResourceUploadHttpTests
         }
         using (var generic = await client.PostAsJsonAsync("/api/storageobject/upload-sessions", new CreateStorageUploadSessionDto
         {
-            ExpectedSizeBytes = 5, ContentType = "text/plain", OriginalFileName = "ordinary.txt", Extension = "txt",
-            Purpose = StorageObjectPurposes.Attachment, Visibility = StorageObjectVisibilities.PrivateOwner,
+            ExpectedSizeBytes = 5,
+            ContentType = "text/plain",
+            OriginalFileName = "ordinary.txt",
+            Extension = "txt",
+            Purpose = StorageObjectPurposes.Attachment,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
             IdempotencyKey = Guid.CreateVersion7().ToString("N")
         }))
             await Assert.That(generic.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
@@ -156,9 +177,12 @@ public sealed class EventResourceUploadHttpTests
         byte[] bytes = "%PDF-1.7\nresource handout\n%%EOF"u8.ToArray();
         var upload = new CreateEventResourceUploadSessionDto
         {
-            ExpectedVersion = version, ExpectedSizeBytes = bytes.Length,
-            ContentType = EventResourceGovernancePolicy.PdfMediaType, SafeDisplayName = "handout.pdf",
-            Extension = "pdf", IdempotencyKey = Guid.CreateVersion7().ToString("N")
+            ExpectedVersion = version,
+            ExpectedSizeBytes = bytes.Length,
+            ContentType = EventResourceGovernancePolicy.PdfMediaType,
+            SafeDisplayName = "handout.pdf",
+            Extension = "pdf",
+            IdempotencyKey = Guid.CreateVersion7().ToString("N")
         };
         using var reservation = new HttpRequestMessage(HttpMethod.Post, uploadHref)
         {
@@ -231,7 +255,9 @@ public sealed class EventResourceUploadHttpTests
                 policy.SystemSettings.Add(new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
-                    Value = "true", ValueType = SettingValueType.Boolean, Category = "EventResources"
+                    Value = "true",
+                    ValueType = SettingValueType.Boolean,
+                    Category = "EventResources"
                 });
                 await policy.SaveChangesAsync();
             }

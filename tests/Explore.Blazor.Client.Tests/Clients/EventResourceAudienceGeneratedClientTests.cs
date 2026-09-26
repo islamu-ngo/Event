@@ -11,8 +11,13 @@ public sealed class EventResourceAudienceGeneratedClientTests
         string cursor = Guid.CreateVersion7().ToString("N");
         var resource = new
         {
-            id, eventId, title = "Public material notice", kind = "GeneralDocument",
-            isTeaser = true, availability = "unavailable", requirements = "eligibility-required",
+            id,
+            eventId,
+            title = "Public material notice",
+            kind = "GeneralDocument",
+            isTeaser = true,
+            availability = "unavailable",
+            requirements = "eligibility-required",
             _links = new { self = new { href = $"/api/eventresource/{id:D}" } }
         };
         var detail = JsonSerializer.Deserialize<HalResourceOfEventResourceAudienceDetailDto>(JsonSerializer.Serialize(resource))
@@ -45,8 +50,12 @@ public sealed class EventResourceAudienceGeneratedClientTests
         Guid id = Guid.CreateVersion7(), eventId = Guid.CreateVersion7();
         var resource = new
         {
-            id, eventId, title = "Handout", kind = "GeneralDocument",
-            isTeaser = false, availability = "available",
+            id,
+            eventId,
+            title = "Handout",
+            kind = "GeneralDocument",
+            isTeaser = false,
+            availability = "available",
             file = new { fileName = "handout.pdf", contentType = "application/pdf", sizeBytes = 123L, safetyState = "unscanned" },
             _links = new { download = new { href = $"/api/eventresource/{id:D}/content" } }
         };

@@ -8,7 +8,8 @@ public sealed class EventResourceDraftValidatorTests
 {
     private static EventResourceDraftDto Draft() => new()
     {
-        Title = "Material", Kind = (EventResourceKindEnum)1,
+        Title = "Material",
+        Kind = (EventResourceKindEnum)1,
         DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
         DeliveryType = EventResourceDeliveryTypeEnum.StoredFile,
         AudienceRules = [new(EventResourceAudienceKindEnum.Public)]

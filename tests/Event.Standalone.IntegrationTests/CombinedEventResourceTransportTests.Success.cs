@@ -28,7 +28,9 @@ public sealed partial class CombinedEventResourceTransportTests
         await using var host = deployment.CreateHost();
         using var client = host.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
         string password = NativeEmailOptionalStandaloneFixture.NewPassword();
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login",
@@ -65,9 +67,14 @@ public sealed partial class CombinedEventResourceTransportTests
             if (membership is null)
                 db.TenantUsers.Add(new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    UserId = user.Id, User = user, ActorId = actor.Id,
-                    StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = user.Id,
+                    User = user,
+                    ActorId = actor.Id,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    CreatedAt = DateTime.UtcNow
                 });
             else
             {
@@ -80,23 +87,34 @@ public sealed partial class CombinedEventResourceTransportTests
                 db.SystemSettings.Add(new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
-                    Value = "true", ValueType = SettingValueType.Boolean, Category = "EventResources"
+                    Value = "true",
+                    ValueType = SettingValueType.Boolean,
+                    Category = "EventResources"
                 });
             else unscanned.Value = "true";
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Combined private file", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Combined private file",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Member handout", Kind = EventResourceKindEnum.GeneralDocument,
+                    Title = "Member handout",
+                    Kind = EventResourceKindEnum.GeneralDocument,
                     DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,
@@ -195,14 +213,17 @@ public sealed partial class CombinedEventResourceTransportTests
                     var organizationId = Guid.CreateVersion7();
                     var participation = new OrganizationTenant
                     {
-                        Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId,
-                        Tenant = null!, OrganizationId = organizationId,
+                        Id = Guid.CreateVersion7(),
+                        TenantId = PlatformDefaults.DefaultTenantId,
+                        Tenant = null!,
+                        OrganizationId = organizationId,
                         Organization = new Organization
                         {
                             Id = organizationId,
                             Pii = new OrganizationPii
                             {
-                                OrganizationId = organizationId, FullName = "Independent evidence holder"
+                                OrganizationId = organizationId,
+                                FullName = "Independent evidence holder"
                             }
                         },
                         ApprovalStatusId = (int)ApprovalStatusEnum.Pending,

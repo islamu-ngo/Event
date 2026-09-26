@@ -34,19 +34,32 @@ public sealed class BffEventResourceTelemetryTests
             success = true,
             id = new
             {
-                id = sessionId, tenantId = Guid.CreateVersion7(), provider = "local",
-                expectedSizeBytes = bytes.Length, reservedBytes = bytes.Length,
-                contentType = "application/pdf", safeDisplayName = "handout.pdf",
-                purpose = "event_resource", visibility = "private_owner", status = "reserved",
-                expiresAt = DateTimeOffset.UtcNow.AddMinutes(10), maxUploadBytes = 10485760,
-                tenantQuotaBytes = 1073741824, usedBytes = 0, totalReservedBytes = bytes.Length
+                id = sessionId,
+                tenantId = Guid.CreateVersion7(),
+                provider = "local",
+                expectedSizeBytes = bytes.Length,
+                reservedBytes = bytes.Length,
+                contentType = "application/pdf",
+                safeDisplayName = "handout.pdf",
+                purpose = "event_resource",
+                visibility = "private_owner",
+                status = "reserved",
+                expiresAt = DateTimeOffset.UtcNow.AddMinutes(10),
+                maxUploadBytes = 10485760,
+                tenantQuotaBytes = 1073741824,
+                usedBytes = 0,
+                totalReservedBytes = bytes.Length
             }
         }));
         upstream.MapPut("/api/storageobject/upload-sessions/{id:guid}/content", async (HttpContext context) =>
         {
             await context.Request.Body.CopyToAsync(Stream.Null, context.RequestAborted);
-            return Results.Json(new { success = true, id = new
-                { id = sessionId, storageObjectId = Guid.CreateVersion7(), status = "finalized" } });
+            return Results.Json(new
+            {
+                success = true,
+                id = new
+                { id = sessionId, storageObjectId = Guid.CreateVersion7(), status = "finalized" }
+            });
         });
         upstream.MapGet("/api/eventresource/{id:guid}/content", () => Results.NotFound());
         await upstream.StartAsync();
@@ -72,7 +85,8 @@ public sealed class BffEventResourceTelemetryTests
         });
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false, HandleCookies = false
+            AllowAutoRedirect = false,
+            HandleCookies = false
         });
         client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(
             Guid.CreateVersion7(), "Transport reader", ("test:access_token",
@@ -80,8 +94,13 @@ public sealed class BffEventResourceTelemetryTests
         client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", "validated-by-test-antiforgery");
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var reserved = await client.PostAsJsonAsync($"/bff/event-resources/{resourceId:D}/upload-session",
-            new { expectedVersion = Guid.CreateVersion7(), fileName = "handout.pdf", contentType = "application/pdf",
-                expectedSizeBytes = bytes.Length }, deadline.Token);
+            new
+            {
+                expectedVersion = Guid.CreateVersion7(),
+                fileName = "handout.pdf",
+                contentType = "application/pdf",
+                expectedSizeBytes = bytes.Length
+            }, deadline.Token);
         reserved.EnsureSuccessStatusCode();
         using var body = JsonDocument.Parse(await reserved.Content.ReadAsStringAsync(deadline.Token));
         string opaque = body.RootElement.GetProperty("uploadSessionId").GetString()!;

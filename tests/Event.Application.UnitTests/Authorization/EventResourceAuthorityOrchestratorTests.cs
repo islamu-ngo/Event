@@ -425,8 +425,13 @@ public class EventResourceAuthorityOrchestratorTests
                 case "attachment": f.Facts = f.Capture("generation-2"); break;
                 case "version": f.Resource.ConcurrencyStamp = EventId; f.Facts = f.Capture(); break;
                 case "disclosure":
-                    f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Resource", PublicTitle = "Public",
-                        Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Public },
+                    f.Resource.UpdateMetadata(new EventResourceMetadata
+                    {
+                        Title = "Resource",
+                        PublicTitle = "Public",
+                        Kind = (EventResourceKindEnum)1,
+                        DisclosureMode = EventResourceDisclosureModeEnum.Public
+                    },
                         f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
                     f.Facts = f.Capture(); break;
             }
@@ -698,7 +703,10 @@ public class EventResourceAuthorityOrchestratorTests
             defaults.MaxUploadBytes, false, [], defaults.AuditRetentionDays, 0, long.MaxValue);
         f.Request = f.Request with
         {
-            ResourceId = EventId, Action = "view-management", IsEventCollection = true, DeadlineUtc = null
+            ResourceId = EventId,
+            Action = "view-management",
+            IsEventCollection = true,
+            DeadlineUtc = null
         };
         f.Facts = new(f.Access.Parent, Tenant, Subject, false,
             Management([new("event:update", new(true))]), disabled);
@@ -762,8 +770,13 @@ public class EventResourceAuthorityOrchestratorTests
     {
         var f = new Fixture(availability: EventResourceAvailability.Create(absoluteEndUtc: Now.AddSeconds(5)));
         f.Request = f.Request with { SubjectUserId = null, Action = "view" };
-        f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Private", PublicTitle = "Public",
-            Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Teaser },
+        f.Resource.UpdateMetadata(new EventResourceMetadata
+        {
+            Title = "Private",
+            PublicTitle = "Public",
+            Kind = (EventResourceKindEnum)1,
+            DisclosureMode = EventResourceDisclosureModeEnum.Teaser
+        },
             f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
         f.Facts = f.Capture(access: new(Tenant, null, false, f.Access.Parent, [], true, f.Access.GovernancePolicy));
         await using var preparation = new Preparation("generation-1");
@@ -869,8 +882,13 @@ public class EventResourceAuthorityOrchestratorTests
         var f = new Fixture(EventResourceAudienceKindEnum.Organizer);
         var subject = authenticated ? Subject : (Guid?)null;
         f.Request = f.Request with { SubjectUserId = subject };
-        f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Private", PublicTitle = "Public",
-            Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Teaser },
+        f.Resource.UpdateMetadata(new EventResourceMetadata
+        {
+            Title = "Private",
+            PublicTitle = "Public",
+            Kind = (EventResourceKindEnum)1,
+            DisclosureMode = EventResourceDisclosureModeEnum.Teaser
+        },
             f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
         f.Facts = f.Capture(access: new(Tenant, subject, false, f.Access.Parent, [], true, f.Access.GovernancePolicy));
         var result = await f.Service.AuthorizeAsync(f.Request, NeverPrepare);
@@ -882,13 +900,22 @@ public class EventResourceAuthorityOrchestratorTests
     public async Task PreparedPrivateMetadataCannotBorrowTeaserGrantAfterEntitlementDowngrade()
     {
         var f = new Fixture(EventResourceAudienceKindEnum.AuthenticatedTenantMember);
-        f.Resource.UpdateMetadata(new EventResourceMetadata { Title = "Private", PublicTitle = "Public",
-            Kind = (EventResourceKindEnum)1, DisclosureMode = EventResourceDisclosureModeEnum.Teaser },
+        f.Resource.UpdateMetadata(new EventResourceMetadata
+        {
+            Title = "Private",
+            PublicTitle = "Public",
+            Kind = (EventResourceKindEnum)1,
+            DisclosureMode = EventResourceDisclosureModeEnum.Teaser
+        },
             f.Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);
         f.Facts = f.Capture();
         var version = f.Resource.ConcurrencyStamp;
-        var bound = f.Request with { Action = "view", ExpectedResourceVersion = version,
-            ExpectedDisclosure = new(true, true, true) };
+        var bound = f.Request with
+        {
+            Action = "view",
+            ExpectedResourceVersion = version,
+            ExpectedDisclosure = new(true, true, true)
+        };
         var before = await f.Service.AuthorizeCapabilitiesAsync([bound]);
         await Assert.That(before[0]).IsEqualTo(EventResourceAuthorityOutcome.Allowed);
         f.Facts = f.Capture(access: new(Tenant, Subject, false, f.Access.Parent, [], true, f.Access.GovernancePolicy));
@@ -926,14 +953,19 @@ public class EventResourceAuthorityOrchestratorTests
         public Func<DateTimeOffset, CancellationToken, Task>? OnRead { get; set; }
         public bool RejectSingleCalls { get; set; }
         public Func<IReadOnlyList<EventResourceProviderInput>, CancellationToken,
-            Task<IReadOnlyList<EventResourceProviderDecision>>>? OnBatchProvider { get; set; }
+            Task<IReadOnlyList<EventResourceProviderDecision>>>? OnBatchProvider
+        { get; set; }
 
         public Fixture(EventResourceAudienceKindEnum audience = EventResourceAudienceKindEnum.Public,
             EventResourceAvailability? availability = null)
         {
             Resource = EventResource.CreateDraft(ResourceId, Tenant, EventId, null,
-                new EventResourceMetadata { Title = "Resource", Kind = (EventResourceKindEnum)1,
-                    DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly },
+                new EventResourceMetadata
+                {
+                    Title = "Resource",
+                    Kind = (EventResourceKindEnum)1,
+                    DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+                },
                 EventResourceDeliveryTypeEnum.StoredFile, availability ?? EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(Tenant, EventId, ResourceId, audience)], Subject, Now.UtcDateTime);
             Resource.SetStoredFile(Guid.Parse("018f0000-0000-7000-8000-000000000105"), Resource.ConcurrencyStamp, Subject, Now.UtcDateTime);

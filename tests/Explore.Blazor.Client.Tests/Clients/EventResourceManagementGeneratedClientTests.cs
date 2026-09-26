@@ -11,12 +11,18 @@ public sealed class EventResourceManagementGeneratedClientTests
         var edit = $"/api/eventresource/{id:D}";
         var resource = new
         {
-            id, eventId = Guid.CreateVersion7(), version, publicationState = "Draft",
+            id,
+            eventId = Guid.CreateVersion7(),
+            version,
+            publicationState = "Draft",
             createdAt = DateTimeOffset.UtcNow,
             draft = new
             {
-                title = "Private workshop notes", kind = "GeneralDocument", disclosureMode = "EligibleOnly",
-                deliveryType = "StoredFile", availability = new { },
+                title = "Private workshop notes",
+                kind = "GeneralDocument",
+                disclosureMode = "EligibleOnly",
+                deliveryType = "StoredFile",
+                availability = new { },
                 audienceRules = new[] { new { kind = "Public" } }
             },
             _links = new { edit = new { href = edit, method = "PUT" } }
@@ -32,7 +38,9 @@ public sealed class EventResourceManagementGeneratedClientTests
 
         var collection = JsonSerializer.Deserialize<EventResourceManagementCollectionDto>(JsonSerializer.Serialize(new
         {
-            pageNumber = 2, pageSize = 20, _links = new { self = new { href = "/api/event/test/resources/management?page=2" } },
+            pageNumber = 2,
+            pageSize = 20,
+            _links = new { self = new { href = "/api/event/test/resources/management?page=2" } },
             _embedded = new { items = new[] { resource } }
         })) ?? throw new InvalidOperationException("Missing generated collection.");
         var item = (collection._embedded.Items

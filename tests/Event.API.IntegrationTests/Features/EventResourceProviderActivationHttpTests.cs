@@ -87,10 +87,10 @@ public sealed class EventResourceProviderActivationHttpTests
         client.DefaultRequestHeaders.Add("Idempotency-Key", bindingReplayKey);
         EventResourceProviderOperation bound;
         using (HttpResponseMessage response = await client.PutAsJsonAsync(BindingsPath, new
-               {
-                   binding = new { deploymentId, endpoints = aliases, scope = "", policyVersion = "default" },
-                   expectedRevision = emptyRevision
-               }, Token))
+        {
+            binding = new { deploymentId, endpoints = aliases, scope = "", policyVersion = "default" },
+            expectedRevision = emptyRevision
+        }, Token))
         {
             await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await response.Content.ReadAsStringAsync(Token));
             bound = (await response.Content.ReadFromJsonAsync<EventResourceProviderOperation>(Token))!;
@@ -114,18 +114,18 @@ public sealed class EventResourceProviderActivationHttpTests
 
         client.DefaultRequestHeaders.Add("Idempotency-Key", bindingReplayKey);
         using (HttpResponseMessage staleRevision = await client.PutAsJsonAsync(BindingsPath, new
-               {
-                   binding = new { deploymentId, endpoints = aliases, scope = "", policyVersion = "default" },
-                   expectedRevision = emptyRevision
-               }, Token))
+        {
+            binding = new { deploymentId, endpoints = aliases, scope = "", policyVersion = "default" },
+            expectedRevision = emptyRevision
+        }, Token))
             await AssertProblemAsync(staleRevision, HttpStatusCode.Conflict);
         client.DefaultRequestHeaders.Remove("Idempotency-Key");
 
         using (HttpResponseMessage malformed = await client.PutAsJsonAsync(BindingsPath, new
-               {
-                   binding = new { deploymentId = Guid.NewGuid(), endpoints = new[] { "not-a-route" }, scope = "", policyVersion = "default" },
-                   expectedRevision = bound.BindingRevision
-               }, Token))
+        {
+            binding = new { deploymentId = Guid.NewGuid(), endpoints = new[] { "not-a-route" }, scope = "", policyVersion = "default" },
+            expectedRevision = bound.BindingRevision
+        }, Token))
             await AssertProblemAsync(malformed, HttpStatusCode.BadRequest);
         using (HttpResponseMessage unknown = await client.PostAsJsonAsync(BeginPath,
                    new { deploymentId = Guid.CreateVersion7() }, Token))

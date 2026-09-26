@@ -68,7 +68,8 @@ public sealed class EventResourceRequestLoggingTests
         });
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         string path = "/" + string.Format(System.Globalization.CultureInfo.InvariantCulture,
             requestTemplate, identifier) + $"?title={title}&token={credential}";
@@ -108,7 +109,8 @@ public sealed class EventResourceRequestLoggingTests
                 tracing.AddProcessor(new SimpleActivityExportProcessor(exporter)))));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         var logObserved = diagnostics.Observed;
         var spanObserved = exporter.Observed;

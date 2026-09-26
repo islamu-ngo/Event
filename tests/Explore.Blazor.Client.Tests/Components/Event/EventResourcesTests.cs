@@ -63,10 +63,13 @@ public sealed class EventResourcesTests : IDisposable
     {
         var page = Page(Detail("download"));
         if (advertised)
-            page = page with { _links = new Dictionary<string, HalLink>(page._links)
+            page = page with
             {
-                ["manage-resources"] = new() { Href = $"/studio/events/{_eventId}/resources", Method = "GET" }
-            } };
+                _links = new Dictionary<string, HalLink>(page._links)
+                {
+                    ["manage-resources"] = new() { Href = $"/studio/events/{_eventId}/resources", Method = "GET" }
+                }
+            };
         _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(page);
         _client.GetEventResourceAudienceDetailAsync(_resourceId, Arg.Any<string?>(), Arg.Any<string?>(),
@@ -143,8 +146,10 @@ public sealed class EventResourcesTests : IDisposable
         detail.AccessibilityNote = "private-accessibility-note";
         detail.File = new EventResourceFileMetadataDto
         {
-            FileName = "private-file.pdf", ContentType = "application/pdf",
-            SizeBytes = 1024, SafetyState = "Ready"
+            FileName = "private-file.pdf",
+            ContentType = "application/pdf",
+            SizeBytes = 1024,
+            SafetyState = "Ready"
         };
         detail.ExternalDestinationSafeOrigin = "https://private-origin.example.test";
         _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
@@ -168,8 +173,10 @@ public sealed class EventResourcesTests : IDisposable
         var detail = available ? Detail("download") : Detail();
         detail.File = new EventResourceFileMetadataDto
         {
-            FileName = "handout.pdf", ContentType = "application/pdf",
-            SizeBytes = 1024, SafetyState = "unscanned"
+            FileName = "handout.pdf",
+            ContentType = "application/pdf",
+            SizeBytes = 1024,
+            SafetyState = "unscanned"
         };
         if (!available) detail.Availability = "unavailable";
         _client.ListEventResourcesAsync(_eventId, Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
@@ -231,11 +238,21 @@ public sealed class EventResourcesTests : IDisposable
 
     private HalResourceOfEventResourceAudienceDetailDto Detail(params string[] relations) => new()
     {
-        Id = _resourceId, EventId = _eventId, Title = "Accessible handout", Availability = "available",
-        Requirements = "Admission required", LanguageCode = "en", IsTeaser = false,
+        Id = _resourceId,
+        EventId = _eventId,
+        Title = "Accessible handout",
+        Availability = "available",
+        Requirements = "Admission required",
+        LanguageCode = "en",
+        IsTeaser = false,
         File = relations.Contains("download")
-            ? new EventResourceFileMetadataDto { FileName = "handout.pdf", SizeBytes = 1024,
-                ContentType = "application/pdf", SafetyState = "Ready" }
+            ? new EventResourceFileMetadataDto
+            {
+                FileName = "handout.pdf",
+                SizeBytes = 1024,
+                ContentType = "application/pdf",
+                SafetyState = "Ready"
+            }
             : null,
         ExternalDestinationSafeOrigin = relations.Contains("access") ? "https://destination.example.test" : null,
         AccessibleAlternativeEventResourceId = _alternativeId,

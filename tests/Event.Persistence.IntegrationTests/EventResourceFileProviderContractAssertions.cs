@@ -334,33 +334,58 @@ internal static class EventResourceFileProviderContractAssertions
             Id = subjectId,
             Pii = new UserPii
             {
-                Email = $"provider-contract-{subjectId:N}@example.test", FirstName = "Resource", LastName = "Reader"
+                Email = $"provider-contract-{subjectId:N}@example.test",
+                FirstName = "Resource",
+                LastName = "Reader"
             }
         };
         context.Users.Add(subject);
         context.TenantUsers.AddRange(
             new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = publisherId,
-                User = null!, ActorId = scope.ActorId, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = publisherId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             },
             new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = subjectId,
-                User = subject, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = subjectId,
+                User = subject,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             });
         var binding = StorageProviderBinding.Local(Path.GetFullPath("provider-contract-storage"));
         context.Set<StorageProviderBinding>().Add(binding);
         var storage = new StorageObject
         {
             StorageProviderBindingId = binding.Id,
-            Id = storageId, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-            FileType = null!, Uri = $"/api/storageobject/{storageId}/content", Provider = StorageProviders.Local,
-            ObjectKey = $"provider-contract/{storageId:N}.pdf", FullName = "provider-contract.pdf",
-            SafeDisplayName = "provider-contract.pdf", Extension = "pdf", ContentType = "application/pdf",
-            Size = Pdf.Length, Sha256Checksum = checksum, Purpose = StorageObjectPurposes.EventResource,
-            Visibility = StorageObjectVisibilities.PrivateOwner, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-            OwningResourceId = resourceId, LifecycleState = StorageObjectLifecycleStates.Active
+            Id = storageId,
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = $"/api/storageobject/{storageId}/content",
+            Provider = StorageProviders.Local,
+            ObjectKey = $"provider-contract/{storageId:N}.pdf",
+            FullName = "provider-contract.pdf",
+            SafeDisplayName = "provider-contract.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = Pdf.Length,
+            Sha256Checksum = checksum,
+            Purpose = StorageObjectPurposes.EventResource,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = resourceId,
+            LifecycleState = StorageObjectLifecycleStates.Active
         };
         storage.RecordEventResourceInspection(storageId, checksum);
         var parent = await context.Events.SingleAsync(row => row.Id == scope.EventAId);
@@ -369,7 +394,8 @@ internal static class EventResourceFileProviderContractAssertions
         EventResource resource = EventResource.CreateDraft(resourceId, scope.TenantAId, scope.EventAId, null,
             new EventResourceMetadata
             {
-                Title = "Provider contract material", Kind = (EventResourceKindEnum)1,
+                Title = "Provider contract material",
+                Kind = (EventResourceKindEnum)1,
                 DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
             }, EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
             [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, resourceId, audience)], publisherId, Now);
@@ -392,8 +418,14 @@ internal static class EventResourceFileProviderContractAssertions
         (await context.Events.SingleAsync(row => row.Id == scope.EventAId)).OrganizerActorId = scope.ActorId;
         context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = userId,
-            User = null!, ActorId = scope.ActorId, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            UserId = userId,
+            User = null!,
+            ActorId = scope.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = Now
         });
         EventResource resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
         EventResource second = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
@@ -503,8 +535,12 @@ internal static class EventResourceFileProviderContractAssertions
 
     private static CreateEventResourceUploadSessionDto Intent(Guid version) => new()
     {
-        ExpectedVersion = version, ExpectedSizeBytes = Pdf.Length, ContentType = "application/pdf",
-        SafeDisplayName = "provider-contract.pdf", Extension = "pdf", IdempotencyKey = Guid.CreateVersion7().ToString("N")
+        ExpectedVersion = version,
+        ExpectedSizeBytes = Pdf.Length,
+        ContentType = "application/pdf",
+        SafeDisplayName = "provider-contract.pdf",
+        Extension = "pdf",
+        IdempotencyKey = Guid.CreateVersion7().ToString("N")
     };
 
     private static async Task<Explore.Application.Responses.BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto>>
@@ -513,7 +549,10 @@ internal static class EventResourceFileProviderContractAssertions
         using var content = new MemoryStream(Pdf);
         return await workflow.FinalizeAsync(new FinalizeStorageUploadSessionCommand
         {
-            UploadSessionId = id, Content = content, ContentLength = Pdf.Length, ContentType = "application/pdf"
+            UploadSessionId = id,
+            Content = content,
+            ContentLength = Pdf.Length,
+            ContentType = "application/pdf"
         }, cancellationToken);
     }
 

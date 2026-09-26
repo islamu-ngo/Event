@@ -40,14 +40,25 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         string checksum = Convert.ToHexString(SHA256.HashData("%PDF-1.7\ncleanup\n%%EOF"u8));
         var storage = new StorageObject
         {
-            Id = objectId, TenantId = scope.TenantAId, Tenant = null!,
-            FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-            Provider = StorageProviders.Local, ObjectKey = $"tenants/{scope.TenantAId:N}/{objectId:N}.pdf",
-            Uri = $"/api/eventresource/{fileId}/content", FullName = "handout.pdf",
-            SafeDisplayName = "handout.pdf", Extension = "pdf", ContentType = "application/pdf",
-            Size = 21, Sha256Checksum = checksum, Purpose = StorageObjectPurposes.EventResource,
-            Visibility = StorageObjectVisibilities.PrivateOwner, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-            OwningResourceId = fileId, LifecycleState = StorageObjectLifecycleStates.Active
+            Id = objectId,
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Provider = StorageProviders.Local,
+            ObjectKey = $"tenants/{scope.TenantAId:N}/{objectId:N}.pdf",
+            Uri = $"/api/eventresource/{fileId}/content",
+            FullName = "handout.pdf",
+            SafeDisplayName = "handout.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 21,
+            Sha256Checksum = checksum,
+            Purpose = StorageObjectPurposes.EventResource,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = fileId,
+            LifecycleState = StorageObjectLifecycleStates.Active
         };
         storage.RecordEventResourceInspection(objectId, checksum);
         file.SetStoredFile(objectId, file.ConcurrencyStamp, managerId, Now);
@@ -81,7 +92,8 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
             EventResource.CreateDraft(id, scope.TenantAId, scope.EventAId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Private material", Kind = EventResourceKindEnum.GeneralDocument,
+                    Title = "Private material",
+                    Kind = EventResourceKindEnum.GeneralDocument,
                     DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, delivery, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, id,
@@ -122,18 +134,35 @@ public sealed class EventResourceCleanupTests(EventResourceFileUploadTests.Datab
         await Assert.That(setting.Success).IsTrue();
         context.AddRange(resource, binding, new StorageObject
         {
-            Id = objectId, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-            FileType = null!, Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-            ObjectKey = key, Uri = "/private", FullName = "private.pdf", SafeDisplayName = "private.pdf",
-            Extension = "pdf", ContentType = "application/pdf", Size = 64, Sha256Checksum = checksum,
-            Purpose = StorageObjectPurposes.EventResource, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-            OwningResourceId = resource.Id, Visibility = StorageObjectVisibilities.PrivateOwner,
-            LifecycleState = StorageObjectLifecycleStates.Active, CreatedAt = Now,
+            Id = objectId,
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = key,
+            Uri = "/private",
+            FullName = "private.pdf",
+            SafeDisplayName = "private.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 64,
+            Sha256Checksum = checksum,
+            Purpose = StorageObjectPurposes.EventResource,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = resource.Id,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            CreatedAt = Now,
             CreatedBy = managerId
         }, new StorageUsageCounter
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Provider = StorageProviders.Local,
-            UsedBytes = 64, ObjectCount = 1
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Provider = StorageProviders.Local,
+            UsedBytes = 64,
+            ObjectCount = 1
         });
         await context.SaveChangesAsync();
         resource.SetStoredFile(objectId, resource.ConcurrencyStamp, managerId, Now);

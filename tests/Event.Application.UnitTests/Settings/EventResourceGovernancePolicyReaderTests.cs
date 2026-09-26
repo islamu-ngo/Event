@@ -38,7 +38,10 @@ public sealed class EventResourceGovernancePolicyReaderTests
         string currentCeiling = "10485760";
         systems.GetByKey(key, Arg.Any<CancellationToken>()).Returns(_ => new SystemSetting
         {
-            SettingKey = key, Value = currentCeiling, ValueType = SettingValueType.Long, IsLocked = false
+            SettingKey = key,
+            Value = currentCeiling,
+            ValueType = SettingValueType.Long,
+            IsLocked = false
         });
         tenants.GetByTenantAndKeys(tenantId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns([new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = "8388608" }]);
@@ -58,12 +61,16 @@ public sealed class EventResourceGovernancePolicyReaderTests
         systems.GetByKey(GovernanceSettingKeys.Deployment.Mode, Arg.Any<CancellationToken>())
             .Returns(new SystemSetting
             {
-                SettingKey = GovernanceSettingKeys.Deployment.Mode, Value = "\"SingleTenant\"",
+                SettingKey = GovernanceSettingKeys.Deployment.Mode,
+                Value = "\"SingleTenant\"",
                 ValueType = SettingValueType.String
             });
         systems.GetByKey(key, Arg.Any<CancellationToken>()).Returns(new SystemSetting
         {
-            SettingKey = key, Value = "[\"Organizer\"]", ValueType = SettingValueType.Json, IsLocked = true
+            SettingKey = key,
+            Value = "[\"Organizer\"]",
+            ValueType = SettingValueType.Json,
+            IsLocked = true
         });
         tenants.GetByTenantAndKeys(tenantId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns([new TenantSetting { TenantId = tenantId, Tenant = null!, SettingKey = key, Value = "[\"Public\"]" }]);
@@ -83,7 +90,9 @@ public sealed class EventResourceGovernancePolicyReaderTests
         string key = GovernanceSettingKeys.EventResources.MaxUploadBytes;
         systems.GetByKey(key, Arg.Any<CancellationToken>()).Returns(new SystemSetting
         {
-            SettingKey = key, Value = malformed, ValueType = SettingValueType.Long
+            SettingKey = key,
+            Value = malformed,
+            ValueType = SettingValueType.Long
         });
         tenants.GetByTenantAndKeys(Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns(new List<TenantSetting>());
@@ -104,18 +113,22 @@ public sealed class EventResourceGovernancePolicyReaderTests
             .Returns(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Deployment.Mode,
-                Value = singleTenant ? "\"SingleTenant\"" : "\"MultiTenant\"", ValueType = SettingValueType.String
+                Value = singleTenant ? "\"SingleTenant\"" : "\"MultiTenant\"",
+                ValueType = SettingValueType.String
             });
         systems.GetByKey(GovernanceSettingKeys.EventResources.MaxUploadBytes, Arg.Any<CancellationToken>())
             .Returns(new SystemSetting
             {
-                SettingKey = GovernanceSettingKeys.EventResources.MaxUploadBytes, Value = "20971520", ValueType = SettingValueType.Long
+                SettingKey = GovernanceSettingKeys.EventResources.MaxUploadBytes,
+                Value = "20971520",
+                ValueType = SettingValueType.Long
             });
         systems.GetByKey(GovernanceSettingKeys.Storage.InstanceMaxUploadBytes, Arg.Any<CancellationToken>())
             .Returns(_ => new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Storage.InstanceMaxUploadBytes,
-                Value = storageCeiling, ValueType = SettingValueType.Long
+                Value = storageCeiling,
+                ValueType = SettingValueType.Long
             });
         tenants.GetByTenantAndKeys(tenantId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns([new TenantSetting

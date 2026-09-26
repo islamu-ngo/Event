@@ -35,24 +35,39 @@ public sealed class EventResourceControllerTests
             database.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             });
             var user = await database.Users.SingleAsync(row => row.Pii!.Email == credentials.Identifier, Token);
             userId = user.Id;
             var actor = await database.Actors.SingleAsync(row => row.UserId == user.Id, Token);
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = user.Id, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             });
             database.Events.Add(new Explore.Domain.Event
             {
-                Id = eventId, Title = "Resource authoring", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Resource authoring",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             });
             database.EventRoleAssignments.Add(EventRoleAssignment.Create(PlatformDefaults.DefaultTenantId, eventId, user.Id,
                 (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddMinutes(-1), null, user.Id));
@@ -78,7 +93,8 @@ public sealed class EventResourceControllerTests
         })) : null;
         using var client = (intercepted ?? factory).CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token))
         {
@@ -88,8 +104,10 @@ public sealed class EventResourceControllerTests
         }
         var draft = new EventResourceDraftDto
         {
-            Title = "Organizer-only draft title", SensitiveNotes = "Private authoring note",
-            Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
+            Title = "Organizer-only draft title",
+            SensitiveNotes = "Private authoring note",
+            Kind = EventResourceKindEnum.GeneralDocument,
+            DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
             DeliveryType = EventResourceDeliveryTypeEnum.StoredFile,
             AudienceRules = [new(EventResourceAudienceKindEnum.Public)]
         };
@@ -167,9 +185,11 @@ public sealed class EventResourceControllerTests
         }
         IdempotencyKey($"resource-invalid-{resourceId:N}");
         using (var injected = await client.PostAsJsonAsync(collection, new
-               {
-                   resourceId = Guid.CreateVersion7(), draft, storageObjectId = Guid.CreateVersion7()
-               }, Token))
+        {
+            resourceId = Guid.CreateVersion7(),
+            draft,
+            storageObjectId = Guid.CreateVersion7()
+        }, Token))
             await Assert.That(injected.StatusCode).IsEqualTo(HttpStatusCode.BadRequest).Because(await injected.Content.ReadAsStringAsync(Token));
         IdempotencyKey($"resource-publish-{resourceId:N}");
         using (var publish = await client.PostAsJsonAsync($"/api/eventresource/{resourceId:D}/publish",

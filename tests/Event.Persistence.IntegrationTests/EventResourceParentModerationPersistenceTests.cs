@@ -38,25 +38,39 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
             userId = (await seed.Actors.Where(value => value.Id == scope.ActorId).Select(value => value.UserId).SingleAsync())!.Value;
             var member = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = state == "wrong-tenant" ? scope.TenantBId : scope.TenantAId,
-                Tenant = null!, UserId = userId, User = null!, ActorId = scope.ActorId,
+                Id = Guid.CreateVersion7(),
+                TenantId = state == "wrong-tenant" ? scope.TenantBId : scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
                 StatusId = state == "inactive" ? (int)TenantUserStatusEnum.Suspended : (int)TenantUserStatusEnum.Active,
-                IsDeleted = state == "deleted", CreatedAt = Now
+                IsDeleted = state == "deleted",
+                CreatedAt = Now
             };
             seed.AddRange(member, resource);
             if (state.StartsWith("platform-", StringComparison.Ordinal))
                 seed.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = userId, User = null!,
+                    Id = Guid.CreateVersion7(),
+                    UserId = userId,
+                    User = null!,
                     RoleId = state == "platform-admin" ? (int)RoleEnum.Admin : (int)RoleEnum.Moderator,
-                    Role = null!, GrantedAt = Now
+                    Role = null!,
+                    GrantedAt = Now
                 });
             else
                 seed.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = member.TenantId, Tenant = null!, TenantUserId = member.Id,
-                    TenantUser = member, RoleId = state == "tenant-moderator" ? (int)RoleEnum.TenantModerator : (int)RoleEnum.TenantAdmin,
-                    Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = Now,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = member.TenantId,
+                    Tenant = null!,
+                    TenantUserId = member.Id,
+                    TenantUser = member,
+                    RoleId = state == "tenant-moderator" ? (int)RoleEnum.TenantModerator : (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    GrantedAt = Now,
                     RevokedAt = state == "revoked" ? Now : null
                 });
             await seed.SaveChangesAsync();
@@ -96,13 +110,26 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
             userId = (await seed.Actors.Where(value => value.Id == scope.ActorId).Select(value => value.UserId).SingleAsync())!.Value;
             var member = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = userId,
-                User = null!, ActorId = scope.ActorId, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             };
             seed.AddRange(member, resource, new TenantUserRoleGrant
             {
-                Id = grantId, TenantId = member.TenantId, Tenant = null!, TenantUserId = member.Id, TenantUser = member,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = Now
+                Id = grantId,
+                TenantId = member.TenantId,
+                Tenant = null!,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = Now
             });
             await seed.SaveChangesAsync();
         }
@@ -173,34 +200,65 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
             userId = (await seed.Actors.Where(value => value.Id == scope.ActorId).Select(value => value.UserId).SingleAsync())!.Value;
             var organization = new Organization
             {
-                Id = organizationId, Pii = new() { FullName = "Principal organization" }, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = organizationId,
+                Pii = new() { FullName = "Principal organization" },
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             var group = new Group { Id = groupId, FullName = "Principal group", ConcurrencyStamp = Guid.CreateVersion7() };
             var orgTenant = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, OrganizationId = organizationId,
-                Organization = organization, ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!,
-                IsOrganizerEligible = true, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                OrganizationId = organizationId,
+                Organization = organization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                IsOrganizerEligible = true,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             var groupTenant = new GroupTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, GroupId = groupId, Group = group,
-                ApprovalStatusId = (int)ApprovalStatusEnum.Approved, ApprovalStatus = null!, IsOrganizerEligible = true,
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                GroupId = groupId,
+                Group = group,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Approved,
+                ApprovalStatus = null!,
+                IsOrganizerEligible = true,
                 ConcurrencyStamp = Guid.CreateVersion7()
             };
             var organizer = new Actor
             {
-                Id = organizerId, ActorTypeId = (int)ActorTypeEnum.Group, ActorType = null!, GroupId = groupId,
+                Id = organizerId,
+                ActorTypeId = (int)ActorTypeEnum.Group,
+                ActorType = null!,
+                GroupId = groupId,
                 Pii = new() { DisplayName = "Group organizer" }
             };
             seed.AddRange(resource, orgTenant, groupTenant, organizer, new OrganizationMember
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, OrganizationTenantId = orgTenant.Id,
-                OrganizationTenant = orgTenant, UserId = userId, User = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                OrganizationTenantId = orgTenant.Id,
+                OrganizationTenant = orgTenant,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.OrgAdmin,
+                Role = null!
             }, new GroupMember
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, GroupTenantId = groupTenant.Id,
-                GroupTenant = groupTenant, UserId = userId, User = null!, RoleId = (int)RoleEnum.GroupAdmin, Role = null!
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                GroupTenantId = groupTenant.Id,
+                GroupTenant = groupTenant,
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.GroupAdmin,
+                Role = null!
             });
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             parent.OrganizerActorId = organizerId;
@@ -208,10 +266,16 @@ public sealed class EventResourceParentModerationPersistenceTests(EventResourceP
             var permissions = await seed.Permissions.Where(value => value.MasterCode == PermissionCodes.EventCreate
                 || value.MasterCode == PermissionCodes.EventManageFinance).ToListAsync();
             foreach (var permission in permissions)
-            foreach (int roleId in new[] { (int)RoleEnum.OrgAdmin, (int)RoleEnum.GroupAdmin })
-                if (!await seed.RolePermissions.AnyAsync(value => value.RoleId == roleId && value.PermissionId == permission.Id))
-                    seed.RolePermissions.Add(new() { RoleId = roleId, Role = null!, PermissionId = permission.Id,
-                        Permission = permission, GrantedAt = Now });
+                foreach (int roleId in new[] { (int)RoleEnum.OrgAdmin, (int)RoleEnum.GroupAdmin })
+                    if (!await seed.RolePermissions.AnyAsync(value => value.RoleId == roleId && value.PermissionId == permission.Id))
+                        seed.RolePermissions.Add(new()
+                        {
+                            RoleId = roleId,
+                            Role = null!,
+                            PermissionId = permission.Id,
+                            Permission = permission,
+                            GrantedAt = Now
+                        });
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();

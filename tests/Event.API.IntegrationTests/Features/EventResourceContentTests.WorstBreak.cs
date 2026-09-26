@@ -82,9 +82,13 @@ public sealed partial class EventResourceContentTests
                 user.Pii!.Email == seed.PurchaserCredentials!.Identifier);
             db.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = purchaserUser.Id, User = purchaserUser,
-                RoleId = (int)RoleEnum.Admin, Role = null!,
-                GrantedAt = DateTime.UtcNow, GrantedBy = purchaserUser.Id
+                Id = Guid.CreateVersion7(),
+                UserId = purchaserUser.Id,
+                User = purchaserUser,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = purchaserUser.Id
             });
             await db.SaveChangesAsync();
         }
@@ -491,7 +495,8 @@ public sealed partial class EventResourceContentTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         await AuthenticateAsync(client, seed.Credentials);
 
@@ -665,7 +670,8 @@ public sealed partial class EventResourceContentTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         await AuthenticateAsync(client, seed.Credentials);
         using var response = await client.GetAsync($"/api/eventresource/{seed.ResourceId}/content");
@@ -701,55 +707,88 @@ public sealed partial class EventResourceContentTests
             : await db.Actors.SingleAsync(row => row.UserId == purchaserUser.Id);
         db.Tenants.Add(new Tenant
         {
-            Id = otherTenantId, FullName = "Other resource tenant", Slug = $"other-{otherTenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+            Id = otherTenantId,
+            FullName = "Other resource tenant",
+            Slug = $"other-{otherTenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = DateTime.UtcNow
         });
         db.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            UserId = user.Id, User = user, ActorId = actor.Id,
-            StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            UserId = user.Id,
+            User = user,
+            ActorId = actor.Id,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = DateTime.UtcNow
         });
         if (purchaserCredentials is not null)
             db.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = purchaserUser.Id, User = purchaserUser, ActorId = purchaserActor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = purchaserUser.Id,
+                User = purchaserUser,
+                ActorId = purchaserActor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             });
         db.SystemSettings.AddRange(
             new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
-                Value = "true", ValueType = SettingValueType.Boolean, Category = "EventResources"
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                Category = "EventResources"
             },
             new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             });
         if (externalDestination)
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
-                Value = "[\"https://resource.example.org\"]", ValueType = SettingValueType.Json,
+                Value = "[\"https://resource.example.org\"]",
+                ValueType = SettingValueType.Json,
                 Category = "EventResources"
             });
         var parent = new Explore.Domain.Event
         {
-            Id = eventId, Title = "Participant event", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+            Id = eventId,
+            Title = "Participant event",
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            ActorId = actor.Id,
+            Actor = actor,
+            OrganizerActorId = actor.Id,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventStatus = null!
         };
         parent.Publish(DateTime.UtcNow);
         DateTimeOffset start = sessionStart ?? DateTimeOffset.UtcNow;
         var session = new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = sessionId, EventId = eventId, Event = parent, TenantId = PlatformDefaults.DefaultTenantId,
-            Tenant = null!, Title = "Participant session", StartTime = start,
-            EndTime = start.AddHours(1), CreatedAt = DateTime.UtcNow,
+            Id = sessionId,
+            EventId = eventId,
+            Event = parent,
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            Title = "Participant session",
+            StartTime = start,
+            EndTime = start.AddHours(1),
+            CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         parent.Sessions.Add(session);
@@ -807,11 +846,19 @@ public sealed partial class EventResourceContentTests
                 db.ParticipantAdmissionEligibilities.Add(otherEligibility);
                 db.EventRegistrations.Add(new EventRegistration
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    EventId = eventId, Event = parent, EventSessionId = sessionId, EventSession = session,
-                    LinkedUserId = purchaserUser.Id, RegistrationOrderId = order.Id,
-                    RegistrationOrderLineId = line.Id, RegistrationParticipantId = other.Id,
-                    RegistrationParticipant = other, CoverageEstablishedAt = DateTime.UtcNow,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    EventId = eventId,
+                    Event = parent,
+                    EventSessionId = sessionId,
+                    EventSession = session,
+                    LinkedUserId = purchaserUser.Id,
+                    RegistrationOrderId = order.Id,
+                    RegistrationOrderLineId = line.Id,
+                    RegistrationParticipantId = other.Id,
+                    RegistrationParticipant = other,
+                    CoverageEstablishedAt = DateTime.UtcNow,
                     ConcurrencyStamp = Guid.CreateVersion7()
                 });
             }
@@ -839,23 +886,35 @@ public sealed partial class EventResourceContentTests
         var binding = StorageProviderBinding.Local(Path.GetFullPath("resource-content-test-storage"));
         var storage = new StorageObject
         {
-            Id = storageId, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-            Uri = $"/api/eventresource/{resourceId}/content", ObjectKey = objectKey,
-            Provider = StorageProviders.Local, FullName = "retained.pdf", SafeDisplayName = "retained.pdf",
+            Id = storageId,
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = $"/api/eventresource/{resourceId}/content",
+            ObjectKey = objectKey,
+            Provider = StorageProviders.Local,
+            FullName = "retained.pdf",
+            SafeDisplayName = "retained.pdf",
             StorageProviderBindingId = binding.Id,
-            Extension = "pdf", ContentType = EventResourceGovernancePolicy.PdfMediaType,
-            Size = bytes.Length, Sha256Checksum = Convert.ToHexString(SHA256.HashData(bytes)),
-            Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-            OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = resourceId,
-            LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = user.Id
+            Extension = "pdf",
+            ContentType = EventResourceGovernancePolicy.PdfMediaType,
+            Size = bytes.Length,
+            Sha256Checksum = Convert.ToHexString(SHA256.HashData(bytes)),
+            Purpose = StorageObjectPurposes.EventResource,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = resourceId,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            CreatedBy = user.Id
         };
         storage.RecordEventResourceInspection(storageId, storage.Sha256Checksum);
         var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId,
             completedRecording ? sessionId : null,
             new EventResourceMetadata
             {
-                Title = title, Kind = completedRecording ? EventResourceKindEnum.Recording
+                Title = title,
+                Kind = completedRecording ? EventResourceKindEnum.Recording
                     : EventResourceKindEnum.GeneralDocument,
                 DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
             }, externalDestination ? EventResourceDeliveryTypeEnum.ExternalLink
@@ -900,18 +959,31 @@ public sealed partial class EventResourceContentTests
         if (speakerAudience)
             db.EventSessionSpeakers.Add(new EventSessionSpeaker
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, EventSessionId = sessionId, EventSession = session,
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                EventSessionId = sessionId,
+                EventSession = session,
                 ConcurrencyStamp = Guid.CreateVersion7()
             });
         db.AddRange(parent, catalog, order, binding, storage, resource, new EventRegistration
         {
-            Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-            EventId = eventId, Event = parent, EventSessionId = sessionId, EventSession = session,
-            LinkedUserId = user.Id, RegistrationOrderId = order.Id,
+            Id = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
+            Tenant = null!,
+            EventId = eventId,
+            Event = parent,
+            EventSessionId = sessionId,
+            EventSession = session,
+            LinkedUserId = user.Id,
+            RegistrationOrderId = order.Id,
             RegistrationOrderLineId = line?.Id,
-            RegistrationParticipantId = participant.Id, RegistrationParticipant = participant,
-            CoverageEstablishedAt = DateTime.UtcNow, ConcurrencyStamp = Guid.CreateVersion7()
+            RegistrationParticipantId = participant.Id,
+            RegistrationParticipant = participant,
+            CoverageEstablishedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.CreateVersion7()
         });
         await db.SaveChangesAsync();
         return new(credentials, eventId, sessionId, resourceId, storageId, binding.Id, orderId, otherTenantId, objectKey, title,

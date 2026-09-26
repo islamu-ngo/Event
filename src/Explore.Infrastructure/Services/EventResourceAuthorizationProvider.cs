@@ -165,14 +165,14 @@ public sealed partial class EventResourceAuthorizationProvider(ICerbosClientFact
                 return;
 
             foreach (var item in resources)
-            foreach (var (action, indexes) in item.Actions)
-            {
-                var decision = bound[item][action] == Effect.Allow
-                    ? EventResourceProviderDecision.Allow
-                    : EventResourceProviderDecision.Deny;
-                foreach (var index in indexes)
-                    decisions[index] = decision;
-            }
+                foreach (var (action, indexes) in item.Actions)
+                {
+                    var decision = bound[item][action] == Effect.Allow
+                        ? EventResourceProviderDecision.Allow
+                        : EventResourceProviderDecision.Deny;
+                    foreach (var index in indexes)
+                        decisions[index] = decision;
+                }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

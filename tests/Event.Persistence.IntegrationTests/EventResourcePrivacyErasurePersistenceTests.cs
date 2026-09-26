@@ -151,7 +151,9 @@ public sealed class EventResourcePrivacyErasurePersistenceTests(
             session.BindEventResourceVersion(resource.ConcurrencyStamp);
             seed.Add(new StorageUsageCounter
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Provider = StorageProviders.Local,
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Provider = StorageProviders.Local,
                 ReservedBytes = 64
             });
             if (producerStarted)
@@ -200,57 +202,57 @@ public sealed class EventResourcePrivacyErasurePersistenceTests(
     private static StorageObject Storage(Guid id, Guid tenantId, FileType fileType, string objectKey,
         string purpose, string? ownerKind, Guid? ownerId, Guid actorId, Guid subjectId, Guid otherId,
         string checksum) => new()
-    {
-        Id = id,
-        TenantId = tenantId,
-        Tenant = null!,
-        FileTypeId = fileType.Id,
-        FileType = fileType,
-        Uri = $"private://{id:N}",
-        ObjectKey = objectKey,
-        Provider = StorageProviders.Local,
-        FullName = $"{id:N}.pdf",
-        SafeDisplayName = "shared.pdf",
-        Extension = "pdf",
-        ContentType = "application/pdf",
-        Sha256Checksum = checksum,
-        Size = 64,
-        Visibility = StorageObjectVisibilities.PrivateOwner,
-        Purpose = purpose,
-        LifecycleState = StorageObjectLifecycleStates.Active,
-        OwningResourceKind = ownerKind,
-        OwningResourceId = ownerId,
-        ActorId = actorId,
-        CreatedAt = Now,
-        CreatedBy = subjectId,
-        UpdatedAt = Now,
-        UpdatedBy = otherId,
-        DeletedBy = subjectId,
-        QuarantinedBy = subjectId,
-        ConcurrencyStamp = Guid.CreateVersion7()
-    };
+        {
+            Id = id,
+            TenantId = tenantId,
+            Tenant = null!,
+            FileTypeId = fileType.Id,
+            FileType = fileType,
+            Uri = $"private://{id:N}",
+            ObjectKey = objectKey,
+            Provider = StorageProviders.Local,
+            FullName = $"{id:N}.pdf",
+            SafeDisplayName = "shared.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Sha256Checksum = checksum,
+            Size = 64,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            Purpose = purpose,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            OwningResourceKind = ownerKind,
+            OwningResourceId = ownerId,
+            ActorId = actorId,
+            CreatedAt = Now,
+            CreatedBy = subjectId,
+            UpdatedAt = Now,
+            UpdatedBy = otherId,
+            DeletedBy = subjectId,
+            QuarantinedBy = subjectId,
+            ConcurrencyStamp = Guid.CreateVersion7()
+        };
 
     private static StorageUploadSession Session(Guid id, Guid tenantId, Guid subjectId, string objectKey,
         string purpose, string? ownerKind, Guid? ownerId) => new()
-    {
-        Id = id,
-        TenantId = tenantId,
-        UserId = subjectId,
-        Provider = StorageProviders.Local,
-        ExpectedSizeBytes = 64,
-        ContentType = "application/pdf",
-        SafeDisplayName = "upload.pdf",
-        Extension = "pdf",
-        Purpose = purpose,
-        Visibility = StorageObjectVisibilities.PrivateOwner,
-        OwningResourceKind = ownerKind,
-        OwningResourceId = ownerId,
-        Status = StorageUploadSessionStates.Reserved,
-        ObjectKey = objectKey,
-        ExpiresAt = Now.AddHours(1),
-        CreatedAt = Now,
-        CreatedBy = subjectId,
-        UpdatedBy = subjectId,
-        ConcurrencyStamp = Guid.CreateVersion7()
-    };
+        {
+            Id = id,
+            TenantId = tenantId,
+            UserId = subjectId,
+            Provider = StorageProviders.Local,
+            ExpectedSizeBytes = 64,
+            ContentType = "application/pdf",
+            SafeDisplayName = "upload.pdf",
+            Extension = "pdf",
+            Purpose = purpose,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = ownerKind,
+            OwningResourceId = ownerId,
+            Status = StorageUploadSessionStates.Reserved,
+            ObjectKey = objectKey,
+            ExpiresAt = Now.AddHours(1),
+            CreatedAt = Now,
+            CreatedBy = subjectId,
+            UpdatedBy = subjectId,
+            ConcurrencyStamp = Guid.CreateVersion7()
+        };
 }

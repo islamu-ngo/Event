@@ -50,28 +50,44 @@ public sealed class EventResourceAccessTests
             var actor = await db.Actors.SingleAsync(row => row.UserId == userId);
             db.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             });
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             });
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
-                Value = "[\"https://resource.example.org\"]", ValueType = SettingValueType.Json,
+                Value = "[\"https://resource.example.org\"]",
+                ValueType = SettingValueType.Json,
                 Category = "EventResources"
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Resource destination", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Resource destination",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
@@ -79,8 +95,13 @@ public sealed class EventResourceAccessTests
                 (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddMinutes(-1),
                 change == "staff-expiry-before-final-read" ? clock.GetUtcNow().AddSeconds(5).UtcDateTime : null, userId));
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
-                new EventResourceMetadata { Title = "Public destination", PublicTitle = "Visit",
-                    Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.Public },
+                new EventResourceMetadata
+                {
+                    Title = "Public destination",
+                    PublicTitle = "Visit",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.Public
+                },
                 EventResourceDeliveryTypeEnum.ExternalLink,
                 change == "window-boundaries"
                     ? EventResourceAvailability.Create(absoluteStartUtc: clock.GetUtcNow().AddMinutes(1),
@@ -122,8 +143,11 @@ public sealed class EventResourceAccessTests
         {
             client.DefaultRequestHeaders.Add("Idempotency-Key", $"invalid-destination-{resourceId:N}");
             using var rejected = await client.PutAsJsonAsync($"/api/eventresource/{resourceId}/destination",
-                new { expectedVersion = version,
-                    destination = $"https://reader:{sentinel}@resource.example.org/visit" });
+                new
+                {
+                    expectedVersion = version,
+                    destination = $"https://reader:{sentinel}@resource.example.org/visit"
+                });
             await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
             await Assert.That(await rejected.Content.ReadAsStringAsync()).DoesNotContain(sentinel);
             await Assert.That(rejected.Headers.Location).IsNull();

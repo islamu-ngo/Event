@@ -68,7 +68,10 @@ public sealed class EventResourceAuditRetentionServiceTests
                     .Where(id => call.Arg<Guid?>() is not { } cursor || id.CompareTo(cursor) > 0)
                     .Take(call.Arg<int>()).Select(id => new Tenant
                     {
-                        Id = id, FullName = "Audit tenant", Slug = $"audit-{id:N}", TenantStatus = null!
+                        Id = id,
+                        FullName = "Audit tenant",
+                        Slug = $"audit-{id:N}",
+                        TenantStatus = null!
                     }).ToArray());
             repository.DeleteExpiredBatchAsync(Arg.Any<Guid>(), Arg.Any<DateTime?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(call =>

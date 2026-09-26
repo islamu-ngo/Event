@@ -59,7 +59,7 @@ public sealed partial class EventResourceManagementWorkflow
                 || (collectionEventId is { } eventId && item.EventId != eventId)))
             throw new BadRequestException("Invalid management disclosure scope.");
         var checks = items.Select(item => Request(item.Id, "view-management") with
-            { ExpectedResourceVersion = item.Version, ExpectedAttachmentGeneration = item.File?.AttachmentGeneration }).ToList();
+        { ExpectedResourceVersion = item.Version, ExpectedAttachmentGeneration = item.File?.AttachmentGeneration }).ToList();
         if (collectionEventId is { } parentId)
             checks.Insert(0, Request(parentId, "view-management", collection: true));
         var decisions = await authority.AuthorizeCapabilitiesAsync(checks, cancellationToken);
@@ -118,12 +118,17 @@ public sealed partial class EventResourceManagementWorkflow
     private static EventResourceManagementDto Map(EventResource resource) => new(resource.Id, resource.EventId,
         resource.ConcurrencyStamp, (EventResourcePublicationStateEnum)resource.PublicationStateId, new()
         {
-            Title = resource.Title, PublicTitle = resource.PublicTitle, Description = resource.Description,
-            SensitiveNotes = resource.SensitiveNotes, Kind = (EventResourceKindEnum)resource.EventResourceKindId,
+            Title = resource.Title,
+            PublicTitle = resource.PublicTitle,
+            Description = resource.Description,
+            SensitiveNotes = resource.SensitiveNotes,
+            Kind = (EventResourceKindEnum)resource.EventResourceKindId,
             DisclosureMode = (EventResourceDisclosureModeEnum)resource.DisclosureModeId,
             DeliveryType = (EventResourceDeliveryTypeEnum)resource.EventResourceDeliveryTypeId,
-            EventSessionId = resource.EventSessionId, LanguageCode = resource.LanguageCode,
-            AccessibilityNote = resource.AccessibilityNote, SortOrder = resource.SortOrder,
+            EventSessionId = resource.EventSessionId,
+            LanguageCode = resource.LanguageCode,
+            AccessibilityNote = resource.AccessibilityNote,
+            SortOrder = resource.SortOrder,
             AccessibleAlternativeEventResourceId = resource.AccessibleAlternativeEventResourceId,
             Availability = new(resource.AvailabilityAbsoluteStartUtc, resource.AvailabilityAbsoluteEndUtc,
                 (EventResourceAvailabilityAnchorEnum?)resource.AvailabilityStartAnchorId, resource.AvailabilityStartOffsetTicks,

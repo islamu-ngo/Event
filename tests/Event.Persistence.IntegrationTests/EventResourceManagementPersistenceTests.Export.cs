@@ -33,7 +33,8 @@ public sealed partial class EventResourceManagementPersistenceTests
         var id = Guid.CreateVersion7();
         var draft = Draft() with
         {
-            DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink, SensitiveNotes = "Authorized management note",
+            DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink,
+            SensitiveNotes = "Authorized management note",
             Availability = new(StartAnchor: EventResourceAvailabilityAnchorEnum.EventEnd, StartOffsetTicks: TimeSpan.FromDays(1).Ticks)
         };
         await Assert.That((await workflow.CreateAsync(scope.EventAId, id, draft, default)).IsSuccess).IsTrue();
@@ -174,7 +175,8 @@ public sealed partial class EventResourceManagementPersistenceTests
                     var resource = await writer.EventResources.SingleAsync(row => row.Id == id);
                     resource.UpdateMetadata(new EventResourceMetadata
                     {
-                        Title = "New semantic revision", Kind = EventResourceKindEnum.GeneralDocument,
+                        Title = "New semantic revision",
+                        Kind = EventResourceKindEnum.GeneralDocument,
                         DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                     }, resource.ConcurrencyStamp, actor, Now);
                     await writer.SaveChangesAsync();

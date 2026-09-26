@@ -617,7 +617,9 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
             var organizationId = Guid.CreateVersion7();
             var participation = new OrganizationTenant
             {
-                Id = Guid.CreateVersion7(), TenantId = seed.TenantId, Tenant = null!,
+                Id = Guid.CreateVersion7(),
+                TenantId = seed.TenantId,
+                Tenant = null!,
                 OrganizationId = organizationId,
                 Organization = new Organization
                 {
@@ -978,8 +980,14 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         (await context.Events.SingleAsync(value => value.Id == scope.EventAId)).OrganizerActorId = scope.ActorId;
         context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = actor, User = null!,
-            ActorId = scope.ActorId, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            UserId = actor,
+            User = null!,
+            ActorId = scope.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = Now
         });
         var resource = EventResourcePersistenceTests.CreateDraft(scope.TenantAId, scope.EventAId);
         context.EventResources.Add(resource);
@@ -1067,8 +1075,12 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
 
     private static CreateEventResourceUploadSessionDto Intent(Guid version) => new()
     {
-        ExpectedVersion = version, ExpectedSizeBytes = Pdf.Length, ContentType = "application/pdf",
-        SafeDisplayName = "resource.pdf", Extension = "pdf", IdempotencyKey = Guid.CreateVersion7().ToString("N")
+        ExpectedVersion = version,
+        ExpectedSizeBytes = Pdf.Length,
+        ContentType = "application/pdf",
+        SafeDisplayName = "resource.pdf",
+        Extension = "pdf",
+        IdempotencyKey = Guid.CreateVersion7().ToString("N")
     };
 
     private static async Task<BaseCommandResponse<Explore.Application.DTOs.StorageObject.StorageUploadSessionDto>> FinalizeAsync(

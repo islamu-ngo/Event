@@ -66,34 +66,55 @@ public sealed partial class CombinedEventResourceTransportTests
             if (!await db.TenantUsers.AnyAsync(row => row.TenantId == PlatformDefaults.DefaultTenantId && row.UserId == user.Id))
                 db.TenantUsers.Add(new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    UserId = user.Id, User = user, ActorId = actor.Id,
-                    StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = user.Id,
+                    User = user,
+                    ActorId = actor.Id,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    CreatedAt = DateTime.UtcNow
                 });
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
-                Value = "true", ValueType = SettingValueType.Boolean, Category = "EventResources"
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                Category = "EventResources"
             });
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
-                Value = "[\"https://files.example.org\"]", ValueType = SettingValueType.Json,
+                Value = "[\"https://files.example.org\"]",
+                ValueType = SettingValueType.Json,
                 Category = "EventResources"
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Restored materials", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Restored materials",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
             var file = EventResource.CreateDraft(fileId, PlatformDefaults.DefaultTenantId, eventId, null,
-                new EventResourceMetadata { Title = "Restored file", PublicTitle = "Handout",
-                    Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.Public },
+                new EventResourceMetadata
+                {
+                    Title = "Restored file",
+                    PublicTitle = "Handout",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.Public
+                },
                 EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, fileId,
                     EventResourceAudienceKindEnum.Public)], user.Id, DateTime.UtcNow);
@@ -105,16 +126,27 @@ public sealed partial class CombinedEventResourceTransportTests
             var binding = StorageProviderBinding.Local(storageRoot);
             var storage = new StorageObject
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-                Uri = $"/api/eventresource/{fileId}/content", ObjectKey = stored.ObjectKey,
-                Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-                FullName = "handout.pdf", SafeDisplayName = "handout.pdf", Extension = "pdf",
-                ContentType = "application/pdf", Size = bytes.Length,
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document,
+                FileType = null!,
+                Uri = $"/api/eventresource/{fileId}/content",
+                ObjectKey = stored.ObjectKey,
+                Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
+                FullName = "handout.pdf",
+                SafeDisplayName = "handout.pdf",
+                Extension = "pdf",
+                ContentType = "application/pdf",
+                Size = bytes.Length,
                 Sha256Checksum = Convert.ToHexString(SHA256.HashData(bytes)),
-                Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-                OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = fileId,
-                LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = user.Id
+                Purpose = StorageObjectPurposes.EventResource,
+                Visibility = StorageObjectVisibilities.PrivateOwner,
+                OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                OwningResourceId = fileId,
+                LifecycleState = StorageObjectLifecycleStates.Active,
+                CreatedBy = user.Id
             };
             storage.RecordEventResourceInspection(storage.Id, storage.Sha256Checksum);
             db.AddRange(binding, storage);
@@ -124,8 +156,13 @@ public sealed partial class CombinedEventResourceTransportTests
                 file.ConcurrencyStamp, user.Id, DateTime.UtcNow);
             db.EventResources.Add(file);
             var link = EventResource.CreateDraft(linkId, PlatformDefaults.DefaultTenantId, eventId, null,
-                new EventResourceMetadata { Title = "Restored link", PublicTitle = "Visit",
-                    Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.Public },
+                new EventResourceMetadata
+                {
+                    Title = "Restored link",
+                    PublicTitle = "Visit",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.Public
+                },
                 EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, linkId,
                     EventResourceAudienceKindEnum.Public)], user.Id, DateTime.UtcNow);

@@ -132,9 +132,15 @@ public sealed partial class EventResourceManagementPersistenceTests
             var member = await seed.TenantUsers.SingleAsync(value => value.TenantId == scope.TenantAId && value.UserId == actor);
             seed.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, TenantUserId = member.Id,
-                TenantUser = member, RoleId = (int)RoleEnum.TenantAdmin, Role = null!,
-                RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = Now
             });
             seed.EventResources.Add(resource);
             await seed.SaveChangesAsync();

@@ -30,7 +30,8 @@ public sealed partial class EventResourceManagementPersistenceTests
                     var resource = await writer.EventResources.SingleAsync(row => row.Id == id);
                     resource.UpdateMetadata(new EventResourceMetadata
                     {
-                        Title = "Changed after projection", Kind = EventResourceKindEnum.GeneralDocument,
+                        Title = "Changed after projection",
+                        Kind = EventResourceKindEnum.GeneralDocument,
                         DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                     }, resource.ConcurrencyStamp, actor, Now);
                     await writer.SaveChangesAsync();

@@ -103,7 +103,7 @@ public sealed class EventResourceLifecycleTests
         await Assert.That(resource.Title).IsEqualTo("Private material");
         var stamp = resource.ConcurrencyStamp;
         await Assert.That(() => resource.UpdateMetadata(metadata with
-            { DisclosureMode = EventResourceDisclosureModeEnum.Teaser, PublicTitle = null },
+        { DisclosureMode = EventResourceDisclosureModeEnum.Teaser, PublicTitle = null },
             stamp, subject, EventResourceTestData.Now)).Throws<ArgumentException>();
         await Assert.That(resource.Title).IsEqualTo("Private material");
         resource.UpdateMetadata(metadata, stamp, subject, EventResourceTestData.Now);

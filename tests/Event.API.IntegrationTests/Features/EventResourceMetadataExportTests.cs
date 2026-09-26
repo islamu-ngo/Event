@@ -33,11 +33,15 @@ public sealed class EventResourceMetadataExportTests
             database.SystemSettings.AddRange(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             }, new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
-                Value = "true", ValueType = SettingValueType.Boolean, Category = "EventResources"
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                Category = "EventResources"
             });
             var user = await database.Users.SingleAsync(row => row.Pii!.Email == credentials.Identifier, Token);
             userId = user.Id;
@@ -45,25 +49,40 @@ public sealed class EventResourceMetadataExportTests
             var now = DateTime.UtcNow;
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = now
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Portable semantic metadata", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Portable semantic metadata",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(now);
             database.Events.Add(parent);
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Organizer metadata", SensitiveNotes = "Authorized private note",
-                    Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+                    Title = "Organizer metadata",
+                    SensitiveNotes = "Authorized private note",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, EventResourceDeliveryTypeEnum.ExternalLink,
                 EventResourceAvailability.Create(startAnchor: EventResourceAvailabilityAnchorEnum.EventEnd, startOffset: TimeSpan.FromHours(2)),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId, EventResourceAudienceKindEnum.Public)], userId, now);
@@ -80,23 +99,36 @@ public sealed class EventResourceMetadataExportTests
                 var storageId = Guid.CreateVersion7();
                 var storage = new StorageObject
                 {
-                    Id = storageId, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-                    Uri = $"/api/eventresource/{item.Id:D}/content", ObjectKey = $"{providerKey}-{item.Id:N}",
-                    Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-                    FullName = item.Name, SafeDisplayName = item.Name,
-                    Extension = ".pdf", ContentType = EventResourceGovernancePolicy.PdfMediaType,
-                    Size = 13, Sha256Checksum = checksum, Purpose = StorageObjectPurposes.EventResource,
+                    Id = storageId,
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    FileTypeId = (int)FileTypeEnum.Document,
+                    FileType = null!,
+                    Uri = $"/api/eventresource/{item.Id:D}/content",
+                    ObjectKey = $"{providerKey}-{item.Id:N}",
+                    Provider = StorageProviders.Local,
+                    StorageProviderBindingId = binding.Id,
+                    FullName = item.Name,
+                    SafeDisplayName = item.Name,
+                    Extension = ".pdf",
+                    ContentType = EventResourceGovernancePolicy.PdfMediaType,
+                    Size = 13,
+                    Sha256Checksum = checksum,
+                    Purpose = StorageObjectPurposes.EventResource,
                     Visibility = StorageObjectVisibilities.PrivateOwner,
-                    OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = item.Id,
-                    LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = userId
+                    OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                    OwningResourceId = item.Id,
+                    LifecycleState = StorageObjectLifecycleStates.Active,
+                    CreatedBy = userId
                 };
                 storage.RecordEventResourceInspection(storageId, checksum);
                 database.StorageObjects.Add(storage);
                 var stored = EventResource.CreateDraft(item.Id, PlatformDefaults.DefaultTenantId, eventId, null,
                     new EventResourceMetadata
                     {
-                        Title = item.Name, PublicTitle = item.Name, Kind = EventResourceKindEnum.GeneralDocument,
+                        Title = item.Name,
+                        PublicTitle = item.Name,
+                        Kind = EventResourceKindEnum.GeneralDocument,
                         DisclosureMode = EventResourceDisclosureModeEnum.Public
                     }, EventResourceDeliveryTypeEnum.StoredFile,
                     EventResourceAvailability.Create(absoluteStartUtc: item.Future ? now.AddDays(1) : null),
@@ -113,7 +145,8 @@ public sealed class EventResourceMetadataExportTests
         }
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token))
         {

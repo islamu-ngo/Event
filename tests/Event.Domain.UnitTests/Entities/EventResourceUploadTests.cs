@@ -101,19 +101,36 @@ public sealed class EventResourceUploadTests
 
     private static StorageUploadSession Session() => new()
     {
-        TenantId = Guid.CreateVersion7(), UserId = Guid.CreateVersion7(), Provider = StorageProviders.Local,
-        Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-        OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = Guid.CreateVersion7(),
-        ExpectedSizeBytes = 12, ReservedBytes = 12, ContentType = "application/pdf", SafeDisplayName = "file.pdf",
+        TenantId = Guid.CreateVersion7(),
+        UserId = Guid.CreateVersion7(),
+        Provider = StorageProviders.Local,
+        Purpose = StorageObjectPurposes.EventResource,
+        Visibility = StorageObjectVisibilities.PrivateOwner,
+        OwningResourceKind = StorageOwningResourceKinds.EventResource,
+        OwningResourceId = Guid.CreateVersion7(),
+        ExpectedSizeBytes = 12,
+        ReservedBytes = 12,
+        ContentType = "application/pdf",
+        SafeDisplayName = "file.pdf",
         Status = StorageUploadSessionStates.Reserved
     };
 
     private static StorageObject Object() => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, FileType = null!,
-        Provider = StorageProviders.Local, Uri = "/private", FullName = "file.pdf", SafeDisplayName = "file.pdf",
-        Extension = "pdf", Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-        OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = Guid.CreateVersion7(),
-        LifecycleState = StorageObjectLifecycleStates.DeleteRequested, Sha256Checksum = new string('a', 64)
+        Id = Guid.CreateVersion7(),
+        TenantId = Guid.CreateVersion7(),
+        Tenant = null!,
+        FileType = null!,
+        Provider = StorageProviders.Local,
+        Uri = "/private",
+        FullName = "file.pdf",
+        SafeDisplayName = "file.pdf",
+        Extension = "pdf",
+        Purpose = StorageObjectPurposes.EventResource,
+        Visibility = StorageObjectVisibilities.PrivateOwner,
+        OwningResourceKind = StorageOwningResourceKinds.EventResource,
+        OwningResourceId = Guid.CreateVersion7(),
+        LifecycleState = StorageObjectLifecycleStates.DeleteRequested,
+        Sha256Checksum = new string('a', 64)
     };
 }

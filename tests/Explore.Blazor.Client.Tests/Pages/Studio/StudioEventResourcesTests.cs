@@ -219,8 +219,11 @@ public sealed class StudioEventResourcesTests : IDisposable
             Arg.Any<CancellationToken>()).Returns(Item("self"));
         _export.ExportEventResourceMetadataAsync(_eventId, Arg.Any<int?>(), Arg.Any<int?>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(new EventResourceMetadataExportPageDto { EventId = _eventId,
-                Items = [new EventResourceMetadataExportDto { Id = _resourceId, Title = "Authorized handout" }] });
+            .Returns(new EventResourceMetadataExportPageDto
+            {
+                EventId = _eventId,
+                Items = [new EventResourceMetadataExportDto { Id = _resourceId, Title = "Authorized handout" }]
+            });
         var cut = Render();
         cut.WaitForElement("[data-testid='resource-export']").Click();
         cut.WaitForAssertion(() => Assert.That(cut.Markup).Contains("Authorized handout"));
@@ -257,20 +260,26 @@ public sealed class StudioEventResourcesTests : IDisposable
 
     private EventResourceManagementCollectionDto Collection(string[] collectionLinks, params string[] itemLinks) => new()
     {
-        PageNumber = 1, PageSize = 20,
+        PageNumber = 1,
+        PageSize = 20,
         _links = Links(collectionLinks),
         _embedded = new HalCollectionEmbeddedOfEventResourceManagementDto { Items = [Item(itemLinks)] }
     };
 
     private HalResourceOfEventResourceManagementDto Item(params string[] links) => new()
     {
-        Id = _resourceId, EventId = _eventId, Version = _version,
+        Id = _resourceId,
+        EventId = _eventId,
+        Version = _version,
         Draft = new EventResourceDraftDto { Title = "Organizer handout" },
         _links = Links(links)
     };
 
     private Dictionary<string, HalLink> Links(params string[] relations) => relations.ToDictionary(
         relation => relation,
-        relation => new HalLink { Href = $"/api/event/resources/{_resourceId}/{relation}",
-            Method = relation is "edit" ? "PUT" : "POST" });
+        relation => new HalLink
+        {
+            Href = $"/api/event/resources/{_resourceId}/{relation}",
+            Method = relation is "edit" ? "PUT" : "POST"
+        });
 }

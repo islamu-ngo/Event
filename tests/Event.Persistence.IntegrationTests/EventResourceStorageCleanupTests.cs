@@ -109,7 +109,9 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
             new StorageObjectRepository(context), Substitute.For<IFileStorageProviderResolver>(), [],
             Options.Create(new StorageReconciliationSettings
             {
-                DryRun = dryRun, DeleteQuarantinedObjects = false, QuarantineMissingObjects = false
+                DryRun = dryRun,
+                DeleteQuarantinedObjects = false,
+                QuarantineMissingObjects = false
             }),
             new BusinessMetrics(metrics.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>()),
             NullLogger<StorageReconciliationService>.Instance,
@@ -147,13 +149,26 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
         await using var context = database.CreateContext();
         context.AddRange(binding, work, new StorageObject
         {
-            Id = work.Id, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-            FileType = null!, Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-            ObjectKey = work.ObjectKey, Uri = "/private", FullName = "private.pdf", SafeDisplayName = "private.pdf",
-            Extension = "pdf", ContentType = "application/pdf", Size = 64,
-            Purpose = StorageObjectPurposes.EventResource, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-            OwningResourceId = Guid.CreateVersion7(), Visibility = StorageObjectVisibilities.PrivateOwner,
-            LifecycleState = StorageObjectLifecycleStates.DeleteRequested, CreatedAt = Now
+            Id = work.Id,
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Provider = StorageProviders.Local,
+            StorageProviderBindingId = binding.Id,
+            ObjectKey = work.ObjectKey,
+            Uri = "/private",
+            FullName = "private.pdf",
+            SafeDisplayName = "private.pdf",
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 64,
+            Purpose = StorageObjectPurposes.EventResource,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = Guid.CreateVersion7(),
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            LifecycleState = StorageObjectLifecycleStates.DeleteRequested,
+            CreatedAt = Now
         });
         await context.SaveChangesAsync();
         var repository = new StorageObjectDeletionTombstoneRepository(context);
@@ -208,14 +223,25 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
         await context.SaveChangesAsync();
         var session = new StorageUploadSession
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, UserId = subject,
-            Provider = StorageProviders.Local, RouteKey = "documents", PolicyVersion = "test",
-            PolicyMaxUploadBytes = 1024, ExpectedSizeBytes = 64, ReservedBytes = 64,
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            UserId = subject,
+            Provider = StorageProviders.Local,
+            RouteKey = "documents",
+            PolicyVersion = "test",
+            PolicyMaxUploadBytes = 1024,
+            ExpectedSizeBytes = 64,
+            ReservedBytes = 64,
             Status = StorageUploadSessionStates.Reserved,
-            ContentType = "application/pdf", SafeDisplayName = "file.pdf", Extension = "pdf",
-            Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-            OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = resource.Id,
-            ExpiresAt = Now.AddMinutes(-1), CreatedAt = Now.AddMinutes(-3)
+            ContentType = "application/pdf",
+            SafeDisplayName = "file.pdf",
+            Extension = "pdf",
+            Purpose = StorageObjectPurposes.EventResource,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = resource.Id,
+            ExpiresAt = Now.AddMinutes(-1),
+            CreatedAt = Now.AddMinutes(-3)
         };
         session.BindEventResourceVersion(resource.ConcurrencyStamp);
         Guid objectId = Guid.CreateVersion7();
@@ -225,13 +251,26 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
             string key = $"objects/{objectId:N}";
             context.AddRange(binding, new StorageObject
             {
-                Id = objectId, TenantId = scope.TenantAId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-                FileType = null!, Provider = StorageProviders.Local, StorageProviderBindingId = binding.Id,
-                ObjectKey = key, Uri = "/private", FullName = "file.pdf", SafeDisplayName = "file.pdf",
-                Extension = "pdf", ContentType = "application/pdf", Size = 64,
-                Purpose = StorageObjectPurposes.EventResource, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-                OwningResourceId = resource.Id, Visibility = StorageObjectVisibilities.PrivateOwner,
-                LifecycleState = StorageObjectLifecycleStates.DeleteRequested, CreatedAt = Now.AddMinutes(-2)
+                Id = objectId,
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document,
+                FileType = null!,
+                Provider = StorageProviders.Local,
+                StorageProviderBindingId = binding.Id,
+                ObjectKey = key,
+                Uri = "/private",
+                FullName = "file.pdf",
+                SafeDisplayName = "file.pdf",
+                Extension = "pdf",
+                ContentType = "application/pdf",
+                Size = 64,
+                Purpose = StorageObjectPurposes.EventResource,
+                OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                OwningResourceId = resource.Id,
+                Visibility = StorageObjectVisibilities.PrivateOwner,
+                LifecycleState = StorageObjectLifecycleStates.DeleteRequested,
+                CreatedAt = Now.AddMinutes(-2)
             });
             session.ReserveObjectKey(key);
             session.MarkUploading(Now.AddMinutes(-2));
@@ -240,7 +279,10 @@ public sealed class EventResourceStorageCleanupTests(EventResourceFileUploadTest
         }
         context.AddRange(session, new StorageUsageCounter
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Provider = StorageProviders.Local, ReservedBytes = 64
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Provider = StorageProviders.Local,
+            ReservedBytes = 64
         });
         await context.SaveChangesAsync();
         bool providerAttempted = false;

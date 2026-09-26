@@ -67,15 +67,24 @@ public sealed class EventResourceFileUploadWorkflow(
                 await counters.Update(counter);
                 var session = new StorageUploadSession
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenant.TenantId, UserId = user.UserId,
-                    Provider = policy.Provider, RouteKey = policy.RouteKey, PolicyMaxUploadBytes = policy.MaxUploadBytes,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenant.TenantId,
+                    UserId = user.UserId,
+                    Provider = policy.Provider,
+                    RouteKey = policy.RouteKey,
+                    PolicyMaxUploadBytes = policy.MaxUploadBytes,
                     PolicyVersion = policy.PolicyVersion.ToString(CultureInfo.InvariantCulture),
-                    ExpectedSizeBytes = dto.ExpectedSizeBytes, ReservedBytes = dto.ExpectedSizeBytes,
-                    ContentType = dto.ContentType, SafeDisplayName = dto.SafeDisplayName,
+                    ExpectedSizeBytes = dto.ExpectedSizeBytes,
+                    ReservedBytes = dto.ExpectedSizeBytes,
+                    ContentType = dto.ContentType,
+                    SafeDisplayName = dto.SafeDisplayName,
                     Extension = CreateEventResourceUploadSessionDtoValidator.ExtensionFor(dto.ContentType),
-                    Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-                    OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = resourceId,
-                    Status = StorageUploadSessionStates.Reserved, IdempotencyKey = dto.IdempotencyKey,
+                    Purpose = StorageObjectPurposes.EventResource,
+                    Visibility = StorageObjectVisibilities.PrivateOwner,
+                    OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                    OwningResourceId = resourceId,
+                    Status = StorageUploadSessionStates.Reserved,
+                    IdempotencyKey = dto.IdempotencyKey,
                     ExpiresAt = clock.GetUtcNow().UtcDateTime.AddMinutes(15)
                 };
                 session.BindEventResourceVersion(dto.ExpectedVersion);
@@ -361,13 +370,25 @@ public sealed class EventResourceFileUploadWorkflow(
         var id = Guid.CreateVersion7();
         return new()
         {
-            Id = id, TenantId = session.TenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
-            Uri = $"/api/storageobject/{id}/content", Provider = session.Provider, ObjectKey = session.ObjectKey,
+            Id = id,
+            TenantId = session.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = $"/api/storageobject/{id}/content",
+            Provider = session.Provider,
+            ObjectKey = session.ObjectKey,
             StorageProviderBindingId = session.StorageProviderBindingId,
-            FullName = session.SafeDisplayName, SafeDisplayName = session.SafeDisplayName, Extension = session.Extension!,
-            ContentType = session.ContentType, Size = session.ExpectedSizeBytes, Purpose = StorageObjectPurposes.EventResource,
-            Visibility = StorageObjectVisibilities.PrivateOwner, OwningResourceKind = StorageOwningResourceKinds.EventResource,
-            OwningResourceId = session.OwningResourceId, LifecycleState = StorageObjectLifecycleStates.DeleteRequested
+            FullName = session.SafeDisplayName,
+            SafeDisplayName = session.SafeDisplayName,
+            Extension = session.Extension!,
+            ContentType = session.ContentType,
+            Size = session.ExpectedSizeBytes,
+            Purpose = StorageObjectPurposes.EventResource,
+            Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.EventResource,
+            OwningResourceId = session.OwningResourceId,
+            LifecycleState = StorageObjectLifecycleStates.DeleteRequested
         };
     }
 

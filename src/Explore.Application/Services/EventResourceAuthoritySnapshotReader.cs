@@ -241,9 +241,11 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                          && value.Actor is { IsDeleted: false, IsSuspended: false }))
             {
                 audience.Add(AudienceFact(request, parentEvent.Id, EventResourceAudienceKindEnum.AnyEventSessionSpeaker)
-                    with { EventSessionId = speaker.EventSessionId });
+                    with
+                { EventSessionId = speaker.EventSessionId });
                 audience.Add(AudienceFact(request, parentEvent.Id, EventResourceAudienceKindEnum.SessionSpeaker)
-                    with { EventSessionId = speaker.EventSessionId });
+                    with
+                { EventSessionId = speaker.EventSessionId });
             }
             if (parentEvent.OrganizerActorId is { } organizerId && controlledActors.Contains(organizerId))
                 audience.Add(AudienceFact(request, parentEvent.Id, EventResourceAudienceKindEnum.Organizer));
@@ -325,8 +327,11 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 Guid? completed = state.RequirementsCompletedAt.HasValue && state.SubjectUserId == userId ? userId : null;
                 audience.Add(AudienceFact(request, resource.EventId, EventResourceAudienceKindEnum.TicketHolder) with
                 {
-                    EventSessionId = qualifierSessionId, EventTicketTypeId = ticket.EventTicketTypeId,
-                    OrderConfirmed = confirmed, ApprovedSubjectUserId = approved, CompletedSubjectUserId = completed
+                    EventSessionId = qualifierSessionId,
+                    EventTicketTypeId = ticket.EventTicketTypeId,
+                    OrderConfirmed = confirmed,
+                    ApprovedSubjectUserId = approved,
+                    CompletedSubjectUserId = completed
                 });
 
                 if (rule.AudienceKindId != (int)EventResourceAudienceKindEnum.CheckedInParticipant
@@ -341,10 +346,13 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
                 audience.Add(AudienceFact(request, resource.EventId,
                     EventResourceAudienceKindEnum.CheckedInParticipant) with
                 {
-                    EventSessionId = qualifierSessionId, EventTicketTypeId = ticket.EventTicketTypeId,
+                    EventSessionId = qualifierSessionId,
+                    EventTicketTypeId = ticket.EventTicketTypeId,
                     AdmissionTargetType = (AdmissionTargetTypeEnum)target.AdmissionTargetTypeId,
-                    AdmissionTargetId = target.Id, OrderConfirmed = confirmed,
-                    ApprovedSubjectUserId = approved, CompletedSubjectUserId = completed
+                    AdmissionTargetId = target.Id,
+                    OrderConfirmed = confirmed,
+                    ApprovedSubjectUserId = approved,
+                    CompletedSubjectUserId = completed
                 });
             }
         }
@@ -356,8 +364,11 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         CancellationToken cancellationToken)
     {
         HashSet<Guid> controlled = actors.Where(actor => !actor.IsDeleted && !actor.IsSuspended
-                && actor.UserId == userId && tenantUser is { IsDeleted: false,
-                    StatusId: (int)TenantUserStatusEnum.Active } && tenantUser.ActorId == actor.Id)
+                && actor.UserId == userId && tenantUser is
+                {
+                    IsDeleted: false,
+                    StatusId: (int)TenantUserStatusEnum.Active
+                } && tenantUser.ActorId == actor.Id)
             .Select(actor => actor.Id).ToHashSet();
         Guid[] organizationIds = actors.Where(actor => !actor.IsDeleted && !actor.IsSuspended)
             .Select(actor => actor.OrganizationId).OfType<Guid>().Distinct().ToArray();
@@ -377,15 +388,21 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
 
         foreach (OrganizationMember membership in organizations.Where(value => !value.IsDeleted
                      && createRoles.Contains(value.RoleId)
-                     && value.OrganizationTenant is { IsDeleted: false, IsSuspended: false,
-                         IsOrganizerEligible: true, ApprovalStatusId: (int)ApprovalStatusEnum.Approved }))
+                     && value.OrganizationTenant is
+                     {
+                         IsDeleted: false, IsSuspended: false,
+                         IsOrganizerEligible: true, ApprovalStatusId: (int)ApprovalStatusEnum.Approved
+                     }))
             foreach (Actor actor in actors.Where(value => !value.IsDeleted && !value.IsSuspended
                          && value.OrganizationId == membership.OrganizationTenant.OrganizationId))
                 controlled.Add(actor.Id);
         foreach (GroupMember membership in groups.Where(value => !value.IsDeleted
                      && createRoles.Contains(value.RoleId)
-                     && value.GroupTenant is { IsDeleted: false, IsSuspended: false,
-                         IsOrganizerEligible: true, ApprovalStatusId: (int)ApprovalStatusEnum.Approved }))
+                     && value.GroupTenant is
+                     {
+                         IsDeleted: false, IsSuspended: false,
+                         IsOrganizerEligible: true, ApprovalStatusId: (int)ApprovalStatusEnum.Approved
+                     }))
             foreach (Actor actor in actors.Where(value => !value.IsDeleted && !value.IsSuspended
                          && value.GroupId == membership.GroupTenant.GroupId))
                 controlled.Add(actor.Id);
@@ -410,14 +427,14 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
         EventResourceAuthorityRequest request, Guid eventId, Guid sessionId, RegistrationOrder order,
         ParticipantAdmissionEligibility? state, Guid userId) => AudienceFact(
         request, eventId, EventResourceAudienceKindEnum.SessionRegistrant) with
-    {
-        EventSessionId = sessionId,
-        OrderConfirmed = order.RegistrationOrderStatusId == (int)RegistrationOrderStatusEnum.Confirmed,
-        ApprovedSubjectUserId = state is { ApprovedAt: not null, RevokedAt: null, SubjectUserId: var approvedSubject }
+        {
+            EventSessionId = sessionId,
+            OrderConfirmed = order.RegistrationOrderStatusId == (int)RegistrationOrderStatusEnum.Confirmed,
+            ApprovedSubjectUserId = state is { ApprovedAt: not null, RevokedAt: null, SubjectUserId: var approvedSubject }
             && approvedSubject == userId ? userId : null,
-        CompletedSubjectUserId = state is { RequirementsCompletedAt: not null, RevokedAt: null, SubjectUserId: var completedSubject }
+            CompletedSubjectUserId = state is { RequirementsCompletedAt: not null, RevokedAt: null, SubjectUserId: var completedSubject }
             && completedSubject == userId ? userId : null
-    };
+        };
 
     private static (bool Safe, string Generation) ReadAttachment(
         EventResource resource, IReadOnlyDictionary<Guid, StorageObject> storageById, EventResourceGovernancePolicy? governancePolicy)
@@ -440,10 +457,13 @@ public sealed partial class EventResourceAuthoritySnapshotReader(
 
     private static EventResourceAudienceFact AudienceFact(
         EventResourceAuthorityRequest request, Guid eventId, EventResourceAudienceKindEnum kind) => new()
-    {
-        TenantId = request.TenantId, EventId = eventId, SubjectUserId = request.SubjectUserId!.Value,
-        Kind = kind, IsCurrent = true
-    };
+        {
+            TenantId = request.TenantId,
+            EventId = eventId,
+            SubjectUserId = request.SubjectUserId!.Value,
+            Kind = kind,
+            IsCurrent = true
+        };
 
     private static bool Covers(TicketTypeEntitlement entitlement, Guid? sessionId) =>
         (EntitlementScopeTypeEnum)entitlement.EntitlementScopeTypeId switch

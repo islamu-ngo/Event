@@ -28,7 +28,8 @@ public sealed partial class EventResourceManagementPersistenceTests
         var detail = await workflow.GetAsync(id, default);
         var command = new UpdateEventResourceCommand(id, detail.Value!.Version, Draft() with
         {
-            Title = "Revised material", AudienceRules = [new(EventResourceAudienceKindEnum.EventStaff)]
+            Title = "Revised material",
+            AudienceRules = [new(EventResourceAudienceKindEnum.EventStaff)]
         });
         var handler = new UpdateEventResourceCommandHandler(workflow);
         await Assert.That((await handler.ExecuteAsync(command)).IsSuccess).IsTrue();
@@ -55,7 +56,8 @@ public sealed partial class EventResourceManagementPersistenceTests
         }
         var revised = Draft() with
         {
-            Title = "Audited revision", AudienceRules = [new(EventResourceAudienceKindEnum.Organizer)]
+            Title = "Audited revision",
+            AudienceRules = [new(EventResourceAudienceKindEnum.Organizer)]
         };
         await using (var failing = database.CreateContext(new AuditFailure()))
             await Assert.That(async () => await Workflow(failing, scope.TenantAId, actor)

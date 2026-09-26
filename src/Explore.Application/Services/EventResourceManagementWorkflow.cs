@@ -95,8 +95,11 @@ public sealed partial class EventResourceManagementWorkflow(
                 return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
             var external = await resources.GetByIdAsync(request.TenantId,
                 lease.Snapshot.Facts.Access.Parent.EventId, resourceId, cancellationToken);
-            if (external is not { ExternalDestinationCiphertext: { } ciphertext,
-                ExternalDestinationProtectionVersion: { } version }
+            if (external is not
+                {
+                    ExternalDestinationCiphertext: { } ciphertext,
+                    ExternalDestinationProtectionVersion: { } version
+                }
                 || external.ConcurrencyStamp != expectedVersion)
                 return BaseCommandResponse.Failure<Guid>(EventResourceManagementFailureCodes.PublicationUnavailable);
             try

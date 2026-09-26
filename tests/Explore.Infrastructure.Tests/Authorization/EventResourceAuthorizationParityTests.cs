@@ -480,7 +480,8 @@ public sealed class EventResourceAuthorizationParityTests
                 new(["event.manager"]), new(["event:update"]))]));
         return input with
         {
-            Action = "moderate", Route = Remote() with { ParentEventPolicy = route },
+            Action = "moderate",
+            Route = Remote() with { ParentEventPolicy = route },
             Principal = input.Principal with { CanModerate = true },
             ParentModeration = new(route, principal, new(input.Resource.TenantId, input.Resource.EventId,
                 Guid.CreateVersion7(), input.Principal.UserId, organization, group, Guid.CreateVersion7(),

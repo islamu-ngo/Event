@@ -76,9 +76,13 @@ public sealed class EventResourceSettingsWriter(
                 bool created = row is null;
                 row ??= new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                    SettingKey = mutation.Key, Value = definition.DefaultValue,
-                    CreatedAt = now, CreatedBy = actorUserId
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    SettingKey = mutation.Key,
+                    Value = definition.DefaultValue,
+                    CreatedAt = now,
+                    CreatedBy = actorUserId
                 };
                 if (mutation.Kind == EventResourceSettingMutationKind.Remove)
                     tenants.Remove((tenantId, mutation.Key));
@@ -109,9 +113,14 @@ public sealed class EventResourceSettingsWriter(
                 bool created = row is null;
                 row ??= new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = mutation.Key, Value = definition.DefaultValue,
-                    ValueType = definition.ValueType, Category = definition.Category, Description = definition.Description,
-                    CreatedAt = now, CreatedBy = actorUserId
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = mutation.Key,
+                    Value = definition.DefaultValue,
+                    ValueType = definition.ValueType,
+                    Category = definition.Category,
+                    Description = definition.Description,
+                    CreatedAt = now,
+                    CreatedBy = actorUserId
                 };
                 if (mutation.Kind == EventResourceSettingMutationKind.Remove)
                     systems.Remove(mutation.Key);

@@ -229,8 +229,14 @@ public sealed class StudioEventNavigationTests : IDisposable
     private static EventResourceAudiencePageResource ResourcePage(bool canManage) => new()
     {
         _links = canManage
-            ? new Dictionary<string, HalLink> { ["manage-resources"] = new()
-                { Href = "/api/eventresource/event/manage", Method = "GET" } }
+            ? new Dictionary<string, HalLink>
+            {
+                ["manage-resources"] = new()
+                {
+                    Href = "/api/eventresource/event/manage",
+                    Method = "GET"
+                }
+            }
             : new Dictionary<string, HalLink>(),
         _embedded = new HalCollectionEmbeddedOfEventResourceAudienceDetailDto()
     };

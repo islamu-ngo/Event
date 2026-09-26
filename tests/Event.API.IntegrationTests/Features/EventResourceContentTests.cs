@@ -56,51 +56,82 @@ public sealed partial class EventResourceContentTests
             var actor = await db.Actors.SingleAsync(row => row.UserId == userId);
             db.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = clock.GetUtcNow().UtcDateTime
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = clock.GetUtcNow().UtcDateTime
             });
             if (change == "tighten-audience")
                 db.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = userId, User = user,
-                    RoleId = (int)RoleEnum.Admin, Role = null!,
-                    GrantedAt = clock.GetUtcNow().UtcDateTime, GrantedBy = userId
+                    Id = Guid.CreateVersion7(),
+                    UserId = userId,
+                    User = user,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = clock.GetUtcNow().UtcDateTime,
+                    GrantedBy = userId
                 });
             db.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,
                 Value = change == "owner-after-hal" ? "false" : "true",
-                ValueType = SettingValueType.Boolean, Category = "EventResources"
+                ValueType = SettingValueType.Boolean,
+                Category = "EventResources"
             });
             if (change is "owner-after-hal" or "tighten-audience")
                 db.SystemSettings.Add(new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                    Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                    Value = "\"local\"",
+                    ValueType = SettingValueType.String,
+                    Category = "Security"
                 });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Resource file delivery", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Resource file delivery",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(clock.GetUtcNow().UtcDateTime);
             db.Events.Add(parent);
             var storage = new StorageObject
             {
-                Id = storageId, TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                FileTypeId = (int)FileTypeEnum.Document, FileType = null!,
+                Id = storageId,
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                FileTypeId = (int)FileTypeEnum.Document,
+                FileType = null!,
                 Uri = $"/api/eventresource/{resourceId}/content",
-                ObjectKey = objectKey, Provider = StorageProviders.Local,
+                ObjectKey = objectKey,
+                Provider = StorageProviders.Local,
                 StorageProviderBindingId = binding.Id,
-                FullName = "handout.pdf", SafeDisplayName = "handout.pdf", Extension = "pdf",
-                ContentType = EventResourceGovernancePolicy.PdfMediaType, Size = bytes.Length, Sha256Checksum = checksum,
-                Purpose = StorageObjectPurposes.EventResource, Visibility = StorageObjectVisibilities.PrivateOwner,
-                OwningResourceKind = StorageOwningResourceKinds.EventResource, OwningResourceId = resourceId,
-                LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = userId
+                FullName = "handout.pdf",
+                SafeDisplayName = "handout.pdf",
+                Extension = "pdf",
+                ContentType = EventResourceGovernancePolicy.PdfMediaType,
+                Size = bytes.Length,
+                Sha256Checksum = checksum,
+                Purpose = StorageObjectPurposes.EventResource,
+                Visibility = StorageObjectVisibilities.PrivateOwner,
+                OwningResourceKind = StorageOwningResourceKinds.EventResource,
+                OwningResourceId = resourceId,
+                LifecycleState = StorageObjectLifecycleStates.Active,
+                CreatedBy = userId
             };
             storage.RecordEventResourceInspection(storageId, checksum);
             db.AddRange(binding, storage);
@@ -214,7 +245,8 @@ public sealed partial class EventResourceContentTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         if (change == "tighten-audience")
         {

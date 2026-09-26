@@ -25,9 +25,17 @@ public sealed partial class EventResourceDiscoveryQueryTests
         var parent = await context.Events.SingleAsync(value => value.Id == scope.EventAId);
         parent.Publish(Now);
         parent.OrganizerActorId = scope.ActorId;
-        context.TenantUsers.Add(new TenantUser { Id = Guid.CreateVersion7(), TenantId = scope.TenantAId,
-            Tenant = null!, UserId = user, User = null!, ActorId = scope.ActorId,
-            StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now });
+        context.TenantUsers.Add(new TenantUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            UserId = user,
+            User = null!,
+            ActorId = scope.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = Now
+        });
         await context.SaveChangesAsync();
         return (scope, user);
     }
@@ -35,11 +43,27 @@ public sealed partial class EventResourceDiscoveryQueryTests
     private async Task<Guid> MemberAsync(Guid tenantId)
     {
         await using var context = database.CreateContext();
-        var user = new User { Id = Guid.CreateVersion7(), Pii = new UserPii {
-            Email = $"reader-{Guid.CreateVersion7():N}@example.test", FirstName = "Reader", LastName = "Member" } };
+        var user = new User
+        {
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii
+            {
+                Email = $"reader-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Reader",
+                LastName = "Member"
+            }
+        };
         context.Users.Add(user);
-        context.TenantUsers.Add(new TenantUser { Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-            UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now });
+        context.TenantUsers.Add(new TenantUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            UserId = user.Id,
+            User = user,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = Now
+        });
         await context.SaveChangesAsync();
         return user.Id;
     }
@@ -50,10 +74,19 @@ public sealed partial class EventResourceDiscoveryQueryTests
     {
         var id = Guid.CreateVersion7();
         var resource = EventResource.CreateDraft(id, scope.TenantAId, scope.EventAId, null,
-            new EventResourceMetadata { Title = $"private-{id:N}", PublicTitle = $"public-{id:N}",
-                Description = $"description-{id:N}", SensitiveNotes = $"sensitive-{id:N}", LanguageCode = "en",
-                AccessibilityNote = $"accessibility-{id:N}", Kind = EventResourceKindEnum.GeneralDocument,
-                DisclosureMode = mode, SortOrder = sort, AccessibleAlternativeEventResourceId = alternative },
+            new EventResourceMetadata
+            {
+                Title = $"private-{id:N}",
+                PublicTitle = $"public-{id:N}",
+                Description = $"description-{id:N}",
+                SensitiveNotes = $"sensitive-{id:N}",
+                LanguageCode = "en",
+                AccessibilityNote = $"accessibility-{id:N}",
+                Kind = EventResourceKindEnum.GeneralDocument,
+                DisclosureMode = mode,
+                SortOrder = sort,
+                AccessibleAlternativeEventResourceId = alternative
+            },
             EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
             [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, id, audience)], user, Now);
         resource.SetExternalDestination(Guid.CreateVersion7().ToString("N"), 1, "https://resources.example.test",
@@ -104,7 +137,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
             if (Failure == "timeout") throw new TimeoutException();
             IReadOnlyList<EventResourceProviderDecision> result = Failure switch
             {
-                "partial" => [], "malformed" => inputs.Select(_ => (EventResourceProviderDecision)int.MaxValue).ToArray(),
+                "partial" => [],
+                "malformed" => inputs.Select(_ => (EventResourceProviderDecision)int.MaxValue).ToArray(),
                 _ => inputs.Select(Decide).ToArray()
             };
             return result;

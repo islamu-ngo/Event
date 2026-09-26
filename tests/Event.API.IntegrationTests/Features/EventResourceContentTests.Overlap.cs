@@ -41,7 +41,8 @@ public sealed partial class EventResourceContentTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         await AuthenticateAsync(client, seed.Credentials);
 

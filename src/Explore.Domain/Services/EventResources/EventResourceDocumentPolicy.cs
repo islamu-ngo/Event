@@ -311,9 +311,12 @@ public static class EventResourceDocumentPolicy
         using var data = entry.Open();
         using var reader = XmlReader.Create(data, new XmlReaderSettings
         {
-            DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null,
-            MaxCharactersInDocument = budget, MaxCharactersFromEntities = 0,
-            IgnoreComments = true, IgnoreProcessingInstructions = true
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = budget,
+            MaxCharactersFromEntities = 0,
+            IgnoreComments = true,
+            IgnoreProcessingInstructions = true
         });
         while (reader.Read())
         {
@@ -365,8 +368,12 @@ public static class EventResourceDocumentPolicy
     {
         "rels" => mime == "application/vnd.openxmlformats-package.relationships+xml",
         "xml" => XmlTypes.Contains(mime) && mime != "application/vnd.openxmlformats-package.relationships+xml",
-        "png" => mime == "image/png", "jpg" or "jpeg" => mime == "image/jpeg",
-        "gif" => mime == "image/gif", "bmp" => mime == "image/bmp", "tif" or "tiff" => mime == "image/tiff", _ => false
+        "png" => mime == "image/png",
+        "jpg" or "jpeg" => mime == "image/jpeg",
+        "gif" => mime == "image/gif",
+        "bmp" => mime == "image/bmp",
+        "tif" or "tiff" => mime == "image/tiff",
+        _ => false
     };
 
     private static string RequiredAttribute(XmlReader reader, string name)

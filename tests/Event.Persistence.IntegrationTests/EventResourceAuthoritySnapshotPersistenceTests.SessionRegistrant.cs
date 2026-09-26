@@ -26,9 +26,14 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
                 .Select(value => value.UserId).SingleAsync())!.Value;
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                UserId = userId, User = null!, ActorId = scope.ActorId,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             });
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
@@ -85,8 +90,12 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
             selectedEligibilityId = selectedEligibility.Id;
             var resourceId = Guid.CreateVersion7();
             resource = EventResource.CreateDraft(resourceId, scope.TenantAId, scope.EventAId, null,
-                new() { Title = "Selected session approval", Kind = EventResourceKindEnum.GeneralDocument,
-                    DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly },
+                new()
+                {
+                    Title = "Selected session approval",
+                    Kind = EventResourceKindEnum.GeneralDocument,
+                    DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+                },
                 EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, resourceId,
                     EventResourceAudienceKindEnum.SessionRegistrant, sessionId: selectedSession.Id,
@@ -97,13 +106,21 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
                 true, resource.ConcurrencyStamp, userId, Now);
             seed.AddRange(order, firstEligibility, selectedEligibility, resource, new EventRegistration
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                EventId = scope.EventAId, Event = parent, EventSessionId = selectedSession.Id,
-                EventSession = selectedSession, LinkedUserId = userId, RegistrationOrderId = order.Id,
-                RegistrationParticipantId = participant.Id, RegistrationParticipant = participant,
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                EventId = scope.EventAId,
+                Event = parent,
+                EventSessionId = selectedSession.Id,
+                EventSession = selectedSession,
+                LinkedUserId = userId,
+                RegistrationOrderId = order.Id,
+                RegistrationParticipantId = participant.Id,
+                RegistrationParticipant = participant,
                 RegistrationOrderLineId = bindRegistrationLine ? selectedLine.Id : null,
                 TicketTypeEntitlementId = selectedEntitlement.Id,
-                CoverageEstablishedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                CoverageEstablishedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
             await seed.SaveChangesAsync();
         }

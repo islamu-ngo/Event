@@ -187,7 +187,8 @@ public sealed class EventResourceProviderControlPlaneTests
         await Assert.ThrowsAsync<AuthorizationException>(() => fixture.Control.BeginAsync(fixture.DeploymentId, default));
         await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Settings.UpsertAsync(new SystemSetting
         {
-            SettingKey = EventResourceProviderBindingDocument.SettingKey, Value = "{}"
+            SettingKey = EventResourceProviderBindingDocument.SettingKey,
+            Value = "{}"
         }));
         await Assert.That((await fixture.Reader.ReadAsync(fixture.Database.TenantId, default))!.IsUsable).IsTrue();
     }
@@ -295,7 +296,9 @@ public sealed class EventResourceProviderControlPlaneTests
             var resolver = Substitute.For<ICerbosConfigResolver>();
             resolver.ResolveAsync(Arg.Any<CancellationToken>()).Returns(new CerbosConfiguration
             {
-                Endpoint = Alias, Mode = CerbosMode.CustomEndpoint, IsInstanceDefault = false,
+                Endpoint = Alias,
+                Mode = CerbosMode.CustomEndpoint,
+                IsInstanceDefault = false,
                 AdminEndpoint = "https://admin.example.test"
             });
             _handler = new Handler(response);

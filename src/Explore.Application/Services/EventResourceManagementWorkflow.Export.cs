@@ -36,15 +36,22 @@ public sealed partial class EventResourceManagementWorkflow
                     var semantics = Map(row).Draft;
                     return new EventResourceMetadataExportDto
                     {
-                        Id = row.Id, EventSessionId = row.EventSessionId,
+                        Id = row.Id,
+                        EventSessionId = row.EventSessionId,
                         PublicationState = (EventResourcePublicationStateEnum)row.PublicationStateId,
-                        Title = semantics.Title, PublicTitle = semantics.PublicTitle,
-                        Description = semantics.Description, SensitiveNotes = semantics.SensitiveNotes,
-                        Kind = semantics.Kind, DisclosureMode = semantics.DisclosureMode,
-                        DeliveryType = semantics.DeliveryType, LanguageCode = semantics.LanguageCode,
-                        AccessibilityNote = semantics.AccessibilityNote, SortOrder = semantics.SortOrder,
+                        Title = semantics.Title,
+                        PublicTitle = semantics.PublicTitle,
+                        Description = semantics.Description,
+                        SensitiveNotes = semantics.SensitiveNotes,
+                        Kind = semantics.Kind,
+                        DisclosureMode = semantics.DisclosureMode,
+                        DeliveryType = semantics.DeliveryType,
+                        LanguageCode = semantics.LanguageCode,
+                        AccessibilityNote = semantics.AccessibilityNote,
+                        SortOrder = semantics.SortOrder,
                         AccessibleAlternativeEventResourceId = semantics.AccessibleAlternativeEventResourceId,
-                        Availability = semantics.Availability, AudienceRules = semantics.AudienceRules,
+                        Availability = semantics.Availability,
+                        AudienceRules = semantics.AudienceRules,
                         File = files[row.Id]
                     };
                 }).ToImmutableArray();
@@ -85,7 +92,7 @@ public sealed partial class EventResourceManagementWorkflow
         var pageResult = prepared.Page with
         {
             Items = prepared.Page.Items.Select(item => item with
-                { DownloadAuthorized = downloadable.Contains(item.Id) }).ToImmutableArray()
+            { DownloadAuthorized = downloadable.Contains(item.Id) }).ToImmutableArray()
         };
         return EventResourceManagementReadResult.Success(pageResult);
     }

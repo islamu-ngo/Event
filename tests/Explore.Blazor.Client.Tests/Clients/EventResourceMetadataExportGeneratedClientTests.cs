@@ -11,7 +11,9 @@ public sealed class EventResourceMetadataExportGeneratedClientTests
         long offset = TimeSpan.FromHours(2).Ticks;
         var page = JsonSerializer.Deserialize<EventResourceMetadataExportPageDto>(JsonSerializer.Serialize(new
         {
-            eventId, page = 1, pageSize = 20,
+            eventId,
+            page = 1,
+            pageSize = 20,
             items = new[]
             {
                 new

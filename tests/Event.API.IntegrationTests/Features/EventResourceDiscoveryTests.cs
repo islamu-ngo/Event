@@ -37,7 +37,9 @@ public sealed partial class EventResourceDiscoveryTests
             database.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             });
             var user = await database.Users.SingleAsync(row => row.Pii!.Email == credentials.Identifier, Token);
             userId = user.Id;
@@ -45,17 +47,30 @@ public sealed partial class EventResourceDiscoveryTests
             var now = DateTime.UtcNow;
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = now
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Audience resource discovery", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Audience resource discovery",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(now);
             database.Events.Add(parent);
@@ -65,8 +80,11 @@ public sealed partial class EventResourceDiscoveryTests
                     new EventResourceMetadata
                     {
                         Title = audience == EventResourceAudienceKindEnum.Public ? "Open material" : privateTitle,
-                        PublicTitle = "Public material notice", SensitiveNotes = privateNotes,
-                        Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = disclosure, SortOrder = sort,
+                        PublicTitle = "Public material notice",
+                        SensitiveNotes = privateNotes,
+                        Kind = EventResourceKindEnum.GeneralDocument,
+                        DisclosureMode = disclosure,
+                        SortOrder = sort,
                         AccessibleAlternativeEventResourceId = id == publicId ? hiddenId : null
                     }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                     [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, id, audience)], userId, now);
@@ -99,7 +117,8 @@ public sealed partial class EventResourceDiscoveryTests
         })) : null;
         using var client = (intercepted ?? factory).CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         using (var publicDetail = await client.GetAsync($"/api/eventresource/{publicId:D}", Token))
         {

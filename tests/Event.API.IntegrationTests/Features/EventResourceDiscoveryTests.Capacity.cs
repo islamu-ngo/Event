@@ -31,24 +31,39 @@ public sealed partial class EventResourceDiscoveryTests
             database.SystemSettings.Add(new SystemSetting
             {
                 SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                Value = "\"local\"",
+                ValueType = SettingValueType.String,
+                Category = "Security"
             });
             var user = await database.Users.SingleAsync(row => row.Pii!.Email == credentials.Identifier, Token);
             var actor = await database.Actors.SingleAsync(row => row.UserId == user.Id, Token);
             var now = DateTime.UtcNow;
             database.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = user.Id, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = now
             });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Sparse governed material", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Sparse governed material",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(now);
             database.Events.Add(parent);
@@ -60,8 +75,10 @@ public sealed partial class EventResourceDiscoveryTests
                     new EventResourceMetadata
                     {
                         Title = index == 499 ? "Visible last material" : "Provider-denied title",
-                        SensitiveNotes = "Never disclose manager note", SortOrder = index,
-                        Kind = EventResourceKindEnum.GeneralDocument, DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+                        SensitiveNotes = "Never disclose manager note",
+                        SortOrder = index,
+                        Kind = EventResourceKindEnum.GeneralDocument,
+                        DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                     }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                     [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, id,
                         EventResourceAudienceKindEnum.AuthenticatedTenantMember)], user.Id, now);
@@ -84,7 +101,8 @@ public sealed partial class EventResourceDiscoveryTests
         }));
         using var client = hosted.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token))
         {
@@ -112,8 +130,10 @@ public sealed partial class EventResourceDiscoveryTests
         using var rejected = await client.PostAsJsonAsync($"/api/event/{eventId:D}/resources",
             new CreateEventResourceRequestDto(Guid.CreateVersion7(), new EventResourceDraftDto
             {
-                Title = "Overflow draft", Kind = EventResourceKindEnum.GeneralDocument,
-                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly, DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink,
+                Title = "Overflow draft",
+                Kind = EventResourceKindEnum.GeneralDocument,
+                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
+                DeliveryType = EventResourceDeliveryTypeEnum.ExternalLink,
                 AudienceRules = [new(EventResourceAudienceKindEnum.AuthenticatedTenantMember)]
             }), Token);
         await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.Conflict).Because(await rejected.Content.ReadAsStringAsync(Token));

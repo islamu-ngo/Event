@@ -36,29 +36,45 @@ public sealed class EventResourceGovernanceHttpTests
             administratorId = user.Id;
             database.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-                RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = DateTime.UtcNow, GrantedBy = user.Id
+                Id = Guid.CreateVersion7(),
+                UserId = user.Id,
+                User = user,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = user.Id
             });
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = user.Id, User = user,
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
                 ActorId = await database.Actors.Where(actor => actor.UserId == user.Id).Select(actor => actor.Id).SingleAsync(Token),
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             };
             database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                GrantedAt = DateTime.UtcNow, GrantedBy = user.Id
+                Id = Guid.CreateVersion7(),
+                TenantId = membership.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = user.Id
             });
             await database.SaveChangesAsync(Token);
         }
 
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         client.DefaultRequestHeaders.Accept.ParseAdd("application/hal+json");
         const string instancePath = "/api/settings/instance/event-resources";
@@ -66,14 +82,14 @@ public sealed class EventResourceGovernanceHttpTests
         using (var anonymousGet = await client.GetAsync(instancePath, Token))
             await Assert.That(anonymousGet.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         using (var anonymousPut = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "80" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "80" } }, Token))
             await Assert.That(anonymousPut.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
 
         await AuthenticateAsync(client, nonAdministrator);
         using (var deniedGet = await client.GetAsync(instancePath, Token))
             await Assert.That(deniedGet.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         using (var deniedPut = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "80" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "80" } }, Token))
             await Assert.That(deniedPut.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
 
         await AuthenticateAsync(client, administrator);
@@ -90,11 +106,13 @@ public sealed class EventResourceGovernanceHttpTests
             await Assert.That(root.GetProperty("settings").EnumerateArray().Count()).IsEqualTo(8);
         }
         using (var update = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string>
-                   {
-                       [GovernanceSettingKeys.EventResources.MaxActiveResources] = "80",
-                       [GovernanceSettingKeys.EventResources.AllowUnscannedDocuments] = "true"
-                   } }, Token))
+        {
+            Values = new Dictionary<string, string>
+            {
+                [GovernanceSettingKeys.EventResources.MaxActiveResources] = "80",
+                [GovernanceSettingKeys.EventResources.AllowUnscannedDocuments] = "true"
+            }
+        }, Token))
             await Assert.That(update.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await update.Content.ReadAsStringAsync(Token));
         using (var current = await client.GetAsync(instancePath, Token))
         {
@@ -115,35 +133,39 @@ public sealed class EventResourceGovernanceHttpTests
                 .GetProperty("canEdit").GetBoolean()).IsFalse();
         }
         using (var tenantOptIn = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.AllowUnscannedDocuments] = "true" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.AllowUnscannedDocuments] = "true" } }, Token))
             await Assert.That(tenantOptIn.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         using (var tenantCap = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "81" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "81" } }, Token))
             await Assert.That(tenantCap.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         using (var tenantCap = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "40" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "40" } }, Token))
             await Assert.That(tenantCap.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using (var instanceOptions = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string>
-                   {
-                       [GovernanceSettingKeys.EventResources.EnabledDeliveryTypes] = "[\"StoredFile\",\"ExternalLink\"]",
-                       [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Public\",\"Organizer\"]",
-                       [GovernanceSettingKeys.EventResources.PermittedFileTypes] = "[\"application/pdf\",\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"]",
-                       [GovernanceSettingKeys.EventResources.ExternalOrigins] = "[\"https://a.example.org\",\"https://b.example.org\"]",
-                       [GovernanceSettingKeys.EventResources.MaxUploadBytes] = "20000000",
-                       [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "60"
-                   } }, Token))
+        {
+            Values = new Dictionary<string, string>
+            {
+                [GovernanceSettingKeys.EventResources.EnabledDeliveryTypes] = "[\"StoredFile\",\"ExternalLink\"]",
+                [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Public\",\"Organizer\"]",
+                [GovernanceSettingKeys.EventResources.PermittedFileTypes] = "[\"application/pdf\",\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"]",
+                [GovernanceSettingKeys.EventResources.ExternalOrigins] = "[\"https://a.example.org\",\"https://b.example.org\"]",
+                [GovernanceSettingKeys.EventResources.MaxUploadBytes] = "20000000",
+                [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "60"
+            }
+        }, Token))
             await Assert.That(instanceOptions.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await instanceOptions.Content.ReadAsStringAsync(Token));
         using (var tenantOptions = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string>
-                   {
-                       [GovernanceSettingKeys.EventResources.EnabledDeliveryTypes] = "[\"StoredFile\",\"ExternalLink\"]",
-                       [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Public\",\"Organizer\"]",
-                       [GovernanceSettingKeys.EventResources.PermittedFileTypes] = "[\"application/pdf\",\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"]",
-                       [GovernanceSettingKeys.EventResources.ExternalOrigins] = "[\"https://a.example.org\",\"https://b.example.org\"]",
-                       [GovernanceSettingKeys.EventResources.MaxUploadBytes] = "15000000",
-                       [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "40"
-                   } }, Token))
+        {
+            Values = new Dictionary<string, string>
+            {
+                [GovernanceSettingKeys.EventResources.EnabledDeliveryTypes] = "[\"StoredFile\",\"ExternalLink\"]",
+                [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Public\",\"Organizer\"]",
+                [GovernanceSettingKeys.EventResources.PermittedFileTypes] = "[\"application/pdf\",\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"]",
+                [GovernanceSettingKeys.EventResources.ExternalOrigins] = "[\"https://a.example.org\",\"https://b.example.org\"]",
+                [GovernanceSettingKeys.EventResources.MaxUploadBytes] = "15000000",
+                [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "40"
+            }
+        }, Token))
             await Assert.That(tenantOptions.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await tenantOptions.Content.ReadAsStringAsync(Token));
         foreach (var (key, widening) in new (string Key, string Value)[]
                  {
@@ -175,15 +197,17 @@ public sealed class EventResourceGovernanceHttpTests
             await Assert.That(persisted.Value).IsEqualTo("40");
         }
         using (var tighten = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string>
-                   {
-                       [GovernanceSettingKeys.EventResources.MaxActiveResources] = "20",
-                       [GovernanceSettingKeys.EventResources.EnabledDeliveryTypes] = "[\"ExternalLink\"]",
-                       [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Organizer\"]",
-                       [GovernanceSettingKeys.EventResources.PermittedFileTypes] = "[\"application/pdf\"]",
-                       [GovernanceSettingKeys.EventResources.ExternalOrigins] = "[\"https://a.example.org\"]",
-                       [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "20"
-                   } }, Token))
+        {
+            Values = new Dictionary<string, string>
+            {
+                [GovernanceSettingKeys.EventResources.MaxActiveResources] = "20",
+                [GovernanceSettingKeys.EventResources.EnabledDeliveryTypes] = "[\"ExternalLink\"]",
+                [GovernanceSettingKeys.EventResources.EnabledAudiences] = "[\"Organizer\"]",
+                [GovernanceSettingKeys.EventResources.PermittedFileTypes] = "[\"application/pdf\"]",
+                [GovernanceSettingKeys.EventResources.ExternalOrigins] = "[\"https://a.example.org\"]",
+                [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "20"
+            }
+        }, Token))
             await Assert.That(tighten.StatusCode).IsEqualTo(HttpStatusCode.OK).Because(await tighten.Content.ReadAsStringAsync(Token));
         using (var effective = await client.GetAsync(tenantPath, Token))
         {
@@ -209,7 +233,7 @@ public sealed class EventResourceGovernanceHttpTests
             await Assert.That(policy!.MaxActiveResources).IsEqualTo(20);
         }
         using (var widenedAfterTightening = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "30" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "30" } }, Token))
             await Assert.That(widenedAfterTightening.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
 
         await using (var database = factory.CreateDatabase())
@@ -235,7 +259,7 @@ public sealed class EventResourceGovernanceHttpTests
             await Assert.That(lockedCapacity.GetProperty("canEdit").GetBoolean()).IsFalse();
         }
         using (var stale = await client.PutAsJsonAsync(tenantPath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "20" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.MaxActiveResources] = "20" } }, Token))
             await Assert.That(stale.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         using (var locked = await client.GetAsync(instancePath, Token))
         {
@@ -264,13 +288,13 @@ public sealed class EventResourceGovernanceHttpTests
             await Assert.That(document.RootElement.GetProperty("_links").TryGetProperty("edit", out _)).IsFalse();
         }
         using (var foreignKey = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { ["private.invalid.setting"] = "private-invalid-value" } }, Token))
+        { Values = new Dictionary<string, string> { ["private.invalid.setting"] = "private-invalid-value" } }, Token))
         {
             await Assert.That(foreignKey.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
             await Assert.That((await foreignKey.Content.ReadAsStringAsync(Token)).Contains("private-invalid-value", StringComparison.Ordinal)).IsFalse();
         }
         using (var invalid = await client.PutAsJsonAsync(instancePath, new UpdateSettingBatchDto
-               { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.ExternalOrigins] = "private-invalid-value" } }, Token))
+        { Values = new Dictionary<string, string> { [GovernanceSettingKeys.EventResources.ExternalOrigins] = "private-invalid-value" } }, Token))
         {
             await Assert.That(invalid.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
             await Assert.That((await invalid.Content.ReadAsStringAsync(Token)).Contains("private-invalid-value", StringComparison.Ordinal)).IsFalse();
@@ -297,22 +321,37 @@ public sealed class EventResourceGovernanceHttpTests
             userId = user.Id;
             database.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = userId, User = user,
-                RoleId = (int)RoleEnum.Admin, Role = null!, GrantedAt = DateTime.UtcNow, GrantedBy = userId
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = user,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = userId
             });
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user,
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
                 ActorId = await database.Actors.Where(actor => actor.UserId == userId).Select(actor => actor.Id).SingleAsync(Token),
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             };
             database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                GrantedAt = DateTime.UtcNow, GrantedBy = userId
+                Id = Guid.CreateVersion7(),
+                TenantId = membership.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = userId
             });
             await database.SaveChangesAsync(Token);
             var unit = new EfCoreUnitOfWork(database);
@@ -324,7 +363,8 @@ public sealed class EventResourceGovernanceHttpTests
         }
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         using (var login = await client.PostAsJsonAsync("/api/auth/local/login", credentials, Token))
         {
@@ -338,13 +378,13 @@ public sealed class EventResourceGovernanceHttpTests
         using (var widening = await client.PutAsJsonAsync(capacityPath, new UpdateSettingValueDto { Value = "101" }, Token))
             await Assert.That(widening.StatusCode).IsEqualTo(HttpStatusCode.BadRequest).Because(await widening.Content.ReadAsStringAsync(Token));
         using (var batch = await client.PutAsJsonAsync("/api/settings/tenant/EventResources", new UpdateSettingBatchDto
-               {
-                   Values = new Dictionary<string, string>
-                   {
-                       [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "5",
-                       [GovernanceSettingKeys.EventResources.MaxActiveResources] = "150"
-                   }
-               }, Token))
+        {
+            Values = new Dictionary<string, string>
+            {
+                [GovernanceSettingKeys.EventResources.AuditRetentionDays] = "5",
+                [GovernanceSettingKeys.EventResources.MaxActiveResources] = "150"
+            }
+        }, Token))
             await Assert.That(batch.StatusCode).IsEqualTo(HttpStatusCode.BadRequest).Because(await batch.Content.ReadAsStringAsync(Token));
         using (var optIn = await client.PutAsJsonAsync(
                    "/api/settings/tenant/keys/" + GovernanceSettingKeys.EventResources.AllowUnscannedDocuments,

@@ -58,8 +58,11 @@ public sealed partial class EventResourceDiscoveryQueryTests(EventResourcePersis
         var rows = Enumerable.Range(0, 5).Select(_ => Resource(scope, user, 7, EventResourceAudienceKindEnum.Public))
             .OrderBy(row => row.Id).ToArray();
         await SaveAsync(rows);
-        var provider = new Provider { Decide = input => input.Resource.Id == rows[1].Id || input.Resource.Id == rows[3].Id
-            ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow };
+        var provider = new Provider
+        {
+            Decide = input => input.Resource.Id == rows[1].Id || input.Resource.Id == rows[3].Id
+            ? EventResourceProviderDecision.Deny : EventResourceProviderDecision.Allow
+        };
         await using var context = database.CreateContext();
         var workflow = Workflow(context, scope.TenantAId, user, provider);
         var first = await workflow.ListAsync(scope.EventAId, 1, null, default);

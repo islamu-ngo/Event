@@ -40,8 +40,12 @@ public sealed class EventResourceParentModerationFactsTests
     {
         Guid user = Guid.CreateVersion7(), tenant = Guid.CreateVersion7(), parentId = Guid.CreateVersion7(), id = Guid.CreateVersion7();
         var resource = EventResource.CreateDraft(id, tenant, parentId, null,
-            new() { Title = "Restricted", Kind = EventResourceKindEnum.GeneralDocument,
-                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly },
+            new()
+            {
+                Title = "Restricted",
+                Kind = EventResourceKindEnum.GeneralDocument,
+                DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
+            },
             EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
             [EventResourceAudienceRule.Create(tenant, parentId, id, EventResourceAudienceKindEnum.Organizer)], user, Now.UtcDateTime);
         resource.SetStoredFile(Guid.CreateVersion7(), resource.ConcurrencyStamp, user, Now.UtcDateTime);

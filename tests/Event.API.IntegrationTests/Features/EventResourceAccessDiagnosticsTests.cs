@@ -41,29 +41,45 @@ public sealed class EventResourceAccessDiagnosticsTests
             var actor = await db.Actors.SingleAsync(row => row.UserId == userId);
             db.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = userId, User = user, ActorId = actor.Id,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = user,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             });
             db.SystemSettings.AddRange(
                 new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.Security.AuthorizationProvider,
-                    Value = "\"local\"", ValueType = SettingValueType.String, Category = "Security"
+                    Value = "\"local\"",
+                    ValueType = SettingValueType.String,
+                    Category = "Security"
                 },
                 new SystemSetting
                 {
                     SettingKey = GovernanceSettingKeys.EventResources.ExternalOrigins,
-                    Value = "[\"https://resource.example.org\"]", ValueType = SettingValueType.Json,
+                    Value = "[\"https://resource.example.org\"]",
+                    ValueType = SettingValueType.Json,
                     Category = "EventResources"
                 });
             var parent = new Explore.Domain.Event
             {
-                Id = eventId, Title = "Resource diagnostics", TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = eventId,
+                Title = "Resource diagnostics",
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!
             };
             parent.Publish(DateTime.UtcNow);
             db.Events.Add(parent);
@@ -72,7 +88,9 @@ public sealed class EventResourceAccessDiagnosticsTests
             var resource = EventResource.CreateDraft(resourceId, PlatformDefaults.DefaultTenantId, eventId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Public link", PublicTitle = "Visit", Kind = EventResourceKindEnum.GeneralDocument,
+                    Title = "Public link",
+                    PublicTitle = "Visit",
+                    Kind = EventResourceKindEnum.GeneralDocument,
                     DisclosureMode = EventResourceDisclosureModeEnum.Public
                 }, EventResourceDeliveryTypeEnum.ExternalLink, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(PlatformDefaults.DefaultTenantId, eventId, resourceId,

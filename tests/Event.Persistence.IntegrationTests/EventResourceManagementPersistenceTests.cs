@@ -77,8 +77,14 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
         parent.OrganizerActorId = scope.ActorId;
         seed.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = actor,
-            User = null!, ActorId = scope.ActorId, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+            Id = Guid.CreateVersion7(),
+            TenantId = scope.TenantAId,
+            Tenant = null!,
+            UserId = actor,
+            User = null!,
+            ActorId = scope.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            CreatedAt = Now
         });
         await seed.SaveChangesAsync();
         return (scope, actor);
@@ -118,7 +124,8 @@ public sealed partial class EventResourceManagementPersistenceTests(EventResourc
 
     private static EventResourceDraftDto Draft() => new()
     {
-        Title = "Protected material", Kind = (EventResourceKindEnum)1,
+        Title = "Protected material",
+        Kind = (EventResourceKindEnum)1,
         DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly,
         DeliveryType = EventResourceDeliveryTypeEnum.StoredFile,
         AudienceRules = [new(EventResourceAudienceKindEnum.Public)]

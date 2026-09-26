@@ -34,7 +34,9 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             Id = Guid.CreateVersion7(),
             Pii = new UserPii
             {
-                Email = $"audience-{Guid.CreateVersion7():N}@example.test", FirstName = "Audience", LastName = "Member"
+                Email = $"audience-{Guid.CreateVersion7():N}@example.test",
+                FirstName = "Audience",
+                LastName = "Member"
             }
         };
         var resourceId = Guid.CreateVersion7();
@@ -46,14 +48,24 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             seed.TenantUsers.AddRange(
                 new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                    UserId = publisherId, User = null!, ActorId = scope.ActorId,
-                    StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scope.TenantAId,
+                    Tenant = null!,
+                    UserId = publisherId,
+                    User = null!,
+                    ActorId = scope.ActorId,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    CreatedAt = Now
                 },
                 new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                    UserId = subject.Id, User = subject, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scope.TenantAId,
+                    Tenant = null!,
+                    UserId = subject.Id,
+                    User = subject,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    CreatedAt = Now
                 });
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
@@ -61,7 +73,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             var resource = EventResource.CreateDraft(resourceId, scope.TenantAId, scope.EventAId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Tenant member material", Kind = (EventResourceKindEnum)1,
+                    Title = "Tenant member material",
+                    Kind = (EventResourceKindEnum)1,
                     DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, resourceId,
@@ -139,9 +152,14 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
                 .Select(actor => actor.UserId).SingleAsync())!.Value;
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                UserId = userId, User = null!, ActorId = scope.ActorId,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             });
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
@@ -200,7 +218,8 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             resource = EventResource.CreateDraft(resourceId, scope.TenantAId, scope.EventAId, null,
                 new EventResourceMetadata
                 {
-                    Title = "Checked-in participant material", Kind = (EventResourceKindEnum)1,
+                    Title = "Checked-in participant material",
+                    Kind = (EventResourceKindEnum)1,
                     DisclosureMode = EventResourceDisclosureModeEnum.EligibleOnly
                 }, EventResourceDeliveryTypeEnum.StoredFile, EventResourceAvailability.Create(),
                 [EventResourceAudienceRule.Create(scope.TenantAId, scope.EventAId, resourceId,
@@ -214,13 +233,20 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             seed.AddRange(eligibility);
             seed.EventRegistrations.AddRange(participants.Select(participant => new EventRegistration
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                EventId = scope.EventAId, Event = parent,
-                EventSessionId = scope.SessionAId, EventSession = session,
-                LinkedUserId = userId, RegistrationOrderId = order.Id,
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                EventId = scope.EventAId,
+                Event = parent,
+                EventSessionId = scope.SessionAId,
+                EventSession = session,
+                LinkedUserId = userId,
+                RegistrationOrderId = order.Id,
                 RegistrationOrderLineId = line.Id,
-                RegistrationParticipantId = participant.Id, RegistrationParticipant = participant,
-                CoverageEstablishedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                RegistrationParticipantId = participant.Id,
+                RegistrationParticipant = participant,
+                CoverageEstablishedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             }));
             await seed.SaveChangesAsync();
         }
@@ -319,9 +345,14 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             parent.VisibilityTypeId = (int)VisibilityTypeEnum.Unlisted;
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                UserId = userId, User = null!, ActorId = scope.ActorId,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             });
             seed.Add(resource);
             await seed.SaveChangesAsync();
@@ -353,9 +384,14 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
                 .Select(actor => actor.UserId).SingleAsync())!.Value;
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                UserId = userId, User = null!, ActorId = scope.ActorId,
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             });
             var parent = await seed.Events.SingleAsync(value => value.Id == scope.EventAId);
             if (parent.EventStatusId != (int)EventStatusEnum.Published) parent.Publish(Now);
@@ -423,11 +459,19 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests(
             order.AddParticipant(participant);
             seed.AddRange(order, resource, new EventRegistration
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!,
-                EventId = scope.EventAId, Event = null!, EventSessionId = scope.SessionAId,
-                EventSession = null!, LinkedUserId = userId, RegistrationOrderId = order.Id,
-                RegistrationParticipantId = participant.Id, RegistrationParticipant = participant,
-                CoverageEstablishedAt = Now, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                EventId = scope.EventAId,
+                Event = null!,
+                EventSessionId = scope.SessionAId,
+                EventSession = null!,
+                LinkedUserId = userId,
+                RegistrationOrderId = order.Id,
+                RegistrationParticipantId = participant.Id,
+                RegistrationParticipant = participant,
+                CoverageEstablishedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
             await seed.SaveChangesAsync();
             await seed.RegistrationOrders.Where(value => value.Id == order.Id)

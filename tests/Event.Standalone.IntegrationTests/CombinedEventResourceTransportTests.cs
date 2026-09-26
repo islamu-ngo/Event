@@ -72,7 +72,8 @@ public sealed partial class CombinedEventResourceTransportTests
         using var csrfScope = factory.Services.CreateScope();
         var csrf = new Microsoft.AspNetCore.Http.DefaultHttpContext
         {
-            RequestServices = csrfScope.ServiceProvider, User = principal
+            RequestServices = csrfScope.ServiceProvider,
+            User = principal
         };
         csrf.Request.Scheme = "https";
         var tokens = csrfScope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Antiforgery.IAntiforgery>()

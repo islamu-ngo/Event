@@ -25,8 +25,14 @@ public sealed partial class EventResourceAuthoritySnapshotPersistenceTests
                 .Select(actor => actor.UserId).SingleAsync())!.Value;
             seed.TenantUsers.Add(new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = scope.TenantAId, Tenant = null!, UserId = userId, User = null!,
-                ActorId = scope.ActorId, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = Now
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = scope.ActorId,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = Now
             });
             seed.EventRoleAssignments.Add(EventRoleAssignment.Create(scope.TenantAId, scope.EventAId, userId,
                 (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, Now.AddMinutes(-1), null, userId));

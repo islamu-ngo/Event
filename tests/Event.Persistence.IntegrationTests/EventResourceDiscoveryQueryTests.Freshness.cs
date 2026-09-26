@@ -64,11 +64,22 @@ public sealed partial class EventResourceDiscoveryQueryTests
                 RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(), 1, 1, 1, null), null, null, "USD", Now, null);
             var participant = RegistrationParticipant.Create(scope.TenantAId, order.Id, subject, ParticipantTypeEnum.Adult, null);
             order.AddParticipant(participant);
-            seed.AddRange(resource, order, new EventRegistration { Id = Guid.CreateVersion7(),
-                TenantId = scope.TenantAId, Tenant = null!, EventId = parent.Id, Event = parent,
-                EventSessionId = session.Id, EventSession = session, LinkedUserId = subject,
-                RegistrationOrderId = order.Id, RegistrationParticipantId = participant.Id,
-                RegistrationParticipant = participant, CoverageEstablishedAt = Now, ConcurrencyStamp = Guid.CreateVersion7() });
+            seed.AddRange(resource, order, new EventRegistration
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = scope.TenantAId,
+                Tenant = null!,
+                EventId = parent.Id,
+                Event = parent,
+                EventSessionId = session.Id,
+                EventSession = session,
+                LinkedUserId = subject,
+                RegistrationOrderId = order.Id,
+                RegistrationParticipantId = participant.Id,
+                RegistrationParticipant = participant,
+                CoverageEstablishedAt = Now,
+                ConcurrencyStamp = Guid.CreateVersion7()
+            });
             await seed.SaveChangesAsync();
         }
         await using var context = database.CreateContext();
@@ -92,7 +103,9 @@ public sealed partial class EventResourceDiscoveryQueryTests
         await using var context = database.CreateIndependentContext();
         // Retain a stale entity deliberately; fresh authority must not consume it.
         var tracked = await context.TenantUsers.SingleAsync(value => value.UserId == subject);
-        var provider = new Provider { BeforeDecision = async inputs =>
+        var provider = new Provider
+        {
+            BeforeDecision = async inputs =>
         {
             await Assert.That(context.Database.CurrentTransaction).IsNull();
             privateInputs.Add(inputs[0].Resource.DisclosePrivateMetadata);
@@ -100,7 +113,8 @@ public sealed partial class EventResourceDiscoveryQueryTests
             await using var writer = database.CreateIndependentContext();
             await writer.TenantUsers.Where(value => value.UserId == subject)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.StatusId, (int)TenantUserStatusEnum.Suspended));
-        } };
+        }
+        };
         var detail = await Workflow(context, scope.TenantAId, subject, provider).GetAsync(resource.Id, default);
         await Assert.That(detail.Failure).IsEqualTo(EventResourceAudienceFailure.None);
         await Assert.That(detail.Value!.IsTeaser).IsTrue();

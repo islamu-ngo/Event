@@ -10,6 +10,7 @@ public sealed class RecipientDeliveryMigrationContainerFixture : IAsyncInitializ
         .WithDatabase("recipient_delivery_migration_" + Guid.NewGuid().ToString("N"))
         .WithUsername("postgres")
         .WithPassword("postgres")
+        .WithCommand("-c", "max_locks_per_transaction=512")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

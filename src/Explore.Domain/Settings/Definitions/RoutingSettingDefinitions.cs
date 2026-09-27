@@ -36,16 +36,16 @@ public static class RoutingSettingDefinitions
     public static readonly SettingDefinition ResolverPathEnabled = new(
         Key: "routing.resolver_path_enabled",
         ValueType: SettingValueType.Boolean,
-        DefaultValue: "false",
+        DefaultValue: "true",
         Category: "Routing",
-        Description: "Enable tenant resolution via URL path prefix");
+        Description: "Enable tenant resolution via URL path");
 
     public static readonly SettingDefinition PathPrefix = new(
         Key: "routing.path_prefix",
         ValueType: SettingValueType.String,
         DefaultValue: "\"\"",
         Category: "Routing",
-        Description: "URL path prefix for path-based tenant resolution (e.g., /t/{tenant})");
+        Description: "Optional URL path prefix for tenant resolution (empty for /{slug})");
 
     // Render Policy Tenant Override Controls
     public static readonly SettingDefinition RenderPolicyAllowTenantOverride = new(

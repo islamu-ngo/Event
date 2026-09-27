@@ -250,9 +250,19 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 ## Multi-Tenancy Model
 1. Runtime mode is resolved from governance settings (`SingleTenant` / `MultiTenant`).
 2. In `SingleTenant`, default tenant is used for all requests.
-3. In `MultiTenant`, tenant is resolved from header/domain/subdomain fallback chain.
-4. EF query filters enforce tenant isolation centrally in `ExploreDbContext`.
-5. **Hierarchical Settings**: Governance settings follow a 5-tier resolution cascade: User → Group → Organization → Tenant → Instance. Resolution is performed in batch via `HierarchicalSettingsResolver` with support for instance-level locks and single-tenant bypass.
+3. In `MultiTenant`, browser navigation defaults to `/{slug}`. The BFF resolves the
+   first non-reserved segment, rewrites the request beneath that tenant base path,
+   and translates the result into trusted `X-Tenant-Slug` for the API. An empty
+   configured prefix means root matching; configured nonempty prefixes remain
+   supported. The default does not require wildcard DNS or TLS.
+4. The API resolves a trusted tenant header first, then a mapped custom domain,
+   then a tenant subdomain; unresolved requests fail closed with `404`. The BFF
+   strips browser-supplied tenant headers before adding its route-derived value.
+5. Reserved root segments protect application pages, framework infrastructure,
+   authentication endpoints, static assets, and governed names. Tenant create and
+   slug-update validation reject them case-insensitively.
+6. EF query filters enforce tenant isolation centrally in `ExploreDbContext`.
+7. **Hierarchical Settings**: Governance settings follow a 5-tier resolution cascade: User → Group → Organization → Tenant → Instance. Resolution is performed in batch via `HierarchicalSettingsResolver` with support for instance-level locks and single-tenant bypass.
 
 ## Authorization Architecture
 1. Endpoint-level auth is handled via ASP.NET attributes/policies. `[AuthorizeResource]` attribute pairs a resource kind with a domain action constant from `AuthorizationActions`.

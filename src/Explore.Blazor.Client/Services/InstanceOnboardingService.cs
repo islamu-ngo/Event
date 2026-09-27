@@ -8,6 +8,7 @@ namespace Explore.Blazor.Client.Services;
 public interface IInstanceOnboardingService
 {
     Task<InstanceOnboardingStartupStatus> GetStartupStatusAsync(CancellationToken cancellationToken = default);
+    Task<ResolverConfigurationDto?> GetResolverConfigurationAsync(CancellationToken cancellationToken = default);
     Task<SystemOnboardingStatusDto?> GetSystemOnboardingStatusAsync();
     Task<OnboardingPreflightDto?> GetOnboardingPreflightAsync();
     Task<HalResourceOfInstanceOnboardingJourneyDto?> GetJourneyAsync(CancellationToken cancellationToken = default);
@@ -97,6 +98,12 @@ public sealed class InstanceOnboardingService(
 {
     public Task<SystemOnboardingStatusDto?> GetSystemOnboardingStatusAsync() =>
         GetOptionalAsync(ct => systemClient.GetSystemOnboardingStatusAsync(cancellationToken: ct), "system onboarding status");
+
+    public Task<ResolverConfigurationDto?> GetResolverConfigurationAsync(CancellationToken cancellationToken = default) =>
+        GetOptionalAsync(
+            ct => messagingClient.GetInstanceResolverConfigurationAsync(cancellationToken: ct),
+            "resolver configuration",
+            cancellationToken);
 
     public async Task<InstanceOnboardingStartupStatus> GetStartupStatusAsync(
         CancellationToken cancellationToken = default)

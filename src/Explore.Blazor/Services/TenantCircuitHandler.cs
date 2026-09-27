@@ -9,7 +9,10 @@ public class TenantCircuitHandler : CircuitHandler
     private readonly ITenantRouteContextAccessor _tenantRouteContextAccessor;
     private readonly NavigationManager _navigationManager;
     private readonly IBffResolverConfigurationProvider _resolverConfigurationProvider;
+    private readonly Explore.Blazor.Client.Models.OnboardingRequestOrigin _requestOrigin;
+    private PathString _deploymentPathBase;
     private string? _pathPrefix;
+    private IReadOnlyCollection<string>? _reservedSlugs;
     private bool _pathEnabled;
     private bool _subscribed;
 
@@ -19,8 +22,8 @@ public class TenantCircuitHandler : CircuitHandler
         IBffResolverConfigurationProvider resolverConfigurationProvider,
         Explore.Blazor.Client.Models.OnboardingRequestOrigin requestOrigin)
     {
-        // Resolve and retain the scoped request snapshot while the circuit's initial HTTP context exists.
-        _ = requestOrigin;
+        // Retain the scoped request snapshot while the circuit's initial HTTP context exists.
+        _requestOrigin = requestOrigin;
         _tenantRouteContextAccessor = tenantRouteContextAccessor;
         _navigationManager = navigationManager;
         _resolverConfigurationProvider = resolverConfigurationProvider;
@@ -31,6 +34,23 @@ public class TenantCircuitHandler : CircuitHandler
         var configuration = await _resolverConfigurationProvider.GetConfigurationAsync(cancellationToken);
         _pathEnabled = configuration.PathEnabled == true;
         _pathPrefix = configuration.PathPrefix;
+        _reservedSlugs = configuration.ReservedSlugs as IReadOnlyCollection<string> ??
+            configuration.ReservedSlugs?.ToArray();
+        var deploymentPath = _requestOrigin.Url is null
+            ? string.Empty
+            : new Uri(_requestOrigin.Url).AbsolutePath.TrimEnd('/');
+        var initialTenantSlug = _tenantRouteContextAccessor.TenantSlug;
+        if (!string.IsNullOrEmpty(initialTenantSlug))
+        {
+            var prefix = _pathPrefix?.Trim().Trim('/') ?? string.Empty;
+            var tenantRoute = (prefix.Length > 0 ? "/" + prefix : string.Empty) + "/" + initialTenantSlug;
+            if (deploymentPath.EndsWith(tenantRoute, StringComparison.OrdinalIgnoreCase))
+            {
+                deploymentPath = deploymentPath[..^tenantRoute.Length];
+            }
+        }
+
+        _deploymentPathBase = new PathString(deploymentPath);
         UpdateTenantSlug(_navigationManager.Uri);
 
         if (!_subscribed)
@@ -70,14 +90,27 @@ public class TenantCircuitHandler : CircuitHandler
 
     private void UpdateTenantSlug(string location)
     {
-        if (!_pathEnabled ||
-            !Uri.TryCreate(location, UriKind.Absolute, out var uri) ||
-            !TenantRoutePathMatcher.TryMatch(
-                new PathString(uri.AbsolutePath),
+        if (!_pathEnabled || !Uri.TryCreate(location, UriKind.Absolute, out var uri))
+        {
+            _tenantRouteContextAccessor.Clear();
+            return;
+        }
+
+        var path = new PathString(uri.AbsolutePath);
+        if (_deploymentPathBase.HasValue &&
+            !path.StartsWithSegments(_deploymentPathBase, out path))
+        {
+            _tenantRouteContextAccessor.Clear();
+            return;
+        }
+
+        if (!TenantRoutePathMatcher.TryMatch(
+                path,
                 _pathPrefix,
                 out var tenantSlug,
                 out _,
-                out _))
+                out _,
+                _reservedSlugs))
         {
             _tenantRouteContextAccessor.Clear();
             return;

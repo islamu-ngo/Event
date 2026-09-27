@@ -10,7 +10,9 @@ public sealed record ResolverConfigurationDto
 
     public bool PathEnabled { get; set; } = true;
 
-    public string PathPrefix { get; set; } = "/t";
+    public string PathPrefix { get; set; } = string.Empty;
+
+    public IReadOnlyList<string> ReservedSlugs { get; set; } = [];
 
     public string InstanceBaseDomain { get; set; } = string.Empty;
 

@@ -101,6 +101,7 @@ Every change must answer these eight questions **before editing any file**:
 | Pattern/Skill | [`.agents/skills/`](.agents/skills/) — load relevant `SKILL.md` |
 | Build/Test | [`docs/internal/OPERATIONS.md#verification-policy`](docs/internal/OPERATIONS.md#verification-policy) |
 | UI Workflow | [`docs/internal/BLAZOR_DEV_WORKFLOW.md`](docs/internal/BLAZOR_DEV_WORKFLOW.md) |
+| Local agent browser authentication | [`docs/internal/BLAZOR_DEV_WORKFLOW.md#2-local-agent-browser-authentication`](docs/internal/BLAZOR_DEV_WORKFLOW.md#2-local-agent-browser-authentication) |
 | Agent Ops | [`.agents/CONTEXT_ENGINEERING.md`](.agents/CONTEXT_ENGINEERING.md) |
 | PR Review | [`.agents/skills/review-pr/SKILL.md`](.agents/skills/review-pr/SKILL.md) |
 | Log Finding | [`.agents/skills/finding/SKILL.md`](.agents/skills/finding/SKILL.md) |

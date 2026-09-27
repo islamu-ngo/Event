@@ -116,3 +116,22 @@
 **References:** [lifetime decision and revision mappings](../../../docs/internal/adr/ADR-031-provider-credential-lifetime-boundaries.md), [HTTP replay boundary](../../../src/Explore.API/Middleware/IdempotencyMiddleware.cs), [actual HTTP invariant specification](../../../tests/Event.API.IntegrationTests/Features/ProviderCredentialHttpBoundaryTests.cs), [runtime authority follow-up](../../backlog/provider-credential-runtime-authority.md), [deployment isolation follow-up](../../backlog/provider-credential-deployment-isolation.md), [Cerbos publication follow-up](../../backlog/provider-credential-cerbos-publication.md).
 
 These are reusable design/test lessons and source observations. Deferred custody behavior has not been implemented or runtime-verified by this documentation entry.
+
+---
+
+[2026-09-26 Europe/Brussels] - AgentBrowser provisioning receipts establish bounded restart finality
+
+The Development-only `AgentBrowser` profile treats the configured bootstrap
+marker, exact application binding graph, and completed Local credential receipt
+as lifecycle evidence, not as an invitation to synchronize fixture state on
+every launch. Startup classifies recorded state before initialization work: an
+incomplete owned operation may resume, while an exact completed binding does not
+reread initialization passwords, reset credentials, recreate grants, or adopt a
+matching email/subject from another owner. Conflicts and terminal inconsistency
+fail closed.
+
+This explains finality for the isolated local profile only. It does not certify
+browser execution, establish Keycloak/Cerbos parity, or make a general claim
+about provider behavior. The browser protocol still proves identity with a
+fresh context, ordinary antiforgery-protected BFF login, post-login status, HAL
+affordances, and direct-denial checks.

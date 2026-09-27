@@ -2554,3 +2554,97 @@ References: `InstanceOnboardingGenerationReader`,
 - [x] Stays in journal only (the schema and focused regression now guard the contract)
 
 ---
+
+[2026-09-27 Europe/Brussels] — Tenant-filtered event projections need tenant-partitioned cache keys
+
+**Context**: While testing the local-agent browser personas, the default tenant queried an event owned by the negative-control tenant before that tenant read its own published event.
+
+**Symptom / Observation**: The foreign-tenant request correctly returned 404, but the owning tenant then also received 404 for its still-published event. Reversing the read order hid the failure.
+
+**Root Cause**: `GetEventDetailsRequestHandler` cached the tenant-filtered `EventDetailsProjectionService` result, including `null`, under `event:detail:{eventId}`. The first request's ambient tenant therefore determined what every tenant read from that key until expiry or invalidation.
+
+**Resolution**: Partition the `HybridCache` key by `ITenantContext.TenantId` and event ID while retaining the current-tenant eligibility check and event-scoped invalidation tags. The focused PostgreSQL `AgentBrowserPersonaHttpTests.DeniedMutationAndCanonicalTenantRoutesDoNotCrossEventBoundaries` passed 1/1 with the foreign-tenant read first.
+
+**Why This Matters for Future Work**: A scoped repository does not make a shared cache tenant-safe. Include the same authority partition in the cache key before storing either a successful projection or a miss; check both read orders in an HTTP regression.
+
+**References**:
+- `src/Explore.Application/Features/Events/Handlers/Queries/GetEventDetailsRequestHandler.cs:39`
+- `src/Explore.Application/Services/EventDetailsProjectionService.cs:35`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaHttpTests.cs:158`
+- `docs/internal/API.md#event-detail-cache-isolation`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the API architecture note and HTTP regression now guard the rule)
+
+---
+
+[2026-09-27 Europe/Brussels] — Resolve the authenticated root tenant from UI-shell authority when its cascade is missing
+
+**Context**: Fresh Local Manager login authenticated through the BFF, but navigation from `default.localhost:5200/` repeatedly attempted the same tenant route and ended in `ERR_TOO_MANY_REDIRECTS`.
+
+**Symptom / Observation**: The tenant provider loaded a valid UI-shell tenant ID, while `HomeStart` received no cascading tenant ID on either `/` or `/t/default/`.
+
+**Root Cause**: `HomeStart` relied only on the rendering cascade to distinguish an authenticated tenant member from a tenantless visitor. With the cascade absent at the root page, it repeatedly redirected an already-routed Manager back to `/t/default/`.
+
+**Resolution**: When an authenticated multi-tenant root lacks the cascading tenant ID, `HomeStart` obtains that ID from the existing `IUiShellContextService` before deciding whether tenant redirection is necessary. It does not infer tenant membership or authority from the host. A focused component regression covers the missing-cascade state, and a fresh Manager browser sign-in now settles on the authenticated tenant home.
+
+**Why This Matters for Future Work**: A rendering cascade is not an authority source and may be absent where root routing runs. Resolve the current tenant through the same authenticated UI-shell contract used by the provider before issuing a full-load tenant redirect.
+
+**References**:
+- `src/Explore.Blazor.Client/Pages/HomeStart.razor:175`
+- `src/Explore.Blazor.Client/Providers/TenantContextProvider.razor:26`
+- `tests/Explore.Blazor.Client.Tests/Pages/HomeStartTests.cs:12`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the focused component regression and real browser login guard this case)
+
+---
+
+[2026-09-27 Europe/Brussels] — Admin-host Local sessions need instance-scope identity reads
+
+**Context**: While verifying the isolated Development Local browser profile, the dedicated admin host had to authenticate the configured instance administrator without selecting an ordinary tenant.
+
+**Symptom / Observation**: `/login` initially rendered, then Blazor replaced it with a control-plane 404. After that was corrected, Local login returned 503 because the API rejected the admin host with `Tenant not resolved`. Exempting login alone produced a 200 response but the next `/auth/status` rejected the cookie; the BFF validates a Local session by reading the current user before it fetches admin authority.
+
+**Root Cause**: The admin-host shell selector ignored the browser route during interactive rendering; API tenant resolution applied to instance-scope credential, current-user and authority endpoints; and the BFF's default administrator destination named the tenant-host settings page rather than the admin-host control plane.
+
+**Resolution**: Keep Local auth pages in the ordinary BFF routes, allow only the exact Local login and authenticated identity/authority reads to run without tenant resolution (GET-only for `/api/user`), and select `/admin/instance` for an administrator signing in on the dedicated host. PostgreSQL HTTP coverage proves the login and both identity reads while `/api/event/my` and `DELETE /api/user` still return 404. BFF selector and redirect regressions pass, and a fresh Chrome session reaches the control plane with the correct `/auth/status` identity.
+
+**Why This Matters for Future Work**: Cookie creation is not proof of usable administrator access. The full BFF validation chain and interactive shell route must work on the same host, while privileged writes and tenant data remain bound to their actual tenant authority.
+
+**References**:
+- `src/Explore.API/Middleware/ApiTenantResolutionMiddleware.cs:178`
+- `src/Explore.Blazor/Services/AdminHostControlPlaneShellSelector.cs:8`
+- `src/Explore.Blazor/Extensions/BffAuthEndpoints.cs:897`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaHttpTests.cs:18`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/LocalBffCredentialReplacementTests.cs:84`
+- `docs/internal/API.md#tenantless-local-sign-in-on-the-admin-host`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (HTTP and BFF regressions plus the browser protocol now guard the chain)
+
+---
+
+[2026-09-27 Europe/Brussels] — Evict tenant-partitioned event details through their shared event tag
+
+**Context**: Independent security review of the Local browser authentication work found that the tenant-qualified event-detail cache reader had changed without its mutation-side invalidators.
+
+**Symptom / Observation**: A real authenticated organizer PATCH returned 200, but the next anonymous detail GET still returned the former title. `AuthorizedUpdateInvalidatesTenantScopedEventDetails` failed with `Expected to be equal to "Updated agent browser event" but received "Agent browser event"`.
+
+**Root Cause**: The reader uses `event:detail:{tenantId}:{eventId}`, while 47 event, session, ticketing, aspect, and registration mutation paths still called `RemoveAsync("event:detail:{eventId}")`. The obsolete key never matched a cached tenant-partitioned detail.
+
+**Resolution**: Every mutation path now removes `CacheTags.Event(eventId)` with `HybridCache.RemoveByTagAsync`; the reader already attaches that same per-event tag to each tenant-qualified entry. The focused real-HTTP regression passed after the first handler change, and the complete Release solution built successfully after the remaining mutation paths were updated.
+
+**Why This Matters for Future Work**: Partitioning a cache key for tenant isolation also changes the invalidation contract. Use a shared aggregate tag when writers know the event but not every tenant-partitioned key; test a real read-write-read flow, not just a mock eviction call.
+
+**References**:
+- `src/Explore.Application/Features/Events/Handlers/Queries/GetEventDetailsRequestHandler.cs:41`
+- `src/Explore.Application/Features/Events/Handlers/Commands/UpdateEventCommandHandler.cs:284`
+- `src/Explore.Application/Caching/CacheTags.cs:25`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaHttpTests.cs:208`
+- `docs/internal/API.md#event-detail-cache-isolation`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the real-HTTP read-write-read regression protects this cache contract)
+
+---

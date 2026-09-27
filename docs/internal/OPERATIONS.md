@@ -441,6 +441,34 @@ Do not treat a green lifecycle worker as live Google proof. Operators must still
 
 ## Local Startup Topology (Aspire)
 
+### Isolated Local-Agent Browser Authentication
+
+For the Development-only local-agent browser-authentication profile, use the
+protocol in [Blazor UI Development Workflow](BLAZOR_DEV_WORKFLOW.md#local-agent-browser-authentication):
+
+```bash
+dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj --launch-profile local-agent
+```
+
+It is the isolated `AgentBrowser` Split profile: API `http://localhost:5100`,
+BFF `http://localhost:5200`, admin host `http://admin.localhost:5200`, default
+tenant host `http://default.localhost:5200`, negative tenant host
+`http://agent-negative.localhost:5200`, and Mailpit UI/SMTP
+`http://localhost:58025` / `localhost:51025`. The selected secret authority
+must supply `POSTGRESQL_USERNAME`, `POSTGRESQL_PASSWORD`,
+`AGENT_BROWSER_REDIS_PASSWORD`, and `AUTHENTICATION_LOCAL_JWT_KEY` on every
+launch. Initial provisioning also needs `AGENT_BROWSER_PERSONA_PASSWORD` and
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD`. Never record their values.
+
+Subscribe to AppHost resource state before launch and proceed only after
+migration completion and API/BFF readiness; this profile omits the ordinary
+artificial startup delay. Do not substitute a fixed sleep, stop all `dotnet`
+processes, or select alternate ports after a conflict. Restart or stop only the
+AppHost session this operation owns. Completion receipts are final for the
+profile: restart may resume an owned incomplete operation but must not reset
+passwords, restore grants, or adopt collisions. Data/volume deletion is a
+separate destructive operation requiring explicit approval.
+
 `Explore.AppHost/AppHost.cs` selects local infrastructure from `ISLAMU_ASPIRE_MODE`, normally through `Explore.AppHost/Properties/launchSettings.json`; `Hosting:Topology` separately selects the web-process topology:
 
 | Launch profile | Mode | Started by Aspire |

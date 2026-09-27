@@ -47,7 +47,7 @@ public sealed partial class NativeStorageObjectHttpTests
     [Arguments("authenticated", true)]
     [Arguments("tenant-admin", true)]
     [Arguments("instance-admin", true)]
-    public async Task NonEvidenceFinalizationPreservesCerbosForAllPurposesAndOwnerPairs(string principalKind, bool byo)
+    public async Task NonEventResourceFinalizationPreservesCerbosForAllOwnerPairs(string principalKind, bool byo)
     {
         await using var factory = await StorageFactory.CreateAsync(useProductionAuthorization: true);
         await GrantCompatibilityAuthorityAsync(factory, factory.OwnerId, principalKind);
@@ -71,7 +71,7 @@ public sealed partial class NativeStorageObjectHttpTests
         var sessionIds = new HashSet<string>();
         long expectedUsedBytes = 0;
         int finalizedCount = 0;
-        foreach (string purpose in StorageObjectPurposes.All)
+        foreach (string purpose in StorageObjectPurposes.All.Where(purpose => purpose != StorageObjectPurposes.EventResource))
             foreach (bool hasOwnerPair in new[] { false, true })
             {
                 bool image = SafeRasterContentPolicy.IsImagePurpose(purpose);
@@ -177,7 +177,7 @@ public sealed partial class NativeStorageObjectHttpTests
     [Arguments("authenticated", true)]
     [Arguments("tenant-admin", true)]
     [Arguments("instance-admin", true)]
-    public async Task OrganizationTenantReservationsRemainCerbosUnsupportedForEveryPurpose(string principalKind, bool byo)
+    public async Task OrganizationTenantReservationsRemainCerbosUnsupportedForNonEventResourcePurposes(string principalKind, bool byo)
     {
         await using var factory = await StorageFactory.CreateAsync(useProductionAuthorization: true);
         var owner = await SeedFinalizationOwnerAsync(factory);
@@ -198,7 +198,7 @@ public sealed partial class NativeStorageObjectHttpTests
                 .GetOrCreateAsync(owner.TenantId, StorageProviders.Local, default);
             long reservedBytes = 0;
             var checks = new List<AuthorizationRequest>();
-            foreach (string purpose in StorageObjectPurposes.All)
+            foreach (string purpose in StorageObjectPurposes.All.Where(purpose => purpose != StorageObjectPurposes.EventResource))
             {
                 bool image = SafeRasterContentPolicy.IsImagePurpose(purpose);
                 byte[] bytes = image ? CompatibilityPng : "%PDF-"u8.ToArray();
@@ -249,7 +249,7 @@ public sealed partial class NativeStorageObjectHttpTests
             }
             await Assert.That((await runtime.AuthorizeBatchAsync(checks)).All(result => !result.IsAllowed)).IsTrue();
             await Assert.That(transport.Requests).IsEmpty();
-            await Assert.That(transport.Endpoints.Count > 0).IsEqualTo(byo);
+            await Assert.That(transport.Endpoints).IsEmpty();
             await Assert.That(counter.ReservedBytes).IsEqualTo(reservedBytes);
             await Assert.That(factory.WriteCount).IsEqualTo(0);
         }

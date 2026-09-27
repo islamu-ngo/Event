@@ -47,6 +47,7 @@ public sealed record AgentBrowserProfileSettings
     public string PostgresUsernameConfigurationKey { get; } = "POSTGRESQL_USERNAME";
     public string PostgresPasswordConfigurationKey { get; } = "POSTGRESQL_PASSWORD";
     public string RedisPasswordConfigurationKey { get; } = "AGENT_BROWSER_REDIS_PASSWORD";
+    public string ContainerPidsLimit { get; } = "2048";
     public bool IncludesPlatformResources { get; } = false;
     public bool IncludesMessaging { get; } = false;
     public bool SelectsSecretAuthority { get; } = false;

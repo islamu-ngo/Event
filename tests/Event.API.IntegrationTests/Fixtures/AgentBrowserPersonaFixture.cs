@@ -5,10 +5,12 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.API.Hosting;
 using Explore.Application.Constants;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Persistence;
@@ -32,7 +34,7 @@ using Testcontainers.PostgreSql;
 
 namespace Event.Api.IntegrationTests.Fixtures;
 
-internal sealed class AgentBrowserPersonaFixture : IAsyncDisposable
+internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
 {
     private static readonly PostgreSqlContainer Container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("islamu_event_agent").WithUsername("postgres")
@@ -54,7 +56,17 @@ internal sealed class AgentBrowserPersonaFixture : IAsyncDisposable
         {
             await (await Initialization.Value).ResetAsync();
             await using (var database = fixture.CreateDatabase())
+            {
+                var agentRouting = await database.Set<SystemSetting>().SingleOrDefaultAsync(row =>
+                    row.Id == AgentBrowserPersonaCatalog.Id(324), Token);
+                if (agentRouting is not null)
+                    database.Set<SystemSetting>().Remove(agentRouting);
+                var baseDomain = await database.Set<SystemSetting>().SingleAsync(row =>
+                    row.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain, Token);
+                baseDomain.Value = "\"\"";
+                await database.SaveChangesAsync(Token);
                 await LookupTableSeeder.SeedAsync(database, Token);
+            }
             var values = new Dictionary<string, string?>
             {
                 ["AGENT_BROWSER_SEED_ENABLED"] = "true",
@@ -259,9 +271,16 @@ internal sealed class AgentBrowserPersonaFixture : IAsyncDisposable
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveExploreDbContextRegistrations();
-                services.AddDbContextFactory<ExploreDbContext>(options => options.UseNpgsql(connection)
+                services.AddDbContextFactory<ExploreDbContext>(options => options.UseNpgsql(
+                        connection, provider => provider.EnableRetryOnFailure())
                     .UseSnakeCaseNamingConvention().AddInterceptors(fault));
-                services.AddScoped(provider => provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext());
+                services.AddScoped(provider =>
+                {
+                    var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
+                    database.TenantContext = provider.GetRequiredService<ITenantContext>();
+                    database.CurrentUserService = provider.GetRequiredService<ICurrentUserService>();
+                    return database;
+                });
                 services.RemoveAll<ISecretResolver>();
                 services.AddSingleton<ISecretResolver>(secrets);
             });

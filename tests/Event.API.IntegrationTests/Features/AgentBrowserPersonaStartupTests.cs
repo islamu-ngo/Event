@@ -1,5 +1,7 @@
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -40,6 +42,48 @@ public sealed class AgentBrowserPersonaStartupTests
         await fixture.RunAsync();
         await fixture.AssertReadyAsync();
         await fixture.AssertChangesPreservedAsync();
+    }
+
+    [Test]
+    public async Task FreshFoundationEnablesTenantHostsWithoutResettingOperatorChangesOnReplay()
+    {
+        await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();
+        await fixture.RunAsync();
+        await using (var database = fixture.CreateDatabase())
+        {
+            var baseDomain = await database.Set<SystemSetting>().SingleAsync(row =>
+                row.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain);
+            var subdomain = await database.Set<SystemSetting>().SingleAsync(row =>
+                row.SettingKey == GovernanceSettingKeys.Routing.ResolverSubdomainEnabled);
+            var positiveHost = await database.TenantSettingOverrides.SingleAsync(row =>
+                row.TenantId == AgentBrowserPersonaCatalog.TenantId
+                && row.SettingKey == GovernanceSettingKeys.Domains.TenantSubdomain);
+            var negativeHost = await database.TenantSettingOverrides.SingleAsync(row =>
+                row.TenantId == AgentBrowserPersonaCatalog.NegativeTenantId
+                && row.SettingKey == GovernanceSettingKeys.Domains.TenantSubdomain);
+            await Assert.That(baseDomain.Value).IsEqualTo("\"localhost\"");
+            await Assert.That(subdomain.Value).IsEqualTo("true");
+            await Assert.That(positiveHost.Value).IsEqualTo("\"default\"");
+            await Assert.That(negativeHost.Value).IsEqualTo("\"agent-negative\"");
+            baseDomain.Value = "\"operator.localhost\"";
+            subdomain.Value = "false";
+            positiveHost.Value = "\"operator-default\"";
+            await database.SaveChangesAsync();
+        }
+
+        fixture.RemoveInitializationSecrets();
+        await fixture.RunAsync();
+        await using var replay = fixture.CreateDatabase();
+        await Assert.That((await replay.Set<SystemSetting>().SingleAsync(row =>
+            row.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain)).Value)
+            .IsEqualTo("\"operator.localhost\"");
+        await Assert.That((await replay.Set<SystemSetting>().SingleAsync(row =>
+            row.SettingKey == GovernanceSettingKeys.Routing.ResolverSubdomainEnabled)).Value)
+            .IsEqualTo("false");
+        await Assert.That((await replay.TenantSettingOverrides.SingleAsync(row =>
+            row.TenantId == AgentBrowserPersonaCatalog.TenantId
+            && row.SettingKey == GovernanceSettingKeys.Domains.TenantSubdomain)).Value)
+            .IsEqualTo("\"operator-default\"");
     }
 
     [Test]

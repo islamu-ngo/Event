@@ -74,10 +74,16 @@ or browser automation output. The profile honors Environment, Development User
 Secrets, or Infisical exactly as selected and does not fall back to another
 provider. Persona, bootstrap, and Local JWT values are forwarded only to the API;
 the BFF and migration service do not receive them.
+Select the provider in the launching shell or the ignored repository `.env`
+before running the profile; a new terminal does not inherit the previous
+selection. An incomplete authority fails closed rather than resetting
+the isolated data or switching providers.
 
 ```bash
+dotnet build --configuration Release --verbosity quiet
+# Select SECRET_PROVIDER in this shell or the ignored repository .env first.
 dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj \
-  --launch-profile local-agent
+  --configuration Release --no-build --launch-profile local-agent
 ```
 
 Use `http://localhost:5200` for discovery,
@@ -87,10 +93,25 @@ Use `http://localhost:5200` for discovery,
 `localhost:51025`. A port conflict or unsafe topology fails startup instead of
 silently changing the origin or using a populated ordinary-development store.
 Wait for migration, API, and BFF readiness rather than using a fixed delay.
+The dedicated PostgreSQL, Redis, and Mailpit containers use a 2048-process
+limit for consistent Docker and Podman startup; this is not a startup-time
+guarantee. Geocoding is disabled for this profile.
+
+On first provisioning, the isolated instance enables tenant subdomains under
+`localhost` and binds `default` and `agent-negative` to the corresponding
+synthetic tenants. Later changes to its routing settings are preserved on restart.
 
 The profile provisions synthetic `@agent.example.test` identities only through
-the native Local credential lifecycle. Passwords, revoked grants, and profile
-changes are not reset on a completed restart. PostgreSQL, Redis, Mailpit, local
+the native Local credential lifecycle. Sign in through the visible `/login`
+form on the selected tenant or admin host; a successful response is not an
+authenticated browser session until `/auth/status` reports the intended
+identity after navigation. Local credential verification, the authenticated
+current-user check, and the admin-authority check work on the admin host
+without a tenant; ordinary
+tenant-scoped API requests still require a resolved tenant. Do not inject
+cookies or bearer tokens. Passwords,
+revoked grants, and profile changes are not reset on a completed restart.
+PostgreSQL, Redis, Mailpit, local
 object storage, and privacy-erasure data use dedicated agent-profile locations;
 stopping Aspire preserves them. Never delete those volumes or directories as a
 routine retry. Diagnose the bounded startup failure first, and obtain explicit

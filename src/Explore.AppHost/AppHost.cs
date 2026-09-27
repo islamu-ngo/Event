@@ -189,7 +189,8 @@ if (runMode.UsesLocalData())
 {
     database = (agentBrowserProfile is null
             ? builder.AddPostgres("postgres")
-            : builder.AddPostgres("postgres", agentPostgresUsername!, agentPostgresPassword!))
+            : builder.AddPostgres("postgres", agentPostgresUsername!, agentPostgresPassword!)
+                .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit))
         .WithImageTag("18-alpine")
         .WithDataVolume(agentBrowserProfile?.PostgresVolumeName ?? "islamu-event-postgres-data")
         .AddDatabase("islamu-event-db", agentBrowserProfile?.DatabaseName ?? "islamu_event_db");
@@ -204,7 +205,8 @@ if (runMode.UsesLocalData())
 
     cache = (agentBrowserProfile is null
             ? builder.AddRedis("cache")
-            : builder.AddRedis("cache", password: agentRedisPassword!))
+            : builder.AddRedis("cache", password: agentRedisPassword!)
+                .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit))
         .WithDataVolume(agentBrowserProfile?.RedisVolumeName ?? "islamu-event-redis-data");
 }
 
@@ -338,7 +340,9 @@ if (hostingTopology == HostingTopology.Split)
     }
 
     exploreAPI = ConfigureLocalMailpitSmtp(exploreAPI, mailpit, builder.Configuration);
-    exploreAPI = ConfigureGeocoding(exploreAPI, builder.Configuration);
+    exploreAPI = agentBrowserProfile is null
+        ? ConfigureGeocoding(exploreAPI, builder.Configuration)
+        : exploreAPI.WithEnvironment("GEOCODING_PROVIDER", "None");
 
     if (!string.IsNullOrWhiteSpace(eventLocationPrivacyMigrationStage))
     {
@@ -1007,7 +1011,7 @@ static IResourceBuilder<ContainerResource> AddMailpit(
     IDistributedApplicationBuilder builder,
     AgentBrowserProfileSettings? agentBrowserProfile)
 {
-    return builder.AddContainer("mailpit", "axllent/mailpit", builder.Configuration["MAILPIT_TAG"] ?? "latest")
+    var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", builder.Configuration["MAILPIT_TAG"] ?? "latest")
         .WithEnvironment("MP_MAX_MESSAGES", builder.Configuration["MAILPIT_MAX_MESSAGES"] ?? "5000")
         .WithEnvironment("MP_DATABASE", "/data/mailpit.db")
         .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "1")
@@ -1023,6 +1027,9 @@ static IResourceBuilder<ContainerResource> AddMailpit(
             targetPort: 8025,
             port: agentBrowserProfile?.MailpitUiPort ?? 8025,
             name: "http");
+    return agentBrowserProfile is null
+        ? mailpit
+        : mailpit.WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit);
 }
 
 static void AddLocalFormbricks(IDistributedApplicationBuilder builder)

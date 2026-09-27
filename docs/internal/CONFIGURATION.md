@@ -311,6 +311,17 @@ Service discovery remains the BFF-to-API authority, and the API/BFF retain their
 migration and health dependencies. The artificial 30-second compatibility
 health delay is omitted; readiness reflects actual database, migration, API, and
 BFF state.
+Only this profile sets a 2048-process limit on its PostgreSQL, Redis, and
+Mailpit containers. Podman's Docker-compatible runtime otherwise reported a
+zero PID limit for these Aspire resources, leaving all three unable to fork.
+Ordinary Aspire profiles retain their existing container configuration.
+The profile explicitly disables geocoding without forwarding the ordinary
+provider's retry collection into API configuration.
+The first owned foundation transaction enables the subdomain resolver, sets
+the instance base domain to `localhost`, and binds the synthetic tenants to
+the `default` and `agent-negative` subdomains. This allows BFF requests on
+both hosts to resolve the same tenants as direct API requests. Completed
+restarts do not reset operator routing changes.
 
 | Surface or durable unit | Agent profile value |
 |---|---|

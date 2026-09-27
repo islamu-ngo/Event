@@ -51,6 +51,7 @@ public sealed class AgentBrowserProfileSettingsTests
         await Assert.That(_settings.PostgresUsernameConfigurationKey).IsEqualTo("POSTGRESQL_USERNAME");
         await Assert.That(_settings.PostgresPasswordConfigurationKey).IsEqualTo("POSTGRESQL_PASSWORD");
         await Assert.That(_settings.RedisPasswordConfigurationKey).IsEqualTo("AGENT_BROWSER_REDIS_PASSWORD");
+        await Assert.That(_settings.ContainerPidsLimit).IsEqualTo("2048");
     }
 
     [Test]

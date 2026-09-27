@@ -149,7 +149,7 @@ public static class AgentBrowserPersonaStartup
             marker = await scope.ServiceProvider.GetRequiredService<ExploreDbContext>().InstanceBootstrapStates.AsNoTracking().SingleAsync(token);
         }
         await using (var scope = services.CreateAsyncScope())
-            await Binder(scope.ServiceProvider).SeedFoundationAsync(token);
+            await Binder(scope.ServiceProvider).SeedFoundationAsync(marker.Status, token);
 
         if (marker.Status != InstanceBootstrapStatus.Completed
             || states[Administrator.SubjectId]?.CredentialState == LocalCredentialState.ProvisioningPending)

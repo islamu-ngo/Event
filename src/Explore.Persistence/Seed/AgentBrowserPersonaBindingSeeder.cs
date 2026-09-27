@@ -80,34 +80,72 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
         finally { if (restore) database.ClearTenantFilterBypass(); }
     }
 
-    public async Task SeedFoundationAsync(CancellationToken token)
+    public async Task SeedFoundationAsync(InstanceBootstrapStatus markerStatus, CancellationToken token)
     {
         bool restore = !database.IsTenantFilterBypassed;
         database.EnableTenantFilterBypass(TenantFilterBypassReasons.DatabaseSeeding);
         try
         {
-            if (await ValidateFoundationAsync(false, token)) return;
-            await using var transaction = await database.Database.BeginTransactionAsync(token);
-            DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-            await CreateTenantAsync(TenantId, "default", "Agent browser", Id(320), Id(321), now, token);
-            await CreateTenantAsync(NegativeTenantId, "agent-negative", "Agent negative control", Id(322), Id(323), now, token);
-            await database.SaveChangesAsync(token);
-            database.Organizations.AddRange(
-                Organization(OrganizationId, "Agent organizer", now),
-                Organization(NegativeOrganizationId, "Agent negative organizer", now));
-            await database.SaveChangesAsync(token);
-            database.Actors.AddRange(
-                OrganizationActor(OrganizationActorId, OrganizationId, "Agent organizer", now),
-                OrganizationActor(NegativeOrganizationActorId, NegativeOrganizationId, "Agent negative organizer", now));
-            await database.SaveChangesAsync(token);
-            database.Set<OrganizationTenant>().AddRange(
-                Participation(OrganizationTenantId, TenantId, OrganizationId, now),
-                Participation(NegativeOrganizationTenantId, NegativeTenantId, NegativeOrganizationId, now));
-            var positive = Event(EventId, TenantId, OrganizationActorId, "Agent browser event", "agent-browser", now);
-            var negative = Event(NegativeEventId, NegativeTenantId, NegativeOrganizationActorId, "Agent negative event", "agent-negative", now);
-            database.Events.AddRange(positive, negative);
-            await database.SaveChangesAsync(token);
-            await transaction.CommitAsync(token);
+            await ExecuteRetryableAsync(async () =>
+            {
+                if (await ValidateFoundationAsync(markerStatus == InstanceBootstrapStatus.Completed, token)) return;
+                await using var transaction = await database.Database.BeginTransactionAsync(token);
+                DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+                SystemSetting? baseDomain = await database.Set<SystemSetting>().SingleOrDefaultAsync(
+                    row => row.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain, token);
+                if (baseDomain is null
+                    || baseDomain.Id != SeedIds.SystemSettingDomainsInstanceBaseDomainId
+                    || baseDomain.Value != "\"\""
+                    || await database.Set<SystemSetting>().AnyAsync(
+                        row => row.SettingKey == GovernanceSettingKeys.Routing.ResolverSubdomainEnabled, token))
+                    throw Failure("routing_conflict");
+                baseDomain.Value = "\"localhost\"";
+                baseDomain.UpdatedAt = now;
+                database.Set<SystemSetting>().Add(new SystemSetting
+                {
+                    Id = Id(324),
+                    SettingKey = GovernanceSettingKeys.Routing.ResolverSubdomainEnabled,
+                    Value = "true",
+                    ValueType = SettingValueType.Boolean,
+                    IsLocked = false,
+                    Description = "Enable agent fixture tenant hosts under localhost",
+                    Category = "Routing",
+                    DisplayOrder = 22,
+                    CreatedAt = now
+                });
+                await CreateTenantAsync(TenantId, "default", "Agent browser", Id(320), Id(321), now, token);
+                await CreateTenantAsync(NegativeTenantId, "agent-negative", "Agent negative control", Id(322), Id(323), now, token);
+                await database.SaveChangesAsync(token);
+                database.TenantSettingOverrides.AddRange(
+                    new TenantSetting
+                    {
+                        Id = Id(325), TenantId = TenantId, Tenant = null!,
+                        SettingKey = GovernanceSettingKeys.Domains.TenantSubdomain,
+                        Value = "\"default\"", CreatedAt = now
+                    },
+                    new TenantSetting
+                    {
+                        Id = Id(326), TenantId = NegativeTenantId, Tenant = null!,
+                        SettingKey = GovernanceSettingKeys.Domains.TenantSubdomain,
+                        Value = "\"agent-negative\"", CreatedAt = now
+                    });
+                database.Organizations.AddRange(
+                    Organization(OrganizationId, "Agent organizer", now),
+                    Organization(NegativeOrganizationId, "Agent negative organizer", now));
+                await database.SaveChangesAsync(token);
+                database.Actors.AddRange(
+                    OrganizationActor(OrganizationActorId, OrganizationId, "Agent organizer", now),
+                    OrganizationActor(NegativeOrganizationActorId, NegativeOrganizationId, "Agent negative organizer", now));
+                await database.SaveChangesAsync(token);
+                database.Set<OrganizationTenant>().AddRange(
+                    Participation(OrganizationTenantId, TenantId, OrganizationId, now),
+                    Participation(NegativeOrganizationTenantId, NegativeTenantId, NegativeOrganizationId, now));
+                var positive = Event(EventId, TenantId, OrganizationActorId, "Agent browser event", "agent-browser", now);
+                var negative = Event(NegativeEventId, NegativeTenantId, NegativeOrganizationActorId, "Agent negative event", "agent-negative", now);
+                database.Events.AddRange(positive, negative);
+                await database.SaveChangesAsync(token);
+                await transaction.CommitAsync(token);
+            });
         }
         finally { if (restore) database.ClearTenantFilterBypass(); }
     }
@@ -123,42 +161,57 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
         database.EnableTenantFilterBypass(TenantFilterBypassReasons.DatabaseSeeding);
         try
         {
-            if (await HasExactGraphAsync(receipt, token))
+            await ExecuteRetryableAsync(async () =>
             {
-                await RequireMembershipAsync(persona, receipt, token);
-                return;
-            }
-            if (receipt.Stage != LocalCredentialOperationStage.ProvisioningPending
-                || await database.Users.IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AnyAsync(row => row.Id == persona.SubjectId, token)
-                || await database.Actors.IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AnyAsync(row => row.Id == receipt.PersonalActorId || row.UserId == persona.SubjectId, token)
-                || await database.UserExternalLogins.AnyAsync(row => row.Id == receipt.ExternalLoginId || row.UserId == persona.SubjectId
-                    || (row.AuthenticationProviderId == (int)AuthenticationProviderKind.Local && row.ProviderKey == persona.SubjectId.ToString()), token))
-                throw Failure("binding_conflict");
-            await using var transaction = await database.Database.BeginTransactionAsync(token);
-            DateTime now = timeProvider.GetUtcNow().UtcDateTime;
-            database.Users.Add(new User { Id = persona.SubjectId, Pii = new UserPii { Email = snapshot.Email!, FirstName = snapshot.FirstName, LastName = snapshot.LastName }, EmailVerified = snapshot.EmailVerified, CreatedAt = now });
-            await database.SaveChangesAsync(token);
-            database.Actors.Add(new Actor { Id = receipt.PersonalActorId, UserId = persona.SubjectId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, Pii = new ActorPii { DisplayName = snapshot.FirstName }, CreatedAt = now });
-            database.UserExternalLogins.Add(new UserExternalLogin { Id = receipt.ExternalLoginId, UserId = persona.SubjectId, User = null!, AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!, ProviderKey = persona.SubjectId.ToString("D"), ProviderDisplayName = "Local", CreatedAt = now });
-            await database.SaveChangesAsync(token);
-            int index = All.ToList().IndexOf(persona);
-            Guid membership = Id(400 + index);
-            database.TenantUsers.Add(new TenantUser { Id = membership, TenantId = TenantId, Tenant = null!, UserId = persona.SubjectId, User = null!, ActorId = receipt.PersonalActorId, StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now, CreatedAt = now });
-            database.TenantUserRoleGrants.Add(new TenantUserRoleGrant { Id = Id(410 + index), TenantId = TenantId, Tenant = null!, TenantUserId = membership, TenantUser = null!, RoleId = (int)persona.TenantRole, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = now, GrantedBy = Administrator.SubjectId, CreatedAt = now });
-            if (persona == Organizer)
-            {
-                database.OrganizationMembers.Add(new OrganizationMember { Id = Id(420), OrganizationTenantId = OrganizationTenantId, OrganizationTenant = null!, UserId = persona.SubjectId, User = null!, TenantId = TenantId, Tenant = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!, CreatedAt = now });
-                AddEventRole(persona.SubjectId, RoleEnum.EventOwner, Id(421), now);
-            }
-            if (persona == Manager)
-            {
-                AddEventRole(persona.SubjectId, RoleEnum.EventManager, Id(422), now);
-                AddEventRole(persona.SubjectId, RoleEnum.RegistrationManager, Id(423), now);
-            }
-            await database.SaveChangesAsync(token);
-            await transaction.CommitAsync(token);
+                if (await HasExactGraphAsync(receipt, token))
+                {
+                    await RequireMembershipAsync(persona, receipt, token);
+                    return;
+                }
+                if (receipt.Stage != LocalCredentialOperationStage.ProvisioningPending
+                    || await database.Users.IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AnyAsync(row => row.Id == persona.SubjectId, token)
+                    || await database.Actors.IgnoreQueryFilters([QueryFilterNames.SoftDelete]).AnyAsync(row => row.Id == receipt.PersonalActorId || row.UserId == persona.SubjectId, token)
+                    || await database.UserExternalLogins.AnyAsync(row => row.Id == receipt.ExternalLoginId || row.UserId == persona.SubjectId
+                        || (row.AuthenticationProviderId == (int)AuthenticationProviderKind.Local && row.ProviderKey == persona.SubjectId.ToString()), token))
+                    throw Failure("binding_conflict");
+                await using var transaction = await database.Database.BeginTransactionAsync(token);
+                DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+                database.Users.Add(new User { Id = persona.SubjectId, Pii = new UserPii { Email = snapshot.Email!, FirstName = snapshot.FirstName, LastName = snapshot.LastName }, EmailVerified = snapshot.EmailVerified, CreatedAt = now });
+                await database.SaveChangesAsync(token);
+                database.Actors.Add(new Actor { Id = receipt.PersonalActorId, UserId = persona.SubjectId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, Pii = new ActorPii { DisplayName = snapshot.FirstName }, CreatedAt = now });
+                database.UserExternalLogins.Add(new UserExternalLogin { Id = receipt.ExternalLoginId, UserId = persona.SubjectId, User = null!, AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!, ProviderKey = persona.SubjectId.ToString("D"), ProviderDisplayName = "Local", CreatedAt = now });
+                await database.SaveChangesAsync(token);
+                int index = All.ToList().IndexOf(persona);
+                Guid membership = Id(400 + index);
+                database.TenantUsers.Add(new TenantUser { Id = membership, TenantId = TenantId, Tenant = null!, UserId = persona.SubjectId, User = null!, ActorId = receipt.PersonalActorId, StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now, CreatedAt = now });
+                database.TenantUserRoleGrants.Add(new TenantUserRoleGrant { Id = Id(410 + index), TenantId = TenantId, Tenant = null!, TenantUserId = membership, TenantUser = null!, RoleId = (int)persona.TenantRole, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = now, GrantedBy = Administrator.SubjectId, CreatedAt = now });
+                if (persona == Organizer)
+                {
+                    database.OrganizationMembers.Add(new OrganizationMember { Id = Id(420), OrganizationTenantId = OrganizationTenantId, OrganizationTenant = null!, UserId = persona.SubjectId, User = null!, TenantId = TenantId, Tenant = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!, CreatedAt = now });
+                    AddEventRole(persona.SubjectId, RoleEnum.EventOwner, Id(421), now);
+                }
+                if (persona == Manager)
+                {
+                    AddEventRole(persona.SubjectId, RoleEnum.EventManager, Id(422), now);
+                    AddEventRole(persona.SubjectId, RoleEnum.RegistrationManager, Id(423), now);
+                }
+                await database.SaveChangesAsync(token);
+                await transaction.CommitAsync(token);
+            });
         }
         finally { if (restore) database.ClearTenantFilterBypass(); }
+    }
+
+    private Task ExecuteRetryableAsync(Func<Task> operation)
+    {
+        bool attempted = false;
+        return database.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            if (attempted)
+                database.ChangeTracker.Clear();
+            attempted = true;
+            await operation();
+        });
     }
 
     private Task<bool> HasExactGraphAsync(LocalCredentialOperationReceipt receipt, CancellationToken token) =>
@@ -210,6 +263,22 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
         int documents = await database.TenantSettingsDocuments.CountAsync(row => documentIds.Contains(row.Id), token);
         if (!required && tenants + organizations + actors + events + participations + documents == 0) return false;
         if (tenants != 2 || organizations != 2 || actors != 2 || events != 2 || participations != 2 || documents != 4
+            || (!required && (
+                !await database.Set<SystemSetting>().AnyAsync(row =>
+                    row.Id == SeedIds.SystemSettingDomainsInstanceBaseDomainId
+                    && row.Value == "\"localhost\"", token)
+                || !await database.Set<SystemSetting>().AnyAsync(row =>
+                    row.Id == Id(324)
+                    && row.SettingKey == GovernanceSettingKeys.Routing.ResolverSubdomainEnabled
+                    && row.Value == "true", token)
+                || !await database.TenantSettingOverrides.AnyAsync(row =>
+                    row.Id == Id(325) && row.TenantId == TenantId
+                    && row.SettingKey == GovernanceSettingKeys.Domains.TenantSubdomain
+                    && row.Value == "\"default\"", token)
+                || !await database.TenantSettingOverrides.AnyAsync(row =>
+                    row.Id == Id(326) && row.TenantId == NegativeTenantId
+                    && row.SettingKey == GovernanceSettingKeys.Domains.TenantSubdomain
+                    && row.Value == "\"agent-negative\"", token)))
             || !await database.Tenants.AnyAsync(row => row.Id == TenantId && row.Slug == "default" && row.TenantStatusId == (int)TenantStatusEnum.Active, token)
             || !await database.Tenants.AnyAsync(row => row.Id == NegativeTenantId && row.Slug == "agent-negative" && row.TenantStatusId == (int)TenantStatusEnum.Active, token)
             || !await database.Actors.AnyAsync(row => row.Id == OrganizationActorId && row.OrganizationId == OrganizationId && !row.IsSuspended, token)

@@ -198,7 +198,7 @@ public sealed partial class NativeStorageObjectHttpTests
             await db.SaveChangesAsync();
         }
         bool unavailable = false;
-        var secrets = Substitute.For<ISecretResolver>();
+        var secrets = Substitute.For<ISecretResolver, IRetainedSecretResolver>();
         secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(_ =>
         {
             if (unavailable && configFailure) throw new IOException("Secret provider unavailable.");

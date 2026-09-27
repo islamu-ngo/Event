@@ -13,7 +13,7 @@ public static class ReservedTenantSlugs
         "users", "oauth", "test-endpoint",
         "_blazor", "_framework", "_content", "_host",
         "api", "bff", "health", "healthz", "metrics", "prometheus", "swagger", "openapi", "mcp",
-        "connect", "signin-oidc", "signout-callback-oidc",
+        "connect", "signin-atproto", "signin-oidc", "signout-callback-oidc",
         "root", "administrator", "security", "help", "support", "billing", "official", "event",
         "islamu", "system", "instance", "test",
         "css", "js", "static", "assets", "fonts", "image", "images", "dist", "lib",

@@ -58,7 +58,7 @@ public sealed class BffResolverConfigurationProvider(
             "startup", "status", "studio", "terms", "tickets", "users", "oauth", "test-endpoint",
             "_blazor", "_framework", "_content", "_host",
             "api", "bff", "health", "healthz", "metrics", "prometheus", "swagger",
-            "openapi", "mcp", "connect", "signin-oidc", "signout-callback-oidc",
+            "openapi", "mcp", "connect", "signin-atproto", "signin-oidc", "signout-callback-oidc",
             "root", "administrator", "security", "help", "support", "billing",
             "official", "event", "islamu", "system", "instance", "test",
             "css", "js", "static", "assets", "fonts", "image", "images", "dist", "lib",

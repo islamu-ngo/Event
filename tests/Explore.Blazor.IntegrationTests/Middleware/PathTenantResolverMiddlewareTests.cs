@@ -49,6 +49,7 @@ public class PathTenantResolverMiddlewareTests
     [Arguments("/payments/checkout/success")]
     [Arguments("/forbidden")]
     [Arguments("/oauth/client-metadata.json")]
+    [Arguments("/signin-atproto")]
     [Arguments("/manifest.webmanifest")]
     [Arguments("/test-endpoint")]
     [Arguments("/appsettings.json")]
@@ -132,6 +133,7 @@ public class PathTenantResolverMiddlewareTests
     [Arguments("/Explore.Blazor.styles.css")]
     [Arguments("/Explore.Blazor.Client.bundle.scp.css")]
     [Arguments("/push-service-worker.js")]
+    [Arguments("/signin-atproto")]
     [Arguments("/image/Icon_landingpage.png")]
     [Arguments("/appsettings.json")]
     [Arguments("/appsettings.Development.json")]
@@ -249,7 +251,7 @@ public class PathTenantResolverMiddlewareTests
         PathPrefix = string.Empty,
         ReservedSlugs =
             ["admin", "_framework", "events", "api", "test", "payments", "forbidden",
-             "oauth", "manifest.webmanifest", "test-endpoint"]
+             "oauth", "signin-atproto", "manifest.webmanifest", "test-endpoint"]
     };
 
     private sealed class TenantInfoResponse

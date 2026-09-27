@@ -23,7 +23,8 @@ public class ReservedTenantSlugsTests
     public async Task IsReserved_WithInfrastructureSegments_ReturnsTrue()
     {
         string[] infrastructureSegments =
-            ["_framework", "_blazor", "api", "bff", "mcp", "oauth", "test-endpoint", "manifest.webmanifest"];
+            ["_framework", "_blazor", "api", "bff", "mcp", "oauth", "signin-atproto",
+             "test-endpoint", "manifest.webmanifest"];
 
         await Assert.That(infrastructureSegments.All(ReservedTenantSlugs.IsReserved)).IsTrue();
     }

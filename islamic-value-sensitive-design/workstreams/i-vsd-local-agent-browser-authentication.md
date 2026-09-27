@@ -10,7 +10,10 @@ Last Updated: 2026-09-26
 - Report status: current
 - Disposition: plan-aligned
 - Evidence cutoff: 2026-09-26
-- Reviewed input: repository `91b246e96407207336887140def224d76c9b8835`; completed local-agent-browser-authentication plan/tasks revision r1
+- Reviewed input: repository `91b246e96407207336887140def224d76c9b8835`; completed local-agent-browser-authentication plan/tasks revision r2
+- Reviewed plan SHA-256: `f1dece79f7ce60de23146d00f0d776a3277c1612bd3a5eb4f2349899f6e6489e`
+- Reviewed tasks SHA-256: `e4273d84354a9e5c77bc5c5a4c0f467e43a63f99b51cedcc1a4b65f9b6147935`
+- Freshness check: final HEAD `67d6069fb62959d7f8ed9e71bc10a9b8d2e390a8`; reviewed source owners unchanged from the evidence baseline
 - Supersedes: none
 
 ## Scope
@@ -38,6 +41,9 @@ an implementation obligation.
   isolated storage and a single selected secret authority before any privileged
   write. Preserve ordinary bootstrap and credential-replacement invariants.
   Reject collisions or unsupported topology without mutating existing accounts.
+  This includes early Standalone/migrator admission, suppressing ordinary
+  business seeds in agent mode, ownership/secret preflight under a lock, and
+  state dispatch before initialization operations on replay.
 - **IVSD-M002:** Use synthetic identities and explicit scoped grants; verify
   both positive authority and wrong-tenant/wrong-event denials. Do not restore
   revoked privileges or reset established passwords on startup.
@@ -94,8 +100,13 @@ responsibility review rather than an implicit exception.
   2026-09-26, found in the prior agent's artifact directory. Claims were checked
   against repository evidence rather than accepted as implementation facts.
 - E6: `dev/active/local-agent-browser-authentication/local-agent-browser-authentication-plan.md`
-  and `local-agent-browser-authentication-tasks.md`, revision r1. Scenarios
+  and `local-agent-browser-authentication-tasks.md`, revision r2. Scenarios
   S1-S8 and mapped tasks were revalidated against the four accepted mitigations.
+- E7: adversarial plan review checked `src/Event.Standalone/Program.cs`,
+  `src/Event.MigrationService/Worker.cs`, `ExploreDatabaseMigrator.cs`,
+  `LocalAdministratorBootstrapOperation.cs`, configured bootstrap preparation,
+  JWT validation configuration and credential replay checks. The lead corrected
+  the four startup/replay blockers in r2 and revalidated IVSD-M001/M003.
 
 ## Missing Evidence
 Completed implementation, runtime verification, measured startup times,
@@ -118,11 +129,13 @@ must not be represented as proof of every Cerbos or OIDC behavior.
 |---|---|---|---|---|
 | 2026-09-26 | none | draft | Planning intake from report and source-grounded CTO review | E1-E5 |
 | 2026-09-26 | draft | current | Revalidated completed r1 scenarios, boundaries and task mappings | E6; plan-aligned, not implementation-verified |
+| 2026-09-26 | current | stale | Adversarial review found earlier mutation and replay gaps in r1 | E7 |
+| 2026-09-26 | stale | current | Revalidated r2 early admission, lookup-only migrator, pre-write authority checks and completed replay | E6-E7; plan-aligned, not implementation-verified |
 
 ## Planning Handoff
 - Workstream: local-agent-browser-authentication
 - Status: current
-- Reviewed input: completed local-agent-browser-authentication plan/tasks r1
+- Reviewed input: completed local-agent-browser-authentication plan/tasks r2
 - Findings and mitigations: IVSD-F001 -> IVSD-M001; IVSD-F002 -> IVSD-M002;
   IVSD-F003 -> IVSD-M003; IVSD-F004 -> IVSD-M004
 - Required plan mappings, verified in plan Section 9:

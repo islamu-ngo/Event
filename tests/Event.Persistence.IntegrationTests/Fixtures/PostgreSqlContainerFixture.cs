@@ -35,8 +35,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     public PostgreSqlContainerFixture()
     {
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_test")
             .WithUsername("postgres")
             .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
@@ -113,6 +112,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             finally
             {
                 _metadataCache.Dispose();
+                GC.SuppressFinalize(this);
             }
         }
     }

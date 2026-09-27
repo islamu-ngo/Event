@@ -68,7 +68,7 @@ public sealed class DeleteEventCapacityPoolCommandHandler(
                 return response;
             }
 
-        await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
             return response;
         }
         catch (ArgumentException exception)

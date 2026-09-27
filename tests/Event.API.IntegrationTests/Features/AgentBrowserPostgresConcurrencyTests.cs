@@ -49,9 +49,13 @@ public sealed class AgentBrowserPostgresConcurrencyTests
             stamp = (await database.Events.SingleAsync(row => row.Id == AgentBrowserPersonaCatalog.EventId)).ConcurrencyStamp;
             database.Set<OutboxMessage>().Add(new OutboxMessage
             {
-                Id = messageId, AggregateId = AgentBrowserPersonaCatalog.EventId,
-                AggregateType = "Event", EventType = "reset-concurrency-invariant",
-                Status = OutboxMessageStatus.Pending, CreatedAt = DateTime.UtcNow, MaxRetries = 3
+                Id = messageId,
+                AggregateId = AgentBrowserPersonaCatalog.EventId,
+                AggregateType = "Event",
+                EventType = "reset-concurrency-invariant",
+                Status = OutboxMessageStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                MaxRetries = 3
             });
             await database.SaveChangesAsync();
         }
@@ -219,8 +223,17 @@ public sealed class AgentBrowserPostgresConcurrencyTests
         {
             await using var scope = Services.CreateAsyncScope();
             var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            database.Users.Add(new User { Id = request.RunId, CreatedAt = DateTime.UtcNow,
-                Pii = new UserPii { Email = "queue@agent.example.test", FirstName = "Queue", LastName = "Invariant" } });
+            database.Users.Add(new User
+            {
+                Id = request.RunId,
+                CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii
+                {
+                    Email = "queue@agent.example.test",
+                    FirstName = "Queue",
+                    LastName = "Invariant"
+                }
+            });
             await database.SaveChangesAsync(cancellationToken);
             if (request.RunId == ExpectedFreshId) FreshCommitted.TrySetResult();
         }
@@ -248,8 +261,14 @@ public sealed class AgentBrowserPostgresConcurrencyTests
             var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             database.Users.Add(new User
             {
-                Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow,
-                Pii = new UserPii { Email = "worker@agent.example.test", FirstName = "Concurrent", LastName = "Worker" }
+                Id = Guid.CreateVersion7(),
+                CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii
+                {
+                    Email = "worker@agent.example.test",
+                    FirstName = "Concurrent",
+                    LastName = "Worker"
+                }
             });
             await database.SaveChangesAsync(token);
         }

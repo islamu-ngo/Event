@@ -89,10 +89,10 @@ public sealed class AgentBrowserProvisioningOptionsTests
         string erasureTopology, string webhookProvider)
     {
         await Assert.That(() => (Admitted with
-            {
-                PrivacyErasureTopology = erasureTopology,
-                WebhookProvider = webhookProvider
-            }).EnsureAdmitted()).Throws<InvalidOperationException>();
+        {
+            PrivacyErasureTopology = erasureTopology,
+            WebhookProvider = webhookProvider
+        }).EnsureAdmitted()).Throws<InvalidOperationException>();
     }
 
     [Test]

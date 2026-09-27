@@ -66,7 +66,7 @@ public sealed class UpdateEventCapacityPoolCommandHandler(
                 return response;
             }
 
-        await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
             return response;
         }
         catch (ConcurrencyConflictException exception)

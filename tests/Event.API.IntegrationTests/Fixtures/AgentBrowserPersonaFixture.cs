@@ -155,9 +155,12 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         Directory.CreateDirectory(MigrationAuthorityDirectory);
         var values = new Dictionary<string, string?>
         {
-            ["AGENT_BROWSER_SEED_ENABLED"] = "true", ["ISLAMU_ASPIRE_MODE"] = "AgentBrowser",
-            ["Hosting:Topology"] = "Split", ["IdentityDatabase:Topology"] = "colocated",
-            ["Authentication:Provider"] = "local", ["Authorization:Provider"] = "local",
+            ["AGENT_BROWSER_SEED_ENABLED"] = "true",
+            ["ISLAMU_ASPIRE_MODE"] = "AgentBrowser",
+            ["Hosting:Topology"] = "Split",
+            ["IdentityDatabase:Topology"] = "colocated",
+            ["Authentication:Provider"] = "local",
+            ["Authorization:Provider"] = "local",
             ["CONFIGURATION_MANIFEST_MODE"] = "Off",
             ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
             ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Combine(MigrationAuthorityDirectory, "authority.db"),

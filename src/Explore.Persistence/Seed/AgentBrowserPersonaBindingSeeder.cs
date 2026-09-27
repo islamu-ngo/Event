@@ -119,15 +119,21 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
                 database.TenantSettingOverrides.AddRange(
                     new TenantSetting
                     {
-                        Id = Id(325), TenantId = TenantId, Tenant = null!,
+                        Id = Id(325),
+                        TenantId = TenantId,
+                        Tenant = null!,
                         SettingKey = GovernanceSettingKeys.Domains.TenantSubdomain,
-                        Value = "\"default\"", CreatedAt = now
+                        Value = "\"default\"",
+                        CreatedAt = now
                     },
                     new TenantSetting
                     {
-                        Id = Id(326), TenantId = NegativeTenantId, Tenant = null!,
+                        Id = Id(326),
+                        TenantId = NegativeTenantId,
+                        Tenant = null!,
                         SettingKey = GovernanceSettingKeys.Domains.TenantSubdomain,
-                        Value = "\"agent-negative\"", CreatedAt = now
+                        Value = "\"agent-negative\"",
+                        CreatedAt = now
                     });
                 database.Organizations.AddRange(
                     Organization(OrganizationId, "Agent organizer", now),
@@ -304,9 +310,14 @@ public sealed class AgentBrowserPersonaBindingSeeder(ExploreDbContext database, 
         var branding = TenantBrandingSettingsDocumentDefaults.Create(tenantId, name);
         var identity = TenantDirectoryOperatorIdentityDocumentDefaults.Create(tenantId, new TenantDirectoryOperatorIdentitySettings
         {
-            PublicName = name, LegalName = name + " synthetic fixture", OperatorKindCode = TenantDirectoryOperatorKinds.UnincorporatedAssociation,
-            JurisdictionCountryCode = "BE", PublicContactEmail = "operator@agent.example.test",
-            LegalNoticeUrl = "https://agent.example.test/legal", PrivacyUrl = "https://agent.example.test/privacy", TermsUrl = "https://agent.example.test/terms"
+            PublicName = name,
+            LegalName = name + " synthetic fixture",
+            OperatorKindCode = TenantDirectoryOperatorKinds.UnincorporatedAssociation,
+            JurisdictionCountryCode = "BE",
+            PublicContactEmail = "operator@agent.example.test",
+            LegalNoticeUrl = "https://agent.example.test/legal",
+            PrivacyUrl = "https://agent.example.test/privacy",
+            TermsUrl = "https://agent.example.test/terms"
         });
         var creator = new TenantCreationService(new TenantRepository(database), new TenantSettingsDocumentRepository(database));
         await creator.CreateInCurrentTransactionAsync(new TenantCreationRequest(tenantId, name, slug, (int)TenantStatusEnum.Active, null, now,

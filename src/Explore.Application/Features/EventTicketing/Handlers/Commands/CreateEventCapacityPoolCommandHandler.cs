@@ -47,7 +47,7 @@ public sealed class CreateEventCapacityPoolCommandHandler(
                 (CapacityOversellPolicyEnum)command.CapacityPool.CapacityOversellPolicyId,
                 command.CapacityPool.IsActive);
             await catalogs.AddCapacityPoolAsync(pool, cancellationToken);
-        await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
             return Ok(pool.Id, "Capacity pool created.");
         }
         catch (ConcurrencyConflictException exception)

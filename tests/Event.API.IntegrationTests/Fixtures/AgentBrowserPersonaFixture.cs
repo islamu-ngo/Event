@@ -163,7 +163,7 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
             ["Authorization:Provider"] = "local",
             ["CONFIGURATION_MANIFEST_MODE"] = "Off",
             ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
-            ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Combine(MigrationAuthorityDirectory, "authority.db"),
+            ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Join(MigrationAuthorityDirectory, "authority.db"),
             ["WEBHOOKS_PROVIDER"] = "Local"
         };
         TestDatabaseConfiguration.AddPostgreSql(values, Container.GetConnectionString());

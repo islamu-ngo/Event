@@ -27,7 +27,7 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         bool tenantSurface = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
             || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)
                 && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
-        if (!tenantSurface || ApiTenantResolutionMiddleware.IsTenantExemptPath(context.Request.Path)
+        if (!tenantSurface || ApiTenantResolutionMiddleware.IsTenantExemptPath(context.Request)
             || IsExistingAuthenticationOrSignedCallback(context)
             || HttpMethods.IsGet(context.Request.Method)
                 && context.Request.Path.Equals(new PathString("/api/instance/settings/branding"), StringComparison.OrdinalIgnoreCase)

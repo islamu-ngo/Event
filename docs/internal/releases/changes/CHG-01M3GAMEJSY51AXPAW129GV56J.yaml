@@ -1,0 +1,31 @@
+Change-Id: CHG-01M3GAMEJSY51AXPAW129GV56J
+Title: admit Local administrator sessions on the dedicated admin host
+Type: fix
+Scope: access
+Summary: Allow only instance-scoped Local sign-in and identity reads without a tenant while keeping tenant APIs closed.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: No existing endpoint or authenticated tenant contract is removed.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Exact Local login and GET-only current-user identity paths bypass tenant resolution, but protected tenant reads and writes still require a tenant.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: Existing Local credentials and data require no schema migration.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: The host-specific routing correction adds no new setting or secret.
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+    Detail: Endpoint shapes and HTTP methods are unchanged.
+  Operator:
+    Reference: docs/internal/BLAZOR_DEV_WORKFLOW.md
+    Disposition: documented
+    Detail: The administrator signs in and reaches the instance control plane at the dedicated admin host.

@@ -8,6 +8,7 @@
 @inject IRuntimeRenderPolicyService RuntimeRenderPolicyService
 @inject AdminHostControlPlaneShellSelector AdminHostShellSelector
 @inject ILogger<App> Logger
+@inject NavigationManager Navigation
 
 @{
     var cspNonce = HttpContextAccessor.HttpContext?.Items[MiddlewareExtensions.ContentSecurityPolicyNonceItemKey]
@@ -164,7 +165,9 @@
 
     private bool ShouldUseControlPlaneShell()
     {
-        return AdminHostShellSelector.ShouldUseControlPlaneShell(HttpContextAccessor.HttpContext);
+        return AdminHostShellSelector.ShouldUseControlPlaneShell(
+            HttpContextAccessor.HttpContext,
+            new PathString(Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath));
     }
 
     private static bool IsOnboardingPath(string? path)

@@ -40,6 +40,36 @@ public sealed class AdminHostControlPlaneShellSelectorTests
         await Assert.That(shouldUseShell).IsFalse();
     }
 
+    [Test]
+    [Arguments("/login")]
+    [Arguments("/logout")]
+    [Arguments("/auth/local/change-password")]
+    [Arguments("/auth/local-account-recovery")]
+    public async Task ShouldUseControlPlaneShell_WithAdminHostAuthenticationPage_ReturnsFalse(string path)
+    {
+        var selector = CreateSelector("admin.example.org");
+        var httpContext = CreateHttpContext("admin.example.org");
+        httpContext.Request.Path = path;
+
+        var shouldUseShell = selector.ShouldUseControlPlaneShell(httpContext);
+
+        await Assert.That(shouldUseShell).IsFalse();
+    }
+
+    [Test]
+    public async Task ShouldUseControlPlaneShell_UsesBrowserRouteDuringInteractiveCircuit()
+    {
+        var selector = CreateSelector("admin.example.org");
+        var httpContext = CreateHttpContext("admin.example.org");
+        httpContext.Request.Path = "/_blazor";
+
+        var shouldUseShell = selector.ShouldUseControlPlaneShell(
+            httpContext,
+            new PathString("/login"));
+
+        await Assert.That(shouldUseShell).IsFalse();
+    }
+
     private static DefaultHttpContext CreateHttpContext(string host)
     {
         var httpContext = new DefaultHttpContext();

@@ -47,7 +47,7 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        if (IsTenantExemptPath(context.Request.Path)
+        if (IsTenantExemptPath(context.Request)
             || context.GetEndpoint()?.Metadata.GetMetadata<InstanceManagementAttribute>() is not null)
         {
             await _next(context);
@@ -175,9 +175,14 @@ public sealed class ApiTenantResolutionMiddleware
         return NormalizeHost(context.Request.Host.Host) ?? string.Empty;
     }
 
-    internal static bool IsTenantExemptPath(PathString path)
+    internal static bool IsTenantExemptPath(HttpRequest request)
     {
+        PathString path = request.Path;
         return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
+            || path.Equals(new PathString("/api/auth/local/login"), StringComparison.OrdinalIgnoreCase)
+            || (HttpMethods.IsGet(request.Method)
+                && path.Equals(new PathString("/api/user"), StringComparison.OrdinalIgnoreCase))
+            || path.Equals(new PathString("/api/user/admin-authority"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
             || path.Equals(new PathString("/api/operator-identity-metadata"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/System", StringComparison.OrdinalIgnoreCase)

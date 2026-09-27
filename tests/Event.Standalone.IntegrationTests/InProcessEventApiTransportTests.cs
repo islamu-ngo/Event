@@ -304,6 +304,7 @@ public sealed class InProcessEventApiTransportTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddHttpContextAccessor();
+        services.AddScoped<ITenantRouteContextAccessor, TenantRouteContextAccessor>();
         services.AddApiHttpClients(
             new ConfigurationBuilder().Build(),
             new TestWebHostEnvironment(),

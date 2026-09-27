@@ -80,6 +80,11 @@ public class EventLifecycleController : EventControllerBase
         "Event validation failed",
         "Event cancel failed.");
 
+    private static readonly ApiValidationProblemDescriptor DeleteValidationProblem = new(
+        "event",
+        "Event deletion failed",
+        "Event deletion failed.");
+
     private static readonly ApiNotFoundProblemDescriptor EventNotFoundProblem = new(
         "Event not found",
         "Event not found.");
@@ -92,6 +97,19 @@ public class EventLifecycleController : EventControllerBase
             "Event approval-publication conflict.",
             EventPublicationExecutor.ConcurrencyConflictCode);
 
+    private static readonly CommandFailurePolicy DeleteFailures = CommandFailurePolicy
+        .ValidatedBy(DeleteValidationProblem)
+        .NotFound(EventNotFoundProblem, FailureCodes.NotFound)
+        .AuthenticationRequired(FailureCodes.AuthenticationRequired)
+        .Forbidden(
+            "Event deletion authority required",
+            "Current event deletion authority is required.",
+            DeleteEventFailureCodes.AuthorityDenied)
+        .Conflict(
+            "Event deletion conflict",
+            "An event with paid evidence cannot be deleted.",
+            DeleteEventFailureCodes.PaidEvidenceConflict);
+
     private readonly ICommandHandler<CreateEventCommand, BaseCommandResponse<Guid>> _createHandler;
     private readonly ICommandHandler<ImportEventCommand, BaseCommandResponse<Guid>> _importHandler;
     private readonly ICommandHandler<PublishEventCommand, BaseCommandResponse<Guid>> _publishHandler;
@@ -99,7 +117,7 @@ public class EventLifecycleController : EventControllerBase
     private readonly ICommandHandler<UpdateEventCommand, BaseCommandResponse<Guid>> _updateHandler;
     private readonly ICommandHandler<ArchiveEventCommand, BaseCommandResponse<Guid>> _archiveHandler;
     private readonly ICommandHandler<CancelEventCommand, BaseCommandResponse<Guid>> _cancelHandler;
-    private readonly ICommandHandler<DeleteEventCommand, bool> _deleteHandler;
+    private readonly ICommandHandler<DeleteEventCommand, BaseCommandResponse<Guid>> _deleteHandler;
     private readonly ITenantContext _tenantContext;
 
     public EventLifecycleController(
@@ -110,7 +128,7 @@ public class EventLifecycleController : EventControllerBase
         ICommandHandler<UpdateEventCommand, BaseCommandResponse<Guid>> updateHandler,
         ICommandHandler<ArchiveEventCommand, BaseCommandResponse<Guid>> archiveHandler,
         ICommandHandler<CancelEventCommand, BaseCommandResponse<Guid>> cancelHandler,
-        ICommandHandler<DeleteEventCommand, bool> deleteHandler,
+        ICommandHandler<DeleteEventCommand, BaseCommandResponse<Guid>> deleteHandler,
         ITenantContext tenantContext)
     {
         _createHandler = createHandler;
@@ -374,6 +392,7 @@ public class EventLifecycleController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var userId = CurrentUserId?.ToString();
@@ -384,8 +403,8 @@ public class EventLifecycleController : EventControllerBase
         }
 
         var command = new DeleteEventCommand { Id = id, UserId = userId };
-        await _deleteHandler.ExecuteAsync(command, cancellationToken);
+        BaseCommandResponse<Guid> response = await _deleteHandler.ExecuteAsync(command, cancellationToken);
 
-        return NoContent();
+        return DeleteFailures.Map(this, response, NoContent);
     }
 }

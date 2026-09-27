@@ -26678,6 +26678,23 @@
               "application/json": { },
               "application/hal+json": { }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
           }
         },
         "x-endpoint-class": "Authenticated"

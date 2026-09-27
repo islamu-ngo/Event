@@ -36,7 +36,7 @@ public sealed class NativeEventOperationTests
     [Arguments(typeof(CreateEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UpdateEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(UpdateEventDraftCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
-    [Arguments(typeof(DeleteEventCommand), typeof(ICommand<bool>))]
+    [Arguments(typeof(DeleteEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(PublishEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(ApprovePublishEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]
     [Arguments(typeof(ArchiveEventCommand), typeof(ICommand<BaseCommandResponse<Guid>>))]

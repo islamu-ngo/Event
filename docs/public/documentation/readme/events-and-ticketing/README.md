@@ -22,6 +22,15 @@ ISLAMU Event keeps event domain content, attendee registration, payment truth, a
 
 Before publishing a paid or controlled-entry event, verify module policy, registration capacity, provider-confirmed payment/refund state, admission issuance, credential recovery, and exact-target check-in. Current server-issued [HAL links](../security-and-identity/authorization.md#the-golden-rule-of-client-ui-affordances) govern every operator affordance.
 
+## Deleting an Event
+
+Follow the current event detail's `delete` HAL link before requesting
+`DELETE /api/event/{id}`. Event or registration management alone does not grant
+aggregate deletion. A successful soft deletion returns 204; missing events
+return 404, denied authority returns 403, and paid evidence prevents deletion
+with 409. Do not treat a missing link or a prior successful request as standing
+permission.
+
 ## Removing a Scheduled Item
 
 Deleting a session, session group, or agenda item removes that item's venue and room references together. It does not delete the shared venue or another scheduled item's location assignment.

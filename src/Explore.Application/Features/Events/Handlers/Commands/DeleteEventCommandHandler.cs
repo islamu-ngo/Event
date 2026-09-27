@@ -7,6 +7,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Federation.Atproto.Services;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Explore.Application.Contracts.Operations;
 using Explore.Domain.Federation;
@@ -27,7 +28,7 @@ namespace Explore.Application.Features.Events.Handlers.Commands;
 /// When an event is deleted, all associated EventSessions are also soft deleted.
 /// This ensures referential integrity and proper audit trail with DeletedAt/DeletedBy fields.
 /// </summary>
-public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, bool>
+public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -70,14 +71,14 @@ public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, boo
         _atprotoPublicationPlanner = atprotoPublicationPlanner;
     }
 
-    public async Task<bool> ExecuteAsync(DeleteEventCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteEventCommand request, CancellationToken cancellationToken)
     {
         // Get current user ID from authentication context
         var userId = _currentUserService.UserId;
         if (userId == null)
         {
             _logger.LogWarning("Delete event failed: User ID not found in authentication context");
-            return false;
+            return BaseCommandResponse.Authentication<Guid>("An authenticated user is required to delete an event.");
         }
 
         // Get the event
@@ -85,7 +86,7 @@ public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, boo
         if (@event == null)
         {
             _logger.LogWarning("Delete event failed: Event {EventId} not found", request.Id);
-            return false;
+            return BaseCommandResponse.NotFound<Guid>("Event not found.", request.Id);
         }
 
         // Check authorization
@@ -96,14 +97,20 @@ public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, boo
                 "Delete event failed: User {UserId} not authorized to delete event {EventId}",
                 userId.Value,
                 request.Id);
-            return false;
+            return BaseCommandResponse.Failure<Guid>(
+                DeleteEventFailureCodes.AuthorityDenied,
+                "Current event deletion authority is required.",
+                id: request.Id);
         }
 
         if (await _registrationInventoryRepository.HasPaidEvidenceAsync(
                 @event.Id, @event.TenantId, cancellationToken))
         {
             _logger.LogWarning("Delete event rejected because paid evidence exists for event {EventId}", request.Id);
-            return false;
+            return BaseCommandResponse.Failure<Guid>(
+                DeleteEventFailureCodes.PaidEvidenceConflict,
+                "An event with paid evidence cannot be deleted.",
+                id: request.Id);
         }
 
         var sessions = await _eventSessionRepository.GetSessionsByEvent(request.Id);
@@ -146,7 +153,7 @@ public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, boo
 
         try
         {
-            await _cache.RemoveAsync($"event:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(request.Id), cancellationToken);
             await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(@event.TenantId), cancellationToken);
         }
         catch (Exception ex)
@@ -154,7 +161,7 @@ public class DeleteEventCommandHandler : ICommandHandler<DeleteEventCommand, boo
             _logger.LogWarning(ex, "Cache invalidation failed after deleting event {EventId}", request.Id);
         }
 
-        return true;
+        return BaseCommandResponse.Success(request.Id);
     }
 
     /// <summary>

@@ -68,7 +68,7 @@ public class UserControllerTests
     [Test]
     public async Task GetUserOrganizations_WhenRequestedUserDiffersFromCurrentUser_ShouldReturnForbiddenProblemDetails()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var currentUserId = Guid.NewGuid();
         var requestedUserId = Guid.NewGuid();
@@ -98,7 +98,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_WithOidcIssuerNormalization_PersistsAuthorityQualifiedProviderKey()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         string subject = Guid.NewGuid().ToString("D");
         ProviderAccountKey expected = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
@@ -123,7 +123,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_WhenOnlyRawSubjectLoginExists_DoesNotUseLegacyFallback()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         Guid legacyUserId = Guid.CreateVersion7();
         string subject = Guid.NewGuid().ToString("D");
@@ -154,7 +154,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_GuidSubjectFromDifferentIssuer_DoesNotSelectExistingInternalUser()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         Guid existingUserId = Guid.CreateVersion7();
         string subject = existingUserId.ToString("D");
@@ -185,7 +185,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_WithAmbientAtprotoClaimsWithoutEmailVerification_ShouldReturnUnauthorized()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var authUserId = Guid.NewGuid();
         var did = $"did:plc:{Guid.NewGuid():N}";
@@ -201,7 +201,7 @@ public class UserControllerTests
     [Category(TestCategories.Fast)]
     public async Task SyncUser_WithAmbientAtprotoClaimsAndEmailVerification_ShouldReturnUnauthorized()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var authUserId = Guid.NewGuid();
         var did = $"did:plc:{Guid.NewGuid():N}";
@@ -263,7 +263,7 @@ public class UserControllerTests
     public async Task UpdateUserPatch_WhenAuthenticatedWithoutIfMatch_ShouldReturnBadRequest()
     {
         // Arrange
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var userId = Guid.NewGuid();
         var updateDto = new UpdateUserDto

@@ -23,7 +23,7 @@ public sealed class NativeIdentityQueryControllerTests
     [Test]
     public async Task HttpProviderIdentityAndLegacyAdminQueryCoexistWithoutClaimOrEmailFallback()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         factory.AdditionalConfiguration["Diagnostics:EnableAdminCacheInvalidation"] = "true";
         using var client = factory.CreateClient();
         await SeedAsync(factory);

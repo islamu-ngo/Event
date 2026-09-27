@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Domain.Constants;
+using Explore.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -38,6 +42,10 @@ public class SecurityIntegrationTests : IAsyncDisposable
             AuthorizationProviderOverride = new StubAuthorizationProvider()
         };
         _client = _factory.CreateClient();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        db.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
+        db.SaveChanges();
     }
 
     public async ValueTask DisposeAsync()

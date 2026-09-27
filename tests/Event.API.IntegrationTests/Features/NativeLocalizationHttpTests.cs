@@ -43,7 +43,8 @@ public sealed class NativeLocalizationHttpTests
             environment.ContentRootPath.Returns(directory.FullName);
             await using var baseFactory = new AuthenticatedWebApplicationFactory
             {
-                AuthorizationProviderOverride = new StubAuthorizationProvider()
+                AuthorizationProviderOverride = new StubAuthorizationProvider(),
+                SeedActiveDefaultTenant = true
             };
             await using var factory = baseFactory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             {

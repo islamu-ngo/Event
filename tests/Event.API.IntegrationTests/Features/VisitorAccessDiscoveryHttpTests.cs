@@ -9,6 +9,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -336,6 +337,20 @@ public sealed class VisitorAccessDiscoveryHttpTests
             mode == ParticipationHandlingModeEnum.PlatformManaged ? (int)identity : null,
             mode == ParticipationHandlingModeEnum.PlatformManaged && identity != IdentityAccessModeEnum.AccountRequired ? GuestRecoveryPolicyEnum.EmailOptional : null, DateTime.UtcNow);
         entity.Publish(DateTime.UtcNow);
+        var start = DateTimeOffset.UtcNow.AddDays(7);
+        var session = new EventSession(EventSessionStatusEnum.Published)
+        {
+            Id = Guid.CreateVersion7(),
+            EventId = entity.Id,
+            Event = entity,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            Title = "Visitor event session",
+            ConcurrencyStamp = Guid.CreateVersion7()
+        };
+        session.Reschedule(UtcInstantRange.Create(start, start.AddHours(1)), "UTC", new EventScheduleProjectionCalculator());
+        entity.Sessions.Add(session);
+        entity.RecalculateScheduleSummaryFromSessions();
         database.Events.Add(entity);
         if (mode == ParticipationHandlingModeEnum.ExternalManaged)
         {

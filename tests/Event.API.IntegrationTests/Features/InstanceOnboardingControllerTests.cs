@@ -205,7 +205,7 @@ public class InstanceOnboardingControllerTests
     }
 
     [Test]
-    public async Task SaveProfile_WithInvalidSetupSecret_AndAuthentication_ReturnsForbiddenProblemDetails()
+    public async Task SaveProfile_WithInvalidSetupSecret_AndAuthentication_ReturnsUnauthorizedProblemDetails()
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
@@ -222,12 +222,12 @@ public class InstanceOnboardingControllerTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
 
         var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         await Assert.That(problemDetails).IsNotNull();
-        await Assert.That(problemDetails!.Status).IsEqualTo(StatusCodes.Status403Forbidden);
+        await Assert.That(problemDetails!.Status).IsEqualTo(StatusCodes.Status401Unauthorized);
     }
 
     [Test]
@@ -577,6 +577,7 @@ public class InstanceOnboardingControllerTests
     public async Task UpdateModuleSettings_WhenUserIsNotInstanceAdmin_ShouldReturnForbidden()
     {
         using var factory = CreateFactoryWithSetupSecret();
+        factory.SeedActiveDefaultTenant = true;
         using var client = factory.CreateClient();
 
         var nonAdminUserId = Guid.CreateVersion7();
@@ -597,6 +598,7 @@ public class InstanceOnboardingControllerTests
     public async Task RetiredInstanceSettingsAndOnboardingWrites_ShouldNotBeRoutable()
     {
         using var factory = CreateFactoryWithSetupSecret();
+        factory.SeedActiveDefaultTenant = true;
         using var client = factory.CreateClient();
         (HttpMethod Method, string Path, HttpStatusCode ExpectedStatus)[] retiredWrites =
         [
@@ -787,6 +789,7 @@ public class InstanceOnboardingControllerTests
             ["Keycloak:ClientId"] = clientId,
             ["Keycloak:ClientSecret"] = clientSecret
         });
+        factory.SeedActiveDefaultTenant = true;
         using var client = factory.CreateClient();
 
         var publicResponse = await client.GetAsync($"{BaseUrl}/auth-provider-configuration");
@@ -952,6 +955,7 @@ public class InstanceOnboardingControllerTests
         {
             ["Authorization:Provider"] = "local"
         });
+        factory.SeedActiveDefaultTenant = true;
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync($"{SettingsBaseUrl}/authz-provider/status");
@@ -1142,14 +1146,18 @@ public class InstanceOnboardingControllerTests
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret(
         IReadOnlyDictionary<string, string?>? configurationOverrides = null)
     {
-        return configurationOverrides is null
+        var factory = configurationOverrides is null
             ? new OnboardingWebApplicationFactory()
             : new ConfigurableAuthenticatedWebApplicationFactory(configurationOverrides);
+        factory.AdditionalConfiguration["Authorization:Provider"] = "local";
+        return factory;
     }
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecretWithoutClaimsTransformation()
     {
-        return new PassthroughClaimsTransformationFactory();
+        var factory = new PassthroughClaimsTransformationFactory();
+        factory.AdditionalConfiguration["Authorization:Provider"] = "local";
+        return factory;
     }
 
     private sealed class ConfigurableAuthenticatedWebApplicationFactory : OnboardingWebApplicationFactory

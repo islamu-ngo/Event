@@ -26,6 +26,13 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
     {
         await fixture.ResetAsync();
 
+        await using ExploreDbContext verificationContext = fixture.CreateDbContext();
+        var operatorIdentity = verificationContext.SystemSettings
+            .AsNoTracking()
+            .Where(setting => setting.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity)
+            .Select(setting => new { setting.Id, setting.Value, setting.IsLocked, setting.UpdatedAt });
+        var original = await operatorIdentity.SingleOrDefaultAsync();
+
         var saveObserver = new SaveObserver();
         await using ExploreDbContext context = fixture.CreateDbContext(saveObserver);
         var repository = new SystemSettingRepository(
@@ -51,11 +58,7 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         await Assert.That(context.ChangeTracker.Entries().Any(entry =>
             entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)).IsFalse();
 
-        await using ExploreDbContext verificationContext = fixture.CreateDbContext();
-        await Assert.That(await verificationContext.SystemSettings
-            .AsNoTracking()
-            .AnyAsync(setting => setting.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity))
-            .IsFalse();
+        await Assert.That(await operatorIdentity.SingleOrDefaultAsync()).IsEqualTo(original);
     }
 
     [Test]
@@ -113,9 +116,11 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
             await service.SaveAsync(ValidCandidate(), expectedRevision: null);
 
         await Assert.That(first.IsSuccess).IsTrue();
-        await Assert.That(first.Id.PublicDisclosure.IsReady).IsTrue();
-        await Assert.That(first.Id.PaidCommerce.IsReady).IsTrue();
-        Guid firstRevision = first.Id.Revision;
+        InstanceOperatorIdentitySavedDocument firstSaved = first.Id
+            ?? throw new InvalidOperationException("Operator identity save returned no document.");
+        await Assert.That(firstSaved.PublicDisclosure.IsReady).IsTrue();
+        await Assert.That(firstSaved.PaidCommerce.IsReady).IsTrue();
+        Guid firstRevision = firstSaved.Revision;
 
         InstanceOperatorIdentityDocument document = await service.GetCurrentAsync();
         await Assert.That(document.Settings).IsNotNull();
@@ -131,10 +136,12 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
             await service.SaveAsync(ValidCandidate() with { PublicName = "Updated Operator" }, firstRevision);
 
         await Assert.That(second.IsSuccess).IsTrue();
-        await Assert.That(second.Id.Revision).IsNotEqualTo(firstRevision);
+        InstanceOperatorIdentitySavedDocument secondSaved = second.Id
+            ?? throw new InvalidOperationException("Updated operator identity save returned no document.");
+        await Assert.That(secondSaved.Revision).IsNotEqualTo(firstRevision);
 
         InstanceOperatorIdentityDocument updated = await service.GetCurrentAsync();
-        await Assert.That(updated.Settings!.Revision).IsEqualTo(second.Id.Revision);
+        await Assert.That(updated.Settings!.Revision).IsEqualTo(secondSaved.Revision);
         await Assert.That(updated.Settings.PublicName).IsEqualTo("Updated Operator");
 
         await Assert.ThrowsAsync<ConcurrencyConflictException>(

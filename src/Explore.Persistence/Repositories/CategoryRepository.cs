@@ -9,12 +9,6 @@ namespace Explore.Persistence.Repositories;
 
 public class CategoryRepository : GenericRepository<Category, Guid>, ICategoryRepository
 {
-    private static readonly Func<ExploreDbContext, Guid, Task<Category?>> GetByIdCompiled =
-        EF.CompileAsyncQuery((ExploreDbContext ctx, Guid id) =>
-            ctx.Categories
-                .AsNoTracking()
-                .FirstOrDefault(c => c.Id == id));
-
     private readonly ExploreDbContext _dbContext;
 
     public CategoryRepository(ExploreDbContext dbContext) : base(dbContext)
@@ -24,7 +18,9 @@ public class CategoryRepository : GenericRepository<Category, Guid>, ICategoryRe
 
     public new async Task<Category?> GetById(Guid id)
     {
-        return await GetByIdCompiled(_dbContext, id);
+        return await _dbContext.Categories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id);
     }
 
     public async Task<Category> GetCategoryWithDetails(Guid id)

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -92,6 +93,14 @@ public class SafeModeLatchTests : IAsyncDisposable
             keycloak.Authority, keycloak.MetadataAddress,
             _tenantAdminContext, _tenantContext, byoConfig);
         _tenantAdminClient = _tenantAdminFactory.CreateClient();
+
+        foreach (var factory in new[] { _instanceAdminFactory, _regularUserFactory, _tenantAdminFactory })
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            db.Tenants.Add(new TenantBuilder().WithId(DefaultTenantId).Build());
+            db.SaveChanges();
+        }
     }
 
     public async ValueTask DisposeAsync()

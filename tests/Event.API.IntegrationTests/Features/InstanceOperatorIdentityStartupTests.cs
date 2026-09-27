@@ -157,7 +157,7 @@ public class InstanceOperatorIdentityStartupTests
     [Test]
     public async Task PublicLegalDocument_WhenInstanceIdentityNotReady_Returns503Unavailable()
     {
-        using var factory = new OnboardingWebApplicationFactory();
+        using var factory = new OnboardingWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
 
         using (var scope = factory.Services.CreateScope())

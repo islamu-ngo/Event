@@ -390,7 +390,8 @@ public partial class FallbackAuthorizationService
         IDictionary<string, object>? resourceAttributes,
         CancellationToken cancellationToken)
     {
-        if (action is not (AuthorizationActions.RegistrationOrders.View
+        if (action is not (AuthorizationActions.Create
+            or AuthorizationActions.RegistrationOrders.View
             or AuthorizationActions.RegistrationOrders.Cancel
             or AuthorizationActions.RegistrationOrders.Continue
             or AuthorizationActions.RegistrationOrders.Finalize
@@ -403,6 +404,11 @@ public partial class FallbackAuthorizationService
         }
 
         var currentUserId = _adminContext.UserId ?? await _adminContext.ResolveUserIdAsync(cancellationToken);
+        if (action == AuthorizationActions.Create)
+        {
+            return currentUserId.HasValue;
+        }
+
         if (currentUserId.HasValue &&
             TryResolveGuidAttribute(resourceAttributes, "accountUserId", out var accountUserId) &&
             currentUserId == accountUserId)

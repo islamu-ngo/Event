@@ -1,7 +1,11 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Domain.Constants;
+using Explore.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -161,6 +165,12 @@ public class TokenClaimsVerificationTests
         };
 
         using var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            db.Tenants.Add(new TenantBuilder().WithId(PlatformDefaults.DefaultTenantId).Build());
+            await db.SaveChangesAsync();
+        }
         var token = await _infra.TokenClient.GetUserTokenAsync();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/event");

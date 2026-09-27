@@ -7,7 +7,9 @@ using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -239,26 +241,44 @@ public sealed class LocalAdmissionPolicyHttpTests
     private static async Task SetInstanceIntentAsync(LocalAdmissionWebApplicationFactory factory, string? value)
     {
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
-        if (value is null)
+        if (value is null or not ("true" or "false"))
         {
             var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             SystemSetting existing = await database.SystemSettings.SingleAsync(
                 setting => setting.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled);
-            database.SystemSettings.Remove(existing);
+            if (value is null)
+                database.SystemSettings.Remove(existing);
+            else
+                existing.Value = value;
             await database.SaveChangesAsync();
             return;
         }
 
-        var repository = scope.ServiceProvider.GetRequiredService<ISystemSettingRepository>();
-        await repository.UpsertAsync(new SystemSetting
+        var writer = scope.ServiceProvider.GetRequiredService<IEmailDeliverySettingsWriter>();
+        EmailDeliverySettingsWriteResult result = await writer.ApplyAsync(
+            [new(null, GovernanceSettingKeys.Email.DeliveryEnabled,
+                EmailDeliverySettingMutationKind.SetValue, value)], null);
+        if (result.Status == EmailDeliverySettingsWriteStatus.RequiresDisableConfirmation)
         {
-            Id = Guid.CreateVersion7(),
-            SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-            Value = value,
-            ValueType = SettingValueType.Boolean,
-            Category = "Email",
-            CreatedAt = DateTime.UtcNow
-        });
+            Guid actor = Guid.CreateVersion7();
+            result = await scope.ServiceProvider.GetRequiredService<ISettingMutationLock>()
+                .ExecuteOrderedGroupsAsync([EmailDeliverySettingKeys.All],
+                    cancellationToken => scope.ServiceProvider.GetRequiredService<IUnitOfWork>()
+                        .ExecuteSerializableAsync(async transactionToken =>
+                        {
+                            var snapshot = await scope.ServiceProvider.GetRequiredService<IEmailDeliveryDisableImpactReader>()
+                                .ReadAsync(null, transactionToken)
+                                ?? throw new InvalidOperationException("The email disable preview is unavailable.");
+                            string token = scope.ServiceProvider.GetRequiredService<IEmailDeliveryDisableTokenService>()
+                                .Issue(actor, snapshot).Token;
+                            return await writer.DisableAsync(new EmailDeliveryDisableConfirmation(
+                                null, actor, snapshot.Revision, token,
+                                EmailDeliveryDisableConfirmation.RequiredAcknowledgement), transactionToken);
+                        }, cancellationToken));
+        }
+
+        await Assert.That(result.Status is EmailDeliverySettingsWriteStatus.Applied
+            or EmailDeliverySettingsWriteStatus.NoChange).IsTrue();
     }
 
     private static async Task AssertUnconfirmedAsync(LocalAdmissionWebApplicationFactory factory, string email)

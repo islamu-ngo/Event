@@ -134,6 +134,7 @@ public sealed class GeocodingControllerContractTests
         var logs = new CapturingLoggerProvider();
         await using var rootFactory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider()
         };
         await using WebApplicationFactory<Program> factory =

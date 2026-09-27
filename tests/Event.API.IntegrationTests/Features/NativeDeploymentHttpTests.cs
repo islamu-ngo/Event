@@ -35,7 +35,7 @@ public sealed class NativeDeploymentHttpTests
     [Test]
     public async Task AnonymousGet_ReturnsTheRealCatalogThroughTheNativeHandlerWithPrivateNoStore()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using var scope = factory.Services.CreateScope();
         var catalog = scope.ServiceProvider.GetRequiredService<ITicketingDeploymentCapabilityCatalog>();

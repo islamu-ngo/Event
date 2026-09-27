@@ -49,6 +49,7 @@ public sealed class EmailDispatchAdminControllerTests
         var outboxId = Guid.NewGuid();
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -324,6 +325,7 @@ public sealed class EmailDispatchAdminControllerTests
 
     private static AuthenticatedWebApplicationFactory CreateIngressFactory() => new()
     {
+        SeedActiveDefaultTenant = true,
         // Reaching protected native dispatch would produce a 500, not the expected ingress 400.
         AuthorizationProviderOverride = new StubAuthorizationProvider
         {

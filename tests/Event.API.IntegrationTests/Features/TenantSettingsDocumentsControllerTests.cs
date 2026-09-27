@@ -94,17 +94,19 @@ public sealed class TenantSettingsDocumentsControllerTests
             using var denied = path == Branding
                 ? await forged.PatchAsJsonAsync(Root + path, BrandPatch(Guid.CreateVersion7()))
                 : await forged.PatchAsJsonAsync(Root + path, IdentityPatch(Guid.CreateVersion7()));
-            await ProblemAsync(denied, HttpStatusCode.Forbidden);
+            await ProblemAsync(denied, HttpStatusCode.NotFound);
         }
         using (var denied = await forged.GetAsync(Root + Identity))
         {
-            await ProblemAsync(denied, HttpStatusCode.Forbidden);
+            await ProblemAsync(denied, HttpStatusCode.NotFound);
             await Assert.That(await denied.Content.ReadAsStringAsync()).DoesNotContain("Community Events ASBL");
             await Assert.That(factory.ResolutionObservation.IdentityReads).IsEqualTo(0);
         }
-        // Branding retains its existing authenticated-member read/provision authority.
-        var memberBranding = await ReadAsync<TenantBrandingSettingsDocumentDto>(forged, Branding);
-        await Assert.That(memberBranding.SourceScopeId).IsEqualTo(PlatformDefaults.DefaultTenantId);
+        using (var denied = await forged.GetAsync(Root + Branding))
+            await ProblemAsync(denied, HttpStatusCode.NotFound);
+        using (var scope = factory.Services.CreateScope())
+            await Assert.That(await scope.ServiceProvider.GetRequiredService<ITenantSettingsDocumentRepository>()
+                .GetByTenantAndDocumentKey(PlatformDefaults.DefaultTenantId, SettingsDocumentKeys.Tenant.Branding)).IsNull();
         foreach (var client in new[] { admin, instance })
         {
             using var allowed = await client.GetAsync(Root + Identity);
@@ -151,7 +153,7 @@ public sealed class TenantSettingsDocumentsControllerTests
         await using var factory = await DocumentFactory.CreateAsync();
         var seed = await SeedAsync(factory);
         using var first = Client(factory, seed.AdminId);
-        using var second = Client(factory, seed.MemberId);
+        using var second = Client(factory, seed.InstanceAdminId);
         factory.SaveBoundary.RaceProvisioning = true;
         Task<HttpResponseMessage> firstRequest = first.GetAsync(Root + Branding);
         Task<HttpResponseMessage> secondRequest = second.GetAsync(Root + Branding);

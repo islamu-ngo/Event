@@ -13,7 +13,7 @@ public sealed class NativeGroupMemberHttpTests
     [Test]
     public async Task AnonymousReads_PreserveEmptyHalAndMissingDetailWhileWritesRequireIdentity()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         var missingId = Guid.CreateVersion7();
         using var list = await client.GetAsync($"/api/groupmember/{missingId}");
@@ -41,7 +41,7 @@ public sealed class NativeGroupMemberHttpTests
     [Test]
     public async Task AuthenticatedCommands_ReachNativeHandlersAndPreserveValidationProblems()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName,
             TestAuthHandler.CreateAuthHeaderValue(Guid.CreateVersion7()));

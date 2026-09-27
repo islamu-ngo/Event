@@ -15,7 +15,7 @@ public sealed class EfCoreUnitOfWorkRetryTests
     public async Task ExecuteInTransactionAsync_WhenExecutionStrategyRetries_RetainsExactlyOneAuditWrite()
     {
         await using var context = CreateContext();
-        var transaction = new TestDbContextTransaction();
+        await using var transaction = new TestDbContextTransaction();
         var strategy = new RetryOnceExecutionStrategy(context);
         var unitOfWork = new EfCoreUnitOfWork(context, () => strategy, _ => Task.FromResult<IDbContextTransaction>(transaction));
         var attempts = 0;
@@ -41,7 +41,7 @@ public sealed class EfCoreUnitOfWorkRetryTests
     public async Task ExecuteInTransactionAsync_WhenCallerTokenIsCancelled_PreservesOriginalOperationException()
     {
         await using var context = CreateContext();
-        var transaction = new TestDbContextTransaction();
+        await using var transaction = new TestDbContextTransaction();
         var strategy = new RetryOnceExecutionStrategy(context);
         var unitOfWork = new EfCoreUnitOfWork(context, () => strategy, _ => Task.FromResult<IDbContextTransaction>(transaction));
         using var cancellation = new CancellationTokenSource();
@@ -69,7 +69,7 @@ public sealed class EfCoreUnitOfWorkRetryTests
     public async Task ExecuteInTransactionAsync_WhenRollbackThrowsDatabaseException_ClearsTrackingAndPreservesOriginalException()
     {
         await using var context = CreateContext();
-        var transaction = new TestDbContextTransaction(new TestRollbackDbException());
+        await using var transaction = new TestDbContextTransaction(new TestRollbackDbException());
         var strategy = new RetryOnceExecutionStrategy(context);
         var unitOfWork = new EfCoreUnitOfWork(context, () => strategy, _ => Task.FromResult<IDbContextTransaction>(transaction));
         var originalException = new InvalidOperationException("Original operation failure.");

@@ -76,8 +76,7 @@ public sealed class SemanticValueNonTransactionalProviderFixture
 
     private IContainer BuildContainer(PrimaryDatabaseProvider provider)
     {
-        ContainerBuilder builder = new ContainerBuilder()
-            .WithImage(provider == PrimaryDatabaseProvider.MariaDb
+        ContainerBuilder builder = new ContainerBuilder(provider == PrimaryDatabaseProvider.MariaDb
                 ? "mariadb:11.4.7"
                 : "mysql:8.4.6")
             .WithPortBinding(DatabasePort, assignRandomHostPort: true)

@@ -19,7 +19,7 @@ public sealed class NativeAudienceAgeHttpTests
     [Test]
     public async Task AnonymousReads_PreserveLookupValuesAndMissingDetailResponse()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {
@@ -76,7 +76,7 @@ public sealed class NativeAudienceAgeHttpTests
     [Test]
     public async Task EmptyCatalog_RemainsAnEmptyJsonArray()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {

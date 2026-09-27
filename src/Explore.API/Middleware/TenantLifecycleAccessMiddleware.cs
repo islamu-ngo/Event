@@ -98,6 +98,8 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
                 && context.User.TryGetLocalCredentialReplacementAuthority() is not null
                 || action.ControllerTypeInfo.AsType() == typeof(IncomingWebhooksController)
                 && action.MethodInfo.Name is nameof(IncomingWebhooksController.RecordStripeConnectCallback)
-                    or nameof(IncomingWebhooksController.RecordSvixOperationalCallback));
+                    or nameof(IncomingWebhooksController.RecordSvixOperationalCallback)
+                || action.ControllerTypeInfo.AsType() == typeof(RegistrationProviderCallbackController)
+                && action.MethodInfo.Name == nameof(RegistrationProviderCallbackController.RecordCallback));
     }
 }

@@ -9,14 +9,17 @@ internal static class TenantRoutePathMatcher
         string? configuredPathPrefix,
         out string tenantSlug,
         out PathString matchedPathBase,
-        out PathString remainingPath)
+        out PathString remainingPath,
+        IReadOnlyCollection<string>? reservedSlugs = null)
     {
         tenantSlug = string.Empty;
         matchedPathBase = PathString.Empty;
         remainingPath = requestPath;
 
         var pathPrefix = NormalizePathPrefix(configuredPathPrefix);
-        if (!requestPath.StartsWithSegments(pathPrefix, out var remainingAfterPrefix))
+        var remainingAfterPrefix = requestPath;
+        if (pathPrefix is not null &&
+            !requestPath.StartsWithSegments(pathPrefix, out remainingAfterPrefix))
         {
             return false;
         }
@@ -28,7 +31,22 @@ internal static class TenantRoutePathMatcher
             return false;
         }
 
-        tenantSlug = pathSegments[0];
+        var slug = pathSegments[0];
+        if (pathPrefix is null &&
+            (slug.Length is < 3 or > 500 ||
+             slug[0] == '-' ||
+             slug[^1] == '-' ||
+             slug.Contains("--", StringComparison.Ordinal) ||
+             slug.Any(static character =>
+                 character is not ('-' or >= '0' and <= '9' or >= 'a' and <= 'z')) ||
+             reservedSlugs is null ||
+             reservedSlugs.Count == 0 ||
+             reservedSlugs.Contains(slug, StringComparer.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        tenantSlug = slug;
         matchedPathBase = new PathString(pathPrefix + "/" + tenantSlug);
         remainingPath = remainingAfterPrefix.StartsWithSegments(
             new PathString("/" + tenantSlug),
@@ -39,11 +57,11 @@ internal static class TenantRoutePathMatcher
         return true;
     }
 
-    private static string NormalizePathPrefix(string? pathPrefix)
+    private static string? NormalizePathPrefix(string? pathPrefix)
     {
         if (string.IsNullOrWhiteSpace(pathPrefix))
         {
-            return "/t";
+            return null;
         }
 
         var normalized = pathPrefix.Trim();
@@ -52,6 +70,7 @@ internal static class TenantRoutePathMatcher
             normalized = "/" + normalized;
         }
 
-        return normalized.TrimEnd('/');
+        var prefix = normalized.TrimEnd('/');
+        return prefix.Length == 0 ? null : prefix;
     }
 }

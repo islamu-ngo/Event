@@ -131,7 +131,6 @@ public class ActorLifecycleArchitectureTests
         await Assert.That(profile).DoesNotContain("IsInRole");
         await Assert.That(profile).DoesNotContain("CurrentUserRoleId");
         await Assert.That(routes).Contains("/actors/:id");
-        await Assert.That(routes).Contains("/t/:tenantId/actors/:id");
     }
 
     private static Type RequiredDomainType(string typeName) =>

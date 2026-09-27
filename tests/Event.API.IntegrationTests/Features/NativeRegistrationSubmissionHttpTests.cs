@@ -691,7 +691,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(Action<IServiceCollection>? configureServices = null) =>
-        new AuthenticatedWebApplicationFactory().WithWebHostBuilder(builder =>
+        new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true }.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
                 configureServices?.Invoke(services);
@@ -725,7 +725,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
     private static WebApplicationFactory<Program> CreateCallbackFactory<TVerifier>(
         Action<IServiceCollection>? configureServices = null)
         where TVerifier : class, IRegistrationProviderDescriptor, IRegistrationProviderCallbackVerifier =>
-        new AuthenticatedWebApplicationFactory().WithWebHostBuilder(builder =>
+        new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true }.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IRegistrationProviderCallbackVerifier>();

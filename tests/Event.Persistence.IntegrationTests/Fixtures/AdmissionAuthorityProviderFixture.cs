@@ -97,10 +97,9 @@ public sealed class AdmissionAuthorityProviderFixture
     }
 
     private IContainer BuildSqlServer() =>
-        new ContainerBuilder()
-            .WithImage(
-                "mcr.microsoft.com/mssql/server@sha256:" +
-                "ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89")
+        new ContainerBuilder(
+            "mcr.microsoft.com/mssql/server@sha256:" +
+            "ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89")
             .WithPortBinding(SqlServerPort, assignRandomHostPort: true)
             .WithEnvironment("ACCEPT_EULA", "Y")
             .WithEnvironment("MSSQL_PID", "Developer")
@@ -113,8 +112,7 @@ public sealed class AdmissionAuthorityProviderFixture
 
     private IContainer BuildMySqlFamily(PrimaryDatabaseProvider provider)
     {
-        ContainerBuilder builder = new ContainerBuilder()
-            .WithImage(provider == PrimaryDatabaseProvider.MariaDb
+        ContainerBuilder builder = new ContainerBuilder(provider == PrimaryDatabaseProvider.MariaDb
                 ? "mariadb:11.4.7"
                 : "mysql:8.4.6")
             .WithCommand("--performance-schema=OFF", "--innodb-buffer-pool-size=64M")

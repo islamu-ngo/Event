@@ -28,7 +28,9 @@ public class PathTenantResolverMiddleware
                 configuration.PathPrefix,
                 out var tenantSlug,
                 out var matchedPathBase,
-                out var rewrittenPath))
+                out var rewrittenPath,
+                configuration.ReservedSlugs as IReadOnlyCollection<string> ??
+                    configuration.ReservedSlugs?.ToArray()))
         {
             await _next(context);
             return;

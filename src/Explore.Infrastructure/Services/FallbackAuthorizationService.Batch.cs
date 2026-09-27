@@ -49,10 +49,11 @@ public partial class FallbackAuthorizationService
         for (var i = 0; i < checks.Count; i++)
         {
             var check = checks[i];
-            if (check.ResourceKind == ResourceKinds.Organization
+            if (check.ResourceKind == ResourceKinds.RegistrationOrder
+                || (check.ResourceKind == ResourceKinds.Organization
                 && check.Action is AuthorizationActions.Organizations.SubmitEvidence
                     or AuthorizationActions.Organizations.ViewEvidence
-                    or AuthorizationActions.Organizations.ReviewEvidence)
+                    or AuthorizationActions.Organizations.ReviewEvidence))
             {
                 results[i] = await AuthorizeAsync(check, cancellationToken);
                 continue;

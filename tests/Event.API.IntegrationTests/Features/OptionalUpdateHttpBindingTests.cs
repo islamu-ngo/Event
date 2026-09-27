@@ -122,7 +122,7 @@ public sealed class OptionalUpdateHttpBindingTests
     private static AuthenticatedWebApplicationFactory CreateFactory()
     {
         Environment.SetEnvironmentVariable("SETUP_SECRET", SetupSecret);
-        return new AuthenticatedWebApplicationFactory();
+        return new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
     }
 
     private static async Task<Guid> CreateInstanceAdminAsync(AuthenticatedWebApplicationFactory factory)

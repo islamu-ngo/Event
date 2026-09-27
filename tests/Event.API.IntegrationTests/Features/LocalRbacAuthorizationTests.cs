@@ -1,13 +1,17 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
 using System.Text;
+using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Domain;
 using Explore.Domain.Constants;
+using Explore.Domain.Enums;
 using Explore.Domain.Modules;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
@@ -216,6 +220,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     public async Task LocalRbac_InstanceAdmin_CanUpdateSettings()
     {
         var token = await _keycloak.TokenClient.GetAdminTokenAsync();
+        await SeedProviderBindingAsync(_instanceAdminFactory, token, _instanceAdminContext.UserId!.Value);
         using var request = CreateAuthorizedRequest(HttpMethod.Patch, "/api/instance/settings/modules", token, ModuleSettingsJson);
 
         var response = await _instanceAdminClient.SendAsync(request);
@@ -228,6 +233,7 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     public async Task LocalRbac_RegularUser_DeniedSettingUpdate()
     {
         var token = await _keycloak.TokenClient.GetUserTokenAsync();
+        await SeedProviderBindingAsync(_regularUserFactory, token, _regularUserContext.UserId!.Value);
         using var request = CreateAuthorizedRequest(HttpMethod.Patch, "/api/instance/settings/modules", token, ModuleSettingsJson);
 
         var response = await _regularUserClient.SendAsync(request);
@@ -288,6 +294,37 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
     #region Helpers
 
     private const string ModuleSettingsJson = "{\"enableIslamicModule\":{\"hasValue\":true,\"value\":true},\"enableTechModule\":{\"hasValue\":true,\"value\":true}}";
+
+    private static async Task SeedProviderBindingAsync(WebApplicationFactory<Program> factory, string token, Guid userId)
+    {
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        var account = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(jwt.Issuer, jwt.Subject);
+        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var user = new User
+        {
+            Id = userId,
+            Pii = new UserPii
+            {
+                Email = $"local-rbac-{userId:N}@example.test",
+                FirstName = "Local",
+                LastName = "Rbac"
+            },
+            CreatedAt = DateTime.UtcNow
+        };
+        database.Users.Add(user);
+        database.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = user,
+            AuthenticationProviderId = (int)account.ProviderKind,
+            AuthenticationProvider = null!,
+            ProviderKey = account.Value,
+            CreatedAt = DateTime.UtcNow
+        });
+        await database.SaveChangesAsync();
+    }
 
     private static string CreateTenantJson()
     {
@@ -520,6 +557,11 @@ public class LocalRbacAuthorizationTests : IAsyncDisposable
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var tenant = await dbContext.Tenants.FindAsync([DefaultTenantId], cancellationToken);
+            if (tenant is null)
+                dbContext.Tenants.Add(new TenantBuilder().WithId(DefaultTenantId).Build());
+            else
+                tenant.TenantStatusId = (int)TenantStatusEnum.Active;
 
             dbContext.SystemSettings.Add(new SystemSetting
             {

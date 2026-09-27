@@ -23,7 +23,7 @@ public sealed class RegistrationPaymentCheckoutTicketStatelessTests
             var requestContext = new DefaultHttpContext();
             requestContext.Request.Scheme = Uri.UriSchemeHttps;
             requestContext.Request.Host = new HostString(CheckoutHost);
-            requestContext.Request.PathBase = "/t/acme";
+            requestContext.Request.PathBase = "/acme";
             string checkoutSession = Guid.NewGuid().ToString("N");
             var issuer = new RegistrationPaymentCheckoutTicketStore(CreateProvider(keyDirectory), timeProvider);
             RegistrationPaymentCheckoutTicketIssue? issue = issuer.PrepareIssue(

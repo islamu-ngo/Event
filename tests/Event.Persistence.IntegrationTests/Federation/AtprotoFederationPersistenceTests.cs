@@ -41,7 +41,8 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
             .Properties
             .Select(property => property.Name)
             .ToArray();
-        string modelIndexName = sourceVersionIndex.GetDatabaseName();
+        string modelIndexName = sourceVersionIndex.GetDatabaseName()
+            ?? throw new InvalidOperationException("PDS source-attempt index has no database name.");
         string? modelFilter = sourceVersionIndex.GetFilter();
         await context.Database.OpenConnectionAsync();
         await using DbCommand columnCommand = context.Database.GetDbConnection().CreateCommand();
@@ -78,7 +79,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
             nameof(PdsSyncOutbox.PayloadHash)
         ]);
         await Assert.That(modelFilter).IsEqualTo("status IN (1, 2) AND superseded_at IS NULL");
-        await Assert.That(Convert.ToInt32(columnLength)).IsEqualTo(255);
+        await Assert.That((int)columnLength!).IsEqualTo(255);
         await Assert.That(indexDefinition).Contains("payload_hash");
         await Assert.That(indexDefinition).Contains("WHERE");
         await Assert.That(indexDefinition).Contains("status");

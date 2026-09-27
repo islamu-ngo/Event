@@ -22,7 +22,7 @@ public sealed class NativeEventSessionStatusHttpTests
     [Test]
     public async Task AnonymousSeededCatalogue_PreservesGlobalLifecycleIdentities()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using var response = await client.GetAsync("/api/eventsessionstatus");
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -50,7 +50,7 @@ public sealed class NativeEventSessionStatusHttpTests
     [Test]
     public async Task AnonymousReads_PreserveMappedValuesNullableDescriptionAndMissingDetail()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {

@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 using System.Net.Http.Json;
 using System.Net;
 
@@ -107,7 +108,10 @@ public class SetupSecretFlowTests
 
         // Complete onboarding to end setup mode
         await SaveReadyOperatorIdentityAsync(client);
-        var completePayload = CreateValidSettings();
+        var completePayload = CreateValidSettings() with
+        {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client, userId)
+        };
         using var completeRequest = CreateInstanceAdminRequest(
             HttpMethod.Post, $"{BaseUrl}/complete", userId, completePayload, includeSetupSecret: true);
         var completeResponse = await client.SendAsync(completeRequest);
@@ -141,12 +145,16 @@ public class SetupSecretFlowTests
         await EnsureUserExistsAsync(factory, userId);
         await SaveReadyOperatorIdentityAsync(client);
 
-        var completePayload = CreateValidSettings();
+        var completePayload = CreateValidSettings() with
+        {
+            ExpectedJourneyGeneration = await ReadGenerationAsync(client, userId)
+        };
         using var completeRequest = CreateInstanceAdminRequest(
             HttpMethod.Post, $"{BaseUrl}/complete", userId, completePayload, includeSetupSecret: true);
         var completeResponse = await client.SendAsync(completeRequest);
 
-        await Assert.That(completeResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(completeResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
+            .Because(await completeResponse.Content.ReadAsStringAsync());
 
         var body = await completeResponse.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
         await Assert.That(body).IsNotNull();
@@ -216,7 +224,9 @@ public class SetupSecretFlowTests
         await SaveReadyOperatorIdentityAsync(client);
 
         using var completeRequest = CreateInstanceAdminRequest(
-            HttpMethod.Post, $"{BaseUrl}/complete", userId, CreateValidSettings(), includeSetupSecret: true);
+            HttpMethod.Post, $"{BaseUrl}/complete", userId,
+            CreateValidSettings() with { ExpectedJourneyGeneration = await ReadGenerationAsync(client, userId) },
+            includeSetupSecret: true);
         var completeResponse = await client.SendAsync(completeRequest);
         await Assert.That(completeResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
@@ -321,6 +331,23 @@ public class SetupSecretFlowTests
         return request;
     }
 
+    private static async Task<string> ReadGenerationAsync(HttpClient client, Guid userId)
+    {
+        using var request = CreateInstanceAdminRequest(
+            HttpMethod.Get, $"{BaseUrl}/journey", userId, null, includeSetupSecret: true);
+        using var response = await client.SendAsync(request);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var journey = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(journey.RootElement.GetProperty("state").GetString()).IsEqualTo("Available");
+        var preflight = journey.RootElement.GetProperty("preflight");
+        await Assert.That(preflight.GetProperty("isReadyToLaunch").GetBoolean()).IsTrue()
+            .Because(string.Join(", ", preflight.GetProperty("blockingChecks").EnumerateArray()
+                .Where(check => check.GetProperty("status").GetString() != "Pass")
+                .Select(check => check.GetProperty("code").GetString())));
+        return journey.RootElement.GetProperty("generation").GetString()
+            ?? throw new InvalidOperationException("Setup journey did not provide a generation.");
+    }
+
     private static CompleteInstanceOnboardingRequest CreateValidSettings()
     {
         return new CompleteInstanceOnboardingRequest
@@ -391,6 +418,7 @@ internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFact
     public OnboardingWebApplicationFactory()
     {
         AdditionalConfiguration["SETUP_SECRET"] = SetupSecret;
+        AdditionalConfiguration["Authorization:Provider"] = "local";
         ClientOptions.BaseAddress = new Uri("https://localhost");
         _connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {

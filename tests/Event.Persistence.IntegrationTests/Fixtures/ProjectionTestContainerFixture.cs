@@ -23,8 +23,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
 
     public ProjectionTestContainerFixture()
     {
-        _container = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_projection")
             .WithUsername("postgres")
             .WithPassword("postgres")
@@ -46,6 +45,7 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
     {
         await _container.StopAsync();
         await _container.DisposeAsync();
+        GC.SuppressFinalize(this);
     }
 
     public ExploreDbContext CreateDbContext()

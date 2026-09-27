@@ -190,7 +190,12 @@
                     var redirection = await UserService.ResolveUserTenantRedirectionAsync();
                     if (redirection != null && !string.IsNullOrWhiteSpace(redirection.TenantSlug))
                     {
-                        var tenantUrl = $"/t/{redirection.TenantSlug}/";
+                        var pathPrefix = (await InstanceOnboardingService.GetResolverConfigurationAsync())
+                            ?.PathPrefix?.Trim().Trim('/') ?? string.Empty;
+                        var tenantPath = pathPrefix.Length == 0
+                            ? $"{redirection.TenantSlug}/"
+                            : $"{pathPrefix}/{redirection.TenantSlug}/";
+                        var tenantUrl = new Uri(new Uri(Navigation.BaseUri), tenantPath).AbsoluteUri;
                         Navigation.NavigateTo(tenantUrl, forceLoad: true);
                         return;
                     }

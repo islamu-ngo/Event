@@ -19,7 +19,7 @@ public sealed class NativeApprovalStatusHttpTests
     [Test]
     public async Task AnonymousCatalogue_PreservesScalarValuesAndNullableDescription()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {
@@ -57,7 +57,7 @@ public sealed class NativeApprovalStatusHttpTests
     [Test]
     public async Task EmptyCatalogue_RemainsAnEmptyJsonArray()
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {

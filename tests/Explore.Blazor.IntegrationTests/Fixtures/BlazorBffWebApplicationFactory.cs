@@ -23,7 +23,25 @@ public class BlazorBffWebApplicationFactory : WebApplicationFactory<Program>
         : this(new ResolverConfigurationDto
         {
             PathEnabled = true,
-            PathPrefix = "/t"
+            PathPrefix = string.Empty,
+            ReservedSlugs =
+            [
+                "about", "admin", "ai", "auth", "community-guidelines", "contact",
+                "error", "errors", "actors", "events", "event-created", "forbidden", "group",
+                "home", "login", "logout", "my", "notifications", "onboarding", "organization",
+                "organizations", "payments", "privacy", "registration", "settings", "setup",
+                "startup", "status", "studio", "terms", "tickets", "users", "oauth", "test-endpoint",
+                "_blazor", "_framework", "_content", "_host",
+                "api", "bff", "health", "healthz", "metrics", "prometheus", "swagger",
+                "openapi", "mcp", "connect", "signin-atproto", "signin-oidc",
+                "signout-callback-oidc",
+                "root", "administrator", "security", "help", "support", "billing",
+                "official", "event", "islamu", "system", "instance", "test",
+                "css", "js", "static", "assets", "fonts", "image", "images", "dist", "lib",
+                "Explore.Blazor.styles.css", "Explore.Blazor.Client.bundle.scp.css", "favicon.ico",
+                "robots.txt", "sitemap.xml", "manifest.json", "manifest.webmanifest",
+                "service-worker.js", "push-service-worker.js"
+            ]
         })
     {
     }

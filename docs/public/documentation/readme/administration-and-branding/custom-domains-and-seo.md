@@ -10,14 +10,31 @@ Custom vanity domains in ISLAMU Event are tenant routing and public accountabili
 
 ## Domain Setup & Tenant Routing
 
+Custom domains are optional. The default browser URL is
+`https://events.example.org/{slug}` and works with one normal DNS record and TLS
+certificate; wildcard DNS and wildcard TLS are not required. Configure a vanity
+domain only when a tenant needs its own host, such as `events.al-nour.org`.
+
 Before enabling an external domain for a community tenant:
 
 1. **Verify Tenant Ownership**: Ensure the domain binding is requested by an authorized Tenant Administrator (see [Admin Hierarchy](admin-hierarchy.md)).
 2. **DNS & TLS Provisioning**: Point DNS A/AAAA or CNAME records to your server and verify valid TLS certificate issuance.
-3. **Reverse-Proxy Header Forwarding**: Ensure your reverse proxy (Caddy, Traefik, or Nginx) forwards the client `Host` and `X-Forwarded-Proto` headers (see [Docker Compose Reverse Proxy](../self-hosting/docker-compose.md#5-reverse-proxy-configuration)).
-4. **Tenant Resolution Order**: In [Multi-Tenant Mode](../security-and-identity/multi-tenancy.md), requests evaluate:
-   $$\text{Trusted BFF Context} \longrightarrow \text{Admin-Host Exclusion} \longrightarrow \text{Custom Domain} \longrightarrow \text{Subdomain} \longrightarrow 404$$
+3. **Reverse-Proxy Header Forwarding**: Ensure your reverse proxy (Caddy, Traefik, or Nginx) forwards the client `Host` and `X-Forwarded-Proto` headers (see [Docker Compose Reverse Proxy](../self-hosting/docker-compose.md#5-reverse-proxy--tls-configuration)).
+4. **Tenant Resolution Order**: In [Multi-Tenant Mode](../security-and-identity/multi-tenancy.md), API requests evaluate:
+   $$\text{Trusted X-Tenant-Slug} \longrightarrow \text{Custom Domain} \longrightarrow \text{Subdomain} \longrightarrow 404$$
 5. **Fail-Closed Verification**: An unmapped or unknown domain must immediately return `404 Not Found`. It will never route to a random tenant.
+
+The ordering is security-significant. The BFF removes any browser-supplied
+`X-Tenant-Slug` and creates the trusted internal value only from resolved route
+context. When that trusted header is present, it wins over host matching. When it
+is absent, the API checks the mapped custom domain before an eligible subdomain.
+Do not configure an edge proxy to copy an untrusted client header through to the
+API.
+
+Path routing remains available when host routing is enabled. Its empty prefix
+means the default `/{slug}` shape; a configured nonempty prefix is a supported
+deployment choice, not a compatibility shim. Reserved system and application
+segments cannot be assigned as tenant slugs.
 
 ---
 
@@ -41,7 +58,7 @@ The platform automates structured metadata and search cards, but does not provid
 
 ## Related Guides & Next Steps
 
-* **[Multi-Tenancy Architecture](../security-and-identity/multi-tenancy.md)** — Learn how host headers resolve tenant boundaries.
+* **[Multi-Tenancy Architecture](../security-and-identity/multi-tenancy.md)** — Learn how browser paths and host headers resolve tenant boundaries.
 * **[White-Labeling & Branding](white-labeling.md)** — Customize storefront appearance while preserving governance locks.
-* **[Docker Compose Reverse Proxy Setup](../self-hosting/docker-compose.md#5-reverse-proxy-configuration)** — Configure Caddy, Traefik, or Nginx for custom domains.
+* **[Docker Compose Reverse Proxy Setup](../self-hosting/docker-compose.md#5-reverse-proxy--tls-configuration)** — Configure Caddy, Traefik, or Nginx for custom domains.
 * **[Troubleshooting Tenant Routing](../configuration-and-operations/troubleshooting-and-health.md)** — Diagnose 404 unknown host and redirect issues.

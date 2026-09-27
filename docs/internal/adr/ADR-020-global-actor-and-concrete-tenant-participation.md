@@ -23,7 +23,12 @@ Tenant authority is concrete:
 
 Events keep a simple global `ActorId`; tenant write authority is resolved from the concrete participation and current user. `ActorSubscription` remains tenant-local and targets a global Actor. Create/read/fanout require local discoverability; unsubscribe may retain durable-row access after the target becomes hidden.
 
-Canonical `/actors/{actorId}` profiles contain only safe global data. Tenant-contextual `/t/{tenantId}/actors/{actorId}` profiles compose approved public local overrides. Clients render subscription, evidence, document, and review actions only from HAL.
+Canonical `/actors/{actorId}` is the only Actor profile page and contains only
+safe global data. Tenant-aware API consumers may request
+`GET /api/actor/by-tenant/{tenantId}/{id}` to compose approved public local
+overrides under the endpoint's fail-closed discoverability rules; this does not
+create a tenant-contextual browser page. Clients render subscription, evidence,
+document, and review actions only from HAL.
 
 Organization legitimacy evidence targets `OrganizationTenant` and a private tenant-owned Document. Submission and review are separate, retained, audited workflows; evidence approval never approves participation automatically.
 

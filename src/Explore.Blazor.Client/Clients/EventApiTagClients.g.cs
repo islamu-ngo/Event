@@ -200550,6 +200550,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("pathPrefix")]
         public string? PathPrefix { get; init; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("reservedSlugs")]
+        public System.Collections.Generic.ICollection<string>? ReservedSlugs { get; init; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("instanceBaseDomain")]
         public string? InstanceBaseDomain { get; init; } = default!;
 

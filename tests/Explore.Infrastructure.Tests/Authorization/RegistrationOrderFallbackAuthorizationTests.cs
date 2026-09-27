@@ -26,6 +26,54 @@ public sealed class RegistrationOrderFallbackAuthorizationTests
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
 
     [Test]
+    public async Task IsAllowed_StartingAnOrderRequiresCurrentAccountAndMatchingEventTenant()
+    {
+        FallbackAuthorizationService service = CreateService();
+        var eventFacts = Attributes(includeAccountUserId: false);
+
+        bool anonymous = await service.IsAllowedAsync(
+            ResourceKinds.RegistrationOrder, _eventId.ToString("D"), AuthorizationActions.Create, eventFacts);
+        _adminContext.UserId.Returns(_accountUserId);
+        bool account = await service.IsAllowedAsync(
+            ResourceKinds.RegistrationOrder, _eventId.ToString("D"), AuthorizationActions.Create, eventFacts);
+        bool otherTenant = await service.IsAllowedAsync(
+            ResourceKinds.RegistrationOrder, _eventId.ToString("D"), AuthorizationActions.Create,
+            Attributes(Guid.CreateVersion7(), includeAccountUserId: false));
+        bool missingEvent = await service.IsAllowedAsync(
+            ResourceKinds.RegistrationOrder, "invalid", AuthorizationActions.Create,
+            Attributes(includeAccountUserId: false, includeEventContext: false));
+
+        await Assert.That(anonymous).IsFalse();
+        await Assert.That(account).IsTrue();
+        await Assert.That(otherTenant).IsFalse();
+        await Assert.That(missingEvent).IsFalse();
+    }
+
+    [Test]
+    public async Task AuthorizeBatch_RegistrationStartMatchesScalarAuthorityWithoutWeakeningTenantIsolation()
+    {
+        FallbackAuthorizationService service = CreateService();
+        _adminContext.UserId.Returns(_accountUserId);
+        AuthorizationRequest[] checks =
+        [
+            new(ResourceKinds.RegistrationOrder, _eventId.ToString("D"), AuthorizationActions.Create,
+                Facts: new EventScopedAuthorizationFacts(_tenantId, _eventId)),
+            new(ResourceKinds.RegistrationOrder, _eventId.ToString("D"), AuthorizationActions.Create,
+                Facts: new EventScopedAuthorizationFacts(Guid.CreateVersion7(), _eventId)),
+            new(ResourceKinds.RegistrationOrder, _eventId.ToString("D"), AuthorizationActions.Create)
+        ];
+
+        var decisions = await service.AuthorizeBatchAsync(checks);
+        await Assert.That(decisions[0].IsAllowed).IsTrue();
+        await Assert.That(decisions[1].IsAllowed).IsFalse();
+        await Assert.That(decisions[2].IsAllowed).IsFalse();
+
+        _adminContext.UserId.Returns((Guid?)null);
+        _adminContext.ResolveUserIdAsync(Arg.Any<CancellationToken>()).Returns((Guid?)null);
+        await Assert.That((await service.AuthorizeBatchAsync(checks)).All(decision => !decision.IsAllowed)).IsTrue();
+    }
+
+    [Test]
     public async Task IsAllowed_AccountOwnerMayViewAndUseLifecycleActionsOnOwnTenantOrder()
     {
         FallbackAuthorizationService service = CreateService();

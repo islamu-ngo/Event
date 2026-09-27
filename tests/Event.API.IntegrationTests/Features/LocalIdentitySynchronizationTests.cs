@@ -9,6 +9,7 @@ using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Infrastructure.Services;
@@ -152,6 +153,8 @@ public sealed class LocalIdentitySynchronizationTests
         await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton)));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
+            .SetTenant(PlatformDefaults.DefaultTenantId);
         boundary.Enabled = true;
 
         BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
@@ -353,6 +356,8 @@ public sealed class LocalIdentitySynchronizationTests
         await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton)));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
+            .SetTenant(PlatformDefaults.DefaultTenantId);
         boundary.Enabled = true;
 
         BaseCommandResponse<Guid> response = await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
@@ -546,10 +551,15 @@ public sealed class LocalIdentitySynchronizationTests
     private static async Task PrepareNativeAdministratorAsync(
         LocalAdmissionWebApplicationFactory factory, IServiceProvider services, ProviderAccountKey accountKey)
     {
+        services.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
         await using (ExploreDbContext mutation = factory.CreateDatabase())
         {
             InstanceBootstrapState initial = await mutation.InstanceBootstrapStates.SingleAsync(CancellationToken);
             await mutation.InstanceBootstrapStates.Where(state => state.Id == initial.Id).ExecuteDeleteAsync(CancellationToken);
+            Tenant defaultTenant = await mutation.Tenants.SingleAsync(
+                tenant => tenant.Id == PlatformDefaults.DefaultTenantId, CancellationToken);
+            defaultTenant.TenantStatusId = (int)TenantStatusEnum.Provisioning;
+            await mutation.SaveChangesAsync(CancellationToken);
         }
         await services.GetRequiredService<ConfiguredAdministratorBootstrapStartupRunner>().PrepareAsync(CancellationToken);
         await Assert.That(await services.GetRequiredService<IConfiguredAdministratorBootstrapProvider>()
@@ -590,6 +600,8 @@ public sealed class LocalIdentitySynchronizationTests
         LocalAdmissionWebApplicationFactory factory, SyncUserCommand command)
     {
         await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
+            .SetTenant(PlatformDefaults.DefaultTenantId);
         return await scope.ServiceProvider.GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(command, CancellationToken);
     }
 

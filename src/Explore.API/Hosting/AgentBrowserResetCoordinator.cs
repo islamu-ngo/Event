@@ -278,7 +278,7 @@ public sealed class AgentBrowserResetCoordinator(
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            logger.LogDebug("Agent database reset control listener stopped on host cancellation.");
+            return;
         }
         finally { await Task.WhenAll(clients); }
     }

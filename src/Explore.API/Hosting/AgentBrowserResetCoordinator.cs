@@ -276,7 +276,10 @@ public sealed class AgentBrowserResetCoordinator(
                 if (!connected.Task.IsCompletedSuccessfully) await client;
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            logger.LogDebug("Agent database reset control listener stopped on host cancellation.");
+        }
         finally { await Task.WhenAll(clients); }
     }
 
@@ -303,6 +306,7 @@ public sealed class AgentBrowserResetCoordinator(
             }
             catch (Exception exception)
             {
+                // Every reset failure leaves admission closed and must return a sanitized failure to the control caller.
                 // Native/provider exception messages can contain secrets or SQL values.
                 string reason = exception is InvalidOperationException && exception.Message.StartsWith("agent_browser_", StringComparison.Ordinal)
                     ? exception.Message : exception is PostgresException postgres ? postgres.SqlState : exception.GetType().Name;

@@ -13,7 +13,7 @@ public sealed class AgentBrowserAdmissionTests
         await using var factory = new RejectedAgentHost();
         Exception? failure = null;
         try { using var client = factory.CreateClient(); }
-        catch (Exception exception) { failure = exception; }
+        catch (InvalidOperationException exception) { failure = exception; }
         await Assert.That(failure).IsNotNull();
         var messages = new List<string>();
         for (Exception? current = failure; current is not null; current = current.InnerException)

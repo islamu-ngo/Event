@@ -67,7 +67,7 @@ public sealed class AgentBrowserPostgresConcurrencyTests
         patch.Headers.TryAddWithoutValidation("If-Match", $"\"{stamp:D}\"");
         requestBarrier.Armed = true;
         Task<HttpResponseMessage> request = client.SendAsync(patch);
-        var outbox = ActivatorUtilities.CreateInstance<OutboxProcessor>(fixture.Services);
+        using var outbox = ActivatorUtilities.CreateInstance<OutboxProcessor>(fixture.Services);
         Task worker = outbox.ProcessOutboxBatchAsync(TestContext.Current!.Execution.CancellationToken);
         try
         {
@@ -115,7 +115,6 @@ public sealed class AgentBrowserPostgresConcurrencyTests
             requestBarrier.Release.TrySetResult();
             dispatch.Release.TrySetResult();
             await Task.WhenAll(request, worker).WaitAsync(TimeSpan.FromSeconds(20));
-            outbox.Dispose();
         }
     }
 

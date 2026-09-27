@@ -222,7 +222,7 @@ public sealed class AgentDatabaseResetLifecycleTests
 
     private static async Task ResetThroughToolAsync()
     {
-        string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+        string root = Path.GetFullPath("../../../../../", AppContext.BaseDirectory);
         var start = new ProcessStartInfo("dotnet") { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (string argument in new[] { "run", "eng/tools/AgentDatabaseReset.cs", "--", "--owner-pid",
             Environment.ProcessId.ToString(CultureInfo.InvariantCulture), "--apply" }) start.ArgumentList.Add(argument);

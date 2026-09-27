@@ -41,10 +41,10 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         "postgis/postgis:18-3.6-alpine@sha256:ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7")
         .WithDatabase("islamu_event_agent").WithUsername("postgres")
         .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))).Build();
-    private static readonly string MigrationAuthorityDirectory = Path.Combine(
+    private static readonly string MigrationAuthorityDirectory = Path.Join(
         Path.GetTempPath(), $"agent-browser-migration-{Guid.NewGuid():N}");
     private readonly TestSecrets _secrets = new();
-    private readonly string _erasureDirectory = Path.Combine(
+    private readonly string _erasureDirectory = Path.Join(
         Path.GetTempPath(), $"agent-browser-erasure-{Guid.NewGuid():N}");
     private static readonly Lazy<Task<TestDatabaseReset>> Initialization = new(InitializeDatabaseAsync);
     private readonly BoundaryFault _fault = new();
@@ -92,7 +92,7 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 ["Authentication:Local:JwtKey"] = fixture._secrets.Values[SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey],
                 ["CONFIGURATION_MANIFEST_MODE"] = "Off",
                 ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
-                ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Combine(fixture._erasureDirectory, "authority.db"),
+                ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Join(fixture._erasureDirectory, "authority.db"),
                 ["WEBHOOKS_PROVIDER"] = "Local",
                 ["INSTANCE_BOOTSTRAP_MODE"] = "ConfiguredAdministrator",
                 ["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = "local",
@@ -104,7 +104,7 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 ["Deployment:Mode"] = "MultiTenant",
                 ["Testing:SkipJwtAuthorityWarmup"] = "true",
                 ["SETUP_SECRET"] = NewPassword(),
-                ["SETUP_SECRET_FILE"] = Path.Combine(Path.GetTempPath(), $"agent-setup-{Guid.CreateVersion7():N}"),
+                ["SETUP_SECRET_FILE"] = Path.Join(Path.GetTempPath(), $"agent-setup-{Guid.CreateVersion7():N}"),
                 ["OutboxProcessor:Enabled"] = "false",
                 ["EmailDispatchProcessor:Enabled"] = "false"
             };
@@ -283,11 +283,10 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         await connection.OpenAsync(Token);
         var fingerprints = new List<string>();
         using var identifiers = new NpgsqlCommandBuilder();
-        foreach (string table in new[] { "__EFMigrationsHistory", "__EFDataProtectionMigrationsHistory",
+        foreach (string identifier in new[] { "__EFMigrationsHistory", "__EFDataProtectionMigrationsHistory",
             "roles", "role_permissions", "permissions", "authentication_providers",
-            "module_definitions", "ui_theme_presets" })
+            "module_definitions", "ui_theme_presets" }.Select(identifiers.QuoteIdentifier))
         {
-            string identifier = identifiers.QuoteIdentifier(table);
             await using var command = new NpgsqlCommand($"SELECT md5(string_agg(payload, '|' ORDER BY payload)) FROM (SELECT to_jsonb(t)::text AS payload FROM islamu_event.{identifier} t) s", connection);
             fingerprints.Add((string)(await command.ExecuteScalarAsync(Token))!);
         }

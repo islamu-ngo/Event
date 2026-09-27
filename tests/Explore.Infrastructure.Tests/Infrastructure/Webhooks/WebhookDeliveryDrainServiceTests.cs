@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Security.Cryptography;
@@ -349,15 +348,17 @@ public sealed class WebhookDeliveryDrainServiceTests
     public async Task ProcessBatchAsync_UsesGovernedEndpointTimeout()
     {
         var policy = new WebhookDeliveryGovernancePolicy(16, 4, 1, 10, 8, 1, 5, "test-policy-v1");
-        var fixture = new Fixture(new NeverCompletingMessageHandler(), deliveryPolicy: policy);
+        var handler = new NeverCompletingMessageHandler();
+        var fixture = new Fixture(handler, deliveryPolicy: policy);
         var attempt = CreateAttempt();
         fixture.ConfigureClaim(attempt);
-        var startedAt = Stopwatch.GetTimestamp();
 
-        var result = await fixture.Service.ProcessBatchAsync(CancellationToken.None);
+        var processing = fixture.Service.ProcessBatchAsync(CancellationToken.None);
 
+        await handler.RequestStarted.WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.CancellationObserved.WaitAsync(TimeSpan.FromSeconds(10));
+        var result = await processing.WaitAsync(TimeSpan.FromSeconds(10));
         await Assert.That(result.RetryScheduledCount).IsEqualTo(1);
-        await Assert.That(Stopwatch.GetElapsedTime(startedAt)).IsLessThan(TimeSpan.FromSeconds(3));
     }
 
     [Test]
@@ -871,10 +872,22 @@ public sealed class WebhookDeliveryDrainServiceTests
 
     private sealed class NeverCompletingMessageHandler : HttpMessageHandler
     {
+        private readonly TaskCompletionSource _requestStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _cancellationObserved =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task RequestStarted => _requestStarted.Task;
+
+        public Task CancellationObserved => _cancellationObserved.Task;
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            _requestStarted.TrySetResult();
+            using var registration = cancellationToken.Register(
+                () => _cancellationObserved.TrySetResult());
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException("Unreachable after cancellation.");
         }

@@ -598,21 +598,35 @@ public class EventListTests : IDisposable
         await SelectRenderedEventAsync(cut, "Dock Baseline Event");
         await OpenTagManagementAsync(cut);
 
+        var tagPopupClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) =>
+        {
+            if (cut.FindAll(".tagcat-manager__popup").Count == 0)
+            {
+                tagPopupClosed.TrySetResult();
+            }
+        };
+
         await cut.Find(".event-details-sidebar [aria-label='Close']").ClickAsync(new MouseEventArgs());
+        await tagPopupClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         await Assert.That(cut.FindAll(".tagcat-manager__popup")).IsEmpty();
         await Assert.That(_dockLayoutState.GetPanel(EventDockPanels.EventPreviewId)?.State.IsOpen).IsTrue();
 
+        var previewClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) =>
+        {
+            if (cut.FindAll("[aria-label='Event preview']").Count == 0)
+            {
+                previewClosed.TrySetResult();
+            }
+        };
+
         await cut.Find(".event-details-sidebar [aria-label='Close']").ClickAsync(new MouseEventArgs());
+        await previewClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         await Assert.That(_dockLayoutState.GetPanel(EventDockPanels.EventPreviewId)?.State.IsOpen).IsFalse();
-        cut.WaitForAssertion(() =>
-        {
-            if (cut.FindAll("[aria-label='Event preview']").Count != 0)
-            {
-                throw new InvalidOperationException("Expected the event preview to be removed after closing it.");
-            }
-        });
+        await Assert.That(cut.FindAll("[aria-label='Event preview']")).IsEmpty();
     }
 
     [Test]

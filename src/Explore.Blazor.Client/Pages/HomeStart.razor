@@ -4,9 +4,11 @@
 @using Explore.Blazor.Client.Models
 @using Explore.Blazor.Client.Services
 @using Explore.Blazor.Client.Clients
+@using Explore.Blazor.Client.Contracts.Services.Shell
 @inject IStartupRoutingService StartupRoutingService
 @inject IInstanceOnboardingService InstanceOnboardingService
 @inject IUserService UserService
+@inject IUiShellContextService ShellContextService
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
@@ -175,6 +177,12 @@
         if (isMultiTenant)
         {
             var resolvedTenantId = TenantContext?.TenantId;
+            if (instanceStatus.IsAuthenticated &&
+                (resolvedTenantId == null || resolvedTenantId == Guid.Empty))
+            {
+                resolvedTenantId = (await ShellContextService.GetCachedContextAsync())?.TenantId;
+            }
+
             if (resolvedTenantId == null || resolvedTenantId == Guid.Empty)
             {
                 if (instanceStatus.IsAuthenticated)

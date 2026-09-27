@@ -9,6 +9,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -83,7 +84,7 @@ public sealed class LocationPrivateHomeApiTests
     [Arguments("private-home/ownership", "unquoted")]
     public async Task Write_WithMissingOrInvalidIfMatch_ReturnsBadRequest(string suffix, string? ifMatch)
     {
-        await using var factory = new AuthenticatedWebApplicationFactory();
+        await using var factory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         using HttpClient client = factory.CreateClient();
         using var request = AuthenticatedRequest(HttpMethod.Post, Route(Guid.CreateVersion7(), suffix), Guid.CreateVersion7());
         request.Content = JsonContent.Create(AffirmativeConsent());
@@ -103,7 +104,7 @@ public sealed class LocationPrivateHomeApiTests
         Guid locationId = Guid.CreateVersion7();
         Guid stamp = Guid.CreateVersion7();
         ILocationRepository repository = Substitute.For<ILocationRepository>();
-        await using var baseFactory = new AuthenticatedWebApplicationFactory();
+        await using var baseFactory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         await using WebApplicationFactory<Program> factory = WithRepository(baseFactory, repository);
         using HttpClient client = factory.CreateClient();
         using var request = AuthenticatedRequest(HttpMethod.Post, Route(locationId, suffix), Guid.CreateVersion7());
@@ -133,7 +134,7 @@ public sealed class LocationPrivateHomeApiTests
             FullName = "Private venue",
             Country = "Belgium",
             City = "Brussels",
-            TenantId = Guid.CreateVersion7(),
+            TenantId = PlatformDefaults.DefaultTenantId,
             ConcurrencyStamp = stamp
         };
         if (transfer)
@@ -141,7 +142,7 @@ public sealed class LocationPrivateHomeApiTests
 
         ILocationRepository repository = Substitute.For<ILocationRepository>();
         repository.GetById(locationId).Returns(location);
-        await using var baseFactory = new AuthenticatedWebApplicationFactory();
+        await using var baseFactory = new AuthenticatedWebApplicationFactory { SeedActiveDefaultTenant = true };
         await using WebApplicationFactory<Program> factory = WithRepository(baseFactory, repository);
         using HttpClient client = factory.CreateClient();
         using var request = AuthenticatedRequest(HttpMethod.Post, Route(locationId, suffix), actorId);

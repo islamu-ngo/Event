@@ -242,6 +242,8 @@ public class StorageObjectControllerTests
         };
         var repository = Substitute.For<IStorageObjectRepository>();
         repository.GetById(storageObjectId).Returns(storageObject);
+        repository.GetForGenericAccessAsync(storageObjectId, Arg.Any<CancellationToken>())
+            .Returns(storageObject);
         repository.IsRegistrationAnswerFileQuarantinedAsync(storageObjectId, Arg.Any<CancellationToken>())
             .Returns(true);
         var resolver = CreateProviderResolver([1, 2, 3, 4, 5, 6, 7, 8]);
@@ -256,6 +258,7 @@ public class StorageObjectControllerTests
             resolver,
             objectStorageService)
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         using var client = factory.CreateClient();
@@ -334,6 +337,7 @@ public class StorageObjectControllerTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = false }
         };
         using var client = factory.CreateClient();
@@ -515,6 +519,7 @@ public class StorageObjectControllerTests
     {
         await using var factory = new AuthenticatedWebApplicationFactory
         {
+            SeedActiveDefaultTenant = true,
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true }
         };
         using var client = factory.CreateClient();

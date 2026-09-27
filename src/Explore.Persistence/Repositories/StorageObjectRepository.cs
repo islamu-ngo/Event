@@ -29,6 +29,7 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
     private IQueryable<StorageObject> WithoutResourceOwnership(IQueryable<StorageObject> query) =>
         query
             .Where(storageObject =>
+                !storageObject.IsDeleted &&
                 storageObject.Purpose != StorageObjectPurposes.EventResource &&
                 storageObject.OwningResourceKind != StorageOwningResourceKinds.EventResource &&
                 !_dbContext.EventResources

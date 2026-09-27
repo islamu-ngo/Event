@@ -223,6 +223,12 @@ public sealed partial class NativeStorageObjectHttpTests
         using (var deleted = await client.DeleteAsync($"{Root}/{id}"))
             await Assert.That(deleted.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(factory.Objects).IsEmpty();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var visible = await scope.ServiceProvider.GetRequiredService<IStorageObjectRepository>()
+                .GetForGenericAccessAsync(id, default);
+            await Assert.That(visible).IsNull();
+        }
         using (var missing = await client.GetAsync($"{Root}/{id}/content"))
             await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }

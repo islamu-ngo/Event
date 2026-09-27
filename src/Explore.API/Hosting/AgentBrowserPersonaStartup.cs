@@ -39,6 +39,17 @@ public static class AgentBrowserPersonaStartup
         IHostEnvironment environment, CancellationToken cancellationToken = default)
     {
         if (!ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(configuration, environment)) return;
+        if (services.GetService<AgentBrowserResetCoordinator>() is { } owner)
+        {
+            await owner.InitializeAsync(cancellationToken);
+            return;
+        }
+        await WithProvisioningLockAsync(services, token => ProvisionAsync(services, configuration, token), cancellationToken);
+    }
+
+    internal static async Task WithProvisioningLockAsync(IServiceProvider services, Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken)
+    {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(120));
         CancellationToken token = deadline.Token;
@@ -55,7 +66,7 @@ public static class AgentBrowserPersonaStartup
             command.Parameters.AddWithValue("key", AdvisoryLockKey);
             locked = (bool)(await command.ExecuteScalarAsync(token))!;
             if (!locked) throw Failure("provisioning_contended");
-            await ProvisionAsync(services, configuration, token);
+            await operation(token);
         }
         finally
         {
@@ -72,7 +83,7 @@ public static class AgentBrowserPersonaStartup
         }
     }
 
-    private static async Task ProvisionAsync(IServiceProvider services, IConfiguration configuration, CancellationToken token)
+    internal static async Task ProvisionAsync(IServiceProvider services, IConfiguration configuration, CancellationToken token)
     {
         InstanceBootstrapState? marker;
         var states = new Dictionary<Guid, LocalCredentialOperationStatus?>();
@@ -203,6 +214,50 @@ public static class AgentBrowserPersonaStartup
         foreach (var persona in All)
             if (!Ready(await ClassifyAsync(services, persona, persona.OperationId ?? marker.Id, token)))
                 throw Failure("completion_incomplete");
+    }
+
+    internal static async Task ValidateResetOwnershipAsync(IServiceProvider services, IConfiguration configuration, CancellationToken token)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var marker = await db.InstanceBootstrapStates.AsNoTracking().SingleOrDefaultAsync(token);
+        if (configuration["INSTANCE_BOOTSTRAP_MODE"] != "ConfiguredAdministrator"
+            || configuration["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] != "local"
+            || configuration["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] != Administrator.SubjectId.ToString("D")
+            || marker?.Status != InstanceBootstrapStatus.Completed || marker.CompletedByUserId != Administrator.SubjectId)
+            throw Failure("reset_ownership");
+        var provider = ActivatorUtilities.CreateInstance<ConfiguredAdministratorBootstrapProvider>(scope.ServiceProvider);
+        if (await provider.GetVerifiedBindingAsync(new ProviderAccountKey(AuthenticationProviderKind.Local, Administrator.SubjectId.ToString("D")), token) is null)
+            throw Failure("reset_ownership");
+        await Binder(scope.ServiceProvider).EnsureOwnershipAsync(marker, token);
+        foreach (var persona in All)
+            if (!Ready(await ClassifyAsync(services, persona, persona.OperationId ?? marker.Id, token)))
+                throw Failure("reset_credential_ownership");
+    }
+
+    internal static async Task VerifyResetBaselineAsync(IServiceProvider services, CancellationToken token)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        db.EnableTenantFilterBypass(Explore.Persistence.QueryFilters.TenantFilterBypassReasons.DatabaseSeeding);
+        try
+        {
+            var marker = await db.InstanceBootstrapStates.AsNoTracking().SingleAsync(token);
+            await Binder(scope.ServiceProvider).EnsureOwnershipAsync(marker, token);
+            if (marker.Status != InstanceBootstrapStatus.Completed
+                || await db.Users.CountAsync(token) != 6 || await db.Set<LocalIdentityUser>().CountAsync(token) != 6
+                || await db.Actors.CountAsync(token) != 8 || await db.UserExternalLogins.CountAsync(token) != 6
+                || await db.Tenants.CountAsync(token) != 2 || await db.Organizations.CountAsync(token) != 2
+                || await db.Events.CountAsync(token) != 2 || await db.TenantUsers.CountAsync(token) != 5
+                || await db.PlatformUserRoles.CountAsync(token) != 1 || await db.EventRoleAssignments.CountAsync(token) != 3
+                || await db.TenantUserRoleGrants.CountAsync(token) != 5
+                || await db.TenantUserRoleGrants.AnyAsync(row => row.RevokedAt != null, token))
+                throw Failure("reset_baseline_incomplete");
+            foreach (var persona in All)
+                if (!Ready(await ClassifyAsync(services, persona, persona.OperationId ?? marker.Id, token)))
+                    throw Failure("reset_baseline_incomplete");
+        }
+        finally { db.ClearTenantFilterBypass(); }
     }
 
     private static async Task<LocalCredentialOperationStatus?> ClassifyAsync(IServiceProvider services, AgentBrowserPersona persona, Guid? operationId, CancellationToken token)

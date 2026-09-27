@@ -1,3 +1,4 @@
+using Explore.API.Hosting;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
@@ -7,7 +8,8 @@ namespace Explore.API.BackgroundServices;
 public sealed class AiAssistantRunWorker(
     IAiAssistantRunQueue queue,
     IServiceScopeFactory scopeFactory,
-    ILogger<AiAssistantRunWorker> logger) : BackgroundService
+    ILogger<AiAssistantRunWorker> logger,
+    AgentBrowserResetCoordinator? agentDatabase = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -19,6 +21,10 @@ public sealed class AiAssistantRunWorker(
 
     private async Task ProcessAsync(AiAssistantRunQueueItem item, CancellationToken stoppingToken)
     {
+        using var work = agentDatabase is null ? null : await agentDatabase.EnterAsync(stoppingToken);
+        // An item may have been dequeued before maintenance but not yet admitted. Never execute that
+        // pointer after purge, including when its continuation resumes only after readiness reopens.
+        if (agentDatabase is not null && item.AgentDatabaseGeneration != agentDatabase.Generation) return;
         await using var scope = scopeFactory.CreateAsyncScope();
         var tenantAccessor = scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>();
         tenantAccessor.SetTenant(item.TenantId);

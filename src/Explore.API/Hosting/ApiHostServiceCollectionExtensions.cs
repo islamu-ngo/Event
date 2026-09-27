@@ -28,6 +28,8 @@ using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.NotificationFanout;
 using Explore.Infrastructure.Webhooks;
 using Explore.Persistence;
+using Explore.Persistence.Schema;
+using Microsoft.AspNetCore.OutputCaching;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
@@ -129,6 +131,16 @@ public static class ApiHostServiceCollectionExtensions
             secretProviderConfiguration,
             enableAuditing: true,
             enableRefreshService: !isOpenApiGeneration);
+        if (!isOpenApiGeneration && ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment))
+        {
+            if (builder.Configuration.GetValue<bool>("EmailDispatchRabbitMq:Enabled"))
+                throw new InvalidOperationException("agent_browser_reset_external_consumer");
+            builder.Services.AddSingleton<AgentBrowserResetCoordinator>();
+            builder.Services.AddSingleton<IAgentBrowserWorkAdmission>(provider => provider.GetRequiredService<AgentBrowserResetCoordinator>());
+            builder.Services.AddHostedService(provider => provider.GetRequiredService<AgentBrowserResetCoordinator>());
+            builder.Services.AddHealthChecks().AddCheck<AgentBrowserResetCoordinator>("agent-database", tags: ["ready"]);
+            builder.Services.Configure<OutputCacheOptions>(options => options.AddBasePolicy(policy => policy.Tag("agent-database")));
+        }
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<
             IKeycloakOperatorAuthority,

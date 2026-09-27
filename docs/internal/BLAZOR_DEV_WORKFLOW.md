@@ -55,12 +55,28 @@ launching shell (or the ignored repository `.env`); a new shell does not inherit
 a selection made in a previous terminal. When selecting Infisical, the chosen
 project and environment must also contain the required `/postgresql` folder.
 A missing folder fails closed during AppHost startup. Never rotate an existing
-synthetic database password or reset its volume to work around that failure.
+synthetic database password or reset its volume silently to work around that
+failure. A separately authorized agent-only recovery must record the loss of
+the original session and establish a new cold/warm baseline.
 
 ```bash
 # Select SECRET_PROVIDER in this shell or the ignored repository .env first.
 dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj --configuration Release --no-build --launch-profile local-agent
 ```
+
+When the shared Development Infisical `/api` folder selects Keycloak, direct
+Infisical selection correctly rejects the Local-only agent API. The
+repository-native `bash eng/scripts/run-local-agent.sh --no-build` instead
+reads approved Development Universal Auth bootstrap values from the shared
+User Secrets store, imports only six allowlisted agent credentials from the
+selected `/api` and `/postgresql` vault folders into this process,
+and selects Environment plus the agent's compiled Local topology. It does not
+rewrite the shared vault, the ignored `.env`, or any credential. The operator
+needs `curl`, `jq`, `base64`, and `dotnet`; omit `--no-build` after source edits
+until a Release build has produced the intended binaries. The implement-tasks
+workflow copies any repository-root `.env` into a new or resumed worktree
+without overwriting a task-specific copy. An empty source `.env` does not
+supply missing secrets.
 
 The profile binds loopback-only HTTP endpoints. Register the AppHost
 resource-state observer before launch, then wait for the migration resource to
@@ -160,6 +176,20 @@ Stop only the AppHost process/session that this work launched (normally
 kill all `dotnet` processes, stop unrelated containers, or delete the agent
 database/volumes as recovery. A fresh-volume reset is destructive and requires
 explicit developer approval.
+
+For an intentionally new synthetic database baseline, use the
+[agent database reset procedure](OPERATIONS.md#reset-only-the-agent-database)
+against the **running agent API**, not a container or filesystem. The
+maintenance owner first returns 503/no-store on new API requests and drains
+active request/worker units. It preserves migrations, approved lookups, Redis,
+Mailpit, file storage, and the erasure authority while regenerating six native
+Local credentials in separate recoverable transactions. Once the tool reports
+ready, discard old browser sessions and sign all six personas in again.
+If it reports a native failure, admission remains closed until same-owner
+retry or pre-traffic restart recovery succeeds. A client timeout or lost
+response has an unknown outcome: inspect `/health` and the new credential
+baseline before assuming the API is either closed or ready.
+Measure request-to-ready rather than claiming the 2000 ms target by design.
 
 ## 3. Visual Inspection
 

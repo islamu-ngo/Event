@@ -11,9 +11,6 @@ namespace Event.Api.IntegrationTests.Features;
 [NotInParallel("ApiTestFixture")]
 public sealed class AgentBrowserPersonaStartupTests
 {
-    [After(Class)]
-    public static async Task DisposeDatabase() => await AgentBrowserPersonaFixture.DisposeDatabaseAsync();
-
     [Test]
     [Arguments("marker")]
     [Arguments("receipt")]

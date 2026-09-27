@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Infrastructure;
 using Microsoft.Extensions.Options;
 
@@ -6,7 +7,8 @@ namespace Explore.API.BackgroundServices;
 public sealed class EmailDispatchProcessor(
     EmailDispatchHostedDrainRunner drainRunner,
     IOptions<EmailDispatchProcessorSettings> settings,
-    ILogger<EmailDispatchProcessor> logger) : BackgroundService
+    ILogger<EmailDispatchProcessor> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     private readonly EmailDispatchProcessorSettings _settings = settings.Value;
 
@@ -29,6 +31,7 @@ public sealed class EmailDispatchProcessor(
         {
             try
             {
+                using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(stoppingToken);
                 await drainRunner.RunOnceAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

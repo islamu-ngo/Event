@@ -2648,3 +2648,71 @@ References: `InstanceOnboardingGenerationReader`,
 - [x] Stays in journal only (the real-HTTP read-write-read regression protects this cache contract)
 
 ---
+
+[2026-09-27 Europe/Brussels] — Local sign-in must not depend on stale OIDC discovery
+
+**Context**: The Development-only agent browser profile used Local Identity while importing approved secret values from a shared vault whose ordinary API configuration still selected Keycloak.
+
+**Symptom / Observation**: Aspire marked the API and BFF resources healthy, but both `/health` endpoints returned HTTP 503 after a five-second OIDC timeout. The redacted response named `oidc-discovery` as Unhealthy; Local `/login` still returned HTTP 200.
+
+**Root Cause**: `OidcDiscoveryHealthCheck` probed any configured `Keycloak:Authority` or `Keycloak:MetadataAddress` without considering the effective `AUTHENTICATION_PROVIDER`. A Local-only process could therefore require an absent external Identity service just because the shared vault retained Keycloak metadata.
+
+**Resolution**: The check now returns Healthy without network I/O when the effective provider is Local; Keycloak mode still probes and fails closed on an unreachable discovery endpoint. The two-case `ApiHostCompositionTests/OidcReadiness*` TUnit slice passed, and the actual Local agent API and BFF `/health` endpoints both returned HTTP 200 after restart.
+
+**Why This Matters for Future Work**: A readiness check represents dependencies of the selected runtime mode, not every provider whose configuration appears in a shared authority. Check effective provider selection before probing optional external services.
+
+**References**:
+- `src/Explore.ServiceDefaults/HealthChecks/OidcDiscoveryHealthCheck.cs:15`
+- `tests/Event.API.IntegrationTests/Hosting/ApiHostCompositionTests.cs:88`
+- `docs/internal/CONFIGURATION.md#isolated-local-agent-browser-profile`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the provider-conditional health regression covers this behavior)
+
+---
+
+[2026-09-27 Europe/Brussels] — A static database fixture needs assembly-scoped disposal
+
+**Context**: The agent persona startup, reset and PostgreSQL concurrency integration classes began sharing one lazily initialized Testcontainers database fixture.
+
+**Symptom / Observation**: A read-only persistence review found that running the existing startup class first disposed the shared container in its `[After(Class)]` hook. A later class then reused the completed static `Lazy<Task<TestDatabaseReset>>` against a stopped container; a single-class run concealed the order dependency.
+
+**Root Cause**: The shared fixture has assembly lifetime, but one consumer owned class lifetime cleanup. Disposal did not reset the static lazy initialization, so later consumers could never reacquire a live database.
+
+**Resolution**: Removed the startup class's early cleanup and kept the existing `[After(Assembly)]` cleanup in the reset lifecycle class. The startup, concurrency and reset classes passed together in one TUnit process with `--minimum-expected-tests 11 --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: The teardown boundary must match a shared fixture's longest consumer lifetime. Run all classes that share a static Testcontainers fixture together at least once; isolated green classes do not prove deterministic suite ordering.
+
+**References**:
+- `tests/Event.API.IntegrationTests/Fixtures/AgentBrowserPersonaFixture.cs:44`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaStartupTests.cs:12`
+- `tests/Event.API.IntegrationTests/Features/AgentDatabaseResetLifecycleTests.cs:15`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the combined multi-class run exposes lifecycle regressions)
+
+---
+
+[2026-09-27 Europe/Brussels] — Agent admission must guard direct hosts and persisted storage
+
+**Context**: The final security/operations gate reviewed the Local-only agent Aspire profile alongside a directly launched API and migration service.
+
+**Symptom / Observation**: A direct AgentBrowser API could pass its original admission predicate with a co-located privacy-erasure authority or Svix webhooks. The latter registered an ungated external startup worker; a persisted S3-compatible storage policy could also be selected before synthetic persona provisioning.
+
+**Root Cause**: The shared `AgentBrowserProvisioningOptions` checked Development, authentication and PostgreSQL but omitted erasure and webhook topology. The compiled Aspire defaults did not protect direct host entrypoints. Storage provider selection is a persisted hierarchical policy, not a flat AppHost `STORAGE_PROVIDER` variable. An instance-only resolution also misses an unlocked tenant override even when the instance provider is Local.
+
+**Resolution**: All host entrypoints now reject non-EmbeddedSqlite erasure or non-Local webhooks through the shared options. The API reset owner invalidates canonical instance and tenant settings caches, then resolves effective storage routes for the instance and every persisted tenant under its PostgreSQL owner lock before the first persona write or database purge. Five direct migrator binding cases and both real PostgreSQL instance-S3 denial tests passed. A new real unlocked-tenant S3 case failed on the old null-tenant guard, then passed after tenant-wide admission without purging any of six existing users. The fixture restores only its own canonical Local lookup baseline between cases; production retains operator changes.
+
+**Why This Matters for Future Work**: A safe compiled AppHost topology is not an admission boundary for independently launched children. Validate all providers capable of side effects at the earliest direct host boundary; persisted governance settings must be read as effective policy for every active scope, not replaced by a decorative environment flag or instance-only shortcut. When proving direct-host rejection, use `--no-launch-profile`: the `local-agent` launch settings intentionally pin Local webhooks and embedded erasure, overriding an invalid shell selector before admission sees it.
+
+**References**:
+- `src/Explore.Application/Configuration/AgentBrowserProvisioningOptions.cs`
+- `src/Explore.Persistence/Schema/ProviderPrimitives/ExploreDatabaseMigrator.cs`
+- `src/Explore.API/Hosting/AgentBrowserResetCoordinator.cs`
+- `tests/Event.Persistence.IntegrationTests/Database/AgentBrowserAdmissionConfigurationTests.cs`
+- `tests/Event.API.IntegrationTests/Features/AgentDatabaseResetLifecycleTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the direct-host and persisted-policy integration regressions protect this boundary)
+
+---

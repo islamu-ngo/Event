@@ -154,8 +154,15 @@ public sealed class DiscoveryPostgisSeparationArchitectureTests
     }
 
     [Test]
-    public async Task PostgisDiscoveryRuntimeSurfaceRemainsAbsent()
+    public async Task PostgisProductDiscoverySurfaceRemainsAbsent()
     {
+        // AgentBrowser alone provisions extension binaries and activates the extension.
+        // Real PostgreSQL tests verify that guard; product discovery must still not use it.
+        var agentOnlyReadinessSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ContextSystemHelpers.RepoPath("Explore.AppHost", "AppHost.cs"),
+            ContextSystemHelpers.RepoPath("Explore.Persistence", "Schema", "ProviderPrimitives", "ExploreDatabaseMigrator.cs")
+        };
         var forbiddenPatterns = new (string Surface, string Pattern)[]
         {
             ("domain entity", @"\bLocationDiscoveryPoint\b"),
@@ -169,7 +176,7 @@ public sealed class DiscoveryPostgisSeparationArchitectureTests
         };
         var sourceFiles = Directory
             .EnumerateFiles(ContextSystemHelpers.RepoPath("src"), "*", SearchOption.AllDirectories)
-            .Where(IsProductionContractSource)
+            .Where(path => IsProductionContractSource(path) && !agentOnlyReadinessSources.Contains(path))
             .Append(ContextSystemHelpers.RepoPath("Directory.Packages.props"))
             .Append(ContextSystemHelpers.RepoPath("docker-compose.yml"));
         var violations = new List<string>();

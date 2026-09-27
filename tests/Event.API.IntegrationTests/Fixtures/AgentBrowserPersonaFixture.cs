@@ -22,6 +22,7 @@ using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -36,10 +37,15 @@ namespace Event.Api.IntegrationTests.Fixtures;
 
 internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
 {
-    private static readonly PostgreSqlContainer Container = new PostgreSqlBuilder("postgres:18-alpine")
+    private static readonly PostgreSqlContainer Container = new PostgreSqlBuilder(
+        "postgis/postgis:18-3.6-alpine@sha256:ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7")
         .WithDatabase("islamu_event_agent").WithUsername("postgres")
         .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32))).Build();
+    private static readonly string MigrationAuthorityDirectory = Path.Combine(
+        Path.GetTempPath(), $"agent-browser-migration-{Guid.NewGuid():N}");
     private readonly TestSecrets _secrets = new();
+    private readonly string _erasureDirectory = Path.Combine(
+        Path.GetTempPath(), $"agent-browser-erasure-{Guid.NewGuid():N}");
     private static readonly Lazy<Task<TestDatabaseReset>> Initialization = new(InitializeDatabaseAsync);
     private readonly BoundaryFault _fault = new();
     private NativeFactory? _factory;
@@ -49,11 +55,15 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
     private string _finalPassword = null!;
     private static CancellationToken Token => TestContext.Current!.Execution.CancellationToken;
 
-    internal static async Task<AgentBrowserPersonaFixture> CreateAsync()
+    internal IServiceProvider Services => _factory!.Services;
+
+    internal static async Task<AgentBrowserPersonaFixture> CreateAsync(bool enableReset = false,
+        Action<IServiceCollection>? configure = null, string? resetPipeName = null)
     {
         var fixture = new AgentBrowserPersonaFixture();
         try
         {
+            Directory.CreateDirectory(fixture._erasureDirectory);
             await (await Initialization.Value).ResetAsync();
             await using (var database = fixture.CreateDatabase())
             {
@@ -64,6 +74,9 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 var baseDomain = await database.Set<SystemSetting>().SingleAsync(row =>
                     row.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain, Token);
                 baseDomain.Value = "\"\"";
+                var storageProvider = await database.Set<SystemSetting>().SingleAsync(row =>
+                    row.SettingKey == GovernanceSettingKeys.Storage.Provider, Token);
+                storageProvider.Value = $"\"{StorageProviders.Local}\"";
                 await database.SaveChangesAsync(Token);
                 await LookupTableSeeder.SeedAsync(database, Token);
             }
@@ -78,7 +91,9 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 ["SecretProvider:Provider"] = "Environment",
                 ["Authentication:Local:JwtKey"] = fixture._secrets.Values[SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey],
                 ["CONFIGURATION_MANIFEST_MODE"] = "Off",
-                ["PrivacyErasure:Authority:Topology"] = "CoLocated",
+                ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
+                ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Combine(fixture._erasureDirectory, "authority.db"),
+                ["WEBHOOKS_PROVIDER"] = "Local",
                 ["INSTANCE_BOOTSTRAP_MODE"] = "ConfiguredAdministrator",
                 ["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = "local",
                 ["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] = AgentBrowserPersonaCatalog.Administrator.SubjectId.ToString("D"),
@@ -93,10 +108,11 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 ["OutboxProcessor:Enabled"] = "false",
                 ["EmailDispatchProcessor:Enabled"] = "false"
             };
+            if (resetPipeName is not null) values["AgentBrowser:ResetPipeName"] = resetPipeName;
             TestDatabaseConfiguration.AddPostgreSql(values, Container.GetConnectionString());
             fixture._configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
             fixture._finalPassword = fixture._secrets.Values[SecretDefinitionRegistry.Keys.Authentication.AgentBrowserPersonaPassword];
-            fixture._factory = new NativeFactory(Container.GetConnectionString(), values, fixture._secrets, fixture._fault);
+            fixture._factory = new NativeFactory(Container.GetConnectionString(), values, fixture._secrets, fixture._fault, enableReset, configure);
             fixture._client = fixture._factory.CreateClient();
             fixture._client.BaseAddress = new Uri("http://default.localhost");
             fixture._client.DefaultRequestHeaders.Add(TenantHeaderNames.TenantSlug, "default");
@@ -136,12 +152,16 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
     private static async Task<TestDatabaseReset> InitializeDatabaseAsync()
     {
         await Container.StartAsync(Token);
+        Directory.CreateDirectory(MigrationAuthorityDirectory);
         var values = new Dictionary<string, string?>
         {
             ["AGENT_BROWSER_SEED_ENABLED"] = "true", ["ISLAMU_ASPIRE_MODE"] = "AgentBrowser",
             ["Hosting:Topology"] = "Split", ["IdentityDatabase:Topology"] = "colocated",
             ["Authentication:Provider"] = "local", ["Authorization:Provider"] = "local",
-            ["CONFIGURATION_MANIFEST_MODE"] = "Off", ["PrivacyErasure:Authority:Topology"] = "CoLocated"
+            ["CONFIGURATION_MANIFEST_MODE"] = "Off",
+            ["PrivacyErasure:Authority:Topology"] = "EmbeddedSqlite",
+            ["PrivacyErasureAuthorityEmbedded:Path"] = Path.Combine(MigrationAuthorityDirectory, "authority.db"),
+            ["WEBHOOKS_PROVIDER"] = "Local"
         };
         TestDatabaseConfiguration.AddPostgreSql(values, Container.GetConnectionString());
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
@@ -155,7 +175,13 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         return await TestDatabaseReset.CreateAsync(Container.GetConnectionString());
     }
 
-    internal static ValueTask DisposeDatabaseAsync() => Container.DisposeAsync();
+    internal static async ValueTask DisposeDatabaseAsync()
+    {
+        await Container.DisposeAsync();
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(MigrationAuthorityDirectory))
+            Directory.Delete(MigrationAuthorityDirectory, recursive: true);
+    }
 
     internal async Task AssertReadyAsync()
     {
@@ -237,7 +263,10 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
 
     internal async Task<NpgsqlConnection> AcquireProvisioningLockAsync()
     {
-        var connection = new NpgsqlConnection(Container.GetConnectionString());
+        var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(Container.GetConnectionString())
+        {
+            Pooling = false // Disposal releases the session lock now, not on a later pooled checkout.
+        }.ConnectionString);
         await connection.OpenAsync(Token);
         await using var command = new NpgsqlCommand("SELECT pg_advisory_lock(@key)", connection);
         command.Parameters.AddWithValue("key", AgentBrowserPersonaStartup.AdvisoryLockKey);
@@ -245,15 +274,36 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
         return connection;
     }
 
+    internal async Task<string> DatabasePreservationFingerprintAsync()
+    {
+        await using var connection = new NpgsqlConnection(Container.GetConnectionString());
+        await connection.OpenAsync(Token);
+        var fingerprints = new List<string>();
+        using var identifiers = new NpgsqlCommandBuilder();
+        foreach (string table in new[] { "__EFMigrationsHistory", "__EFDataProtectionMigrationsHistory",
+            "roles", "role_permissions", "permissions", "authentication_providers",
+            "module_definitions", "ui_theme_presets" })
+        {
+            string identifier = identifiers.QuoteIdentifier(table);
+            await using var command = new NpgsqlCommand($"SELECT md5(string_agg(payload, '|' ORDER BY payload)) FROM (SELECT to_jsonb(t)::text AS payload FROM islamu_event.{identifier} t) s", connection);
+            fingerprints.Add((string)(await command.ExecuteScalarAsync(Token))!);
+        }
+        return string.Join(":", fingerprints);
+    }
+
     public async ValueTask DisposeAsync()
     {
         _client?.Dispose();
         if (_factory is not null) await _factory.DisposeAsync();
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(_erasureDirectory))
+            Directory.Delete(_erasureDirectory, recursive: true);
     }
 
     private static string NewPassword() => $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
 
-    private sealed class NativeFactory(string connection, Dictionary<string, string?> settings, TestSecrets secrets, BoundaryFault fault) : CustomWebApplicationFactory
+    private sealed class NativeFactory(string connection, Dictionary<string, string?> settings, TestSecrets secrets, BoundaryFault fault,
+        bool enableReset, Action<IServiceCollection>? configure) : CustomWebApplicationFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -271,9 +321,9 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveExploreDbContextRegistrations();
-                services.AddDbContextFactory<ExploreDbContext>(options => options.UseNpgsql(
-                        connection, provider => provider.EnableRetryOnFailure())
-                    .UseSnakeCaseNamingConvention().AddInterceptors(fault));
+                services.AddDbContextFactory<ExploreDbContext>((provider, options) => options.UseNpgsql(
+                        connection, npgsql => npgsql.EnableRetryOnFailure())
+                    .UseSnakeCaseNamingConvention().AddInterceptors(fault).AddInterceptors(provider.GetServices<IInterceptor>()));
                 services.AddScoped(provider =>
                 {
                     var database = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
@@ -283,6 +333,18 @@ internal sealed partial class AgentBrowserPersonaFixture : IAsyncDisposable
                 });
                 services.RemoveAll<ISecretResolver>();
                 services.AddSingleton<ISecretResolver>(secrets);
+                if (enableReset)
+                {
+                    var admission = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+                    services.AddSingleton(provider => new AgentBrowserResetCoordinator(provider, admission,
+                        new HostingEnvironment { EnvironmentName = "Development" },
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentBrowserResetCoordinator>.Instance));
+                    services.AddSingleton<IAgentBrowserWorkAdmission>(provider => provider.GetRequiredService<AgentBrowserResetCoordinator>());
+                    services.AddHostedService(provider => provider.GetRequiredService<AgentBrowserResetCoordinator>());
+                    services.Configure<Microsoft.AspNetCore.OutputCaching.OutputCacheOptions>(options =>
+                        options.AddBasePolicy(policy => policy.Tag("agent-database")));
+                }
+                configure?.Invoke(services);
             });
         }
     }

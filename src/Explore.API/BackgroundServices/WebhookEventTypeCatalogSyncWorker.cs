@@ -1,15 +1,18 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Webhooks;
 
 namespace Explore.API.BackgroundServices;
 
 public sealed class WebhookEventTypeCatalogSyncWorker(
     IServiceScopeFactory scopeFactory,
-    ILogger<WebhookEventTypeCatalogSyncWorker> logger) : BackgroundService
+    ILogger<WebhookEventTypeCatalogSyncWorker> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
+            using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(stoppingToken);
             using var scope = scopeFactory.CreateScope();
             var syncService = scope.ServiceProvider.GetRequiredService<IWebhookEventTypeCatalogSyncService>();
             var result = await syncService.SyncAsync(stoppingToken);

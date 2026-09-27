@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO.Pipes;
 using System.Net.Sockets;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -27,6 +29,8 @@ var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE
 var agentBrowserProfile = runMode == AspireRunMode.AgentBrowser
     ? AgentBrowserProfileSettings.Create()
     : null;
+var agentResetPipeName = agentBrowserProfile is null
+    ? null : $"islamu-agent-database-reset-{Guid.NewGuid():N}";
 var hostingTopology = ParseHostingTopology(builder.Configuration["Hosting:Topology"]);
 var configurationManifestMode = ConfiguredValue(
     builder.Configuration,
@@ -49,8 +53,14 @@ if (agentBrowserProfile is not null || agentBrowserSeedEnabled)
             AuthorizationProvider: ConfiguredValue(builder.Configuration, "AUTHORIZATION_PROVIDER", expectedProfile.AuthorizationProvider),
             DatabaseProvider: ConfiguredValue(builder.Configuration, "DATABASE_PROVIDER", expectedProfile.DatabaseProvider),
             DatabaseName: ConfiguredValue(builder.Configuration, "DATABASE_NAME", expectedProfile.DatabaseName),
-            ConfigurationManifestMode: configurationManifestMode)
-        .EnsureAdmitted();
+            ConfigurationManifestMode: configurationManifestMode,
+            PrivacyErasureTopology: ConfiguredValue(builder.Configuration,
+                "PrivacyErasure:Authority:Topology", expectedProfile.PrivacyErasureTopology),
+            WebhookProvider: ConfiguredValue(builder.Configuration, "Webhooks:Provider",
+                ConfiguredValue(builder.Configuration, "WEBHOOKS_PROVIDER", expectedProfile.WebhookProvider)))
+        .EnsureAdmitted(
+            erasureDatabaseTopology: builder.Configuration["ERASURE_DATABASE_TOPOLOGY"],
+            flatWebhookProvider: builder.Configuration["WEBHOOKS_PROVIDER"]);
 }
 SecretProviderType configuredSecretProvider =
     SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
@@ -188,12 +198,46 @@ var mailpit = AddMailpit(builder, agentBrowserProfile);
 if (runMode.UsesLocalData())
 {
     database = (agentBrowserProfile is null
-            ? builder.AddPostgres("postgres")
+            ? builder.AddPostgres("postgres").WithImageTag("18-alpine")
             : builder.AddPostgres("postgres", agentPostgresUsername!, agentPostgresPassword!)
-                .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit))
-        .WithImageTag("18-alpine")
+                .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit)
+                .WithImage("postgis/postgis")
+                .WithImageTag("18-3.6-alpine@sha256:"
+                    + "ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7"))
         .WithDataVolume(agentBrowserProfile?.PostgresVolumeName ?? "islamu-event-postgres-data")
         .AddDatabase("islamu-event-db", agentBrowserProfile?.DatabaseName ?? "islamu_event_db");
+
+    if (agentResetPipeName is not null)
+    {
+        database = database.WithCommand("reset-agent-database", "Reset agent database", async context =>
+        {
+            long started = Stopwatch.GetTimestamp();
+            try
+            {
+                await using var pipe = new NamedPipeClientStream(".", agentResetPipeName,
+                    PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                using var connectDeadline = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+                connectDeadline.CancelAfter(TimeSpan.FromSeconds(5));
+                await pipe.ConnectAsync(connectDeadline.Token);
+                using var operationDeadline = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+                operationDeadline.CancelAfter(TimeSpan.FromSeconds(125));
+                await pipe.WriteAsync("reset\n"u8.ToArray(), operationDeadline.Token);
+                await pipe.FlushAsync(operationDeadline.Token);
+                using var reader = new StreamReader(pipe);
+                string? response = await reader.ReadLineAsync(operationDeadline.Token);
+                if (response is null || !response.StartsWith("ready ", StringComparison.Ordinal))
+                    return CommandResults.Failure("agent_database_reset_failed_closed");
+                double elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                string report = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"request-to-ready={elapsed:F0}ms; target=2000ms; target-met={elapsed < 2000}");
+                return CommandResults.Success("Agent database ready", report, CommandResultFormat.Text);
+            }
+            catch (Exception)
+            {
+                return CommandResults.Failure("agent_database_reset_owner_unavailable");
+            }
+        });
+    }
 
     if (usesExternalPrivacyErasureAuthority)
     {
@@ -398,6 +442,8 @@ if (hostingTopology == HostingTopology.Split)
             .WithReference(cache)
             .WaitFor(cache);
     }
+    if (agentResetPipeName is not null)
+        exploreAPI = exploreAPI.WithEnvironment("AgentBrowser__ResetPipeName", agentResetPipeName);
 
     if (messaging is not null)
     {

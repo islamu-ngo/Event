@@ -14,7 +14,8 @@ namespace Explore.API.BackgroundServices;
 public sealed class OutboxProcessor(
     IServiceProvider serviceProvider,
     IOptions<OutboxProcessorSettings> settings,
-    ILogger<OutboxProcessor> logger) : BackgroundService
+    ILogger<OutboxProcessor> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     private readonly OutboxProcessorSettings _settings = settings.Value;
 
@@ -61,8 +62,9 @@ public sealed class OutboxProcessor(
         logger.LogInformation("Outbox processor stopped");
     }
 
-    private async Task ProcessOutboxBatchAsync(CancellationToken stoppingToken)
+    internal async Task ProcessOutboxBatchAsync(CancellationToken stoppingToken)
     {
+        using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(stoppingToken);
         await using var scope = serviceProvider.CreateAsyncScope();
 
         var outboxRepository = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();

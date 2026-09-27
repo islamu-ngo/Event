@@ -11,9 +11,14 @@ public sealed record AgentBrowserProvisioningOptions(
     string AuthorizationProvider = "",
     string DatabaseProvider = "",
     string DatabaseName = "",
-    string ConfigurationManifestMode = "")
+    string ConfigurationManifestMode = "",
+    string PrivacyErasureTopology = "",
+    string WebhookProvider = "")
 {
-    public bool EnsureAdmitted(bool isStandaloneHost = false)
+    public bool EnsureAdmitted(
+        bool isStandaloneHost = false,
+        string? erasureDatabaseTopology = null,
+        string? flatWebhookProvider = null)
     {
         bool agentMode = string.Equals(Mode, "AgentBrowser", StringComparison.OrdinalIgnoreCase);
         if (Enabled != agentMode)
@@ -39,6 +44,16 @@ public sealed record AgentBrowserProvisioningOptions(
             throw new InvalidOperationException("agent-browser-database-name-unsupported");
         if (!string.Equals(ConfigurationManifestMode, "Off", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("agent-browser-manifest-unsupported");
+        if (!string.Equals(PrivacyErasureTopology, "EmbeddedSqlite", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("agent-browser-erasure-topology-unsupported");
+        if (erasureDatabaseTopology is not null
+            && !string.Equals(erasureDatabaseTopology, "EmbeddedSqlite", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("agent-browser-erasure-topology-unsupported");
+        if (!string.Equals(WebhookProvider, "Local", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("agent-browser-webhook-provider-unsupported");
+        if (flatWebhookProvider is not null
+            && !string.Equals(flatWebhookProvider, "Local", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("agent-browser-webhook-provider-unsupported");
 
         return true;
     }

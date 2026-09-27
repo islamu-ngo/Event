@@ -25,6 +25,9 @@ public static class ApiHostApplicationExtensions
         ArgumentNullException.ThrowIfNull(app);
         ArgumentNullException.ThrowIfNull(state);
 
+        if (app.Services.GetService<AgentBrowserResetCoordinator>() is { } agentDatabase)
+            app.Use((HttpContext context, RequestDelegate next) => agentDatabase.HandleHttpAsync(context, next));
+
         if (predicate is not null)
         {
             app.UseWhen(predicate, branch => UseApiHostMiddlewareBeforeScheduler(

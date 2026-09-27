@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;
@@ -10,7 +11,8 @@ namespace Explore.API.BackgroundServices;
 public sealed class AiProviderSettingsBootstrapWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<AiProviderSettings> options,
-    ILogger<AiProviderSettingsBootstrapWorker> logger) : BackgroundService
+    ILogger<AiProviderSettingsBootstrapWorker> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -49,6 +51,7 @@ public sealed class AiProviderSettingsBootstrapWorker(
             return;
         }
 
+        using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(cancellationToken);
         using var scope = scopeFactory.CreateScope();
         var systemSettings = scope.ServiceProvider.GetRequiredService<ISystemSettingRepository>();
         var upsertService = scope.ServiceProvider.GetRequiredService<SettingUpsertService>();

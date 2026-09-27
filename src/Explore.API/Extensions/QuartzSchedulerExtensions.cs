@@ -1,5 +1,6 @@
 using System.Globalization;
 using Explore.API.Configuration;
+using Explore.API.Hosting;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Scheduling;
@@ -103,6 +104,8 @@ public static class QuartzSchedulerExtensions
             // It is resolved from the container so it can reach BusinessMetrics; its own faults are
             // contained inside the listener, because an unhandled listener exception can disrupt the
             // scheduling cycle for every job in the process.
+            if (environment.IsDevelopment() && configuration.GetValue<bool>("AGENT_BROWSER_SEED_ENABLED"))
+                quartz.AddJobListener<AgentBrowserResetJobListener>();
             quartz.AddJobListener<SchedulerTelemetryJobListener>();
         });
 

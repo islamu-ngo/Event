@@ -24,7 +24,12 @@ public static class ExploreDatabaseMigrator
             configuration["Authorization:Provider"] ?? configuration["AUTHORIZATION_PROVIDER"] ?? "",
             configuration["Database:Provider"] ?? configuration["DATABASE_PROVIDER"] ?? "",
             configuration["Database:Database"] ?? configuration["DATABASE_NAME"] ?? "",
-            configuration["CONFIGURATION_MANIFEST_MODE"] ?? "Off").EnsureAdmitted(isStandaloneHost);
+            configuration["CONFIGURATION_MANIFEST_MODE"] ?? "Off",
+            configuration["PrivacyErasure:Authority:Topology"] ?? configuration["ERASURE_DATABASE_TOPOLOGY"] ?? "",
+            configuration["Webhooks:Provider"] ?? configuration["WEBHOOKS_PROVIDER"] ?? "").EnsureAdmitted(
+                isStandaloneHost,
+                configuration["ERASURE_DATABASE_TOPOLOGY"],
+                configuration["WEBHOOKS_PROVIDER"]);
 
     public static async Task MigrateAndSeedAsync(
         ExploreDbContext runtimeDatabase,
@@ -65,6 +70,11 @@ public static class ExploreDatabaseMigrator
             migrationDatabaseOptions);
         await using (var migrationDatabase = new ExploreDbContext(migrationOptions.Options))
         {
+            if (agentBrowser)
+                await migrationDatabase.Database.ExecuteSqlRawAsync(
+                    "CREATE EXTENSION IF NOT EXISTS postgis",
+                    cancellationToken);
+
             await MigrateAsync(migrationDatabase, configuration, cancellationToken);
         }
         logger.LogInformation("Database migration operation {Operation} completed.", "Application");

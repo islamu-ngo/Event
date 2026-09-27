@@ -14,6 +14,13 @@ public sealed class OidcDiscoveryHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
+        if (string.Equals(
+            configuration["Authentication:Provider"] ?? configuration["AUTHENTICATION_PROVIDER"],
+            "local", StringComparison.OrdinalIgnoreCase))
+        {
+            return HealthCheckResult.Healthy("Local authentication does not require OIDC discovery.");
+        }
+
         var metadataAddress = ResolveMetadataAddress(configuration);
         if (metadataAddress is null)
         {

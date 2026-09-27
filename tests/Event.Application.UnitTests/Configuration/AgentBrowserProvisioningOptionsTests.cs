@@ -14,7 +14,9 @@ public sealed class AgentBrowserProvisioningOptionsTests
         AuthorizationProvider: "local",
         DatabaseProvider: "PostgreSql",
         DatabaseName: "islamu_event_agent",
-        ConfigurationManifestMode: "Off");
+        ConfigurationManifestMode: "Off",
+        PrivacyErasureTopology: "EmbeddedSqlite",
+        WebhookProvider: "Local");
 
     [Test]
     public async Task DisabledNormalHostIsInertAndNoDefaultEnablesProvisioning()
@@ -72,11 +74,44 @@ public sealed class AgentBrowserProvisioningOptionsTests
     [Test]
     public async Task WrongDatabaseOrManifestImportIsRejected()
     {
-        await Assert.That(() => (Admitted with { DatabaseProvider = "Sqlite" }).EnsureAdmitted())
-            .Throws<InvalidOperationException>();
         await Assert.That(() => (Admitted with { DatabaseName = "islamu_event_db" }).EnsureAdmitted())
             .Throws<InvalidOperationException>();
         await Assert.That(() => (Admitted with { ConfigurationManifestMode = "Import" }).EnsureAdmitted())
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments("CoLocated", "Local")]
+    [Arguments("ExternalDatabase", "Local")]
+    [Arguments("EmbeddedSqlite", "Svix")]
+    [Arguments("EmbeddedSqlite", "Composite")]
+    public async Task AgentBrowserRejectsExternalErasureOrWebhookProvider(
+        string erasureTopology, string webhookProvider)
+    {
+        await Assert.That(() => (Admitted with
+            {
+                PrivacyErasureTopology = erasureTopology,
+                WebhookProvider = webhookProvider
+            }).EnsureAdmitted()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task StructuredLocalTopologyDoesNotMaskConflictingFlatSelectors()
+    {
+        await Assert.That(() => Admitted.EnsureAdmitted(erasureDatabaseTopology: "CoLocated"))
+            .Throws<InvalidOperationException>();
+        await Assert.That(() => Admitted.EnsureAdmitted(flatWebhookProvider: "Svix"))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    [Arguments("Sqlite")]
+    [Arguments("SqlServer")]
+    [Arguments("MariaDb")]
+    [Arguments("MySql")]
+    public async Task AgentBrowserRequiresPostgreSqlProvider(string databaseProvider)
+    {
+        await Assert.That(() => (Admitted with { DatabaseProvider = databaseProvider }).EnsureAdmitted())
             .Throws<InvalidOperationException>();
     }
 
@@ -93,6 +128,8 @@ public sealed class AgentBrowserProvisioningOptionsTests
             Admitted with { DatabaseProvider = "" },
             Admitted with { DatabaseName = "" },
             Admitted with { ConfigurationManifestMode = "" },
+            Admitted with { PrivacyErasureTopology = "" },
+            Admitted with { WebhookProvider = "" },
         ];
         foreach (AgentBrowserProvisioningOptions options in invalid)
         {

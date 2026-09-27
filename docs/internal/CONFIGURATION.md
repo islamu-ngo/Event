@@ -292,10 +292,12 @@ Local Identity browser sign-in and permission checks. It is not a deployment
 mode and is inert unless `AGENT_BROWSER_SEED_ENABLED=true` and
 `ISLAMU_ASPIRE_MODE=AgentBrowser` agree. Admission rejects non-Development,
 Standalone, external Identity, non-Local authentication or authorization,
-another database descriptor, and configuration-manifest import before AppHost
-registers child resources. The profile never chooses a secret authority: the
-operator must select Environment, Development User Secrets, or Infisical using
-the existing `SecretProvider` contract.
+non-embedded privacy erasure, external webhooks, another database descriptor,
+and configuration-manifest import before AppHost registers child resources.
+The API owner also resolves the persisted storage policy before any persona
+write and refuses a non-Local provider or route. The profile never chooses a
+secret authority: the operator must select Environment, Development User
+Secrets, or Infisical using the existing `SecretProvider` contract.
 
 Run it from the repository root:
 
@@ -303,6 +305,20 @@ Run it from the repository root:
 dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj \
   --launch-profile local-agent
 ```
+
+If the shared Development vault's `/api` folder selects Keycloak, that
+non-secret setting conflicts with this Local-only profile and direct
+Infisical selection fails closed. Use
+`bash eng/scripts/run-local-agent.sh [--no-build]` instead: the launcher reads
+approved Infisical bootstrap authority from Development User Secrets,
+injects only six approved agent credentials from the selected `/api` and
+`/postgresql` folders into this process's Environment authority,
+and applies the agent-only Local topology without changing the shared vault
+or persisting values in the worktree `.env`. The root `.env` is copied by the
+implement-tasks workflow when a worktree is created or resumed, but an empty
+copy is not a credential source. See the
+[browser workflow](BLAZOR_DEV_WORKFLOW.md#2-local-agent-browser-authentication)
+for the exact launch and sign-in protocol.
 
 The resource graph is intentionally small: PostgreSQL, Redis, Mailpit, migration
 service, API, and Blazor BFF. It does not register Keycloak, CockroachDB, Cerbos,
@@ -331,7 +347,7 @@ restarts do not reset operator routing changes.
 | Instance administration | `http://admin.localhost:5200` |
 | Negative-control tenant | `http://agent-negative.localhost:5200` |
 | Mailpit SMTP / UI | `localhost:51025` / `http://localhost:58025` |
-| Primary database | PostgreSQL database `islamu_event_agent`, volume `islamu-event-agent-postgres-data` |
+| Primary database | PostgreSQL 18/PostGIS 3.6 agent-only image, database `islamu_event_agent`, volume `islamu-event-agent-postgres-data` |
 | Cache | volume `islamu-event-agent-redis-data` |
 | Local object storage | `storage-data/aspire-agent` |
 | Embedded erasure authority | `privacy-erasure-authority-data/aspire-agent/privacy_erasure_authority.db` |
@@ -339,9 +355,21 @@ restarts do not reset operator routing changes.
 The profile uses Local authentication, Local authorization, colocated Identity,
 embedded privacy-erasure authority, Local file storage, Local webhooks, and
 multi-tenant host resolution. Configuration-manifest mode is fixed off. Its
+API and BFF health checks skip OIDC discovery when Local authentication is
+selected, even if a shared Development vault includes stale Keycloak
+metadata; `/health` remains an actual Local-only readiness check. Its
 PostgreSQL, Redis, Mailpit, storage, and erasure data do not share ordinary
 Aspire profile storage. The four existing launch profiles and their ports remain
 unchanged.
+
+Only the isolated agent resource selects the pinned PostGIS-capable PostgreSQL
+18 image. Its migrator initializes `postgis` before application migrations and
+fails closed when extension binaries are unavailable; ordinary database
+profiles keep their existing image. This is engine readiness for a future
+separately approved capability, not a geospatial entity, public coordinate
+surface, or proximity API. Image provenance and redistribution limits are
+recorded in
+[the agent PostGIS dependency decision](legal/dependencies/postgis-agent-image.md).
 
 Required credentials stay in the selected authority, never in launch settings:
 `AUTHENTICATION_LOCAL_JWT_KEY`, `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD`,
@@ -355,6 +383,19 @@ their dedicated secret parameters. Port conflicts fail startup instead of select
 new browser origin. Stopping the profile preserves all named volumes and local
 paths. Deleting its database, cache, storage, Mailpit, or erasure data is a
 separate destructive recovery action and requires explicit operator approval.
+
+For a deterministic new synthetic baseline without deleting a volume, the
+running API exposes an agent-only current-user named-pipe maintenance owner.
+`eng/tools/AgentDatabaseReset.cs` closes new HTTP/background admission,
+drains admitted work, validates owner/provider/database, and transactionally
+purges only owned application rows while preserving migrations and approved
+lookup data. Native credential creation and first-use transitions then resume
+in separate transactions, followed by cache/routing verification before
+readmission. A failed or incomplete transition stays closed; retry the same
+owner or restart into pre-traffic recovery. See the
+[agent database reset procedure](OPERATIONS.md#reset-only-the-agent-database)
+for command syntax, boundaries, and the measured latency target. This control
+is not available through a public API or in ordinary Aspire profiles.
 
 `Hosting:Topology` is an AppHost-only setting for local Aspire composition; it
 does not change a deployed application's configuration source or migrate data.

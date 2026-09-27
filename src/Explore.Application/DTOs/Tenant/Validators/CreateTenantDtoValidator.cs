@@ -19,7 +19,7 @@ public class CreateTenantDtoValidator : AbstractValidator<CreateTenantDto>
             .MinimumLength(3).WithMessage("Slug must be at least 3 characters")
             .MaximumLength(500).WithMessage("Slug cannot exceed 500 characters")
             .Must(slug => slug is null || !ReservedTenantSlugs.IsReserved(slug)).WithMessage("Slug is reserved")
-            .Matches("^[a-z0-9]+(-[a-z0-9]+)*$").WithMessage("Slug must contain only lowercase letters, numbers, and single hyphens between segments");
+            .Matches("^[a-z0-9]+(-[a-z0-9]+)*\\z").WithMessage("Slug must contain only lowercase letters, numbers, and single hyphens between segments");
 
         When(x => x.IsActive, () =>
         {

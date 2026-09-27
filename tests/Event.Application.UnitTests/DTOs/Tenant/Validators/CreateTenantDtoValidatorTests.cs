@@ -45,6 +45,7 @@ public class CreateTenantDtoValidatorTests
     [Arguments("-invalid")]
     [Arguments("invalid-")]
     [Arguments("my--bad")]
+    [Arguments("acme\n")]
     public async Task Validate_WithMalformedSlug_ReturnsFormatError(string slug)
     {
         ValidationResult result = await _validator.ValidateAsync(CreateDto(slug));
@@ -111,6 +112,7 @@ public class UpdateTenantSlugDtoValidatorTests
     [Arguments("-invalid")]
     [Arguments("invalid-")]
     [Arguments("my--bad")]
+    [Arguments("acme\n")]
     public async Task Validate_WithShortOrMalformedSlug_ReturnsInvalid(string slug)
     {
         ValidationResult result = await _validator.ValidateAsync(CreateDto(slug));

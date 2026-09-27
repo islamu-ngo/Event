@@ -76,6 +76,30 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
+    public async Task GetResolverConfigurationAsync_ReturnsConfiguredPathPrefix()
+    {
+        SetupBffClient(CreateJsonResponse(new ResolverConfigurationDto
+        {
+            PathEnabled = true,
+            PathPrefix = "/communities"
+        }));
+
+        var result = await _service.GetResolverConfigurationAsync();
+
+        await Assert.That(result?.PathPrefix).IsEqualTo("/communities");
+    }
+
+    [Test]
+    public async Task GetResolverConfigurationAsync_WhenUnavailable_ReturnsNull()
+    {
+        SetupBffClient(_ => throw new HttpRequestException("Resolver unavailable"));
+
+        var result = await _service.GetResolverConfigurationAsync();
+
+        await Assert.That(result).IsNull();
+    }
+
+    [Test]
     public async Task GetStatusAsync_ReturnsStatus_WhenApiSucceeds()
     {
         // Arrange

@@ -145,7 +145,7 @@ public class UpdateEventSessionGroupCommandHandler : ICommandHandler<UpdateEvent
                 await _eventLocationAttachmentService.DetachIfUnreferencedAsync(previousEventLocationId, token);
         }, cancellationToken);
 
-        await _cache.RemoveAsync($"event:detail:{group.EventId}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(group.EventId), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(group.TenantId), cancellationToken);
 
         return BaseCommandResponse.Success(group.Id, "Event session group updated successfully.");

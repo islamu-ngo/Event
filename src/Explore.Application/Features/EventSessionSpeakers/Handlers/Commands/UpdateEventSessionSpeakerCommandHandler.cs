@@ -132,11 +132,11 @@ public class UpdateEventSessionSpeakerCommandHandler : ICommandHandler<UpdateEve
 
     private async Task InvalidateCachesAsync(Guid? previousEventId, Guid currentEventId, Guid tenantId, CancellationToken cancellationToken)
     {
-        await _cache.RemoveAsync($"event:detail:{currentEventId}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(currentEventId), cancellationToken);
 
         if (previousEventId.HasValue && previousEventId.Value != currentEventId)
         {
-            await _cache.RemoveAsync($"event:detail:{previousEventId.Value}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(previousEventId.Value), cancellationToken);
         }
 
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);

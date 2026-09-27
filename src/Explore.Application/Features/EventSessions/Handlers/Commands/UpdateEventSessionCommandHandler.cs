@@ -330,10 +330,10 @@ public class UpdateEventSessionCommandHandler : ICommandHandler<UpdateEventSessi
 
         if (eventChangedForCache)
         {
-            await _cache.RemoveAsync($"event:detail:{previousEventIdForCache}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(previousEventIdForCache), cancellationToken);
         }
 
-        await _cache.RemoveAsync($"event:detail:{parentEventIdForCache}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(parentEventIdForCache), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantIdForCache), cancellationToken);
 
         return BaseCommandResponse.Success(updatedSessionId, "Event session updated successfully.");

@@ -1,3 +1,4 @@
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -67,7 +68,7 @@ public sealed class DeleteEventCapacityPoolCommandHandler(
                 return response;
             }
 
-            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
             return response;
         }
         catch (ArgumentException exception)

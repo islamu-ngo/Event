@@ -69,7 +69,7 @@ public sealed class CreateDraftEventSessionCommandHandler(
             return await eventSessionRepository.Create(session);
         }, cancellationToken);
 
-        await cache.RemoveAsync($"event:detail:{parentEvent.Id}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(parentEvent.Id), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
 
         return Success(created.Id, "Event session draft created successfully.");

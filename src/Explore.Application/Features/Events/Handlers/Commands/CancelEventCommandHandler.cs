@@ -181,7 +181,7 @@ public sealed class CancelEventCommandHandler(
             return response;
         }
 
-        await cache.RemoveAsync($"event:detail:{request.Id}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(request.Id), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantIdToInvalidate.Value), cancellationToken);
         return response;
     }

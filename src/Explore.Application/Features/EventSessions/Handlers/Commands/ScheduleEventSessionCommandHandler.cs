@@ -269,7 +269,7 @@ public sealed class ScheduleEventSessionCommandHandler(
 
         if (eventIdToInvalidate is { } parentEventId && tenantIdToInvalidate is { } tenantId)
         {
-            await cache.RemoveAsync($"event:detail:{parentEventId}", cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(parentEventId), cancellationToken);
             await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
         }
 

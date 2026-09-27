@@ -87,7 +87,7 @@ public class CreateEventSessionSpeakerCommandHandler : ICommandHandler<CreateEve
         };
 
         speaker = await _speakerRepository.Create(speaker);
-        await _cache.RemoveAsync($"event:detail:{eventSession.EventId}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(eventSession.EventId), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(eventSession.TenantId), cancellationToken);
 
         return BaseCommandResponse.Success(speaker.Id, "Speaker assigned to session successfully.");

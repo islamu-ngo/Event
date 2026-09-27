@@ -60,7 +60,7 @@ public sealed class ConfigureEventParticipationCommandHandler(
             cancellationToken);
         if (response.IsSuccess)
         {
-            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
             await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantContext.TenantId), cancellationToken);
         }
 

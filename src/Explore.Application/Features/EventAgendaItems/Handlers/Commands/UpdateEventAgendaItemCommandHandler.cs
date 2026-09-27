@@ -151,10 +151,10 @@ public class UpdateEventAgendaItemCommandHandler : ICommandHandler<UpdateEventAg
 
         if (eventChanged)
         {
-            await _cache.RemoveAsync($"event:detail:{previousEventId}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(previousEventId), cancellationToken);
         }
 
-        await _cache.RemoveAsync($"event:detail:{parentEvent.Id}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(parentEvent.Id), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
 
         return BaseCommandResponse.Success(agendaItem.Id, "Event agenda item updated successfully.");

@@ -49,7 +49,7 @@ public class DeleteEventSessionSpeakerCommandHandler : ICommandHandler<DeleteEve
         }
 
         await _speakerRepository.Delete(speaker);
-        await _cache.RemoveAsync($"event:detail:{eventSession.EventId}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(eventSession.EventId), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(eventSession.TenantId), cancellationToken);
 
         return true;

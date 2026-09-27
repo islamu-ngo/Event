@@ -124,7 +124,7 @@ public class UpdateEventSessionAgendaItemCommandHandler : ICommandHandler<Update
             await _eventLocationAttachmentService.DetachIfUnreferencedAsync(previousEventLocationId, token);
         }, cancellationToken);
 
-        await _cache.RemoveAsync($"event:detail:{parentSession.EventId}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(parentSession.EventId), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentSession.TenantId), cancellationToken);
 
         return BaseCommandResponse.Success(agendaItem.Id, "Agenda item updated successfully.");

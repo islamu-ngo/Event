@@ -109,10 +109,10 @@ public class UpdateEventDayCommandHandler : ICommandHandler<UpdateEventDayComman
 
         if (eventChanged)
         {
-            await _cache.RemoveAsync($"event:detail:{previousEventId}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(previousEventId), cancellationToken);
         }
 
-        await _cache.RemoveAsync($"event:detail:{parentEvent.Id}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(parentEvent.Id), cancellationToken);
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
 
         return BaseCommandResponse.Success(eventDay.Id, "Event day updated successfully.");

@@ -281,7 +281,7 @@ public class UpdateEventCommandHandler : ICommandHandler<UpdateEventCommand, Bas
 
         try
         {
-            await _cache.RemoveAsync($"event:detail:{eventIdForCache}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(eventIdForCache), cancellationToken);
             await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantIdForCache), cancellationToken);
         }
         catch (Exception)

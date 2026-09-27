@@ -1,3 +1,4 @@
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -58,7 +59,7 @@ public sealed class DeleteEventTicketTypeCommandHandler(
                 return Missing(command.TicketTypeId);
             }
 
-            await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
             return Ok(ticketTypeId.Value, "Ticket type deleted.");
         }
         catch (ArgumentException exception)

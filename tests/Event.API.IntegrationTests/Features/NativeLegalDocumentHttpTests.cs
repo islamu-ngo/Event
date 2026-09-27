@@ -278,6 +278,25 @@ public sealed class NativeLegalDocumentHttpTests
         }
         db.LegalDocuments.Add(document);
         await db.SaveChangesAsync();
+        if (document.TenantId is null)
+        {
+            var saved = await scope.ServiceProvider.GetRequiredService<InstanceOperatorIdentityService>()
+                .SaveAsync(new InstanceOperatorIdentitySettings
+                {
+                    PublicName = "Test Instance Operator",
+                    LegalName = "Test Instance Operator ASBL",
+                    OperatorKindCode = "registered_organization",
+                    JurisdictionCountryCode = "BE",
+                    RegistrationIdentifier = "BE 0123.456.789",
+                    PublicContactEmail = "contact@instance.example.test",
+                    WebsiteUrl = "https://instance.example.test",
+                    LegalNoticeUrl = "https://instance.example.test/legal",
+                    TermsUrl = "https://instance.example.test/terms",
+                    PrivacyUrl = "https://instance.example.test/privacy",
+                    OfficialOrigin = "https://instance.example.test"
+                }, null);
+            await Assert.That(saved.IsSuccess).IsTrue();
+        }
     }
 
     private static async Task<PublicLegalDocumentDto> ReadAsync(HttpResponseMessage response)
@@ -299,6 +318,11 @@ public sealed class NativeLegalDocumentHttpTests
     private sealed class LegalDocumentFactory : AuthenticatedWebApplicationFactory
     {
         private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"native-legal-{Guid.CreateVersion7():N}.db");
+
+        public LegalDocumentFactory()
+        {
+            SeedActiveDefaultTenant = true;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {

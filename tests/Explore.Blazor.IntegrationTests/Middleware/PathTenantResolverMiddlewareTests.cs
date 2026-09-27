@@ -51,6 +51,10 @@ public class PathTenantResolverMiddlewareTests
     [Arguments("/oauth/client-metadata.json")]
     [Arguments("/manifest.webmanifest")]
     [Arguments("/test-endpoint")]
+    [Arguments("/appsettings.json")]
+    [Arguments("/appsettings.Development.json")]
+    [Arguments("/Explore.Blazor.fingerprint.styles.css")]
+    [Arguments("/push-service-worker.fingerprint.js")]
     public async Task Request_WithInfrastructurePath_PassesThrough(string path)
     {
         var context = new DefaultHttpContext();
@@ -129,6 +133,10 @@ public class PathTenantResolverMiddlewareTests
     [Arguments("/Explore.Blazor.Client.bundle.scp.css")]
     [Arguments("/push-service-worker.js")]
     [Arguments("/image/Icon_landingpage.png")]
+    [Arguments("/appsettings.json")]
+    [Arguments("/appsettings.Development.json")]
+    [Arguments("/Explore.Blazor.fingerprint.styles.css")]
+    [Arguments("/push-service-worker.fingerprint.js")]
     public async Task ResolverConfiguration_WhenApiReadFails_PreservesMappedRoot(string path)
     {
         var apiClient = Substitute.For<IInstanceMessagingSettingsClient>();

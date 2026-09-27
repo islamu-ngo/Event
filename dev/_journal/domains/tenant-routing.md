@@ -20,6 +20,9 @@
 - Root matching requires a case-insensitive reserved-slug catalog. Tenant writes
   reject protected application, framework, authentication, infrastructure,
   static-asset, and governed-name segments.
+- Root matching also enforces tenant slug grammar before selecting a tenant.
+  Dotted configuration and fingerprinted asset filenames cannot be interpreted
+  as tenant slugs even when a new filename is absent from the reserved catalog.
 
 ## 2026-09-26 - Empty prefixes are routing policy
 
@@ -38,7 +41,8 @@ normalization, BFF fallback configuration, middleware, and circuit navigation.
 
 **Why this matters:** Configuration semantics must survive end to end. A fallback
 must not change the public URL contract. Safety during resolver-config failure
-comes from the reserved slug set, not from substituting another URL shape.
+comes from the reserved slug set and canonical slug grammar, not from
+substituting another URL shape.
 
 **References:**
 

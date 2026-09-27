@@ -34,7 +34,8 @@ public class ReservedTenantSlugsTests
         string[] staticAssetRoots =
         [
             "Explore.Blazor.styles.css", "Explore.Blazor.Client.bundle.scp.css",
-            "push-service-worker.js", "image"
+            "push-service-worker.js", "appsettings.json", "appsettings.Development.json",
+            "image"
         ];
 
         await Assert.That(staticAssetRoots.All(ReservedTenantSlugs.IsReserved)).IsTrue();

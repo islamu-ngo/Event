@@ -31,15 +31,22 @@ internal static class TenantRoutePathMatcher
             return false;
         }
 
+        var slug = pathSegments[0];
         if (pathPrefix is null &&
-            (reservedSlugs is null ||
+            (slug.Length is < 3 or > 500 ||
+             slug[0] == '-' ||
+             slug[^1] == '-' ||
+             slug.Contains("--", StringComparison.Ordinal) ||
+             slug.Any(static character =>
+                 character is not ('-' or >= '0' and <= '9' or >= 'a' and <= 'z')) ||
+             reservedSlugs is null ||
              reservedSlugs.Count == 0 ||
-             reservedSlugs.Contains(pathSegments[0], StringComparer.OrdinalIgnoreCase)))
+             reservedSlugs.Contains(slug, StringComparer.OrdinalIgnoreCase)))
         {
             return false;
         }
 
-        tenantSlug = pathSegments[0];
+        tenantSlug = slug;
         matchedPathBase = new PathString(pathPrefix + "/" + tenantSlug);
         remainingPath = remainingAfterPrefix.StartsWithSegments(
             new PathString("/" + tenantSlug),

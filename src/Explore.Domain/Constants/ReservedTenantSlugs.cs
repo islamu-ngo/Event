@@ -19,7 +19,7 @@ public static class ReservedTenantSlugs
         "css", "js", "static", "assets", "fonts", "image", "images", "dist", "lib",
         "Explore.Blazor.styles.css", "Explore.Blazor.Client.bundle.scp.css", "favicon.ico",
         "robots.txt", "sitemap.xml", "manifest.json", "manifest.webmanifest", "service-worker.js",
-        "push-service-worker.js"
+        "push-service-worker.js", "appsettings.json", "appsettings.Development.json"
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     public static bool IsReserved(string slug) => All.Contains(slug);

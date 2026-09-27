@@ -39,6 +39,11 @@ static-asset paths, and governed names. Tenant create and slug-update validation
 reject reserved values. The resolver configuration API carries the catalog to the
 BFF so the browser host does not reference backend assemblies; the BFF keeps an
 outage-time safety catalog for configuration-read failure.
+Root matching also requires the same three-to-five-hundred-character lowercase
+alphanumeric and single-hyphen grammar as tenant creation. Configuration files
+and fingerprinted static filenames therefore pass through even when their exact
+filenames are not enumerated; shipped configuration filenames are reserved in
+both catalogs as well.
 
 ## Consequences
 

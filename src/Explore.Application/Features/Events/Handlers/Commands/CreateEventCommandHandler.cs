@@ -369,7 +369,7 @@ public class CreateEventCommandHandler : ICommandHandler<CreateEventCommand, Bas
             _metrics.RecordEventCreated();
             try
             {
-                await _cache.RemoveAsync($"event:detail:{eventId}", cancellationToken);
+                await _cache.RemoveByTagAsync(CacheTags.Event(eventId), cancellationToken);
                 await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(_tenantContext.TenantId), cancellationToken);
             }
             catch (Exception)

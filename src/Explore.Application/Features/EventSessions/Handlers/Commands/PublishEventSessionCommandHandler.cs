@@ -142,7 +142,7 @@ public sealed class PublishEventSessionCommandHandler(
             return result.Response;
         }
 
-        await cache.RemoveAsync($"event:detail:{parentEventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(parentEventId), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
         return result.Response;
     }

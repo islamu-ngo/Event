@@ -1,4 +1,5 @@
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Pages;
 using Explore.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
@@ -50,6 +51,10 @@ public class HomeStartRoutingTests : IDisposable
         user.ResolveUserTenantRedirectionAsync()
             .Returns(new UserTenantRedirectionDto { TenantSlug = "acme" });
         _context.Services.AddSingleton(user);
+        var shellContext = Substitute.For<IUiShellContextService>();
+        shellContext.GetCachedContextAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<UiShellContextDto?>(null));
+        _context.Services.AddSingleton(shellContext);
         _context.Services.AddSingleton(Substitute.For<IStartupRoutingService>());
 
         _context.RenderMudComponent<HomeStart>();

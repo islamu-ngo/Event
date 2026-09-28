@@ -308,14 +308,18 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
     {
         var fixture = new Fixture(ImageBytes, TimeSpan.FromMilliseconds(25));
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.ContentFactory = () => new ProbeContent(new StallingStream(started), declaredLength: null, "image/png");
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.ContentFactory = () => new ProbeContent(
+            new StallingStream(started, cancellationObserved),
+            declaredLength: null,
+            "image/png");
 
         Task<FileStorageWriteResult?> fetch = fixture.Gateway.FetchAndStageAsync(
             Candidate(Cid, "image/png", MaximumBytes), TenantId(), CancellationToken.None);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
-        FileStorageWriteResult? result = await fetch.WaitAsync(TimeSpan.FromSeconds(1));
-
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        FileStorageWriteResult? result = await fetch.WaitAsync(TimeSpan.FromSeconds(10));
         await Assert.That(result).IsNull();
         await Assert.That(fixture.Storage.WriteCount).IsEqualTo(0);
         await Assert.That(fixture.Storage.Objects).IsEmpty();
@@ -751,7 +755,9 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         }
     }
 
-    private sealed class StallingStream(TaskCompletionSource started) : Stream
+    private sealed class StallingStream(
+        TaskCompletionSource started,
+        TaskCompletionSource? cancellationObserved = null) : Stream
     {
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -767,11 +773,15 @@ public sealed class AtprotoThumbnailBlobGatewayContractTests
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             started.TrySetResult();
-            return new ValueTask<int>(WaitForCancellationAsync(cancellationToken));
+            return new ValueTask<int>(WaitForCancellationAsync(cancellationToken, cancellationObserved));
         }
 
-        private static async Task<int> WaitForCancellationAsync(CancellationToken cancellationToken)
+        private static async Task<int> WaitForCancellationAsync(
+            CancellationToken cancellationToken,
+            TaskCompletionSource? cancellationObserved)
         {
+            using var registration = cancellationToken.Register(
+                () => cancellationObserved?.TrySetResult());
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return 0;
         }

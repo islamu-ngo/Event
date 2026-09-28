@@ -86,7 +86,7 @@ public sealed class AttachRegistrationRequirementCommandHandler(
             }, cancellationToken);
             if (response.IsSuccess)
             {
-                await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+                await cache.RemoveByTagAsync(CacheTags.Event(request.EventId), cancellationToken);
                 await cache.RemoveByTagAsync(
                     CacheTags.EventListByTenant(tenantContext.TenantId), cancellationToken);
             }
@@ -169,7 +169,7 @@ public sealed class DetachRegistrationRequirementCommandHandler(
             }, cancellationToken);
             if (response.IsSuccess)
             {
-                await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+                await cache.RemoveByTagAsync(CacheTags.Event(request.EventId), cancellationToken);
                 await cache.RemoveByTagAsync(
                     CacheTags.EventListByTenant(tenantContext.TenantId), cancellationToken);
             }

@@ -68,7 +68,7 @@ public sealed class CreateEventIslamicAspectCommandHandler(
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        await targetCache.RemoveAsync($"event:detail:{eventId}", cancellationToken);
+        await targetCache.RemoveByTagAsync(CacheTags.Event(eventId), cancellationToken);
         await targetCache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
     }
 }
@@ -123,7 +123,7 @@ public sealed class UpdateEventIslamicAspectCommandHandler(
 
         Apply(aspect, request.AspectDto);
         await aspectRepository.Update(aspect);
-        await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(request.EventId), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
         return BaseCommandResponse.Success(aspect.Id, "Islamic aspect updated successfully.");
     }

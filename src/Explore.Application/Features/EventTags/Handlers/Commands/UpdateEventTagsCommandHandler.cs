@@ -173,11 +173,11 @@ public class UpdateEventTagsCommandHandler : ICommandHandler<UpdateEventTagsComm
 
     private async Task InvalidateCachesAsync(Guid previousEventId, Guid currentEventId, Guid tenantId, CancellationToken cancellationToken)
     {
-        await _cache.RemoveAsync($"event:detail:{currentEventId}", cancellationToken);
+        await _cache.RemoveByTagAsync(CacheTags.Event(currentEventId), cancellationToken);
 
         if (previousEventId != currentEventId)
         {
-            await _cache.RemoveAsync($"event:detail:{previousEventId}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(previousEventId), cancellationToken);
         }
 
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);

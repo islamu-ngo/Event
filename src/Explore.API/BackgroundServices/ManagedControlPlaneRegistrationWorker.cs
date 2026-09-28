@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.Management.Requests.Commands;
@@ -9,7 +10,8 @@ namespace Explore.API.BackgroundServices;
 public sealed class ManagedControlPlaneRegistrationWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<ManagedControlPlaneOptions> options,
-    ILogger<ManagedControlPlaneRegistrationWorker> logger) : BackgroundService
+    ILogger<ManagedControlPlaneRegistrationWorker> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMinutes(1);
 
@@ -24,6 +26,7 @@ public sealed class ManagedControlPlaneRegistrationWorker(
         {
             try
             {
+                using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(stoppingToken);
                 using var scope = scopeFactory.CreateScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<TriggerManagedControlPlaneRegistrationCommand, TriggerManagedRegistrationResultDto>>();
                 var result = await handler.ExecuteAsync(

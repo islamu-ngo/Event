@@ -46,7 +46,7 @@ public sealed class CreateEventTechAspectCommandHandler(
             PrizeCurrencyCode = request.AspectDto.PrizeCurrencyCode
         };
         await aspectRepository.Create(aspect);
-        await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(request.EventId), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
         return BaseCommandResponse.Success(aspect.Id, "Tech aspect created successfully.");
     }
@@ -116,7 +116,7 @@ public sealed class UpdateEventTechAspectCommandHandler(
 
         Apply(aspect, request.AspectDto);
         await aspectRepository.Update(aspect);
-        await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(request.EventId), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);
         return BaseCommandResponse.Success(aspect.Id, "Tech aspect updated successfully.");
     }

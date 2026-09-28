@@ -70,7 +70,8 @@ public static class HttpClientExtensions
         {
             client.BaseAddress = new Uri(apiBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(5);
-        }).ConfigureApiTransport(environment, profile)
+        }).AddHttpMessageHandler<TenantHeaderForwardingHandler>()
+          .ConfigureApiTransport(environment, profile)
           .AddAdminResilience();
 
         services.AddHttpClient(ApiBackedOAuthSessionStore.HttpClientName, client =>

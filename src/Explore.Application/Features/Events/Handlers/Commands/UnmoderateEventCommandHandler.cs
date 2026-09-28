@@ -185,7 +185,7 @@ public sealed class UnmoderateEventCommandHandler(
     {
         if (result.CacheEventId is { } eventId && result.TenantId is { } tenantId)
         {
-            await cache.RemoveAsync($"event:detail:{eventId}", cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(eventId), cancellationToken);
             await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
         }
 

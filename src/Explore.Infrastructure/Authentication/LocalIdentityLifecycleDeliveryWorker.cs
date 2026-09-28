@@ -1,5 +1,6 @@
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;
 using Explore.Application.Responses;
@@ -11,7 +12,8 @@ namespace Explore.Infrastructure.Authentication;
 
 public sealed class LocalIdentityLifecycleDeliveryWorker(
     IServiceScopeFactory scopes,
-    ILogger<LocalIdentityLifecycleDeliveryWorker> logger) : BackgroundService
+    ILogger<LocalIdentityLifecycleDeliveryWorker> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -35,6 +37,7 @@ public sealed class LocalIdentityLifecycleDeliveryWorker(
 
     public async Task RunOnceAsync(CancellationToken cancellationToken)
     {
+        using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(cancellationToken);
         IReadOnlyList<LocalIdentityLifecyclePointer> pending;
         await using (var read = scopes.CreateAsyncScope())
             pending = await read.ServiceProvider.GetRequiredService<ILocalIdentityLifecycleDeliveryStore>()

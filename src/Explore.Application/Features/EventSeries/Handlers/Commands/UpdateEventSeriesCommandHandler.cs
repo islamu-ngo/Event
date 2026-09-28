@@ -83,7 +83,7 @@ public class UpdateEventSeriesCommandHandler : ICommandHandler<UpdateEventSeries
 
         foreach (var eventEntity in series.Events)
         {
-            await _cache.RemoveAsync($"event:detail:{eventEntity.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(eventEntity.Id), cancellationToken);
         }
 
         await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(series.TenantId), cancellationToken);

@@ -23,7 +23,7 @@ priority: high
      - Active branch: `feat/<task-name>`
      - Task folder: `.worktrees/<task-name>/dev/active/<task-name>/`
      - Execution context: all shell commands set `Cwd: .worktrees/<task-name>`; all file edits target `.worktrees/<task-name>/...`
-     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`.
+     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`. If the root `.env` exists and the worktree has none, copy it without printing its contents: `[ -f .env ] && [ ! -e .worktrees/<task-name>/.env ] && install -m 600 .env .worktrees/<task-name>/.env`.
    - **Case B: In-Tree / Develop In-Flight (`dev/active/<task-name>`)**:
      If `dev/active/<task-name>` exists in the repository root and work is already in-progress (e.g. checked items `[x]` in `tasks.md`, existing commits, or user explicitly requested running directly on `develop` or current branch):
      - Active branch: current branch (e.g. `develop` or current feature branch)
@@ -38,9 +38,11 @@ priority: high
        git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
        mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
        [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
+       [ -f .env ] && install -m 600 .env .worktrees/<task-name>/.env
        ```
      - Moving preserves strict single-source-of-truth, eliminates split-brain checklists, and ensures clean garbage collection on worktree removal.
      - **Copy `AGENTS.local.md` (Never Move)**: If `AGENTS.local.md` exists in the repository root, copy it into `.worktrees/<task-name>/AGENTS.local.md`. It must be **copied (never moved)** so that local developer overrides and environment constraints remain in effect inside the isolated worktree while preserving the root configuration for subsequent sessions or tasks. (Because `AGENTS.local.md` is gitignored, it will not be staged or committed).
+     - **Copy `.env` (Never Move or Overwrite)**: If the repository root has an `.env`, copy it into the new worktree with owner-only permissions. On resume, copy only when the worktree has no `.env`; preserve any task-specific values already there. `.env` is gitignored and must never be staged, logged, or committed. A copied file does not supply missing keys: resolve those through the selected approved secret authority.
    - **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke Topology & Bounded Worker Pooling)**:
      When a grand migration or refactoring spans dozens of cohorts (e.g. cross-cutting library cutovers), execution uses a **Lead Hub Worktree** (`.worktrees/<task-name>` on `feat/<task-name>`) and **Ephemeral Spoke Workers** (`.worktrees/<task-name>--<cohort>` on `feat/<task-name>--<cohort>`):
      - **Hyphenated Task-Namespacing**: To eliminate collisions and human confusion across concurrent tasks, all spoke worktrees and branches MUST use the strict hyphenated prefix format: `.worktrees/<task-name>--<cohort>` on `feat/<task-name>--<cohort>`. Bare unprefixed worktree names (e.g. `.worktrees/<cohort>`) are strictly forbidden.
@@ -141,6 +143,8 @@ priority: high
      -> FOUND: Topology = Worktree. Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
         Skip worktree creation and plan mv. If AGENTS.local.md exists in root and is missing in worktree, copy it:
         [ -f AGENTS.local.md ] && [ ! -f .worktrees/<task>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
+        If .env exists in root and is missing in worktree, copy it without displaying values:
+        [ -f .env ] && [ ! -e .worktrees/<task>/.env ] && install -m 600 .env .worktrees/<task>/.env
      -> NOT FOUND:
         - If dev/active/<task> exists and (resuming OR user mandated in-tree):
           Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
@@ -150,6 +154,7 @@ priority: high
           git worktree add -b feat/<task> .worktrees/<task> origin/develop
           mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
           [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
+          [ -f .env ] && install -m 600 .env .worktrees/<task>/.env
           Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
 
 2. Context Load & Holistic Orientation:

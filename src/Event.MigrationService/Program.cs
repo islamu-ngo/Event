@@ -6,6 +6,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Privacy.ErasureAuthority;
+using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
@@ -20,6 +21,7 @@ public class Program
 
         var databaseOptions = builder.Configuration.AddPrimaryDatabaseBootstrap(
             builder.Environment.EnvironmentName);
+        ExploreDatabaseMigrator.EnsureAgentBrowserAdmission(builder.Configuration, builder.Environment);
         var runtimeDatabaseOptions = databaseOptions with { Role = PrimaryDatabaseRole.Runtime };
 
         builder.AddServiceDefaults();

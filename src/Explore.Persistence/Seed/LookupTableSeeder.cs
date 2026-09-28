@@ -2010,7 +2010,7 @@ public static class LookupTableSeeder
         }
     }
 
-    private static async Task SeedSystemSettingsAsync(ExploreDbContext context, CancellationToken ct)
+    internal static async Task SeedSystemSettingsAsync(ExploreDbContext context, CancellationToken ct)
     {
         var seedTimestamp = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var expectedSettings = new[]
@@ -2541,7 +2541,7 @@ public static class LookupTableSeeder
     /// Seeds default instance-level footer link groups (TenantId = null) with standard navigation links.
     /// Only runs if no instance-level footer link groups exist yet.
     /// </summary>
-    private static async Task SeedDefaultFooterLinkGroupsAsync(ExploreDbContext context, CancellationToken ct)
+    internal static async Task SeedDefaultFooterLinkGroupsAsync(ExploreDbContext context, CancellationToken ct)
     {
         // Only seed if no instance-level (TenantId = null) footer link groups exist
         if (await context.Set<TenantFooterLinkGroup>().AnyAsync(g => g.TenantId == null, ct)) return;

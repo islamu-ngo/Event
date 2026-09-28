@@ -176,7 +176,7 @@ public abstract class EventSessionLifecycleTransitionCommandHandlerBase<TCommand
             return response;
         }
 
-        await cache.RemoveAsync($"event:detail:{eventIdToInvalidate.Value}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(eventIdToInvalidate.Value), cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantIdToInvalidate.Value), cancellationToken);
         return response;
     }

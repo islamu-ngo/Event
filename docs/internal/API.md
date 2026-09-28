@@ -295,6 +295,30 @@ Three-reader non-URL versioning — clients may use any of the following; all th
    - **Domain-Family Base Classes**: Permitted only when two or more split controllers share an exact, multi-step domain protocol or security check (e.g. `RegistrationOrderControllerBase` for guest vs. authenticated checkout; `InstanceSettingsControllerBase` for setup-secret vs. admin).
    - **Composition Over Inheritance**: Shared mechanics belong in `CommandFailurePolicy`, `IResourceAssembler`, MediatR commands/queries, and extension methods (`ToCommandValidationProblem`, `ToNotFoundProblem`), leaving controller actions explicit, declarative, and independent.
 
+### Event Aggregate Deletion
+
+`DeleteEventCommandHandler` returns `BaseCommandResponse<Guid>`: missing event,
+denied owner/organization/instance authority, and paid-evidence conflict carry
+distinct failure codes. `EventLifecycleController.Delete` maps those codes
+through `CommandFailurePolicy` to 404, 403, and 409; only a committed deletion
+returns 204. The native `AuthorizeResource` check remains in front of the
+handler. Event detail's `delete` HAL link requires `event:delete`.
+`FallbackAuthorizationService` maps registration-form `delete` to
+`event_registration:manage` only for the registration-form resource kind;
+an EventManager or RegistrationManager assignment cannot borrow that
+permission to delete the event aggregate.
+
+### Event Detail Cache Isolation
+
+`GetEventDetailsRequestHandler` partitions its `HybridCache` projection by the
+ambient `ITenantContext.TenantId` and event ID. The projection reads through
+tenant-filtered repositories, so a missing projection from a wrong-tenant
+request must not cache a 404 for the tenant that owns the event. Public
+eligibility is rechecked against the current tenant after each cache read;
+event, aspect, session, ticketing and registration writers invalidate
+`CacheTags.Event(eventId)` to evict every tenant-partitioned projection. Removing
+the former unqualified `event:detail:{eventId}` key leaves stale details behind.
+
 ### Event Program Summary Queries
 
 `EventManagementReadController.GetProgramSummary` and `GetManagedProgramSummary`
@@ -952,6 +976,19 @@ Non-GET responses additionally receive:
 - `POST/PUT/DELETE`: `[Authorize]`
 - Privileged operations: role/policy constrained
 - User ID extraction fallback order: `sub` → `nameidentifier` → `sid`.
+
+### Tenantless Local Sign-In On The Admin Host
+`ApiTenantResolutionMiddleware` exempts `POST /api/auth/local/login`,
+authenticated `GET /api/user` for Local-session validation, and authenticated
+`GET /api/user/admin-authority` from tenant resolution. Native Local credentials,
+the current user's identity, and persisted administrator authority are
+instance-scoped; the BFF can therefore sign in and validate an administrator
+at the dedicated admin host without naming an ordinary tenant. Credential
+verification retains its rate limiter and no-store response; both identity
+reads still require a valid bearer token. The current-user exception is
+method-specific: `DELETE /api/user`, event reads, and other tenant-scoped
+API actions still fail closed without a resolved tenant. The persona HTTP
+regression verifies these boundaries.
 
 ### MediatR Authorization Behavior
 `AuthorizationBehavior` in the pipeline checks:

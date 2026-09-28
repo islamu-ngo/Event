@@ -389,6 +389,9 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | identity | sensitive | None | optional | process |
 | `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | identity | sensitive | None | optional | process |
 | `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | identity | secret | None (secret) | required | process |
+| `AGENT_BROWSER_SEED_ENABLED` | identity | public | false | defaulted | process |
+| `AGENT_BROWSER_PERSONA_PASSWORD` | identity | secret | None (secret) | optional | process |
+| `AGENT_BROWSER_REDIS_PASSWORD` | security | secret | None (secret) | required | process |
 | `AUTHENTICATION_LOCAL_JWT_KEY` | security | secret | None (secret) | optional | process |
 | `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | security | public | 5 | defaulted | process |
 | `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | security | public | 15 | defaulted | process |

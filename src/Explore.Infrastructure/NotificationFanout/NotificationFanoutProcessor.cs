@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
@@ -24,7 +25,8 @@ public sealed class NotificationFanoutProcessor(
     IOptions<NotificationFanoutProcessorSettings> options,
     TimeProvider timeProvider,
     BusinessMetrics metrics,
-    ILogger<NotificationFanoutProcessor> logger) : BackgroundService
+    ILogger<NotificationFanoutProcessor> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     private readonly NotificationFanoutProcessorSettings _settings = options.Value;
 
@@ -61,6 +63,7 @@ public sealed class NotificationFanoutProcessor(
     public async Task<NotificationFanoutProcessorRoundResult> ProcessRoundAsync(
         CancellationToken cancellationToken)
     {
+        using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(cancellationToken);
         DateTime claimedAt = UtcNow();
         NotificationFanoutClaimRoundResult claimRound;
         await using (AsyncServiceScope claimScope = scopeFactory.CreateAsyncScope())

@@ -91,6 +91,25 @@ public sealed class LocalProviderParityLaneTests
     }
 
     [Test]
+    public async Task EventManagerRegistrationPermissionDoesNotAuthorizeAggregateDeletion()
+    {
+        var facts = ParityCorpus.OrganizationOwnedEvent();
+        var decisions = await CreateService(ParitySubject.EventManager).AuthorizeBatchAsync(
+        [
+            new AuthorizationRequest(ResourceKinds.Event, ParityCorpus.EventId.ToString("D"),
+                AuthorizationActions.Events.ManageRegistrations, Facts: facts),
+            new AuthorizationRequest(ResourceKinds.Event, ParityCorpus.EventId.ToString("D"),
+                AuthorizationActions.Delete, Facts: facts),
+            new AuthorizationRequest(ResourceKinds.Event, ParityCorpus.EventId.ToString("D"),
+                AuthorizationActions.Events.Publish, Facts: facts)
+        ]);
+
+        await Assert.That(decisions[0].IsAllowed).IsTrue();
+        await Assert.That(decisions[1].IsAllowed).IsFalse();
+        await Assert.That(decisions[2].IsAllowed).IsTrue();
+    }
+
+    [Test]
     public async Task ConfigurationManifestExport_RequiresInstanceAdminAndExplicitExportFact()
     {
         var authorizedRequest = new AuthorizationRequest(

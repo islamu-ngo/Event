@@ -197,7 +197,7 @@ public sealed class HeavyRedactEventCommandHandler(
 
         if (shouldInvalidateCache)
         {
-            await cache.RemoveAsync($"event:detail:{eventId}", cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(eventId), cancellationToken);
             await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId), cancellationToken);
         }
 

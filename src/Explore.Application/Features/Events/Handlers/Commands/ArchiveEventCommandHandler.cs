@@ -108,7 +108,7 @@ public sealed class ArchiveEventCommandHandler(
 
         if (response.IsSuccess && tenantIdToInvalidate.HasValue)
         {
-            await cache.RemoveAsync($"event:detail:{request.Id}", cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.Event(request.Id), cancellationToken);
             await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantIdToInvalidate.Value), cancellationToken);
         }
 

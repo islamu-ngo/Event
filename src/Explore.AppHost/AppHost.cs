@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO.Pipes;
 using System.Net.Sockets;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -24,6 +26,42 @@ if (SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.Envi
     builder.Configuration.AddUserSecrets(typeof(SecretAuthorityConfiguration).Assembly, optional: true, reloadOnChange: false);
 }
 var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE_MODE"]);
+var agentBrowserProfile = runMode == AspireRunMode.AgentBrowser
+    ? AgentBrowserProfileSettings.Create()
+    : null;
+var agentResetPipeName = agentBrowserProfile is null
+    ? null : $"islamu-agent-database-reset-{Guid.NewGuid():N}";
+var hostingTopology = ParseHostingTopology(builder.Configuration["Hosting:Topology"]);
+var configurationManifestMode = ConfiguredValue(
+    builder.Configuration,
+    "CONFIGURATION_MANIFEST_MODE",
+    "Off");
+var agentBrowserSeedEnabled = ParseRequiredBoolean(
+    builder.Configuration["AGENT_BROWSER_SEED_ENABLED"],
+    "AGENT_BROWSER_SEED_ENABLED",
+    fallback: false);
+if (agentBrowserProfile is not null || agentBrowserSeedEnabled)
+{
+    var expectedProfile = agentBrowserProfile ?? AgentBrowserProfileSettings.Create();
+    _ = new AgentBrowserProvisioningOptions(
+            Enabled: agentBrowserSeedEnabled,
+            EnvironmentName: builder.Environment.EnvironmentName,
+            Mode: runMode.ToString(),
+            HostingTopology: hostingTopology.ToString(),
+            IdentityDatabaseTopology: ConfiguredValue(builder.Configuration, "IDENTITY_DATABASE_TOPOLOGY", expectedProfile.IdentityDatabaseTopology),
+            AuthenticationProvider: ConfiguredValue(builder.Configuration, "AUTHENTICATION_PROVIDER", expectedProfile.AuthenticationProvider),
+            AuthorizationProvider: ConfiguredValue(builder.Configuration, "AUTHORIZATION_PROVIDER", expectedProfile.AuthorizationProvider),
+            DatabaseProvider: ConfiguredValue(builder.Configuration, "DATABASE_PROVIDER", expectedProfile.DatabaseProvider),
+            DatabaseName: ConfiguredValue(builder.Configuration, "DATABASE_NAME", expectedProfile.DatabaseName),
+            ConfigurationManifestMode: configurationManifestMode,
+            PrivacyErasureTopology: ConfiguredValue(builder.Configuration,
+                "PrivacyErasure:Authority:Topology", expectedProfile.PrivacyErasureTopology),
+            WebhookProvider: ConfiguredValue(builder.Configuration, "Webhooks:Provider",
+                ConfiguredValue(builder.Configuration, "WEBHOOKS_PROVIDER", expectedProfile.WebhookProvider)))
+        .EnsureAdmitted(
+            erasureDatabaseTopology: builder.Configuration["ERASURE_DATABASE_TOPOLOGY"],
+            flatWebhookProvider: builder.Configuration["WEBHOOKS_PROVIDER"]);
+}
 SecretProviderType configuredSecretProvider =
     SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
 IConfiguration authorityBootstrap = runMode == AspireRunMode.FullLocal
@@ -40,14 +78,30 @@ IConfiguration secretAuthority = SecretAuthorityConfiguration.Build(
     authorityBootstrap,
     builder.Environment.EnvironmentName,
     "/keycloak", "/database", "/database/erasure", "/api", "/blazor",
-    "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe",
+    "/cerbos", "/mcp", "/ai", "/storage", "/smtp", "/stripe", "/postgresql",
     "/integrations/listmonk");
 builder.Configuration.AddConfiguration(secretAuthority);
-var hostingTopology = ParseHostingTopology(builder.Configuration["Hosting:Topology"]);
-var configurationManifestMode = ConfiguredValue(
-    builder.Configuration,
-    "CONFIGURATION_MANIFEST_MODE",
-    "Off");
+IResourceBuilder<ParameterResource>? agentPostgresUsername = null;
+IResourceBuilder<ParameterResource>? agentPostgresPassword = null;
+IResourceBuilder<ParameterResource>? agentRedisPassword = null;
+if (agentBrowserProfile is not null)
+{
+    agentPostgresUsername = AddSelectedAuthorityParameter(
+        builder,
+        "agent-postgres-username",
+        agentBrowserProfile.PostgresUsernameConfigurationKey,
+        secret: true);
+    agentPostgresPassword = AddSelectedAuthorityParameter(
+        builder,
+        "agent-postgres-password",
+        agentBrowserProfile.PostgresPasswordConfigurationKey,
+        secret: true);
+    agentRedisPassword = AddSelectedAuthorityParameter(
+        builder,
+        "agent-redis-password",
+        agentBrowserProfile.RedisPasswordConfigurationKey,
+        secret: true);
+}
 var configurationManifestHostDirectory = ConfiguredValue(
     builder.Configuration,
     "CONFIGURATION_MANIFEST_HOST_DIRECTORY",
@@ -66,7 +120,13 @@ var privacyErasureTopology = ParsePrivacyErasureTopology(
         ConfiguredValue(
             builder.Configuration,
             "ERASURE_DATABASE_TOPOLOGY",
-            nameof(PrivacyErasureAuthorityTopology.EmbeddedSqlite))));
+            agentBrowserProfile?.PrivacyErasureTopology
+                ?? nameof(PrivacyErasureAuthorityTopology.EmbeddedSqlite))));
+if (agentBrowserProfile is not null
+    && privacyErasureTopology != PrivacyErasureAuthorityTopology.EmbeddedSqlite)
+{
+    throw new InvalidOperationException("agent_browser_profile_requires_embedded_erasure");
+}
 var usesEmbeddedPrivacyErasureAuthority =
     privacyErasureTopology == PrivacyErasureAuthorityTopology.EmbeddedSqlite;
 var usesExternalPrivacyErasureAuthority =
@@ -74,19 +134,23 @@ var usesExternalPrivacyErasureAuthority =
 var webhookProvider = ConfiguredValue(
     builder.Configuration,
     "WEBHOOKS_PROVIDER",
-    WebhookOptions.ProviderLocal);
+    agentBrowserProfile?.WebhookProvider ?? WebhookOptions.ProviderLocal);
+if (agentBrowserProfile is not null
+    && !string.Equals(webhookProvider, WebhookOptions.ProviderLocal, StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("agent_browser_profile_requires_local_webhooks");
+}
 var includeSvix = UsesSvixProvider(webhookProvider);
 var appHostConfigRoot = Path.Combine(repositoryRoot, "src", "Explore.AppHost", "Config");
 var cerbosPolicyPackagePath = Path.Combine(repositoryRoot, "cerbos", "policies");
 var cerbosConfigPath = Path.Combine(repositoryRoot, "cerbos", "config", ".cerbos.yaml");
 var cerbosSchemaPath = Path.Combine(repositoryRoot, "cerbos", "init", "cerbos-schema.sql");
 var coopNginxConfigPath = Path.Combine(appHostConfigRoot, "coop", "nginx.conf");
-var localStorageRootPath = Path.Combine(repositoryRoot, "storage-data", "aspire-local");
+var localStorageRootPath = Path.Combine(repositoryRoot, agentBrowserProfile?.LocalStorageRelativePath ?? "storage-data/aspire-local");
 var embeddedPrivacyErasureAuthorityPath = Path.Combine(
     repositoryRoot,
-    "privacy-erasure-authority-data",
-    "aspire-local",
-    "privacy_erasure_authority.db");
+    agentBrowserProfile?.PrivacyErasureRelativePath
+        ?? "privacy-erasure-authority-data/aspire-local/privacy_erasure_authority.db");
 var embeddedPrivacyErasureAuthorityDirectory = Path.GetDirectoryName(embeddedPrivacyErasureAuthorityPath)!;
 var embeddedPrivacyErasureAuthorityBusyTimeout = ConfiguredValue(
     builder.Configuration,
@@ -97,6 +161,13 @@ var admissionCheckInAlertRulesPath = Path.Combine(appHostConfigRoot, "admission-
 var grafanaDashboardPath = Path.Combine(appHostConfigRoot, "grafana-dashboard");
 var pgAdminServersPath = Path.Combine(appHostConfigRoot, "pgadmin", "servers.json");
 var pgAdminPassFilePath = Path.Combine(appHostConfigRoot, "pgadmin", "pgpass");
+var controlPlanePublicOrigin = agentBrowserProfile?.AdminOrigin
+    ?? ConfiguredValue(
+        builder.Configuration,
+        "CONTROL_PLANE_PUBLIC_ORIGIN",
+        BuildDefaultHttpUri(DefaultControlPlaneHost, DefaultControlPlanePort));
+var publicBaseUrl = agentBrowserProfile?.DefaultTenantOrigin
+    ?? ConfiguredValue(builder.Configuration, "PUBLIC_BASE_URL", string.Empty);
 Directory.CreateDirectory(localStorageRootPath);
 if (usesEmbeddedPrivacyErasureAuthority)
     Directory.CreateDirectory(embeddedPrivacyErasureAuthorityDirectory);
@@ -106,27 +177,67 @@ Console.WriteLine("===========================================");
 Console.WriteLine("Explore AppHost - Local Development Orchestrator");
 Console.WriteLine($"Mode: {runMode}");
 Console.WriteLine($"Hosting topology: {hostingTopology}");
-Console.WriteLine("local-full: full local platform; local-default: lightweight local platform; local-core: local data/cache; local-lite: external infrastructure");
+Console.WriteLine("local-agent: isolated browser authentication; local-full: full local platform; local-default: lightweight local platform; local-core: local data/cache; local-lite: external infrastructure");
 Console.WriteLine("===========================================");
 
-// Delayed health check for startup sequencing
-var startAfter = DateTime.Now.AddSeconds(30);
-builder.Services.AddHealthChecks().AddCheck("startup-delay", () =>
-    DateTime.Now > startAfter ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy());
+// Ordinary profiles retain the compatibility delay; agent readiness follows real dependencies.
+if (runMode != AspireRunMode.AgentBrowser)
+{
+    var startAfter = DateTime.Now.AddSeconds(30);
+    builder.Services.AddHealthChecks().AddCheck("startup-delay", () =>
+        DateTime.Now > startAfter ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy());
+}
 
 IResourceBuilder<PostgresDatabaseResource>? database = null;
 IResourceBuilder<PostgresDatabaseResource>? privacyErasureDatabase = null;
 IResourceBuilder<RedisResource>? cache = null;
 IResourceBuilder<RabbitMQServerResource>? messaging = null;
 LocalPlatformResources? localPlatformResources = null;
-var mailpit = AddMailpit(builder);
+var mailpit = AddMailpit(builder, agentBrowserProfile);
 
 if (runMode.UsesLocalData())
 {
-    database = builder.AddPostgres("postgres")
-        .WithImageTag("18-alpine")
-        .WithDataVolume("islamu-event-postgres-data")
-        .AddDatabase("islamu-event-db", "islamu_event_db");
+    database = (agentBrowserProfile is null
+            ? builder.AddPostgres("postgres").WithImageTag("18-alpine")
+            : builder.AddPostgres("postgres", agentPostgresUsername!, agentPostgresPassword!)
+                .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit)
+                .WithImage("postgis/postgis")
+                .WithImageTag("18-3.6-alpine@sha256:"
+                    + "ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7"))
+        .WithDataVolume(agentBrowserProfile?.PostgresVolumeName ?? "islamu-event-postgres-data")
+        .AddDatabase("islamu-event-db", agentBrowserProfile?.DatabaseName ?? "islamu_event_db");
+
+    if (agentResetPipeName is not null)
+    {
+        database = database.WithCommand("reset-agent-database", "Reset agent database", async context =>
+        {
+            long started = Stopwatch.GetTimestamp();
+            try
+            {
+                await using var pipe = new NamedPipeClientStream(".", agentResetPipeName,
+                    PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                using var connectDeadline = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+                connectDeadline.CancelAfter(TimeSpan.FromSeconds(5));
+                await pipe.ConnectAsync(connectDeadline.Token);
+                using var operationDeadline = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+                operationDeadline.CancelAfter(TimeSpan.FromSeconds(125));
+                await pipe.WriteAsync("reset\n"u8.ToArray(), operationDeadline.Token);
+                await pipe.FlushAsync(operationDeadline.Token);
+                using var reader = new StreamReader(pipe);
+                string? response = await reader.ReadLineAsync(operationDeadline.Token);
+                if (response is null || !response.StartsWith("ready ", StringComparison.Ordinal))
+                    return CommandResults.Failure("agent_database_reset_failed_closed");
+                double elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                string report = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"request-to-ready={elapsed:F0}ms; target=2000ms; target-met={elapsed < 2000}");
+                return CommandResults.Success("Agent database ready", report, CommandResultFormat.Text);
+            }
+            catch (Exception)
+            {
+                return CommandResults.Failure("agent_database_reset_owner_unavailable");
+            }
+        });
+    }
 
     if (usesExternalPrivacyErasureAuthority)
     {
@@ -136,8 +247,11 @@ if (runMode.UsesLocalData())
             .AddDatabase("privacy-erasure-authority", "islamu_event_privacy_erasure");
     }
 
-    cache = builder.AddRedis("cache")
-        .WithDataVolume("islamu-event-redis-data");
+    cache = (agentBrowserProfile is null
+            ? builder.AddRedis("cache")
+            : builder.AddRedis("cache", password: agentRedisPassword!)
+                .WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit))
+        .WithDataVolume(agentBrowserProfile?.RedisVolumeName ?? "islamu-event-redis-data");
 }
 
 if (runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal)
@@ -173,7 +287,8 @@ var migrations = WithProfileSecretMode(
             "event-migrationservice",
             ExcludeProjectLaunchProfile),
         runMode,
-        builder.Configuration)
+        builder.Configuration,
+        allowAgentRuntimeSecrets: false)
     .WithEnvironment("PrivacyErasure__Authority__Topology", privacyErasureTopology.ToString());
 migrations = ConfigureConfigurationManifestOwner(
     migrations,
@@ -186,7 +301,8 @@ if (usesEmbeddedPrivacyErasureAuthority)
     migrations = WithEmbeddedPrivacyErasureAuthority(
         migrations,
         embeddedPrivacyErasureAuthorityPath,
-        embeddedPrivacyErasureAuthorityBusyTimeout);
+        embeddedPrivacyErasureAuthorityBusyTimeout,
+        agentBrowserProfile?.PrivacyErasureVolumeName);
 }
 
 if (!string.IsNullOrWhiteSpace(eventLocationPrivacyMigrationStage))
@@ -229,25 +345,23 @@ var vapidSubject = builder.Configuration["VAPID_SUBJECT"];
 if (hostingTopology == HostingTopology.Split)
 {
     var exploreAPI = WithProfileSecretMode(
-            builder.AddProject<Projects.Explore_API>(
+            WithApiEndpoints(
+                builder.AddProject<Projects.Explore_API>(
                     "explore-api",
-                    ExcludeProjectLaunchProfile)
-                .WithHttpEndpoint(name: "http")
-                .WithHttpsEndpoint(port: 7039, name: "https"),
+                    ExcludeProjectLaunchProfile),
+                agentBrowserProfile),
             runMode,
-            builder.Configuration)
-        .WithEnvironment("HttpsRedirection__Enabled", "false")
-        .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", ConfiguredValue(
             builder.Configuration,
-            "CONTROL_PLANE_PUBLIC_ORIGIN",
-            BuildDefaultHttpUri(DefaultControlPlaneHost, DefaultControlPlanePort)))
+            allowAgentRuntimeSecrets: true)
+        .WithEnvironment("HttpsRedirection__Enabled", "false")
+        .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", controlPlanePublicOrigin)
         .WithEnvironment("Cerbos__PolicyPackagePath", cerbosPolicyPackagePath)
         .WithEnvironment("Storage__Local__RootPath", localStorageRootPath)
         .WithEnvironment("Storage__Local__CreateRootIfMissing", "true")
         .WithEnvironment("StorageReconciliation__Enabled", "true")
         .WithEnvironment("StorageReconciliation__DryRun", "true")
         .WithEnvironment("PrivacyErasure__Authority__Topology", privacyErasureTopology.ToString())
-        .WithEnvironment("PublicBaseUrl", ConfiguredValue(builder.Configuration, "PUBLIC_BASE_URL", string.Empty))
+        .WithEnvironment("PublicBaseUrl", publicBaseUrl)
         .WithEnvironment("Payments__Stripe__Mode", ConfiguredValue(builder.Configuration, "PAYMENTS_STRIPE_MODE", "Test"))
         .WithEnvironment("Payments__Stripe__AllowedCheckoutHosts__0", ConfiguredValue(builder.Configuration, "PAYMENTS_STRIPE_ALLOWED_CHECKOUT_HOST", "checkout.stripe.com"))
         .WithEnvironment("Payments__OrganizerDirect__ProviderCode", ConfiguredValue(builder.Configuration, "PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE", string.Empty))
@@ -265,11 +379,14 @@ if (hostingTopology == HostingTopology.Split)
         exploreAPI = WithEmbeddedPrivacyErasureAuthority(
             exploreAPI,
             embeddedPrivacyErasureAuthorityPath,
-            embeddedPrivacyErasureAuthorityBusyTimeout);
+            embeddedPrivacyErasureAuthorityBusyTimeout,
+            agentBrowserProfile?.PrivacyErasureVolumeName);
     }
 
     exploreAPI = ConfigureLocalMailpitSmtp(exploreAPI, mailpit, builder.Configuration);
-    exploreAPI = ConfigureGeocoding(exploreAPI, builder.Configuration);
+    exploreAPI = agentBrowserProfile is null
+        ? ConfigureGeocoding(exploreAPI, builder.Configuration)
+        : exploreAPI.WithEnvironment("GEOCODING_PROVIDER", "None");
 
     if (!string.IsNullOrWhiteSpace(eventLocationPrivacyMigrationStage))
     {
@@ -325,6 +442,8 @@ if (hostingTopology == HostingTopology.Split)
             .WithReference(cache)
             .WaitFor(cache);
     }
+    if (agentResetPipeName is not null)
+        exploreAPI = exploreAPI.WithEnvironment("AgentBrowser__ResetPipeName", agentResetPipeName);
 
     if (messaging is not null)
     {
@@ -352,19 +471,17 @@ if (hostingTopology == HostingTopology.Split)
     // Service discovery (via WithReference) automatically resolves the API URL at runtime.
     // Do NOT hardcode ExploreAPI__BaseUrl here — Aspire assigns dynamic ports.
     var exploreBlazor = WithProfileSecretMode(
-            builder.AddProject<Projects.Explore_Blazor>(
+            WithBffEndpoints(
+                builder.AddProject<Projects.Explore_Blazor>(
                     "explore-blazor",
-                    ExcludeProjectLaunchProfile)
-                .WithHttpEndpoint(name: "http")
-                .WithHttpsEndpoint(port: 7177, name: "https"),
+                    ExcludeProjectLaunchProfile),
+                agentBrowserProfile),
             runMode,
-            builder.Configuration)
+            builder.Configuration,
+            allowAgentRuntimeSecrets: false)
         .WithReference(exploreAPI)
         .WaitFor(exploreAPI)
-        .WithEnvironment("Bff__AdminHosts__0", ConfiguredValue(
-            builder.Configuration,
-            "CONTROL_PLANE_PUBLIC_ORIGIN",
-            BuildDefaultHttpUri(DefaultControlPlaneHost, DefaultControlPlanePort)))
+        .WithEnvironment("Bff__AdminHosts__0", controlPlanePublicOrigin)
         .WithEnvironment("ForwardedHeadersTrust__ForwardLimit", ConfiguredValue(
             builder.Configuration,
             "BFF_FORWARDED_HEADERS_FORWARD_LIMIT",
@@ -421,7 +538,8 @@ else
                 .WithHttpEndpoint(name: "http")
                 .WithHttpsEndpoint(port: 7180, name: "https"),
             runMode,
-            builder.Configuration)
+            builder.Configuration,
+            allowAgentRuntimeSecrets: false)
         .WithEnvironment("HttpsRedirection__Enabled", "false")
         .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", ConfiguredValue(
             builder.Configuration,
@@ -462,7 +580,8 @@ else
         eventStandalone = WithEmbeddedPrivacyErasureAuthority(
             eventStandalone,
             embeddedPrivacyErasureAuthorityPath,
-            embeddedPrivacyErasureAuthorityBusyTimeout);
+            embeddedPrivacyErasureAuthorityBusyTimeout,
+            agentBrowserProfile?.PrivacyErasureVolumeName);
     }
 
     eventStandalone = ConfigureLocalMailpitSmtp(eventStandalone, mailpit, builder.Configuration);
@@ -934,21 +1053,29 @@ static LocalPlatformResources AddLocalPlatform(
         Grafana: grafana);
 }
 
-static IResourceBuilder<ContainerResource> AddMailpit(IDistributedApplicationBuilder builder)
+static IResourceBuilder<ContainerResource> AddMailpit(
+    IDistributedApplicationBuilder builder,
+    AgentBrowserProfileSettings? agentBrowserProfile)
 {
-    return builder.AddContainer("mailpit", "axllent/mailpit", builder.Configuration["MAILPIT_TAG"] ?? "latest")
+    var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", builder.Configuration["MAILPIT_TAG"] ?? "latest")
         .WithEnvironment("MP_MAX_MESSAGES", builder.Configuration["MAILPIT_MAX_MESSAGES"] ?? "5000")
         .WithEnvironment("MP_DATABASE", "/data/mailpit.db")
         .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "1")
         .WithEnvironment("MP_SMTP_AUTH_ALLOW_INSECURE", "1")
         .WithEnvironment("MP_DISABLE_VERSION_CHECK", "true")
-        .WithVolume("islamu-event-mailpit-data", "/data")
+        .WithVolume(agentBrowserProfile?.MailpitVolumeName ?? "islamu-event-mailpit-data", "/data")
         .WithEndpoint(
             targetPort: 1025,
-            port: 1025,
+            port: agentBrowserProfile?.MailpitSmtpPort ?? 1025,
             name: "smtp",
             protocol: ProtocolType.Tcp)
-        .WithHttpEndpoint(targetPort: 8025, port: 8025, name: "http");
+        .WithHttpEndpoint(
+            targetPort: 8025,
+            port: agentBrowserProfile?.MailpitUiPort ?? 8025,
+            name: "http");
+    return agentBrowserProfile is null
+        ? mailpit
+        : mailpit.WithContainerRuntimeArgs("--pids-limit", agentBrowserProfile.ContainerPidsLimit);
 }
 
 static void AddLocalFormbricks(IDistributedApplicationBuilder builder)
@@ -1058,6 +1185,36 @@ static void ExcludeProjectLaunchProfile(ProjectResourceOptions options)
 {
     options.ExcludeLaunchProfile = true;
 }
+
+static IResourceBuilder<ProjectResource> WithApiEndpoints(
+    IResourceBuilder<ProjectResource> project,
+    AgentBrowserProfileSettings? agentBrowserProfile) =>
+    agentBrowserProfile is null
+        ? project
+            .WithHttpEndpoint(name: "http")
+            .WithHttpsEndpoint(port: 7039, name: "https")
+        : project
+            .WithHttpEndpoint(
+                port: agentBrowserProfile.ApiPort,
+                targetPort: agentBrowserProfile.ApiPort,
+                name: "http",
+                isProxied: false)
+            .WithEnvironment("ASPNETCORE_URLS", agentBrowserProfile.ApiLoopbackUrl);
+
+static IResourceBuilder<ProjectResource> WithBffEndpoints(
+    IResourceBuilder<ProjectResource> project,
+    AgentBrowserProfileSettings? agentBrowserProfile) =>
+    agentBrowserProfile is null
+        ? project
+            .WithHttpEndpoint(name: "http")
+            .WithHttpsEndpoint(port: 7177, name: "https")
+        : project
+            .WithHttpEndpoint(
+                port: agentBrowserProfile.BffPort,
+                targetPort: agentBrowserProfile.BffPort,
+                name: "http",
+                isProxied: false)
+            .WithEnvironment("ASPNETCORE_URLS", agentBrowserProfile.BffLoopbackUrl);
 
 static IResourceBuilder<ProjectResource> ConfigureLocalMailpitSmtp(
     IResourceBuilder<ProjectResource> project,
@@ -1466,7 +1623,8 @@ static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityData
 static IResourceBuilder<ProjectResource> WithEmbeddedPrivacyErasureAuthority(
     IResourceBuilder<ProjectResource> project,
     string localPath,
-    string busyTimeoutSeconds)
+    string busyTimeoutSeconds,
+    string? volumeName = null)
 {
     const string containerPath = "/app/data/privacy_erasure_authority.db";
 
@@ -1477,7 +1635,7 @@ static IResourceBuilder<ProjectResource> WithEmbeddedPrivacyErasureAuthority(
         .WithEnvironment("PrivacyErasureAuthorityEmbedded__BusyTimeoutSeconds", busyTimeoutSeconds)
         .PublishAsDockerFile(container => container
             .WithEnvironment("PrivacyErasureAuthorityEmbedded__Path", containerPath)
-            .WithVolume("islamu-event-privacy-erasure-authority-data", "/app/data"));
+            .WithVolume(volumeName ?? "islamu-event-privacy-erasure-authority-data", "/app/data"));
 }
 
 static PrivacyErasureAuthorityTopology ParsePrivacyErasureTopology(string value)
@@ -1534,12 +1692,22 @@ static HostingTopology ParseHostingTopology(string? rawValue)
 static IResourceBuilder<ProjectResource> WithProfileSecretMode(
     IResourceBuilder<ProjectResource> project,
     AspireRunMode runMode,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    bool allowAgentRuntimeSecrets = false)
 {
     project = project
         .WithEnvironment("ISLAMU_ASPIRE_MODE", runMode.ToString())
         .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
         .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development");
+
+    if (runMode == AspireRunMode.AgentBrowser)
+    {
+        project = WithAgentBrowserEnvironment(project, AgentBrowserProfileSettings.Create());
+        if (!allowAgentRuntimeSecrets)
+        {
+            return WithoutAgentRuntimeSecrets(project);
+        }
+    }
 
     SecretProviderType provider = SecretAuthorityConfiguration.GetRequiredProvider(configuration);
     return runMode == AspireRunMode.FullLocal && provider == SecretProviderType.Infisical
@@ -1552,6 +1720,53 @@ static IResourceBuilder<ProjectResource> WithProfileSecretMode(
             .WithEnvironment("SecretProvider__Infisical__Environment", "")
         : WithSelectedSecretAuthority(project, configuration);
 }
+
+static IResourceBuilder<ProjectResource> WithAgentBrowserEnvironment(
+    IResourceBuilder<ProjectResource> project,
+    AgentBrowserProfileSettings profile) =>
+    project
+        .WithEnvironment("AGENT_BROWSER_SEED_ENABLED", profile.SeedEnabled.ToString())
+        .WithEnvironment("Hosting__Topology", profile.HostingTopology)
+        .WithEnvironment("IDENTITY_DATABASE_TOPOLOGY", profile.IdentityDatabaseTopology)
+        .WithEnvironment("AUTHENTICATION_PROVIDER", profile.AuthenticationProvider)
+        .WithEnvironment("AUTHORIZATION_PROVIDER", profile.AuthorizationProvider)
+        .WithEnvironment("DEPLOYMENT_MODE", profile.DeploymentMode)
+        .WithEnvironment("CONFIGURATION_MANIFEST_MODE", profile.ConfigurationManifestMode)
+        .WithEnvironment("PrivacyErasure__Authority__Topology", profile.PrivacyErasureTopology)
+        .WithEnvironment("ERASURE_DATABASE_TOPOLOGY", profile.PrivacyErasureTopology)
+        .WithEnvironment("WEBHOOKS_PROVIDER", profile.WebhookProvider)
+        .WithEnvironment("INSTANCE_BOOTSTRAP_MODE", profile.InstanceBootstrapMode)
+        .WithEnvironment("INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", profile.InstanceBootstrapAdminProvider)
+        .WithEnvironment("INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", profile.InstanceBootstrapAdminSubject)
+        .WithEnvironment("INSTANCE_BOOTSTRAP_ADMIN_EMAIL", profile.InstanceBootstrapAdminEmail)
+        .WithEnvironment("INSTANCE_BOOTSTRAP_BINDING_GENERATION", profile.InstanceBootstrapBindingGeneration)
+        .WithEnvironment("CONTROL_PLANE_PUBLIC_ORIGIN", profile.AdminOrigin)
+        .WithEnvironment("PUBLIC_BASE_URL", profile.DefaultTenantOrigin)
+        .WithEnvironment("Bff__AdminHosts__0", profile.AdminOrigin);
+
+static IResourceBuilder<ProjectResource> WithoutAgentRuntimeSecrets(
+    IResourceBuilder<ProjectResource> project) =>
+    project
+        .WithEnvironment("SecretProvider__Provider", nameof(SecretProviderType.Environment))
+        .WithEnvironment("SecretProvider__Infisical__Url", "")
+        .WithEnvironment("SecretProvider__Infisical__ProjectId", "")
+        .WithEnvironment("SecretProvider__Infisical__ClientId", "")
+        .WithEnvironment("SecretProvider__Infisical__ClientSecret", "")
+        .WithEnvironment("SecretProvider__Infisical__Environment", "")
+        .WithEnvironment("INSTANCE_BOOTSTRAP_LOCAL_PASSWORD", "")
+        .WithEnvironment("AGENT_BROWSER_PERSONA_PASSWORD", "")
+        .WithEnvironment("AUTHENTICATION_LOCAL_JWT_KEY", "");
+
+static IResourceBuilder<ParameterResource> AddSelectedAuthorityParameter(
+    IDistributedApplicationBuilder builder,
+    string resourceName,
+    string configurationKey,
+    bool secret) =>
+    builder.AddParameter(
+        resourceName,
+        () => RequiredConfiguredValue(builder.Configuration, configurationKey),
+        publishValueAsDefault: false,
+        secret: secret);
 
 static IResourceBuilder<ProjectResource> WithSelectedSecretAuthority(
     IResourceBuilder<ProjectResource> project,
@@ -1656,6 +1871,23 @@ static IResourceBuilder<ProjectResource> ConfigureConfigurationManifestOwner(
 static string ConfiguredValue(IConfiguration configuration, string key, string fallback) =>
     string.IsNullOrWhiteSpace(configuration[key]) ? fallback : configuration[key]!;
 
+static string RequiredConfiguredValue(IConfiguration configuration, string key) =>
+    string.IsNullOrWhiteSpace(configuration[key])
+        ? throw new InvalidOperationException($"agent_browser_selected_authority_missing:{key}")
+        : configuration[key]!;
+
+static bool ParseRequiredBoolean(string? value, string key, bool fallback)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return fallback;
+    }
+
+    return bool.TryParse(value, out bool parsed)
+        ? parsed
+        : throw new InvalidOperationException($"{key} must be true or false.");
+}
+
 static bool UsesSvixProvider(string provider) =>
     string.Equals(provider, WebhookOptions.ProviderSvix, StringComparison.OrdinalIgnoreCase) ||
     string.Equals(provider, WebhookOptions.ProviderComposite, StringComparison.OrdinalIgnoreCase);
@@ -1671,13 +1903,14 @@ internal enum AspireRunMode
     FullLocal,
     DefaultLocal,
     ExternalInfra,
-    LocalDataExternalPlatform
+    LocalDataExternalPlatform,
+    AgentBrowser
 }
 
 internal static class AspireRunModeExtensions
 {
     public static bool UsesLocalData(this AspireRunMode runMode) =>
-        runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal or AspireRunMode.LocalDataExternalPlatform;
+        runMode is AspireRunMode.FullLocal or AspireRunMode.DefaultLocal or AspireRunMode.LocalDataExternalPlatform or AspireRunMode.AgentBrowser;
 
     public static AspireRunMode Parse(string? rawValue)
     {
@@ -1719,8 +1952,14 @@ internal static class AspireRunModeExtensions
             return AspireRunMode.LocalDataExternalPlatform;
         }
 
+        if (normalized.Equals("agentbrowser", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("localagent", StringComparison.OrdinalIgnoreCase))
+        {
+            return AspireRunMode.AgentBrowser;
+        }
+
         throw new InvalidOperationException(
-            $"Unsupported ISLAMU_ASPIRE_MODE '{rawValue}'. Use FullLocal, DefaultLocal, ExternalInfra, or LocalDataExternalPlatform.");
+            $"Unsupported ISLAMU_ASPIRE_MODE '{rawValue}'. Use FullLocal, DefaultLocal, ExternalInfra, LocalDataExternalPlatform, or AgentBrowser.");
     }
 }
 

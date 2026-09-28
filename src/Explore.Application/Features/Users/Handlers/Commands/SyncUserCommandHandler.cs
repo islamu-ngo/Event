@@ -104,7 +104,17 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                     "tenant_lifecycle_unavailable", "Tenant is not available for user synchronization.");
             }
 
-            if (request.LocalLifecycleSynchronization is null && bootstrap is
+            bool completedOrdinaryLocalBinding = providerKind == AuthenticationProviderKind.Local
+                && bootstrap is
+                {
+                    Mode: InstanceBootstrapMode.ConfiguredAdministrator,
+                    Status: InstanceBootstrapStatus.Completed,
+                    CompletedByUserId: Guid administratorId
+                }
+                && existingLogin is not null
+                && existingLogin.UserId != administratorId;
+
+            if (request.LocalLifecycleSynchronization is null && !completedOrdinaryLocalBinding && bootstrap is
                 {
                     Mode: InstanceBootstrapMode.ConfiguredAdministrator
                 })

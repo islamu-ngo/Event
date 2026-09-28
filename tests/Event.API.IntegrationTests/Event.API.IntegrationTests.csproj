@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\src\Explore.API\Explore.API.csproj" />
     <ProjectReference Include="..\..\src\Explore.Blazor\Explore.Blazor.csproj" Aliases="bff" />
     <ProjectReference Include="..\..\src\Event.Standalone\Event.Standalone.csproj" Aliases="standalone" />
+    <ProjectReference Include="..\..\src\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite\Explore.Persistence.PrivacyErasureAuthority.Migrations.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
 

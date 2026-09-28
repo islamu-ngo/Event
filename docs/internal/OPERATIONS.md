@@ -441,6 +441,110 @@ Do not treat a green lifecycle worker as live Google proof. Operators must still
 
 ## Local Startup Topology (Aspire)
 
+### Isolated Local-Agent Browser Authentication
+
+For the Development-only local-agent browser-authentication profile, use the
+protocol in [Blazor UI Development Workflow](BLAZOR_DEV_WORKFLOW.md#2-local-agent-browser-authentication):
+
+```bash
+dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj --launch-profile local-agent
+```
+
+For the shared Development vault whose `/api` configuration selects Keycloak,
+use `bash eng/scripts/run-local-agent.sh [--no-build]` instead. It imports
+only the six allowlisted agent credentials from `/api` and `/postgresql` into
+the current process, rejects vault runtime directives, selects Environment
+and the agent's Local-only topology without changing vault records, and never prints secret
+values. Its prerequisites are `curl`, `jq`, `base64`, `dotnet`, and shared
+Development User Secrets holding the Infisical bootstrap authority. A copied
+root `.env` remains ignored and does not provide credentials when empty.
+The launcher emits only bounded startup reason codes, not raw AppHost output
+or dashboard URLs; inspect owned resource states with `aspire describe` and
+redact logs before sharing them.
+
+It is the isolated `AgentBrowser` Split profile: API `http://localhost:5100`,
+BFF `http://localhost:5200`, admin host `http://admin.localhost:5200`, default
+tenant host `http://default.localhost:5200`, negative tenant host
+`http://agent-negative.localhost:5200`, and Mailpit UI/SMTP
+`http://localhost:58025` / `localhost:51025`. The selected secret authority
+must supply `POSTGRESQL_USERNAME`, `POSTGRESQL_PASSWORD`,
+`AGENT_BROWSER_REDIS_PASSWORD`, and `AUTHENTICATION_LOCAL_JWT_KEY` on every
+launch. Initial provisioning also needs `AGENT_BROWSER_PERSONA_PASSWORD` and
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD`. Never record their values.
+Only its PostgreSQL resource uses the digest-pinned PostGIS 3.6/PostgreSQL 18
+image; the migrator enables `postgis` in the isolated agent database before
+application migrations. The extension is installed in the `islamu_event`
+application schema: a standalone `psql` spatial smoke must set
+`search_path` to include that schema, or qualify PostGIS types and functions.
+Confirm extension creation and `ST_DWithin` on the configured image rather
+than assuming unqualified `psql` finds `geography` in `public`. Other Aspire
+profiles and product proximity behavior
+are unchanged; see [the image dependency decision](legal/dependencies/postgis-agent-image.md).
+
+Subscribe to AppHost resource state before launch and proceed only after
+migration completion and API/BFF readiness; this profile omits the ordinary
+artificial startup delay. Do not substitute a fixed sleep, stop all `dotnet`
+processes, or select alternate ports after a conflict. Restart or stop only the
+AppHost session this operation owns. Completion receipts are final for the
+profile: restart may resume an owned incomplete operation but must not reset
+passwords, restore grants, or adopt collisions. Data/volume deletion is a
+separate destructive operation requiring explicit approval.
+Both the API and BFF `/health` endpoints must return HTTP 200 under Local
+authentication; the API may report `Degraded` for intentionally disabled Web
+Push. The OIDC discovery check skips external Keycloak metadata
+only when the effective authentication provider is Local. External Identity
+profiles keep their discovery readiness check.
+
+#### Reset only the agent database
+
+The Development-only reset is a maintenance operation on the **running**
+`explore-api` process, not a new API endpoint or a container/volume reset.
+Run the Aspire database resource command from the repository root (or choose
+**Reset agent database** on `islamu-event-db` in the Aspire dashboard):
+
+```bash
+aspire resource islamu-event-db reset-agent-database \
+  --apphost src/Explore.AppHost/Explore.AppHost.csproj
+```
+
+The agent AppHost binds this command to its exact API process with a unique
+same-run control pipe. For an API running without the Aspire command, use the
+same reset owner through its process-specific pipe; supply the **agent API**
+PID, not the AppHost PID:
+
+```bash
+dotnet run eng/tools/AgentDatabaseReset.cs -- --owner-pid <agent-api-process-id> --apply
+```
+
+Both entrypoints use current-OS-user-only named pipes. The API first
+closes HTTP admission with a no-store 503 response and pauses whole background
+work units, including outbox and Quartz dispatch. After draining in-flight
+work, it validates the synthetic owner and purges only owned application
+tables in one schema-qualified PostgreSQL transaction using `RESTRICT`. It
+preserves EF migration history and approved lookup data; Redis, Mailpit,
+local files, and the embedded privacy-erasure authority are not erased.
+It then invalidates database projections, runs native credential provisioning
+in its own transactions, verifies six new sign-in-capable personas and routing,
+and reopens admission. Previous browser credentials are no longer a continuity
+proof: use fresh sign-in after a successful reset.
+
+A failed native reset leaves admission closed. A client timeout or lost
+response has an **unknown** outcome: the API may have completed its owned
+operation after the client disconnected. Check its `/health` readiness and
+the new credential baseline before treating it as ready; if not healthy,
+inspect its value-free failure code and the selected authority, then retry
+against the **same owner**. If purge committed before failure, its next
+attempt resumes native provisioning without purging partial receipts; an API
+process restart also runs pre-traffic native recovery. A different API, an
+absent owner, wrong database/provider/topology, non-embedded erasure authority,
+external webhook provider, non-Local storage route, or another in-progress
+reset fails closed. The owner invalidates instance and tenant settings caches
+before resolving the effective storage routes for the instance and every
+persisted tenant, including unlocked overrides or out-of-band policy changes.
+The tool reports request-to-ready latency and whether the
+2000 ms target was met; the target is measured, not a correctness threshold.
+No database-volume deletion is part of this reset protocol.
+
 `Explore.AppHost/AppHost.cs` selects local infrastructure from `ISLAMU_ASPIRE_MODE`, normally through `Explore.AppHost/Properties/launchSettings.json`; `Hosting:Topology` separately selects the web-process topology:
 
 | Launch profile | Mode | Started by Aspire |

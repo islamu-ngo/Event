@@ -1,4 +1,5 @@
 using Explore.Application.Authorization;
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
@@ -115,7 +116,7 @@ public sealed class PublishEventTicketCatalogCommandHandler(
             return Missing(command.EventId);
         }
 
-        await cache.RemoveAsync($"event:detail:{command.EventId}", cancellationToken);
+        await cache.RemoveByTagAsync(CacheTags.Event(command.EventId), cancellationToken);
         return Ok(catalogId.Value, "Ticket catalog published.");
     }
 

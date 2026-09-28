@@ -2,6 +2,9 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.ServiceDefaults.HealthChecks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -79,6 +82,39 @@ public sealed class ApiHostCompositionTests
         await Assert.That(data.TryGetProperty("token", out _)).IsFalse();
     }
 
+    [Test]
+    [Arguments("local", HealthStatus.Healthy)]
+    [Arguments("keycloak", HealthStatus.Unhealthy)]
+    public async Task OidcReadiness_DependsOnTheSelectedAuthenticationProvider(
+        string provider, HealthStatus expected)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AUTHENTICATION_PROVIDER"] = provider,
+                ["Keycloak:Authority"] = "http://127.0.0.1:51099"
+            })
+            .Build();
+        using var client = new HttpClient(new UnreachableDiscoveryHandler());
+        var check = new OidcDiscoveryHealthCheck(configuration, new FixedClientFactory(client));
+
+        HealthCheckResult result = await check.CheckHealthAsync(new HealthCheckContext());
+
+        await Assert.That(result.Status).IsEqualTo(expected);
+    }
+
     private static bool HasPublicStaticMethod(Type type, string methodName) =>
         type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static) is not null;
+
+    private sealed class FixedClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class UnreachableDiscoveryHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromException<HttpResponseMessage>(new HttpRequestException("OIDC discovery unavailable"));
+    }
 }

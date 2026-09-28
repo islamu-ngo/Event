@@ -1,4 +1,5 @@
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -15,6 +16,7 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
     private readonly IEventRepository _eventRepository;
     private readonly IEventDetailsProjectionService _detailsProjectionService;
     private readonly HybridCache _cache;
+    private readonly ITenantContext _tenantContext;
     private readonly ITenantLifecycleAccessService _lifecycle;
     private readonly IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> _optionalQuestionnaireHandler;
 
@@ -23,18 +25,20 @@ public class GetEventDetailsRequestHandler : IQueryHandler<GetEventDetailsReques
         IEventDetailsProjectionService detailsProjectionService,
         HybridCache cache,
         IQueryHandler<GetOptionalQuestionnaireQuery, OptionalQuestionnaireDto?> optionalQuestionnaireHandler,
-        ITenantLifecycleAccessService lifecycle)
+        ITenantLifecycleAccessService lifecycle,
+        ITenantContext tenantContext)
     {
         _eventRepository = eventRepository;
         _detailsProjectionService = detailsProjectionService;
         _cache = cache;
         _lifecycle = lifecycle;
+        _tenantContext = tenantContext;
         _optionalQuestionnaireHandler = optionalQuestionnaireHandler;
     }
 
     public async Task<EventDto?> QueryAsync(GetEventDetailsRequest request, CancellationToken cancellationToken)
     {
-        var cacheKey = $"event:detail:{request.Id}";
+        var cacheKey = $"event:detail:{_tenantContext.TenantId:D}:{request.Id:D}";
 
         var eventDto = await _cache.GetOrCreateAsync(
             cacheKey,

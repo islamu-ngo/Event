@@ -105,7 +105,7 @@ public sealed class UpdateEventDraftCommandHandler : ICommandHandler<UpdateEvent
             }, token), cancellationToken);
         if (response.IsSuccess && tenantId.HasValue)
         {
-            await _cache.RemoveAsync($"event:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.Event(request.Id), cancellationToken);
             await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId.Value), cancellationToken);
         }
 

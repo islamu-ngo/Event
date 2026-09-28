@@ -51,7 +51,8 @@ public static class SecretDefinitionRegistry
         _ = GetRequired(settingKey);
         var mode = settingKey switch
         {
-            Keys.SetupSecret or Keys.Authentication.LocalBootstrapPassword => SecretRotationMode.UnsupportedLive,
+            Keys.SetupSecret or Keys.Authentication.LocalBootstrapPassword
+                or Keys.Authentication.AgentBrowserPersonaPassword => SecretRotationMode.UnsupportedLive,
             Keys.Promotions.CodeLookupHmacKey
                 or Keys.Admissions.CredentialLookupHmacKey
                 or Keys.Admissions.RecoveryCapabilityHmacKey
@@ -128,6 +129,12 @@ public static class SecretDefinitionRegistry
         {
             public const string LocalJwtKey = "authentication.local.jwt_key";
             public const string LocalBootstrapPassword = "authentication.local.bootstrap_password";
+            public const string AgentBrowserPersonaPassword = "authentication.local.agent_browser_persona_password";
+        }
+
+        public static class Redis
+        {
+            public const string AgentBrowserPassword = "redis.agent_browser_password";
         }
 
         public static class IdentityDatabase
@@ -294,6 +301,28 @@ public static class SecretDefinitionRegistry
                 DefaultEnvironmentVariableName = "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
                 IsBootstrapSecret = true,
                 Description = "Initial Local administrator credential requiring private first-use replacement.",
+            },
+            new()
+            {
+                Key = Keys.Authentication.AgentBrowserPersonaPassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/api",
+                DefaultInfisicalKey = "AGENT_BROWSER_PERSONA_PASSWORD",
+                DefaultEnvironmentVariableName = "AGENT_BROWSER_PERSONA_PASSWORD",
+                IsBootstrapSecret = true,
+                Description = "Final Local credential for unfinished development agent personas.",
+            },
+            new()
+            {
+                Key = Keys.Redis.AgentBrowserPassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/api",
+                DefaultInfisicalKey = "AGENT_BROWSER_REDIS_PASSWORD",
+                DefaultEnvironmentVariableName = "AGENT_BROWSER_REDIS_PASSWORD",
+                IsBootstrapSecret = true,
+                Description = "Dedicated cache credential for the isolated development agent profile.",
             },
 
             // --- storage/STORAGE_S3_* ---

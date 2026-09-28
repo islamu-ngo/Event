@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,7 +8,8 @@ namespace Explore.Infrastructure.WebPush;
 public sealed class WebPushDispatchProcessor(
     WebPushDispatchDrainService drainService,
     IOptions<WebPushSettings> options,
-    ILogger<WebPushDispatchProcessor> logger) : BackgroundService
+    ILogger<WebPushDispatchProcessor> logger,
+    IAgentBrowserWorkAdmission? agentWorkAdmission = null) : BackgroundService
 {
     private readonly WebPushSettings _settings = options.Value;
 
@@ -22,6 +24,7 @@ public sealed class WebPushDispatchProcessor(
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_settings.PollingIntervalSeconds));
         do
         {
+            using var work = agentWorkAdmission is null ? null : await agentWorkAdmission.EnterAsync(stoppingToken);
             await drainService.RecoverStaleProcessingAsync(stoppingToken);
             await drainService.ProcessBatchAsync(stoppingToken);
         }

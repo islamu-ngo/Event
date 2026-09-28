@@ -2,6 +2,7 @@ using System.Diagnostics.Metrics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using CarpaNet.Jetstream;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Requests.Commands;
@@ -29,6 +30,7 @@ public sealed class AtprotoJetstreamSubscriber : BackgroundService
         unit: "ms",
         description: "Milliseconds between the producer commit timestamp and local application of the envelope.");
     private readonly IAtprotoJetstreamRuntimeStore _store;
+    private readonly IAgentBrowserWorkAdmission? _agentWorkAdmission;
     private readonly IAtprotoJetstreamEventSource _eventSource;
     private readonly AtprotoJetstreamOptions _options;
     private readonly TimeProvider _timeProvider;
@@ -52,9 +54,11 @@ public sealed class AtprotoJetstreamSubscriber : BackgroundService
         IOptionsMonitor<AtprotoJetstreamOptions> options,
         TimeProvider timeProvider,
         ILogger<AtprotoJetstreamSubscriber> logger,
-        AtprotoJetstreamLiveness? liveness = null)
+        AtprotoJetstreamLiveness? liveness = null,
+        IAgentBrowserWorkAdmission? agentWorkAdmission = null)
     {
         _store = store;
+        _agentWorkAdmission = agentWorkAdmission;
         _eventSource = eventSource;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -143,6 +147,12 @@ public sealed class AtprotoJetstreamSubscriber : BackgroundService
 
     internal async Task<bool> RunSingleLeaseAsync(CancellationToken cancellationToken)
     {
+        using var work = _agentWorkAdmission is null ? null : await _agentWorkAdmission.EnterAsync(cancellationToken);
+        // Maintenance terminates idle stream/renewal waits, then the lease's existing finally drains
+        // both recovery and renewal before releasing admission. No old cursor survives into a new DB.
+        using var maintenance = _agentWorkAdmission is null ? null : CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, _agentWorkAdmission.MaintenanceRequested);
+        if (maintenance is not null) cancellationToken = maintenance.Token;
         IReadOnlyList<Guid> enabledTenants = await _store.ResolveEnabledTenantIdsAsync(cancellationToken);
         if (enabledTenants.Count == 0)
         {

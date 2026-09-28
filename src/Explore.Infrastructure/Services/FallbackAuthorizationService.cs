@@ -567,12 +567,14 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
             : resourceKind.StartsWith(productNamespacePrefix, StringComparison.Ordinal)
                 ? resourceKind[productNamespacePrefix.Length..]
                 : resourceKind;
-        if (resourceKind is ResourceKinds.Event or ResourceKinds.RegistrationForm &&
-            action is AuthorizationActions.Events.ManageRegistrations
+        if (resourceKind == ResourceKinds.Event
+            && action is (AuthorizationActions.Events.ManageRegistrations
                 or AuthorizationActions.Events.ManageRegistrationWorkflow
                 or AuthorizationActions.Events.ManageRegistrationChannels
-                or AuthorizationActions.Events.ViewRegistrationProviderHealth
-                or AuthorizationActions.RegistrationForms.View
+                or AuthorizationActions.Events.ViewRegistrationProviderHealth))
+            return PermissionCodes.EventRegistrationManage;
+        if (resourceKind == ResourceKinds.RegistrationForm
+            && action is (AuthorizationActions.RegistrationForms.View
                 or AuthorizationActions.RegistrationForms.Create
                 or AuthorizationActions.RegistrationForms.Update
                 or AuthorizationActions.RegistrationForms.Delete
@@ -580,7 +582,7 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
                 or AuthorizationActions.RegistrationForms.Publish
                 or AuthorizationActions.RegistrationForms.ManageRequirements
                 or AuthorizationActions.RegistrationForms.Attach
-                or AuthorizationActions.RegistrationForms.Detach)
+                or AuthorizationActions.RegistrationForms.Detach))
             return PermissionCodes.EventRegistrationManage;
         if (resourceKind == ResourceKinds.Event && action == AuthorizationActions.Events.ManageTickets)
             return PermissionCodes.EventManageTickets;

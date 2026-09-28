@@ -1,0 +1,32 @@
+Change-Id: CHG-01M3FPW8911TE5YAQ559SC1GYX
+Title: provision isolated development browser personas through native credentials
+Type: feat
+Scope: access
+Summary: Add an explicitly admitted local browser fixture with native first-use credential proof, scoped authority, and restart finality.
+Group: authentication
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/adr/agent-browser-persona-provisioning.md
+    Disposition: not-applicable
+    Detail: Ordinary hosting and existing authentication contracts remain unchanged.
+  Security:
+    Reference: docs/internal/adr/agent-browser-persona-provisioning.md
+    Disposition: documented
+    Detail: Development-only admission, exact receipt ownership, signed password proof, and completed-state no-reset and no-regrant rules bound the fixture.
+  Migration:
+    Reference: docs/internal/adr/agent-browser-persona-provisioning.md
+    Disposition: not-applicable
+    Detail: No new schema or migration artifact is required; agent migration excludes business fixtures.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: AgentBrowser requires explicit opt-in, an isolated PostgreSQL database, Local providers, and authority-owned initialization secrets.
+  OpenAPI:
+    Reference: docs/internal/adr/agent-browser-persona-provisioning.md
+    Disposition: not-applicable
+    Detail: Provisioning composes existing native handlers and exposes no new endpoint.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Keep initialization authority stable until completion and recreate only disposable agent-owned data when recovery is intended.

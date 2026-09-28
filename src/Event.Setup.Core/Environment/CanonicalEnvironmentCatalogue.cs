@@ -30,6 +30,9 @@ public static partial class CanonicalEnvironmentCatalogue
         INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME
         INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME
         INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
+        AGENT_BROWSER_SEED_ENABLED
+        AGENT_BROWSER_PERSONA_PASSWORD
+        AGENT_BROWSER_REDIS_PASSWORD
         AUTHENTICATION_LOCAL_JWT_KEY
         AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD
         AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES
@@ -630,6 +633,8 @@ public static partial class CanonicalEnvironmentCatalogue
         """
         SETUP_SECRET
         INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
+        AGENT_BROWSER_PERSONA_PASSWORD
+        AGENT_BROWSER_REDIS_PASSWORD
         SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY
         STORAGE_S3_ENDPOINT
         STORAGE_S3_PUBLIC_ENDPOINT
@@ -761,7 +766,8 @@ public static partial class CanonicalEnvironmentCatalogue
 
         var graph = new EnvironmentActivationGraph(
             ["combined", "split", "standalone"],
-            Enum.GetNames<EnvironmentVariableCategory>().Select(value => value.ToLowerInvariant()),
+            Enum.GetNames<EnvironmentVariableCategory>().Select(value => value.ToLowerInvariant())
+                .Append("agent-browser"),
             ["environment", "infisical", "local", "cerbos", "keycloak", "postgresql", "sqlite", "sqlserver", "mariadb", "mysql", "s3", "stripe", "svix", "interactive", "configured-administrator", "atproto"],
             new Dictionary<string, EnvironmentActivationExpression>(StringComparer.Ordinal)
             {
@@ -786,6 +792,10 @@ public static partial class CanonicalEnvironmentCatalogue
                     EnvironmentActivationExpression.Provider("configured-administrator")),
                 ["local-bootstrap-config"] = EnvironmentActivationExpression.All(
                     EnvironmentActivationExpression.Feature("configured-bootstrap-config"),
+                    EnvironmentActivationExpression.Provider("local")),
+                ["agent-browser-config"] = EnvironmentActivationExpression.All(
+                    EnvironmentActivationExpression.Capability("agent-browser"),
+                    EnvironmentActivationExpression.Topology("split"),
                     EnvironmentActivationExpression.Provider("local")),
                 ["atproto-bootstrap-config"] = EnvironmentActivationExpression.All(
                     EnvironmentActivationExpression.Feature("configured-bootstrap-config"),

@@ -1,11 +1,29 @@
 using Event.Web.BffHosting.Security;
+using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Blazor.IntegrationTests.Handlers;
 
 public class TenantHeaderForwardingHandlerTests
 {
+    [Test]
+    public async Task AdminAuthorityClientForwardsTenantContextWhenValidatingLocalCookies()
+    {
+        using var factory = new BlazorBffWebApplicationFactory();
+        var handler = factory.Services.GetRequiredService<IHttpMessageHandlerFactory>()
+            .CreateHandler("AdminAuthority");
+        bool forwardsTenant = false;
+        while (handler is DelegatingHandler delegating)
+        {
+            forwardsTenant |= delegating is TenantHeaderForwardingHandler;
+            handler = delegating.InnerHandler;
+        }
+
+        await Assert.That(forwardsTenant).IsTrue();
+    }
+
     [Test]
     public async Task SendAsync_WithTenantSlug_AddsXTenantSlugHeader()
     {

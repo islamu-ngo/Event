@@ -2554,3 +2554,165 @@ References: `InstanceOnboardingGenerationReader`,
 - [x] Stays in journal only (the schema and focused regression now guard the contract)
 
 ---
+
+[2026-09-27 Europe/Brussels] — Tenant-filtered event projections need tenant-partitioned cache keys
+
+**Context**: While testing the local-agent browser personas, the default tenant queried an event owned by the negative-control tenant before that tenant read its own published event.
+
+**Symptom / Observation**: The foreign-tenant request correctly returned 404, but the owning tenant then also received 404 for its still-published event. Reversing the read order hid the failure.
+
+**Root Cause**: `GetEventDetailsRequestHandler` cached the tenant-filtered `EventDetailsProjectionService` result, including `null`, under `event:detail:{eventId}`. The first request's ambient tenant therefore determined what every tenant read from that key until expiry or invalidation.
+
+**Resolution**: Partition the `HybridCache` key by `ITenantContext.TenantId` and event ID while retaining the current-tenant eligibility check and event-scoped invalidation tags. The focused PostgreSQL `AgentBrowserPersonaHttpTests.DeniedMutationAndCanonicalTenantRoutesDoNotCrossEventBoundaries` passed 1/1 with the foreign-tenant read first.
+
+**Why This Matters for Future Work**: A scoped repository does not make a shared cache tenant-safe. Include the same authority partition in the cache key before storing either a successful projection or a miss; check both read orders in an HTTP regression.
+
+**References**:
+- `src/Explore.Application/Features/Events/Handlers/Queries/GetEventDetailsRequestHandler.cs:39`
+- `src/Explore.Application/Services/EventDetailsProjectionService.cs:35`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaHttpTests.cs:158`
+- `docs/internal/API.md#event-detail-cache-isolation`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the API architecture note and HTTP regression now guard the rule)
+
+---
+
+[2026-09-27 Europe/Brussels] — Resolve the authenticated root tenant from UI-shell authority when its cascade is missing
+
+**Context**: Fresh Local Manager login authenticated through the BFF, but navigation from `default.localhost:5200/` repeatedly attempted the same tenant route and ended in `ERR_TOO_MANY_REDIRECTS`.
+
+**Symptom / Observation**: The tenant provider loaded a valid UI-shell tenant ID, while `HomeStart` received no cascading tenant ID on either `/` or `/t/default/`.
+
+**Root Cause**: `HomeStart` relied only on the rendering cascade to distinguish an authenticated tenant member from a tenantless visitor. With the cascade absent at the root page, it repeatedly redirected an already-routed Manager back to `/t/default/`.
+
+**Resolution**: When an authenticated multi-tenant root lacks the cascading tenant ID, `HomeStart` obtains that ID from the existing `IUiShellContextService` before deciding whether tenant redirection is necessary. It does not infer tenant membership or authority from the host. A focused component regression covers the missing-cascade state, and a fresh Manager browser sign-in now settles on the authenticated tenant home.
+
+**Why This Matters for Future Work**: A rendering cascade is not an authority source and may be absent where root routing runs. Resolve the current tenant through the same authenticated UI-shell contract used by the provider before issuing a full-load tenant redirect.
+
+**References**:
+- `src/Explore.Blazor.Client/Pages/HomeStart.razor:175`
+- `src/Explore.Blazor.Client/Providers/TenantContextProvider.razor:26`
+- `tests/Explore.Blazor.Client.Tests/Pages/HomeStartTests.cs:12`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the focused component regression and real browser login guard this case)
+
+---
+
+[2026-09-27 Europe/Brussels] — Admin-host Local sessions need instance-scope identity reads
+
+**Context**: While verifying the isolated Development Local browser profile, the dedicated admin host had to authenticate the configured instance administrator without selecting an ordinary tenant.
+
+**Symptom / Observation**: `/login` initially rendered, then Blazor replaced it with a control-plane 404. After that was corrected, Local login returned 503 because the API rejected the admin host with `Tenant not resolved`. Exempting login alone produced a 200 response but the next `/auth/status` rejected the cookie; the BFF validates a Local session by reading the current user before it fetches admin authority.
+
+**Root Cause**: The admin-host shell selector ignored the browser route during interactive rendering; API tenant resolution applied to instance-scope credential, current-user and authority endpoints; and the BFF's default administrator destination named the tenant-host settings page rather than the admin-host control plane.
+
+**Resolution**: Keep Local auth pages in the ordinary BFF routes, allow only the exact Local login and authenticated identity/authority reads to run without tenant resolution (GET-only for `/api/user`), and select `/admin/instance` for an administrator signing in on the dedicated host. PostgreSQL HTTP coverage proves the login and both identity reads while `/api/event/my` and `DELETE /api/user` still return 404. BFF selector and redirect regressions pass, and a fresh Chrome session reaches the control plane with the correct `/auth/status` identity.
+
+**Why This Matters for Future Work**: Cookie creation is not proof of usable administrator access. The full BFF validation chain and interactive shell route must work on the same host, while privileged writes and tenant data remain bound to their actual tenant authority.
+
+**References**:
+- `src/Explore.API/Middleware/ApiTenantResolutionMiddleware.cs:178`
+- `src/Explore.Blazor/Services/AdminHostControlPlaneShellSelector.cs:8`
+- `src/Explore.Blazor/Extensions/BffAuthEndpoints.cs:897`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaHttpTests.cs:18`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/LocalBffCredentialReplacementTests.cs:84`
+- `docs/internal/API.md#tenantless-local-sign-in-on-the-admin-host`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (HTTP and BFF regressions plus the browser protocol now guard the chain)
+
+---
+
+[2026-09-27 Europe/Brussels] — Evict tenant-partitioned event details through their shared event tag
+
+**Context**: Independent security review of the Local browser authentication work found that the tenant-qualified event-detail cache reader had changed without its mutation-side invalidators.
+
+**Symptom / Observation**: A real authenticated organizer PATCH returned 200, but the next anonymous detail GET still returned the former title. `AuthorizedUpdateInvalidatesTenantScopedEventDetails` failed with `Expected to be equal to "Updated agent browser event" but received "Agent browser event"`.
+
+**Root Cause**: The reader uses `event:detail:{tenantId}:{eventId}`, while 47 event, session, ticketing, aspect, and registration mutation paths still called `RemoveAsync("event:detail:{eventId}")`. The obsolete key never matched a cached tenant-partitioned detail.
+
+**Resolution**: Every mutation path now removes `CacheTags.Event(eventId)` with `HybridCache.RemoveByTagAsync`; the reader already attaches that same per-event tag to each tenant-qualified entry. The focused real-HTTP regression passed after the first handler change, and the complete Release solution built successfully after the remaining mutation paths were updated.
+
+**Why This Matters for Future Work**: Partitioning a cache key for tenant isolation also changes the invalidation contract. Use a shared aggregate tag when writers know the event but not every tenant-partitioned key; test a real read-write-read flow, not just a mock eviction call.
+
+**References**:
+- `src/Explore.Application/Features/Events/Handlers/Queries/GetEventDetailsRequestHandler.cs:41`
+- `src/Explore.Application/Features/Events/Handlers/Commands/UpdateEventCommandHandler.cs:284`
+- `src/Explore.Application/Caching/CacheTags.cs:25`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaHttpTests.cs:208`
+- `docs/internal/API.md#event-detail-cache-isolation`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the real-HTTP read-write-read regression protects this cache contract)
+
+---
+
+[2026-09-27 Europe/Brussels] — Local sign-in must not depend on stale OIDC discovery
+
+**Context**: The Development-only agent browser profile used Local Identity while importing approved secret values from a shared vault whose ordinary API configuration still selected Keycloak.
+
+**Symptom / Observation**: Aspire marked the API and BFF resources healthy, but both `/health` endpoints returned HTTP 503 after a five-second OIDC timeout. The redacted response named `oidc-discovery` as Unhealthy; Local `/login` still returned HTTP 200.
+
+**Root Cause**: `OidcDiscoveryHealthCheck` probed any configured `Keycloak:Authority` or `Keycloak:MetadataAddress` without considering the effective `AUTHENTICATION_PROVIDER`. A Local-only process could therefore require an absent external Identity service just because the shared vault retained Keycloak metadata.
+
+**Resolution**: The check now returns Healthy without network I/O when the effective provider is Local; Keycloak mode still probes and fails closed on an unreachable discovery endpoint. The two-case `ApiHostCompositionTests/OidcReadiness*` TUnit slice passed, and the actual Local agent API and BFF `/health` endpoints both returned HTTP 200 after restart.
+
+**Why This Matters for Future Work**: A readiness check represents dependencies of the selected runtime mode, not every provider whose configuration appears in a shared authority. Check effective provider selection before probing optional external services.
+
+**References**:
+- `src/Explore.ServiceDefaults/HealthChecks/OidcDiscoveryHealthCheck.cs:15`
+- `tests/Event.API.IntegrationTests/Hosting/ApiHostCompositionTests.cs:88`
+- `docs/internal/CONFIGURATION.md#isolated-local-agent-browser-profile`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the provider-conditional health regression covers this behavior)
+
+---
+
+[2026-09-27 Europe/Brussels] — A static database fixture needs assembly-scoped disposal
+
+**Context**: The agent persona startup, reset and PostgreSQL concurrency integration classes began sharing one lazily initialized Testcontainers database fixture.
+
+**Symptom / Observation**: A read-only persistence review found that running the existing startup class first disposed the shared container in its `[After(Class)]` hook. A later class then reused the completed static `Lazy<Task<TestDatabaseReset>>` against a stopped container; a single-class run concealed the order dependency.
+
+**Root Cause**: The shared fixture has assembly lifetime, but one consumer owned class lifetime cleanup. Disposal did not reset the static lazy initialization, so later consumers could never reacquire a live database.
+
+**Resolution**: Removed the startup class's early cleanup and kept the existing `[After(Assembly)]` cleanup in the reset lifecycle class. The startup, concurrency and reset classes passed together in one TUnit process with `--minimum-expected-tests 11 --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: The teardown boundary must match a shared fixture's longest consumer lifetime. Run all classes that share a static Testcontainers fixture together at least once; isolated green classes do not prove deterministic suite ordering.
+
+**References**:
+- `tests/Event.API.IntegrationTests/Fixtures/AgentBrowserPersonaFixture.cs:44`
+- `tests/Event.API.IntegrationTests/Features/AgentBrowserPersonaStartupTests.cs:12`
+- `tests/Event.API.IntegrationTests/Features/AgentDatabaseResetLifecycleTests.cs:15`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the combined multi-class run exposes lifecycle regressions)
+
+---
+
+[2026-09-27 Europe/Brussels] — Agent admission must guard direct hosts and persisted storage
+
+**Context**: The final security/operations gate reviewed the Local-only agent Aspire profile alongside a directly launched API and migration service.
+
+**Symptom / Observation**: A direct AgentBrowser API could pass its original admission predicate with a co-located privacy-erasure authority or Svix webhooks. The latter registered an ungated external startup worker; a persisted S3-compatible storage policy could also be selected before synthetic persona provisioning.
+
+**Root Cause**: The shared `AgentBrowserProvisioningOptions` checked Development, authentication and PostgreSQL but omitted erasure and webhook topology. The compiled Aspire defaults did not protect direct host entrypoints. Storage provider selection is a persisted hierarchical policy, not a flat AppHost `STORAGE_PROVIDER` variable. An instance-only resolution also misses an unlocked tenant override even when the instance provider is Local.
+
+**Resolution**: All host entrypoints now reject non-EmbeddedSqlite erasure or non-Local webhooks through the shared options. The API reset owner invalidates canonical instance and tenant settings caches, then resolves effective storage routes for the instance and every persisted tenant under its PostgreSQL owner lock before the first persona write or database purge. Five direct migrator binding cases and both real PostgreSQL instance-S3 denial tests passed. A new real unlocked-tenant S3 case failed on the old null-tenant guard, then passed after tenant-wide admission without purging any of six existing users. The fixture restores only its own canonical Local lookup baseline between cases; production retains operator changes.
+
+**Why This Matters for Future Work**: A safe compiled AppHost topology is not an admission boundary for independently launched children. Validate all providers capable of side effects at the earliest direct host boundary; persisted governance settings must be read as effective policy for every active scope, not replaced by a decorative environment flag or instance-only shortcut. When proving direct-host rejection, use `--no-launch-profile`: the `local-agent` launch settings intentionally pin Local webhooks and embedded erasure, overriding an invalid shell selector before admission sees it.
+
+**References**:
+- `src/Explore.Application/Configuration/AgentBrowserProvisioningOptions.cs`
+- `src/Explore.Persistence/Schema/ProviderPrimitives/ExploreDatabaseMigrator.cs`
+- `src/Explore.API/Hosting/AgentBrowserResetCoordinator.cs`
+- `tests/Event.Persistence.IntegrationTests/Database/AgentBrowserAdmissionConfigurationTests.cs`
+- `tests/Event.API.IntegrationTests/Features/AgentDatabaseResetLifecycleTests.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (the direct-host and persisted-policy integration regressions protect this boundary)
+
+---

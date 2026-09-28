@@ -54,6 +54,69 @@ would remove every usable administrator sign-in path.
 `ATPROTO_LOGIN_ENABLED=true`. The application rejects the contradictory
 `false` combination. Google SSO is disabled in AT Protocol-only mode.
 
+## Development-only agent browser profile
+
+Contributors who need predictable real-browser Local Identity sessions can use
+the opt-in Aspire `local-agent` launch profile. It is strictly Development-only,
+Split-only, and isolated from ordinary Aspire data. It starts PostgreSQL, Redis,
+Mailpit, the migration service, API, and BFF; it does not start Keycloak, Cerbos,
+RabbitMQ, MinIO, or the larger local platform stack. This is reduced
+infrastructure, not a zero-container or startup-latency guarantee.
+
+Before launch, choose one existing secret authority and supply the Local JWT
+signing key, configured-administrator bootstrap password, and agent persona
+password under `AUTHENTICATION_LOCAL_JWT_KEY`,
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD`, `AGENT_BROWSER_PERSONA_PASSWORD`,
+`POSTGRESQL_USERNAME`, `POSTGRESQL_PASSWORD`, and
+`AGENT_BROWSER_REDIS_PASSWORD`.
+Do not put their values in source, launch settings, shell history, screenshots,
+or browser automation output. The profile honors Environment, Development User
+Secrets, or Infisical exactly as selected and does not fall back to another
+provider. Persona, bootstrap, and Local JWT values are forwarded only to the API;
+the BFF and migration service do not receive them.
+Select the provider in the launching shell or the ignored repository `.env`
+before running the profile; a new terminal does not inherit the previous
+selection. An incomplete authority fails closed rather than resetting
+the isolated data or switching providers.
+
+```bash
+dotnet build --configuration Release --verbosity quiet
+# Select SECRET_PROVIDER in this shell or the ignored repository .env first.
+dotnet run --project src/Explore.AppHost/Explore.AppHost.csproj \
+  --configuration Release --no-build --launch-profile local-agent
+```
+
+Use `http://localhost:5200` for discovery,
+`http://default.localhost:5200` for the fixture tenant, and
+`http://admin.localhost:5200` for instance administration. The API is fixed at
+`http://localhost:5100`; Mailpit is at `http://localhost:58025` with SMTP on
+`localhost:51025`. A port conflict or unsafe topology fails startup instead of
+silently changing the origin or using a populated ordinary-development store.
+Wait for migration, API, and BFF readiness rather than using a fixed delay.
+The dedicated PostgreSQL, Redis, and Mailpit containers use a 2048-process
+limit for consistent Docker and Podman startup; this is not a startup-time
+guarantee. Geocoding is disabled for this profile.
+
+On first provisioning, the isolated instance enables tenant subdomains under
+`localhost` and binds `default` and `agent-negative` to the corresponding
+synthetic tenants. Later changes to its routing settings are preserved on restart.
+
+The profile provisions synthetic `@agent.example.test` identities only through
+the native Local credential lifecycle. Sign in through the visible `/login`
+form on the selected tenant or admin host; a successful response is not an
+authenticated browser session until `/auth/status` reports the intended
+identity after navigation. Local credential verification, the authenticated
+current-user check, and the admin-authority check work on the admin host
+without a tenant; ordinary
+tenant-scoped API requests still require a resolved tenant. Do not inject
+cookies or bearer tokens. Passwords,
+revoked grants, and profile changes are not reset on a completed restart.
+PostgreSQL, Redis, Mailpit, local
+object storage, and privacy-erasure data use dedicated agent-profile locations;
+stopping Aspire preserves them. Never delete those volumes or directories as a
+routine retry. Diagnose the bounded startup failure first, and obtain explicit
+approval before destructive reset.
+
 ## Keycloak Account Claims
 
 Keycloak must issue the same canonical account `sub` in the ID token and API

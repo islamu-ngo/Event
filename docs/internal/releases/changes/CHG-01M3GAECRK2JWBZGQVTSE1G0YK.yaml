@@ -1,0 +1,31 @@
+Change-Id: CHG-01M3GAECRK2JWBZGQVTSE1G0YK
+Title: isolate event detail caching by tenant and evict changed events
+Type: fix
+Scope: events
+Summary: Prevent cross-tenant negative cache entries and stale event details after authorized writes.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: Event detail routes and response shapes remain unchanged.
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Detail: Each tenant has its own event-detail entry, while mutation paths invalidate every entry tagged for the affected event.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: The cache correction requires no persistence schema migration.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: No new secret or cache backend setting is required.
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+    Detail: No event-detail endpoint contract changes.
+  Operator:
+    Reference: docs/internal/BLAZOR_DEV_WORKFLOW.md
+    Disposition: not-applicable
+    Detail: Cache invalidation follows existing event writes without operator intervention.

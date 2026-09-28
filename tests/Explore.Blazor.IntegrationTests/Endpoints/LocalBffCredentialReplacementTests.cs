@@ -15,6 +15,7 @@ using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
 using Event.Web.BffHosting.Security;
 using Event.Web.BffHosting.Authentication;
+using Event.Web.BffHosting.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -78,6 +79,23 @@ public sealed class LocalBffCredentialReplacementTests
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         await Assert.That(body.RootElement.GetProperty("redirectUrl").GetString()).IsEqualTo(expectedDestination);
         await Assert.That(fixture.ReadCookieTicket(response).Properties.RedirectUri).IsEqualTo(expectedDestination);
+    }
+
+    [Test]
+    public async Task FreshAdministratorSignInOnAdminHostEntersControlPlane()
+    {
+        await using var fixture = new Fixture();
+        fixture.Transport.OrdinaryLogin = true;
+        fixture.Transport.InstanceAdmin = true;
+
+        using var response = await fixture.LoginAsync("/", adminHost: true);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        await Assert.That(body.RootElement.GetProperty("redirectUrl").GetString())
+            .IsEqualTo("/admin/instance");
+        await Assert.That(fixture.ReadCookieTicket(response).Properties.RedirectUri)
+            .IsEqualTo("/admin/instance");
     }
 
     [Test]
@@ -768,6 +786,8 @@ public sealed class LocalBffCredentialReplacementTests
                         options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                         options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                     });
+                    services.PostConfigure<EventBffHostingOptions>(options =>
+                        options.AdminHosts = ["admin.localhost"]);
                     services.PostConfigure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
                     {
                         options.ForwardAuthenticate = null; options.ForwardChallenge = null;
@@ -887,9 +907,15 @@ public sealed class LocalBffCredentialReplacementTests
             catch { socket.Dispose(); throw; }
         }
 
-        internal async Task<HttpResponseMessage> LoginAsync(string returnUrl = "https://untrusted.example.test/redirect")
+        internal async Task<HttpResponseMessage> LoginAsync(
+            string returnUrl = "https://untrusted.example.test/redirect",
+            bool adminHost = false)
         {
-            string csrf = await CsrfAsync();
+            using HttpClient? hostClient = adminHost ? CreateClient() : null;
+            if (hostClient is not null)
+                hostClient.BaseAddress = new Uri("https://admin.localhost");
+            HttpClient client = hostClient ?? Client;
+            string csrf = await CsrfAsync(client);
             using var request = new HttpRequestMessage(HttpMethod.Post, "/bff/auth/local/login")
             {
                 Content = JsonContent.Create(new
@@ -901,7 +927,7 @@ public sealed class LocalBffCredentialReplacementTests
                 })
             };
             request.Headers.Add("X-CSRF-TOKEN", csrf);
-            return await Client.SendAsync(request, CancellationToken);
+            return await client.SendAsync(request, CancellationToken);
         }
 
         internal async Task<HttpRequestMessage> ReplacementRequestAsync(string password, HttpClient? client = null)

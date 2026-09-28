@@ -1,0 +1,31 @@
+Change-Id: CHG-01M3GA9T8ZMA1J1SX0CY8E0ZJ9
+Title: require native authority for event deletion
+Type: fix
+Scope: events
+Summary: Reject event deletion without current event authority or when paid evidence exists, and return precise HTTP outcomes.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: The correction does not remove an endpoint or persisted event contract.
+  Security:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Registration management no longer grants event deletion, and the native handler rechecks persisted event authority.
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: Existing event rows and database schema require no migration.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: The correction introduces no operator setting or new secret.
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: documented
+    Detail: The event DELETE endpoint now advertises a conflict response when paid evidence prevents deletion.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Operators can distinguish missing events, denied authority and paid-evidence conflicts from successful deletion.

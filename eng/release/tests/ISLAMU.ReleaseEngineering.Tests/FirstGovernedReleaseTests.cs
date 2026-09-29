@@ -117,7 +117,7 @@ public sealed class FirstGovernedReleaseTests
             await Assert.That(evidence.Disposition).IsEqualTo("documented");
             await Assert.That(string.IsNullOrWhiteSpace(evidence.Detail)).IsFalse();
             string section = notes.Split($"#### {heading}\n", StringSplitOptions.None)[1].Split("\n#", StringSplitOptions.None)[0];
-            await Assert.That(section).Contains($"- `{upgrade.ChangeId}` - documented: {CanonicalArtifactPolicy.EscapeUntrustedMarkdown(evidence.Detail!).Text} (Evidence: `{CanonicalArtifactPolicy.EscapeUntrustedMarkdown(evidence.Reference).Text}`)");
+            await Assert.That(section).Contains($"- `{upgrade.ChangeId}` - documented: {ReleaseArtifactPolicy.EscapeUntrustedMarkdown(evidence.Detail!).Text} (Evidence: `{ReleaseArtifactPolicy.EscapeUntrustedMarkdown(evidence.Reference).Text}`)");
         }
         string range = notes.Split("## Complete Commit Range\n", StringSplitOptions.None)[1].Trim();
         await Assert.That(range).IsEqualTo(string.Join('\n',

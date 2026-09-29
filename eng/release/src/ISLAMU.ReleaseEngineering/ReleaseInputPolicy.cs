@@ -37,7 +37,7 @@ public sealed record PublicChangeFragment(
     string? BackportOf,
     IReadOnlyList<string> Supersedes,
     IReadOnlyDictionary<string, FragmentImpact> Impacts,
-    string CanonicalSnapshot);
+    string NormalizedSnapshot);
 
 public sealed record FragmentImpact(
     string Reference,
@@ -382,7 +382,7 @@ public static class ReleaseInputPolicy
             {
                 diagnostics.Add($"fragment_deleted:{priorFragment.ChangeId}");
             }
-            else if (!string.Equals(currentFragment.CanonicalSnapshot, priorFragment.CanonicalSnapshot, StringComparison.Ordinal))
+            else if (!string.Equals(currentFragment.NormalizedSnapshot, priorFragment.NormalizedSnapshot, StringComparison.Ordinal))
             {
                 diagnostics.Add($"fragment_mutated:{priorFragment.ChangeId}");
             }

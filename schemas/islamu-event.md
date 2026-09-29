@@ -1031,7 +1031,7 @@ Table "atproto_records" {
     subject_uri [name: 'ix_atproto_records_subject_uri', note: 'filter: subject_uri IS NOT NULL']
   }
 
-  Note: 'Global canonical AT Protocol record. Tenant visibility and outbound ownership are stored separately.'
+  Note: 'Global authoritative AT Protocol record. Tenant visibility and outbound ownership are stored separately.'
 }
 
 Table "atproto_event_projections" {
@@ -1055,7 +1055,7 @@ Table "atproto_event_projections" {
     (name, atproto_record_id) [name: 'ix_atproto_event_projections_name']
   }
 
-  Note: 'Bounded typed public projection materialized atomically with its canonical event record; source URLs are HTTPS-only and tenant presentation is resolved separately.'
+  Note: 'Bounded typed public projection materialized atomically with its authoritative event record; source URLs are HTTPS-only and tenant presentation is resolved separately.'
 }
 
 Table "sync_states" {
@@ -1082,7 +1082,7 @@ Table "atproto_record_tenant_presentations" {
     atproto_record_id [name: 'ix_atproto_record_tenant_presentations_atproto_record_id']
   }
 
-  Note: 'Tenant capability/presentation decision for one global canonical record.'
+  Note: 'Tenant capability/presentation decision for one global source record.'
 }
 
 Table "atproto_outbound_record_ownerships" {
@@ -1101,7 +1101,7 @@ Table "atproto_outbound_record_ownerships" {
     user_id [name: 'ix_atproto_outbound_record_ownerships_user_id']
   }
 
-  Note: 'Tenant/user/lifecycle authority for a locally published canonical record.'
+  Note: 'Tenant/user/lifecycle authority for a locally published source record.'
 }
 
 Table "atproto_jetstream_consumer_states" {
@@ -1253,7 +1253,7 @@ Table "notification_recipient_kinds" {
 
 Table "notification_preference_channels" {
   "id" int [pk, not null]
-  "master_code" varchar(100) [not null, unique, note: 'Canonical codes include email, in_app, and push']
+  "master_code" varchar(100) [not null, unique, note: 'Supported codes include email, in_app, and push']
   "full_name" varchar(200) [not null]
   "description" varchar(500)
   "sort_order" int [not null]
@@ -1504,7 +1504,7 @@ Table "configuration_manifest_tenant_results" {
     (tenant_id, operation_id) [unique, name: 'ux_configuration_manifest_results_tenant_operation']
   }
 
-  Note: 'Append-only tenant-filtered outcome evidence. Changed-key columns contain sorted canonical names only and never corresponding values.'
+  Note: 'Append-only tenant-filtered outcome evidence. Changed-key columns contain sorted normalized names only and never corresponding values.'
 }
 
 Table "email_dispatch_outbox" {
@@ -3033,7 +3033,7 @@ Table "event_locations" {
     (tenant_id, event_id) [unique, name: 'ux_event_locations_active_tba', note: 'partial: is_deleted = false AND is_to_be_announced = true']
   }
 
-  Note: 'Canonical per-event location disclosure authority. Checks enforce physical Location XOR explicit TBA, TBA field suppression, positive policy version, and UUIDv7 identity.'
+  Note: 'Authoritative per-event location disclosure policy. Checks enforce physical Location XOR explicit TBA, TBA field suppression, positive policy version, and UUIDv7 identity.'
 }
 
 Table "event_location_disclosure_audits" {
@@ -3301,7 +3301,7 @@ Table "service_principals" {
 Table "actor_merges" {
   "id" uuid [pk, not null]
   "source_actor_id" uuid [not null, unique]
-  "canonical_actor_id" uuid [not null]
+  "target_actor_id" uuid [not null]
   "proof_kind" int [not null]
   "evidence_reference" varchar(2048) [not null]
   "merged_at" timestamptz [not null]
@@ -3529,7 +3529,7 @@ Table "organizations" {
   "deleted_by" uuid
   "concurrency_stamp" uuid [not null]
 
-  Note: 'Global canonical organization. Tenant approval and local profile state live in organization_tenants.'
+  Note: 'Global authoritative organization. Tenant approval and local profile state live in organization_tenants.'
 }
 
 Table "organization_tenants" {
@@ -3689,7 +3689,7 @@ Table "groups" {
   "deleted_by" uuid
   "concurrency_stamp" uuid [not null]
 
-  Note: 'Global canonical group. Tenant approval, hierarchy, and local profile state live in group_tenants.'
+  Note: 'Global authoritative group. Tenant approval, hierarchy, and local profile state live in group_tenants.'
 }
 
 Table "group_tenants" {
@@ -4859,7 +4859,7 @@ Table "registration_answer_sync_modes" {
     master_code [unique, name: 'ix_registration_answer_sync_modes_master_code']
   }
 
-  Note: 'Lookup: None(1), Completion only(2), Selected fields(3), Full canonical(4), Mirror only(5). Seeded.'
+  Note: 'Lookup: None(1), Completion only(2), Selected fields(3), Full sync(4), Mirror only(5). Seeded.'
 }
 
 Table "registration_requirement_subject_types" {
@@ -5199,7 +5199,7 @@ Table "registration_form_versions" {
   "version" int [not null]
   "status_id" int [not null]
   "language_tag" varchar(35) [not null]
-  "schema_hash" varchar(64) [note: 'lowercase SHA-256 of the complete canonical schema bundle']
+  "schema_hash" varchar(64) [note: 'lowercase SHA-256 of the complete authoritative schema bundle']
   "data_schema_artifact" text
   "ui_schema_artifact" text
   "logic_schema_artifact" text
@@ -5997,7 +5997,7 @@ Table "registration_provider_submission_write_effects" {
     (tenant_id, registration_submission_id) [unique, name: 'ux_registration_provider_submission_write_effects_submission']
   }
 
-  Note: 'Identifiers-only fenced post-commit provider write intent. Canonical answers are rebuilt after claim. Retryable pre-handoff failures back off; permanent failures dead-letter; ambiguous post-handoff failures park without automatic retry.'
+  Note: 'Identifiers-only fenced post-commit provider write intent. Authoritative answers are rebuilt after claim. Retryable pre-handoff failures back off; permanent failures dead-letter; ambiguous post-handoff failures park without automatic retry.'
 }
 
 Table "registration_answer_files" {
@@ -7547,7 +7547,7 @@ Ref: "actor_pii"."actor_id" - "actors"."id" [delete: cascade]
 Ref: "atproto_identities"."actor_id" > "actors"."id" [delete: restrict]
 Ref: "atproto_identities"."did_custody_type_id" > "did_custody_types"."id" [delete: restrict]
 Ref: "actor_merges"."source_actor_id" > "actors"."id" [delete: restrict]
-Ref: "actor_merges"."canonical_actor_id" > "actors"."id" [delete: restrict]
+Ref: "actor_merges"."target_actor_id" > "actors"."id" [delete: restrict]
 Ref: "actor_key_stores"."actor_id" > "actors"."id" [delete: cascade]
 Ref: "actor_subscriptions"."tenant_id" > "tenants"."id" [delete: restrict]
 Ref: "actor_subscriptions".("tenant_id", "subscriber_tenant_user_id") > "tenant_users".("tenant_id", "id") [delete: restrict]
@@ -8217,7 +8217,7 @@ Table "keycloak_operation_receipts" {
   "change_set" varchar(4096) [not null, note: 'Typed application-owned JSON containing only allowlisted step projections, target identifiers, preconditions and fingerprints.']
   "target_instance_id" uuid [not null]
   "target_authority" varchar(2048) [not null]
-  "target_authority_key" varchar(64) [not null, note: 'SHA-256 lookup/coordination key derived from the canonical authority.']
+  "target_authority_key" varchar(64) [not null, note: 'SHA-256 lookup/coordination key derived from the authoritative source.']
   "target_realm" varchar(256) [not null]
   "target_client" varchar(256) [not null]
   "actor" varchar(256) [not null, note: 'Opaque actor/setup authority binding; never a credential.']

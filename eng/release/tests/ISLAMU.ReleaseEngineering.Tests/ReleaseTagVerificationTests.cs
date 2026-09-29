@@ -445,7 +445,7 @@ public sealed class ReleaseTagVerificationTests
                     .OrderBy(item => item.path, StringComparer.Ordinal)
                     .ToArray(),
             });
-            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), CanonicalArtifactPolicy.CanonicalizeJson(manifestJson).Bytes!);
+            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
             ResignReceipt();
         }
 
@@ -492,7 +492,7 @@ public sealed class ReleaseTagVerificationTests
                 trustDigest = root.GetProperty("trustDigest").GetString(),
                 promotionPrincipal = "fixture-tooling-promoter",
             });
-            File.WriteAllBytes(receiptPath, CanonicalArtifactPolicy.CanonicalizeJson(receiptJson).Bytes!);
+            File.WriteAllBytes(receiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
             if (File.Exists(signaturePath)) File.Delete(signaturePath);
             RunProcess("/usr/bin/ssh-keygen", null, "-Y", "sign", "-f", promotionPrivateKeyPath, "-n", "islamu-release-promotion", receiptPath);
         }

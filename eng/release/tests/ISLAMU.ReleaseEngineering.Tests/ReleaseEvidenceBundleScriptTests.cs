@@ -76,7 +76,7 @@ public sealed class ReleaseEvidenceBundleScriptTests
     }
 
     [Test]
-    public async Task BundleScriptKeepsCanonicalIdentityAndChecksumsIndependentOfCollectionMetadata()
+    public async Task BundleScriptKeepsNormalizedIdentityAndChecksumsIndependentOfCollectionMetadata()
     {
         using var fixture = BundleFixture.Create();
         string secondOutput = Path.Combine(fixture.Root, "bundle-second");
@@ -214,9 +214,9 @@ public sealed class ReleaseEvidenceBundleScriptTests
         File.WriteAllText(malformed.FinalManifestPath, "{\n");
         ScriptResult malformedResult = malformed.GenerateBundle();
 
-        using var noncanonical = BundleFixture.Create();
-        File.WriteAllText(noncanonical.FinalManifestPath, File.ReadAllText(noncanonical.FinalManifestPath).Replace("\n", "\r\n", StringComparison.Ordinal));
-        ScriptResult noncanonicalResult = noncanonical.GenerateBundle();
+        using var unnormalized = BundleFixture.Create();
+        File.WriteAllText(unnormalized.FinalManifestPath, File.ReadAllText(unnormalized.FinalManifestPath).Replace("\n", "\r\n", StringComparison.Ordinal));
+        ScriptResult unnormalizedResult = unnormalized.GenerateBundle();
 
         using var injected = BundleFixture.Create();
         injected.WriteFinalManifest(extraPropertyName: "prompt");
@@ -236,9 +236,9 @@ public sealed class ReleaseEvidenceBundleScriptTests
         await Assert.That(disagreeingRefResult.Output).Contains("release_bundle_ref_mismatch");
         await Assert.That(malformedResult.Output).Contains("release_bundle_final_manifest_malformed");
         await Assert.That(malformedResult.Output).DoesNotContain("Unhandled exception");
-        await Assert.That(noncanonicalResult.Output).Contains("release_bundle_final_manifest_canonical_invalid");
+        await Assert.That(unnormalizedResult.Output).Contains("release_bundle_final_manifest_encoding_invalid");
         await Assert.That(injectedResult.Output).Contains("release_bundle_final_manifest_schema_invalid");
-        await Assert.That(new[] { missing, duplicate, disagreeingVersion, stale, tampered, disagreeingCommit, disagreeingRef, malformed, noncanonical, injected }.Any(fixture => Directory.Exists(fixture.OutputRoot))).IsFalse();
+        await Assert.That(new[] { missing, duplicate, disagreeingVersion, stale, tampered, disagreeingCommit, disagreeingRef, malformed, unnormalized, injected }.Any(fixture => Directory.Exists(fixture.OutputRoot))).IsFalse();
     }
 
     [Test]

@@ -6,11 +6,11 @@ using System.Text.RegularExpressions;
 
 namespace ISLAMU.ReleaseEngineering;
 
-public sealed record CanonicalArtifactResult(bool IsValid, byte[]? Bytes, IReadOnlyList<string> Diagnostics);
+public sealed record ArtifactPolicyResult(bool IsValid, byte[]? Bytes, IReadOnlyList<string> Diagnostics);
 
-public sealed record CanonicalTextResult(bool IsValid, string? Text, string? Diagnostic);
+public sealed record UntrustedTextResult(bool IsValid, string? Text, string? Diagnostic);
 
-public static class CanonicalArtifactPolicy
+public static class ReleaseArtifactPolicy
 {
     public const int MaximumFieldUtf8Bytes = 4_096;
     public const int MaximumDocumentUtf8Bytes = 1_048_576;
@@ -44,16 +44,16 @@ public static class CanonicalArtifactPolicy
         "workflowid",
     };
 
-    public static CanonicalArtifactResult CanonicalizeJson(string json)
+    public static ArtifactPolicyResult NormalizeJson(string json)
     {
         if (!TryGetUtf8ByteCount(json, out int byteCount))
         {
-            return Invalid("canonical_json_invalid_unicode");
+            return Invalid("normalized_json_invalid_unicode");
         }
 
         if (byteCount > MaximumDocumentUtf8Bytes)
         {
-            return Invalid("canonical_json_too_large");
+            return Invalid("normalized_json_too_large");
         }
 
         try
@@ -66,43 +66,43 @@ public static class CanonicalArtifactPolicy
                 Indented = true,
             }))
             {
-                WriteCanonical(document.RootElement, writer, null);
+                WriteNormalized(document.RootElement, writer, null);
             }
 
             stream.WriteByte((byte)'\n');
             byte[] bytes = stream.ToArray();
             return bytes.Length <= MaximumDocumentUtf8Bytes
-                ? new CanonicalArtifactResult(true, bytes, [])
-                : Invalid("canonical_json_too_large");
+                ? new ArtifactPolicyResult(true, bytes, [])
+                : Invalid("normalized_json_too_large");
         }
         catch (JsonException)
         {
-            return Invalid("canonical_json_malformed");
+            return Invalid("normalized_json_malformed");
         }
-        catch (CanonicalJsonException exception)
+        catch (JsonNormalizationException exception)
         {
             return Invalid(exception.Diagnostic);
         }
     }
 
-    public static CanonicalArtifactResult CanonicalizeText(string text)
+    public static ArtifactPolicyResult NormalizeText(string text)
     {
         if (!TryNormalize(text, out string? normalized))
         {
-            return Invalid("canonical_text_invalid_unicode");
+            return Invalid("normalized_text_invalid_unicode");
         }
 
-        string canonical = normalized.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd('\n') + "\n";
-        byte[] bytes = StrictUtf8.GetBytes(canonical);
+        string normalizedText = normalized.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').TrimEnd('\n') + "\n";
+        byte[] bytes = StrictUtf8.GetBytes(normalizedText);
         return bytes.Length <= MaximumDocumentUtf8Bytes
-            ? new CanonicalArtifactResult(true, bytes, [])
-            : Invalid("canonical_text_too_large");
+            ? new ArtifactPolicyResult(true, bytes, [])
+            : Invalid("normalized_text_too_large");
     }
 
-    public static CanonicalArtifactResult RenderMarkdown(string title, IEnumerable<string> entries)
+    public static ArtifactPolicyResult RenderMarkdown(string title, IEnumerable<string> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        CanonicalTextResult safeTitle = EscapeUntrustedMarkdown(title, rejectRawHtml: false);
+        UntrustedTextResult safeTitle = EscapeUntrustedMarkdown(title, rejectRawHtml: false);
         if (!safeTitle.IsValid)
         {
             return Invalid($"markdown_title_invalid:{safeTitle.Diagnostic}");
@@ -118,7 +118,7 @@ public static class CanonicalArtifactPolicy
                 return Invalid("markdown_collection_too_large");
             }
 
-            CanonicalTextResult safeEntry = EscapeUntrustedMarkdown(entry, rejectRawHtml: false);
+            UntrustedTextResult safeEntry = EscapeUntrustedMarkdown(entry, rejectRawHtml: false);
             if (!safeEntry.IsValid)
             {
                 return Invalid($"markdown_entry_invalid:{index}:{safeEntry.Diagnostic}");
@@ -135,10 +135,10 @@ public static class CanonicalArtifactPolicy
         }
 
         string markdown = $"# {safeTitle.Text}\n\n{string.Join('\n', safeEntries.Order(StringComparer.Ordinal).Select(entry => $"- {entry}"))}\n";
-        return CanonicalizeText(markdown);
+        return NormalizeText(markdown);
     }
 
-    public static CanonicalTextResult EscapeUntrustedMarkdown(string value) => EscapeUntrustedMarkdown(value, rejectRawHtml: true);
+    public static UntrustedTextResult EscapeUntrustedMarkdown(string value) => EscapeUntrustedMarkdown(value, rejectRawHtml: true);
 
     public static IReadOnlyDictionary<string, string> CreateDeterministicEnvironment(string isolationDirectory)
     {
@@ -160,41 +160,41 @@ public static class CanonicalArtifactPolicy
         };
     }
 
-    private static CanonicalTextResult EscapeUntrustedMarkdown(string value, bool rejectRawHtml)
+    private static UntrustedTextResult EscapeUntrustedMarkdown(string value, bool rejectRawHtml)
     {
         if (!TryGetUtf8ByteCount(value, out int byteCount) || !TryNormalize(value, out string? normalized))
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_invalid_unicode");
+            return new UntrustedTextResult(false, null, "untrusted_text_invalid_unicode");
         }
 
         if (byteCount > MaximumFieldUtf8Bytes)
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_too_large");
+            return new UntrustedTextResult(false, null, "untrusted_text_too_large");
         }
 
         if (normalized.EnumerateRunes().Any(rune => Rune.GetUnicodeCategory(rune) is UnicodeCategory.Control or UnicodeCategory.Format))
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_ambiguous_unicode");
+            return new UntrustedTextResult(false, null, "untrusted_text_ambiguous_unicode");
         }
 
         if (SecretPattern.IsMatch(normalized))
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_secret_material");
+            return new UntrustedTextResult(false, null, "untrusted_text_secret_material");
         }
 
         if (IdentityOrProviderPattern.IsMatch(normalized))
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_identity_or_provider");
+            return new UntrustedTextResult(false, null, "untrusted_text_identity_or_provider");
         }
 
         if (rejectRawHtml && RawHtmlPattern.IsMatch(normalized))
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_raw_html");
+            return new UntrustedTextResult(false, null, "untrusted_text_raw_html");
         }
 
         if (rejectRawHtml && MarkdownAutolinkPattern.IsMatch(normalized))
         {
-            return new CanonicalTextResult(false, null, "untrusted_text_markdown_autolink");
+            return new UntrustedTextResult(false, null, "untrusted_text_markdown_autolink");
         }
 
         var escaped = new StringBuilder(normalized.Length);
@@ -230,10 +230,10 @@ public static class CanonicalArtifactPolicy
             }
         }
 
-        return new CanonicalTextResult(true, escaped.ToString(), null);
+        return new UntrustedTextResult(true, escaped.ToString(), null);
     }
 
-    private static void WriteCanonical(JsonElement element, Utf8JsonWriter writer, string? propertyName)
+    private static void WriteNormalized(JsonElement element, Utf8JsonWriter writer, string? propertyName)
     {
         switch (element.ValueKind)
         {
@@ -245,30 +245,30 @@ public static class CanonicalArtifactPolicy
                     .ToArray();
                 if (properties.Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() != properties.Length)
                 {
-                    throw new CanonicalJsonException("canonical_json_duplicate_property");
+                    throw new JsonNormalizationException("normalized_json_duplicate_property");
                 }
 
                 foreach ((string name, JsonElement propertyValue) in properties)
                 {
                     ValidatePropertyName(name);
                     writer.WritePropertyName(name);
-                    WriteCanonical(propertyValue, writer, name);
+                    WriteNormalized(propertyValue, writer, name);
                 }
 
                 writer.WriteEndObject();
                 break;
             case JsonValueKind.Array:
                 writer.WriteStartArray();
-                foreach (JsonElement item in element.EnumerateArray().OrderBy(item => CanonicalSortKey(item, propertyName), StringComparer.Ordinal))
+                foreach (JsonElement item in element.EnumerateArray().OrderBy(item => NormalizedSortKey(item, propertyName), StringComparer.Ordinal))
                 {
-                    WriteCanonical(item, writer, propertyName);
+                    WriteNormalized(item, writer, propertyName);
                 }
 
                 writer.WriteEndArray();
                 break;
             case JsonValueKind.String:
                 string stringValue = element.GetString()!.Normalize(NormalizationForm.FormC);
-                ValidateCanonicalString(stringValue, propertyName);
+                ValidateNormalizedString(stringValue, propertyName);
                 writer.WriteStringValue(IsPathProperty(propertyName) ? NormalizePath(stringValue) : stringValue);
                 break;
             case JsonValueKind.Number:
@@ -282,23 +282,23 @@ public static class CanonicalArtifactPolicy
                 }
                 else
                 {
-                    throw new CanonicalJsonException("canonical_json_invalid_number");
+                    throw new JsonNormalizationException("normalized_json_invalid_number");
                 }
 
                 break;
             case JsonValueKind.True: writer.WriteBooleanValue(true); break;
             case JsonValueKind.False: writer.WriteBooleanValue(false); break;
             case JsonValueKind.Null: writer.WriteNullValue(); break;
-            default: throw new CanonicalJsonException("canonical_json_unsupported_value");
+            default: throw new JsonNormalizationException("normalized_json_unsupported_value");
         }
     }
 
-    private static string CanonicalSortKey(JsonElement element, string? propertyName)
+    private static string NormalizedSortKey(JsonElement element, string? propertyName)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
         {
-            WriteCanonical(element, writer, propertyName);
+            WriteNormalized(element, writer, propertyName);
         }
 
         return StrictUtf8.GetString(stream.ToArray());
@@ -321,18 +321,18 @@ public static class CanonicalArtifactPolicy
     {
         if (propertyName.EnumerateRunes().Any(rune => Rune.GetUnicodeCategory(rune) is UnicodeCategory.Control or UnicodeCategory.Format))
         {
-            throw new CanonicalJsonException("canonical_json_ambiguous_unicode");
+            throw new JsonNormalizationException("normalized_json_ambiguous_unicode");
         }
 
         string compact = NormalizePropertyName(propertyName);
         if (ForbiddenPropertyNames.Contains(compact))
         {
-            throw new CanonicalJsonException("canonical_json_identity_or_provider_property");
+            throw new JsonNormalizationException("normalized_json_identity_or_provider_property");
         }
 
         if (IsClockProperty(compact))
         {
-            throw new CanonicalJsonException("canonical_json_clock_property");
+            throw new JsonNormalizationException("normalized_json_clock_property");
         }
     }
 
@@ -375,33 +375,33 @@ public static class CanonicalArtifactPolicy
         return builder.ToString();
     }
 
-    private static void ValidateCanonicalString(string value, string? propertyName)
+    private static void ValidateNormalizedString(string value, string? propertyName)
     {
         if (value.EnumerateRunes().Any(rune => Rune.GetUnicodeCategory(rune) is UnicodeCategory.Control or UnicodeCategory.Format))
         {
-            throw new CanonicalJsonException("canonical_json_ambiguous_unicode");
+            throw new JsonNormalizationException("normalized_json_ambiguous_unicode");
         }
 
         if (SecretPattern.IsMatch(value))
         {
-            throw new CanonicalJsonException("canonical_json_secret_material");
+            throw new JsonNormalizationException("normalized_json_secret_material");
         }
 
         if (IdentityOrProviderPattern.IsMatch(value))
         {
-            throw new CanonicalJsonException("canonical_json_identity_or_provider");
+            throw new JsonNormalizationException("normalized_json_identity_or_provider");
         }
 
         if (RawHtmlPattern.IsMatch(value))
         {
-            throw new CanonicalJsonException("canonical_json_raw_html");
+            throw new JsonNormalizationException("normalized_json_raw_html");
         }
 
         if (propertyName is not null &&
             (propertyName.Equals("date", StringComparison.OrdinalIgnoreCase) || propertyName.EndsWith("Date", StringComparison.OrdinalIgnoreCase)) &&
             !DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
         {
-            throw new CanonicalJsonException("canonical_json_invalid_release_date");
+            throw new JsonNormalizationException("normalized_json_invalid_release_date");
         }
     }
 
@@ -445,9 +445,9 @@ public static class CanonicalArtifactPolicy
         }
     }
 
-    private static CanonicalArtifactResult Invalid(string diagnostic) => new(false, null, [diagnostic]);
+    private static ArtifactPolicyResult Invalid(string diagnostic) => new(false, null, [diagnostic]);
 
-    private sealed class CanonicalJsonException(string diagnostic) : Exception
+    private sealed class JsonNormalizationException(string diagnostic) : Exception
     {
         public string Diagnostic { get; } = diagnostic;
     }

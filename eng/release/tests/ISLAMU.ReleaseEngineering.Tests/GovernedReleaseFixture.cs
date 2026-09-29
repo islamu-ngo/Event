@@ -452,7 +452,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
         File.WriteAllText(configPath, "[changelog]\nbody = \"\"\"\n# Release {{ version }}\n{% for commit in commits %}\n- {{ commit.group }}: {{ commit.message }} ({{ commit.id }})\n{% endfor %}\n\"\"\"\ntrim = true\nrender_always = true\n");
 
         // The renderer clears PATH, so the stub uses shell builtins only. It reads the release
-        // version out of the canonical context git-cliff was handed, which keeps one pinned binary
+        // version out of the normalized context git-cliff was handed, which keeps one pinned binary
         // digest valid across every release the fixture produces.
         File.WriteAllText(
             executablePath,
@@ -508,7 +508,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
                 .OrderBy(item => item.path, StringComparer.Ordinal)
                 .ToArray(),
         });
-        File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), CanonicalArtifactPolicy.CanonicalizeJson(manifestJson).Bytes!);
+        File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
         ResignReceipt();
     }
 
@@ -532,7 +532,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
             trustDigest = root.GetProperty("trustDigest").GetString(),
             promotionPrincipal = "fixture-tooling-promoter",
         });
-        File.WriteAllBytes(receiptPath, CanonicalArtifactPolicy.CanonicalizeJson(receiptJson).Bytes!);
+        File.WriteAllBytes(receiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
         if (File.Exists(signaturePath)) File.Delete(signaturePath);
         RunProcess("/usr/bin/ssh-keygen", null, "-Y", "sign", "-f", promotionPrivateKeyPath, "-n", "islamu-release-promotion", receiptPath);
     }

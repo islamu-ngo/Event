@@ -11,7 +11,7 @@ public sealed record ChangeIdRename(
 public sealed record ChangeIdRenameLoadResult(
     bool IsValid,
     IReadOnlyList<ChangeIdRename> Renames,
-    IReadOnlyList<string> CanonicalDocuments,
+    IReadOnlyList<string> NormalizedDocuments,
     IReadOnlyList<string> Diagnostics);
 
 public static class ChangeIdRenamePolicy
@@ -52,10 +52,10 @@ public static class ChangeIdRenamePolicy
                 }
 
                 string text = StrictUtf8.GetString(bytes);
-                CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(text);
-                if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes))
+                ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(text);
+                if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes))
                 {
-                    diagnostics.Add($"change_id_rename_not_canonical:{Path.GetFileName(file)}");
+                    diagnostics.Add($"change_id_rename_not_normalized:{Path.GetFileName(file)}");
                     continue;
                 }
 

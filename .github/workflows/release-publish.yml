@@ -35,14 +35,14 @@ jobs:
           global-json-file: global.json
 
       # A forge release body is mutable, unsigned, and editable by any maintainer or by the forge
-      # itself. It can therefore never be release truth. Every page states the canonical notes hash
+      # itself. It can therefore never be release truth. Every page states the release notes hash
       # and the tag it projects so a reader can check the page against the repository.
       - name: Declare the publication projection contract
         run: |
-          printf '%s\n' 'release-publish: noncanonical projection of the signed tag'
-          printf '%s\n' 'page-header: canonical-notes-sha256 and tag-reference are required on every published body'
+          printf '%s\n' 'release-publish: non-authoritative projection of the signed tag'
+          printf '%s\n' 'page-header: release-notes-sha256 and tag-reference are required on every published body'
           printf '%s\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'
-          printf '%s\n' 'canonical-truth: refs/tags/v<version> plus release-notes.md committed at B'
+          printf '%s\n' 'release-truth: refs/tags/v<version> plus release-notes.md committed at B'
 
       - name: Report publication drift without repairing it
         env:

@@ -66,8 +66,8 @@ if (args[0] == "--check")
     string evidencePath = Path.Combine(repositoryRoot, EvidenceRelativePath);
     ValidateGeneratedEvidence(
         generatedPath, evidencePath, sourceRevision, coreRevision, wireRevision, targetRevision);
-    await VerifyCanonicalOutputsAsync(generatedPath, specs);
-    Console.WriteLine("Setup composition scale profiles are current and canonical (4/4).");
+    await VerifySerializedOutputsAsync(generatedPath, specs);
+    Console.WriteLine("Setup composition scale profiles are current and deterministic (4/4).");
     return 0;
 }
 
@@ -144,8 +144,8 @@ static async Task<ProfileMeasurement> MeasureInputAsync(
         long afterAllocated = GC.GetTotalAllocatedBytes(precise: true);
         RequireSuccess(spec.Name, result);
         if (final is not null
-            && !final.CanonicalBytes.Span.SequenceEqual(result.CanonicalBytes.Span))
-            throw new InvalidOperationException($"non-deterministic-canonical-output:{spec.Name}");
+            && !final.SerializedBytes.Span.SequenceEqual(result.SerializedBytes.Span))
+            throw new InvalidOperationException($"non-deterministic-serialized-output:{spec.Name}");
         final = result;
         elapsed[index] = Stopwatch.GetElapsedTime(start, stop).Ticks / 10;
         allocated[index] = checked(afterAllocated - beforeAllocated);
@@ -161,11 +161,11 @@ static async Task<ProfileMeasurement> MeasureInputAsync(
         await compiler.CompileAsync(input.Source, cancellation.Token);
     bool cancellationObserved =
         cancelled.Failure.Code == SetupCompositionFailureCode.Cancelled
-        && cancelled.CanonicalBytes.IsEmpty
+        && cancelled.SerializedBytes.IsEmpty
         && cancelled.Artifact is null;
 
-    byte[] canonical = final!.CanonicalBytes.ToArray();
-    bool targetAccepted = AcceptByTargetContract(final.ArtifactKind, canonical);
+    byte[] serialized = final!.SerializedBytes.ToArray();
+    bool targetAccepted = AcceptByTargetContract(final.ArtifactKind, serialized);
     var measurement = new ProfileMeasurement(
         spec.Name,
         spec.SourceKind,
@@ -187,8 +187,8 @@ static async Task<ProfileMeasurement> MeasureInputAsync(
         input.MappingEntries,
         input.SequenceEntries,
         input.ScalarCharacters,
-        canonical.Length,
-        Convert.ToHexStringLower(SHA256.HashData(canonical)),
+        serialized.Length,
+        Convert.ToHexStringLower(SHA256.HashData(serialized)),
         WarmupCount,
         IterationCount,
         Median(elapsed),
@@ -212,19 +212,19 @@ static void RequireSuccess(string profile, SetupCompositionResult result)
 }
 
 static bool AcceptByTargetContract(
-    SetupCompositionArtifactKind artifactKind, byte[] canonical)
+    SetupCompositionArtifactKind artifactKind, byte[] serialized)
 {
-    if (canonical.Length > ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes)
+    if (serialized.Length > ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes)
         return false;
     try
     {
         switch (artifactKind)
         {
             case SetupCompositionArtifactKind.ConfigurationManifest:
-                _ = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(canonical);
+                _ = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(serialized);
                 break;
             case SetupCompositionArtifactKind.TenantConfigurationPackage:
-                _ = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(canonical);
+                _ = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(serialized);
                 break;
             default:
                 throw new InvalidOperationException("unknown-artifact-kind");
@@ -548,7 +548,7 @@ static byte[] WriteGenerated(
         writer.WriteEndObject();
         writer.WriteNumber("schemaVersion", 1);
         WriteHost(writer, host);
-        WriteCanonicalDefaults(writer);
+        WriteDefaultLimits(writer);
         writer.WriteStartArray("disabledProfiles");
         writer.WriteStringValue("expanded");
         writer.WriteEndArray();
@@ -578,9 +578,9 @@ static void WriteHost(Utf8JsonWriter writer, HostEvidence host)
     writer.WriteEndObject();
 }
 
-static void WriteCanonicalDefaults(Utf8JsonWriter writer)
+static void WriteDefaultLimits(Utf8JsonWriter writer)
 {
-    writer.WriteStartObject("canonicalDefault");
+    writer.WriteStartObject("defaultLimits");
     writer.WriteNumber("aggregateSourceBytes", SetupCompositionLimits.DefaultAggregateSourceBytes);
     writer.WriteNumber("yamlDocuments", SetupCompositionLimits.DefaultYamlDocuments);
     writer.WriteNumber("parserEvents", SetupCompositionLimits.DefaultParserEvents);
@@ -632,8 +632,8 @@ static void WriteProfile(
     writer.WriteNumber("mappingEntries", measurement.MappingEntries);
     writer.WriteNumber("sequenceEntries", measurement.SequenceEntries);
     writer.WriteNumber("scalarCharacters", measurement.ScalarCharacters);
-    writer.WriteNumber("canonicalArtifactBytes", measurement.CanonicalArtifactBytes);
-    writer.WriteString("canonicalArtifactSha256", measurement.CanonicalArtifactSha256);
+    writer.WriteNumber("serializedArtifactBytes", measurement.SerializedArtifactBytes);
+    writer.WriteString("serializedArtifactSha256", measurement.SerializedArtifactSha256);
     writer.WriteNumber("warmupCount", measurement.WarmupCount);
     writer.WriteNumber("iterationCount", measurement.IterationCount);
     writer.WriteNumber("medianElapsedMicroseconds", measurement.MedianElapsedMicroseconds);
@@ -664,7 +664,7 @@ static string WriteEvidenceMarkdown(
 {
     var builder = new StringBuilder();
     builder.AppendLine("<!-- ABOUTME: Records controlled Setup composition scale measurements and admission evidence. -->");
-    builder.AppendLine("<!-- ABOUTME: Contains synthetic aggregate facts only; canonical defaults remain unchanged. -->");
+    builder.AppendLine("<!-- ABOUTME: Contains synthetic aggregate facts only; default limits remain unchanged. -->");
     builder.AppendLine();
     builder.AppendLine("# Setup Composition Scale Results");
     builder.AppendLine();
@@ -694,12 +694,12 @@ static string WriteEvidenceMarkdown(
     builder.AppendLine();
     builder.AppendLine("## Measurements");
     builder.AppendLine();
-    builder.AppendLine("| Profile | Source | Bytes | Files | Nodes | Events | Canonical bytes | Median us | p95 us | Median allocation | Peak working set | Target | Evidence |");
+    builder.AppendLine("| Profile | Source | Bytes | Files | Nodes | Events | Serialized bytes | Median us | p95 us | Median allocation | Peak working set | Target | Evidence |");
     builder.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|");
     foreach (ProfileMeasurement item in measurements)
     {
         builder.AppendLine(FormattableString.Invariant(
-            $"| {item.Name} | {item.SourceKind} | {item.AggregateSourceBytes} | {item.Files} | {item.Nodes} | {item.ParserEvents} | {item.CanonicalArtifactBytes} | {item.MedianElapsedMicroseconds} | {item.P95ElapsedMicroseconds} | {item.MedianAllocatedBytes} | {item.PeakWorkingSetBytes} | {(item.TargetAccepted ? "accepted" : "rejected")} | `{item.EvidenceDigest}` |"));
+            $"| {item.Name} | {item.SourceKind} | {item.AggregateSourceBytes} | {item.Files} | {item.Nodes} | {item.ParserEvents} | {item.SerializedArtifactBytes} | {item.MedianElapsedMicroseconds} | {item.P95ElapsedMicroseconds} | {item.MedianAllocatedBytes} | {item.PeakWorkingSetBytes} | {(item.TargetAccepted ? "accepted" : "rejected")} | `{item.EvidenceDigest}` |"));
     }
     builder.AppendLine();
     builder.AppendLine("All four profiles use synthetic non-secret settings. Each successful result was");
@@ -713,7 +713,7 @@ static string WriteEvidenceMarkdown(
     builder.AppendLine();
     builder.AppendLine("`small`, `medium`, `large`, and `ceiling` are enabled only for their exact");
     builder.AppendLine("generated evidence digest and when the target advertises at least the measured");
-    builder.AppendLine("canonical artifact byte capacity. `expanded` is a known disabled profile.");
+    builder.AppendLine("serialized artifact byte capacity. `expanded` is a known disabled profile.");
     builder.AppendLine("Unknown, disabled, evidence-mismatched, and target-incompatible requests return");
     builder.AppendLine("distinct closed failures with no profile, clamp, fallback, or default replacement.");
     builder.AppendLine("All effective parser limits remain `SetupCompositionLimits.Default`.");
@@ -775,7 +775,7 @@ static string EvidenceDigestFromJson(JsonElement profile)
     return Convert.ToHexStringLower(SHA256.HashData(stream.ToArray()));
 }
 
-static async Task VerifyCanonicalOutputsAsync(
+static async Task VerifySerializedOutputsAsync(
     string generatedPath, IReadOnlyList<ProfileSpec> specs)
 {
     using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(generatedPath));
@@ -794,12 +794,12 @@ static async Task VerifyCanonicalOutputsAsync(
             SetupCompositionResult result = await compiler.CompileAsync(input.Source);
             RequireSuccess(spec.Name, result);
             string actual = Convert.ToHexStringLower(
-                SHA256.HashData(result.CanonicalBytes.Span));
+                SHA256.HashData(result.SerializedBytes.Span));
             JsonElement expected = generated[spec.Name];
-            if (actual != expected.GetProperty("canonicalArtifactSha256").GetString()
-                || result.CanonicalBytes.Length
-                    != expected.GetProperty("canonicalArtifactBytes").GetInt32())
-                throw new InvalidOperationException($"canonical-profile-drifted:{spec.Name}");
+            if (actual != expected.GetProperty("serializedArtifactSha256").GetString()
+                || result.SerializedBytes.Length
+                    != expected.GetProperty("serializedArtifactBytes").GetInt32())
+                throw new InvalidOperationException($"serialized-profile-drifted:{spec.Name}");
         }
         finally
         {
@@ -1028,8 +1028,8 @@ internal sealed record ProfileMeasurement(
     int MappingEntries,
     int SequenceEntries,
     int ScalarCharacters,
-    int CanonicalArtifactBytes,
-    string CanonicalArtifactSha256,
+    int SerializedArtifactBytes,
+    string SerializedArtifactSha256,
     int WarmupCount,
     int IterationCount,
     long MedianElapsedMicroseconds,

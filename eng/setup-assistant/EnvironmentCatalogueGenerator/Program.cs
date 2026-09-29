@@ -41,7 +41,7 @@ internal static class Program
     private static int Execute(bool write)
     {
         string repositoryRoot = FindRepositoryRoot();
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         SecretDefinition[] registry = SecretDefinitionRegistry.All.Values
             .OrderBy(item => item.DefaultEnvironmentVariableName, StringComparer.Ordinal).ToArray();
         ValidateRegistry(catalogue, registry);
@@ -93,10 +93,10 @@ internal static class Program
             || names.Distinct(StringComparer.Ordinal).Count() != names.Length
             || names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Length)
             throw new InvalidDataException("environment-registry-duplicate-key");
-        if (names.Any(name => !IsCanonicalKey(name)))
-            throw new InvalidDataException("environment-registry-noncanonical-key");
+        if (names.Any(name => !IsValidEnvironmentKey(name)))
+            throw new InvalidDataException("environment-registry-invalid-key");
 
-        string[] compiled = CanonicalEnvironmentCatalogue.SecretBindingEnvironmentKeys
+        string[] compiled = PlatformEnvironmentCatalogue.SecretBindingEnvironmentKeys
             .Order(StringComparer.Ordinal).ToArray();
         if (!compiled.SequenceEqual(names.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             throw new InvalidDataException("environment-registry-core-parity-drift");
@@ -115,17 +115,17 @@ internal static class Program
         {
             if (!seen.Add(key))
                 throw new InvalidDataException("environment-template-duplicate-key:" + key);
-            if (CanonicalEnvironmentCatalogue.Catalogue.Lookup(key) is null)
+            if (PlatformEnvironmentCatalogue.Catalogue.Lookup(key) is null)
                 throw new InvalidDataException("environment-template-unknown-key:" + key);
         }
     }
 
     private static void ValidateCompose(ComposeProjection actual)
     {
-        string[] expected = CanonicalEnvironmentCatalogue.ComposeEnvironmentKeys.ToArray();
+        string[] expected = PlatformEnvironmentCatalogue.ComposeEnvironmentKeys.ToArray();
         if (!actual.Keys.SequenceEqual(expected, StringComparer.Ordinal))
             throw new InvalidDataException("environment-compose-key-order-drift");
-        string[] expectedRequired = CanonicalEnvironmentCatalogue.Catalogue.Definitions
+        string[] expectedRequired = PlatformEnvironmentCatalogue.Catalogue.Definitions
             .Where(item => item.Generation.ComposeRequired)
             .OrderBy(item => item.Generation.ComposeOrder)
             .Select(item => item.Key).ToArray();
@@ -182,8 +182,8 @@ internal static class Program
             writer.WriteEndArray();
             WriteStrings(writer, "secretBindingEnvironmentKeys", registry
                 .Select(item => item.DefaultEnvironmentVariableName).Order(StringComparer.Ordinal));
-            WriteStrings(writer, "dotenvEnvironmentKeys", CanonicalEnvironmentCatalogue.DotenvEnvironmentKeys);
-            WriteStrings(writer, "composeEnvironmentKeys", CanonicalEnvironmentCatalogue.ComposeEnvironmentKeys);
+            WriteStrings(writer, "dotenvEnvironmentKeys", PlatformEnvironmentCatalogue.DotenvEnvironmentKeys);
+            WriteStrings(writer, "composeEnvironmentKeys", PlatformEnvironmentCatalogue.ComposeEnvironmentKeys);
             WriteStrings(writer, "composeRequiredEnvironmentKeys", catalogue.Definitions
                 .Where(item => item.Generation.ComposeRequired)
                 .OrderBy(item => item.Generation.ComposeOrder).Select(item => item.Key));
@@ -261,7 +261,7 @@ internal static class Program
             {
                 throw new InvalidDataException("environment-artifact-utf8-invalid");
             }
-            if (!IsCanonicalKey(key)) throw new InvalidDataException("environment-template-key-invalid");
+            if (!IsValidEnvironmentKey(key)) throw new InvalidDataException("environment-template-key-invalid");
             keys.Add(key);
         }
         return keys.AsReadOnly();
@@ -365,7 +365,7 @@ internal static class Program
         throw new InvalidDataException("environment-repository-root-not-found");
     }
 
-    private static bool IsCanonicalKey(string key) => key.Length is > 0 and <= 128
+    private static bool IsValidEnvironmentKey(string key) => key.Length is > 0 and <= 128
         && key[0] is >= 'A' and <= 'Z' && key[^1] != '_'
         && !key.Contains("___", StringComparison.Ordinal)
         && key.All(character => character is >= 'A' and <= 'Z' or >= '0' and <= '9' or '_');

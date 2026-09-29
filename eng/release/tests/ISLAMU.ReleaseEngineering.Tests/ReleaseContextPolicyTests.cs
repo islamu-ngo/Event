@@ -187,7 +187,7 @@ public sealed class ReleaseContextPolicyTests
     }
 
     [Test]
-    public async Task CanonicalContextRejectsIdentityBearingSubjectsAndOmitsRawBodies()
+    public async Task NormalizedContextRejectsIdentityBearingSubjectsAndOmitsRawBodies()
     {
         ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(ReleaseYaml("1.0.1", "v1.0", "v1.0.0", "v1.0.0", FullOid('a'), FullOid('b')), [], []);
         ReleaseContextValidationResult emailSubject = ReleaseContextPolicy.Build(

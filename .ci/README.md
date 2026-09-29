@@ -22,9 +22,9 @@ against the provider-neutral adapter contract and writes deterministic
 manifest events, actions, final environment approval, trusted default-branch refs, and
 transport-only no-checkout discovery claims match the reviewed workflow files. The
 plans carry explicit local release inputs, full Git object IDs, protected-ref
-compare-and-swap IDs, required check names, and canonical checksum equality only. They
+compare-and-swap IDs, required check names, and authoritative checksum equality only. They
 deliberately do not choose versions, classify commits, render notes, sign tags, publish
-releases, mutate protected refs, or make provider metadata canonical.
+releases, mutate protected refs, or make provider metadata authoritative.
 
 Current provider definitions are:
 
@@ -40,10 +40,10 @@ Current provider definitions are:
 `generate-release-evidence-bundle.cs` is a durable bundle index, not a release
 identity generator. Release-mode bundle generation requires exactly one retained
 `release-evidence.v1.json` final manifest under the artifact root. The script
-parses that canonical manifest, verifies its version/tag/target/hash fields
+parses that release manifest, verifies its version/tag/target/hash fields
 against explicit release inputs and retained artifacts, and keeps workflow run
-IDs, URLs, provider data, and collection time as noncanonical bundle metadata.
-Malformed/noncanonical JSON, unknown fields, missing or duplicate manifests,
+IDs, URLs, provider data, and collection time as non-authoritative bundle metadata.
+Malformed/non-authoritative JSON, unknown fields, missing or duplicate manifests,
 case/NFC/path aliases, symlinks, oversized inputs, and retained-hash disagreement
 fail with stable diagnostics before the final output directory is published.
 The output directory must not already exist: the script publishes the complete

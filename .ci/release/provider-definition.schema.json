@@ -30,11 +30,11 @@
     "guards": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["immutableBundleVerification", "providerNeutralChecksumEquality", "metadataCanonical", "misleadingSuccessForbidden"],
+      "required": ["immutableBundleVerification", "providerNeutralChecksumEquality", "metadataAuthoritative", "misleadingSuccessForbidden"],
       "properties": {
         "immutableBundleVerification": { "type": "boolean" },
         "providerNeutralChecksumEquality": { "type": "boolean" },
-        "metadataCanonical": { "type": "boolean" },
+        "metadataAuthoritative": { "type": "boolean" },
         "misleadingSuccessForbidden": { "type": "boolean" }
       }
     },

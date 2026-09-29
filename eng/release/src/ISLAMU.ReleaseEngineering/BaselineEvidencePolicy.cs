@@ -24,8 +24,8 @@ public static class BaselineEvidencePolicy
         if (!File.Exists(path)) return false;
 
         byte[] bytes = File.ReadAllBytes(path);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(StrictUtf8.GetString(bytes));
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes)) return false;
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(StrictUtf8.GetString(bytes));
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes)) return false;
 
         using JsonDocument document = JsonDocument.Parse(bytes);
         JsonElement root = document.RootElement;

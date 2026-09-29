@@ -1,10 +1,10 @@
 # Release Adapter Contract
 
-This contract is prospective release transport only. The release engine owns canonical release identity; adapters move explicit inputs, retained artifacts, and protected-ref actions without reinterpreting them.
+This contract is prospective release transport only. The release engine owns release identity; adapters move explicit inputs, retained artifacts, and protected-ref actions without reinterpreting them.
 
-## Canonical Boundary
+## Release Identity Boundary
 
-Adapters receive only explicit full Git object IDs, a promoted trusted bundle, release inputs, retained artifacts, and requested protected-ref or publication actions. Provider run IDs, URLs, actors, labels, comments, and release-page metadata are noncanonical and must not change canonical checksums.
+Adapters receive only explicit full Git object IDs, a promoted trusted bundle, release inputs, retained artifacts, and requested protected-ref or publication actions. Provider run IDs, URLs, actors, labels, comments, and release-page metadata are non-authoritative and must not change release checksums.
 
 The validator/planner is `.ci/scripts/validate-release-provider-adapters.cs`. It validates `.ci/providers/**/provider-definition.v1.json`, verifies the caller-supplied synthetic release input file, checks the promoted bundle checksum, and writes provider transport plans. It never signs, tags, pushes, publishes, deploys, fetches, or executes candidate checkout code.
 
@@ -32,7 +32,7 @@ The planner accepts one `release-adapter-inputs.v1` JSON document containing:
   **mutation precondition**, not release identity: it exists so a protected-ref update
   fails on a race. No adapter input carries a branch ref or branch head as identity.
 - `tagObjectId`: final annotated tag object ID.
-- `tagName`: canonical tag name.
+- `tagName`: release tag name.
 - `releaseBundlePath`: path under the supplied bundle root.
 - `releaseBundleSha256`: expected SHA-256 of that promoted bundle artifact.
 - `artifactManifestSha256`: checksum of retained artifact manifest evidence.
@@ -52,8 +52,8 @@ Each successful provider plan is `provider.transport-plan.v1.json` and contains:
 - preview and final lane events/checks;
 - exact protected-ref compare-and-swap old/new IDs;
 - tag object and promoted bundle checksum;
-- canonical checksum set for the release inputs and promoted bundle;
-- `transportOnly=true` and `metadataCanonical=false`.
+- authoritative checksum set for the release inputs and promoted bundle;
+- `transportOnly=true` and `metadataAuthoritative=false`.
 
 ## Publication Projection
 
@@ -62,8 +62,8 @@ Publishing a release page is **not** part of release identity. Each provider def
 
 - The workflow runs only in a trusted lane. `pull_request`, `pull_request_target`, and `push`
   origins are rejected (`adapter_publication_untrusted_origin`).
-- Every published body carries the canonical `release-notes.md` SHA-256 and its tag reference, so a
-  reader can check the page against the repository (`adapter_publication_canonical_reference_missing`).
+- Every published body carries the release `release-notes.md` SHA-256 and its tag reference, so a
+  reader can check the page against the repository (`adapter_publication_release_notes_reference_missing`).
 - Self-verifying assets are attached: `release-evidence.v1.json`, `artifacts.sha256`, container
   image digests, and SBOM (`adapter_publication_asset_missing`). Forge-generated `.zip`/`.tar.gz`
   archives may be linked but are never treated as reproducible artifacts.
@@ -76,7 +76,7 @@ Publishing a release page is **not** part of release identity. Each provider def
 `.ci/scripts/report-publication-drift.cs` consumes a bounded `release-publication-projection.v1`
 document and the release's own `release-evidence.v1.json`, then writes
 `publication-drift-report.v1.json` plus a Markdown summary. It **reports**: it never edits a page,
-never rewrites canonical bytes, and never invalidates a release. Its report always carries
+never rewrites release bytes, and never invalidates a release. Its report always carries
 `autoRepair: false` and `releaseInvalidated: false`. Drift exits `0` by default; operators who want
 a blocking gate pass `--fail-on-drift`.
 
@@ -113,4 +113,4 @@ Promoted bundle files, release input files, provider manifests, and external-con
 
 ## Cleanup And Retention
 
-Provider definitions declare artifact retention days and cleanup support. Cleanup is transport metadata only; canonical evidence remains the release-engine and durable bundle responsibility.
+Provider definitions declare artifact retention days and cleanup support. Cleanup is transport metadata only; release evidence remains the release-engine and durable bundle responsibility.

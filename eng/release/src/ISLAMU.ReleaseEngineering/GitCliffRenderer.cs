@@ -9,7 +9,7 @@ namespace ISLAMU.ReleaseEngineering;
 
 public sealed record GitCliffRenderRequest(
     VerifiedTrustedBundle TrustedBundle,
-    byte[] CanonicalContext,
+    byte[] NormalizedContext,
     string Platform,
     string IsolationRoot,
     TimeSpan Timeout);
@@ -110,7 +110,7 @@ internal static class PresentationConfigGrammar
 public static class GitCliffRenderer
 {
     private const int MaximumDiagnosticCharacters = 4096;
-    private const int MaximumOutputCharacters = CanonicalArtifactPolicy.MaximumDocumentUtf8Bytes;
+    private const int MaximumOutputCharacters = ReleaseArtifactPolicy.MaximumDocumentUtf8Bytes;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly Regex UrlPattern = new(@"(?:https?://|mailto:|www\.)\S+", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
     private static readonly Regex EmailOrHandlePattern = new(@"[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}|(?<![\w@])@[A-Za-z0-9][A-Za-z0-9-]{0,38}(?![\w-])", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
@@ -146,9 +146,9 @@ public static class GitCliffRenderer
             return Invalid(configDiagnostic!);
         }
 
-        if (!TryReadCanonicalContext(request.CanonicalContext, out ReleaseContext? context))
+        if (!TryReadNormalizedContext(request.NormalizedContext, out ReleaseContext? context))
         {
-            return Invalid("renderer_context_not_canonical");
+            return Invalid("renderer_context_not_normalized");
         }
 
         using var verificationOutput = new StringWriter();
@@ -203,10 +203,10 @@ public static class GitCliffRenderer
             else
             {
                 byte[] outputBytes = StrictUtf8.GetBytes(output);
-                CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(output);
-                if (!canonical.IsValid || !outputBytes.AsSpan().SequenceEqual(canonical.Bytes))
+                ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(output);
+                if (!normalized.IsValid || !outputBytes.AsSpan().SequenceEqual(normalized.Bytes))
                 {
-                    result = Invalid("renderer_output_not_canonical");
+                    result = Invalid("renderer_output_not_normalized");
                 }
                 else if (!IsSafeMarkdown(output))
                 {
@@ -305,10 +305,10 @@ public static class GitCliffRenderer
         }
     }
 
-    private static bool TryReadCanonicalContext(byte[] bytes, out ReleaseContext? context)
+    private static bool TryReadNormalizedContext(byte[] bytes, out ReleaseContext? context)
     {
         context = null;
-        if (bytes.Length == 0 || bytes.Length > CanonicalArtifactPolicy.MaximumDocumentUtf8Bytes || bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble))
+        if (bytes.Length == 0 || bytes.Length > ReleaseArtifactPolicy.MaximumDocumentUtf8Bytes || bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble))
         {
             return false;
         }
@@ -546,7 +546,7 @@ public static class GitCliffRenderer
         startInfo.ArgumentList.Add("--offline");
         startInfo.ArgumentList.Add("--no-exec");
         startInfo.Environment.Clear();
-        foreach ((string name, string value) in CanonicalArtifactPolicy.CreateDeterministicEnvironment(workingDirectory))
+        foreach ((string name, string value) in ReleaseArtifactPolicy.CreateDeterministicEnvironment(workingDirectory))
         {
             startInfo.Environment.Add(name, value);
         }
@@ -582,13 +582,13 @@ public static class GitCliffRenderer
         !UrlPattern.IsMatch(value) &&
         !EmailOrHandlePattern.IsMatch(value) &&
         !RawHtmlPattern.IsMatch(value) &&
-        CanonicalArtifactPolicy.EscapeUntrustedMarkdown(value).IsValid;
+        ReleaseArtifactPolicy.EscapeUntrustedMarkdown(value).IsValid;
 
     private static bool IsSafeMarkdown(string value) =>
         !UrlPattern.IsMatch(value) &&
         !EmailOrHandlePattern.IsMatch(value) &&
         !RawHtmlPattern.IsMatch(value) &&
-        value.Split('\n', StringSplitOptions.RemoveEmptyEntries).All(line => CanonicalArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid);
+        value.Split('\n', StringSplitOptions.RemoveEmptyEntries).All(line => ReleaseArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid);
 
     private static GitCliffRenderResult Invalid(string diagnostic) => new(false, null, diagnostic);
     private static StringComparison PathComparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;

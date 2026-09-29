@@ -353,7 +353,7 @@ public sealed class ReleaseInputPolicyTests
 
             await Assert.That(first.IsValid).IsTrue();
             await Assert.That(second.Diagnostics).IsEquivalentTo(first.Diagnostics);
-            await Assert.That(second.Fragments[0].CanonicalSnapshot).IsEqualTo(first.Fragments[0].CanonicalSnapshot);
+            await Assert.That(second.Fragments[0].NormalizedSnapshot).IsEqualTo(first.Fragments[0].NormalizedSnapshot);
         }
         finally
         {

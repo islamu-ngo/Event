@@ -14,7 +14,7 @@ using Microsoft.Win32.SafeHandles;
 
 var artifactRoot = args.Length > 0 ? args[0] : "artifacts";
 var outputDirectory = args.Length > 1 ? args[1] : "release-evidence";
-const int MaximumCanonicalManifestBytes = 1_048_576;
+const int MaximumManifestBytes = 1_048_576;
 const int MaximumArtifactCount = 4_096;
 const int MaximumArtifactPathBytes = 4_096;
 const int MaximumArtifactPathDepth = 32;
@@ -130,7 +130,7 @@ catch (JsonException)
 }
 catch (DecoderFallbackException)
 {
-    Console.Error.WriteLine("release_bundle_final_manifest_canonical_invalid");
+    Console.Error.WriteLine("release_bundle_final_manifest_encoding_invalid");
     return 1;
 }
 
@@ -217,8 +217,8 @@ static string BuildMarkdown(ReleaseEvidenceBundle bundle)
     AppendInvariantLine(builder, $"- Workflow run: `{ValueOrUnknown(bundle.RunId)}` attempt `{ValueOrUnknown(bundle.RunAttempt)}`");
     AppendInvariantLine(builder, $"- Release version: `{ValueOrUnknown(bundle.ReleaseVersion)}`");
     AppendInvariantLine(builder, $"- CLA status: `{ValueOrUnknown(bundle.ClaStatus)}`");
-    AppendInvariantLine(builder, $"- Canonical final manifest: `{bundle.ReleaseIdentity.ManifestPath}` `{bundle.ReleaseIdentity.ManifestSha256}`");
-    AppendInvariantLine(builder, $"- Canonical tag: `{bundle.ReleaseIdentity.TagName}` object `{bundle.ReleaseIdentity.TagObjectId}` target `{bundle.ReleaseIdentity.TargetOid}`");
+    AppendInvariantLine(builder, $"- Release final manifest: `{bundle.ReleaseIdentity.ManifestPath}` `{bundle.ReleaseIdentity.ManifestSha256}`");
+    AppendInvariantLine(builder, $"- Release tag: `{bundle.ReleaseIdentity.TagName}` object `{bundle.ReleaseIdentity.TagObjectId}` target `{bundle.ReleaseIdentity.TargetOid}`");
     builder.AppendLine();
     builder.AppendLine("## Evidence Categories");
     builder.AppendLine();
@@ -316,8 +316,8 @@ static string BuildReleaseNotesEvidence(ReleaseEvidenceBundle bundle)
     builder.AppendLine();
     AppendInvariantLine(builder, $"- Release version: `{ValueOrUnknown(bundle.ReleaseVersion)}`");
     AppendInvariantLine(builder, $"- Commit SHA: `{ValueOrUnknown(bundle.CommitSha)}`");
-    AppendInvariantLine(builder, $"- Canonical final manifest: `{bundle.ReleaseIdentity.ManifestPath}` `{bundle.ReleaseIdentity.ManifestSha256}`");
-    AppendInvariantLine(builder, $"- Canonical tag object: `{bundle.ReleaseIdentity.TagObjectId}`");
+    AppendInvariantLine(builder, $"- Release final manifest: `{bundle.ReleaseIdentity.ManifestPath}` `{bundle.ReleaseIdentity.ManifestSha256}`");
+    AppendInvariantLine(builder, $"- Release tag object: `{bundle.ReleaseIdentity.TagObjectId}`");
     AppendInvariantLine(builder, $"- Source ref: `{ValueOrUnknown(bundle.Ref)}`");
     AppendInvariantLine(builder, $"- Workflow run: `{ValueOrUnknown(bundle.RunId)}` attempt `{ValueOrUnknown(bundle.RunAttempt)}`");
     AppendInvariantLine(builder, $"- CLA status: `{ValueOrUnknown(bundle.ClaStatus)}`");
@@ -349,7 +349,7 @@ static string ReleaseReviewHint(string category)
     {
         "container" => "Image digest, SBOM/provenance, scan, attestation, promotion, and checksum evidence agree.",
         "deployment" => "Environment, expected tag/digest, webhook result, smoke result, freeze state, and rollback note are present.",
-        "release-identity" => "Canonical final release-evidence.v1.json owns version, tag, target, and source hashes.",
+        "release-identity" => "Release final release-evidence.v1.json owns version, tag, target, and source hashes.",
         "release-governance" => "Release descriptor, summary, context, notes, and candidate evidence hashes agree.",
         "trusted-tooling" => "Trusted bundle manifest, promotion receipt, signature, policy, config, trust, and tool evidence agree.",
         "signer-verification" => "Local SSH signer and tag verification evidence was reviewed.",
@@ -613,14 +613,14 @@ static string GetMetadataEnv(string name)
 static ReleaseIdentity ReadReleaseIdentity(string path, ArtifactEvidence manifestArtifact, IReadOnlyDictionary<string, ArtifactEvidence> artifacts, Regex fullOidPattern, Regex sha256Pattern, Regex versionPattern)
 {
     byte[] bytes = File.ReadAllBytes(path);
-    if (bytes.Length == 0 || bytes.Length > MaximumCanonicalManifestBytes) throw new InvalidOperationException("release_bundle_final_manifest_size_invalid");
-    if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) throw new InvalidOperationException("release_bundle_final_manifest_canonical_invalid");
+    if (bytes.Length == 0 || bytes.Length > MaximumManifestBytes) throw new InvalidOperationException("release_bundle_final_manifest_size_invalid");
+    if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) throw new InvalidOperationException("release_bundle_final_manifest_encoding_invalid");
     string text = new UTF8Encoding(false, true).GetString(bytes);
-    if (text.Contains('\r', StringComparison.Ordinal)) throw new InvalidOperationException("release_bundle_final_manifest_canonical_invalid");
+    if (text.Contains('\r', StringComparison.Ordinal)) throw new InvalidOperationException("release_bundle_final_manifest_encoding_invalid");
     using JsonDocument document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });
     JsonElement root = document.RootElement;
     if (root.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("release_bundle_final_manifest_schema_invalid");
-    ValidateCanonicalManifest(bytes, root);
+    ValidateManifestEncoding(bytes, root);
     string schemaVersion = RequiredString(root, "schemaVersion");
     if (schemaVersion != "release-evidence.v1") throw new InvalidOperationException("release_bundle_final_manifest_schema_invalid");
     string objectFormat = RequiredString(root, "objectFormat");
@@ -696,7 +696,7 @@ static ReleaseIdentity ReadReleaseIdentity(string path, ArtifactEvidence manifes
         trustedBundleGitCliffSha256);
 }
 
-static void ValidateCanonicalManifest(byte[] bytes, JsonElement root)
+static void ValidateManifestEncoding(byte[] bytes, JsonElement root)
 {
     string[] expectedProperties =
     [
@@ -724,7 +724,7 @@ static void ValidateCanonicalManifest(byte[] bytes, JsonElement root)
 
     foreach (JsonProperty property in properties)
     {
-        if (!property.Name.IsNormalized(NormalizationForm.FormC)) throw new InvalidOperationException("release_bundle_final_manifest_canonical_invalid");
+        if (!property.Name.IsNormalized(NormalizationForm.FormC)) throw new InvalidOperationException("release_bundle_final_manifest_encoding_invalid");
         if (property.Name == "oidLength")
         {
             if (property.Value.ValueKind != JsonValueKind.Number || !property.Value.TryGetInt32(out int oidLength) || oidLength is not (40 or 64))
@@ -749,7 +749,7 @@ static void ValidateCanonicalManifest(byte[] bytes, JsonElement root)
         writer.WriteEndObject();
     }
     stream.WriteByte((byte)'\n');
-    if (!bytes.AsSpan().SequenceEqual(stream.ToArray())) throw new InvalidOperationException("release_bundle_final_manifest_canonical_invalid");
+    if (!bytes.AsSpan().SequenceEqual(stream.ToArray())) throw new InvalidOperationException("release_bundle_final_manifest_encoding_invalid");
 }
 
 static void VerifyExplicitInput(string name, string expected, string diagnostic)

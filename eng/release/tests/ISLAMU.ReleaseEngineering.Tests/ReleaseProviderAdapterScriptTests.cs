@@ -17,7 +17,7 @@ public sealed class ReleaseProviderAdapterScriptTests
         untrustedOrigin.MutatePublicationWorkflow("github", yaml => yaml.Replace("on:\n  workflow_dispatch:", "on:\n  pull_request:", StringComparison.Ordinal));
 
         using var missingReference = ProviderFixture.CreateSingle("github");
-        missingReference.MutatePublicationWorkflow("github", yaml => yaml.Replace("canonical-notes-sha256", "release-title", StringComparison.Ordinal));
+        missingReference.MutatePublicationWorkflow("github", yaml => yaml.Replace("release-notes-sha256", "release-title", StringComparison.Ordinal));
 
         using var missingAsset = ProviderFixture.CreateSingle("github");
         missingAsset.MutatePublicationWorkflow("github", yaml => yaml.Replace("sbom", "changelog", StringComparison.Ordinal));
@@ -36,7 +36,7 @@ public sealed class ReleaseProviderAdapterScriptTests
 
         await Assert.That(originResult.ExitCode).IsNotEqualTo(0);
         await Assert.That(originResult.Output).Contains("adapter_publication_untrusted_origin");
-        await Assert.That(referenceResult.Output).Contains("adapter_publication_canonical_reference_missing");
+        await Assert.That(referenceResult.Output).Contains("adapter_publication_release_notes_reference_missing");
         await Assert.That(assetResult.Output).Contains("adapter_publication_asset_missing");
         await Assert.That(actionResult.Output).Contains("adapter_action_pin_mutable");
         await Assert.That(noopResult.Output).Contains("adapter_publication_noop_evidence_required");
@@ -312,7 +312,7 @@ public sealed class ReleaseProviderAdapterScriptTests
     }
 
     [Test]
-    public async Task ProviderAdapterScriptEmitsPlansForAllThreeProvidersWithIdenticalCanonicalChecksums()
+    public async Task ProviderAdapterScriptEmitsPlansForAllThreeProvidersWithIdenticalNormalizedChecksums()
     {
         using var fixture = ProviderFixture.CreateAll();
 
@@ -327,9 +327,9 @@ public sealed class ReleaseProviderAdapterScriptTests
             using JsonDocument plan = JsonDocument.Parse(File.ReadAllBytes(planPath));
             JsonElement root = plan.RootElement;
             await Assert.That(root.GetProperty("providerId").GetString()).IsEqualTo(provider);
-            await Assert.That(root.GetProperty("canonicalChecksums").GetRawText()).IsEqualTo(fixture.ExpectedChecksumJson);
+            await Assert.That(root.GetProperty("authoritativeChecksums").GetRawText()).IsEqualTo(fixture.ExpectedChecksumJson);
             await Assert.That(root.GetProperty("transportOnly").GetBoolean()).IsTrue();
-            await Assert.That(root.GetProperty("metadataCanonical").GetBoolean()).IsFalse();
+            await Assert.That(root.GetProperty("metadataAuthoritative").GetBoolean()).IsFalse();
         }
     }
 
@@ -344,7 +344,7 @@ public sealed class ReleaseProviderAdapterScriptTests
             InputPath = Path.Combine(Root, "release-inputs.json");
             Directory.CreateDirectory(ProvidersRoot);
             Directory.CreateDirectory(BundleRoot);
-            File.WriteAllText(Path.Combine(BundleRoot, "promoted-bundle.tar"), "canonical bundle bytes\n");
+            File.WriteAllText(Path.Combine(BundleRoot, "promoted-bundle.tar"), "normalized bundle bytes\n");
             BundleSha256 = Sha256(File.ReadAllBytes(Path.Combine(BundleRoot, "promoted-bundle.tar")));
             WriteInputs();
             foreach (string provider in providers) WriteProvider(provider);
@@ -524,7 +524,7 @@ public sealed class ReleaseProviderAdapterScriptTests
               "guards": {
                 "immutableBundleVerification": true,
                 "providerNeutralChecksumEquality": true,
-                "metadataCanonical": false,
+                "metadataAuthoritative": false,
                 "misleadingSuccessForbidden": true
               },
               "diagnostics": ["adapter_validation_passed"]
@@ -543,7 +543,7 @@ public sealed class ReleaseProviderAdapterScriptTests
             File.WriteAllText(
                 Path.Combine(ProvidersRoot, provider, "release-publish.yml"),
                 "name: publish\non:\n  workflow_dispatch:\njobs:\n  release-publish:\n" + environment + "    steps:\n" + noop +
-                "      - run: printf '%s\\n' 'page-header: canonical-notes-sha256 and tag-reference'\n" +
+                "      - run: printf '%s\\n' 'page-header: release-notes-sha256 and tag-reference'\n" +
                 "      - run: printf '%s\\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'\n");
         }
 

@@ -8,7 +8,7 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 /// <summary>
 /// A forge release page is mutable, unsigned, and editable by any maintainer or by the forge
 /// itself, so it can never be release truth. These specifications pin the only guarantees that are
-/// actually enforceable: each page must carry the canonical notes hash and its tag reference,
+/// actually enforceable: each page must carry the normalized notes hash and its tag reference,
 /// divergence is reported rather than repaired, and a provider without a release API degrades to a
 /// recorded operator no-op instead of a failed release.
 /// </summary>
@@ -16,7 +16,7 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class ReleasePublicationDriftScriptTests
 {
     [Test]
-    public async Task DriftReporterAcceptsAProjectionCarryingTheCanonicalHashAndTagReference()
+    public async Task DriftReporterAcceptsAProjectionCarryingTheNormalizedHashAndTagReference()
     {
         using var fixture = DriftFixture.Create();
         fixture.WriteProjections(fixture.InSyncProjection("github"));
@@ -31,8 +31,8 @@ public sealed class ReleasePublicationDriftScriptTests
         await Assert.That(root.GetProperty("schemaVersion").GetString()).IsEqualTo("publication-drift-report.v1");
         await Assert.That(root.GetProperty("autoRepair").GetBoolean()).IsFalse();
         await Assert.That(root.GetProperty("releaseInvalidated").GetBoolean()).IsFalse();
-        await Assert.That(root.GetProperty("canonical").GetProperty("tagRef").GetString()).IsEqualTo("refs/tags/v1.1.0");
-        await Assert.That(root.GetProperty("canonical").GetProperty("releaseNotesSha256").GetString()).IsEqualTo(fixture.NotesSha256);
+        await Assert.That(root.GetProperty("releaseIdentity").GetProperty("tagRef").GetString()).IsEqualTo("refs/tags/v1.1.0");
+        await Assert.That(root.GetProperty("releaseIdentity").GetProperty("releaseNotesSha256").GetString()).IsEqualTo(fixture.NotesSha256);
     }
 
     [Test]
@@ -51,14 +51,14 @@ public sealed class ReleasePublicationDriftScriptTests
         await Assert.That(result.ExitCode).IsEqualTo(0).Because(result.Output);
         await Assert.That(result.Output).Contains("github: drift");
         await Assert.That(result.Output).Contains("publication_drift_reported: release remains valid");
-        await Assert.That(findings).Contains("published_body_missing_canonical_notes_sha256");
+        await Assert.That(findings).Contains("published_body_missing_release_notes_sha256");
         await Assert.That(findings).Contains("published_body_missing_tag_reference");
         await Assert.That(notesAfter).IsEquivalentTo(notesBefore);
         await Assert.That(report.RootElement.GetProperty("releaseInvalidated").GetBoolean()).IsFalse();
     }
 
     [Test]
-    public async Task DriftReporterFlagsWrongCanonicalHashWrongTagReferenceAndMissingAssets()
+    public async Task DriftReporterFlagsWrongNormalizedHashWrongTagReferenceAndMissingAssets()
     {
         using var wrongHash = DriftFixture.Create();
         wrongHash.WriteProjections(wrongHash.InSyncProjection("github").Replace(wrongHash.NotesSha256, new string('0', 64), StringComparison.Ordinal));
@@ -74,7 +74,7 @@ public sealed class ReleasePublicationDriftScriptTests
         ScriptResult assetResult = missingAsset.Run();
 
         await Assert.That(hashResult.Output).Contains("github: drift");
-        await Assert.That(File.ReadAllText(wrongHash.ReportPath)).Contains("declared_canonical_notes_sha256_mismatch");
+        await Assert.That(File.ReadAllText(wrongHash.ReportPath)).Contains("declared_release_notes_sha256_mismatch");
         await Assert.That(tagResult.Output).Contains("github: drift");
         await Assert.That(File.ReadAllText(wrongTag.ReportPath)).Contains("declared_tag_reference_mismatch");
         await Assert.That(assetResult.Output).Contains("github: drift");
@@ -101,7 +101,7 @@ public sealed class ReleasePublicationDriftScriptTests
     }
 
     [Test]
-    public async Task DriftReporterFailsClosedOnMalformedInputAndOnLocalCanonicalTampering()
+    public async Task DriftReporterFailsClosedOnMalformedInputAndOnLocalNormalizedTampering()
     {
         using var malformed = DriftFixture.Create();
         File.WriteAllText(malformed.ProjectionsPath, "{\"schemaVersion\":\"something-else\"}\n");
@@ -120,7 +120,7 @@ public sealed class ReleasePublicationDriftScriptTests
         await Assert.That(malformedResult.ExitCode).IsNotEqualTo(0);
         await Assert.That(malformedResult.Output).Contains("drift_projection_schema_invalid");
         await Assert.That(tamperedResult.ExitCode).IsNotEqualTo(0);
-        await Assert.That(tamperedResult.Output).Contains("drift_canonical_notes_mismatch");
+        await Assert.That(tamperedResult.Output).Contains("drift_release_notes_mismatch");
         await Assert.That(duplicateResult.ExitCode).IsNotEqualTo(0);
         await Assert.That(duplicateResult.Output).Contains("drift_projection_provider_invalid");
     }
@@ -181,13 +181,13 @@ public sealed class ReleasePublicationDriftScriptTests
 
         public string InSyncProjection(string providerId) => ProjectionWithBody(
             providerId,
-            $"Canonical notes SHA-256: {NotesSha256}\nTag: refs/tags/{TagName}\n\nSee the repository for the signed release.\n");
+            $"Release notes SHA-256: {NotesSha256}\nTag: refs/tags/{TagName}\n\nSee the repository for the signed release.\n");
 
         public string ProjectionWithBody(string providerId, string body) => $$"""
             {
               "providerId": "{{providerId}}",
               "state": "published",
-              "declaredCanonicalNotesSha256": "{{NotesSha256}}",
+              "declaredReleaseNotesSha256": "{{NotesSha256}}",
               "declaredTagRef": "refs/tags/{{TagName}}",
               "publishedBody": {{JsonSerializer.Serialize(body)}},
               "assets": ["release-evidence.v1.json", "artifacts.sha256", "container-image-digests.json", "sbom.spdx.json"]

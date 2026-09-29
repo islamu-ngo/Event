@@ -10,14 +10,14 @@ internal static class Program
     {
         try
         {
-            if (args is ["publish-schema", var schema, var destination])
+            if (args is ["publish-schema", var schema, var schemaDestination])
             {
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(schema));
-                await GeneratedContractPublication.CopyAsync(schema, destination);
+                await GeneratedContractPublication.CopyAsync(schema, schemaDestination);
                 return 0;
             }
 
-            if (args is ["complete-client", var source, var schemaInput, var policy, var capture, var canonical])
+            if (args is ["complete-client", var source, var schemaInput, var policy, var capture, var clientDestination])
             {
                 Diagnostic[] errors = CSharpSyntaxTree.ParseText(File.ReadAllText(source))
                     .GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
@@ -25,7 +25,7 @@ internal static class Program
                     throw new InvalidDataException(string.Join(Environment.NewLine, errors.Select(error => error.ToString())));
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(schemaInput));
                 GeneratedContractFiles files = GeneratedContractCapture.Create(schemaInput, source, policy, capture);
-                await GeneratedContractPublication.CopyAsync(files.Client, canonical);
+                await GeneratedContractPublication.CopyAsync(files.Client, clientDestination);
                 return 0;
             }
 

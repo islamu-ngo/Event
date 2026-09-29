@@ -6,7 +6,7 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 /// <summary>
 /// Task 8.1's advisory activation dry run, expressed as an executable specification rather than a
 /// document that can drift. It exercises the complete governed flow end to end — preparation,
-/// exact-<c>B</c> candidate attestation, canonical tag message, SSH-signed annotated tag, final
+/// exact-<c>B</c> candidate attestation, normalized tag message, SSH-signed annotated tag, final
 /// evidence, and the stable-main proposal — and then re-verifies an already-closed release after
 /// the branch that carried its commits has advanced and after it has been deleted outright.
 /// Nothing here creates, moves, or pushes a ref in a real repository.
@@ -67,7 +67,7 @@ public sealed class ReleaseActivationDryRunTests
     }
 
     [Test]
-    public async Task CanonicalEvidenceCarriesNoBranchIdentityIdentityOrProviderMetadata()
+    public async Task NormalizedEvidenceCarriesNoBranchIdentityIdentityOrProviderMetadata()
     {
         if (OperatingSystem.IsWindows()) return;
 

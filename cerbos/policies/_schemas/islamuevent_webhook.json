@@ -14,11 +14,11 @@
     "ownerKindId": {
       "type": "integer",
       "enum": [1, 2, 3, 4, 5],
-      "description": "Canonical owner kind: Tenant, Organization, Group, User, or Instance."
+      "description": "Supported owner kind: Tenant, Organization, Group, User, or Instance."
     },
     "ownerId": {
       "type": "string",
-      "description": "Canonical identifier of the typed webhook owner."
+      "description": "Identifier of the typed webhook owner."
     },
     "organizationId": {
       "type": "string",

@@ -12,6 +12,6 @@ jobs:
         run: |
           printf '%s\n' 'release-publish: recorded-no-op, provider has no documented release publication API'
           printf '%s\n' 'evidence: release-adapter-external-control-evidence.v1 required from an operator'
-          printf '%s\n' 'page-header: canonical-notes-sha256 and tag-reference apply if a page is ever created'
+          printf '%s\n' 'page-header: release-notes-sha256 and tag-reference apply if a page is ever created'
           printf '%s\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'
           printf '%s\n' 'release-validity: unaffected, the signed tag closes the release'

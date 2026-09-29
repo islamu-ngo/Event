@@ -54,7 +54,7 @@ public static class CandidateCommand
             string contextPath = ResolveChild(releaseDirectory, "release-context.v1.json", mustExist: true);
             string notesPath = ResolveChild(releaseDirectory, "release-notes.md", mustExist: true);
             string manifestPath = ResolveChild(releaseDirectory, "release-candidate.v1.json", mustExist: false);
-            string releaseYaml = ReadCanonicalText(releasePath);
+            string releaseYaml = ReadNormalizedText(releasePath);
             byte[] summaryBytes = File.ReadAllBytes(summaryPath);
             byte[] committedContext = File.ReadAllBytes(contextPath);
             byte[] committedNotes = File.ReadAllBytes(notesPath);
@@ -142,7 +142,7 @@ public static class CandidateCommand
             [
                 .. fragments,
                 .. renameResult.Renames
-                    .Zip(renameResult.CanonicalDocuments)
+                    .Zip(renameResult.NormalizedDocuments)
                     .Where(item => rangeCommitOids.Contains(item.First.CommitOid))
                     .OrderBy(item => item.First.CommitOid, StringComparer.Ordinal)
                     .Select(item => item.Second),
@@ -323,13 +323,13 @@ public static class CandidateCommand
             releaseContextSha256 = Sha256(contextBytes),
             releaseNotesSha256 = Sha256(notesBytes),
         }, JsonOptions);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(json);
-        if (!canonical.IsValid || canonical.Bytes is null)
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(json);
+        if (!normalized.IsValid || normalized.Bytes is null)
         {
-            throw new InvalidOperationException("candidate_manifest_not_canonical");
+            throw new InvalidOperationException("candidate_manifest_not_normalized");
         }
 
-        return canonical.Bytes;
+        return normalized.Bytes;
     }
 
     private static BundleDigests ReadBundleDigests(string bundleRoot)
@@ -355,7 +355,7 @@ public static class CandidateCommand
             ? Directory.EnumerateFiles(fragmentDirectory, "*.yaml", SearchOption.TopDirectoryOnly)
                 .Where(path => linkedChangeIds.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal))
                 .Order(StringComparer.Ordinal)
-                .Select(ReadCanonicalText)
+                .Select(ReadNormalizedText)
                 .ToArray()
             : [];
     }
@@ -537,12 +537,12 @@ public static class CandidateCommand
         }
     }
 
-    private static string ReadCanonicalText(string path)
+    private static string ReadNormalizedText(string path)
     {
         byte[] bytes = File.ReadAllBytes(path);
         string text = StrictUtf8.GetString(bytes);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(text);
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes))
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(text);
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes))
         {
             throw new IOException();
         }

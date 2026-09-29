@@ -85,7 +85,7 @@ public static class TagCommand
             byte[] notesBytes = ReadFileBounded(notesPath);
             byte[] candidateBytes = ReadFileBounded(candidatePath);
             string candidateDigest = Sha256(candidateBytes);
-            if (!string.Equals(candidate.ReleaseDescriptorSha256, Sha256(StrictUtf8.GetBytes(ReadCanonicalText(releasePath))), StringComparison.Ordinal)) return Reject(output, "release_descriptor_hash_mismatch");
+            if (!string.Equals(candidate.ReleaseDescriptorSha256, Sha256(StrictUtf8.GetBytes(ReadNormalizedText(releasePath))), StringComparison.Ordinal)) return Reject(output, "release_descriptor_hash_mismatch");
             if (!string.Equals(candidate.ReleaseSummarySha256, Sha256(summaryBytes), StringComparison.Ordinal)) return Reject(output, "release_summary_hash_mismatch");
             if (!string.Equals(candidate.ReleaseContextSha256, Sha256(contextBytes), StringComparison.Ordinal)) return Reject(output, "release_context_hash_mismatch");
             if (!string.Equals(candidate.ReleaseNotesSha256, Sha256(notesBytes), StringComparison.Ordinal)) return Reject(output, "release_notes_hash_mismatch");
@@ -240,17 +240,17 @@ public static class TagCommand
             signerValidFrom = signer.ValidFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             signerValidUntil = signer.ValidUntil.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         }, JsonOptions);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(json);
-        if (!canonical.IsValid || canonical.Bytes is null) throw new InvalidOperationException("release_evidence_not_canonical");
-        return canonical.Bytes;
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(json);
+        if (!normalized.IsValid || normalized.Bytes is null) throw new InvalidOperationException("release_evidence_not_normalized");
+        return normalized.Bytes;
     }
 
     private static CandidateManifest ReadCandidateManifest(string releaseDirectory)
     {
         string path = Path.Combine(releaseDirectory, "release-candidate.v1.json");
         byte[] bytes = ReadFileBounded(path);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(StrictUtf8.GetString(bytes));
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes)) throw new InvalidOperationException("release_candidate_manifest_invalid");
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(StrictUtf8.GetString(bytes));
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes)) throw new InvalidOperationException("release_candidate_manifest_invalid");
         try
         {
             using JsonDocument document = JsonDocument.Parse(bytes);
@@ -493,12 +493,12 @@ public static class TagCommand
         }
     }
 
-    private static string ReadCanonicalText(string path)
+    private static string ReadNormalizedText(string path)
     {
         byte[] bytes = ReadFileBounded(path);
         string text = StrictUtf8.GetString(bytes);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(text);
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes)) throw new IOException();
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(text);
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes)) throw new IOException();
         return text;
     }
 

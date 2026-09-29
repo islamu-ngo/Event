@@ -168,7 +168,7 @@ static ProviderDefinition ReadProviderDefinition(string path, string definitionD
         PreviewLane: new PreviewLane(ReadString(preview, "event"), ReadBool(preview, "trustedCodeOnly"), ReadStringArray(preview, "secrets"), ReadStringArray(preview, "permissions"), ReadStringArrayOrEmpty(preview, "requiredChecks"), ReadBool(preview, "alwaysPresentNoop")),
         FinalLane: new FinalLane(ReadString(final, "event"), ReadString(final, "trustedRef"), ReadBool(final, "trustedCodeOnly"), ReadBool(final, "environmentApproval"), ReadBool(final, "requiresSelfHostedTrustedRunner"), ReadStringArrayOrEmpty(final, "requiredChecks"), ReadBool(final, "alwaysPresentNoop"), ReadBool(final, "candidateStopsBeforeFinal")),
         Capabilities: new Capabilities(ReadBool(capabilities, "artifacts"), ReadInt(capabilities, "retentionDays"), ReadBool(capabilities, "protectedRefCas"), ReadBool(capabilities, "releasePublication"), ReadBool(capabilities, "operatorEvidenceRequired")),
-        Guards: new Guards(ReadBool(guards, "immutableBundleVerification"), ReadBool(guards, "providerNeutralChecksumEquality"), ReadBool(guards, "metadataCanonical"), ReadBool(guards, "misleadingSuccessForbidden")),
+        Guards: new Guards(ReadBool(guards, "immutableBundleVerification"), ReadBool(guards, "providerNeutralChecksumEquality"), ReadBool(guards, "metadataAuthoritative"), ReadBool(guards, "misleadingSuccessForbidden")),
         Diagnostics: ReadStringArray(root, "diagnostics"));
 }
 
@@ -235,7 +235,7 @@ static void ValidateProvider(ProviderDefinition provider, string operation, Exte
     ValidateFinalEvent(provider);
     if (!provider.PreviewLane.AlwaysPresentNoop || !provider.FinalLane.AlwaysPresentNoop) throw new AdapterException("adapter_required_check_missing");
     if (!provider.PreviewLane.RequiredChecks.Contains("release-adapter-preview", StringComparer.Ordinal) || !provider.FinalLane.RequiredChecks.Contains("release-adapter-final", StringComparer.Ordinal)) throw new AdapterException("adapter_required_check_missing");
-    if (!provider.Guards.ImmutableBundleVerification || !provider.Guards.ProviderNeutralChecksumEquality || provider.Guards.MetadataCanonical) throw new AdapterException("adapter_guard_invalid");
+    if (!provider.Guards.ImmutableBundleVerification || !provider.Guards.ProviderNeutralChecksumEquality || provider.Guards.MetadataAuthoritative) throw new AdapterException("adapter_guard_invalid");
     if (!provider.Guards.MisleadingSuccessForbidden) throw new AdapterException("adapter_misleading_success_forbidden");
     foreach (string action in provider.Actions)
     {
@@ -253,9 +253,9 @@ static void ValidateProvider(ProviderDefinition provider, string operation, Exte
     ValidatePublicationWorkflows(provider);
 }
 
-// A published release page is a noncanonical projection of the signed tag. It is mutable and
+// A published release page is a non-authoritative projection of the signed tag. It is mutable and
 // unsigned, so the contract it must satisfy is stated here and machine-checked: trusted final lane
-// only, canonical notes hash and tag reference on the page, self-verifying assets attached, and a
+// only, release notes hash and tag reference on the page, self-verifying assets attached, and a
 // recorded operator no-op for any provider that has no release API at all.
 static void ValidatePublicationWorkflows(ProviderDefinition provider)
 {
@@ -270,9 +270,9 @@ static void ValidatePublicationWorkflows(ProviderDefinition provider)
             throw new AdapterException("adapter_publication_untrusted_origin");
         }
 
-        if (!text.Contains("canonical-notes-sha256", StringComparison.Ordinal) || !text.Contains("tag-reference", StringComparison.Ordinal))
+        if (!text.Contains("release-notes-sha256", StringComparison.Ordinal) || !text.Contains("tag-reference", StringComparison.Ordinal))
         {
-            throw new AdapterException("adapter_publication_canonical_reference_missing");
+            throw new AdapterException("adapter_publication_release_notes_reference_missing");
         }
 
         foreach (string asset in RequiredPublicationAssets())
@@ -426,12 +426,12 @@ static void WritePlan(string outputRoot, ProviderDefinition provider, ReleaseInp
     writer.WriteString("providerId", provider.ProviderId);
     writer.WriteString("displayName", provider.DisplayName);
     writer.WriteBoolean("transportOnly", true);
-    writer.WriteBoolean("metadataCanonical", false);
+    writer.WriteBoolean("metadataAuthoritative", false);
     writer.WriteString("tagName", inputs.TagName);
     writer.WriteString("tagObjectId", inputs.TagObjectId);
     writer.WriteString("expectedOldProtectedRefOid", inputs.ExpectedOldProtectedRefOid);
     writer.WriteString("targetOid", inputs.TargetOid);
-    writer.WritePropertyName("canonicalChecksums");
+    writer.WritePropertyName("authoritativeChecksums");
     writer.WriteStartObject();
     writer.WriteString("promotedBundleSha256", bundleSha256);
     writer.WriteString("releaseInputsSha256", inputsSha256);
@@ -563,7 +563,7 @@ static IReadOnlySet<string> PreviewSchemaKeys() => new HashSet<string>(["event",
 static IReadOnlySet<string> FinalKeys() => new HashSet<string>(["event", "trustedRef", "trustedCodeOnly", "environmentApproval", "requiresSelfHostedTrustedRunner", "requiredChecks", "alwaysPresentNoop", "candidateStopsBeforeFinal"], StringComparer.Ordinal);
 static IReadOnlySet<string> FinalSchemaKeys() => new HashSet<string>(["event", "trustedRef", "trustedCodeOnly", "environmentApproval", "requiresSelfHostedTrustedRunner", "alwaysPresentNoop", "candidateStopsBeforeFinal"], StringComparer.Ordinal);
 static IReadOnlySet<string> CapabilityKeys() => new HashSet<string>(["artifacts", "retentionDays", "protectedRefCas", "releasePublication", "operatorEvidenceRequired"], StringComparer.Ordinal);
-static IReadOnlySet<string> GuardKeys() => new HashSet<string>(["immutableBundleVerification", "providerNeutralChecksumEquality", "metadataCanonical", "misleadingSuccessForbidden"], StringComparer.Ordinal);
+static IReadOnlySet<string> GuardKeys() => new HashSet<string>(["immutableBundleVerification", "providerNeutralChecksumEquality", "metadataAuthoritative", "misleadingSuccessForbidden"], StringComparer.Ordinal);
 static IReadOnlySet<string> InputKeys() => new HashSet<string>(["schemaVersion", "targetOid", "expectedOldProtectedRefOid", "tagObjectId", "tagName", "releaseBundlePath", "releaseBundleSha256", "artifactManifestSha256", "dirtyWorktree"], StringComparer.Ordinal);
 static IReadOnlySet<string> ExternalEvidenceKeys() => new HashSet<string>(["schemaVersion", "providerId", "operation", "unsupportedCapability", "approved"], StringComparer.Ordinal);
 static Regex FullOidPattern() => Patterns.FullOid();
@@ -576,7 +576,7 @@ sealed record ProviderDefinition(string SchemaVersion, string ProviderId, string
 sealed record PreviewLane(string Event, bool TrustedCodeOnly, IReadOnlyList<string> Secrets, IReadOnlyList<string> Permissions, IReadOnlyList<string> RequiredChecks, bool AlwaysPresentNoop);
 sealed record FinalLane(string Event, string TrustedRef, bool TrustedCodeOnly, bool EnvironmentApproval, bool RequiresSelfHostedTrustedRunner, IReadOnlyList<string> RequiredChecks, bool AlwaysPresentNoop, bool CandidateStopsBeforeFinal);
 sealed record Capabilities(bool Artifacts, int RetentionDays, bool ProtectedRefCas, bool ReleasePublication, bool OperatorEvidenceRequired);
-sealed record Guards(bool ImmutableBundleVerification, bool ProviderNeutralChecksumEquality, bool MetadataCanonical, bool MisleadingSuccessForbidden);
+sealed record Guards(bool ImmutableBundleVerification, bool ProviderNeutralChecksumEquality, bool MetadataAuthoritative, bool MisleadingSuccessForbidden);
 sealed record ReleaseInputs(string SchemaVersion, string TargetOid, string ExpectedOldProtectedRefOid, string TagObjectId, string TagName, string ReleaseBundlePath, string ReleaseBundleSha256, string ArtifactManifestSha256, bool DirtyWorktree);
 sealed record ExternalControlEvidence(string SchemaVersion, string ProviderId, string Operation, string UnsupportedCapability, bool Approved);
 sealed class AdapterException(string code) : Exception(code)

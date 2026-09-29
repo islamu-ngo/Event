@@ -39,7 +39,7 @@ public sealed class GitCliffRendererTests
     }
 
     [Test]
-    public async Task RendererRejectsUntrustedConfigAndUnsafeOrNoncanonicalOutput()
+    public async Task RendererRejectsUntrustedConfigAndUnsafeOrUnnormalizedOutput()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -60,11 +60,11 @@ public sealed class GitCliffRendererTests
         GitCliffRenderResult unsafeOutput = fixture.Render();
 
         await Assert.That(wrongConfig.Diagnostic).IsEqualTo("renderer_config_digest_mismatch");
-        await Assert.That(unsafeOutput.Diagnostic).IsEqualTo("renderer_output_not_canonical");
+        await Assert.That(unsafeOutput.Diagnostic).IsEqualTo("renderer_output_not_normalized");
     }
 
     [Test]
-    public async Task RendererRejectsRestrictedCanonicalOutputWithoutEchoingProcessErrors()
+    public async Task RendererRejectsRestrictedNormalizedOutputWithoutEchoingProcessErrors()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -92,7 +92,7 @@ public sealed class GitCliffRendererTests
     }
 
     [Test]
-    public async Task RendererRejectsNoncanonicalContextAndPolicyBearingTrustedConfig()
+    public async Task RendererRejectsUnnormalizedContextAndPolicyBearingTrustedConfig()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -101,13 +101,13 @@ public sealed class GitCliffRendererTests
 
         using var fixture = new RendererFixture();
         fixture.WriteExecutable("printf '# Release 1.1.0\n'");
-        byte[] canonical = fixture.Context();
-        byte[] noncanonical = System.Text.Encoding.UTF8.Preamble.ToArray().Concat(canonical).ToArray();
-        GitCliffRenderResult contextResult = fixture.Render(context: noncanonical);
+        byte[] normalized = fixture.Context();
+        byte[] unnormalized = System.Text.Encoding.UTF8.Preamble.ToArray().Concat(normalized).ToArray();
+        GitCliffRenderResult contextResult = fixture.Render(context: unnormalized);
 
         GitCliffRenderResult configResult = fixture.RenderWithConfig("[git]\ncommit_parsers = []\n");
 
-        await Assert.That(contextResult.Diagnostic).IsEqualTo("renderer_context_not_canonical");
+        await Assert.That(contextResult.Diagnostic).IsEqualTo("renderer_context_not_normalized");
         await Assert.That(configResult.Diagnostic).IsEqualTo("renderer_config_not_presentation_only");
     }
 
@@ -299,7 +299,7 @@ public sealed class GitCliffRendererTests
         }
     }
 
-    private static async Task VerifyCategorizedCases(GitCliffRenderRequest request, byte[] canonicalContext)
+    private static async Task VerifyCategorizedCases(GitCliffRenderRequest request, byte[] normalizedContext)
     {
         var options = new JsonSerializerOptions
         {
@@ -307,7 +307,7 @@ public sealed class GitCliffRendererTests
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             WriteIndented = true,
         };
-        ReleaseContext context = JsonSerializer.Deserialize<ReleaseContext>(canonicalContext, options)!;
+        ReleaseContext context = JsonSerializer.Deserialize<ReleaseContext>(normalizedContext, options)!;
         ReleaseContextChange seed = context.Changes[0];
         ReleaseContextChange[] changes =
         [
@@ -349,14 +349,14 @@ public sealed class GitCliffRendererTests
         {
             foreach (var scenario in cases)
             {
-                byte[] canonical = System.Text.Encoding.UTF8.GetBytes(
+                byte[] normalized = System.Text.Encoding.UTF8.GetBytes(
                     JsonSerializer.Serialize(context with { Changes = scenario.Changes }, options) + "\n");
                 foreach (string cultureName in new[] { "en-US", "tr-TR" })
                 {
                     CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(cultureName);
                     CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(cultureName);
                     Environment.SetEnvironmentVariable("TZ", cultureName == "en-US" ? "Pacific/Honolulu" : "Asia/Tokyo");
-                    GitCliffRenderResult rendered = GitCliffRenderer.Render(request with { CanonicalContext = canonical });
+                    GitCliffRenderResult rendered = GitCliffRenderer.Render(request with { NormalizedContext = normalized });
                     await Assert.That(rendered.IsValid).IsTrue().Because(rendered.Diagnostic ?? "categorized render");
                     await Assert.That(System.Text.Encoding.UTF8.GetString(rendered.Markdown!)).IsEqualTo(scenario.Markdown);
                 }
@@ -538,7 +538,7 @@ public sealed class GitCliffRendererTests
                     .OrderBy(item => item.path, StringComparer.Ordinal)
                     .ToArray(),
             });
-            File.WriteAllBytes(Path.Combine(BundleRoot, "trusted-bundle.manifest.json"), CanonicalArtifactPolicy.CanonicalizeJson(manifestJson).Bytes!);
+            File.WriteAllBytes(Path.Combine(BundleRoot, "trusted-bundle.manifest.json"), ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
             ResignReceipt();
         }
 
@@ -577,7 +577,7 @@ public sealed class GitCliffRendererTests
                 trustDigest = root.GetProperty("trustDigest").GetString(),
                 promotionPrincipal = "fixture-tooling-promoter",
             });
-            File.WriteAllBytes(receiptPath, CanonicalArtifactPolicy.CanonicalizeJson(receiptJson).Bytes!);
+            File.WriteAllBytes(receiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
             if (File.Exists(signaturePath)) File.Delete(signaturePath);
             Run("/usr/bin/ssh-keygen", "-Y", "sign", "-f", privateKeyPath, "-n", "islamu-release-promotion", receiptPath);
         }

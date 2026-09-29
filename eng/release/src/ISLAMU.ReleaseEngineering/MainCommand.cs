@@ -99,8 +99,8 @@ public static class MainCommand
     private static MainEvidence ReadEvidence(string path)
     {
         byte[] bytes = ReadFileBounded(path);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(System.Text.Encoding.UTF8.GetString(bytes));
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes)) throw new InvalidOperationException("release_main_evidence_invalid");
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(System.Text.Encoding.UTF8.GetString(bytes));
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes)) throw new InvalidOperationException("release_main_evidence_invalid");
         using JsonDocument document = JsonDocument.Parse(bytes);
         JsonElement root = document.RootElement;
         if (!TryString(root, "schemaVersion", out string schema) || schema != "release-evidence.v1" ||
@@ -170,8 +170,8 @@ public static class MainCommand
         try
         {
             byte[] bytes = ReadFileBounded(Path.Combine(releaseDirectory, "release-context.v1.json"));
-            CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(System.Text.Encoding.UTF8.GetString(bytes));
-            if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes)) return "release_main_forward_port_evidence_invalid";
+            ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(System.Text.Encoding.UTF8.GetString(bytes));
+            if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes)) return "release_main_forward_port_evidence_invalid";
             using JsonDocument document = JsonDocument.Parse(bytes);
             JsonElement rootElement = document.RootElement;
             if (!rootElement.TryGetProperty("schemaVersion", out JsonElement schema) || schema.ValueKind != JsonValueKind.Number || schema.GetInt32() != 1 ||
@@ -272,7 +272,7 @@ public static class MainCommand
         Directory.CreateDirectory(isolationDirectory);
         try
         {
-            IReadOnlyDictionary<string, string> environment = CanonicalArtifactPolicy.CreateDeterministicEnvironment(isolationDirectory);
+            IReadOnlyDictionary<string, string> environment = ReleaseArtifactPolicy.CreateDeterministicEnvironment(isolationDirectory);
             File.WriteAllText(environment["GIT_CONFIG_GLOBAL"], string.Empty);
             bool useProcessGroup = !OperatingSystem.IsWindows();
             using var process = new Process { StartInfo = new ProcessStartInfo(useProcessGroup ? "setsid" : "git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true } };

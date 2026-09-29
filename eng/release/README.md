@@ -28,10 +28,10 @@ section for review, and prints `commit_footer: Change-Id: <Change-Id>`. Use
 `allocate-change-id --target develop` only when another tool owns fragment
 creation.
 
-## Categorized canonical notes
+## Categorized release notes
 
 `GitCliffRenderer` groups validated presentation records without changing the
-canonical release context, version policy, visibility, backport identity, or
+normalized release context, version policy, visibility, backport identity, or
 complete commit range. Breaking changes precede Features, Bug Fixes,
 Performance, and Other Improvements; breaking fixes belong only to the first
 category. Context order is preserved within each category, and empty categories
@@ -150,10 +150,10 @@ or executes candidate checkout code. It recomputes the descriptor-selected Git r
 through exact `B`, requires `B`'s terminal changelog skip reason, rerenders notes with
 the verified promoted bundle, and writes or verifies the deterministic
 `release-candidate.v1.json` manifest beside the release notes. The manifest is safe
-for later tag closure because it contains only canonical object IDs and hashes; tag
+for later tag closure because it contains only authoritative object IDs and hashes; tag
 object IDs and provider, clock, identity, raw-body, token, and secret data are excluded.
 
-After candidate verification, generate the canonical annotated-tag message from the
+After candidate verification, generate the deterministic annotated-tag message from the
 release sources and candidate digest, then sign the tag outside the verifier:
 
 ```bash
@@ -209,7 +209,7 @@ dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-
 
 The artifact tree must contain exactly one `release-evidence.v1.json`. Bundle output
 records provider and workflow collection metadata separately, but `releaseIdentity`
-is copied from the canonical final manifest and verified against retained
+is copied from the authoritative final manifest and verified against retained
 `release.yaml`, `summary.md`, `release-context.v1.json`, `release-notes.md`,
 `release-candidate.v1.json`, trusted-bundle policy/config/trust/tool files, and the
 explicit environment inputs. Missing, duplicate, stale, tampered, or disagreeing

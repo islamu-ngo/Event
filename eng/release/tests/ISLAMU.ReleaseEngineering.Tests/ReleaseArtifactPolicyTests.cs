@@ -5,10 +5,10 @@ using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
-public sealed class CanonicalArtifactPolicyTests
+public sealed class ReleaseArtifactPolicyTests
 {
     [Test]
-    [NotInParallel("CanonicalArtifactAmbientState")]
+    [NotInParallel("ReleaseArtifactAmbientState")]
     public async Task JsonAndTextBytesAreStableAcrossPlatformCultureClockAndOrdering()
     {
         const string windowsNfd = "{\r\n  \"z\": [\"beta\", \"alpha\"],\r\n  \"name\": \"Cafe\u0301\",\r\n  \"path\": \"eng\\\\release\\\\notes.md\",\r\n  \"date\": \"2026-08-14\"\r\n}";
@@ -23,22 +23,22 @@ public sealed class CanonicalArtifactPolicyTests
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ar-SA");
             Environment.SetEnvironmentVariable("TZ", "Pacific/Kiritimati");
             TimeZoneInfo.ClearCachedData();
-            CanonicalArtifactResult windows = CanonicalArtifactPolicy.CanonicalizeJson(windowsNfd);
+            ArtifactPolicyResult windows = ReleaseArtifactPolicy.NormalizeJson(windowsNfd);
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-BE");
             CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
             Environment.SetEnvironmentVariable("TZ", "America/Adak");
             TimeZoneInfo.ClearCachedData();
-            CanonicalArtifactResult linux = CanonicalArtifactPolicy.CanonicalizeJson(linuxNfc);
+            ArtifactPolicyResult linux = ReleaseArtifactPolicy.NormalizeJson(linuxNfc);
 
             await Assert.That(windows.IsValid).IsTrue();
             await Assert.That(windows.Bytes!.SequenceEqual(linux.Bytes!)).IsTrue();
             await Assert.That(windows.Bytes![..3]).IsNotEquivalentTo(Encoding.UTF8.GetPreamble());
             await Assert.That(Encoding.UTF8.GetString(windows.Bytes)).IsEqualTo("{\n  \"date\": \"2026-08-14\",\n  \"name\": \"Café\",\n  \"path\": \"eng/release/notes.md\",\n  \"z\": [\n    \"alpha\",\n    \"beta\"\n  ]\n}\n");
             await Assert.That(Convert.ToHexString(SHA256.HashData(windows.Bytes))).IsEqualTo(Convert.ToHexString(SHA256.HashData(linux.Bytes!)));
-            await Assert.That(CanonicalArtifactPolicy.CanonicalizeJson(windowsNfd).Bytes!.SequenceEqual(windows.Bytes)).IsTrue();
+            await Assert.That(ReleaseArtifactPolicy.NormalizeJson(windowsNfd).Bytes!.SequenceEqual(windows.Bytes)).IsTrue();
 
-            CanonicalArtifactResult windowsText = CanonicalArtifactPolicy.CanonicalizeText("Cafe\u0301\r\n\r\n");
-            CanonicalArtifactResult linuxText = CanonicalArtifactPolicy.CanonicalizeText("Café\n");
+            ArtifactPolicyResult windowsText = ReleaseArtifactPolicy.NormalizeText("Cafe\u0301\r\n\r\n");
+            ArtifactPolicyResult linuxText = ReleaseArtifactPolicy.NormalizeText("Café\n");
             await Assert.That(windowsText.Bytes!.SequenceEqual(linuxText.Bytes!)).IsTrue();
             await Assert.That(Encoding.UTF8.GetString(windowsText.Bytes!)).IsEqualTo("Café\n");
         }
@@ -59,7 +59,7 @@ public sealed class CanonicalArtifactPolicyTests
             .Where(line => line.Length != 0)
             .ToArray();
 
-        CanonicalArtifactResult result = CanonicalArtifactPolicy.RenderMarkdown("إطلاق Café", entries);
+        ArtifactPolicyResult result = ReleaseArtifactPolicy.RenderMarkdown("إطلاق Café", entries);
 
         await Assert.That(result.IsValid).IsTrue();
         string markdown = Encoding.UTF8.GetString(result.Bytes!);
@@ -92,23 +92,23 @@ public sealed class CanonicalArtifactPolicyTests
             ["html"] = "<img src=x onerror=alert(1)>",
             ["carriage-return"] = "first\rsecond",
             ["autolink"] = "<https://example.invalid/autolink>",
-            ["oversized"] = new('x', CanonicalArtifactPolicy.MaximumFieldUtf8Bytes + 1),
+            ["oversized"] = new('x', ReleaseArtifactPolicy.MaximumFieldUtf8Bytes + 1),
         };
 
         foreach ((string name, string value) in attacks)
         {
-            CanonicalTextResult result = CanonicalArtifactPolicy.EscapeUntrustedMarkdown(value);
+            UntrustedTextResult result = ReleaseArtifactPolicy.EscapeUntrustedMarkdown(value);
             await Assert.That(result.IsValid).IsFalse().Because(name);
             await Assert.That(result.Diagnostic).StartsWith("untrusted_text_").Because(name);
         }
 
-        CanonicalTextResult multilingual = CanonicalArtifactPolicy.EscapeUntrustedMarkdown("يمكن للحاضرين استخدام اعتماد واحد أثناء تسجيل الوصول – Café");
+        UntrustedTextResult multilingual = ReleaseArtifactPolicy.EscapeUntrustedMarkdown("يمكن للحاضرين استخدام اعتماد واحد أثناء تسجيل الوصول – Café");
         await Assert.That(multilingual.IsValid).IsTrue();
         await Assert.That(multilingual.Text).IsEqualTo("يمكن للحاضرين استخدام اعتماد واحد أثناء تسجيل الوصول – Café");
     }
 
     [Test]
-    public async Task CanonicalDocumentsRejectClockIdentitySecretHtmlInvalidDateAndUnboundedCollections()
+    public async Task NormalizedDocumentsRejectClockIdentitySecretHtmlInvalidDateAndUnboundedCollections()
     {
         string[] invalidJson =
         [
@@ -129,30 +129,30 @@ public sealed class CanonicalArtifactPolicyTests
 
         foreach (string json in invalidJson)
         {
-            await Assert.That(CanonicalArtifactPolicy.CanonicalizeJson(json).IsValid).IsFalse();
+            await Assert.That(ReleaseArtifactPolicy.NormalizeJson(json).IsValid).IsFalse();
         }
 
-        CanonicalArtifactResult extremeNumber = CanonicalArtifactPolicy.CanonicalizeJson("{\"value\":1e9999}");
+        ArtifactPolicyResult extremeNumber = ReleaseArtifactPolicy.NormalizeJson("{\"value\":1e9999}");
         await Assert.That(extremeNumber.IsValid).IsFalse();
-        await Assert.That(extremeNumber.Diagnostics).Contains("canonical_json_invalid_number");
+        await Assert.That(extremeNumber.Diagnostics).Contains("normalized_json_invalid_number");
 
-        CanonicalArtifactResult oversizedMarkdown = CanonicalArtifactPolicy.RenderMarkdown(
+        ArtifactPolicyResult oversizedMarkdown = ReleaseArtifactPolicy.RenderMarkdown(
             "Release",
-            Enumerable.Repeat("bounded", CanonicalArtifactPolicy.MaximumCollectionItems + 1));
+            Enumerable.Repeat("bounded", ReleaseArtifactPolicy.MaximumCollectionItems + 1));
         await Assert.That(oversizedMarkdown.Diagnostics).Contains("markdown_collection_too_large");
     }
 
     [Test]
-    public async Task CanonicalJsonAllowsObjectFormatAndRejectsEmailAddressesByDesign()
+    public async Task NormalizedJsonAllowsObjectFormatAndRejectsEmailAddressesByDesign()
     {
-        CanonicalArtifactResult objectFormat = CanonicalArtifactPolicy.CanonicalizeJson("{\"objectFormat\":\"sha1\"}");
-        CanonicalArtifactResult email = CanonicalArtifactPolicy.CanonicalizeJson("{\"summary\":\"Contact maintainer@example.org for release notes\"}");
-        CanonicalTextResult multilingual = CanonicalArtifactPolicy.EscapeUntrustedMarkdown("يمكن للحاضرين استخدام اعتماد واحد أثناء تسجيل الوصول – Café");
-        CanonicalTextResult emailText = CanonicalArtifactPolicy.EscapeUntrustedMarkdown("Contact maintainer@example.org for release notes");
+        ArtifactPolicyResult objectFormat = ReleaseArtifactPolicy.NormalizeJson("{\"objectFormat\":\"sha1\"}");
+        ArtifactPolicyResult email = ReleaseArtifactPolicy.NormalizeJson("{\"summary\":\"Contact maintainer@example.org for release notes\"}");
+        UntrustedTextResult multilingual = ReleaseArtifactPolicy.EscapeUntrustedMarkdown("يمكن للحاضرين استخدام اعتماد واحد أثناء تسجيل الوصول – Café");
+        UntrustedTextResult emailText = ReleaseArtifactPolicy.EscapeUntrustedMarkdown("Contact maintainer@example.org for release notes");
 
         await Assert.That(objectFormat.IsValid).IsTrue();
         await Assert.That(email.IsValid).IsFalse();
-        await Assert.That(email.Diagnostics).Contains("canonical_json_identity_or_provider");
+        await Assert.That(email.Diagnostics).Contains("normalized_json_identity_or_provider");
         await Assert.That(multilingual.IsValid).IsTrue();
         await Assert.That(emailText.IsValid).IsFalse();
     }
@@ -160,7 +160,7 @@ public sealed class CanonicalArtifactPolicyTests
     [Test]
     public async Task DeterministicEnvironmentIsExplicitAndDoesNotRepurposeHome()
     {
-        IReadOnlyDictionary<string, string> environment = CanonicalArtifactPolicy.CreateDeterministicEnvironment("/isolated/release");
+        IReadOnlyDictionary<string, string> environment = ReleaseArtifactPolicy.CreateDeterministicEnvironment("/isolated/release");
 
         await Assert.That(environment).ContainsKey("TZ");
         await Assert.That(environment["TZ"]).IsEqualTo("UTC");
@@ -179,8 +179,8 @@ public sealed class CanonicalArtifactPolicyTests
         const string windows = "{\"manifest_path\":\"eng\\\\release\\\\bundle.json\",\"items\":[{\"artifactPath\":\"out\\\\release.md\"}] }";
         const string linux = "{\"items\":[{\"artifactPath\":\"out/release.md\"}],\"manifest_path\":\"eng/release/bundle.json\"}";
 
-        CanonicalArtifactResult left = CanonicalArtifactPolicy.CanonicalizeJson(windows);
-        CanonicalArtifactResult right = CanonicalArtifactPolicy.CanonicalizeJson(linux);
+        ArtifactPolicyResult left = ReleaseArtifactPolicy.NormalizeJson(windows);
+        ArtifactPolicyResult right = ReleaseArtifactPolicy.NormalizeJson(linux);
 
         await Assert.That(left.IsValid).IsTrue();
         await Assert.That(left.Bytes!.SequenceEqual(right.Bytes!)).IsTrue();
@@ -193,8 +193,8 @@ public sealed class CanonicalArtifactPolicyTests
         const string mixed = "{\"paths\":[\"z/item\",\"a\\\\item\",\"a/item\"]}";
         const string normalized = "{\"paths\":[\"a/item\",\"a/item\",\"z/item\"]}";
 
-        CanonicalArtifactResult left = CanonicalArtifactPolicy.CanonicalizeJson(mixed);
-        CanonicalArtifactResult right = CanonicalArtifactPolicy.CanonicalizeJson(normalized);
+        ArtifactPolicyResult left = ReleaseArtifactPolicy.NormalizeJson(mixed);
+        ArtifactPolicyResult right = ReleaseArtifactPolicy.NormalizeJson(normalized);
 
         await Assert.That(left.IsValid).IsTrue();
         await Assert.That(left.Bytes!.SequenceEqual(right.Bytes!)).IsTrue();
@@ -204,10 +204,10 @@ public sealed class CanonicalArtifactPolicyTests
     [Test]
     public async Task JsonNumbersUseOneInvariantRepresentation()
     {
-        byte[] integer = CanonicalArtifactPolicy.CanonicalizeJson("{\"value\":1}").Bytes!;
-        byte[] decimalOne = CanonicalArtifactPolicy.CanonicalizeJson("{\"value\":1.0}").Bytes!;
-        byte[] decimalOneWithZeros = CanonicalArtifactPolicy.CanonicalizeJson("{\"value\":1.00}").Bytes!;
-        byte[] exponentOne = CanonicalArtifactPolicy.CanonicalizeJson("{\"value\":1e0}").Bytes!;
+        byte[] integer = ReleaseArtifactPolicy.NormalizeJson("{\"value\":1}").Bytes!;
+        byte[] decimalOne = ReleaseArtifactPolicy.NormalizeJson("{\"value\":1.0}").Bytes!;
+        byte[] decimalOneWithZeros = ReleaseArtifactPolicy.NormalizeJson("{\"value\":1.00}").Bytes!;
+        byte[] exponentOne = ReleaseArtifactPolicy.NormalizeJson("{\"value\":1e0}").Bytes!;
 
         await Assert.That(decimalOne.SequenceEqual(integer)).IsTrue();
         await Assert.That(decimalOneWithZeros.SequenceEqual(integer)).IsTrue();

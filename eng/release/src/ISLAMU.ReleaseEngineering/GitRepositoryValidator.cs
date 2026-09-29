@@ -506,7 +506,7 @@ public static class GitRepositoryValidator
             output = string.Empty;
             string isolationDirectory = Path.Combine(Path.GetTempPath(), $"islamu-release-git-{Guid.NewGuid():N}");
             Directory.CreateDirectory(isolationDirectory);
-            IReadOnlyDictionary<string, string> deterministicEnvironment = CanonicalArtifactPolicy.CreateDeterministicEnvironment(isolationDirectory);
+            IReadOnlyDictionary<string, string> deterministicEnvironment = ReleaseArtifactPolicy.CreateDeterministicEnvironment(isolationDirectory);
             File.WriteAllText(deterministicEnvironment["GIT_CONFIG_GLOBAL"], string.Empty);
             using var process = new Process
             {

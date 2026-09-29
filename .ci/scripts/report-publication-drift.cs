@@ -8,8 +8,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 // A forge release body is mutable, unsigned, and editable by any maintainer or by the forge
-// itself, so "published bodies match canonical notes" is unenforceable by construction. This
-// tool therefore reports; it never repairs, and drift never invalidates the release. Canonical
+// itself, so "published bodies match release notes" is unenforceable by construction. This
+// tool therefore reports; it never repairs, and drift never invalidates the release. Release
 // truth stays the signed tag plus release-notes.md committed at preparation commit B.
 
 const int MaximumProjections = 64;
@@ -29,8 +29,8 @@ try
 
     bool drift = results.Any(result => result.Status == "drift");
     Console.WriteLine(drift
-        ? "publication_drift_reported: release remains valid; the signed tag is canonical"
-        : "publication_drift_none: every projection matches the canonical notes hash");
+        ? "publication_drift_reported: release remains valid; the signed tag defines release identity"
+        : "publication_drift_none: every projection matches the release notes hash");
     return drift && options.FailOnDrift ? 3 : 0;
 }
 catch (DriftException exception)
@@ -93,7 +93,7 @@ static ReleaseIdentity ReadReleaseIdentity(string releaseDirectory)
 
     // The evidence manifest is the authority on which bytes were released. If the working copy of
     // release-notes.md no longer matches it, the local checkout is the problem, not the forge.
-    if (!string.Equals(declaredNotesSha256, notesSha256, StringComparison.Ordinal)) throw new DriftException("drift_canonical_notes_mismatch");
+    if (!string.Equals(declaredNotesSha256, notesSha256, StringComparison.Ordinal)) throw new DriftException("drift_release_notes_mismatch");
 
     return new ReleaseIdentity(version, tagName, $"refs/tags/{tagName}", notesSha256, RequiredString(root, "tagObjectId"));
 }
@@ -128,7 +128,7 @@ static IReadOnlyList<Projection> ReadProjections(string projectionsPath)
         results.Add(new Projection(
             providerId,
             state,
-            OptionalString(item, "declaredCanonicalNotesSha256"),
+            OptionalString(item, "declaredReleaseNotesSha256"),
             OptionalString(item, "declaredTagRef"),
             bodySha256,
             bodyText,
@@ -162,9 +162,9 @@ static ProjectionResult EvaluateProjection(ReleaseIdentity identity, Projection 
     }
 
     var findings = new List<string>();
-    if (!string.Equals(projection.DeclaredCanonicalNotesSha256, identity.NotesSha256, StringComparison.Ordinal))
+    if (!string.Equals(projection.DeclaredReleaseNotesSha256, identity.NotesSha256, StringComparison.Ordinal))
     {
-        findings.Add("declared_canonical_notes_sha256_mismatch");
+        findings.Add("declared_release_notes_sha256_mismatch");
     }
 
     if (!string.Equals(projection.DeclaredTagRef, identity.TagRef, StringComparison.Ordinal))
@@ -184,10 +184,10 @@ static ProjectionResult EvaluateProjection(ReleaseIdentity identity, Projection 
     }
     else if (projection.PublishedBody is not null)
     {
-        // The page is a projection, not a copy, so it is not required to equal the canonical bytes.
-        // What it must do is carry the canonical hash and the tag reference verbatim, so any reader
+        // The page is a projection, not a copy, so it is not required to equal the release bytes.
+        // What it must do is carry the release hash and the tag reference verbatim, so any reader
         // can check the page against the repository without trusting the forge.
-        if (!projection.PublishedBody.Contains(identity.NotesSha256, StringComparison.Ordinal)) findings.Add("published_body_missing_canonical_notes_sha256");
+        if (!projection.PublishedBody.Contains(identity.NotesSha256, StringComparison.Ordinal)) findings.Add("published_body_missing_release_notes_sha256");
         if (!projection.PublishedBody.Contains(identity.TagRef, StringComparison.Ordinal)) findings.Add("published_body_missing_tag_reference");
     }
 
@@ -205,7 +205,7 @@ static void WriteReport(string outputDirectory, ReleaseIdentity identity, IReadO
     {
         writer.WriteStartObject();
         writer.WriteString("schemaVersion", "publication-drift-report.v1");
-        writer.WriteStartObject("canonical");
+        writer.WriteStartObject("releaseIdentity");
         writer.WriteString("version", identity.Version);
         writer.WriteString("tagName", identity.TagName);
         writer.WriteString("tagRef", identity.TagRef);
@@ -235,9 +235,9 @@ static void WriteReport(string outputDirectory, ReleaseIdentity identity, IReadO
 
     var markdown = new StringBuilder();
     markdown.Append(CultureInfo.InvariantCulture, $"# Publication Drift Report — {identity.TagName}\n\n");
-    markdown.Append(CultureInfo.InvariantCulture, $"Canonical notes SHA-256: `{identity.NotesSha256}`\n\n");
+    markdown.Append(CultureInfo.InvariantCulture, $"Release notes SHA-256: `{identity.NotesSha256}`\n\n");
     markdown.Append(CultureInfo.InvariantCulture, $"Tag reference: `{identity.TagRef}` (tag object `{identity.TagObjectId}`)\n\n");
-    markdown.Append("Published pages are a noncanonical projection. Drift is reported, never repaired, and never invalidates the release.\n\n");
+    markdown.Append("Published pages are a non-authoritative projection. Drift is reported, never repaired, and never invalidates the release.\n\n");
     markdown.Append("| Provider | Status | Findings |\n|---|---|---|\n");
     foreach (ProjectionResult result in results)
     {
@@ -284,7 +284,7 @@ internal sealed record ReleaseIdentity(string Version, string TagName, string Ta
 internal sealed record Projection(
     string ProviderId,
     string State,
-    string? DeclaredCanonicalNotesSha256,
+    string? DeclaredReleaseNotesSha256,
     string? DeclaredTagRef,
     string? PublishedBodySha256,
     string? PublishedBody,

@@ -134,7 +134,7 @@ public static class ReleaseContextPolicy
         }
 
         List<ReleaseContextChange> changes = BuildChanges(commitList, evaluatedCommits, input.Fragments, diagnostics);
-        ValidateCanonicalText(changes, diagnostics);
+        ValidateNormalizedText(changes, diagnostics);
         Dictionary<string, string> displayIds = CreateDisplayIds(AllEvidenceOids(descriptor, changes), diagnostics);
         if (diagnostics.Count != 0)
         {
@@ -411,7 +411,7 @@ public static class ReleaseContextPolicy
         fragment.Impacts.TryGetValue("breaking", out FragmentImpact? breaking) &&
         (!string.Equals(breaking.Disposition, "not-applicable", StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(breaking.Detail));
 
-    private static void ValidateCanonicalText(IEnumerable<ReleaseContextChange> changes, List<string> diagnostics)
+    private static void ValidateNormalizedText(IEnumerable<ReleaseContextChange> changes, List<string> diagnostics)
     {
         foreach (ReleaseContextChange change in changes)
         {

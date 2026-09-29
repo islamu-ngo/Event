@@ -63,10 +63,10 @@ public static class ReleasePreparation
         }
 
         sections.Add($"## Complete Commit Range\n\n{fullRange}");
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(string.Join("\n\n", sections));
-        if (!canonical.IsValid || canonical.Bytes is null)
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(string.Join("\n\n", sections));
+        if (!normalized.IsValid || normalized.Bytes is null)
         {
-            return Invalid("prepare_notes_not_canonical");
+            return Invalid("prepare_notes_not_normalized");
         }
 
         string notesPath = Path.Combine(request.ReleaseDirectory, "release-notes.md");
@@ -74,15 +74,15 @@ public static class ReleasePreparation
         {
             if (File.Exists(notesPath))
             {
-                return File.ReadAllBytes(notesPath).AsSpan().SequenceEqual(canonical.Bytes)
-                    ? Valid(descriptor.Version, canonical.Bytes)
+                return File.ReadAllBytes(notesPath).AsSpan().SequenceEqual(normalized.Bytes)
+                    ? Valid(descriptor.Version, normalized.Bytes)
                     : Invalid("prepare_generated_file_unexpected");
             }
 
             string temporaryPath = Path.Combine(request.ReleaseDirectory, $".release-notes.{Guid.NewGuid():N}.tmp");
             try
             {
-                File.WriteAllBytes(temporaryPath, canonical.Bytes);
+                File.WriteAllBytes(temporaryPath, normalized.Bytes);
                 File.Move(temporaryPath, notesPath);
             }
             finally
@@ -98,7 +98,7 @@ public static class ReleasePreparation
             return Invalid("prepare_write_failed");
         }
 
-        return Valid(descriptor.Version, canonical.Bytes);
+        return Valid(descriptor.Version, normalized.Bytes);
     }
 
     private static bool TryValidate(
@@ -177,18 +177,18 @@ public static class ReleasePreparation
             .OfType<string>()
             .Where(oid => !currentChangeOids.Contains(oid))
             .ToHashSet(StringComparer.Ordinal);
-        string[] canonicalRange = actualEvidence.Where(oid =>
+        string[] normalizedRange = actualEvidence.Where(oid =>
             !string.Equals(oid, request.Context.Context.Evidence.BaseStableOid, StringComparison.Ordinal) &&
             !string.Equals(oid, request.Context.Context.Evidence.PreviousPublishedOid, StringComparison.Ordinal) &&
             !backportOriginalOnly.Contains(oid)).ToArray();
-        if (request.RangeOids.Count == 0 || request.RangeOids.Count > CanonicalArtifactPolicy.MaximumCollectionItems ||
+        if (request.RangeOids.Count == 0 || request.RangeOids.Count > ReleaseArtifactPolicy.MaximumCollectionItems ||
             request.RangeOids.Distinct(StringComparer.Ordinal).Count() != request.RangeOids.Count ||
             request.RangeOids.Select(oid => oid.Length).Distinct().Count() != 1 ||
             request.RangeOids.Any(oid => oid.Length is not (40 or 64) || oid.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f'))) ||
             request.Context.Context.Changes.Any(change => !request.RangeOids.Contains(change.Oid, StringComparer.Ordinal)) ||
             actualEvidence.Distinct(StringComparer.Ordinal).Count() != actualEvidence.Length ||
             !expectedEvidence.SetEquals(actualEvidence) ||
-            !request.RangeOids.Order(StringComparer.Ordinal).SequenceEqual(canonicalRange, StringComparer.Ordinal))
+            !request.RangeOids.Order(StringComparer.Ordinal).SequenceEqual(normalizedRange, StringComparer.Ordinal))
         {
             diagnostic = "prepare_range_context_mismatch";
             return false;
@@ -229,8 +229,8 @@ public static class ReleasePreparation
             foreach (PublicChangeFragment fragment in covered)
             {
                 FragmentImpact evidence = fragment.Impacts[impact];
-                CanonicalTextResult safeDetail = CanonicalArtifactPolicy.EscapeUntrustedMarkdown(evidence.Detail ?? string.Empty);
-                CanonicalTextResult safeReference = CanonicalArtifactPolicy.EscapeUntrustedMarkdown(evidence.Reference);
+                UntrustedTextResult safeDetail = ReleaseArtifactPolicy.EscapeUntrustedMarkdown(evidence.Detail ?? string.Empty);
+                UntrustedTextResult safeReference = ReleaseArtifactPolicy.EscapeUntrustedMarkdown(evidence.Reference);
                 if (string.IsNullOrWhiteSpace(evidence.Detail) || !safeDetail.IsValid || !safeReference.IsValid)
                 {
                     diagnostic = $"prepare_impact_detail_invalid:{impact}:{fragment.ChangeId}";
@@ -251,10 +251,10 @@ public static class ReleasePreparation
         try
         {
             string decoded = StrictUtf8.GetString(request.Summary);
-            CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(decoded);
-            if (!canonical.IsValid || canonical.Bytes is null || !request.Summary.AsSpan().SequenceEqual(canonical.Bytes))
+            ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(decoded);
+            if (!normalized.IsValid || normalized.Bytes is null || !request.Summary.AsSpan().SequenceEqual(normalized.Bytes))
             {
-                diagnostic = "prepare_summary_not_canonical";
+                diagnostic = "prepare_summary_not_normalized";
                 return false;
             }
 
@@ -262,7 +262,7 @@ public static class ReleasePreparation
             if (string.IsNullOrWhiteSpace(summary) ||
                 summary.Contains("generated-region", StringComparison.OrdinalIgnoreCase) ||
                 summary.Contains("restricted-details", StringComparison.OrdinalIgnoreCase) ||
-                summary.Split('\n').Any(line => line.TrimStart().StartsWith('#') || !CanonicalArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid))
+                summary.Split('\n').Any(line => line.TrimStart().StartsWith('#') || !ReleaseArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid))
             {
                 diagnostic = "prepare_summary_restricted";
                 return false;
@@ -270,7 +270,7 @@ public static class ReleasePreparation
         }
         catch (DecoderFallbackException)
         {
-            diagnostic = "prepare_summary_not_canonical";
+            diagnostic = "prepare_summary_not_normalized";
             return false;
         }
 

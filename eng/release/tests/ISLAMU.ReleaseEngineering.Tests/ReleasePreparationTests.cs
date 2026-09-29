@@ -16,7 +16,7 @@ public sealed class ReleasePreparationTests
     };
 
     [Test]
-    public async Task PrepareWritesThreeCanonicalLayersAndIsByteIdempotent()
+    public async Task PrepareWritesThreeNormalizedLayersAndIsByteIdempotent()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -127,7 +127,7 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
-    public async Task PrepareRejectsNoncanonicalEvidenceOrderingBeforeRendering()
+    public async Task PrepareRejectsUnnormalizedEvidenceOrderingBeforeRendering()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -158,7 +158,7 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
-    public async Task PreparePreservesChronologicalRangeIndependentOfCanonicalEvidenceOrder()
+    public async Task PreparePreservesChronologicalRangeIndependentOfNormalizedEvidenceOrder()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -168,7 +168,7 @@ public sealed class ReleasePreparationTests
         using var fixture = new PreparationFixture();
         string secondOid = new('d', 40);
         ReleaseContext current = fixture.Context.Context!;
-        ReleaseContext canonical = current with
+        ReleaseContext normalized = current with
         {
             Changes = current.Changes.Append(new ReleaseContextChange(
                 secondOid[..12], secondOid, null, "fix", "registration", "Second change", "Second change", false, false, null)).ToArray(),
@@ -177,7 +177,7 @@ public sealed class ReleasePreparationTests
                 Objects = current.Evidence.Objects.Append(new ReleaseContextObject(secondOid[..12], secondOid)).ToArray(),
             },
         };
-        ReleaseContextValidationResult context = fixture.AsValidationResult(canonical);
+        ReleaseContextValidationResult context = fixture.AsValidationResult(normalized);
 
         ReleasePreparationResult result = fixture.Prepare(context: context, rangeOids: [secondOid, new string('c', 40)]);
 
@@ -691,7 +691,7 @@ public sealed class ReleasePreparationTests
             Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "tag", "-a", baselineRef, baselineOid, "-m", baselineRef);
             string baselineTagObjectId = Git("rev-parse", $"refs/tags/{baselineRef}^{{object}}").Trim();
             Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines"));
-            File.WriteAllBytes(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines", baselineRef + ".v1.json"), CanonicalArtifactPolicy.CanonicalizeJson(JsonSerializer.Serialize(new
+            File.WriteAllBytes(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines", baselineRef + ".v1.json"), ReleaseArtifactPolicy.NormalizeJson(JsonSerializer.Serialize(new
             {
                 schemaVersion = "release-baseline.v1",
                 baselineRef,
@@ -823,7 +823,7 @@ public sealed class ReleasePreparationTests
                     .OrderBy(item => item.path, StringComparer.Ordinal)
                     .ToArray(),
             });
-            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), CanonicalArtifactPolicy.CanonicalizeJson(manifestJson).Bytes!);
+            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
             ResignReceipt();
         }
 
@@ -862,7 +862,7 @@ public sealed class ReleasePreparationTests
                 trustDigest = root.GetProperty("trustDigest").GetString(),
                 promotionPrincipal = "fixture-tooling-promoter",
             });
-            File.WriteAllBytes(receiptPath, CanonicalArtifactPolicy.CanonicalizeJson(receiptJson).Bytes!);
+            File.WriteAllBytes(receiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
             if (File.Exists(signaturePath)) File.Delete(signaturePath);
             Run("/usr/bin/ssh-keygen", "-Y", "sign", "-f", privateKeyPath, "-n", "islamu-release-promotion", receiptPath);
         }

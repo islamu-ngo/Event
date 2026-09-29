@@ -32,7 +32,7 @@ public static class PrepareCommand
 
             string releasePath = ResolveChild(releaseDirectory, "release.yaml", mustExist: true);
             string summaryPath = ResolveChild(releaseDirectory, "summary.md", mustExist: true);
-            string releaseYaml = ReadCanonicalText(releasePath);
+            string releaseYaml = ReadNormalizedText(releasePath);
             byte[] summaryBytes = File.ReadAllBytes(summaryPath);
             if (!IsValidSummary(summaryBytes))
             {
@@ -72,7 +72,7 @@ public static class PrepareCommand
                 ? Directory.EnumerateFiles(fragmentDirectory, "*.yaml", SearchOption.TopDirectoryOnly)
                     .Where(path => linkedChangeIds.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal))
                     .Order(StringComparer.Ordinal)
-                    .Select(ReadCanonicalText)
+                    .Select(ReadNormalizedText)
                     .ToArray()
                 : [];
             if (fragments.Length != linkedChangeIds.Length)
@@ -205,13 +205,13 @@ public static class PrepareCommand
         try
         {
             string decoded = StrictUtf8.GetString(bytes);
-            CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(decoded);
+            ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(decoded);
             string summary = decoded.TrimEnd('\n');
-            return canonical.IsValid && canonical.Bytes is not null && bytes.AsSpan().SequenceEqual(canonical.Bytes) &&
+            return normalized.IsValid && normalized.Bytes is not null && bytes.AsSpan().SequenceEqual(normalized.Bytes) &&
                 !string.IsNullOrWhiteSpace(summary) &&
                 !summary.Contains("generated-region", StringComparison.OrdinalIgnoreCase) &&
                 !summary.Contains("restricted-details", StringComparison.OrdinalIgnoreCase) &&
-                !summary.Split('\n').Any(line => line.TrimStart().StartsWith('#') || !CanonicalArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid);
+                !summary.Split('\n').Any(line => line.TrimStart().StartsWith('#') || !ReleaseArtifactPolicy.EscapeUntrustedMarkdown(line).IsValid);
         }
         catch (DecoderFallbackException)
         {
@@ -287,12 +287,12 @@ public static class PrepareCommand
         });
     }
 
-    private static string ReadCanonicalText(string path)
+    private static string ReadNormalizedText(string path)
     {
         byte[] bytes = File.ReadAllBytes(path);
         string text = StrictUtf8.GetString(bytes);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeText(text);
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes))
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeText(text);
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes))
         {
             throw new IOException();
         }

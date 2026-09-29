@@ -92,7 +92,7 @@ public static class BaselineCommand
             signerValidFrom = signer.ValidFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             signerValidUntil = signer.ValidUntil.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         }, JsonOptions);
-        return CanonicalArtifactPolicy.CanonicalizeJson(json).Bytes ?? throw new InvalidOperationException("release_baseline_not_canonical");
+        return ReleaseArtifactPolicy.NormalizeJson(json).Bytes ?? throw new InvalidOperationException("release_baseline_not_normalized");
     }
 
     private static TrustedBundleResult VerifyBundle(string candidateRoot)

@@ -381,7 +381,7 @@ public sealed class ReleaseMainVerificationTests
                 candidateOid = target,
                 releaseContextSha256 = contextSha256,
             });
-            File.WriteAllBytes(Path.Combine(directory, "release-evidence.v1.json"), CanonicalArtifactPolicy.CanonicalizeJson(json).Bytes!);
+            File.WriteAllBytes(Path.Combine(directory, "release-evidence.v1.json"), ReleaseArtifactPolicy.NormalizeJson(json).Bytes!);
         }
 
         public void WriteContext(string relativeDirectory, string oid, string? changeId, string backportOf)
@@ -392,7 +392,7 @@ public sealed class ReleaseMainVerificationTests
                 schemaVersion = 1,
                 changes = changeId is null ? [] : new[] { new { oid, changeId, backport = true, backportOf } },
             });
-            File.WriteAllBytes(path, CanonicalArtifactPolicy.CanonicalizeJson(json).Bytes!);
+            File.WriteAllBytes(path, ReleaseArtifactPolicy.NormalizeJson(json).Bytes!);
         }
 
         public void WriteEvidenceJson(string relativeDirectory, object payload)

@@ -13,7 +13,7 @@
     },
     "settingKey": {
       "type": "string",
-      "description": "Canonical tenant setting key. Storage administration sends the bounded key 'storage' for HAL affordance checks."
+      "description": "Registered tenant setting key. Storage administration sends the bounded key 'storage' for HAL affordance checks."
     },
     "documentKey": {
       "type": "string",

@@ -46,7 +46,7 @@ public sealed class TrustedReleasePolicyTests
     }
 
     [Test]
-    public async Task PreviouslyPromotedBundleWithExactCanonicalManifestIsAccepted()
+    public async Task PreviouslyPromotedBundleWithExactNormalizedManifestIsAccepted()
     {
         using var bundle = TrustedBundleFixture.Create();
 
@@ -238,7 +238,7 @@ public sealed class TrustedReleasePolicyTests
     }
 
     [Test]
-    public async Task BundleRejectsNoncanonicalManifestAndVersionPolicyConfigOrTrustMismatch()
+    public async Task BundleRejectsUnnormalizedManifestAndVersionPolicyConfigOrTrustMismatch()
     {
         using var bundle = TrustedBundleFixture.Create();
 
@@ -247,9 +247,9 @@ public sealed class TrustedReleasePolicyTests
         await Assert.That(bundle.Verify(bundle.Request() with { ExpectedConfigVersion = "config-v2" }).Diagnostic).IsEqualTo("trusted_bundle_config_mismatch");
         await Assert.That(bundle.Verify(bundle.Request() with { ExpectedTrustVersion = "trust-v2" }).Diagnostic).IsEqualTo("trusted_bundle_trust_mismatch");
 
-        bundle.RewriteManifestAsNoncanonicalJson();
+        bundle.RewriteManifestAsUnnormalizedJson();
         bundle.ResignReceipt();
-        await Assert.That(bundle.Verify().Diagnostic).IsEqualTo("trusted_bundle_manifest_not_canonical");
+        await Assert.That(bundle.Verify().Diagnostic).IsEqualTo("trusted_bundle_manifest_not_normalized");
     }
 
     [Test]
@@ -557,7 +557,7 @@ public sealed class TrustedReleasePolicyTests
             if (resignReceipt) ResignReceipt();
         }
 
-        public void RewriteManifestAsNoncanonicalJson()
+        public void RewriteManifestAsUnnormalizedJson()
         {
             File.WriteAllText(Path.Combine(Root, "trusted-bundle.manifest.json"), manifestJson);
         }
@@ -618,7 +618,7 @@ public sealed class TrustedReleasePolicyTests
 
         public void ResignReceipt(string? manifestDigest = null)
         {
-            using JsonDocument document = JsonDocument.Parse(CanonicalArtifactPolicy.CanonicalizeJson(manifestJson).Bytes!);
+            using JsonDocument document = JsonDocument.Parse(ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
             JsonElement root = document.RootElement;
             string receiptJson = JsonSerializer.Serialize(new
             {
@@ -635,7 +635,7 @@ public sealed class TrustedReleasePolicyTests
                 trustDigest = root.GetProperty("trustDigest").GetString(),
                 promotionPrincipal = "fixture-tooling-promoter",
             });
-            File.WriteAllBytes(ReceiptPath, CanonicalArtifactPolicy.CanonicalizeJson(receiptJson).Bytes!);
+            File.WriteAllBytes(ReceiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
             if (File.Exists(signaturePath)) File.Delete(signaturePath);
             Run("/usr/bin/ssh-keygen", "-Y", "sign", "-f", privateKeyPath, "-n", "islamu-release-promotion", ReceiptPath);
         }
@@ -674,8 +674,8 @@ public sealed class TrustedReleasePolicyTests
 
         private void WriteManifest()
         {
-            CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(manifestJson);
-            File.WriteAllBytes(Path.Combine(Root, "trusted-bundle.manifest.json"), canonical.Bytes!);
+            ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(manifestJson);
+            File.WriteAllBytes(Path.Combine(Root, "trusted-bundle.manifest.json"), normalized.Bytes!);
         }
 
         private static void Run(string executable, params string[] arguments)

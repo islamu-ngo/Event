@@ -11,8 +11,8 @@ jobs:
     steps:
       - name: Declare the publication projection contract
         run: |
-          printf '%s\n' 'release-publish: noncanonical projection of the signed tag'
-          printf '%s\n' 'page-header: canonical-notes-sha256 and tag-reference are required on every published body'
+          printf '%s\n' 'release-publish: non-authoritative projection of the signed tag'
+          printf '%s\n' 'page-header: release-notes-sha256 and tag-reference are required on every published body'
           printf '%s\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'
           printf '%s\n' 'drift: reported by report-publication-drift, never auto-repaired'
           printf '%s\n' 'outage: recorded-no-op with operator evidence, never a failed release'

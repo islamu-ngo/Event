@@ -186,10 +186,10 @@ public static class TrustedBundlePolicy
             return Invalid("trusted_bundle_manifest_invalid_utf8");
         }
 
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(manifestText);
-        if (!canonical.IsValid || !manifestBytes.AsSpan().SequenceEqual(canonical.Bytes))
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(manifestText);
+        if (!normalized.IsValid || !manifestBytes.AsSpan().SequenceEqual(normalized.Bytes))
         {
-            return Invalid("trusted_bundle_manifest_not_canonical");
+            return Invalid("trusted_bundle_manifest_not_normalized");
         }
 
         try
@@ -405,10 +405,10 @@ public static class TrustedBundlePolicy
             }
 
             string receiptText = StrictUtf8.GetString(receipt.Bytes!);
-            CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(receiptText);
-            if (!canonical.IsValid || !receipt.Bytes.AsSpan().SequenceEqual(canonical.Bytes))
+            ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(receiptText);
+            if (!normalized.IsValid || !receipt.Bytes.AsSpan().SequenceEqual(normalized.Bytes))
             {
-                return PromotionInvalid("trusted_bundle_promotion_receipt_not_canonical");
+                return PromotionInvalid("trusted_bundle_promotion_receipt_not_normalized");
             }
 
             using JsonDocument document = JsonDocument.Parse(receipt.Bytes!);
@@ -806,7 +806,7 @@ public static class EmbargoPolicy
             return Invalid("embargo_disclosure_not_authorized");
         }
 
-        CanonicalTextResult disposition = CanonicalArtifactPolicy.EscapeUntrustedMarkdown(input.ApprovedPublicDisposition);
+        UntrustedTextResult disposition = ReleaseArtifactPolicy.EscapeUntrustedMarkdown(input.ApprovedPublicDisposition);
         if (!PublicReferencePattern.IsMatch(input.ApprovedPublicReference) || !disposition.IsValid || input.ApprovedPublicDisposition.Contains('/') || input.ApprovedPublicDisposition.Contains('\\') || AliasesRestrictedInput(input))
         {
             return Invalid("embargo_public_disposition_invalid");

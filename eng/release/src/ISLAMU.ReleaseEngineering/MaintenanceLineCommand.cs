@@ -110,8 +110,8 @@ public static class MaintenanceLineCommand
         var info = new FileInfo(path);
         if (!info.Exists || info.Length > MaximumEvidenceBytes) throw new InvalidOperationException("maintenance_line_evidence_invalid");
         byte[] bytes = File.ReadAllBytes(path);
-        CanonicalArtifactResult canonical = CanonicalArtifactPolicy.CanonicalizeJson(Encoding.UTF8.GetString(bytes));
-        if (!canonical.IsValid || canonical.Bytes is null || !bytes.AsSpan().SequenceEqual(canonical.Bytes)) throw new InvalidOperationException("maintenance_line_evidence_invalid");
+        ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(Encoding.UTF8.GetString(bytes));
+        if (!normalized.IsValid || normalized.Bytes is null || !bytes.AsSpan().SequenceEqual(normalized.Bytes)) throw new InvalidOperationException("maintenance_line_evidence_invalid");
 
         using JsonDocument document = JsonDocument.Parse(bytes);
         JsonElement root = document.RootElement;
@@ -146,7 +146,7 @@ public static class MaintenanceLineCommand
         Directory.CreateDirectory(isolationDirectory);
         try
         {
-            IReadOnlyDictionary<string, string> environment = CanonicalArtifactPolicy.CreateDeterministicEnvironment(isolationDirectory);
+            IReadOnlyDictionary<string, string> environment = ReleaseArtifactPolicy.CreateDeterministicEnvironment(isolationDirectory);
             File.WriteAllText(environment["GIT_CONFIG_GLOBAL"], string.Empty);
             using var process = new System.Diagnostics.Process
             {

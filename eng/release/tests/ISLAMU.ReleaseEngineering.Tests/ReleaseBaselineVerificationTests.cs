@@ -302,7 +302,7 @@ public sealed class ReleaseBaselineVerificationTests
                 trustDigest = Digest(Path.Combine(bundleRoot, "trust", "release-signing-policy.yaml")),
                 files = Directory.EnumerateFiles(bundleRoot, "*", SearchOption.AllDirectories).Where(path => Path.GetFileName(path) != "trusted-bundle.manifest.json").Select(path => new { path = Path.GetRelativePath(bundleRoot, path).Replace(Path.DirectorySeparatorChar, '/'), sha256 = Digest(path) }).OrderBy(item => item.path, StringComparer.Ordinal).ToArray(),
             });
-            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), CanonicalArtifactPolicy.CanonicalizeJson(manifestJson).Bytes!);
+            File.WriteAllBytes(Path.Combine(bundleRoot, "trusted-bundle.manifest.json"), ReleaseArtifactPolicy.NormalizeJson(manifestJson).Bytes!);
             ResignReceipt();
         }
 
@@ -349,7 +349,7 @@ public sealed class ReleaseBaselineVerificationTests
                 trustDigest = root.GetProperty("trustDigest").GetString(),
                 promotionPrincipal = "fixture-tooling-promoter",
             });
-            File.WriteAllBytes(receiptPath, CanonicalArtifactPolicy.CanonicalizeJson(receiptJson).Bytes!);
+            File.WriteAllBytes(receiptPath, ReleaseArtifactPolicy.NormalizeJson(receiptJson).Bytes!);
             if (File.Exists(signaturePath)) File.Delete(signaturePath);
             RunProcess("/usr/bin/ssh-keygen", null, "-Y", "sign", "-f", promotionPrivateKeyPath, "-n", "islamu-release-promotion", receiptPath);
         }

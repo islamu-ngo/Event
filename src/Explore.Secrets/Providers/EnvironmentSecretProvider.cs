@@ -6,7 +6,7 @@ namespace Explore.Secrets.Providers;
 
 /// <summary>
 /// Secret provider that reads from environment variables.
-/// Maps canonical keys (e.g., "Database:ConnectionString") to environment variable format
+/// Maps authoritative keys (e.g., "Database:ConnectionString") to environment variable format
 /// (e.g., "DATABASE__CONNECTIONSTRING").
 /// </summary>
 public sealed class EnvironmentSecretProvider : ISecretProvider
@@ -112,7 +112,7 @@ public sealed class EnvironmentSecretProvider : ISecretProvider
     }
 
     /// <summary>
-    /// Converts a canonical key to environment variable format.
+    /// Converts an authoritative key to environment variable format.
     /// "Database:ConnectionString" -> "DATABASE__CONNECTIONSTRING"
     /// </summary>
     private static string ConvertKeyToEnvVar(string key)
@@ -124,7 +124,7 @@ public sealed class EnvironmentSecretProvider : ISecretProvider
     }
 
     /// <summary>
-    /// Converts an environment variable name back to canonical key format.
+    /// Converts an environment variable name back to authoritative key format.
     /// "DATABASE__CONNECTIONSTRING" -> "Database:ConnectionString"
     /// </summary>
     private static string ConvertEnvVarToKey(string envVar)

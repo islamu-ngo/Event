@@ -113,10 +113,10 @@ public sealed class ConfigurationManifestConcurrencyTests(
         var manifestMutationLock = new RelationalSettingMutationLock(
             manifestContext,
             manifestUnitOfWork,
-            async (canonicalKey, cancellationToken) =>
+            async (normalizedKey, cancellationToken) =>
             {
                 if (!string.Equals(
-                        canonicalKey,
+                        normalizedKey,
                         slugLockKey,
                         StringComparison.Ordinal))
                 {
@@ -440,7 +440,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
     }
 
     [Test]
-    public async Task ConcurrentManifestAndOrdinaryCreateShareCanonicalSlugLock()
+    public async Task ConcurrentManifestAndOrdinaryCreateShareNormalizedSlugLock()
     {
         await fixture.ResetAsync();
         await using ExploreDbContext manifestContext = fixture.CreateDbContext();

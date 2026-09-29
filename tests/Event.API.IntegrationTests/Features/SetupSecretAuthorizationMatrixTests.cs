@@ -31,7 +31,7 @@ public class SetupSecretAuthorizationMatrixTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest).Because("a valid setup secret on an exact canonical PATCH route should reach command validation");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest).Because("a valid setup secret on an exact primary PATCH route should reach command validation");
     }
 
     [Test]
@@ -46,7 +46,7 @@ public class SetupSecretAuthorizationMatrixTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because("a valid setup secret on an exact canonical GET route should reach the provider configuration response");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK).Because("a valid setup secret on an exact primary GET route should reach the provider configuration response");
     }
 
     [Test]
@@ -76,7 +76,7 @@ public class SetupSecretAuthorizationMatrixTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("the canonical PATCH routes must retain their authenticated write boundary");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("the primary PATCH routes must retain their authenticated write boundary");
     }
 
     [Test]
@@ -106,7 +106,7 @@ public class SetupSecretAuthorizationMatrixTests
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("setup-secret authentication must not apply outside the four canonical provider GET and PATCH routes");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized).Because("setup-secret authentication must not apply outside the four primary provider GET and PATCH routes");
     }
 
     [Test]

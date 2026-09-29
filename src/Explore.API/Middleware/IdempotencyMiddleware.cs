@@ -70,7 +70,7 @@ public sealed class IdempotencyMiddleware
             if (context.GetEndpoint()?.Metadata.GetMetadata<IRouteNameMetadata>()?.RouteName
                 == RouteNames.CreateAnonymousRegistrationChallenge)
             {
-                // MVC must leave the original issuance bytes available for intended-start canonicalization.
+                // MVC must leave the original issuance bytes available for intended-start normalization.
                 context.Request.EnableBuffering();
             }
             await _next(context);

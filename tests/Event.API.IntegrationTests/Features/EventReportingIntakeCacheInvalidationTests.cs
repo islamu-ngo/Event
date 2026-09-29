@@ -15,7 +15,7 @@ using NSubstitute;
 public sealed class EventReportingIntakeCacheInvalidationTests
 {
     [Test]
-    public async Task ReportingOutputCacheInvalidator_EvictsOnlyCanonicalEventResponseTags()
+    public async Task ReportingOutputCacheInvalidator_EvictsOnlyPrimaryEventResponseTags()
     {
         IOutputCacheStore store = Substitute.For<IOutputCacheStore>();
         var invalidator = new EventReportingOutputCacheInvalidator(store);

@@ -11,7 +11,7 @@ public sealed class PublicationPolicyProposedStateCompilerTests
     private static readonly Guid TenantC = Guid.Parse("00000000-0000-0000-0000-000000000003");
 
     [Test]
-    public async Task GuardedKeys_AllContainsExactlyTheFiveCanonicalKeysInPolicyStateOrder()
+    public async Task GuardedKeys_AllContainsExactlyTheFiveAuthoritativeKeysInPolicyStateOrder()
     {
         IReadOnlyList<string> keys = PublicationPolicySettingKeys.All;
 

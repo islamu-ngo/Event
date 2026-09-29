@@ -246,7 +246,7 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
     [Test]
     [Arguments("/api/instance/settings/auth-provider")]
     [Arguments("/api/instance/settings/authz-provider")]
-    public async Task InstanceProviderPatch_CanonicalPath_ForwardsOnlyResolverSecret(string path)
+    public async Task InstanceProviderPatch_AllowedPath_ForwardsOnlyResolverSecret(string path)
     {
         _upstream.ResetCapture();
         using var request = CreateProxyRequest(HttpMethod.Patch, $"{path}?source=test");
@@ -272,7 +272,7 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
     [Arguments("PATCH", "/api/instance/settings/authz-provider/")]
     [Arguments("PATCH", "/api/instance/settings/authz-provider/child")]
     [Arguments("PATCH", "/api/instance/settings/authz-provider-extra")]
-    public async Task InstanceProviderRequest_NonCanonicalMethodOrPath_StripsSetupSecret(
+    public async Task InstanceProviderRequest_DisallowedMethodOrPath_StripsSetupSecret(
         string method,
         string path)
     {

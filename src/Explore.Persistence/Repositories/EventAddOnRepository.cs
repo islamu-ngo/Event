@@ -9,7 +9,7 @@ namespace Explore.Persistence.Repositories;
 
 public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAddOnRepository
 {
-    public const string CanonicalFenceOrder =
+    public const string FenceOrder =
         "catalog-item>order>line>inventory>fulfillment>refund";
 
     public Task<EventAddOnCatalogVersion?> GetPublishedCatalogAsync(
@@ -333,7 +333,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
             return EventAddOnInventoryResult.Failure(EventAddOnInventoryOutcome.NotFound);
         }
 
-        await AcquireCanonicalFencesAsync(identity, cancellationToken);
+        await AcquireFencesAsync(identity, cancellationToken);
         replay = await dbContext.EventAddOnInventoryAllocations.FirstOrDefaultAsync(
             allocation =>
                 allocation.TenantId == tenantId &&
@@ -365,7 +365,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
                 tracking: true,
                 cancellationToken)
             ?? throw new InvalidOperationException(
-                "Add-on order line disappeared after its canonical fence was acquired.");
+                "Add-on order line disappeared after its row fence was acquired.");
         EventAddOnCatalogItem item =
             await dbContext.EventAddOnCatalogItems.SingleAsync(
                 value =>
@@ -435,7 +435,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
             return EventAddOnFulfillmentResult.Failure(EventAddOnFulfillmentOutcome.NotFound);
         }
 
-        await AcquireCanonicalFencesAsync(identity, cancellationToken);
+        await AcquireFencesAsync(identity, cancellationToken);
         replay = await dbContext.EventAddOnFulfillments.FirstOrDefaultAsync(
             fulfillment =>
                 fulfillment.TenantId == tenantId &&
@@ -466,7 +466,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
                 tracking: true,
                 cancellationToken)
             ?? throw new InvalidOperationException(
-                "Add-on order line disappeared after its canonical fence was acquired.");
+                "Add-on order line disappeared after its row fence was acquired.");
         EventAddOnFulfillment created = EventAddOnFulfillment.Create(
             Guid.CreateVersion7(),
             operationId,
@@ -522,7 +522,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
             return EventAddOnRefundResult.Failure(EventAddOnRefundOutcome.NotFound);
         }
 
-        await AcquireCanonicalFencesAsync(identity, cancellationToken);
+        await AcquireFencesAsync(identity, cancellationToken);
         replay = await dbContext.EventAddOnRefundAllocations.FirstOrDefaultAsync(
             allocation =>
                 allocation.TenantId == tenantId &&
@@ -548,7 +548,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
                 tracking: true,
                 cancellationToken)
             ?? throw new InvalidOperationException(
-                "Add-on order line disappeared after its canonical fence was acquired.");
+                "Add-on order line disappeared after its row fence was acquired.");
         int alreadyRefunded = await dbContext.EventAddOnRefundAllocations
             .Where(allocation =>
                 allocation.TenantId == tenantId &&
@@ -621,7 +621,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
             return null;
         }
 
-        await AcquireCanonicalFencesAsync(line, cancellationToken);
+        await AcquireFencesAsync(line, cancellationToken);
         EventAddOnRefundAllocation allocation =
             await dbContext.EventAddOnRefundAllocations.SingleAsync(
                 value =>
@@ -719,7 +719,7 @@ public sealed class EventAddOnRepository(ExploreDbContext dbContext) : IEventAdd
             cancellationToken);
     }
 
-    private async Task AcquireCanonicalFencesAsync(
+    private async Task AcquireFencesAsync(
         RegistrationOrderAddOnLine line,
         CancellationToken cancellationToken)
     {

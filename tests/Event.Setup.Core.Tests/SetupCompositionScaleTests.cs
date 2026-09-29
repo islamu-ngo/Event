@@ -8,12 +8,12 @@ using ISLAMU.Event.Setup.Core.Composition;
 public sealed class SetupCompositionScaleTests
 {
     [Test]
-    public async Task GeneratedProfilesMatchClosedProductRegistryAndCanonicalDefaults()
+    public async Task GeneratedProfilesMatchClosedProductRegistryAndStandardDefaults()
     {
         using JsonDocument document = JsonDocument.Parse(
             File.ReadAllBytes(GeneratedProfilesPath()));
         JsonElement root = document.RootElement;
-        JsonElement defaults = root.GetProperty("canonicalDefault");
+        JsonElement defaults = root.GetProperty("defaultLimits");
         JsonElement[] generated = root.GetProperty("profiles").EnumerateArray().ToArray();
         SetupCompositionScaleProfile[] product = SetupCompositionScaleProfiles.All.ToArray();
 
@@ -65,8 +65,8 @@ public sealed class SetupCompositionScaleTests
             await Assert.That(generatedProfile.GetProperty("targetAccepted").GetBoolean()).IsTrue();
             await Assert.That(generatedProfile.GetProperty("evidenceDigest").GetString())
                 .IsEqualTo(profile.EvidenceDigest.ToString());
-            await Assert.That(generatedProfile.GetProperty("canonicalArtifactBytes").GetInt32())
-                .IsEqualTo(profile.CanonicalArtifactBytes);
+            await Assert.That(generatedProfile.GetProperty("serializedArtifactBytes").GetInt32())
+                .IsEqualTo(profile.SerializedArtifactBytes);
         }
     }
 
@@ -76,7 +76,7 @@ public sealed class SetupCompositionScaleTests
         SetupCompositionScaleProfile small = SetupCompositionScaleProfiles.All.Single(
             profile => profile.Id == SetupCompositionScaleProfileId.Small);
         SetupCompositionScaleAdmission accepted = SetupCompositionScaleProfiles.Admit(
-            small.Name, small.EvidenceDigest, small.CanonicalArtifactBytes);
+            small.Name, small.EvidenceDigest, small.SerializedArtifactBytes);
         SetupCompositionScaleAdmission unknown = SetupCompositionScaleProfiles.Admit(
             "unknown", small.EvidenceDigest, int.MaxValue);
         SetupCompositionScaleAdmission disabled = SetupCompositionScaleProfiles.Admit(
@@ -85,7 +85,7 @@ public sealed class SetupCompositionScaleTests
         SetupCompositionScaleAdmission mismatch = SetupCompositionScaleProfiles.Admit(
             small.Name, ArtifactDigest.Compute("mismatch"u8), int.MaxValue);
         SetupCompositionScaleAdmission incompatible = SetupCompositionScaleProfiles.Admit(
-            small.Name, small.EvidenceDigest, small.CanonicalArtifactBytes - 1);
+            small.Name, small.EvidenceDigest, small.SerializedArtifactBytes - 1);
 
         await Assert.That(accepted.Succeeded).IsTrue();
         await Assert.That(accepted.Profile).IsSameReferenceAs(small);
@@ -141,8 +141,8 @@ public sealed class SetupCompositionScaleTests
                 "sourceRevision", "coreRevision", "wireRevision", "targetRevision",
                 "directories", "files", "entriesPerDirectory", "aggregateSourceBytes",
                 "perFileBytes", "depth", "nodes", "parserEvents", "mappingEntries",
-                "sequenceEntries", "scalarCharacters", "canonicalArtifactBytes",
-                "canonicalArtifactSha256", "warmupCount", "iterationCount",
+                "sequenceEntries", "scalarCharacters", "serializedArtifactBytes",
+                "serializedArtifactSha256", "warmupCount", "iterationCount",
                 "medianElapsedMicroseconds", "p95ElapsedMicroseconds",
                 "medianAllocatedBytes", "peakWorkingSetBytes", "gen0Collections",
                 "gen1Collections", "gen2Collections", "stackOverflowDisposition",

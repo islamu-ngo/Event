@@ -34,7 +34,7 @@ public sealed class LegalIdentityDeploymentContractTests
     ];
 
     [Test]
-    public async Task ComposeMapsCanonicalLegalIdentityAndPaymentOperationsIntoApi()
+    public async Task ComposeMapsAuthoritativeLegalIdentityAndPaymentOperationsIntoApi()
     {
         string compose = await File.ReadAllTextAsync(Path.Combine(RepoRoot, "docker-compose.yml"));
 

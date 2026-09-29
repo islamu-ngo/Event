@@ -74,7 +74,7 @@ public sealed class AtprotoOperationalReadinessTests
         });
         using var client = host.CreateClient(new()
         {
-            BaseAddress = new Uri(AtprotoRelationalLoginFixture.CanonicalOrigin),
+            BaseAddress = new Uri(AtprotoRelationalLoginFixture.PublicOrigin),
             AllowAutoRedirect = false
         });
         using var healthy = await client.GetAsync("/health");

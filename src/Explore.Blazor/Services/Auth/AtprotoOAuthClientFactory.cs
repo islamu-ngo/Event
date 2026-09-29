@@ -161,7 +161,7 @@ public sealed class AtprotoOAuthSessionLease(
             || string.IsNullOrWhiteSpace(document.PdsEndpoint)
             || !Uri.TryCreate(document.PdsEndpoint, UriKind.Absolute, out var pdsUri))
         {
-            throw new InvalidOperationException("ATProto identity has no canonical PDS binding.");
+            throw new InvalidOperationException("ATProto identity has no authoritative PDS binding.");
         }
 
         return new(document.Id, pdsUri);

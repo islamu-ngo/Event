@@ -10,7 +10,7 @@ public sealed class TicketingRecoveryRepository(
     ExploreDbContext dbContext) :
     ITicketingRecoveryOperatorStore
 {
-    public const string CanonicalFenceOrder =
+    public const string FenceOrder =
         "recovery-checkpoint>capabilities>credentials>reissue-intents>queues>provider-cursors";
 
     public Task<TicketingRecoveryCheckpoint> BeginRecoveryAsync(

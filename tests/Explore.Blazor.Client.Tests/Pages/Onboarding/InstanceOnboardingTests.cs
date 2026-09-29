@@ -81,7 +81,7 @@ public class InstanceOnboardingTests : IDisposable
         var cut = RenderForDeploymentMode(mode);
         await Assert.That(cut.FindComponents<MudTextField<string>>().Any(component => component.Instance.Label.Contains("URL"))).IsFalse();
         await FindButton(cut, "Save profile and refresh readiness").ClickAsync(new MouseEventArgs());
-        await Assert.That(submitted!.CanonicalUrl).IsEqualTo("https://events.example.test:9443/community");
+        await Assert.That(submitted!.PublicUrl).IsEqualTo("https://events.example.test:9443/community");
     }
 
     [Test]
@@ -93,11 +93,11 @@ public class InstanceOnboardingTests : IDisposable
         _instanceOnboardingService.SaveProfileAsync(Arg.Any<SelfHostOnboardingProfileDto>(), Arg.Any<CancellationToken>())
             .Returns(call => { submitted = call.Arg<SelfHostOnboardingProfileDto>(); return new BaseCommandResponseOfGuid { Success = true }; });
         var cut = RenderForDeploymentMode(mode);
-        _journey!.Profile = new() { SiteName = "Configured", CanonicalUrl = "https://public.example.test" };
+        _journey!.Profile = new() { SiteName = "Configured", PublicUrl = "https://public.example.test" };
         await cut.Find("button[aria-label='Refresh setup status']").ClickAsync(new MouseEventArgs());
 
         await FindButton(cut, "Save profile and refresh readiness").ClickAsync(new MouseEventArgs());
-        await Assert.That(submitted!.CanonicalUrl).IsEqualTo("https://public.example.test");
+        await Assert.That(submitted!.PublicUrl).IsEqualTo("https://public.example.test");
     }
 
     [Test]
@@ -152,7 +152,7 @@ public class InstanceOnboardingTests : IDisposable
         {
             requested.Add("save-profile");
             var saved = call.Arg<SelfHostOnboardingProfileDto>();
-            journey.Profile = new SelfHostOnboardingProfileDto { SiteName = saved.SiteName, CanonicalUrl = saved.CanonicalUrl };
+            journey.Profile = new SelfHostOnboardingProfileDto { SiteName = saved.SiteName, PublicUrl = saved.PublicUrl };
             journey.Generation = "after-save";
             return Task.FromResult(new BaseCommandResponseOfGuid { Success = true });
         });

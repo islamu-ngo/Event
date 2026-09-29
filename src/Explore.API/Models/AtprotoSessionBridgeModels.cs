@@ -8,8 +8,8 @@ public sealed record BffAtprotoSessionBridgeRequest(
     string OAuthClientKeyId,
     string Classification,
     JsonElement OAuthSession,
-    Guid? CanonicalActorId,
-    Guid? ExpectedCanonicalActorConcurrencyStamp);
+    Guid? TargetActorId,
+    Guid? ExpectedTargetActorConcurrencyStamp);
 
 public sealed record BffAtprotoSessionBridgeResponse(
     Guid UserId,
@@ -19,8 +19,8 @@ public sealed record BffAtprotoSessionBridgeResponse(
     string Classification,
     string AccessToken,
     DateTimeOffset ExpiresAt,
-    Guid? CanonicalActorId,
-    Guid? ExpectedCanonicalActorConcurrencyStamp);
+    Guid? TargetActorId,
+    Guid? ExpectedTargetActorConcurrencyStamp);
 
 public sealed record BffAtprotoSessionRefreshResponse(
     Guid UserId,

@@ -101494,7 +101494,7 @@ namespace Explore.Blazor.Client.Clients
         /// Execute Moderation Report Decision
         /// </summary>
         /// <remarks>
-        /// Executes a decision-ready report case through the canonical event moderation command path.
+        /// Executes a decision-ready report case through the primary event moderation command path.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -102292,7 +102292,7 @@ namespace Explore.Blazor.Client.Clients
         /// Execute Moderation Report Decision
         /// </summary>
         /// <remarks>
-        /// Executes a decision-ready report case through the canonical event moderation command path.
+        /// Executes a decision-ready report case through the primary event moderation command path.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -150937,7 +150937,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get webhook event types
         /// </summary>
         /// <remarks>
-        /// Returns the canonical outgoing webhook event catalog with schema and example payload metadata.
+        /// Returns the authoritative outgoing webhook event catalog with schema and example payload metadata.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -151048,7 +151048,7 @@ namespace Explore.Blazor.Client.Clients
         /// Get webhook event types
         /// </summary>
         /// <remarks>
-        /// Returns the canonical outgoing webhook event catalog with schema and example payload metadata.
+        /// Returns the authoritative outgoing webhook event catalog with schema and example payload metadata.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -183682,8 +183682,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
         public System.Guid? TenantId { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("localCanonicalRequired")]
-        public bool? LocalCanonicalRequired { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("localReportingRequired")]
+        public bool? LocalReportingRequired { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("externalSyncEnabled")]
         public bool? ExternalSyncEnabled { get; set; } = default!;
@@ -200252,8 +200252,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
         public System.Guid? TenantId { get; init; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("localCanonicalRequired")]
-        public bool? LocalCanonicalRequired { get; init; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("localReportingRequired")]
+        public bool? LocalReportingRequired { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("externalSyncEnabled")]
         public bool? ExternalSyncEnabled { get; init; } = default!;
@@ -201577,8 +201577,8 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("supportEmail")]
         public string? SupportEmail { get; set; } = default!;
 
-        [System.Text.Json.Serialization.JsonPropertyName("canonicalUrl")]
-        public string? CanonicalUrl { get; set; } = default!;
+        [System.Text.Json.Serialization.JsonPropertyName("publicUrl")]
+        public string? PublicUrl { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("locale")]
         public string? Locale { get; set; } = default!;

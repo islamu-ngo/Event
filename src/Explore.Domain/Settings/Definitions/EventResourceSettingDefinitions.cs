@@ -41,7 +41,7 @@ public static class EventResourceSettingDefinitions
         GovernanceSettingKeys.EventResources.ExternalOrigins,
         SettingValueType.Json,
         "[]",
-        "Explicitly allowed canonical HTTPS origins for external event resources.");
+        "Explicitly allowed normalized HTTPS origins for external event resources.");
 
     public static readonly SettingDefinition AuditRetentionDays = Coordinated(
         GovernanceSettingKeys.EventResources.AuditRetentionDays,

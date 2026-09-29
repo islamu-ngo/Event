@@ -1555,7 +1555,7 @@ static IResourceBuilder<ProjectResource> WithLocalPrivacyErasureAuthorityDatabas
     PrimaryDatabaseRole role)
 {
     var credentialPrefix = $"PrivacyErasureAuthorityDatabase__{role}__";
-    var canonicalCredentialPrefix = $"Database__Erasure__{role}__";
+    var erasureCredentialPrefix = $"Database__Erasure__{role}__";
     var postgres = database.Resource.Parent;
 
     return project
@@ -1573,8 +1573,8 @@ static IResourceBuilder<ProjectResource> WithLocalPrivacyErasureAuthorityDatabas
         .WithEnvironment("Database__Erasure__Database", database.Resource.DatabaseName)
         .WithEnvironment("Database__Erasure__TlsMode", PrimaryDatabaseTlsMode.Prefer.ToString())
         .WithEnvironment("Database__Erasure__TrustServerCertificate", "false")
-        .WithEnvironment($"{canonicalCredentialPrefix}Username", postgres.UserNameReference)
-        .WithEnvironment($"{canonicalCredentialPrefix}Password", postgres.PasswordParameter);
+        .WithEnvironment($"{erasureCredentialPrefix}Username", postgres.UserNameReference)
+        .WithEnvironment($"{erasureCredentialPrefix}Password", postgres.PasswordParameter);
 }
 
 static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityDatabase(
@@ -1584,7 +1584,7 @@ static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityData
 {
     var database = PrivacyErasureAuthorityDatabaseConfiguration.Bind(builder.Configuration, role);
     var credentialPrefix = $"PrivacyErasureAuthorityDatabase__{role}__";
-    var canonicalCredentialPrefix = $"Database__Erasure__{role}__";
+    var erasureCredentialPrefix = $"Database__Erasure__{role}__";
 
     project = project
         .WithEnvironment("PrivacyErasureAuthorityDatabase__Provider", database.Provider.ToString())
@@ -1608,7 +1608,7 @@ static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityData
         .WithEnvironment(
             "Database__Erasure__TrustServerCertificate",
             database.TrustServerCertificate.ToString())
-        .WithEnvironment($"{canonicalCredentialPrefix}Username", database.Username!);
+        .WithEnvironment($"{erasureCredentialPrefix}Username", database.Username!);
 
     var password = builder.AddParameter(
         $"privacy-authority-{role.ToString().ToLowerInvariant()}-{project.Resource.Name}-password",
@@ -1617,7 +1617,7 @@ static IResourceBuilder<ProjectResource> WithExternalPrivacyErasureAuthorityData
         secret: true);
     return project
         .WithEnvironment($"{credentialPrefix}Password", password)
-        .WithEnvironment($"{canonicalCredentialPrefix}Password", password);
+        .WithEnvironment($"{erasureCredentialPrefix}Password", password);
 }
 
 static IResourceBuilder<ProjectResource> WithEmbeddedPrivacyErasureAuthority(

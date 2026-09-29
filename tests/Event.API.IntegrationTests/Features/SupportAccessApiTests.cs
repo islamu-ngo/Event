@@ -28,7 +28,7 @@ public sealed class SupportAccessApiTests
     private static readonly MediaTypeWithQualityHeaderValue HalJsonAcceptHeader = new("application/hal+json");
 
     [Test]
-    public async Task StopLink_UsesCanonicalPriorityAndFailsClosedForPurposeBoundPrincipal()
+    public async Task StopLink_UsesAuthoritativePriorityAndFailsClosedForPurposeBoundPrincipal()
     {
         Guid subject = Guid.CreateVersion7();
         Guid internalUser = Guid.CreateVersion7();
@@ -53,7 +53,7 @@ public sealed class SupportAccessApiTests
     }
 
     [Test]
-    public async Task SessionList_WithConflictingGuidClaims_UsesCanonicalSubjectForStopLink()
+    public async Task SessionList_WithConflictingGuidClaims_UsesAuthoritativeSubjectForStopLink()
     {
         await using var host = await SupportAccessApiHost.CreateAsync(enableSupportAccess: true);
         Guid actorUserId = await host.SeedActorUserAsync();

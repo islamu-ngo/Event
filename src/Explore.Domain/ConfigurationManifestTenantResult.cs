@@ -116,7 +116,7 @@ public sealed class ConfigurationManifestTenantResult : ITenantEntity
                 or '_'
                 or '-')))
         {
-            throw new ArgumentException("Changed keys must be bounded canonical identifiers.", parameterName);
+            throw new ArgumentException("Changed keys must be bounded normalized identifiers.", parameterName);
         }
 
         return normalized;

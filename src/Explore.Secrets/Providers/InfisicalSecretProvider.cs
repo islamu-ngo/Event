@@ -300,12 +300,12 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
                 {
                     if (string.IsNullOrEmpty(secret.SecretKey)) continue;
 
-                    var canonicalKey = ConvertToCanonicalKey(secret.SecretKey, path);
+                    var settingKey = ConvertToSettingKey(secret.SecretKey, path);
                     var secretValue = new SecretValue(
                         secret.SecretValue ?? string.Empty,
                         Version: secret.Version?.ToString());
 
-                    newSecrets[canonicalKey] = secretValue;
+                    newSecrets[settingKey] = secretValue;
 
                     _logger.LogTrace("secret_provider_item_loaded");
                 }
@@ -333,10 +333,10 @@ public sealed class InfisicalSecretProvider : ISecretProvider, IAsyncDisposable
     }
 
     /// <summary>
-    /// Converts an Infisical secret key to canonical format.
+    /// Converts an Infisical secret key to setting-key format.
     /// e.g., "KEYCLOAK_ENDPOINT" with path "/keycloak" -> "Keycloak:Endpoint"
     /// </summary>
-    private static string ConvertToCanonicalKey(string infisicalKey, string path)
+    private static string ConvertToSettingKey(string infisicalKey, string path)
     {
         // Normalize path to section name
         var section = path.Trim('/').Replace("/", ":");

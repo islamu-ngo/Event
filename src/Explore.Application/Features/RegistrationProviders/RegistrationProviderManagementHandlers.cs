@@ -759,8 +759,8 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
             return Failure(request.ConnectionId, "registration_provider_survey_inactive", "Registration provider schema is not active.");
         }
 
-        CanonicalProviderSchemaSnapshot canonical = CanonicalProviderSchemaSnapshot.From(remoteSchema.Snapshot);
-        RegistrationEvidenceHash revisionHash = RegistrationEvidenceHash.Create(canonical.Base64Hash);
+        NormalizedProviderSchemaSnapshot normalized = NormalizedProviderSchemaSnapshot.From(remoteSchema.Snapshot);
+        RegistrationEvidenceHash revisionHash = RegistrationEvidenceHash.Create(normalized.Base64Hash);
         string providerSurveyId = request.Request.ProviderSurveyId.Trim();
         string providerSurveyRevisionId = request.Request.ProviderSurveyRevisionId ?? remoteSchema.Fingerprint;
         RegistrationForm? form = request.Request.FormId is { } formId
@@ -799,7 +799,7 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
                 request.TenantId, request.EventId, form.Id, connection.Id, providerSurveyId, cancellationToken);
             if (previous is not null)
             {
-                driftClass = driftClassifier.Classify(CanonicalProviderSchemaSnapshot.Parse(previous.ProviderSnapshotJson), canonical.Snapshot);
+                driftClass = driftClassifier.Classify(NormalizedProviderSchemaSnapshot.Parse(previous.ProviderSnapshotJson), normalized.Snapshot);
             }
         }
 
@@ -810,8 +810,8 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
             revisionHash,
             providerSurveyId,
             providerSurveyRevisionId,
-            canonical.Json,
-            canonical.HexHash,
+            normalized.Json,
+            normalized.HexHash,
             ToDomain(driftClass),
             now);
         await providerRepository.AddSchemaRevisionAsync(revision, cancellationToken);
@@ -833,9 +833,9 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
             revision.Id,
             providerSurveyId,
             providerSurveyRevisionId,
-            ExternalImportMappingRevision.Hash(tuple, providerSurveyId, providerSurveyRevisionId, canonical.Snapshot),
+            ExternalImportMappingRevision.Hash(tuple, providerSurveyId, providerSurveyRevisionId, normalized.Snapshot),
             now);
-        AddSnapshotFields(version, canonical.Snapshot, now);
+        AddSnapshotFields(version, normalized.Snapshot, now);
         publicationService.Publish(version, now);
         form.AddVersion(version);
         if (createForm)
@@ -863,7 +863,7 @@ public sealed class ImportExternalRegistrationProviderFormVersionCommandHandler(
             RegistrationProviderPresentationModeEnum.Manual,
             RegistrationProviderCollectionModeEnum.ProviderHosted,
             RegistrationProviderCompletionModeEnum.Manual,
-            RegistrationProviderTrustLevelEnum.FullCanonical,
+            RegistrationProviderTrustLevelEnum.FullSync,
             null,
             now);
         binding.SetDraftProvisionedSurvey(request.Request.ProviderSurveyId, request.Request.ProviderSurveyRevisionId);
@@ -1099,9 +1099,9 @@ internal static class ExternalImportMappingRevision
     }
 }
 
-internal sealed record CanonicalProviderSchemaSnapshot(string Json, string HexHash, string Base64Hash, RegistrationProviderSchemaSnapshot Snapshot)
+internal sealed record NormalizedProviderSchemaSnapshot(string Json, string HexHash, string Base64Hash, RegistrationProviderSchemaSnapshot Snapshot)
 {
-    public static CanonicalProviderSchemaSnapshot From(RegistrationProviderSchemaSnapshot snapshot)
+    public static NormalizedProviderSchemaSnapshot From(RegistrationProviderSchemaSnapshot snapshot)
     {
         RegistrationProviderSchemaSnapshot normalized = Normalize(snapshot);
         using MemoryStream stream = new();
@@ -1394,7 +1394,7 @@ internal static class RegistrationProviderManagementHandlerHelpers
         {
             RegistrationProviderTrustLevelEnum.Untrusted => true,
             RegistrationProviderTrustLevelEnum.CompletionOnly => capabilities.CallbackVerification || capabilities.SubmissionRead || capabilities.Manual,
-            RegistrationProviderTrustLevelEnum.SelectedFields or RegistrationProviderTrustLevelEnum.FullCanonical => capabilities.SubmissionRead || capabilities.SubmissionWrite || capabilities.SubmissionSink,
+            RegistrationProviderTrustLevelEnum.SelectedFields or RegistrationProviderTrustLevelEnum.FullSync => capabilities.SubmissionRead || capabilities.SubmissionWrite || capabilities.SubmissionSink,
             _ => false
         };
     }

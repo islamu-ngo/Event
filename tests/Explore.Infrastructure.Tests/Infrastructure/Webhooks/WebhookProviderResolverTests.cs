@@ -567,7 +567,7 @@ public sealed class WebhookProviderResolverTests
     }
 
     [Test]
-    public async Task Publisher_WhenDryRunPlanIsResolved_MaterializesCanonicalMessageWithoutProviderIdentifier()
+    public async Task Publisher_WhenDryRunPlanIsResolved_MaterializesStandardMessageWithoutProviderIdentifier()
     {
         var planResolver = Substitute.For<IWebhookDeliveryPlanResolver>();
         var materializer = Substitute.For<IWebhookDeliveryPlanMaterializer>();

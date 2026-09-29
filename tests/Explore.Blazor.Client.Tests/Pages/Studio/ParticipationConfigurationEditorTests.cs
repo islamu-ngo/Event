@@ -153,7 +153,7 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
     }
 
     [Test]
-    public async Task VisitorPolicyRejectionThroughGeneratedClientReloadsCanonicalCapability()
+    public async Task VisitorPolicyRejectionThroughGeneratedClientReloadsAuthoritativeCapability()
     {
         using var context = new BlazorTestContext();
         var configuration = CreateConfiguration(4, 2, 2, 1);
@@ -163,12 +163,12 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
             AllowsAccountRequiredParticipation = false,
             SignupDestinations = []
         };
-        var canonicalEvent = ComponentDataBuilder.EventDto.Generate() with
+        var authoritativeEvent = ComponentDataBuilder.EventDto.Generate() with
         {
             Id = eventId,
             VisitorAccess = deniedCapability
         };
-        using var handler = new ChangedVisitorPolicyHandler(eventId, JsonSerializer.Serialize(canonicalEvent));
+        using var handler = new ChangedVisitorPolicyHandler(eventId, JsonSerializer.Serialize(authoritativeEvent));
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://app.example.test/") };
         var service = new EventService(
             new EventClient(http),
@@ -200,7 +200,7 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
         await Assert.That(cut.Find("button[data-testid='save-participation-configuration']").HasAttribute("disabled")).IsTrue();
     }
 
-    private sealed class ChangedVisitorPolicyHandler(Guid eventId, string canonicalEvent) : HttpMessageHandler
+    private sealed class ChangedVisitorPolicyHandler(Guid eventId, string authoritativeEvent) : HttpMessageHandler
     {
         public int? SavedIdentityMode { get; private set; }
 
@@ -224,7 +224,7 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
             {
                 return new(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(canonicalEvent, Encoding.UTF8, "application/hal+json")
+                    Content = new StringContent(authoritativeEvent, Encoding.UTF8, "application/hal+json")
                 };
             }
             throw new InvalidOperationException("Unexpected request at the participation policy boundary.");

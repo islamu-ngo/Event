@@ -52,7 +52,7 @@ Unknown API versions, deployment codes, policy versions, or evidence revisions a
 
 `FILE_UPLOAD` and `MULTILINGUAL_FORMS` are absent from the provider capability vocabulary and resolve to the empty capability set. The adapter compatibility check also rejects file fields. A single immutable ISLAMU form version may carry its own language tag; this is not a multilingual provider capability.
 
-`MirrorOnly` collection is a post-commit sink mode. ISLAMU owns validation, canonical answers, fulfillment, and finalization; the provider receives only mapped fields explicitly marked `IsProviderTransferAllowed`. The sink uses the existing fenced provider write-effect worker, not a second delivery path.
+`MirrorOnly` collection is a post-commit sink mode. ISLAMU owns validation, normalized answers, fulfillment, and finalization; the provider receives only mapped fields explicitly marked `IsProviderTransferAllowed`. The sink uses the existing fenced provider write-effect worker, not a second delivery path.
 
 Remote response creation has no documented idempotency-key contract. Ambiguous provider acceptance is therefore never automatically retried; it is parked for reconciliation.
 

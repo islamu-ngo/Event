@@ -15,7 +15,7 @@ using global::Terminal.Gui.Views;
 public sealed class SetupTerminalGuiAdapterTests
 {
     [Test]
-    public async Task WorkspaceCommandWritesCanonicalCoreBytes()
+    public async Task WorkspaceCommandWritesDeterministicCoreBytes()
     {
         if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
             return;
@@ -41,7 +41,7 @@ public sealed class SetupTerminalGuiAdapterTests
             await workspace.ExecuteAsync(Guid.CreateVersion7());
 
             DotenvCompositionResult expected = DotenvComposer.ComposeWithSecrets(
-                CanonicalEnvironmentCatalogue.Catalogue,
+                PlatformEnvironmentCatalogue.Catalogue,
                 new EnvironmentActivationContext(
                     "standalone",
                     ["platform"],

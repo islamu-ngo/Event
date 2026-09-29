@@ -170,7 +170,7 @@ public sealed class AnonymousRegistrationChallengeQuotaTests
     }
 
     [Test]
-    public async Task Settings_AreUncached_AndHonorCanonicalDefaultsAndInstanceLocks()
+    public async Task Settings_AreUncached_AndHonorNormalizedDefaultsAndInstanceLocks()
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var entity = await fixture.SeedEventAsync();

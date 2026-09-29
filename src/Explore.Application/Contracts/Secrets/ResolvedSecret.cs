@@ -7,7 +7,7 @@ namespace Explore.Application.Contracts.Secrets;
 /// metrics, and downstream cache invalidation. The <see cref="Value"/> is sensitive — never log it,
 /// never serialize it to a non-admin surface, and scrub it from any exception messages.
 /// </summary>
-/// <param name="SettingKey">Canonical setting key (see <see cref="Explore.Domain.Secrets.SecretDefinitionRegistry.Keys"/>).</param>
+/// <param name="SettingKey">Authoritative setting key (see <see cref="Explore.Domain.Secrets.SecretDefinitionRegistry.Keys"/>).</param>
 /// <param name="Value">The plaintext secret value materialized from the binding's single declared source.</param>
 /// <param name="Source">The source type that produced <paramref name="Value"/> — identical to the binding's <see cref="Explore.Domain.Secrets.SecretBinding.SourceType"/>.</param>
 /// <param name="Scope">Scope at which the binding was registered.</param>

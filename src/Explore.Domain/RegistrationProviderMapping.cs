@@ -110,7 +110,7 @@ public sealed class RegistrationProviderSchemaRevision : ITenantEntity, IAuditab
     {
         if (tenantId == Guid.Empty || connectionId == Guid.Empty || !Enum.IsDefined(authority) || !Enum.IsDefined(driftClass)) throw new ArgumentException("Schema revision identities and lookup values must be valid.");
         ArgumentException.ThrowIfNullOrWhiteSpace(providerSnapshotJson);
-        if (providerSnapshotSha256Hash.Length != 64 || providerSnapshotSha256Hash.Any(value => !Uri.IsHexDigit(value))) throw new ArgumentException("Provider snapshot hash must be canonical lowercase SHA-256 hex.", nameof(providerSnapshotSha256Hash));
+        if (providerSnapshotSha256Hash.Length != 64 || providerSnapshotSha256Hash.Any(value => !Uri.IsHexDigit(value))) throw new ArgumentException("Provider snapshot hash must be normalized lowercase SHA-256 hex.", nameof(providerSnapshotSha256Hash));
         return new()
         {
             Id = Guid.CreateVersion7(),

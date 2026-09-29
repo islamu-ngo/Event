@@ -255,7 +255,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
 
     private static async Task<bool> TryAcquireCompetingLockAsync(
         ExploreDbContext context,
-        string canonicalKey)
+        string normalizedKey)
     {
         await context.Database.OpenConnectionAsync();
         await using IDbContextTransaction transaction =
@@ -269,7 +269,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         DbParameter parameter = command.CreateParameter();
         parameter.ParameterName = "lock_key";
         parameter.Value =
-            RelationalSettingMutationLock.ComputeStableLockKey(canonicalKey);
+            RelationalSettingMutationLock.ComputeStableLockKey(normalizedKey);
         command.Parameters.Add(parameter);
         object? value = await command.ExecuteScalarAsync();
         await transaction.RollbackAsync();
@@ -313,20 +313,20 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         public IsolationLevel? TransactionIsolation { get; private set; }
 
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             ExecuteManyAsync(
-                [canonicalSettingKey],
+                [settingKey],
                 operation,
                 cancellationToken);
 
         public Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
-            string[] keys = canonicalSettingKeys.ToArray();
+            string[] keys = settingKeys.ToArray();
             return inner.ExecuteManyAsync(
                 keys,
                 async token =>
@@ -334,7 +334,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
                     CapturedKeys =
                     [
                         .. RelationalSettingMutationLock
-                            .NormalizeCanonicalKeys(keys)
+                            .NormalizeSettingKeys(keys)
                     ];
                     TransactionWasActive =
                         context.Database.CurrentTransaction is not null;
@@ -349,11 +349,11 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
         }
 
         public Task<T> ExecuteOrderedGroupsAsync<T>(
-            IEnumerable<IEnumerable<string>> canonicalSettingKeyGroups,
+            IEnumerable<IEnumerable<string>> settingKeyGroups,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
-            string[][] groups = canonicalSettingKeyGroups
+            string[][] groups = settingKeyGroups
                 .Select(group => group.ToArray())
                 .ToArray();
             return inner.ExecuteOrderedGroupsAsync(
@@ -365,7 +365,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
                     [
                         .. groups.SelectMany(group =>
                                 RelationalSettingMutationLock
-                                    .NormalizeCanonicalKeys(group))
+                                    .NormalizeSettingKeys(group))
                             .Where(seen.Add)
                     ];
                     TransactionWasActive =

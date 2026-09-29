@@ -47,7 +47,7 @@ public sealed class AdmissionCheckInPersistenceRedTests
         await Assert.That(entities.Target.FindProperty(nameof(AdmissionTarget.EventSessionId))).IsNotNull();
         await Assert.That(entities.Target.FindProperty("TargetKind")).IsNull();
         await Assert.That(entities.Target.GetIndexes().Any(index => index.IsUnique &&
-            Phase21PersistenceSurface.IsCanonicalTargetIdentity(index))).IsTrue();
+            Phase21PersistenceSurface.IsTargetIdentity(index))).IsTrue();
         IProperty scopeId = entities.Target.FindProperty(nameof(AdmissionTarget.ScopeId))!;
         await Assert.That(scopeId).IsNotNull();
         await Assert.That(scopeId.IsNullable).IsFalse();
@@ -501,7 +501,7 @@ public sealed class AdmissionCheckInConstraintRuntimeTests
     }
 
     [Test]
-    public async Task DuplicateCanonicalTicketTypeEntitlementsAreRejectedByTheDatabase()
+    public async Task DuplicateTicketTypeEntitlementTargetsAreRejectedByTheDatabase()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -1829,7 +1829,7 @@ internal sealed class Phase21PersistenceSurface
     internal static bool HasProperties(IReadOnlyList<IReadOnlyProperty> properties, params string[] names) =>
         properties.Select(property => property.Name).SequenceEqual(names);
 
-    internal static bool IsCanonicalTargetIdentity(IReadOnlyIndex index)
+    internal static bool IsTargetIdentity(IReadOnlyIndex index)
     {
         string[] properties = index.Properties.Select(property => property.Name).ToArray();
         return properties.SequenceEqual(

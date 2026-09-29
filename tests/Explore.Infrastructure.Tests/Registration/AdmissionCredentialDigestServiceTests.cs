@@ -18,7 +18,7 @@ public sealed class AdmissionCredentialDigestServiceTests
     private static readonly Guid CredentialId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000303");
 
     [Test]
-    public async Task CreateAsyncIssuesThirtyTwoByteBase64UrlBearerAndCanonicalKeyedDigest()
+    public async Task CreateAsyncIssuesThirtyTwoByteBase64UrlBearerAndNormalizedKeyedDigest()
     {
         byte[] key = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray();
         AdmissionCredentialDigestService service = Service(7, key);

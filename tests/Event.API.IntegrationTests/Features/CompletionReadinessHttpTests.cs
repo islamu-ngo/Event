@@ -55,7 +55,7 @@ public sealed class CompletionReadinessHttpTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 factory.CreateExternalProviderToken(Guid.CreateVersion7(), "operator@example.test", true));
         using var profileResponse = await client.PatchAsJsonAsync("/api/instanceonboarding/profile",
-            new SelfHostOnboardingProfileDto { SiteName = "Readiness invariant", CanonicalUrl = "https://example.test" }, token);
+            new SelfHostOnboardingProfileDto { SiteName = "Readiness invariant", PublicUrl = "https://example.test" }, token);
         await Assert.That(profileResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var journeyResponse = await client.GetAsync("/api/instanceonboarding/journey", token);
         await Assert.That(journeyResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -71,7 +71,7 @@ public sealed class CompletionReadinessHttpTests
         var settings = new CompleteInstanceOnboardingRequest
         {
             ExpectedJourneyGeneration = journey.RootElement.GetProperty("generation").GetString(),
-            SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Readiness invariant", CanonicalUrl = "https://example.test" }
+            SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Readiness invariant", PublicUrl = "https://example.test" }
         };
         using var response = provider == AuthenticationProviderKind.Local
             ? await client.PostAsJsonAsync("/api/instanceonboarding/complete-local", new CompleteLocalInstanceOnboardingRequestDto

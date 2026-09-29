@@ -32,7 +32,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     public async Task MissingOrUnknownCallbackFlowFailsWithoutReflectingProviderMaterial()
     {
         await using var host = fixture.CreateBff();
-        using var browser = BrowserClient(host, CanonicalOrigin, new CookieContainer());
+        using var browser = BrowserClient(host, PublicOrigin, new CookieContainer());
         string state = RandomValue();
         string code = RandomValue();
         using var missing = await browser.GetAsync("/signin-atproto");
@@ -46,7 +46,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(fixture, browser, cookies);
         int verifications = fixture.External.VerifiedPdsRequests;
         using var rejected = await browser.GetAsync(Callback(flow, "https://attacker.example/"));
@@ -56,7 +56,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             .ReadAsync("oauth_state", flow.State)).IsNotNull();
         using var accepted = await browser.GetAsync(Callback(flow));
         await Assert.That(accepted.Headers.Location?.OriginalString).IsEqualTo("/events");
-        await Assert.That(cookies.GetCookies(new Uri(CanonicalOrigin))[".AspNetCore.Cookies"]).IsNotNull();
+        await Assert.That(cookies.GetCookies(new Uri(PublicOrigin))[".AspNetCore.Cookies"]).IsNotNull();
         using var replay = await browser.GetAsync(Callback(flow));
         await AssertSafeCallbackFailure(replay, flow.State, flow.Code);
     }
@@ -66,7 +66,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(fixture, browser, cookies);
         string description = RandomValue();
         string errorCallback = "/signin-atproto?state=" + Uri.EscapeDataString(flow.State)
@@ -77,7 +77,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             .ReadAsync("oauth_state", flow.State)).IsNull();
         using var replay = await browser.GetAsync(errorCallback);
         await AssertSafeCallbackFailure(replay, flow.State, description, "access_denied");
-        await Assert.That(cookies.GetCookies(new Uri(CanonicalOrigin))[".AspNetCore.Cookies"]).IsNull();
+        await Assert.That(cookies.GetCookies(new Uri(PublicOrigin))[".AspNetCore.Cookies"]).IsNull();
     }
 
     [Test]
@@ -85,7 +85,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(fixture, browser, cookies);
         string prefix = "/signin-atproto?state=" + Uri.EscapeDataString(flow.State) + "&iss=https%3A%2F%2Fissuer.example";
         foreach (string result in new[]
@@ -101,7 +101,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             .ReadAsync("oauth_state", flow.State)).IsNotNull();
         using var accepted = await browser.GetAsync(Callback(flow));
         await Assert.That(accepted.Headers.Location?.OriginalString).IsEqualTo("/events");
-        await Assert.That(cookies.GetCookies(new Uri(CanonicalOrigin))[".AspNetCore.Cookies"]).IsNotNull();
+        await Assert.That(cookies.GetCookies(new Uri(PublicOrigin))[".AspNetCore.Cookies"]).IsNotNull();
     }
 
     [Test]
@@ -109,14 +109,14 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(fixture, browser, cookies,
             new { handle = "alice.example", classification = "person", returnPath = "https://evil.example/steal" });
         using var callback = await browser.GetAsync(Callback(flow));
         await Assert.That(callback.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
         await Assert.That(callback.Headers.Location?.OriginalString).IsEqualTo("/");
         string visible = string.Join('\n', callback.Headers.SelectMany(header => header.Value));
-        var ticket = ReadTicket(host, cookies, CanonicalOrigin);
+        var ticket = ReadTicket(host, cookies, PublicOrigin);
         foreach (string forbidden in new[] { "evil.example", fixture.External.AccessToken, fixture.External.RefreshToken, ticket.Properties.GetTokenValue("access_token")! })
             await Assert.That(visible.Contains(forbidden, StringComparison.Ordinal)).IsFalse();
     }
@@ -126,7 +126,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         int dns = fixture.External.DnsRequests;
         int documents = fixture.External.DidDocumentRequests;
         int pars = fixture.External.PushedAuthorizationRequests;
@@ -149,7 +149,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         {
             await using var host = fixture.CreateBff();
             var cookies = new CookieContainer();
-            using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+            using var browser = BrowserClient(host, PublicOrigin, cookies);
             int documents = fixture.External.DidDocumentRequests;
             int pars = fixture.External.PushedAuthorizationRequests;
             var flow = await StartChallengeAsync(fixture, browser, cookies);
@@ -162,13 +162,13 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
     }
 
     [Test]
-    public async Task CanonicalActorTargetTravelsOnlyThroughProtectedStateAndTheSignedRealBridge()
+    public async Task TargetActorTravelsOnlyThroughProtectedStateAndTheSignedRealBridge()
     {
         using var observation = new BootstrapTargetObservation();
         await using var host = fixture.CreateBff().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             services.AddHttpClient(BffAuth.ApiBackedOAuthSessionStore.HttpClientName).AddHttpMessageHandler(() => observation)));
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         Guid actor = Guid.CreateVersion7();
         Guid stamp = Guid.CreateVersion7();
         var flow = await StartChallengeAsync(fixture, browser, cookies, new
@@ -176,8 +176,8 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             handle = "alice.example",
             classification = "organization",
             returnPath = "/events",
-            canonicalActorId = actor,
-            expectedCanonicalActorConcurrencyStamp = stamp
+            targetActorId = actor,
+            expectedTargetActorConcurrencyStamp = stamp
         });
         using var callback = await browser.GetAsync(Callback(flow));
         await Assert.That(observation.BodyActor).IsEqualTo(actor);
@@ -186,7 +186,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         await Assert.That(observation.SignedStamp).IsEqualTo(stamp);
         await Assert.That(observation.ResponseStatus).IsEqualTo(HttpStatusCode.Conflict);
         await AssertSafeCallbackFailure(callback, actor.ToString("D"), stamp.ToString("D"));
-        await Assert.That(cookies.GetCookies(new Uri(CanonicalOrigin))[".AspNetCore.Cookies"]).IsNull();
+        await Assert.That(cookies.GetCookies(new Uri(PublicOrigin))[".AspNetCore.Cookies"]).IsNull();
     }
 
     [Test]
@@ -195,9 +195,9 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
         using var login = BrowserClient(host, TenantOrigin, cookies);
-        using var canonical = BrowserClient(host, CanonicalOrigin, cookies);
+        using var publicClient = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(fixture, login, cookies);
-        using var callback = await canonical.GetAsync(Callback(flow));
+        using var callback = await publicClient.GetAsync(Callback(flow));
         var destination = callback.Headers.Location!;
         await Assert.That(destination.GetLeftPart(UriPartial.Authority)).IsEqualTo(TenantOrigin);
         string code = QueryHelpers.ParseQuery(destination.Query)["code"].ToString();
@@ -228,7 +228,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         await Assert.That(ticket.Principal.FindFirstValue("did")).IsEqualTo(fixture.External.SubjectDid);
         await Assert.That(ticket.Principal.FindFirstValue("tenant_id")).IsEqualTo(fixture.TenantId.ToString("D"));
         await Assert.That(ticket.Principal.FindFirstValue("auth_provider")).IsEqualTo("atproto");
-        await Assert.That(ticket.Principal.FindFirstValue("canonical_actor_id")).IsNull();
+        await Assert.That(ticket.Principal.FindFirstValue("target_actor_id")).IsNull();
         await Assert.That(ticket.Principal.FindFirstValue("expected_actor_concurrency_stamp")).IsNull();
         await Assert.That(ticket.Properties.GetTokenValue("token_type")).IsEqualTo("Bearer");
         await Assert.That(DateTimeOffset.Parse(ticket.Properties.GetTokenValue("expires_at")!)).IsGreaterThan(DateTimeOffset.UtcNow);
@@ -252,14 +252,14 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         await Assert.That((await statusProvider.GetStatusAsync()).Disposition)
             .IsEqualTo(BffServices.BffOnboardingDisposition.ConfiguredAdministratorPending);
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(configured, browser, cookies);
         using var callback = await browser.GetAsync(Callback(flow));
         await Assert.That(callback.Headers.Location?.OriginalString).IsEqualTo("/events");
         await Assert.That(callback.Headers.GetValues("Set-Cookie").Count(value => value.StartsWith(".AspNetCore.Cookies=", StringComparison.Ordinal)))
             .IsEqualTo(1);
         await Assert.That((await statusProvider.GetStatusAsync()).Disposition).IsEqualTo(BffServices.BffOnboardingDisposition.Completed);
-        var ticket = ReadTicket(host, cookies, CanonicalOrigin);
+        var ticket = ReadTicket(host, cookies, PublicOrigin);
         await Assert.That(ticket.Principal.HasClaim("explore:admin:instance", "true")).IsTrue();
         using var api = configured.Api.CreateClient();
         using var status = await api.GetAsync("/api/InstanceOnboarding/status");
@@ -280,7 +280,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             services.AddSingleton<BffAuth.IAtprotoOAuthTransportFactory>(new LoginHintMetadataTransport(fixture.External));
         }));
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, PublicOrigin, cookies);
         int pars = fixture.External.PushedAuthorizationRequests;
         int verifications = fixture.External.VerifiedPdsRequests;
         using var response = await SendChallengeAsync(browser, cookies);
@@ -314,7 +314,7 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         (string State, string Code) flow;
         await using (var initial = fixture.CreateBff())
         {
-            using var browser = BrowserClient(initial, CanonicalOrigin, cookies);
+            using var browser = BrowserClient(initial, PublicOrigin, cookies);
             flow = await StartChallengeAsync(fixture, browser, cookies);
         }
         await using (var lostKeys = fixture.CreateBff().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
@@ -323,17 +323,17 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
         })))
         {
-            using var rejectedBrowser = BrowserClient(lostKeys, CanonicalOrigin, cookies);
+            using var rejectedBrowser = BrowserClient(lostKeys, PublicOrigin, cookies);
             using var rejected = await rejectedBrowser.GetAsync(Callback(flow));
             await AssertSafeCallbackFailure(rejected, flow.State, flow.Code);
         }
         await using var restarted = fixture.CreateBff(rotateKeys: true);
-        using var restoredBrowser = BrowserClient(restarted, CanonicalOrigin, cookies);
+        using var restoredBrowser = BrowserClient(restarted, PublicOrigin, cookies);
         var store = restarted.Services.GetRequiredService<BffAuth.ApiBackedAtprotoTransientStore>();
         await Assert.That(await store.ReadAsync("oauth_state", flow.State)).IsNotNull();
         using var accepted = await restoredBrowser.GetAsync(Callback(flow));
         await Assert.That(accepted.Headers.Location?.OriginalString).IsEqualTo("/events");
-        await Assert.That(cookies.GetCookies(new Uri(CanonicalOrigin))[".AspNetCore.Cookies"]).IsNotNull();
+        await Assert.That(cookies.GetCookies(new Uri(PublicOrigin))[".AspNetCore.Cookies"]).IsNotNull();
         await Assert.That(await store.ReadAsync("oauth_state", flow.State)).IsNull();
     }
 
@@ -347,14 +347,14 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         await timed.InitializeAsync();
         await using var host = timed.CreateBff();
         var cookies = new CookieContainer();
-        using var browser = BrowserClient(host, handoff ? TenantOrigin : CanonicalOrigin, cookies);
-        using var canonical = BrowserClient(host, CanonicalOrigin, cookies);
+        using var browser = BrowserClient(host, handoff ? TenantOrigin : PublicOrigin, cookies);
+        using var publicClient = BrowserClient(host, PublicOrigin, cookies);
         var flow = await StartChallengeAsync(timed, browser, cookies);
         string path = Callback(flow);
         string locator = flow.State;
         if (handoff)
         {
-            using var callback = await canonical.GetAsync(path);
+            using var callback = await publicClient.GetAsync(path);
             await Assert.That(callback.Headers.Location!.AbsolutePath).IsEqualTo("/auth/atproto/handoff");
             path = callback.Headers.Location.PathAndQuery;
             locator = QueryHelpers.ParseQuery(callback.Headers.Location.Query)["code"].ToString();
@@ -455,11 +455,11 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
             if (request.RequestUri!.AbsolutePath == BffAuth.AtprotoBootstrapAssertionService.BridgePath)
             {
                 using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
-                BodyActor = body.RootElement.GetProperty("canonicalActorId").GetGuid();
-                BodyStamp = body.RootElement.GetProperty("expectedCanonicalActorConcurrencyStamp").GetGuid();
+                BodyActor = body.RootElement.GetProperty("targetActorId").GetGuid();
+                BodyStamp = body.RootElement.GetProperty("expectedTargetActorConcurrencyStamp").GetGuid();
                 var assertion = new JsonWebToken(request.Headers.GetValues(BffAuth.AtprotoBootstrapAssertionService.HeaderName).Single());
-                SignedActor = Guid.Parse(assertion.GetClaim(BffAuth.AtprotoBootstrapAssertionService.CanonicalActorIdClaim).Value);
-                SignedStamp = Guid.Parse(assertion.GetClaim(BffAuth.AtprotoBootstrapAssertionService.ExpectedCanonicalActorConcurrencyStampClaim).Value);
+                SignedActor = Guid.Parse(assertion.GetClaim(BffAuth.AtprotoBootstrapAssertionService.TargetActorIdClaim).Value);
+                SignedStamp = Guid.Parse(assertion.GetClaim(BffAuth.AtprotoBootstrapAssertionService.ExpectedTargetActorConcurrencyStampClaim).Value);
             }
             var response = await base.SendAsync(request, cancellationToken);
             ResponseStatus = response.StatusCode;

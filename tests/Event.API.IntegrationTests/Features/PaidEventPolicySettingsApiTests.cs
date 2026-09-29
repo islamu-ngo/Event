@@ -27,7 +27,7 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class PaidEventPolicySettingsApiTests
 {
     [Test]
-    public async Task Controllers_UseProtectedClassificationsAndCanonicalRoutes()
+    public async Task Controllers_UseProtectedClassificationsAndPrimaryRoutes()
     {
         await AssertController(typeof(InstancePaidEventPolicySettingsController), EndpointClass.Admin, "api/instance/settings/paid-event-policy");
         await AssertController(typeof(TenantPaidEventPolicySettingsController), EndpointClass.Authenticated, "api/tenants/{tenantId:guid}/settings/paid-event-policy");

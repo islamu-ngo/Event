@@ -120,7 +120,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamApply_PersistsCanonicalProjectionAndTenantPresentation()
+    public async Task JetstreamApply_PersistsProjectionAndTenantPresentation()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-pin");
@@ -149,7 +149,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             EventProjection: projection));
 
         context.ChangeTracker.Clear();
-        AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+        AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
         AtprotoEventProjection persistedProjection = await context.AtprotoEventProjections.AsNoTracking().SingleAsync();
         AtprotoRecordTenantPresentation presentation = await context.AtprotoRecordTenantPresentations
             .IgnoreQueryFilters()
@@ -160,17 +160,17 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             .SingleAsync();
 
         await Assert.That(applied).IsTrue();
-        await Assert.That(canonical.Id).IsNotEqualTo(Guid.Empty);
-        await Assert.That(persistedProjection.AtprotoRecordId).IsEqualTo(canonical.Id);
+        await Assert.That(storedRecord.Id).IsNotEqualTo(Guid.Empty);
+        await Assert.That(persistedProjection.AtprotoRecordId).IsEqualTo(storedRecord.Id);
         await Assert.That(persistedProjection.Name).IsEqualTo("Pinned event");
         await Assert.That(presentation.TenantId).IsEqualTo(scope.TenantId);
-        await Assert.That(presentation.AtprotoRecordId).IsEqualTo(canonical.Id);
+        await Assert.That(presentation.AtprotoRecordId).IsEqualTo(storedRecord.Id);
         await Assert.That(presentation.IsVisible).IsTrue();
         await Assert.That(cursor).IsEqualTo(1);
     }
 
     [Test]
-    public async Task JetstreamApply_PinEqualReplayPreservesCanonicalJsonAndImportedIdentities()
+    public async Task JetstreamApply_PinEqualReplayPreservesStoredJsonAndImportedIdentities()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task22-pin");
@@ -191,7 +191,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             "https://events.example/pin-replay",
             observedAt));
         context.ChangeTracker.Clear();
-        Guid canonicalId = await context.AtprotoRecords.Select(value => value.Id).SingleAsync();
+        Guid storedRecordId = await context.AtprotoRecords.Select(value => value.Id).SingleAsync();
         Guid eventId = await context.Events.Select(value => value.Id).SingleAsync();
         Guid sessionId = await context.EventSessions.Select(value => value.Id).SingleAsync();
 
@@ -214,7 +214,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         string persistedJson = await context.AtprotoRecords.Select(value => value.RecordJson!).SingleAsync();
         await Assert.That(created).IsTrue();
         await Assert.That(replayed).IsTrue();
-        await Assert.That(await context.AtprotoRecords.Select(value => value.Id).SingleAsync()).IsEqualTo(canonicalId);
+        await Assert.That(await context.AtprotoRecords.Select(value => value.Id).SingleAsync()).IsEqualTo(storedRecordId);
         await Assert.That(await context.Events.Select(value => value.Id).SingleAsync()).IsEqualTo(eventId);
         await Assert.That(await context.EventSessions.Select(value => value.Id).SingleAsync()).IsEqualTo(sessionId);
         await Assert.That(JsonNode.DeepEquals(JsonNode.Parse(persistedJson), JsonNode.Parse(expectedJson))).IsTrue();
@@ -222,7 +222,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamApply_ExtensibleJsonUsesCanonicalSlugsAndProducerTimezoneWithoutOutboundEcho()
+    public async Task JetstreamApply_ExtensibleJsonUsesNormalizedSlugsAndProducerTimezoneWithoutOutboundEcho()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task22-json");
@@ -393,7 +393,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     [Arguments("image/png", "image/png", 8L, ThumbnailChecksum, ThumbnailCid, "   ", "atproto/rejected")]
     [Arguments("image/png", "image/png", 8L, ThumbnailChecksum, ThumbnailCid, StorageProviders.Local, "")]
     [Arguments("image/png", "image/png", 8L, ThumbnailChecksum, ThumbnailCid, StorageProviders.Local, "   ")]
-    public async Task JetstreamApply_UnsafeOrMismatchedStagedThumbnailPreservesCanonicalGraphWithoutImage(
+    public async Task JetstreamApply_UnsafeOrMismatchedStagedThumbnailPreservesStoredGraphWithoutImage(
         string candidateMimeType,
         string stagedMimeType,
         long stagedSize,
@@ -447,15 +447,15 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await repository.TryApplyAndAdvanceWithResultAsync(request);
 
         context.ChangeTracker.Clear();
-        AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+        AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
         Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
         EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
         await Assert.That(result.Applied).IsTrue();
         await Assert.That(result.ConsumedStagedThumbnails.Count).IsEqualTo(0);
         await Assert.That(JsonNode.DeepEquals(
-            JsonNode.Parse(canonical.RecordJson!),
+            JsonNode.Parse(storedRecord.RecordJson!),
             JsonNode.Parse(expectedJson))).IsTrue();
-        await Assert.That(imported.AtprotoRecordId).IsEqualTo(canonical.Id);
+        await Assert.That(imported.AtprotoRecordId).IsEqualTo(storedRecord.Id);
         await Assert.That(session.EventId).IsEqualTo(imported.Id);
         await Assert.That(imported.FeaturedImageId).IsNull();
         await Assert.That(await context.StorageObjects.CountAsync()).IsEqualTo(0);
@@ -468,7 +468,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     [Arguments("   ", "atproto/cleanup", "image/png")]
     [Arguments(StorageProviders.Local, "", "image/png")]
     [Arguments(StorageProviders.Local, "   ", "image/png")]
-    public async Task JetstreamHandler_RepositoryRejectedStageIsCleanedWhileCanonicalImportSucceeds(
+    public async Task JetstreamHandler_RepositoryRejectedStageIsCleanedWhileStoredImportSucceeds(
         string stagedProvider,
         string stagedObjectKey,
         string stagedMimeType)
@@ -519,7 +519,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             CancellationToken.None);
 
         context.ChangeTracker.Clear();
-        AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+        AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
         Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
         EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
         await Assert.That(applied).IsTrue();
@@ -527,7 +527,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(gateway.CleanupCount).IsEqualTo(1);
         await Assert.That(gateway.CleanedStage).IsEqualTo(staged);
         await Assert.That(JsonNode.DeepEquals(
-            JsonNode.Parse(canonical.RecordJson!),
+            JsonNode.Parse(storedRecord.RecordJson!),
             JsonNode.Parse(expectedJson))).IsTrue();
         await Assert.That(session.EventId).IsEqualTo(imported.Id);
         await Assert.That(imported.FeaturedImageId).IsNull();
@@ -1169,7 +1169,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamApply_StaleSourceCannotOverwriteCanonicalEventOrSession()
+    public async Task JetstreamApply_StaleSourceCannotOverwriteStoredEventOrSession()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-stale");
@@ -1203,12 +1203,12 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             observedAt.AddSeconds(1)));
 
         context.ChangeTracker.Clear();
-        AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+        AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
         Explore.Domain.Event after = await context.Events.AsNoTracking().SingleAsync();
         EventPublicAction sourceAction = await context.EventPublicActions.AsNoTracking().SingleAsync();
         EventSession sessionAfter = await context.EventSessions.AsNoTracking().SingleAsync();
         await Assert.That(applied).IsTrue();
-        await Assert.That(canonical.SourceVersion).IsEqualTo(2);
+        await Assert.That(storedRecord.SourceVersion).IsEqualTo(2);
         await Assert.That(after.Id).IsEqualTo(before.Id);
         await Assert.That(after.Title).IsEqualTo("Current title");
         await Assert.That(sourceAction.Url).IsEqualTo("https://events.example/current");
@@ -1220,7 +1220,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamApply_ConcurrentSameCanonicalRequestsConvergeToOneEventAndSession()
+    public async Task JetstreamApply_ConcurrentSameRecordRequestsConvergeToOneEventAndSession()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-concurrent");
@@ -1260,13 +1260,13 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         await Assert.That(await verifyContext.AtprotoRecords.CountAsync()).IsEqualTo(1);
         await Assert.That(await verifyContext.Events.CountAsync()).IsEqualTo(1);
         await Assert.That(await verifyContext.EventSessions.CountAsync()).IsEqualTo(1);
-        Guid canonicalId = await verifyContext.AtprotoRecords.Select(value => value.Id).SingleAsync();
-        Guid eventCanonicalId = await verifyContext.Events
+        Guid storedRecordId = await verifyContext.AtprotoRecords.Select(value => value.Id).SingleAsync();
+        Guid eventRecordId = await verifyContext.Events
             .Select(value => value.AtprotoRecordId!.Value)
             .SingleAsync();
         Guid eventId = await verifyContext.Events.Select(value => value.Id).SingleAsync();
         Guid sessionEventId = await verifyContext.EventSessions.Select(value => value.EventId).SingleAsync();
-        await Assert.That(eventCanonicalId).IsEqualTo(canonicalId);
+        await Assert.That(eventRecordId).IsEqualTo(storedRecordId);
         await Assert.That(sessionEventId).IsEqualTo(eventId);
         await Assert.That(await verifyContext.PdsSyncOutbox.CountAsync()).IsEqualTo(0);
     }
@@ -1474,7 +1474,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamApply_CancelAfterSaveRollsBackCanonicalEventSessionAndCursor()
+    public async Task JetstreamApply_CancelAfterSaveRollsBackStoredEventSessionAndCursor()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-cancel");
@@ -1535,7 +1535,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamApply_ExpiredCommitFenceRollsBackCanonicalEventSessionPresentationAndCursor()
+    public async Task JetstreamApply_ExpiredCommitFenceRollsBackStoredEventSessionPresentationAndCursor()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-expired-fence");
@@ -1639,7 +1639,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 CancellationToken.None);
 
             context.ChangeTracker.Clear();
-            AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+            AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
             Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
             EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
             StorageObject image = await context.StorageObjects.AsNoTracking().SingleAsync();
@@ -1651,7 +1651,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 $"https://current-pds.example/xrpc/com.atproto.sync.getBlob?did={Uri.EscapeDataString(Did)}&cid={RealPipelineThumbnailCid}"
             ]);
             await Assert.That(JsonNode.DeepEquals(
-                JsonNode.Parse(canonical.RecordJson!),
+                JsonNode.Parse(storedRecord.RecordJson!),
                 JsonNode.Parse(expectedJson))).IsTrue();
             await Assert.That(imported.Slug)
                 .IsEqualTo(SlugGenerator.FromTitle("Verified pipeline event", "event"));
@@ -1757,13 +1757,13 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     CancellationToken.None);
 
                 context.ChangeTracker.Clear();
-                AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+                AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
                 Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
                 EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
                 StorageObject image = await context.StorageObjects.AsNoTracking().SingleAsync();
                 await Assert.That(applied).IsTrue();
                 await Assert.That(JsonNode.DeepEquals(
-                    JsonNode.Parse(canonical.RecordJson!),
+                    JsonNode.Parse(storedRecord.RecordJson!),
                     JsonNode.Parse(expectedJson))).IsTrue();
                 await Assert.That(session.EventId).IsEqualTo(imported.Id);
                 await Assert.That(imported.FeaturedImageId).IsEqualTo(image.Id);
@@ -1786,7 +1786,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamHandler_ActiveTailMatrixPreservesCanonicalGraphWithoutImage()
+    public async Task JetstreamHandler_ActiveTailMatrixPreservesStoredGraphWithoutImage()
     {
         byte[] activeTail = Encoding.UTF8.GetBytes(
             """<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>""");
@@ -1848,12 +1848,12 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                     CancellationToken.None);
 
                 context.ChangeTracker.Clear();
-                AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+                AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
                 Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
                 EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
                 await Assert.That(applied).IsTrue();
                 await Assert.That(JsonNode.DeepEquals(
-                    JsonNode.Parse(canonical.RecordJson!),
+                    JsonNode.Parse(storedRecord.RecordJson!),
                     JsonNode.Parse(expectedJson))).IsTrue();
                 await Assert.That(session.EventId).IsEqualTo(imported.Id);
                 await Assert.That(imported.FeaturedImageId).IsNull();
@@ -1874,7 +1874,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
     }
 
     [Test]
-    public async Task JetstreamHandler_PngHeaderFollowedBySvgPreservesCanonicalImportWithoutStorageOrFeaturedImage()
+    public async Task JetstreamHandler_PngHeaderFollowedBySvgPreservesStoredImportWithoutStorageOrFeaturedImage()
     {
         await fixture.ResetAsync();
         ImportScope scope = await SeedScopeAsync("atproto-import-task24-png-header-svg");
@@ -1946,15 +1946,15 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 CancellationToken.None);
 
             context.ChangeTracker.Clear();
-            AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+            AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
             Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
             EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
             await Assert.That(applied).IsTrue();
-            JsonNode persistedJson = JsonNode.Parse(canonical.RecordJson!)!;
+            JsonNode persistedJson = JsonNode.Parse(storedRecord.RecordJson!)!;
             await Assert.That(JsonNode.DeepEquals(persistedJson, JsonNode.Parse(expectedJson))).IsTrue();
             await Assert.That(persistedJson["futureExtension"]!["svgScript"]!.GetValue<string>())
                 .IsEqualTo(svgActiveContent);
-            await Assert.That(imported.AtprotoRecordId).IsEqualTo(canonical.Id);
+            await Assert.That(imported.AtprotoRecordId).IsEqualTo(storedRecord.Id);
             await Assert.That(session.EventId).IsEqualTo(imported.Id);
             await Assert.That(imported.FeaturedImageId).IsNull();
             await Assert.That(await context.StorageObjects.CountAsync()).IsEqualTo(0);
@@ -2045,11 +2045,11 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 CancellationToken.None);
 
             context.ChangeTracker.Clear();
-            AtprotoRecord canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+            AtprotoRecord storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
             Explore.Domain.Event imported = await context.Events.AsNoTracking().SingleAsync();
             EventSession session = await context.EventSessions.AsNoTracking().SingleAsync();
             StorageObject initialImage = await context.StorageObjects.AsNoTracking().SingleAsync();
-            Guid canonicalId = canonical.Id;
+            Guid storedRecordId = storedRecord.Id;
             Guid eventId = imported.Id;
             Guid sessionId = session.Id;
             Guid initialImageId = initialImage.Id;
@@ -2057,9 +2057,9 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             string sessionSlug = SlugGenerator.FromTitle("Recovered event-session-1", "session");
             await Assert.That(created.Applied).IsTrue();
             await Assert.That(created.ConsumedStagedThumbnails).IsEquivalentTo([initialStage]);
-            await Assert.That(JsonNode.DeepEquals(JsonNode.Parse(canonical.RecordJson!), JsonNode.Parse(initialJson)))
+            await Assert.That(JsonNode.DeepEquals(JsonNode.Parse(storedRecord.RecordJson!), JsonNode.Parse(initialJson)))
                 .IsTrue();
-            await Assert.That(imported.AtprotoRecordId).IsEqualTo(canonicalId);
+            await Assert.That(imported.AtprotoRecordId).IsEqualTo(storedRecordId);
             await Assert.That(imported.Slug).IsEqualTo(eventSlug);
             await Assert.That(imported.EventTimeZoneId).IsEqualTo("Europe/Brussels");
             await Assert.That(imported.Timezone).IsEqualTo("Europe/Brussels");
@@ -2089,7 +2089,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             await Assert.That(replayed.Applied).IsTrue();
             await Assert.That(replayed.ConsumedStagedThumbnails.Count).IsEqualTo(0);
             await Assert.That(await context.AtprotoRecords.Select(value => value.Id).SingleAsync())
-                .IsEqualTo(canonicalId);
+                .IsEqualTo(storedRecordId);
             await Assert.That(await context.Events.Select(value => value.Id).SingleAsync()).IsEqualTo(eventId);
             await Assert.That(await context.EventSessions.Select(value => value.Id).SingleAsync()).IsEqualTo(sessionId);
             await Assert.That(await context.StorageObjects.CountAsync()).IsEqualTo(1);
@@ -2150,7 +2150,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 CancellationToken.None);
 
             context.ChangeTracker.Clear();
-            canonical = await context.AtprotoRecords.AsNoTracking().SingleAsync();
+            storedRecord = await context.AtprotoRecords.AsNoTracking().SingleAsync();
             imported = await context.Events.AsNoTracking().SingleAsync();
             session = await context.EventSessions.AsNoTracking().SingleAsync();
             StorageObject[] images = await context.StorageObjects
@@ -2162,9 +2162,9 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             StorageObject replacementImage = images.Single(value => value.Id != initialImageId);
             await Assert.That(replaced.Applied).IsTrue();
             await Assert.That(replaced.ConsumedStagedThumbnails).IsEquivalentTo([replacementStage]);
-            await Assert.That(canonical.Id).IsEqualTo(canonicalId);
+            await Assert.That(storedRecord.Id).IsEqualTo(storedRecordId);
             await Assert.That(JsonNode.DeepEquals(
-                JsonNode.Parse(canonical.RecordJson!),
+                JsonNode.Parse(storedRecord.RecordJson!),
                 JsonNode.Parse(replacementJson))).IsTrue();
             await Assert.That(imported.Id).IsEqualTo(eventId);
             await Assert.That(imported.Slug).IsEqualTo(eventSlug);

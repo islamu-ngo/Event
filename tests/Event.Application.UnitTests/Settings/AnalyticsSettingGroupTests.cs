@@ -8,7 +8,7 @@ using Explore.Domain.Constants;
 public class AnalyticsSettingGroupTests
 {
     [Test]
-    public async Task SettingKeys_UseCanonicalAnalyticsGovernanceKeys()
+    public async Task SettingKeys_UseAuthoritativeAnalyticsGovernanceKeys()
     {
         var keys = AnalyticsSettingGroup.SettingKeys.ToArray();
 
@@ -36,7 +36,7 @@ public class AnalyticsSettingGroupTests
     }
 
     [Test]
-    public async Task Populate_WithCanonicalKeys_MapsAllSupportedProperties()
+    public async Task Populate_WithAuthoritativeKeys_MapsAllSupportedProperties()
     {
         var settings = new Dictionary<string, ResolvedSetting>
         {
@@ -61,7 +61,7 @@ public class AnalyticsSettingGroupTests
     }
 
     [Test]
-    public async Task Populate_WithLegacyKeys_DoesNotPopulateCanonicalProperties()
+    public async Task Populate_WithLegacyKeys_DoesNotPopulateAuthoritativeProperties()
     {
         var settings = new Dictionary<string, ResolvedSetting>
         {

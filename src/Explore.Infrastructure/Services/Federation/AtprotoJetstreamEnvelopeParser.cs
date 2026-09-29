@@ -238,7 +238,7 @@ internal static class AtprotoJetstreamEnvelopeParser
                 invalidateEventProjection: commit.Collection == AtprotoJetstreamConstants.EventCollection);
         }
 
-        AtprotoRecord canonicalRecord = CreateRecord(
+        AtprotoRecord normalizedRecord = CreateRecord(
             envelope,
             parsedDid,
             commit,
@@ -251,13 +251,13 @@ internal static class AtprotoJetstreamEnvelopeParser
         return new(
             envelope.Seq,
             envelope.TimeUs,
-            canonicalRecord,
+            normalizedRecord,
             null,
             EventProjection: calendarEvent is null
                 ? null
                 : AtprotoCalendarEventProjectionMapper.Map(
                     calendarEvent,
-                    canonicalRecord.Id,
+                    normalizedRecord.Id,
                     envelope.TimeUs,
                     observedAt));
     }

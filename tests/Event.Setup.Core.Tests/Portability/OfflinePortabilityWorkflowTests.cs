@@ -152,7 +152,7 @@ public sealed class OfflinePortabilityWorkflowTests
     }
 
     [Test]
-    public async Task FormatDiffCoverageAndDigestsAreCanonicalOrdinalAndCultureIndependent()
+    public async Task FormatDiffCoverageAndDigestsAreDeterministicOrdinalAndCultureIndependent()
     {
         SetupSelection selection = Selection(SetupScope.Tenant,
             "tenant.settings", "tenant.documents", "tenant.legal_documents");

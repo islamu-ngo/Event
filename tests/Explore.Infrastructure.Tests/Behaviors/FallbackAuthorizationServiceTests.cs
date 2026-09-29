@@ -1150,7 +1150,7 @@ public class FallbackAuthorizationServiceTests
     }
 
     [Test]
-    public async Task IsAllowedBatch_StorageObjectCreate_WithUploadIntentFacts_RequiresCanonicalCommandResourceId()
+    public async Task IsAllowedBatch_StorageObjectCreate_WithUploadIntentFacts_RequiresCommandResourceId()
     {
         _adminContext.UserId.Returns(TestUserId);
         _adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);

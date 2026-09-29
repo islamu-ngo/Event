@@ -24,7 +24,7 @@ public sealed class OperatorIdentityMetadataTests
     }
 
     [Test]
-    public async Task Authenticated_metadata_uses_canonical_codes_and_constraints()
+    public async Task Authenticated_metadata_uses_authoritative_codes_and_constraints()
     {
         using var factory = new OnboardingWebApplicationFactory();
         using var client = factory.CreateClient();

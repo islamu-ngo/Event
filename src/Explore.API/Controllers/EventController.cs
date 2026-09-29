@@ -280,7 +280,7 @@ public class EventController : EventControllerBase
     }
 
     /// <summary>
-    /// Render the canonical Open Graph image for a public event.
+    /// Render the primary Open Graph image for a public event.
     /// </summary>
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]

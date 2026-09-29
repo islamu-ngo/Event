@@ -283,7 +283,7 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
         if (value.DecimalValue is { } number) return FormAnswerValue.From(number);
         if (value.IntegerValue is { } integer) return FormAnswerValue.From((decimal)integer);
         if (value.Date is { } date) return FormAnswerValue.From(date);
-        return FormAnswerValue.From(value.OptionIds is { Count: 1 } option ? option[0].ToString("D") : value.Text ?? value.Canonical);
+        return FormAnswerValue.From(value.OptionIds is { Count: 1 } option ? option[0].ToString("D") : value.Text ?? value.Normalized);
     }
 
     private static (bool Visible, bool Required) ApplyRules(
@@ -324,7 +324,7 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
             field.OrganizerVisibilityId == (int)RegistrationOrganizerVisibilityEnum.Hidden;
         if (sensitive)
         {
-            RegistrationProtectedValue protectedValue = protector.Protect(value.Canonical);
+            RegistrationProtectedValue protectedValue = protector.Protect(value.Normalized);
             RegistrationSensitiveAnswerValue sensitiveValue = RegistrationSensitiveAnswerValue.Create(
                 submission.TenantId, protectedValue.Ciphertext, protectedValue.KeyVersion, field.RetentionPolicyId, now, anonymousUpperBoundUtc);
             yield return RegistrationAnswer.CreateSensitive(submission, field, requirement, input.SubjectType,

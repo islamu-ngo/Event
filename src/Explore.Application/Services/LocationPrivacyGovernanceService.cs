@@ -285,10 +285,10 @@ public sealed class LocationPrivacyGovernanceService(
 
     private static string ComputeVersion(IReadOnlyDictionary<string, string> values)
     {
-        string canonical = string.Join(
+        string normalized = string.Join(
             '\n',
             Keys.Select(key => $"{key}={values.GetValueOrDefault(key, "<inherited>")}"));
-        return ComputeVersion(canonical);
+        return ComputeVersion(normalized);
     }
 
     private static string ComputeVersion(params string[] parts)

@@ -19,7 +19,7 @@ public sealed class AtprotoPdsSnapshotGatewayTests
     private const long SnapshotVersion = 1_768_212_000_000_000;
 
     [Test]
-    public async Task FetchAsync_ValidRepository_UsesExactPublicGetRepoAndMaterializesCanonicalEvent()
+    public async Task FetchAsync_ValidRepository_UsesExactPublicGetRepoAndMaterializesPrimaryEvent()
     {
         var transport = new SnapshotTransport(Did, "https://pds.example", SnapshotCar.Create(Did));
         var gateway = new AtprotoPdsSnapshotGateway(transport.CreatePrimaryHandler);
@@ -595,7 +595,7 @@ public sealed class AtprotoPdsSnapshotGatewayTests
             MstBuild mst = Mst(records, mstFault);
             byte[] commit = Commit(repositoryDid, mst.RootCid, signingKey, revision, omitPrev, signatureFault);
             ATCid commitCid = Cid(commit);
-            byte[] extraRootData = CanonicalNullMap("noop");
+            byte[] extraRootData = NormalizedNullMap("noop");
             ATCid extraRootCid = Cid(extraRootData);
             byte[] header = Header(commitCid, includeAdditionalRoot ? extraRootCid : (ATCid?)null);
             if (tamperRecordBlock)
@@ -951,7 +951,7 @@ public sealed class AtprotoPdsSnapshotGatewayTests
             return writer.Encode();
         }
 
-        private static byte[] CanonicalNullMap(string key)
+        private static byte[] NormalizedNullMap(string key)
         {
             var writer = new DagCborWriter(CborConformanceMode.Canonical);
             writer.WriteStartMap(1);

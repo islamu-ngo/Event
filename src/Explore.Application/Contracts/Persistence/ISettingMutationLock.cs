@@ -3,23 +3,23 @@ namespace Explore.Application.Contracts.Persistence;
 public interface ISettingMutationLock
 {
     Task<T> ExecuteAsync<T>(
-        string canonicalSettingKey,
+        string settingKey,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default);
 
     Task<T> ExecuteManyAsync<T>(
-        IEnumerable<string> canonicalSettingKeys,
+        IEnumerable<string> settingKeys,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default);
 
     Task<T> ExecuteOrderedGroupsAsync<T>(
-        IEnumerable<IEnumerable<string>> canonicalSettingKeyGroups,
+        IEnumerable<IEnumerable<string>> settingKeyGroups,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(canonicalSettingKeyGroups);
+        ArgumentNullException.ThrowIfNull(settingKeyGroups);
         ArgumentNullException.ThrowIfNull(operation);
-        string[][] groups = canonicalSettingKeyGroups
+        string[][] groups = settingKeyGroups
             .Select(group =>
             {
                 ArgumentNullException.ThrowIfNull(group);
@@ -30,8 +30,8 @@ public interface ISettingMutationLock
         if (groups.Length == 0)
         {
             throw new ArgumentException(
-                "At least one canonical setting-key group is required.",
-                nameof(canonicalSettingKeyGroups));
+                "At least one setting-key group is required.",
+                nameof(settingKeyGroups));
         }
 
         return ExecuteGroupAsync(groupIndex: 0, cancellationToken);

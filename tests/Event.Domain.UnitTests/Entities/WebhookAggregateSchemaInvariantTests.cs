@@ -7,7 +7,7 @@ namespace Event.Domain.UnitTests.Entities;
 public sealed class WebhookAggregateSchemaInvariantTests
 {
     [Test]
-    public async Task AggregateAndLookupIdentifiers_UseCanonicalTypes()
+    public async Task AggregateAndLookupIdentifiers_UseExpectedTypes()
     {
         Type[] aggregateTypes =
         [

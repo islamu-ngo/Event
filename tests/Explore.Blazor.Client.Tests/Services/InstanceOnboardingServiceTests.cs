@@ -903,7 +903,7 @@ public class InstanceOnboardingServiceTests
     [Arguments("Local")]
     [Arguments("Keycloak")]
     [Arguments("Atproto")]
-    public async Task GetStartupStatusAsync_MapsInteractivePending_FromCanonicalStateModeAndGeneration(string? provider)
+    public async Task GetStartupStatusAsync_MapsInteractivePending_FromAuthoritativeStateModeAndGeneration(string? provider)
     {
         SetupBffClient(CreateJsonResponse(CreateStatusResource(
             isCompleted: false,
@@ -1019,7 +1019,7 @@ public class InstanceOnboardingServiceTests
     [Arguments(true, "Completed", "Headless", null)]
     [Arguments(true, "completed", "Interactive", null)]
     [Arguments(true, null, null, null)]
-    public async Task GetStartupStatusAsync_FailsClosed_WhenTheCanonicalContractIsInconsistent(
+    public async Task GetStartupStatusAsync_FailsClosed_WhenTheAuthoritativeContractIsInconsistent(
         bool isCompleted,
         string? state,
         string? mode,
@@ -1118,7 +1118,7 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
-    public async Task GetStartupStatusAsync_PrefersCanonicalFields_OverContradictingExtensionData()
+    public async Task GetStartupStatusAsync_PrefersDefinedFields_OverContradictingExtensionData()
     {
         SetupBffClient(CreateRawJsonResponse(
             """

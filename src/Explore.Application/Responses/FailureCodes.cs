@@ -1,7 +1,7 @@
 namespace Explore.Application.Responses;
 
 /// <summary>
-/// Canonical failure codes for <see cref="BaseCommandResponse{TKey}.FailureCode"/>.
+/// Standard failure codes for <see cref="BaseCommandResponse{TKey}.FailureCode"/>.
 /// Null means success or a non-specific failure; these constants identify actionable failure conditions.
 /// </summary>
 public static class FailureCodes

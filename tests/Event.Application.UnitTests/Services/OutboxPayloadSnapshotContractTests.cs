@@ -88,11 +88,11 @@ public sealed class OutboxPayloadSnapshotContractTests
         await Assert.That(replay.Request.TenantId).IsEqualTo(@event.TenantId);
         await Assert.That(replay.Request.ModerationRecordId).IsEqualTo(moderation.Id);
         await Assert.That(replay.WasLegacy).IsFalse();
-        await Assert.That(GetPropertyNames(replay.CanonicalPayload)).IsEquivalentTo([
+        await Assert.That(GetPropertyNames(replay.NormalizedPayload)).IsEquivalentTo([
             "TenantId", "ModerationRecordId", "Version"]);
-        await Assert.That(replay.CanonicalPayload).DoesNotContain("PRIVATE-TITLE-CANARY");
-        await Assert.That(replay.CanonicalPayload).DoesNotContain("PRIVATE-REASON-CANARY");
-        await Assert.That(replay.CanonicalPayload).DoesNotContain("PRIVATE-CORRELATION-CANARY");
+        await Assert.That(replay.NormalizedPayload).DoesNotContain("PRIVATE-TITLE-CANARY");
+        await Assert.That(replay.NormalizedPayload).DoesNotContain("PRIVATE-REASON-CANARY");
+        await Assert.That(replay.NormalizedPayload).DoesNotContain("PRIVATE-CORRELATION-CANARY");
     }
 
     [Test]

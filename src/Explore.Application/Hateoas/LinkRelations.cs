@@ -104,9 +104,9 @@ public static class LinkRelations
     public const string Search = "search";
 
     /// <summary>
-    /// The target resource represents the canonical URI for the context.
+    /// The target resource represents the primary URI for the context.
     /// </summary>
-    public const string Canonical = "canonical";
+    public const string Primary = "primary";
 
     /// <summary>
     /// Refers to a parent document in a hierarchy of documents.

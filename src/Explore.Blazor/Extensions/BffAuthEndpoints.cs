@@ -250,9 +250,9 @@ public static class BffAuthEndpoints
         {
             return Results.BadRequest();
         }
-        if (request.CanonicalActorId.HasValue != request.ExpectedCanonicalActorConcurrencyStamp.HasValue
-            || request.CanonicalActorId == Guid.Empty
-            || request.ExpectedCanonicalActorConcurrencyStamp == Guid.Empty)
+        if (request.TargetActorId.HasValue != request.ExpectedTargetActorConcurrencyStamp.HasValue
+            || request.TargetActorId == Guid.Empty
+            || request.ExpectedTargetActorConcurrencyStamp == Guid.Empty)
         {
             return Results.BadRequest();
         }
@@ -281,8 +281,8 @@ public static class BffAuthEndpoints
                 request.Handle,
                 returnPath,
                 request.Classification,
-                request.CanonicalActorId,
-                request.ExpectedCanonicalActorConcurrencyStamp,
+                request.TargetActorId,
+                request.ExpectedTargetActorConcurrencyStamp,
                 ctx.RequestAborted);
             metrics.Record(
                 AtprotoAuthenticationOperation.Challenge,
@@ -342,9 +342,9 @@ public static class BffAuthEndpoints
             var handler = await provider.GetHandlerAsync(ctx, AuthSchemeNames.Atproto) as AtprotoAuthenticationHandler
                 ?? throw new InvalidOperationException("ATProto authentication handler is unavailable.");
             var completion = await handler.CompleteCallbackAsync(ctx.RequestAborted);
-            var canonicalOrigin = ctx.RequestServices.GetRequiredService<AtprotoTenantOriginResolver>()
-                .ParseCanonicalOrigin();
-            if (AtprotoTenantOriginResolver.OriginsEqual(completion.Seed.Origin, canonicalOrigin))
+            var publicOrigin = ctx.RequestServices.GetRequiredService<AtprotoTenantOriginResolver>()
+                .ParsePublicOrigin();
+            if (AtprotoTenantOriginResolver.OriginsEqual(completion.Seed.Origin, publicOrigin))
             {
                 if (!await SignInAtprotoAsync(ctx, completion.Seed, completion.Session))
                 {
@@ -516,8 +516,8 @@ public static class BffAuthEndpoints
         string? Handle,
         string? ReturnPath,
         string? Classification,
-        Guid? CanonicalActorId,
-        Guid? ExpectedCanonicalActorConcurrencyStamp);
+        Guid? TargetActorId,
+        Guid? ExpectedTargetActorConcurrencyStamp);
 
     private sealed record AtprotoChallengeResponse(string AuthorizationUrl);
 

@@ -75,7 +75,7 @@ public sealed class SecretResolverBindingTests : IDisposable
     }
 
     [Test]
-    public async Task ResolveAsync_WithoutStoredBinding_UsesCanonicalEnvironmentReference()
+    public async Task ResolveAsync_WithoutStoredBinding_UsesAuthoritativeEnvironmentReference()
     {
         var source = new RecordingSecretSource(SecretSourceType.EnvironmentVariable);
         var resolver = ResolverWithDefaults(SecretProviderType.Environment, source);
@@ -91,7 +91,7 @@ public sealed class SecretResolverBindingTests : IDisposable
     }
 
     [Test]
-    public async Task ResolveAsync_WithoutStoredBinding_UsesCanonicalInfisicalReference()
+    public async Task ResolveAsync_WithoutStoredBinding_UsesAuthoritativeInfisicalReference()
     {
         var source = new RecordingSecretSource(SecretSourceType.Infisical);
         var resolver = ResolverWithDefaults(SecretProviderType.Infisical, source, "staging");

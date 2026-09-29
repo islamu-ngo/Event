@@ -158,7 +158,7 @@ public sealed class AtprotoOAuthClientFactoryTests
     }
 
     [Test]
-    public async Task InfrastructureKeyRingRejectsUnboundedNonCanonicalAndAmbiguousMaterial()
+    public async Task InfrastructureKeyRingRejectsUnboundedNonstandardAndAmbiguousMaterial()
     {
         var valid = CreatePrivateJwks(("active", "active"));
         using var document = JsonDocument.Parse(valid);
@@ -181,7 +181,7 @@ public sealed class AtprotoOAuthClientFactoryTests
     }
 
     [Test]
-    public async Task SharedOutboundPolicyRejectsSpecialIpv4Ipv6AndCanonicalAuthorityMatrix()
+    public async Task SharedOutboundPolicyRejectsSpecialIpv4Ipv6AndStandardAuthorityMatrix()
     {
         var policy = new AtprotoOutboundPolicy(false);
         var unsafeUris = new[]

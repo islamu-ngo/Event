@@ -181,7 +181,7 @@ public sealed class ConfigurationManifestExportQueryTests
             binder: null,
             types: [typeof(ConfigurationManifestV1Alpha2)],
             modifiers: null)
-            ?? throw new InvalidOperationException("The canonical serializer must accept ConfigurationManifestV1Alpha2.");
+            ?? throw new InvalidOperationException("The configured serializer must accept ConfigurationManifestV1Alpha2.");
         return (byte[])method.Invoke(null, [manifest])!;
     }
 

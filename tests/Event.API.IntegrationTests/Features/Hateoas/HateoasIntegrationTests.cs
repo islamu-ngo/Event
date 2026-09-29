@@ -60,9 +60,9 @@ public class HateoasIntegrationTests
         var hasLinksProperty = json.RootElement.TryGetProperty("_links", out var links);
         await Assert.That(hasLinksProperty).IsTrue();
 
-        // Collection payloads should expose at least one canonical navigation link.
-        var hasCanonicalLink = links.TryGetProperty("self", out _) || links.TryGetProperty("first", out _);
-        await Assert.That(hasCanonicalLink).IsTrue();
+        // Collection payloads should expose at least one primary navigation link.
+        var hasPrimaryLink = links.TryGetProperty("self", out _) || links.TryGetProperty("first", out _);
+        await Assert.That(hasPrimaryLink).IsTrue();
     }
 
     [Test]
@@ -399,9 +399,9 @@ public class HateoasIntegrationTests
                 foundRelations.Add(link.Name);
             }
 
-            // At minimum, should have a canonical navigation link.
-            var hasCanonicalLink = foundRelations.Contains("self") || foundRelations.Contains("first");
-            await Assert.That(hasCanonicalLink).IsTrue();
+            // At minimum, should have a primary navigation link.
+            var hasPrimaryLink = foundRelations.Contains("self") || foundRelations.Contains("first");
+            await Assert.That(hasPrimaryLink).IsTrue();
 
             // All found relations should be either IANA standard or custom with proper prefix
             foreach (var rel in foundRelations)

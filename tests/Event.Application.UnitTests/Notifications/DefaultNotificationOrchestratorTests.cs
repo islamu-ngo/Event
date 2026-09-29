@@ -333,11 +333,11 @@ public sealed class DefaultNotificationOrchestratorTests
 
     private sealed class TrackingUnitOfWork : IUnitOfWork, ISettingMutationLock
     {
-        public Task<T> ExecuteAsync<T>(string canonicalSettingKey,
+        public Task<T> ExecuteAsync<T>(string settingKey,
             Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
             operation(cancellationToken);
 
-        public Task<T> ExecuteManyAsync<T>(IEnumerable<string> canonicalSettingKeys,
+        public Task<T> ExecuteManyAsync<T>(IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
             operation(cancellationToken);
 

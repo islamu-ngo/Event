@@ -193,7 +193,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
     }
 
     [Test]
-    public async Task ProviderSelectors_UseNormalizedKeycloakAuthorityAndExactCanonicalDid()
+    public async Task ProviderSelectors_UseNormalizedKeycloakAuthorityAndExactDid()
     {
         await using var database = await BootstrapDatabase.CreateAsync();
         Dictionary<string, string?> keycloakValues = ConfiguredValues();
@@ -260,7 +260,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
             "deployment-mode", "SingleTenant",
             "site-name", "Independent Operator",
             "support-email", "contact@example.test",
-            "canonical-url", "https://example.test",
+            "public-url", "https://example.test",
             "locale", "en",
             "time-zone", "UTC",
             "purpose", string.Empty,

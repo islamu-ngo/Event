@@ -41,7 +41,7 @@ namespace Event.API.IntegrationTests.Authentication;
 
 public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDisposable
 {
-    public const string CanonicalOrigin = "https://events.example.com";
+    public const string PublicOrigin = "https://events.example.com";
     public const string TenantOrigin = "https://independent-community.example.net";
     private readonly AtprotoTransientApiFixture database = new();
     private readonly string keyDirectory = Path.Combine(Path.GetTempPath(), "atproto-relational-login-" + Guid.CreateVersion7().ToString("N"));
@@ -82,7 +82,7 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                 {
                     Id = Guid.CreateVersion7(),
                     SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
-                    Value = JsonSerializer.Serialize(CanonicalOrigin),
+                    Value = JsonSerializer.Serialize(PublicOrigin),
                     ValueType = SettingValueType.String,
                     Category = "Authentication",
                     CreatedAt = now
@@ -127,7 +127,7 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
             ["Keycloak:Authority"] = string.Empty,
             ["Keycloak:ClientId"] = string.Empty,
             ["Keycloak:MetadataAddress"] = string.Empty,
-            ["Atproto:PublicUrl"] = CanonicalOrigin,
+            ["Atproto:PublicUrl"] = PublicOrigin,
             ["Atproto:CallbackPath"] = "/signin-atproto"
         };
         if (ConfiguredOnboarding)
@@ -143,14 +143,14 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
             apiConfiguration["Instance:OperatorIdentity:PublicName"] = "Fixture Operator";
             apiConfiguration["Instance:OperatorIdentity:LegalName"] = "Fixture Operator ASBL";
             apiConfiguration["Instance:OperatorIdentity:IsOfficialInstance"] = "false";
-            apiConfiguration["Instance:OperatorIdentity:OfficialOrigin"] = CanonicalOrigin;
+            apiConfiguration["Instance:OperatorIdentity:OfficialOrigin"] = PublicOrigin;
             apiConfiguration["Instance:OperatorIdentity:OperatorKindCode"] = "registered_organization";
             apiConfiguration["Instance:OperatorIdentity:JurisdictionCountryCode"] = "BE";
             apiConfiguration["Instance:OperatorIdentity:PublicContactEmail"] = "operator@example.test";
-            apiConfiguration["Instance:OperatorIdentity:WebsiteUrl"] = CanonicalOrigin;
-            apiConfiguration["Instance:OperatorIdentity:LegalNoticeUrl"] = CanonicalOrigin + "/legal";
-            apiConfiguration["Instance:OperatorIdentity:TermsUrl"] = CanonicalOrigin + "/terms";
-            apiConfiguration["Instance:OperatorIdentity:PrivacyUrl"] = CanonicalOrigin + "/privacy";
+            apiConfiguration["Instance:OperatorIdentity:WebsiteUrl"] = PublicOrigin;
+            apiConfiguration["Instance:OperatorIdentity:LegalNoticeUrl"] = PublicOrigin + "/legal";
+            apiConfiguration["Instance:OperatorIdentity:TermsUrl"] = PublicOrigin + "/terms";
+            apiConfiguration["Instance:OperatorIdentity:PrivacyUrl"] = PublicOrigin + "/privacy";
         }
         Api = new PostgreSqlApiWebApplicationFactory(connection, apiConfiguration, services =>
         {
@@ -192,7 +192,7 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                 ["Keycloak:Authority"] = string.Empty,
                 ["Keycloak:ClientId"] = string.Empty,
                 ["Keycloak:MetadataAddress"] = string.Empty,
-                ["Atproto:PublicUrl"] = CanonicalOrigin,
+                ["Atproto:PublicUrl"] = PublicOrigin,
                 ["Atproto:CallbackPath"] = "/signin-atproto",
                 ["Atproto:TenantOrigins:0:Origin"] = TenantOrigin,
                 ["Atproto:TenantOrigins:0:TenantId"] = TenantId.ToString("D"),

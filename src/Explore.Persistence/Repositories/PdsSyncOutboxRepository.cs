@@ -361,7 +361,7 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
                     }
 
                     if (outbox.ExpectedCid is null
-                        && !await CanonicalMatchesCompensationEvidenceAsync(outbox, record, cancellationToken))
+                        && !await StoredRecordMatchesCompensationEvidenceAsync(outbox, record, cancellationToken))
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         return false;
@@ -412,11 +412,11 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
                         && outbox.ExpectedCid is null
                         && observedBaseCid is not null
                         && string.Equals(record.Cid, observedBaseCid, StringComparison.Ordinal)
-                        && await CanonicalMatchesCompensationEvidenceAsync(outbox, record, cancellationToken);
+                        && await StoredRecordMatchesCompensationEvidenceAsync(outbox, record, cancellationToken);
                     bool immutablePredecessorEcho = outbox.Operation == PdsSyncOperation.Update
                         && outbox.ExpectedCid is null
                         && string.Equals(observedBaseCid, cid, StringComparison.Ordinal)
-                        && await CanonicalMatchesCompensationEvidenceAsync(outbox, record, cancellationToken);
+                        && await StoredRecordMatchesCompensationEvidenceAsync(outbox, record, cancellationToken);
                     bool tombstonedRestore = outbox.Operation == PdsSyncOperation.Create
                         && record.TombstonedAt is not null
                         && record.Cid is null;
@@ -639,16 +639,16 @@ public sealed class PdsSyncOutboxRepository : IPdsSyncOutboxRepository
             value.LeaseExpiresAt > observedAt &&
             value.SupersededAt == null);
 
-    private async Task<bool> CanonicalMatchesCompensationEvidenceAsync(
+    private async Task<bool> StoredRecordMatchesCompensationEvidenceAsync(
         PdsSyncOutbox successor,
-        AtprotoRecord canonical,
+        AtprotoRecord storedRecord,
         CancellationToken cancellationToken)
     {
         PdsSyncCompensationEvidence evidence = await GetCompensationEvidenceAsync(successor, cancellationToken);
         return evidence.IsComplete
-            && (canonical.Cid is not null
-                && evidence.AllowedBaseCids.Contains(canonical.Cid, StringComparer.Ordinal)
-                || evidence.AllowedPayloads.Any(payload => JsonSemanticallyEquals(payload, canonical.RecordJson)));
+            && (storedRecord.Cid is not null
+                && evidence.AllowedBaseCids.Contains(storedRecord.Cid, StringComparer.Ordinal)
+                || evidence.AllowedPayloads.Any(payload => JsonSemanticallyEquals(payload, storedRecord.RecordJson)));
     }
 
     private static bool JsonSemanticallyEquals(string? left, string? right)

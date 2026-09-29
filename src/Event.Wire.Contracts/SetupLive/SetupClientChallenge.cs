@@ -34,7 +34,7 @@ public sealed class SetupClientChallenge
         out SetupClientChallenge? challenge)
     {
         challenge = null;
-        if (!SetupLiveBase64Url32.IsCanonical(candidate))
+        if (!SetupLiveBase64Url32.HasStandardEncoding(candidate))
             return false;
 
         challenge = new SetupClientChallenge(candidate!);
@@ -48,7 +48,7 @@ public sealed class SetupClientChallenge
 
 internal static class SetupLiveBase64Url32
 {
-    internal static bool IsCanonical(string? candidate)
+    internal static bool HasStandardEncoding(string? candidate)
     {
         if (candidate is null || candidate.Length != 43)
             return false;

@@ -21,7 +21,7 @@ namespace Explore.Blazor.IntegrationTests.Endpoints;
 
 public sealed class AtprotoAuthenticationFlowTests
 {
-    private const string CanonicalOrigin = "https://events.example.com";
+    private const string PublicOrigin = "https://events.example.com";
     private static readonly Guid TenantId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000001");
 
     [Test]
@@ -69,16 +69,16 @@ public sealed class AtprotoAuthenticationFlowTests
     }
 
     [Test]
-    public async Task CanonicalActorTargetChallengeRejectsHalfOrEmptyPairBeforeOAuthStateCreation()
+    public async Task TargetActorChallengeRejectsHalfOrEmptyPairBeforeOAuthStateCreation()
     {
         await using var factory = CreateFactory();
         Guid actor = Guid.CreateVersion7();
         Guid stamp = Guid.CreateVersion7();
         foreach (string payload in new[]
         {
-            JsonSerializer.Serialize(new { handle = "alice.example", classification = "person", canonicalActorId = actor }),
-            JsonSerializer.Serialize(new { handle = "alice.example", classification = "person", expectedCanonicalActorConcurrencyStamp = stamp }),
-            JsonSerializer.Serialize(new { handle = "alice.example", classification = "person", canonicalActorId = Guid.Empty, expectedCanonicalActorConcurrencyStamp = stamp })
+            JsonSerializer.Serialize(new { handle = "alice.example", classification = "person", targetActorId = actor }),
+            JsonSerializer.Serialize(new { handle = "alice.example", classification = "person", expectedTargetActorConcurrencyStamp = stamp }),
+            JsonSerializer.Serialize(new { handle = "alice.example", classification = "person", targetActorId = Guid.Empty, expectedTargetActorConcurrencyStamp = stamp })
         })
         {
             var response = await ChallengeWithAntiforgeryAsync(factory, payload);
@@ -136,7 +136,7 @@ public sealed class AtprotoAuthenticationFlowTests
         bool enableRealAtprotoRateLimit = false, BffOnboardingStatus? onboardingStatus = null) =>
         new BlazorBffWebApplicationFactory().WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("Atproto:PublicUrl", CanonicalOrigin);
+            builder.UseSetting("Atproto:PublicUrl", PublicOrigin);
             builder.UseSetting("Atproto:CallbackPath", "/signin-atproto");
             builder.UseSetting("Explore:MultiTenancy:DefaultTenantId", TenantId.ToString("D"));
             builder.UseSetting("Explore:MultiTenancy:DefaultTenant", "default");
@@ -170,7 +170,7 @@ public sealed class AtprotoAuthenticationFlowTests
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory) => factory.CreateClient(new()
     {
         AllowAutoRedirect = false,
-        BaseAddress = new(CanonicalOrigin),
+        BaseAddress = new(PublicOrigin),
         HandleCookies = true
     });
 

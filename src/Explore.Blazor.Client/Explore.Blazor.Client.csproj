@@ -51,7 +51,7 @@
     OpenAPI Client Generation (NSwag)
     ==================================
     WORKFLOW:
-    1. Refresh the canonical OpenAPI schema when the backend contract changes
+    1. Refresh the authoritative OpenAPI schema when the backend contract changes
     2. Build Blazor.Client → NSwag regenerates EventApiTagClients.g.cs BEFORE compilation
 
     KEY DESIGN: Generation happens BEFORE CoreCompile, so:
@@ -102,7 +102,7 @@
     <GeneratedRecordTransformerInput Include="$(GeneratedRecordMutablePolicy)" />
   </ItemGroup>
 
-  <!-- NSwag emits per-tag clients and canonical DTOs before repository-owned policy is applied. -->
+  <!-- NSwag emits per-tag clients and primary DTOs before repository-owned policy is applied. -->
   <Target Name="GenerateApiClientSource" DependsOnTargets="BuildGeneratedContractTool">
     <PropertyGroup>
       <GeneratedContractStagingDirectory>$(GeneratedContractCaptureDirectory)/staging/$([System.Guid]::NewGuid())</GeneratedContractStagingDirectory>

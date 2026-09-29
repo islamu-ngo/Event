@@ -18,10 +18,10 @@ public sealed class SelfHostOnboardingProfileDtoValidator : AbstractValidator<Se
             .WithMessage("SupportEmail must be a valid email address.")
             .When(x => !string.IsNullOrWhiteSpace(x.SupportEmail));
 
-        RuleFor(x => x.CanonicalUrl)
+        RuleFor(x => x.PublicUrl)
             .Must(PublicAddressResolver.IsValid)
-            .WithMessage("CanonicalUrl must be an absolute http or https URL without credentials, query or fragment.")
-            .When(x => !string.IsNullOrWhiteSpace(x.CanonicalUrl));
+            .WithMessage("PublicUrl must be an absolute http or https URL without credentials, query or fragment.")
+            .When(x => !string.IsNullOrWhiteSpace(x.PublicUrl));
 
         RuleFor(x => x.Locale)
             .NotEmpty()

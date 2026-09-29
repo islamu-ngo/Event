@@ -54,7 +54,7 @@ public sealed class EmailOptionalSetupTests
             || entry.Key.StartsWith("MAILPIT_", StringComparison.Ordinal))).IsFalse();
         await Assert.That(entries.Any(entry => entry.Key == "EMAIL_DISPATCH_RABBITMQ_ENABLED"))
             .IsTrue();
-        await Assert.That(entries.Length).IsLessThan(CanonicalEnvironmentCatalogue.DotenvEnvironmentKeys.Count);
+        await Assert.That(entries.Length).IsLessThan(PlatformEnvironmentCatalogue.DotenvEnvironmentKeys.Count);
         await Assert.That(entries.Any(entry => entry.Key.Contains("DELIVERY_ENABLED", StringComparison.OrdinalIgnoreCase)))
             .IsFalse();
     }
@@ -66,18 +66,18 @@ public sealed class EmailOptionalSetupTests
     {
         var context = new EnvironmentActivationContext(topology, ["messaging"], ["local"]);
         DotenvCompositionResult result = DotenvComposer.ComposeNoSecrets(
-            CanonicalEnvironmentCatalogue.Catalogue, context, []);
+            PlatformEnvironmentCatalogue.Catalogue, context, []);
         await Assert.That(result.Diagnostics).IsEmpty();
         await Assert.That(result.Readiness.State).IsEqualTo(DotenvReadinessState.Ready);
         await Assert.That(result.Document.Entries).IsEmpty();
-        await Assert.That(CanonicalEnvironmentCatalogue.Catalogue.Lookup("EMAIL_DISPATCH_RABBITMQ_ENABLED")!.SafeDefault)
+        await Assert.That(PlatformEnvironmentCatalogue.Catalogue.Lookup("EMAIL_DISPATCH_RABBITMQ_ENABLED")!.SafeDefault)
             .IsEqualTo("false");
     }
 
     [Test]
     public async Task CatalogueRetainsSupportedSmtpButRemovesObsoleteCaptureOverrides()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         foreach (string key in new[] { "MAILPIT_TAG", "MAILPIT_SMTP_PORT", "MAILPIT_MAX_MESSAGES" })
             await Assert.That(catalogue.Lookup(key)).IsNull();
         foreach (string key in new[] { "MAIL_SMTP_HOST", "MAIL_SMTP_PORT", "MAIL_SMTP_PASSWORD", "MAIL_SMTP_ENCRYPTION" })
@@ -93,7 +93,7 @@ public sealed class EmailOptionalSetupTests
             item.Key.Contains("DELIVERY_ENABLED", StringComparison.OrdinalIgnoreCase))).IsFalse();
         MachineComposeFile compose = EnvironmentMachineConfiguration.ParseCompose(File.ReadAllText(Path.Combine(
             EnvironmentMachineConfiguration.RepositoryRoot(), "docker-compose.yml")));
-        await Assert.That(compose.Keys.SequenceEqual(CanonicalEnvironmentCatalogue.ComposeEnvironmentKeys,
+        await Assert.That(compose.Keys.SequenceEqual(PlatformEnvironmentCatalogue.ComposeEnvironmentKeys,
             StringComparer.Ordinal)).IsTrue();
     }
 
@@ -142,7 +142,7 @@ public sealed class EmailOptionalSetupTests
     }
 
     private static DotenvCompositionResult Compose(string key, string value) =>
-        DotenvComposer.ComposeNoSecrets(CanonicalEnvironmentCatalogue.Catalogue,
+        DotenvComposer.ComposeNoSecrets(PlatformEnvironmentCatalogue.Catalogue,
             new EnvironmentActivationContext("split", ["integration", "messaging"], ["local"]),
             [new DotenvEntry(key, value, DotenvEntryKind.LocalHumanValue, false, DotenvProvenance.UserInput)]);
 

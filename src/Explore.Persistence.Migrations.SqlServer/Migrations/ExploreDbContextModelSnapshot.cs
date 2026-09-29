@@ -473,10 +473,6 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("CanonicalActorId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("canonical_actor_id");
-
                     b.Property<string>("EvidenceReference")
                         .IsRequired()
                         .HasMaxLength(2048)
@@ -499,19 +495,23 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("source_actor_id");
 
+                    b.Property<Guid>("TargetActorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("target_actor_id");
+
                     b.HasKey("Id")
                         .HasName("pk_actor_merges");
-
-                    b.HasIndex("CanonicalActorId")
-                        .HasDatabaseName("ix_actor_merges_canonical_actor_id");
 
                     b.HasIndex("SourceActorId")
                         .IsUnique()
                         .HasDatabaseName("ix_actor_merges_source_actor_id");
 
+                    b.HasIndex("TargetActorId")
+                        .HasDatabaseName("ix_actor_merges_target_actor_id");
+
                     b.ToTable("actor_merges", "islamu_event", t =>
                         {
-                            t.HasCheckConstraint("ck_actor_merges_distinct_actors", "source_actor_id <> canonical_actor_id");
+                            t.HasCheckConstraint("ck_actor_merges_distinct_actors", "source_actor_id <> target_actor_id");
                         });
                 });
 
@@ -37972,13 +37972,6 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
             modelBuilder.Entity("Explore.Domain.ActorMerge", b =>
                 {
-                    b.HasOne("Explore.Domain.Actor", "CanonicalActor")
-                        .WithMany("MergesInto")
-                        .HasForeignKey("CanonicalActorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_actor_merges_actors_canonical_actor_id");
-
                     b.HasOne("Explore.Domain.Actor", "SourceActor")
                         .WithMany("MergesFrom")
                         .HasForeignKey("SourceActorId")
@@ -37986,9 +37979,16 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_actor_merges_actors_source_actor_id");
 
-                    b.Navigation("CanonicalActor");
+                    b.HasOne("Explore.Domain.Actor", "TargetActor")
+                        .WithMany("MergesInto")
+                        .HasForeignKey("TargetActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_actor_merges_actors_target_actor_id");
 
                     b.Navigation("SourceActor");
+
+                    b.Navigation("TargetActor");
                 });
 
             modelBuilder.Entity("Explore.Domain.ActorModerationRecord", b =>

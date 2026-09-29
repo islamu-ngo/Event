@@ -444,7 +444,7 @@ public sealed class AtprotoPdsSnapshotGateway : IAtprotoPdsSnapshotGateway
         JsonElement record;
         try
         {
-            if (!IsCanonicalRecordWithinDepth(recordData, cancellationToken))
+            if (!IsNormalizedRecordWithinDepth(recordData, cancellationToken))
             {
                 return null;
             }
@@ -498,7 +498,7 @@ public sealed class AtprotoPdsSnapshotGateway : IAtprotoPdsSnapshotGateway
         return new(parsed.Record, parsed.EventProjection);
     }
 
-    private static bool IsCanonicalRecordWithinDepth(
+    private static bool IsNormalizedRecordWithinDepth(
         byte[] data,
         CancellationToken cancellationToken)
     {

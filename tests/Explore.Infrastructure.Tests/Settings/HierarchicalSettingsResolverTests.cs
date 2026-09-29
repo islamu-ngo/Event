@@ -69,12 +69,12 @@ public class HierarchicalSettingsResolverTests : IDisposable
         internal static readonly ImmediateSettingMutationLock Instance = new();
 
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => operation(cancellationToken);
 
         public Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => operation(cancellationToken);
     }
@@ -84,13 +84,13 @@ public class HierarchicalSettingsResolverTests : IDisposable
         internal static readonly RejectingSettingMutationLock Instance = new();
 
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             throw new MutationLockReachedException();
 
         public Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             throw new MutationLockReachedException();

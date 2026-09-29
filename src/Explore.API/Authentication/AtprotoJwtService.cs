@@ -38,8 +38,8 @@ public sealed class AtprotoJwtService(
         var principal = Validate(token, ring, AtprotoJwtOptions.BootstrapIssuer, AtprotoJwtOptions.BootstrapAudience);
         var did = principal?.FindFirstValue(AtprotoJwtOptions.DidClaim);
         var classification = principal?.FindFirstValue(AtprotoJwtOptions.ClassificationClaim);
-        var canonicalActorIdClaims = principal?.FindAll(AtprotoJwtOptions.CanonicalActorIdClaim).Take(2).ToArray() ?? [];
-        var expectedConcurrencyStampClaims = principal?.FindAll(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim).Take(2).ToArray() ?? [];
+        var targetActorIdClaims = principal?.FindAll(AtprotoJwtOptions.TargetActorIdClaim).Take(2).ToArray() ?? [];
+        var expectedConcurrencyStampClaims = principal?.FindAll(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim).Take(2).ToArray() ?? [];
         if (principal is null
             || !Guid.TryParse(principal.FindFirstValue(AtprotoJwtOptions.TenantClaim), out var assertedTenant)
             || assertedTenant != tenantId
@@ -55,11 +55,11 @@ public sealed class AtprotoJwtService(
             return null;
         }
 
-        if (canonicalActorIdClaims.Length != expectedConcurrencyStampClaims.Length
-            || canonicalActorIdClaims.Length > 1
-            || (canonicalActorIdClaims.Length == 1
-                && (!Guid.TryParseExact(canonicalActorIdClaims[0].Value, "D", out var canonicalActorId)
-                    || canonicalActorId == Guid.Empty
+        if (targetActorIdClaims.Length != expectedConcurrencyStampClaims.Length
+            || targetActorIdClaims.Length > 1
+            || (targetActorIdClaims.Length == 1
+                && (!Guid.TryParseExact(targetActorIdClaims[0].Value, "D", out var targetActorId)
+                    || targetActorId == Guid.Empty
                     || !Guid.TryParseExact(expectedConcurrencyStampClaims[0].Value, "D", out var expectedConcurrencyStamp)
                     || expectedConcurrencyStamp == Guid.Empty)))
         {
@@ -71,8 +71,8 @@ public sealed class AtprotoJwtService(
             assertedTenant,
             did!,
             classification,
-            canonicalActorIdClaims.Length == 1 ? Guid.ParseExact(canonicalActorIdClaims[0].Value, "D") : null,
-            canonicalActorIdClaims.Length == 1 ? Guid.ParseExact(expectedConcurrencyStampClaims[0].Value, "D") : null);
+            targetActorIdClaims.Length == 1 ? Guid.ParseExact(targetActorIdClaims[0].Value, "D") : null,
+            targetActorIdClaims.Length == 1 ? Guid.ParseExact(expectedConcurrencyStampClaims[0].Value, "D") : null);
     }
 
     public async Task<AtprotoIssuedSessionToken> IssueAsync(
@@ -322,8 +322,8 @@ public sealed record AtprotoBootstrapIdentity(
     Guid TenantId,
     string Did,
     string Classification,
-    Guid? CanonicalActorId,
-    Guid? ExpectedCanonicalActorConcurrencyStamp);
+    Guid? TargetActorId,
+    Guid? ExpectedTargetActorConcurrencyStamp);
 
 public sealed record AtprotoSessionBridgeIdentity(
     string ReplayKey,

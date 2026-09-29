@@ -44,7 +44,7 @@ public sealed class AtprotoSubjectOnboardingOperation(
         Actor represented;
         if (identity is null)
         {
-            if (request.CanonicalActorId is not null) return AtprotoSubjectOnboardingResult.Failed("classification_conflict");
+            if (request.TargetActorId is not null) return AtprotoSubjectOnboardingResult.Failed("classification_conflict");
             represented = await CreateAsync(request.Classification, userActor, user.Id, verified.Handle, at).ConfigureAwait(false);
             identity = new AtprotoIdentity(did);
             identity.ActorId = represented.Id;
@@ -63,11 +63,11 @@ public sealed class AtprotoSubjectOnboardingOperation(
             represented = identity.Actor;
             if (identity.IsDeleted || identity.IsSuspended || !identity.IsActive || represented.IsDeleted || represented.IsSuspended)
                 return AtprotoSubjectOnboardingResult.Failed("classification_conflict");
-            if (request.CanonicalActorId is not null)
+            if (request.TargetActorId is not null)
             {
-                var canonical = await ConsolidateAsync(request, identity, tenantId, user.Id, at, cancellationToken).ConfigureAwait(false);
-                if (canonical is null) return AtprotoSubjectOnboardingResult.Failed("classification_conflict");
-                represented = canonical;
+                var targetActor = await ConsolidateAsync(request, identity, tenantId, user.Id, at, cancellationToken).ConfigureAwait(false);
+                if (targetActor is null) return AtprotoSubjectOnboardingResult.Failed("classification_conflict");
+                represented = targetActor;
             }
             else if (represented.ActorTypeId == (int)ActorTypeEnum.ExternalUnclassified && request.Classification is AtprotoSubjectClassification.Organization or AtprotoSubjectClassification.Group)
             {
@@ -102,12 +102,12 @@ public sealed class AtprotoSubjectOnboardingOperation(
 
     private async Task<Actor?> ConsolidateAsync(BootstrapAtprotoSessionCommand request, AtprotoIdentity identity, Guid tenantId, Guid userId, DateTime at, CancellationToken ct)
     {
-        if (request.Classification is not (AtprotoSubjectClassification.Organization or AtprotoSubjectClassification.Group) || request.CanonicalActorId is not Guid targetId || request.ExpectedCanonicalActorConcurrencyStamp is not Guid stamp || targetId == Guid.Empty || stamp == Guid.Empty) return null;
+        if (request.Classification is not (AtprotoSubjectClassification.Organization or AtprotoSubjectClassification.Group) || request.TargetActorId is not Guid targetId || request.ExpectedTargetActorConcurrencyStamp is not Guid stamp || targetId == Guid.Empty || stamp == Guid.Empty) return null;
         var source = identity.Actor;
         var target = await actors.GetById(targetId).ConfigureAwait(false);
         var type = request.Classification == AtprotoSubjectClassification.Organization ? (int)ActorTypeEnum.Organization : (int)ActorTypeEnum.Group;
-        if (!IsValidCanonicalTarget(target, type, stamp)
-            || !await HasCanonicalManagementAuthorityAsync(target!, tenantId, userId, ct).ConfigureAwait(false)) return null;
+        if (!IsValidTargetActor(target, type, stamp)
+            || !await HasTargetActorManagementAuthorityAsync(target!, tenantId, userId, ct).ConfigureAwait(false)) return null;
 
         var evidenceReference = BuildEvidenceReference(identity);
         if (source.Id == target!.Id)
@@ -127,7 +127,7 @@ public sealed class AtprotoSubjectOnboardingOperation(
         return target;
     }
 
-    private async Task<bool> HasCanonicalManagementAuthorityAsync(Actor target, Guid tenantId, Guid userId, CancellationToken ct)
+    private async Task<bool> HasTargetActorManagementAuthorityAsync(Actor target, Guid tenantId, Guid userId, CancellationToken ct)
     {
         if (target.OrganizationId is Guid organizationId)
         {
@@ -152,7 +152,7 @@ public sealed class AtprotoSubjectOnboardingOperation(
         return false;
     }
 
-    private static bool IsValidCanonicalTarget(Actor? target, int type, Guid stamp) =>
+    private static bool IsValidTargetActor(Actor? target, int type, Guid stamp) =>
         target is { IsDeleted: false, IsSuspended: false }
         && target.ActorTypeId == type
         && target.ConcurrencyStamp == stamp

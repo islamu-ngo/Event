@@ -274,7 +274,7 @@ public sealed class NativeUiShellHttpTests
         }
         using (var profile = new HttpRequestMessage(HttpMethod.Patch, "/api/InstanceOnboarding/profile")
         {
-            Content = JsonContent.Create(new { siteName = "Private installation", canonicalUrl = "https://private.example.test", locale = "en", timeZone = "UTC" })
+            Content = JsonContent.Create(new { siteName = "Private installation", publicUrl = "https://private.example.test", locale = "en", timeZone = "UTC" })
         })
         {
             profile.Headers.Add("X-Setup-Secret", secret);

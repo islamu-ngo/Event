@@ -218,7 +218,7 @@ public sealed class TriggerManagedControlPlaneRegistrationCommandHandler(
         DateTime eventToControlPlaneExpiresAt,
         DateTime controlPlaneToEventExpiresAt)
     {
-        var canonical = string.Join('\n',
+        var normalized = string.Join('\n',
             registrationId.ToString("D"),
             managedInstanceId.ToString("D"),
             eventInstanceId.ToString("D"),
@@ -231,7 +231,7 @@ public sealed class TriggerManagedControlPlaneRegistrationCommandHandler(
             controlPlaneToEventSecretHash,
             eventToControlPlaneExpiresAt.ToString("O"),
             controlPlaneToEventExpiresAt.ToString("O"));
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant();
     }
 
     private static TriggerManagedRegistrationResultDto Success(ManagedControlPlaneRegistration registration) =>

@@ -149,7 +149,7 @@ public sealed class RegistrationFormVersionTests
     }
 
     [Test]
-    public async Task FieldCanonicalIdentity_MustBeUniqueAcrossSectionsWithinVersion()
+    public async Task FieldIdentity_MustBeUniqueAcrossSectionsWithinVersion()
     {
         RegistrationFormVersion version = Version();
         RegistrationFormSection firstSection = RegistrationFormSection.Create(Id(10), version, 1, "Details", Now);
@@ -281,7 +281,7 @@ public sealed class RegistrationFormVersionTests
             Id(21), section, 1, " ", "email", "Email", RegistrationFieldTypeEnum.Email, 1,
             RegistrationOrganizerVisibilityEnum.AuthorizedOrganizers, false, true, Now)).Throws<ArgumentException>();
 
-        string[] canonicalMembers =
+        string[] artifactMembers =
         [
             .. typeof(RegistrationForm).GetMembers().Select(member => member.Name),
             .. typeof(RegistrationFormVersion).GetMembers().Select(member => member.Name),
@@ -296,7 +296,7 @@ public sealed class RegistrationFormVersionTests
                 .SelectMany(method => method.GetParameters())
                 .Select(parameter => parameter.Name ?? string.Empty)
         ];
-        await Assert.That(canonicalMembers.Any(name => name.Contains("ProviderQuestion", StringComparison.OrdinalIgnoreCase))).IsFalse();
+        await Assert.That(artifactMembers.Any(name => name.Contains("ProviderQuestion", StringComparison.OrdinalIgnoreCase))).IsFalse();
     }
 
     private static RegistrationFormVersion DraftWithGraph()

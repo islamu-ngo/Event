@@ -75,17 +75,17 @@ public sealed class NotificationFanoutRecipientTemplateFactory
             throw new JsonException("Fanout template scope does not match its occurrence.");
         }
 
-        NotificationFanoutChangeSetV1 changeSet = NotificationFanoutTemplateJson.Canonicalize(
+        NotificationFanoutChangeSetV1 changeSet = NotificationFanoutTemplateJson.Normalize(
             JsonSerializer.Deserialize(
                     occurrence.ChangeSetJson,
                     NotificationFanoutTemplateJsonContext.Default.NotificationFanoutChangeSetV1)
                 ?? throw new JsonException("Fanout change set is required."));
-        NotificationFanoutSnapshotV1 before = NotificationFanoutTemplateJson.Canonicalize(
+        NotificationFanoutSnapshotV1 before = NotificationFanoutTemplateJson.Normalize(
             JsonSerializer.Deserialize(
                     occurrence.SafeBeforeSnapshotJson,
                     NotificationFanoutTemplateJsonContext.Default.NotificationFanoutSnapshotV1)
                 ?? throw new JsonException("Fanout before snapshot is required."));
-        NotificationFanoutSnapshotV1 after = NotificationFanoutTemplateJson.Canonicalize(
+        NotificationFanoutSnapshotV1 after = NotificationFanoutTemplateJson.Normalize(
             JsonSerializer.Deserialize(
                     occurrence.SafeAfterSnapshotJson,
                     NotificationFanoutTemplateJsonContext.Default.NotificationFanoutSnapshotV1)

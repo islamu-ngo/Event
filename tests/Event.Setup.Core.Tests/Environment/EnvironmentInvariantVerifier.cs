@@ -32,8 +32,8 @@ internal static partial class EnvironmentInvariantVerifier
 
         foreach (CatalogueDefinitionFixture definition in definitions)
         {
-            if (!CanonicalEnvironmentKey().IsMatch(definition.Key))
-                failures.Add("catalogue-key-noncanonical");
+            if (!ValidEnvironmentKey().IsMatch(definition.Key))
+                failures.Add("catalogue-key-invalid");
             if (!exact.Add(definition.Key))
                 failures.Add("catalogue-duplicate-key");
             else if (!folded.Add(definition.Key))
@@ -125,7 +125,7 @@ internal static partial class EnvironmentInvariantVerifier
             if (equals < 0) failures.Add("dotenv-equals-missing");
             string key = equals < 0 ? line : line[..equals];
             string value = equals < 0 ? string.Empty : line[(equals + 1)..];
-            if (!CanonicalEnvironmentKey().IsMatch(key)
+            if (!ValidEnvironmentKey().IsMatch(key)
                 || key.Length > EnvironmentContractExpectedVectors.MaximumDotenvKeyCharacters)
                 failures.Add("dotenv-key-invalid");
             if (!keys.Add(key)) failures.Add("dotenv-duplicate-key");
@@ -263,5 +263,5 @@ internal static partial class EnvironmentInvariantVerifier
         };
 
     [GeneratedRegex("^[A-Z][A-Z0-9_]*$", RegexOptions.CultureInvariant)]
-    private static partial Regex CanonicalEnvironmentKey();
+    private static partial Regex ValidEnvironmentKey();
 }

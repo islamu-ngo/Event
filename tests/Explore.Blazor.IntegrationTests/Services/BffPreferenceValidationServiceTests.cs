@@ -26,7 +26,7 @@ public sealed class BffPreferenceValidationServiceTests
     }
 
     [Test]
-    public async Task NormalizeLanguage_WithRegisteredCulture_ReturnsCanonicalCode()
+    public async Task NormalizeLanguage_WithRegisteredCulture_ReturnsRegistryCode()
     {
         var service = new BffPreferenceValidationService();
 

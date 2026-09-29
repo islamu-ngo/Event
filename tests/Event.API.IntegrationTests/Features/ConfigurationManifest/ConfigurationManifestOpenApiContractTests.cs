@@ -10,11 +10,11 @@ public sealed class ConfigurationManifestOpenApiContractTests(
     ContractApiFixture fixture)
 {
     private const string OpenApiEndpoint = "/openapi/islamu-event.json";
-    private const string CanonicalPath =
+    private const string PrimaryPath =
         "/api/control-plane/configuration-manifest/export";
 
     [Test]
-    public async Task NativeDocument_ExposesOnlyCanonicalTypedBinaryExport()
+    public async Task NativeDocument_ExposesOnlyPrimaryTypedBinaryExport()
     {
         using HttpResponseMessage response =
             await fixture.Client.GetAsync(OpenApiEndpoint);
@@ -32,7 +32,7 @@ public sealed class ConfigurationManifestOpenApiContractTests(
             "/api/admin/control-plane/tenants/{tenantId}/configuration-manifest/export",
             out _)).IsFalse();
 
-        JsonElement operation = paths.GetProperty(CanonicalPath).GetProperty("get");
+        JsonElement operation = paths.GetProperty(PrimaryPath).GetProperty("get");
         await Assert.That(operation.GetProperty("operationId").GetString())
             .IsEqualTo("ExportConfigurationManifest");
         await Assert.That(operation.GetProperty("x-endpoint-class").GetString())

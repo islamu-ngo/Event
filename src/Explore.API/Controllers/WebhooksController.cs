@@ -102,7 +102,7 @@ public sealed class WebhooksController(
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [EndpointSummary("Get webhook event types")]
-    [EndpointDescription("Returns the canonical outgoing webhook event catalog with schema and example payload metadata.")]
+    [EndpointDescription("Returns the authoritative outgoing webhook event catalog with schema and example payload metadata.")]
     [OutputCache(PolicyName = "LookupData")]
     [ProducesResponseType(typeof(IReadOnlyList<WebhookEventTypeDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<WebhookEventTypeDto>>> GetEventTypes(

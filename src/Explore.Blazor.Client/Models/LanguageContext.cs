@@ -44,7 +44,7 @@ public class LanguageContext
 
     /// <summary>
     /// Creates a <see cref="LanguageContext"/> from a culture code by looking it up in <see cref="CultureRegistry"/>.
-    /// Unknown codes fall back to the first registry entry (canonical default).
+    /// Unknown codes fall back to the first registry entry (registry default).
     /// </summary>
     public static LanguageContext ForLanguage(string? languageCode)
     {

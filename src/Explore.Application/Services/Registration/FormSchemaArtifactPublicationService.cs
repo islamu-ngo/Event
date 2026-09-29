@@ -9,6 +9,6 @@ public sealed class FormSchemaArtifactPublicationService(IFormSchemaArtifactGene
     {
         ArgumentNullException.ThrowIfNull(version);
         FormSchemaArtifactBundle artifacts = generator.Generate(version);
-        version.PinGeneratedSchemaBundle(artifacts.CanonicalBundleJson, publishedAt);
+        version.PinGeneratedSchemaBundle(artifacts.NormalizedBundleJson, publishedAt);
     }
 }

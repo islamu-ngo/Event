@@ -51,7 +51,7 @@ internal static class SetupCliPortabilityHandlers
 
     internal static SetupCliCommandResult Doctor()
     {
-        _ = CanonicalEnvironmentCatalogue.Catalogue.Definitions.Count;
+        _ = PlatformEnvironmentCatalogue.Catalogue.Definitions.Count;
         byte[] bytes = SetupCliCommandSchemaMetadata.GenerateSchema();
         return SetupCliResults.Success([SetupCliResults.Artifact("doctor-report", "application/json", bytes, "public", "none", "none")]);
     }

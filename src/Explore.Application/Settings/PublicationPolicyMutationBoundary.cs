@@ -195,7 +195,7 @@ public sealed class PublicationPolicyMutationBoundary : IPublicationPolicyMutati
     private static ImmutableArray<PublicationPolicySettingMutation> OrderMutations(
         ImmutableArray<PublicationPolicySettingMutation> mutations) =>
         mutations
-            .OrderBy(mutation => CanonicalOrder(mutation.Key))
+            .OrderBy(mutation => PolicyOrder(mutation.Key))
             .ToImmutableArray();
 
     private static ImmutableArray<SettingChangedNotification> MapTenantNotifications(
@@ -240,7 +240,7 @@ public sealed class PublicationPolicyMutationBoundary : IPublicationPolicyMutati
         PublicationPolicySettingKeys.All.SelectMany(key =>
             writeResult.Changes.Where(change => change is not null && change.Key == key));
 
-    private static int CanonicalOrder(string key)
+    private static int PolicyOrder(string key)
     {
         for (int index = 0; index < PublicationPolicySettingKeys.All.Count; index++)
         {

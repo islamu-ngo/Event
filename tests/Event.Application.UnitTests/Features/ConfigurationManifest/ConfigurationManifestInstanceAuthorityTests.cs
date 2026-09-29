@@ -371,7 +371,7 @@ public sealed class ConfigurationManifestInstanceAuthorityTests
         }
 
         return definition.RequiresCoordinatedMutation
-            ? "requires_explicit_canonical_boundary"
+            ? "requires_explicit_authority_boundary"
             : "not_admitted_by_v1alpha2";
     }
 }

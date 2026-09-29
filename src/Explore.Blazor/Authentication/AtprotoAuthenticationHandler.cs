@@ -59,15 +59,15 @@ public sealed class AtprotoAuthenticationHandler(
         string? rawHandle,
         string returnPath,
         string? rawClassification,
-        Guid? canonicalActorId,
-        Guid? expectedCanonicalActorConcurrencyStamp,
+        Guid? targetActorId,
+        Guid? expectedTargetActorConcurrencyStamp,
         CancellationToken cancellationToken)
     {
         var handle = NormalizeHandle(rawHandle);
         var classification = AtprotoSubjectClassifications.Normalize(rawClassification);
-        if (!IsValidCanonicalActorTarget(canonicalActorId, expectedCanonicalActorConcurrencyStamp))
+        if (!IsValidTargetActor(targetActorId, expectedTargetActorConcurrencyStamp))
         {
-            throw new InvalidOperationException("ATProto canonical Actor target is invalid.");
+            throw new InvalidOperationException("ATProto target Actor is invalid.");
         }
         if (!IsSafeReturnPath(returnPath))
         {
@@ -87,8 +87,8 @@ public sealed class AtprotoAuthenticationHandler(
             returnPath,
             lease.PinnedKeyId,
             classification,
-            canonicalActorId,
-            expectedCanonicalActorConcurrencyStamp)
+            targetActorId,
+            expectedTargetActorConcurrencyStamp)
         {
             BrowserBinding = browserBinding
         };
@@ -143,8 +143,8 @@ public sealed class AtprotoAuthenticationHandler(
             || !UrisEqual(client.BaseUrl, binding.Seed.ExpectedPdsUri)
             || !string.Equals(session.Did, binding.Seed.ExpectedDid, StringComparison.Ordinal)
             || !string.Equals(session.Classification, binding.Seed.Classification, StringComparison.Ordinal)
-            || session.CanonicalActorId != binding.Seed.CanonicalActorId
-            || session.ExpectedCanonicalActorConcurrencyStamp != binding.Seed.ExpectedCanonicalActorConcurrencyStamp)
+            || session.TargetActorId != binding.Seed.TargetActorId
+            || session.ExpectedTargetActorConcurrencyStamp != binding.Seed.ExpectedTargetActorConcurrencyStamp)
         {
             throw new InvalidOperationException("ATProto callback identity binding failed.");
         }
@@ -214,9 +214,9 @@ public sealed class AtprotoAuthenticationHandler(
         && value[0] == '/'
         && RedirectHttpResult.IsLocalUrl(value);
 
-    private static bool IsValidCanonicalActorTarget(Guid? canonicalActorId, Guid? expectedConcurrencyStamp) =>
-        canonicalActorId.HasValue == expectedConcurrencyStamp.HasValue
-        && canonicalActorId != Guid.Empty
+    private static bool IsValidTargetActor(Guid? targetActorId, Guid? expectedConcurrencyStamp) =>
+        targetActorId.HasValue == expectedConcurrencyStamp.HasValue
+        && targetActorId != Guid.Empty
         && expectedConcurrencyStamp != Guid.Empty;
 
     private static bool UrisEqual(Uri left, Uri right) =>

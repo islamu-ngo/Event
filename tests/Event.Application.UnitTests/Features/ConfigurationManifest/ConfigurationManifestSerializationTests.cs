@@ -6,7 +6,7 @@ using ISLAMU.Wire.Contracts.ConfigurationPortability;
 public sealed class ConfigurationManifestSerializationTests
 {
     [Test]
-    public async Task Serialize_UsesCanonicalEnvelopeAndFlatSettingKeys()
+    public async Task Serialize_UsesNormalizedEnvelopeAndFlatSettingKeys()
     {
         var settings = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
         {
@@ -61,7 +61,7 @@ public sealed class ConfigurationManifestSerializationTests
     }
 
     [Test]
-    public async Task RoundTrip_PreservesCanonicalManifestIdentity()
+    public async Task RoundTrip_PreservesManifestIdentity()
     {
         ConfigurationManifestV1Alpha2 expected = ConfigurationManifestTestData.Valid();
         string json = JsonSerializer.Serialize(

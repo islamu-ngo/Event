@@ -212,7 +212,7 @@ public sealed partial class NativeStorageObjectHttpTests
                     Visibility = image ? StorageObjectVisibilities.PublicImage : StorageObjectVisibilities.PrivateOwner,
                     OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant,
                     OwningResourceId = participationId,
-                    IdempotencyKey = $"canonical-{purpose}"
+                    IdempotencyKey = $"normalized-{purpose}"
                 };
                 await Assert.That((await new CreateStorageUploadSessionDtoValidator().ValidateAsync(upload)).IsValid).IsTrue();
                 var session = new StorageUploadSession

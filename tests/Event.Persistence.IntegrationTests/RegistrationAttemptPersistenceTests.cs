@@ -800,7 +800,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
         RegistrationRequirement otherRequirement = RegistrationRequirement.Create(
             otherWorkflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow.AddMinutes(1));
         RegistrationChannel otherChannel = RegistrationChannel.Create(
             otherRequirement, 1, true, null, UtcNow.AddMinutes(1));
@@ -1066,7 +1066,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
         RegistrationRequirement requirement = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
         RegistrationForm form = RegistrationForm.Create(tenant.Id, @event.Id, "platform.registration", "runtime", "Runtime", UtcNow);
         RegistrationFormVersion version = RegistrationFormVersion.Create(form, 1, "en", null, null, UtcNow);

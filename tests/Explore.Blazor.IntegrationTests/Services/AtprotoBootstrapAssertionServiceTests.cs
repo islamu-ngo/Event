@@ -41,11 +41,11 @@ public sealed class AtprotoBootstrapAssertionServiceTests
     }
 
     [Test]
-    public async Task IssueOmitsOrIncludesExactlyOneCompleteCanonicalActorTargetPair()
+    public async Task IssueOmitsOrIncludesExactlyOneCompleteTargetActorPair()
     {
         var service = CreateService();
         var tenantId = Guid.NewGuid();
-        var canonicalActorId = Guid.NewGuid();
+        var targetActorId = Guid.NewGuid();
         var expectedConcurrencyStamp = Guid.NewGuid();
 
         var omitted = new JwtSecurityTokenHandler().ReadJwtToken(service.Issue(
@@ -60,12 +60,12 @@ public sealed class AtprotoBootstrapAssertionServiceTests
             "organization",
             HttpMethod.Post,
             AtprotoBootstrapAssertionService.BridgePath,
-            canonicalActorId,
+            targetActorId,
             expectedConcurrencyStamp));
 
-        await Assert.That(omitted.Claims.Any(claim => claim.Type is AtprotoBootstrapAssertionService.CanonicalActorIdClaim or AtprotoBootstrapAssertionService.ExpectedCanonicalActorConcurrencyStampClaim)).IsFalse();
-        await Assert.That(present.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.CanonicalActorIdClaim).Value).IsEqualTo(canonicalActorId.ToString("D"));
-        await Assert.That(present.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.ExpectedCanonicalActorConcurrencyStampClaim).Value).IsEqualTo(expectedConcurrencyStamp.ToString("D"));
+        await Assert.That(omitted.Claims.Any(claim => claim.Type is AtprotoBootstrapAssertionService.TargetActorIdClaim or AtprotoBootstrapAssertionService.ExpectedTargetActorConcurrencyStampClaim)).IsFalse();
+        await Assert.That(present.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.TargetActorIdClaim).Value).IsEqualTo(targetActorId.ToString("D"));
+        await Assert.That(present.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.ExpectedTargetActorConcurrencyStampClaim).Value).IsEqualTo(expectedConcurrencyStamp.ToString("D"));
     }
 
     [Test]
@@ -84,9 +84,9 @@ public sealed class AtprotoBootstrapAssertionServiceTests
         using var invoker = new HttpMessageInvoker(handler);
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.test/api/auth/atproto/session");
         request.Headers.TryAddWithoutValidation(AtprotoBootstrapAssertionService.HeaderName, "browser-controlled");
-        var canonicalActorId = Guid.NewGuid();
+        var targetActorId = Guid.NewGuid();
         var expectedConcurrencyStamp = Guid.NewGuid();
-        AtprotoBootstrapRequestOptions.Bind(request, tenantId, "did:plc:alice", "group", canonicalActorId, expectedConcurrencyStamp);
+        AtprotoBootstrapRequestOptions.Bind(request, tenantId, "did:plc:alice", "group", targetActorId, expectedConcurrencyStamp);
 
         using var response = await invoker.SendAsync(request, CancellationToken.None);
 
@@ -98,9 +98,9 @@ public sealed class AtprotoBootstrapAssertionServiceTests
             .IsEqualTo("did:plc:alice");
         await Assert.That(jwt.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.ClassificationClaim).Value)
             .IsEqualTo("group");
-        await Assert.That(jwt.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.CanonicalActorIdClaim).Value)
-            .IsEqualTo(canonicalActorId.ToString("D"));
-        await Assert.That(jwt.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.ExpectedCanonicalActorConcurrencyStampClaim).Value)
+        await Assert.That(jwt.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.TargetActorIdClaim).Value)
+            .IsEqualTo(targetActorId.ToString("D"));
+        await Assert.That(jwt.Claims.Single(claim => claim.Type == AtprotoBootstrapAssertionService.ExpectedTargetActorConcurrencyStampClaim).Value)
             .IsEqualTo(expectedConcurrencyStamp.ToString("D"));
 
         using var unbound = new HttpRequestMessage(HttpMethod.Post, "https://api.example.test/api/auth/atproto/session");

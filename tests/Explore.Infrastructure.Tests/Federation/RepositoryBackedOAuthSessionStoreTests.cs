@@ -148,7 +148,7 @@ public sealed class RepositoryBackedOAuthSessionStoreTests
     }
 
     [Test]
-    public async Task EncryptionKeyRingRejectsAmbiguousUnknownAndNonCanonicalMaterial()
+    public async Task EncryptionKeyRingRejectsAmbiguousUnknownAndNonstandardMaterial()
     {
         var invalid = new[]
         {

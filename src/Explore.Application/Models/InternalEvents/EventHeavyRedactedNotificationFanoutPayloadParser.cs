@@ -5,14 +5,14 @@ namespace Explore.Application.Models.InternalEvents;
 
 public sealed record EventHeavyRedactedNotificationFanoutPayloadParseResult(
     EventHeavyRedactedNotificationFanoutRequested Request,
-    string CanonicalPayload,
+    string NormalizedPayload,
     bool WasLegacy);
 
 public static class EventHeavyRedactedNotificationFanoutPayloadParser
 {
     public const string SafeInvalidPayload = "{\"Version\":1}";
 
-    private static readonly HashSet<string> CanonicalMembers =
+    private static readonly HashSet<string> StandardMembers =
     [
         nameof(EventHeavyRedactedNotificationFanoutRequested.TenantId),
         nameof(EventHeavyRedactedNotificationFanoutRequested.ModerationRecordId),
@@ -47,11 +47,11 @@ public static class EventHeavyRedactedNotificationFanoutPayloadParser
         }
 
         var memberSet = members.ToHashSet(StringComparer.Ordinal);
-        if (memberSet.SetEquals(CanonicalMembers))
+        if (memberSet.SetEquals(StandardMembers))
         {
             EventHeavyRedactedNotificationFanoutRequested request = JsonSerializer.Deserialize<EventHeavyRedactedNotificationFanoutRequested>(payload)
                 ?? throw InvalidPayload();
-            ValidateCanonical(request);
+            ValidatePayload(request);
             return new(request, JsonSerializer.Serialize(request), WasLegacy: false);
         }
 
@@ -79,7 +79,7 @@ public static class EventHeavyRedactedNotificationFanoutPayloadParser
         throw InvalidPayload();
     }
 
-    private static void ValidateCanonical(EventHeavyRedactedNotificationFanoutRequested request)
+    private static void ValidatePayload(EventHeavyRedactedNotificationFanoutRequested request)
     {
         if (request.TenantId == Guid.Empty
             || request.ModerationRecordId == Guid.Empty

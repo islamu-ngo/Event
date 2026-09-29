@@ -10,7 +10,7 @@ using Explore.Secrets.Database;
 public static class ConfigurationExtensions
 {
     /// <summary>
-    /// Maps the selected secret authority to canonical keys and returns isolated runtime provider configuration.
+    /// Maps the selected secret authority to authoritative keys and returns isolated runtime provider configuration.
     /// </summary>
     public static IConfiguration AddSecretAuthorityConfiguration(
         this IConfigurationBuilder configBuilder,
@@ -47,7 +47,7 @@ public static class ConfigurationExtensions
     /// Maps Infisical secret names to .NET configuration keys.
     /// </summary>
     /// <remarks>
-    /// Canonical Infisical keys:
+    /// Authoritative Infisical keys:
     ///   /database: DATABASE_PROVIDER, DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_SCHEMA, etc.
     ///   /api:      DEPLOYMENT_MODE (single_tenant or multi_tenant)
     ///   /keycloak: KEYCLOAK_ENDPOINT, KEYCLOAK_REALM

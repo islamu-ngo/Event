@@ -8,7 +8,7 @@ namespace Event.Application.UnitTests.Features.RegistrationSubmissions;
 
 public sealed class RegistrationAnswerNormalizerTests
 {
-    public static IEnumerable<Func<(RegistrationFieldTypeEnum Type, string Json, string Canonical)>> ValidCases()
+    public static IEnumerable<Func<(RegistrationFieldTypeEnum Type, string Json, string Normalized)>> ValidCases()
     {
         yield return () => (RegistrationFieldTypeEnum.ShortText, "\"  Cafe\\u0301  \"", "Café");
         yield return () => (RegistrationFieldTypeEnum.LongText, "\"a\\r\\nb\"", "a\nb");
@@ -51,7 +51,7 @@ public sealed class RegistrationAnswerNormalizerTests
     }
 
     public static IEnumerable<Func<(RegistrationFieldTypeEnum Type, RegistrationFieldNormalizationSpec Spec,
-        string Json, bool IsValid, string? Canonical, string? IssueCode)>> BoundaryCases()
+        string Json, bool IsValid, string? Normalized, string? IssueCode)>> BoundaryCases()
     {
         yield return () => (RegistrationFieldTypeEnum.ShortText,
             new(RegistrationFieldTypeEnum.ShortText, null, null, 3, 10, null, null, null, null),
@@ -106,7 +106,7 @@ public sealed class RegistrationAnswerNormalizerTests
 
     [Test]
     [MethodDataSource(nameof(ValidCases))]
-    public async Task ValidPortableValueNormalizesWithoutCoercion(RegistrationFieldTypeEnum type, string json, string canonical)
+    public async Task ValidPortableValueNormalizesWithoutCoercion(RegistrationFieldTypeEnum type, string json, string normalized)
     {
         using JsonDocument document = JsonDocument.Parse(json);
         RegistrationValueNormalizationResult result = RegistrationAnswerNormalizer.Normalize(
@@ -115,7 +115,7 @@ public sealed class RegistrationAnswerNormalizerTests
             document.RootElement);
 
         await Assert.That(result.IsValid).IsTrue();
-        await Assert.That(result.Value!.Canonical).IsEqualTo(canonical);
+        await Assert.That(result.Value!.Normalized).IsEqualTo(normalized);
     }
 
     [Test]
@@ -140,7 +140,7 @@ public sealed class RegistrationAnswerNormalizerTests
         RegistrationFieldNormalizationSpec spec,
         string json,
         bool isValid,
-        string? canonical,
+        string? normalized,
         string? issueCode)
     {
         await Assert.That(spec.FieldType).IsEqualTo(type);
@@ -148,7 +148,7 @@ public sealed class RegistrationAnswerNormalizerTests
         RegistrationValueNormalizationResult result = RegistrationAnswerNormalizer.Normalize(spec, document.RootElement);
 
         await Assert.That(result.IsValid).IsEqualTo(isValid);
-        await Assert.That(result.Value?.Canonical).IsEqualTo(canonical);
+        await Assert.That(result.Value?.Normalized).IsEqualTo(normalized);
         await Assert.That(result.IssueCode).IsEqualTo(issueCode);
     }
 

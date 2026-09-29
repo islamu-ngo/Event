@@ -17,11 +17,11 @@ public class IcalNetEventCalendarFileBuilderTests
             new DateTimeOffset(2026, 5, 1, 18, 30, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 5, 1, 20, 0, 0, TimeSpan.Zero),
             "Main Hall, Brussels");
-        var canonicalUrl = new Uri("https://events.example.org/events/11111111-2222-3333-4444-555555555555");
+        var publicUrl = new Uri("https://events.example.org/events/11111111-2222-3333-4444-555555555555");
 
         var builder = new IcalNetEventCalendarFileBuilder();
-        var content = builder.Build(export, canonicalUrl);
-        var repeatedContent = builder.Build(export, canonicalUrl);
+        var content = builder.Build(export, publicUrl);
+        var repeatedContent = builder.Build(export, publicUrl);
 
         await Assert.That(content).Contains("BEGIN:VCALENDAR");
         await Assert.That(content).Contains("VERSION:2.0");
@@ -47,9 +47,9 @@ public class IcalNetEventCalendarFileBuilderTests
             new DateTimeOffset(2026, 7, 19, 16, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 7, 19, 17, 0, 0, TimeSpan.Zero),
             "Private Home, Family Room, 17 Confidential Crescent, SECRET-1040");
-        var canonicalUrl = new Uri("https://events.example.org/events/bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+        var publicUrl = new Uri("https://events.example.org/events/bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
 
-        string content = new IcalNetEventCalendarFileBuilder().Build(export, canonicalUrl);
+        string content = new IcalNetEventCalendarFileBuilder().Build(export, publicUrl);
         string unfoldedContent = content.Replace("\r\n ", string.Empty, StringComparison.Ordinal);
 
         await Assert.That(unfoldedContent)

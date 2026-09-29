@@ -473,27 +473,27 @@ public sealed class LegalDocumentVersion
 
     private static string ComputeDigest(LegalDocumentVersion version)
     {
-        var canonical = new StringBuilder();
+        var digestInput = new StringBuilder();
         Append(
-            canonical,
+            digestInput,
             ((int)version.Audience).ToString(CultureInfo.InvariantCulture));
-        Append(canonical, version.SourceOrigin ?? string.Empty);
-        Append(canonical, version.RequiresFreshAcceptance ? "1" : "0");
-        Append(canonical, version.TemplateId ?? string.Empty);
-        Append(canonical, version.TemplateVersion ?? string.Empty);
-        Append(canonical, version.TemplateSourceKind?.ToString() ?? string.Empty);
-        Append(canonical, version.TemplateLicenseExpression ?? string.Empty);
-        Append(canonical, version.TemplateReviewReference ?? string.Empty);
+        Append(digestInput, version.SourceOrigin ?? string.Empty);
+        Append(digestInput, version.RequiresFreshAcceptance ? "1" : "0");
+        Append(digestInput, version.TemplateId ?? string.Empty);
+        Append(digestInput, version.TemplateVersion ?? string.Empty);
+        Append(digestInput, version.TemplateSourceKind?.ToString() ?? string.Empty);
+        Append(digestInput, version.TemplateLicenseExpression ?? string.Empty);
+        Append(digestInput, version.TemplateReviewReference ?? string.Empty);
         foreach (LegalDocumentLocalizedSource source in version._sources)
         {
-            Append(canonical, source.LanguageTag);
-            Append(canonical, source.Title);
-            Append(canonical, source.Summary);
-            Append(canonical, source.Markdown);
+            Append(digestInput, source.LanguageTag);
+            Append(digestInput, source.Title);
+            Append(digestInput, source.Summary);
+            Append(digestInput, source.Markdown);
         }
 
         return Convert.ToHexStringLower(
-            SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+            SHA256.HashData(Encoding.UTF8.GetBytes(digestInput.ToString())));
     }
 
     private static void Append(StringBuilder builder, string value)

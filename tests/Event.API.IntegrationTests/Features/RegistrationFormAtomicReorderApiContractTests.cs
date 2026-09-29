@@ -13,7 +13,7 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class RegistrationFormAtomicReorderApiContractTests
 {
     [Test]
-    public async Task ReorderRoutes_AreCanonicalPutOperationsReturningAuthoritativeVersion()
+    public async Task ReorderRoutes_ArePrimaryPutOperationsReturningAuthoritativeVersion()
     {
         var expected = new Dictionary<string, (string Route, string Name)>
         {

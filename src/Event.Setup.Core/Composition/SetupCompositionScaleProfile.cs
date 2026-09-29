@@ -33,20 +33,20 @@ public sealed class SetupCompositionScaleProfile
         string name,
         SetupCompositionSourceKind sourceKind,
         string evidenceDigest,
-        int canonicalArtifactBytes)
+        int serializedArtifactBytes)
     {
         Id = id;
         Name = name;
         SourceKind = sourceKind;
         EvidenceDigest = ArtifactDigest.Parse(evidenceDigest);
-        CanonicalArtifactBytes = canonicalArtifactBytes;
+        SerializedArtifactBytes = serializedArtifactBytes;
     }
 
     public SetupCompositionScaleProfileId Id { get; }
     public string Name { get; }
     public SetupCompositionSourceKind SourceKind { get; }
     public ArtifactDigest EvidenceDigest { get; }
-    public int CanonicalArtifactBytes { get; }
+    public int SerializedArtifactBytes { get; }
     public SetupCompositionLimits EffectiveLimits => SetupCompositionLimits.Default;
 
     public override string ToString() =>
@@ -99,25 +99,25 @@ public static class SetupCompositionScaleProfiles
             SetupCompositionScaleProfileId.Small,
             "small",
             SetupCompositionSourceKind.Json,
-            "29bc56c574126626ef4e7dc48090c54a3ec5aff378b3f7c65bd478e6eac9e062",
+            "8fdd1b6819cbb6e60778e16b90257d00f572b5605cc6e486edcf3394f64a22d5",
             681),
         new(
             SetupCompositionScaleProfileId.Medium,
             "medium",
             SetupCompositionSourceKind.Yaml,
-            "3ccb79c47265802eb9ec5aedd2db60ace4537d946e6913a5b59c24dc97d331ea",
+            "a4735d0bbd1cd08ee47a8a5fe8456f38150a453bd67769af7751f5e21414e443",
             9_634),
         new(
             SetupCompositionScaleProfileId.Large,
             "large",
             SetupCompositionSourceKind.Directory,
-            "aad301a4d4780a668637e3f9d15986fa11c8278170b50c41a40af4c1e553cdea",
+            "6c1fe6990caa6cb68e2d9352a1ee2d31af305ca68533b496a20b7703f0b1821a",
             91_425),
         new(
             SetupCompositionScaleProfileId.Ceiling,
             "ceiling",
             SetupCompositionSourceKind.Json,
-            "0cc1498495205e8ae03e99268c3c48c676032ab411e79802c58c00dfd0599841",
+            "32bc03f3b90998fd05fc4227a2650de78dad30e925fbe58ed7cb9dbfc5a4a60c",
             233_763)
     ];
 
@@ -144,7 +144,7 @@ public static class SetupCompositionScaleProfiles
         if (profile.EvidenceDigest != evidenceDigest)
             return SetupCompositionScaleAdmission.Rejected(
                 SetupCompositionScaleAdmissionCode.EvidenceMismatch);
-        if (targetMaximumArtifactBytes < profile.CanonicalArtifactBytes)
+        if (targetMaximumArtifactBytes < profile.SerializedArtifactBytes)
             return SetupCompositionScaleAdmission.Rejected(
                 SetupCompositionScaleAdmissionCode.TargetIncompatible);
         return SetupCompositionScaleAdmission.Accepted(profile);

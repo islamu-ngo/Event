@@ -35,16 +35,16 @@ public class TenantSettingRepository : ITenantSettingRepository
         CancellationToken cancellationToken = default)
     {
         string normalizedValue = normalizedHost.Trim().TrimEnd('.').ToLowerInvariant();
-        string canonicalValue = SettingValueSerializer.Serialize(normalizedValue);
-        string canonicalValueWithTrailingDot = SettingValueSerializer.Serialize(normalizedValue + ".");
+        string serializedValue = SettingValueSerializer.Serialize(normalizedValue);
+        string serializedValueWithTrailingDot = SettingValueSerializer.Serialize(normalizedValue + ".");
         TenantSetting? match = await _dbContext.TenantSettingOverrides
             .IgnoreTenantFilter(TenantFilterBypassReasons.ManagedTenantDomainUniqueness)
             .AsNoTracking()
             .Where(setting => setting.SettingKey == "domains.tenant_subdomain"
                 || setting.SettingKey == "domains.tenant_custom_domain")
             .FirstOrDefaultAsync(
-                setting => setting.Value.ToLower() == canonicalValue
-                    || setting.Value.ToLower() == canonicalValueWithTrailingDot,
+                setting => setting.Value.ToLower() == serializedValue
+                    || setting.Value.ToLower() == serializedValueWithTrailingDot,
                 cancellationToken);
 
         if (match is null)
@@ -385,14 +385,14 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         var smtpKeys = keys
             .Where(key => RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
-            .Select(RelationalSettingMutationLock.NormalizeCanonicalKey)
+            .Select(RelationalSettingMutationLock.NormalizeSettingKey)
             .ToHashSet(StringComparer.Ordinal);
         if (smtpKeys.Count == 0)
             return;
 
         var entries = _dbContext.ChangeTracker.Entries<TenantSetting>()
             .Where(entry => entry.Entity.TenantId == tenantId
-                && smtpKeys.Contains(RelationalSettingMutationLock.NormalizeCanonicalKey(entry.Entity.SettingKey)))
+                && smtpKeys.Contains(RelationalSettingMutationLock.NormalizeSettingKey(entry.Entity.SettingKey)))
             .ToArray();
         foreach (var entry in entries)
             entry.State = EntityState.Detached;

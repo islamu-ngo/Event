@@ -33,7 +33,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         RegistrationRequirement required = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.EveryParticipant, null, UtcNow);
         RegistrationParticipant first = RegistrationParticipant.Create(
             order.TenantId, order.Id, null, ParticipantTypeEnum.Adult, null);
@@ -179,7 +179,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         RegistrationRequirement optional = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Optional, true,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
         RegistrationChannel channel = RegistrationChannel.Create(optional, 1, true, null, UtcNow);
         optional.AddChannel(channel);
@@ -257,7 +257,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         RegistrationRequirement optional = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Optional, true,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
 
         await using (ExploreDbContext setup = CreateContext(options, true))
@@ -420,7 +420,7 @@ public sealed class RegistrationFinalizationEffectPersistenceTests
         Guid? subjectId) => RegistrationRequirement.Create(
         workflow, ordinal, RegistrationRequirementCriticalityEnum.Required, false,
         RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-        RegistrationAnswerSyncModeEnum.FULL_CANONICAL, subjectType, subjectId, UtcNow);
+        RegistrationAnswerSyncModeEnum.FULL_SYNC, subjectType, subjectId, UtcNow);
 
     private static async Task InsertFulfillmentAsync(
         ExploreDbContext context,

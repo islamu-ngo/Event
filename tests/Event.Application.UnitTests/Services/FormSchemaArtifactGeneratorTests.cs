@@ -28,7 +28,7 @@ public sealed class FormSchemaArtifactGeneratorTests
         await Assert.That(artifacts.SchemaHash).IsEqualTo(GoldenHash);
         await Assert.That(artifacts.SchemaHash).Matches("^[0-9a-f]{64}$");
 
-        using JsonDocument bundle = JsonDocument.Parse(artifacts.CanonicalBundleJson);
+        using JsonDocument bundle = JsonDocument.Parse(artifacts.NormalizedBundleJson);
         string[] artifactNames = [.. bundle.RootElement.EnumerateObject()
             .Where(property => property.Name is "data" or "ui" or "logic" or "mapping")
             .Select(property => property.Name)];
@@ -51,9 +51,9 @@ public sealed class FormSchemaArtifactGeneratorTests
             FormSchemaArtifactBundle second = Generator.Generate(Build(reverseConstruction: true));
             FormSchemaArtifactBundle repeated = Generator.Generate(Build(reverseConstruction: false));
 
-            await Assert.That(second.CanonicalBundleJson).IsEqualTo(first.CanonicalBundleJson);
+            await Assert.That(second.NormalizedBundleJson).IsEqualTo(first.NormalizedBundleJson);
             await Assert.That(second.SchemaHash).IsEqualTo(first.SchemaHash);
-            await Assert.That(repeated.CanonicalBundleJson).IsEqualTo(first.CanonicalBundleJson);
+            await Assert.That(repeated.NormalizedBundleJson).IsEqualTo(first.NormalizedBundleJson);
             await Assert.That(repeated.SchemaHash).IsEqualTo(first.SchemaHash);
         }
         finally
@@ -126,34 +126,34 @@ public sealed class FormSchemaArtifactGeneratorTests
     }
 
     [Test]
-    public async Task Generate_ConsentPurposeCodeChangesCanonicalBundleAndHash()
+    public async Task Generate_ConsentPurposeCodeChangesNormalizedBundleAndHash()
     {
         FormSchemaArtifactBundle baseline = Generator.Generate(Build());
         FormSchemaArtifactBundle changed = Generator.Generate(Build(mutation: "consent-purpose-code"));
 
-        await Assert.That(changed.CanonicalBundleJson).Contains("\"x-consentPurposeCode\":\"CONTACT_UPDATES\"");
-        await Assert.That(changed.CanonicalBundleJson).IsNotEqualTo(baseline.CanonicalBundleJson);
+        await Assert.That(changed.NormalizedBundleJson).Contains("\"x-consentPurposeCode\":\"CONTACT_UPDATES\"");
+        await Assert.That(changed.NormalizedBundleJson).IsNotEqualTo(baseline.NormalizedBundleJson);
         await Assert.That(changed.SchemaHash).IsNotEqualTo(baseline.SchemaHash);
     }
 
     [Test]
-    public async Task Generate_ConsentTextVersionChangesCanonicalBundleAndHash()
+    public async Task Generate_ConsentTextVersionChangesNormalizedBundleAndHash()
     {
         FormSchemaArtifactBundle baseline = Generator.Generate(Build());
         FormSchemaArtifactBundle changed = Generator.Generate(Build(mutation: "consent-text-version"));
 
-        await Assert.That(changed.CanonicalBundleJson).Contains("\"x-consentTextVersion\":\"v2\"");
-        await Assert.That(changed.CanonicalBundleJson).IsNotEqualTo(baseline.CanonicalBundleJson);
+        await Assert.That(changed.NormalizedBundleJson).Contains("\"x-consentTextVersion\":\"v2\"");
+        await Assert.That(changed.NormalizedBundleJson).IsNotEqualTo(baseline.NormalizedBundleJson);
         await Assert.That(changed.SchemaHash).IsNotEqualTo(baseline.SchemaHash);
     }
 
     [Test]
-    public async Task Generate_ConsentTextIsPinnedInCanonicalBundleAndHash()
+    public async Task Generate_ConsentTextIsPinnedInNormalizedBundleAndHash()
     {
         FormSchemaArtifactBundle baseline = Generator.Generate(Build());
         FormSchemaArtifactBundle changed = Generator.Generate(Build(mutation: "consent-text"));
 
-        await Assert.That(changed.CanonicalBundleJson)
+        await Assert.That(changed.NormalizedBundleJson)
             .Contains("\"x-consentText\":\"I agree to the updated event terms.\"");
         await Assert.That(changed.SchemaHash).IsNotEqualTo(baseline.SchemaHash);
     }

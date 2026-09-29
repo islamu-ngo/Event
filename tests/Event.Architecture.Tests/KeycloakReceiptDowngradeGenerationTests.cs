@@ -4,6 +4,7 @@ using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using System.Text.RegularExpressions;
 
 namespace Event.Architecture.Tests;
 
@@ -21,32 +22,27 @@ public sealed class KeycloakReceiptDowngradeGenerationTests
         await using ExploreDbContext context = CreateContext(provider);
         IMigrationsAssembly migrations =
             context.GetService<IMigrationsAssembly>();
-        string[] migrationIds = migrations.Migrations.Keys
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        string receiptMigration = migrationIds.Single(id =>
-            id.EndsWith(
-                "_KeycloakOperationReceipts",
-                StringComparison.Ordinal));
-        int receiptIndex = Array.IndexOf(migrationIds, receiptMigration);
-        string predecessor = migrationIds[receiptIndex - 1];
+        string initialMigration = migrations.Migrations.Keys.Single();
         IMigrator migrator = context.GetService<IMigrator>();
 
         string first = migrator.GenerateScript(
-            receiptMigration,
-            predecessor);
+            initialMigration,
+            Migration.InitialDatabase);
         string second = migrator.GenerateScript(
-            receiptMigration,
-            predecessor);
+            initialMigration,
+            Migration.InitialDatabase);
         int guardIndex = first.IndexOf(
             "ck_keycloak_receipts_no_unresolved_downgrade",
             StringComparison.OrdinalIgnoreCase);
-        int dropIndex = first.IndexOf(
-            "DROP TABLE",
-            StringComparison.OrdinalIgnoreCase);
+        Match receiptTableDrop = Regex.Match(
+            first,
+            @"DROP TABLE[^\r\n]*keycloak_operation_receipts",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(1));
 
         await Assert.That(guardIndex).IsGreaterThanOrEqualTo(0);
-        await Assert.That(dropIndex).IsGreaterThan(guardIndex);
+        await Assert.That(receiptTableDrop.Success).IsTrue();
+        await Assert.That(receiptTableDrop.Index).IsGreaterThan(guardIndex);
         await Assert.That(first).IsEqualTo(second);
     }
 
@@ -62,18 +58,10 @@ public sealed class KeycloakReceiptDowngradeGenerationTests
         await using ExploreDbContext context = CreateContext(provider);
         IMigrationsAssembly migrations =
             context.GetService<IMigrationsAssembly>();
-        string[] migrationIds = migrations.Migrations.Keys
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        string receiptMigration = migrationIds.Single(id =>
-            id.EndsWith(
-                "_KeycloakOperationReceipts",
-                StringComparison.Ordinal));
-        int receiptIndex = Array.IndexOf(migrationIds, receiptMigration);
-        string predecessor = migrationIds[receiptIndex - 1];
+        string initialMigration = migrations.Migrations.Keys.Single();
 
         string script = context.GetService<IMigrator>()
-            .GenerateScript(predecessor, receiptMigration);
+            .GenerateScript(Migration.InitialDatabase, initialMigration);
 
         await Assert.That(script).DoesNotContain(
             "ck_keycloak_receipts_no_unresolved_downgrade");

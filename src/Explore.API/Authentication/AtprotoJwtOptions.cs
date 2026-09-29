@@ -17,8 +17,8 @@ public sealed class AtprotoJwtOptions
     public const string UserClaim = "user_id";
     public const string DidClaim = "atproto_did";
     public const string ClassificationClaim = "subject_classification";
-    public const string CanonicalActorIdClaim = "canonical_actor_id";
-    public const string ExpectedCanonicalActorConcurrencyStampClaim = "expected_actor_concurrency_stamp";
+    public const string TargetActorIdClaim = "target_actor_id";
+    public const string ExpectedTargetActorConcurrencyStampClaim = "expected_actor_concurrency_stamp";
     public const string MethodClaim = "http_method";
     public const string PathClaim = "http_path";
     public const int MaximumBootstrapTokenBytes = 4 * 1024;

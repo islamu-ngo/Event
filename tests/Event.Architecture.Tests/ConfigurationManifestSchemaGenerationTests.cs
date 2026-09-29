@@ -1,9 +1,9 @@
 namespace Event.Architecture.Tests;
 
 using System.Globalization;
-using System.Reflection;
 using System.Text.Json;
 using Explore.Application.DTOs.PaidEventPolicies;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Domain;
@@ -143,7 +143,7 @@ public sealed class ConfigurationManifestSchemaGenerationTests
     }
 
     [Test]
-    public async Task CanonicalExportMetadata_SatisfiesGeneratedSchemaContract()
+    public async Task PortableExportMetadata_SatisfiesGeneratedSchemaContract()
     {
         var manifest = new ConfigurationManifestV1Alpha2
         {
@@ -192,14 +192,7 @@ public sealed class ConfigurationManifestSchemaGenerationTests
                 ]
             }
         };
-        Type serializer = typeof(ConfigurationManifestCatalog).Assembly.GetType(
-            "Explore.Application.Features.ConfigurationManifest.Application.ConfigurationManifestExportJsonSerializer")
-            ?? throw new InvalidOperationException("Missing canonical export serializer.");
-        MethodInfo serialize = serializer.GetMethod(
-            "Serialize",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-            ?? throw new InvalidOperationException("Missing canonical export serialization entry point.");
-        byte[] bytes = (byte[])serialize.Invoke(null, [manifest])!;
+        byte[] bytes = ConfigurationManifestExportJsonSerializer.Serialize(manifest);
 
         using JsonDocument export = JsonDocument.Parse(bytes);
         using JsonDocument schema = JsonDocument.Parse(

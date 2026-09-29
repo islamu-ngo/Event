@@ -18,14 +18,14 @@ namespace Event.API.IntegrationTests.Authentication;
 public sealed class AtprotoSessionControllerTests
 {
     [Test]
-    public async Task BootstrapSessionRejectsCanonicalActorTargetBodyClaimParityMismatch()
+    public async Task BootstrapSessionRejectsTargetActorBodyClaimParityMismatch()
     {
         var bootstrapHandler = Substitute.For<ICommandHandler<BootstrapAtprotoSessionCommand, AtprotoSessionBootstrapResult>>();
         var currentSessionHandler = Substitute.For<IQueryHandler<GetCurrentAtprotoOAuthSessionQuery, AtprotoCurrentOAuthSession?>>();
         var refreshHandler = Substitute.For<ICommandHandler<RefreshAtprotoSessionCommand, AtprotoSessionRefreshResult>>();
         var revokeHandler = Substitute.For<ICommandHandler<RevokeAtprotoSessionCommand, AtprotoSessionRevocationResult>>();
         var tenantContext = Substitute.For<ITenantContext>();
-        var canonicalActorId = Guid.NewGuid();
+        var targetActorId = Guid.NewGuid();
         var expectedConcurrencyStamp = Guid.NewGuid();
         var controller = new AtprotoSessionController(
             bootstrapHandler,
@@ -36,7 +36,7 @@ public sealed class AtprotoSessionControllerTests
         {
             ControllerContext = new ControllerContext
             {
-                HttpContext = CreateContext(canonicalActorId, expectedConcurrencyStamp)
+                HttpContext = CreateContext(targetActorId, expectedConcurrencyStamp)
             }
         };
         using var document = JsonDocument.Parse("{}");
@@ -47,7 +47,7 @@ public sealed class AtprotoSessionControllerTests
             "oauth-active",
             "person",
             document.RootElement.Clone(),
-            canonicalActorId,
+            targetActorId,
             Guid.NewGuid()), CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<ObjectResult>();
@@ -57,15 +57,15 @@ public sealed class AtprotoSessionControllerTests
             Arg.Any<CancellationToken>());
     }
 
-    private static DefaultHttpContext CreateContext(Guid canonicalActorId, Guid stamp)
+    private static DefaultHttpContext CreateContext(Guid targetActorId, Guid stamp)
     {
         var context = new DefaultHttpContext();
         context.User = new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim(AtprotoJwtOptions.DidClaim, "did:plc:alice"),
             new Claim(AtprotoJwtOptions.ClassificationClaim, "person"),
-            new Claim(AtprotoJwtOptions.CanonicalActorIdClaim, canonicalActorId.ToString("D")),
-            new Claim(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim, stamp.ToString("D"))
+            new Claim(AtprotoJwtOptions.TargetActorIdClaim, targetActorId.ToString("D")),
+            new Claim(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim, stamp.ToString("D"))
         ], ApiAuthenticationSchemeNames.AtprotoBootstrap));
         return context;
     }

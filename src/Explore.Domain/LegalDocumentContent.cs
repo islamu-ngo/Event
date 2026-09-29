@@ -95,7 +95,7 @@ public sealed class LegalDocumentLocalizedSource
             "\n",
             StringComparison.Ordinal);
         if (normalizedMarkdown.Contains('\r', StringComparison.Ordinal))
-            throw new ArgumentException("Legal Markdown must use canonical line endings.", nameof(markdown));
+            throw new ArgumentException("Legal Markdown must use normalized line endings.", nameof(markdown));
 
         int byteCount = Encoding.UTF8.GetByteCount(normalizedMarkdown);
         if (byteCount is < 1 or >

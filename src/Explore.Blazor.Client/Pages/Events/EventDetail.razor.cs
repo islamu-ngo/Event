@@ -762,10 +762,10 @@ public partial class EventDetail : ComponentBase, IDisposable
 
     #region OG Metadata Helpers
 
-    private string GetCanonicalUrl()
+    private string GetAbsoluteEventUrl()
     {
         var path = EventUrlHelper.BuildPublicPath(_eventDetails?.Slug, _eventDetails?.PublicCode) ?? "/events";
-        return CanonicalUrlHelper.Build(Navigation, path);
+        return AbsoluteUrlBuilder.Build(Navigation, path);
     }
 
     private string GetMetaDescription()
@@ -798,7 +798,7 @@ public partial class EventDetail : ComponentBase, IDisposable
         var slugCode = EventUrlHelper.BuildPublicSlugCode(_eventDetails?.Slug, _eventDetails?.PublicCode);
         return slugCode is null
             ? string.Empty
-            : CanonicalUrlHelper.Build(Navigation, $"/api/event/public/{slugCode}/og-image");
+            : AbsoluteUrlBuilder.Build(Navigation, $"/api/event/public/{slugCode}/og-image");
     }
 
     private bool ShouldNoIndexEvent()
@@ -834,7 +834,7 @@ public partial class EventDetail : ComponentBase, IDisposable
             ["@type"] = "Event",
             ["name"] = _eventDetails.Title,
             ["description"] = GetMetaDescription(),
-            ["url"] = GetCanonicalUrl(),
+            ["url"] = GetAbsoluteEventUrl(),
             ["eventStatus"] = GetSchemaEventStatus()
         };
 
@@ -908,7 +908,7 @@ public partial class EventDetail : ComponentBase, IDisposable
         var organizerProfileUrl = GetOrganizerProfileUrl();
         if (!string.IsNullOrWhiteSpace(organizerProfileUrl))
         {
-            organizer["url"] = CanonicalUrlHelper.Build(Navigation, organizerProfileUrl);
+            organizer["url"] = AbsoluteUrlBuilder.Build(Navigation, organizerProfileUrl);
         }
 
         return organizer;
@@ -940,7 +940,7 @@ public partial class EventDetail : ComponentBase, IDisposable
 
     private async Task ShareEventAsync()
     {
-        var url = GetCanonicalUrl();
+        var url = GetAbsoluteEventUrl();
 
         if (await BrowserActionInterop.ShareAsync(_eventDetails?.Title ?? "Event", url))
         {
@@ -971,7 +971,7 @@ public partial class EventDetail : ComponentBase, IDisposable
         var end = _primarySession.EndTime!.Value.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'");
         var title = Uri.EscapeDataString(_eventDetails.Title);
         var details = Uri.EscapeDataString(
-            GetMetaDescription() + "\n\n" + GetCanonicalUrl());
+            GetMetaDescription() + "\n\n" + GetAbsoluteEventUrl());
         var url = $"https://calendar.google.com/calendar/r/eventedit?text={title}&dates={start}/{end}&details={details}";
 
         await JsRuntime.InvokeVoidAsync("open", url, "_blank");
@@ -1024,9 +1024,9 @@ public partial class EventDetail : ComponentBase, IDisposable
 
         sb.AppendLine(IcsFoldLine($"SUMMARY:{IcsEscape(_eventDetails!.Title)}"));
 
-        var description = GetMetaDescription() + "\\n\\n" + GetCanonicalUrl();
+        var description = GetMetaDescription() + "\\n\\n" + GetAbsoluteEventUrl();
         sb.AppendLine(IcsFoldLine($"DESCRIPTION:{IcsEscape(description)}"));
-        sb.AppendLine(IcsFoldLine($"URL:{GetCanonicalUrl()}"));
+        sb.AppendLine(IcsFoldLine($"URL:{GetAbsoluteEventUrl()}"));
         sb.AppendLine("END:VEVENT");
         sb.AppendLine("END:VCALENDAR");
 

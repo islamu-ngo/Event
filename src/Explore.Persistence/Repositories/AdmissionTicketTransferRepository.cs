@@ -9,7 +9,7 @@ public sealed class AdmissionTicketTransferRepository(
     ExploreDbContext dbContext) :
     IAdmissionTicketTransferRepository
 {
-    public const string CanonicalFenceOrder =
+    public const string FenceOrder =
         "assignment>eligibility>ticket>transfer";
 
     public Task<AdmissionTicket?> GetTicketAsync(
@@ -137,7 +137,7 @@ public sealed class AdmissionTicketTransferRepository(
             Guid eventId,
             Guid admissionTicketId,
             CancellationToken cancellationToken) =>
-        LoadCanonicalAsync(
+        LoadFencedContextAsync(
             tenantId,
             eventId,
             admissionTicketId,
@@ -151,7 +151,7 @@ public sealed class AdmissionTicketTransferRepository(
             Guid admissionTicketId,
             Guid admissionTicketTransferId,
             CancellationToken cancellationToken) =>
-        LoadCanonicalAsync(
+        LoadFencedContextAsync(
             tenantId,
             eventId,
             admissionTicketId,
@@ -164,7 +164,7 @@ public sealed class AdmissionTicketTransferRepository(
             Guid eventId,
             Guid admissionTicketId,
             CancellationToken cancellationToken) =>
-        LoadCanonicalAsync(
+        LoadFencedContextAsync(
             tenantId,
             eventId,
             admissionTicketId,
@@ -177,7 +177,7 @@ public sealed class AdmissionTicketTransferRepository(
             Guid eventId,
             Guid admissionTicketId,
             CancellationToken cancellationToken) =>
-        LoadCanonicalAsync(
+        LoadFencedContextAsync(
             tenantId,
             eventId,
             admissionTicketId,
@@ -604,7 +604,7 @@ public sealed class AdmissionTicketTransferRepository(
     }
 
     private async Task<AdmissionTicketTransferContext?>
-        LoadCanonicalAsync(
+        LoadFencedContextAsync(
             Guid tenantId,
             Guid eventId,
             Guid admissionTicketId,

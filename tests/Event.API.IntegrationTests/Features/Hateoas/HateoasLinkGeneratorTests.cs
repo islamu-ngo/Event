@@ -53,8 +53,8 @@ public class HateoasLinkGeneratorTests
         var hasFirstLink = links.TryGetProperty("first", out var firstLink);
         await Assert.That(hasSelfLink || hasFirstLink).IsTrue();
 
-        var canonicalLink = hasSelfLink ? selfLink : firstLink;
-        await Assert.That(canonicalLink.TryGetProperty("href", out var href)).IsTrue();
+        var primaryLink = hasSelfLink ? selfLink : firstLink;
+        await Assert.That(primaryLink.TryGetProperty("href", out var href)).IsTrue();
 
         var hrefValue = href.GetString();
         await Assert.That(hrefValue).IsNotNull();

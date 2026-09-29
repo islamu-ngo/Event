@@ -1,6 +1,7 @@
 namespace Event.Architecture.Tests;
 
 using System.Reflection;
+using Explore.Persistence.Configurations.Entities;
 using NetArchTest.Rules;
 
 /// <summary>
@@ -67,60 +68,36 @@ public class NamingConventionTests
     #region Persistence Configuration Conventions
 
     [Test]
-    public async Task Phase4PersistenceConfigurations_ShouldUseOneClassPerCanonicalFile()
+    public async Task EventTicketingPersistenceConfigurations_ShouldUseDedicatedTypes()
     {
-        string configurationDirectory = Path.Combine(FindRepoRoot(), "src", "Explore.Persistence", "Configurations", "Entities");
-        string[] configurationNames =
+        Type[] configurationTypes =
         [
-            "EventTicketCatalogVersionConfiguration",
-            "EventTicketTypeConfiguration",
-            "TicketTypeEntitlementConfiguration",
-            "EventCapacityPoolConfiguration",
-            "LookupConfiguration",
-            "TicketCatalogStatusConfiguration",
-            "TicketPricingModeConfiguration",
-            "ParticipantDataCollectionModeConfiguration",
-            "EntitlementScopeTypeConfiguration",
-            "EntitlementSelectionRuleConfiguration",
-            "CapacityOversellPolicyConfiguration",
-            "PlatformFeePolicyConfiguration",
-            "PlatformFeeFixedChargeConfiguration",
-            "PlatformContributionSettingConfiguration",
-            "PlatformContributionOptionConfiguration"
+            typeof(EventTicketCatalogVersionConfiguration),
+            typeof(EventTicketTypeConfiguration),
+            typeof(TicketTypeEntitlementConfiguration),
+            typeof(EventCapacityPoolConfiguration),
+            typeof(TicketCatalogStatusConfiguration),
+            typeof(TicketPricingModeConfiguration),
+            typeof(ParticipantDataCollectionModeConfiguration),
+            typeof(EntitlementScopeTypeConfiguration),
+            typeof(EntitlementSelectionRuleConfiguration),
+            typeof(CapacityOversellPolicyConfiguration),
+            typeof(PlatformFeePolicyConfiguration),
+            typeof(PlatformFeeFixedChargeConfiguration),
+            typeof(PlatformContributionSettingConfiguration),
+            typeof(PlatformContributionOptionConfiguration)
         ];
+        string[] violations = configurationTypes
+            .Where(type => type.Namespace != typeof(EventTicketCatalogVersionConfiguration).Namespace
+                || !type.IsPublic
+                || type.IsAbstract
+                || !type.IsSealed
+                || !type.Name.EndsWith("Configuration", StringComparison.Ordinal))
+            .Select(type => type.FullName!)
+            .ToArray();
 
-        foreach (string configurationName in configurationNames)
-        {
-            string path = Path.Combine(configurationDirectory, $"{configurationName}.cs");
-            await Assert.That(File.Exists(path)).IsTrue();
-            string source = await File.ReadAllTextAsync(path);
-            string[] classDeclarations = source.Split('\n')
-                .Where(line => line.Contains(" class ", StringComparison.Ordinal))
-                .ToArray();
-            await Assert.That(source).Contains($"class {configurationName}");
-            await Assert.That(classDeclarations.Length).IsEqualTo(1);
-        }
-
-        foreach (string groupedFile in new[] { "EventTicketingConfigurations.cs", "TicketingLookupConfigurations.cs", "PlatformMonetizationConfigurations.cs" })
-        {
-            await Assert.That(File.Exists(Path.Combine(configurationDirectory, groupedFile))).IsFalse();
-        }
-    }
-
-    private static string FindRepoRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Explore.slnx")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate repository root containing Explore.slnx.");
+        await Assert.That(violations).IsEmpty();
+        await Assert.That(typeof(LookupConfiguration<>).IsAbstract).IsTrue();
     }
 
     #endregion

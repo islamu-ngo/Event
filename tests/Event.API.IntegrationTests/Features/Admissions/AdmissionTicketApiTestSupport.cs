@@ -124,26 +124,26 @@ public sealed partial class AdmissionTicketApiRedContractTests
 
     private static async Task<string> ResponseShape(HttpResponseMessage response) =>
         $"{(int)response.StatusCode}|{response.Content.Headers.ContentType?.MediaType}|" +
-        CanonicalJson(await response.Content.ReadAsStringAsync());
+        NormalizeJson(await response.Content.ReadAsStringAsync());
 
     private static async Task<string> ProblemFingerprint(HttpResponseMessage response) =>
-        CanonicalJson(await response.Content.ReadAsStringAsync());
+        NormalizeJson(await response.Content.ReadAsStringAsync());
 
-    private static string CanonicalJson(string body)
+    private static string NormalizeJson(string body)
     {
         if (string.IsNullOrWhiteSpace(body)) return string.Empty;
         using JsonDocument document = JsonDocument.Parse(body);
-        return CanonicalElement(document.RootElement);
+        return NormalizeElement(document.RootElement);
     }
 
-    private static string CanonicalElement(JsonElement element) => element.ValueKind switch
+    private static string NormalizeElement(JsonElement element) => element.ValueKind switch
     {
         JsonValueKind.Object => "{" + string.Join(',', element.EnumerateObject()
             .Where(property => property.Name is not (
                 "traceId" or "timestamp" or "correlationId" or "instance"))
             .OrderBy(property => property.Name, StringComparer.Ordinal)
-            .Select(property => property.Name + ":" + CanonicalElement(property.Value))) + "}",
-        JsonValueKind.Array => "[" + string.Join(',', element.EnumerateArray().Select(CanonicalElement)) + "]",
+            .Select(property => property.Name + ":" + NormalizeElement(property.Value))) + "}",
+        JsonValueKind.Array => "[" + string.Join(',', element.EnumerateArray().Select(NormalizeElement)) + "]",
         _ => element.GetRawText()
     };
 

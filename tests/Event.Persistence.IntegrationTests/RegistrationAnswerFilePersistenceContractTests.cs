@@ -189,7 +189,7 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
         RegistrationRequirement requirement = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, now);
         RegistrationChannel channel = RegistrationChannel.Create(requirement, 1, true, null, now);
         requirement.AddChannel(channel);

@@ -198,7 +198,7 @@ public sealed class NotificationFanoutRecipientTemplateFactoryTests
     }
 
     [Test]
-    public async Task EventTimezoneSessionDisplayTimesAreCanonicalizedAndPairedBySessionId()
+    public async Task EventTimezoneSessionDisplayTimesAreNormalizedAndPairedBySessionId()
     {
         Guid firstId = Guid.Parse("01990000-0000-7000-8000-000000000001");
         Guid secondId = Guid.Parse("01990000-0000-7000-8000-000000000002");

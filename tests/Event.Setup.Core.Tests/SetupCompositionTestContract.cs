@@ -104,14 +104,14 @@ internal static class SetupCompositionTestContract
         new(CompositionMatrix.Smuggling, "acceptance-evidence", "forbidden-authority"),
         new(CompositionMatrix.Smuggling, "tenant-user-authority", "forbidden-authority"),
 
-        new(CompositionMatrix.CanonicalParity, "json", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "yaml", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "directory", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "byte-identity", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "digest-identity", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "coverage-identity", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "legal-identity", "accepted"),
-        new(CompositionMatrix.CanonicalParity, "diagnostic-identity", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "json", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "yaml", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "directory", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "byte-identity", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "digest-identity", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "coverage-identity", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "legal-identity", "accepted"),
+        new(CompositionMatrix.DeterministicParity, "diagnostic-identity", "accepted"),
 
         new(CompositionMatrix.ValueFreeFailure, "closed-code", "accepted"),
         new(CompositionMatrix.ValueFreeFailure, "no-source-path", "accepted"),
@@ -163,7 +163,7 @@ internal enum CompositionMatrix
     ConflictOrdering,
     Cancellation,
     Smuggling,
-    CanonicalParity,
+    DeterministicParity,
     ValueFreeFailure,
     ProfileAdmission
 }

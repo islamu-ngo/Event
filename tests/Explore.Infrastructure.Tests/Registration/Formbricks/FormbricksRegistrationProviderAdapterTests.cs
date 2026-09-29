@@ -116,7 +116,7 @@ public sealed class FormbricksRegistrationProviderAdapterTests
     }
 
     [Test]
-    public async Task ManagedPreflight_UsesActiveSurveyAndMatchingCanonicalFingerprint()
+    public async Task ManagedPreflight_UsesActiveSurveyAndMatchingNormalizedFingerprint()
     {
         RecordingHandler handler = new(_ => Json("""
             {"data":{"id":"survey_123","status":"inProgress","questions":[{"id":"q018e4e5c7f0070008000000000000601","type":"openText","headline":{"default":"Email"},"required":true}]}}
@@ -320,7 +320,7 @@ public sealed class FormbricksRegistrationProviderAdapterTests
             RegistrationProviderPresentationModeEnum.Embed,
             RegistrationProviderCollectionModeEnum.ProviderHosted,
             RegistrationProviderCompletionModeEnum.Callback,
-            RegistrationProviderTrustLevelEnum.FullCanonical,
+            RegistrationProviderTrustLevelEnum.FullSync,
             BindingWebhookBindingId,
             UtcNow);
         binding.SetDraftProvisionedSurvey("survey_123", "rev_123");

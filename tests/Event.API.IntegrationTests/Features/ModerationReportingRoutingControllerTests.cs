@@ -102,7 +102,7 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
 
         using var body = JsonDocument.Parse(json);
         var root = body.RootElement;
-        await Assert.That(root.GetProperty("localCanonicalRequired").GetBoolean()).IsTrue();
+        await Assert.That(root.GetProperty("localReportingRequired").GetBoolean()).IsTrue();
         await Assert.That(root.GetProperty("externalSyncEnabled").GetBoolean()).IsTrue();
         await Assert.That(root.GetProperty("osprey").GetProperty("tenantEnabled").GetBoolean()).IsTrue();
         await Assert.That(root.GetProperty("osprey").GetProperty("targets")[0].GetProperty("apiKeyConfigured").GetBoolean()).IsTrue();
@@ -234,7 +234,7 @@ public sealed class ModerationReportingRoutingControllerAuthorizedTests
         public Task<ReportingRoutingPolicy> ResolveAsync(CancellationToken cancellationToken = default)
         {
             var policy = new ReportingRoutingPolicy(
-                LocalCanonicalRequired: true,
+                LocalReportingRequired: true,
                 ExternalSyncEnabled: true,
                 InstanceOspreyEnabled: true,
                 TenantOspreyEnabled: true,

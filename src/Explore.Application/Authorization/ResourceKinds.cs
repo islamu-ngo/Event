@@ -1,7 +1,7 @@
 namespace Explore.Application.Authorization;
 
 /// <summary>
-/// Canonical catalog of resource kind identifiers used for authorization.
+/// Authoritative catalog of resource kind identifiers used for authorization.
 /// All values match Cerbos resource policy names exactly.
 /// <para>
 /// Use these constants in <see cref="AuthorizeResourceAttribute"/>, link policies,

@@ -115,7 +115,7 @@ public class CqrsPatternTests
     }
 
     [Test]
-    public async Task ConfigurationManifestQueries_ShouldUseCanonicalQuerySuffixAndNamespace()
+    public async Task ConfigurationManifestQueries_ShouldUseQuerySuffixAndNamespace()
     {
         var result = Types.InAssembly(ApplicationAssembly)
             .That()
@@ -132,7 +132,7 @@ public class CqrsPatternTests
     }
 
     [Test]
-    public async Task ConfigurationManifestQueryHandlers_ShouldUseCanonicalSuffixAndNamespace()
+    public async Task ConfigurationManifestQueryHandlers_ShouldUseQueryHandlerSuffixAndNamespace()
     {
         var result = Types.InAssembly(ApplicationAssembly)
             .That()

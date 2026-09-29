@@ -140,7 +140,7 @@ public sealed class ExploreDbContextModelProviderTests
     [Arguments("SqlServer")]
     [Arguments("MariaDb")]
     [Arguments("MySql")]
-    public async Task FinalizedRelationalNamingMatrixUsesProviderNamespaceAndCanonicalNames(
+    public async Task FinalizedRelationalNamingMatrixUsesProviderNamespaceAndNormalizedNames(
         string provider)
     {
         const string configuredSchema = "operator_matrix";
@@ -156,9 +156,9 @@ public sealed class ExploreDbContextModelProviderTests
                 : table.Name.StartsWith("ie_", StringComparison.Ordinal)
                     ? table.Name["ie_".Length..]
                     : table.Name;
-            if (!IsCanonicalSnakeCase(logicalTableName))
+            if (!IsNormalizedSnakeCase(logicalTableName))
             {
-                violations.Add($"{provider}:{table.Name}: non-canonical table name");
+                violations.Add($"{provider}:{table.Name}: non-normalized table name");
             }
             if (usesSchema && !string.Equals(table.Schema, configuredSchema, StringComparison.Ordinal))
             {
@@ -173,48 +173,48 @@ public sealed class ExploreDbContextModelProviderTests
 
             foreach (var column in table.Columns)
             {
-                if (!IsCanonicalSnakeCase(column.Name))
+                if (!IsNormalizedSnakeCase(column.Name))
                 {
-                    violations.Add($"{provider}:{table.Name}.{column.Name}: non-canonical column name");
+                    violations.Add($"{provider}:{table.Name}.{column.Name}: non-normalized column name");
                 }
             }
             foreach (var constraint in table.UniqueConstraints)
             {
                 string prefix = ReferenceEquals(table.PrimaryKey, constraint) ? "pk_" : "ak_";
                 if (!constraint.Name.StartsWith(prefix, StringComparison.Ordinal) ||
-                    !IsCanonicalSnakeCase(constraint.Name))
+                    !IsNormalizedSnakeCase(constraint.Name))
                 {
-                    violations.Add($"{provider}:{table.Name}.{constraint.Name}: non-canonical key name");
+                    violations.Add($"{provider}:{table.Name}.{constraint.Name}: non-normalized key name");
                 }
             }
             foreach (var index in table.Indexes)
             {
                 if (!index.Name.StartsWith("ix_", StringComparison.Ordinal) ||
-                    !IsCanonicalSnakeCase(index.Name))
+                    !IsNormalizedSnakeCase(index.Name))
                 {
-                    violations.Add($"{provider}:{table.Name}.{index.Name}: non-canonical index name");
+                    violations.Add($"{provider}:{table.Name}.{index.Name}: non-normalized index name");
                 }
             }
             foreach (var foreignKey in table.ForeignKeyConstraints)
             {
                 if (!foreignKey.Name.StartsWith("fk_", StringComparison.Ordinal) ||
-                    !IsCanonicalSnakeCase(foreignKey.Name))
+                    !IsNormalizedSnakeCase(foreignKey.Name))
                 {
-                    violations.Add($"{provider}:{table.Name}.{foreignKey.Name}: non-canonical foreign key name");
+                    violations.Add($"{provider}:{table.Name}.{foreignKey.Name}: non-normalized foreign key name");
                 }
             }
             foreach (var check in table.CheckConstraints)
             {
                 if (!check.Name.StartsWith("ck_", StringComparison.Ordinal) ||
-                    !IsCanonicalSnakeCase(check.Name))
+                    !IsNormalizedSnakeCase(check.Name))
                 {
-                    violations.Add($"{provider}:{table.Name}.{check.Name}: non-canonical check name");
+                    violations.Add($"{provider}:{table.Name}.{check.Name}: non-normalized check name");
                 }
             }
         }
 
         await Assert.That(violations).IsEmpty()
-            .Because("the finalized relational model must be schema-configurable and canonically named");
+            .Because("the finalized relational model must be schema-configurable and normalized");
     }
 
     [Test]
@@ -314,7 +314,7 @@ public sealed class ExploreDbContextModelProviderTests
             .IsEqualTo(descriptors.Length);
         await Assert.That(descriptors.All(descriptor =>
             descriptor.Name.Length <= maximumIdentifierLength &&
-            IsCanonicalSnakeCase(descriptor.Name))).IsTrue();
+            IsNormalizedSnakeCase(descriptor.Name))).IsTrue();
         await Assert.That(descriptors.SelectMany(descriptor => descriptor.QualifiedColumns).All(column =>
             !string.IsNullOrWhiteSpace(column) &&
             (provider is "PostgreSql" or "SqlServer" ||
@@ -334,7 +334,7 @@ public sealed class ExploreDbContextModelProviderTests
     [Arguments(PrimaryDatabaseProvider.SqlServer)]
     [Arguments(PrimaryDatabaseProvider.MariaDb)]
     [Arguments(PrimaryDatabaseProvider.MySql)]
-    public async Task PrivateTablesHaveCanonicalDbSetOwners(PrimaryDatabaseProvider provider)
+    public async Task PrivateTablesHaveExpectedDbSetOwners(PrimaryDatabaseProvider provider)
     {
         var violations = new List<string>();
         foreach (bool external in new[] { false, true })
@@ -354,7 +354,7 @@ public sealed class ExploreDbContextModelProviderTests
                 foreach (var mapping in expected)
                 {
                     if (sets.Count(set => set.Type == mapping.Type && set.Name == mapping.Set) != 1)
-                        violations.Add($"{provider}/{context.GetType().Name}: missing canonical DbSet {mapping.Set}");
+                        violations.Add($"{provider}/{context.GetType().Name}: missing expected DbSet {mapping.Set}");
                     IEntityType entity = model.FindEntityType(mapping.Type)!;
                     await Assert.That(entity.GetTableName()).IsEqualTo(usesSchema ? mapping.Table : "ie_" + mapping.Table);
                     await Assert.That(entity.GetSchema()).IsEqualTo(usesSchema
@@ -986,7 +986,7 @@ public sealed class ExploreDbContextModelProviderTests
         }
     }
 
-    private static bool IsCanonicalSnakeCase(string name) =>
+    private static bool IsNormalizedSnakeCase(string name) =>
         name.Length > 0 &&
         name[0] is >= 'a' and <= 'z' &&
         name.All(character =>

@@ -26,12 +26,12 @@ public static class InstanceOperatorIdentitySettingKeys
         }
 
         // Database collations may equate accented/full-width characters or ignore padding.
-        // Canonical setting identifiers are ASCII; reject aliases before a collation can resolve them.
+        // Authoritative setting identifiers are ASCII; reject aliases before a collation can resolve them.
         if (key.Any(character => !char.IsAsciiLetterOrDigit(character)
             && character is not '.' and not '_' and not '-'))
         {
             throw new ArgumentException(
-                "Setting mutations require a canonical ASCII setting key.",
+                "Setting mutations require an authoritative ASCII setting key.",
                 nameof(key));
         }
     }

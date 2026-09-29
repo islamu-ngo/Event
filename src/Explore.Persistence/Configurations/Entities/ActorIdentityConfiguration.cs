@@ -65,14 +65,17 @@ public sealed class ActorMergeConfiguration : IEntityTypeConfiguration<ActorMerg
             .HasForeignKey(e => e.SourceActorId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(e => e.CanonicalActor)
+        builder.HasOne(e => e.TargetActor)
             .WithMany(e => e.MergesInto)
-            .HasForeignKey(e => e.CanonicalActorId)
+            .HasForeignKey(e => e.TargetActorId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(e => e.TargetActorId)
+            .HasColumnName("target_actor_id");
 
         builder.ToTable(t => t.HasCheckConstraint(
             "ck_actor_merges_distinct_actors",
-            "source_actor_id <> canonical_actor_id"));
+            "source_actor_id <> target_actor_id"));
     }
 }
 

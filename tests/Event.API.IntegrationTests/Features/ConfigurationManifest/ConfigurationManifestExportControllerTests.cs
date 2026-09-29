@@ -25,17 +25,17 @@ using NSubstitute;
 
 public sealed class ConfigurationManifestExportControllerTests
 {
-    private const string CanonicalPath =
+    private const string PrimaryPath =
         "/api/control-plane/configuration-manifest/export";
-    private const string CanonicalRoute =
+    private const string PrimaryRoute =
         "api/control-plane/configuration-manifest/export";
     private const string OperationId = "ExportConfigurationManifest";
-    private const string CanonicalFileName = "configuration-manifest-overrides.json";
+    private const string PrimaryFileName = "configuration-manifest-overrides.json";
     private const string ControllerTypeName =
         "Explore.API.Controllers.ConfigurationManifestExportsController";
 
     [Test]
-    public async Task Endpoint_UsesCanonicalRouteOperationMediaTypeAndBufferedNoStoreResponse()
+    public async Task Endpoint_UsesPrimaryRouteOperationMediaTypeAndBufferedNoStoreResponse()
     {
         Type controller = RequireController();
         RouteAttribute route = controller.GetCustomAttribute<RouteAttribute>()
@@ -44,7 +44,7 @@ public sealed class ConfigurationManifestExportControllerTests
             ?? throw new InvalidOperationException("The whole-instance export action was not found.");
         HttpMethodAttribute http = action.GetCustomAttributes<HttpMethodAttribute>().Single();
 
-        await Assert.That(route.Template).IsEqualTo(CanonicalRoute);
+        await Assert.That(route.Template).IsEqualTo(PrimaryRoute);
         await Assert.That(controller.IsDefined(typeof(AuthorizeAttribute), inherit: true)).IsTrue();
         await Assert.That(controller.GetCustomAttribute<EndpointClassificationAttribute>()?.Class)
             .IsEqualTo(EndpointClass.Admin);
@@ -109,12 +109,12 @@ public sealed class ConfigurationManifestExportControllerTests
         };
         using HttpClient client = factory.CreateClient();
 
-        using HttpResponseMessage anonymous = await client.GetAsync($"{CanonicalPath}?view=Overrides");
+        using HttpResponseMessage anonymous = await client.GetAsync($"{PrimaryPath}?view=Overrides");
         await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
 
         using var tenantRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            $"{CanonicalPath}?view=Portable");
+            $"{PrimaryPath}?view=Portable");
         tenantRequest.Headers.Add(
             TestAuthHandler.AuthHeaderName,
             TestAuthHandler.CreateTenantAdminHeaderValue(
@@ -125,7 +125,7 @@ public sealed class ConfigurationManifestExportControllerTests
 
         using var wrongInstanceRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            $"{CanonicalPath}?view=Overrides");
+            $"{PrimaryPath}?view=Overrides");
         wrongInstanceRequest.Headers.Add(
             TestAuthHandler.AuthHeaderName,
             TestAuthHandler.CreateAuthHeaderValue(
@@ -148,7 +148,7 @@ public sealed class ConfigurationManifestExportControllerTests
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            $"{CanonicalPath}?view=Overrides");
+            $"{PrimaryPath}?view=Overrides");
         request.Headers.Add(
             TestAuthHandler.AuthHeaderName,
             TestAuthHandler.CreateInstanceAdminHeaderValue(
@@ -195,11 +195,11 @@ public sealed class ConfigurationManifestExportControllerTests
 
         Type apiContract = controller.Assembly.GetType(
             "Explore.API.Controllers.ConfigurationManifestExportApiContract")
-            ?? throw new InvalidOperationException("Missing canonical configuration manifest API contract.");
+            ?? throw new InvalidOperationException("Missing primary configuration manifest API contract.");
         await Assert.That(apiContract.GetField("MediaType")?.GetRawConstantValue())
             .IsEqualTo(ConfigurationManifestContractMetadata.MediaType);
         await Assert.That(apiContract.GetField("OverridesFileName")?.GetRawConstantValue())
-            .IsEqualTo(CanonicalFileName);
+            .IsEqualTo(PrimaryFileName);
         await Assert.That(apiContract.GetField("TooLargeFailureCode")?.GetRawConstantValue())
             .IsEqualTo("configuration_manifest_export_too_large");
     }
@@ -258,7 +258,7 @@ public sealed class ConfigurationManifestExportControllerTests
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            $"{CanonicalPath}?view=Overrides");
+            $"{PrimaryPath}?view=Overrides");
         request.Headers.Add(
             TestAuthHandler.AuthHeaderName,
             TestAuthHandler.CreateInstanceAdminHeaderValue(

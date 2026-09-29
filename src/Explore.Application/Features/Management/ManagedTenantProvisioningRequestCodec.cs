@@ -156,13 +156,13 @@ public static class ManagedTenantProvisioningRequestCodec
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
-            WriteCanonicalJson(writer, document.RootElement);
+            WriteNormalizedJson(writer, document.RootElement);
         }
 
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
-    private static void WriteCanonicalJson(Utf8JsonWriter writer, JsonElement element)
+    private static void WriteNormalizedJson(Utf8JsonWriter writer, JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -172,7 +172,7 @@ public static class ManagedTenantProvisioningRequestCodec
                          .ThenBy(property => property.Value.GetRawText(), StringComparer.Ordinal))
             {
                 writer.WritePropertyName(property.Name);
-                WriteCanonicalJson(writer, property.Value);
+                WriteNormalizedJson(writer, property.Value);
             }
 
             writer.WriteEndObject();
@@ -184,7 +184,7 @@ public static class ManagedTenantProvisioningRequestCodec
             writer.WriteStartArray();
             foreach (JsonElement item in element.EnumerateArray())
             {
-                WriteCanonicalJson(writer, item);
+                WriteNormalizedJson(writer, item);
             }
 
             writer.WriteEndArray();

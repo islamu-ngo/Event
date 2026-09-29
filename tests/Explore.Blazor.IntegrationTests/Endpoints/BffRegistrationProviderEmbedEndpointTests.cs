@@ -74,7 +74,7 @@ public sealed partial class BffRegistrationProviderEmbedEndpointTests : IAsyncDi
     }
 
     [Test]
-    public async Task EmbedHost_DefaultHttpsPort_UsesCanonicalCspOrigin()
+    public async Task EmbedHost_DefaultHttpsPort_UsesNormalizedCspOrigin()
     {
         GivenDescriptor(Descriptor(url: "https://forms.example.test:443/embed/form-1"));
 

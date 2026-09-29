@@ -6,7 +6,7 @@ public static class TenantFilterBypassReasons
         "Resource audit maintenance traverses bounded tenant pages and deletes bounded expired rows under an exact tenant predicate.";
 
     public const string EventResourceGovernanceMutation =
-        "Resource governance mutation reads only canonical policy keys for the exact tenant ids in the authorized batch.";
+        "Resource governance mutation reads only normalized policy keys for the exact tenant ids in the authorized batch.";
 
     public const string ConfigurationManifestOperationReplay =
         "Manifest retry reconstructs post-commit effects for one exact operation id across its bounded tenant results.";
@@ -18,7 +18,7 @@ public static class TenantFilterBypassReasons
         "Visitor policy mutation evaluates AccountRequired configurations across affected tenant scopes; optional tenant selection uses an exact predicate.";
 
     public const string VisitorPolicyAuthorityInheritanceSafetyRead =
-        "Visitor policy mutation composes final inheritance across affected tenants using only canonical authority keys.";
+        "Visitor policy mutation composes final inheritance across affected tenants using only normalized authority keys.";
 
     public const string TenantScopedRepositoryExactTenantPredicate =
         "Repository bypasses the ambient tenant filter only after applying an explicit tenant predicate.";
@@ -117,7 +117,7 @@ public static class TenantFilterBypassReasons
         "The single Jetstream consumer resolves one exact governance key across active tenants before presentation materialization.";
 
     public const string AtprotoActorConsolidation =
-        "Verified AT Protocol Actor consolidation moves active operational references across tenants by exact source and canonical Actor ids.";
+        "Verified AT Protocol Actor consolidation moves active operational references across tenants by exact source and target Actor ids.";
 
     public const string AtprotoGlobalActorModeration =
         "Instance-global AT Protocol Actor moderation reconciles live owned Event records across tenants by exact Actor and DID predicates.";

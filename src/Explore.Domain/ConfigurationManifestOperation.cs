@@ -303,7 +303,7 @@ public sealed class ConfigurationManifestOperation
                 or '-')))
         {
             throw new ArgumentException(
-                "Changed keys must be bounded canonical identifiers.",
+                "Changed keys must be bounded normalized identifiers.",
                 parameterName);
         }
 

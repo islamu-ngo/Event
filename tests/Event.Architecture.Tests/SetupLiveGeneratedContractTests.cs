@@ -131,7 +131,7 @@ public sealed class SetupLiveGeneratedContractTests
     }
 
     [Test]
-    public async Task GeneratedCreateUsesCanonicalJsonAndExposesOnlyIssuedCapability()
+    public async Task GeneratedCreateUsesNormalizedJsonAndExposesOnlyIssuedCapability()
     {
         string challenge = Base64Url(RandomNumberGenerator.GetBytes(32));
         string capability = Base64Url(RandomNumberGenerator.GetBytes(32));

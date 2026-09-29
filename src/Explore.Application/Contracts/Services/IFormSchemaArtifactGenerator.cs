@@ -12,5 +12,5 @@ public sealed record FormSchemaArtifactBundle(
     string UiSchemaJson,
     string LogicSchemaJson,
     string MappingArtifactJson,
-    string CanonicalBundleJson,
+    string NormalizedBundleJson,
     string SchemaHash);

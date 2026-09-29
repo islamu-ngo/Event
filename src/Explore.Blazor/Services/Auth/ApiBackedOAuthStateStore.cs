@@ -44,7 +44,7 @@ public sealed class ApiBackedOAuthStateStore(
             || !AtprotoOAuthFlowValidation.IsHttpsOrigin(issuer)
             || issuer != new Uri(recovered.Data.Issuer)
             || !Uri.TryCreate($"{context.Request.Scheme}://{context.Request.Host.Value}/", UriKind.Absolute, out var callbackOrigin)
-            || !AtprotoTenantOriginResolver.OriginsEqual(callbackOrigin, resolver.ParseCanonicalOrigin()))
+            || !AtprotoTenantOriginResolver.OriginsEqual(callbackOrigin, resolver.ParsePublicOrigin()))
             return null;
         if (AtprotoTenantOriginResolver.OriginsEqual(callbackOrigin, recovered.Seed.Origin)
             && !proof.Validate(context.Request, recovered.Seed.BrowserBinding))

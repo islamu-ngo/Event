@@ -119,7 +119,7 @@ public sealed class TicketPurchaseGovernanceBffTests
                 eventId,
                 orderId,
                 Arg.Is<string>(value =>
-                    IsCanonicalOperationKey(value)),
+                    IsStandardOperationKey(value)),
                 null,
                 null,
                 Arg.Is<ReserveTicketPurchaseRequest>(body =>
@@ -169,7 +169,7 @@ public sealed class TicketPurchaseGovernanceBffTests
                 eventId,
                 orderId,
                 Arg.Is<string>(value =>
-                    IsCanonicalOperationKey(value)),
+                    IsStandardOperationKey(value)),
                 capability,
                 null,
                 null,
@@ -307,7 +307,7 @@ public sealed class TicketPurchaseGovernanceBffTests
             .IsTrue();
     }
 
-    private static bool IsCanonicalOperationKey(
+    private static bool IsStandardOperationKey(
         string value) =>
         Guid.TryParseExact(value, "N", out _);
 

@@ -74,7 +74,7 @@ public sealed class OpenApiParityTests
         using var swashbuckleResponse = await _fixture.Client.GetAsync(SwashbuckleOpenApiEndpoint);
 
         await Assert.That(nativeResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
-            .Because("The native OpenAPI document is the canonical build-time/runtime contract source.");
+            .Because("The native OpenAPI document is the authoritative build-time/runtime contract source.");
         await Assert.That(swashbuckleResponse.StatusCode).IsEqualTo(HttpStatusCode.OK)
             .Because("The Swashbuckle document must remain available until native parity is proven and cleanup lands.");
     }

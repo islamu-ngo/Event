@@ -222,7 +222,7 @@ public class AdminContextTests
     }
 
     [Test]
-    public async Task ResolveUserIdAsync_ConflictingGuidClaimsUsesCanonicalPriorityWithoutProviderLookup()
+    public async Task ResolveUserIdAsync_ConflictingGuidClaimsUsesAuthoritativePriorityWithoutProviderLookup()
     {
         var subUserId = Guid.NewGuid();
         var internalUserId = Guid.NewGuid();

@@ -102,7 +102,7 @@ public sealed record ConfigurationImportSectionSnapshot
 {
     public ConfigurationImportSectionSnapshot(
         string sectionKey,
-        string canonicalDigest,
+        string normalizedDigest,
         ConfigurationPortabilityClass portabilityClass,
         bool supportsPreview,
         bool supportsDiff,
@@ -113,14 +113,14 @@ public sealed record ConfigurationImportSectionSnapshot
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionKey);
         ConfigurationImportContractGuard.ValidateDigest(
-            canonicalDigest,
-            nameof(canonicalDigest));
+            normalizedDigest,
+            nameof(normalizedDigest));
         if (!Enum.IsDefined(portabilityClass))
             throw new ArgumentOutOfRangeException(nameof(portabilityClass));
         SectionKey = ConfigurationImportStableIdentity.Normalize(
             sectionKey,
             nameof(sectionKey));
-        CanonicalDigest = canonicalDigest;
+        NormalizedDigest = normalizedDigest;
         PortabilityClass = portabilityClass;
         SupportsPreview = supportsPreview;
         SupportsDiff = supportsDiff;
@@ -143,7 +143,7 @@ public sealed record ConfigurationImportSectionSnapshot
     }
 
     public string SectionKey { get; }
-    public string CanonicalDigest { get; }
+    public string NormalizedDigest { get; }
     public ConfigurationPortabilityClass PortabilityClass { get; }
     public bool SupportsPreview { get; }
     public bool SupportsDiff { get; }
@@ -521,14 +521,14 @@ public sealed class ConfigurationImportPreviewComposer
         return Item(
             source,
             string.Equals(
-                source.CanonicalDigest,
-                target.CanonicalDigest,
+                source.NormalizedDigest,
+                target.NormalizedDigest,
                 StringComparison.Ordinal)
                 ? ConfigurationImportPreviewCategory.Unchanged
                 : ConfigurationImportPreviewCategory.Changed,
             string.Equals(
-                source.CanonicalDigest,
-                target.CanonicalDigest,
+                source.NormalizedDigest,
+                target.NormalizedDigest,
                 StringComparison.Ordinal)
                 ? "configuration_import_section_unchanged"
                 : "configuration_import_section_changed");
@@ -584,11 +584,11 @@ public static class ConfigurationImportDigest
     public static string Compute(IEnumerable<string> values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        string canonical = string.Join(
+        string normalized = string.Join(
             '\u001e',
             values.Order(StringComparer.Ordinal));
         return Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes(canonical)))
+                SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))
             .ToLowerInvariant();
     }
 

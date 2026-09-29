@@ -389,14 +389,14 @@ public sealed class CompositeOutboxMessageDispatcher(
             bool scrubbed = await outboxRepository.TryReplaceProcessingPayloadAsync(
                 message.Id,
                 message.Payload,
-                parsed.CanonicalPayload,
+                parsed.NormalizedPayload,
                 cancellationToken);
             if (!scrubbed)
             {
                 throw new InvalidOperationException("The retained heavy moderation fanout payload could not be safely replaced.");
             }
 
-            message.Payload = parsed.CanonicalPayload;
+            message.Payload = parsed.NormalizedPayload;
         }
 
         logger.LogInformation(

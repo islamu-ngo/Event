@@ -67,7 +67,7 @@ public sealed class EventResourceGovernancePolicyTests
     [Arguments("https://*.example.com")]
     [Arguments("https://FILES.example.com")]
     [Arguments("https://files.example.com/")]
-    public async Task Create_RejectsMalformedOrNonCanonicalOrigins(string origin) =>
+    public async Task Create_RejectsMalformedOrNonNormalizedOrigins(string origin) =>
         await Assert.ThrowsAsync<ArgumentException>(() => Task.FromResult(Create(origins: [origin])));
 
     [Test]

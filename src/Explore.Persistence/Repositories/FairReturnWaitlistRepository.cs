@@ -13,7 +13,7 @@ public sealed class FairReturnWaitlistRepository(
 {
     public const string LiteralQueueOrder =
         "priority>enqueued-at>id";
-    public const string CanonicalFenceOrder =
+    public const string FenceOrder =
         "policy>supply>queue>offer>binding>" +
         "payment-dispatch>provider-observation>" +
         "refund-intent";

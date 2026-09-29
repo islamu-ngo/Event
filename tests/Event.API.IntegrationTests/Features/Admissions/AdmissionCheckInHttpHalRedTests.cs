@@ -143,7 +143,7 @@ public sealed class AdmissionCheckInHttpHalRedTests(ContractApiFixture fixture)
         Type scannerRequest = RequestDto(FindAction(actions, Route("ScannerCheckInAdmission"))!);
 
         await Assert.That(staffRequest.GetProperty("TargetId")).IsNotNull()
-            .Because("the canonical staff route selects its admission target in the request body");
+            .Because("the primary staff route selects its admission target in the request body");
         await Assert.That(scannerRequest.GetProperty("TargetId")).IsNull()
             .Because("the AdmissionScanner principal supplies event and target scope");
         await Assert.That(scannerRequest.GetProperty("EventId")).IsNull();

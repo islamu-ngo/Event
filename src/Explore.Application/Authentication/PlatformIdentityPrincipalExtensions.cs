@@ -188,7 +188,7 @@ public static class PlatformIdentityPrincipalExtensions
         }
     }
 
-    /// <summary>Returns the one canonical persisted key for the authenticated provider account.</summary>
+    /// <summary>Returns the one authoritative persisted key for the authenticated provider account.</summary>
     public static string GetProviderId(this ClaimsPrincipal principal, string providerSubject, string provider) =>
         GetProviderAccountKey(RequirePrincipal(principal), provider, providerSubject)?.Value
         ?? throw new UnauthorizedAccessException("Provider authority is not available in the token.");

@@ -13,8 +13,8 @@ public sealed class AtprotoBootstrapAssertionService(
     public const string BridgePath = "/api/auth/atproto/session";
     public const string TenantClaim = "tenant_id";
     public const string ClassificationClaim = "subject_classification";
-    public const string CanonicalActorIdClaim = "canonical_actor_id";
-    public const string ExpectedCanonicalActorConcurrencyStampClaim = "expected_actor_concurrency_stamp";
+    public const string TargetActorIdClaim = "target_actor_id";
+    public const string ExpectedTargetActorConcurrencyStampClaim = "expected_actor_concurrency_stamp";
     public const string MethodClaim = "http_method";
     public const string PathClaim = "http_path";
     public const string SessionBridgeHeaderName = "X-Atproto-Session-Bridge-Assertion";
@@ -31,8 +31,8 @@ public sealed class AtprotoBootstrapAssertionService(
         string rawClassification,
         HttpMethod method,
         string path,
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null)
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null)
     {
         if (tenantId == Guid.Empty
             || string.IsNullOrWhiteSpace(did)
@@ -45,11 +45,11 @@ public sealed class AtprotoBootstrapAssertionService(
             throw new ArgumentException("The ATProto bootstrap assertion target is invalid.");
         }
 
-        if (canonicalActorId.HasValue != expectedCanonicalActorConcurrencyStamp.HasValue
-            || canonicalActorId == Guid.Empty
-            || expectedCanonicalActorConcurrencyStamp == Guid.Empty)
+        if (targetActorId.HasValue != expectedTargetActorConcurrencyStamp.HasValue
+            || targetActorId == Guid.Empty
+            || expectedTargetActorConcurrencyStamp == Guid.Empty)
         {
-            throw new ArgumentException("The ATProto canonical Actor target is invalid.");
+            throw new ArgumentException("The ATProto target Actor is invalid.");
         }
 
         var classification = AtprotoSubjectClassifications.Normalize(rawClassification);
@@ -83,10 +83,10 @@ public sealed class AtprotoBootstrapAssertionService(
             TokenType = "JWT"
         };
 
-        if (canonicalActorId is { } actorId)
+        if (targetActorId is { } actorId)
         {
-            descriptor.Claims[CanonicalActorIdClaim] = actorId.ToString("D");
-            descriptor.Claims[ExpectedCanonicalActorConcurrencyStampClaim] = expectedCanonicalActorConcurrencyStamp!.Value.ToString("D");
+            descriptor.Claims[TargetActorIdClaim] = actorId.ToString("D");
+            descriptor.Claims[ExpectedTargetActorConcurrencyStampClaim] = expectedTargetActorConcurrencyStamp!.Value.ToString("D");
         }
 
         return new JwtSecurityTokenHandler().CreateEncodedJwt(descriptor);

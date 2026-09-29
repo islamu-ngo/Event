@@ -50,7 +50,7 @@ internal static class RegistrationSha256Hash
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ArgumentException($"{displayName} must be a canonical SHA-256 hash.", parameterName);
+            throw new ArgumentException($"{displayName} must be a normalized SHA-256 hash.", parameterName);
         }
 
         byte[] bytes;
@@ -60,12 +60,12 @@ internal static class RegistrationSha256Hash
         }
         catch (FormatException exception)
         {
-            throw new ArgumentException($"{displayName} must be a canonical SHA-256 hash.", parameterName, exception);
+            throw new ArgumentException($"{displayName} must be a normalized SHA-256 hash.", parameterName, exception);
         }
 
         if (bytes.Length != 32 || !string.Equals(Convert.ToBase64String(bytes), value, StringComparison.Ordinal))
         {
-            throw new ArgumentException($"{displayName} must be a canonical SHA-256 hash.", parameterName);
+            throw new ArgumentException($"{displayName} must be a normalized SHA-256 hash.", parameterName);
         }
 
         return value;

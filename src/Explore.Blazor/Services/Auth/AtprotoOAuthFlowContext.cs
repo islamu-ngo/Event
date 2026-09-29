@@ -9,8 +9,8 @@ public sealed record AtprotoOAuthFlowSeed(
     string ReturnPath,
     string OAuthClientKeyId,
     string Classification,
-    Guid? CanonicalActorId = null,
-    Guid? ExpectedCanonicalActorConcurrencyStamp = null)
+    Guid? TargetActorId = null,
+    Guid? ExpectedTargetActorConcurrencyStamp = null)
 {
     public required BffAtprotoBrowserBinding BrowserBinding { get; init; }
 }
@@ -28,8 +28,8 @@ internal static class AtprotoOAuthFlowValidation
             || seed.ExpectedDid.Any(character => char.IsWhiteSpace(character) || char.IsControl(character))
             || string.IsNullOrWhiteSpace(seed.TenantSlug) || string.IsNullOrWhiteSpace(seed.OAuthClientKeyId)
             || seed.OAuthClientKeyId.Length > 128
-            || seed.CanonicalActorId.HasValue != seed.ExpectedCanonicalActorConcurrencyStamp.HasValue
-            || seed.CanonicalActorId == Guid.Empty || seed.ExpectedCanonicalActorConcurrencyStamp == Guid.Empty
+            || seed.TargetActorId.HasValue != seed.ExpectedTargetActorConcurrencyStamp.HasValue
+            || seed.TargetActorId == Guid.Empty || seed.ExpectedTargetActorConcurrencyStamp == Guid.Empty
             || !IsSafeReturnPath(seed.ReturnPath) || !IsHttpsOrigin(seed.ExpectedPdsUri) || !IsHttpsOrigin(seed.Origin)
             || !proof.IsLive(seed.BrowserBinding)
             || AtprotoSubjectClassifications.Normalize(seed.Classification) != seed.Classification)
@@ -56,8 +56,8 @@ public sealed record AtprotoBffSessionResult(
     string Classification,
     string AccessToken,
     DateTimeOffset ExpiresAt,
-    Guid? CanonicalActorId = null,
-    Guid? ExpectedCanonicalActorConcurrencyStamp = null);
+    Guid? TargetActorId = null,
+    Guid? ExpectedTargetActorConcurrencyStamp = null);
 
 public static class AtprotoSubjectClassifications
 {

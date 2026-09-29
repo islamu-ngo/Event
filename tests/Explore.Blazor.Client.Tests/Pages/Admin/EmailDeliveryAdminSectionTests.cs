@@ -14,7 +14,7 @@ public sealed class EmailDeliveryAdminSectionTests
     [Test]
     [Arguments(true)]
     [Arguments(false)]
-    public async Task RenderedConfirmationUsesExactAcknowledgementAndRefreshesCanonicalState(bool instanceScope)
+    public async Task RenderedConfirmationUsesExactAcknowledgementAndRefreshesAuthoritativeState(bool instanceScope)
     {
         using var fixture = new Fixture(instanceScope);
         var cut = fixture.Render();

@@ -18,7 +18,7 @@ public class CurrentUserService : ICurrentUserService
     }
 
     /// <summary>
-    /// Gets the current user's ID from the canonical platform identity authority.
+    /// Gets the current user's ID from the authoritative platform identity authority.
     /// </summary>
     public Guid? UserId
     {

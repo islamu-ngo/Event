@@ -74085,7 +74085,7 @@
           "ModerationReport"
         ],
         "summary": "Execute Moderation Report Decision",
-        "description": "Executes a decision-ready report case through the canonical event moderation command path.",
+        "description": "Executes a decision-ready report case through the primary event moderation command path.",
         "operationId": "ExecuteModerationReportDecision",
         "parameters": [
           {
@@ -109639,7 +109639,7 @@
           "Webhooks"
         ],
         "summary": "Get webhook event types",
-        "description": "Returns the canonical outgoing webhook event catalog with schema and example payload metadata.",
+        "description": "Returns the authoritative outgoing webhook event catalog with schema and example payload metadata.",
         "operationId": "GetWebhookEventTypes",
         "parameters": [
           {
@@ -153437,7 +153437,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "localCanonicalRequired": {
+          "localReportingRequired": {
             "type": "boolean"
           },
           "externalSyncEnabled": {
@@ -173960,7 +173960,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "localCanonicalRequired": {
+          "localReportingRequired": {
             "type": "boolean"
           },
           "externalSyncEnabled": {
@@ -175143,7 +175143,7 @@
               "string"
             ]
           },
-          "canonicalUrl": {
+          "publicUrl": {
             "type": [
               "null",
               "string"

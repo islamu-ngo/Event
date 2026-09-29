@@ -262,7 +262,7 @@ public sealed class TenantPublicExperienceAdminService(
             logger.LogError(ex, "Failed to save tenant public experience settings.");
             MarkUnavailable(model);
             return PublicExperienceAdminSaveResult.Failed(
-                "Public experience settings could not be saved. Reload the canonical settings before retrying.");
+                "Public experience settings could not be saved. Reload the authoritative settings before retrying.");
         }
     }
 
@@ -415,16 +415,16 @@ public sealed class TenantPublicExperienceAdminService(
         string failureMessage,
         CancellationToken cancellationToken)
     {
-        bool restored = await ReloadCanonicalAfterFailureAsync(model, cancellationToken);
+        bool restored = await ReloadAuthoritativeAfterFailureAsync(model, cancellationToken);
         return restored
             ? PublicExperienceAdminSaveResult.Failed(
                 $"{failureMessage} The latest settings were restored.",
-                canonicalStateRestored: true)
+                authoritativeStateRestored: true)
             : PublicExperienceAdminSaveResult.Failed(
                 $"{failureMessage} The latest settings could not be reloaded; editing remains unavailable.");
     }
 
-    private async Task<bool> ReloadCanonicalAfterFailureAsync(
+    private async Task<bool> ReloadAuthoritativeAfterFailureAsync(
         TenantPublicExperienceAdminModel model,
         CancellationToken cancellationToken)
     {
@@ -433,19 +433,19 @@ public sealed class TenantPublicExperienceAdminService(
             HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
                 Category,
                 cancellationToken: cancellationToken);
-            TenantPublicExperienceAdminModel canonical = MapSettings(response);
-            if (!canonical.IsAvailable)
+            TenantPublicExperienceAdminModel authoritative = MapSettings(response);
+            if (!authoritative.IsAvailable)
             {
                 MarkUnavailable(model);
                 return false;
             }
 
-            CopySettings(canonical, model);
+            CopySettings(authoritative, model);
             return true;
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to reload canonical tenant visitor access settings after a rejected save.");
+            logger.LogWarning(ex, "Failed to reload authoritative tenant visitor access settings after a rejected save.");
             MarkUnavailable(model);
             return false;
         }
@@ -658,13 +658,13 @@ public sealed class TenantPublicExperienceAdminModel
 public sealed record PublicExperienceAdminSaveResult(
     bool Success,
     string Message,
-    bool CanonicalStateRestored = false)
+    bool AuthoritativeStateRestored = false)
 {
     public static PublicExperienceAdminSaveResult Successful() => new(true, string.Empty);
     public static PublicExperienceAdminSaveResult Failed(
         string message,
-        bool canonicalStateRestored = false) =>
-        new(false, message, canonicalStateRestored);
+        bool authoritativeStateRestored = false) =>
+        new(false, message, authoritativeStateRestored);
     public static PublicExperienceAdminSaveResult Unavailable() =>
         Failed("Public experience settings are unavailable. Reload them before saving.");
 }

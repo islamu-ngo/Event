@@ -29,7 +29,7 @@ internal static partial class SetupCliMachineContractVerifier
     {
         if (bytes.Length == 0 || bytes[0] == 0xEF || bytes[^1] != (byte)'\n' || bytes.Contains((byte)'\r'))
         {
-            throw new InvalidDataException("schema-bytes-not-canonical");
+            throw new InvalidDataException("schema-bytes-not-deterministic");
         }
         return JsonNode.Parse(bytes)?.AsObject() ?? throw new InvalidDataException("schema-object-required");
     }

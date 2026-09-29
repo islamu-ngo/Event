@@ -199,7 +199,7 @@ public sealed class StudioEventNavigationTests : IDisposable
     }
 
     [Test]
-    public async Task Render_TeamSection_UsesCanonicalPublicEventRouteInsteadOfRawGuidRoute()
+    public async Task Render_TeamSection_UsesPublicEventRouteInsteadOfRawGuidRoute()
     {
         var resource = CreateEvent("team");
         _eventService.GetEventByIdAsync(resource.Id!.Value).Returns(resource);

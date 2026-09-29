@@ -31,7 +31,7 @@ public static class SecretDefinitionRegistry
 {
     private static readonly FrozenDictionary<string, SecretDefinition> DefinitionsByKey = BuildDefinitions();
 
-    /// <summary>All platform secret definitions keyed by canonical setting key (lower.dot.case).</summary>
+    /// <summary>All platform secret definitions keyed by normalized setting key (lower.dot.case).</summary>
     public static IReadOnlyDictionary<string, SecretDefinition> All => DefinitionsByKey;
 
     /// <summary>Returns <c>true</c> when the platform recognizes the given setting key.</summary>
@@ -98,7 +98,7 @@ public static class SecretDefinitionRegistry
     private static string OwnerFor(string settingKey) =>
         settingKey[..settingKey.IndexOf('.')];
 
-    // -- Canonical keys (lower.dot.case, aligned with governance/key naming convention) --
+    // -- Normalized keys (lower.dot.case, aligned with governance/key naming convention) --
 
     public static class Keys
     {

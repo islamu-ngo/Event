@@ -23,9 +23,9 @@ public sealed class ConfigurationExtensionsTests
     [Test]
     public async Task AddSecretAuthorityConfiguration_MapsKeycloakClientIdsForApiProviderManagement()
     {
-        var canonical = BuildConfiguration(new Dictionary<string, string?>
+        var configured = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["KEYCLOAK_CLIENT_ID"] = "canonical-blazor"
+            ["KEYCLOAK_CLIENT_ID"] = "configured-blazor"
         });
         var composeAlias = BuildConfiguration(new Dictionary<string, string?>
         {
@@ -33,13 +33,13 @@ public sealed class ConfigurationExtensionsTests
             ["KEYCLOAK_BLAZOR_CLIENT_SECRET"] = "server-only-secret"
         });
 
-        await Assert.That(canonical["Keycloak:ClientId"]).IsEqualTo("canonical-blazor");
+        await Assert.That(configured["Keycloak:ClientId"]).IsEqualTo("configured-blazor");
         await Assert.That(composeAlias["Keycloak:ClientId"]).IsEqualTo("event-blazor");
         await Assert.That(composeAlias["Keycloak:ClientSecret"]).IsEqualTo("server-only-secret");
     }
 
     [Test]
-    public async Task AddSecretAuthorityConfiguration_DoesNotOverrideCanonicalCerbosUsePolicyScope()
+    public async Task AddSecretAuthorityConfiguration_DoesNotOverrideConfiguredCerbosUsePolicyScope()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
@@ -82,24 +82,24 @@ public sealed class ConfigurationExtensionsTests
     }
 
     [Test]
-    public async Task AddSecretAuthorityConfiguration_MapsAuthorizationProviderIntentWithoutOverridingCanonicalValue()
+    public async Task AddSecretAuthorityConfiguration_MapsAuthorizationProviderIntentWithoutOverridingConfiguredValue()
     {
         var mapped = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHORIZATION_PROVIDER"] = "cerbos"
         });
-        var canonical = BuildConfiguration(new Dictionary<string, string?>
+        var configured = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHORIZATION_PROVIDER"] = "cerbos",
             ["Authorization:Provider"] = "local"
         });
 
         await Assert.That(mapped["Authorization:Provider"]).IsEqualTo("cerbos");
-        await Assert.That(canonical["Authorization:Provider"]).IsEqualTo("local");
+        await Assert.That(configured["Authorization:Provider"]).IsEqualTo("local");
     }
 
     [Test]
-    public async Task AddSecretAuthorityConfiguration_MapsTwoAxisLocalIdentityConfigurationWithoutOverridingCanonicalValues()
+    public async Task AddSecretAuthorityConfiguration_MapsTwoAxisLocalIdentityConfigurationWithoutOverridingConfiguredValues()
     {
         var mapped = BuildConfiguration(new Dictionary<string, string?>
         {
@@ -113,7 +113,7 @@ public sealed class ConfigurationExtensionsTests
             ["IDENTITY_DATABASE_HOST"] = "identity-db",
             ["IDENTITY_DATABASE_RUNTIME_PASSWORD"] = "runtime-secret",
         });
-        var canonical = BuildConfiguration(new Dictionary<string, string?>
+        var configured = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AUTHENTICATION_PROVIDER"] = "local",
             ["ATPROTO_LOGIN_ENABLED"] = "true",
@@ -130,8 +130,8 @@ public sealed class ConfigurationExtensionsTests
         await Assert.That(mapped["IdentityDatabase:Provider"]).IsEqualTo("PostgreSql");
         await Assert.That(mapped["IdentityDatabase:Host"]).IsEqualTo("identity-db");
         await Assert.That(mapped["IdentityDatabase:Runtime:Password"]).IsEqualTo("runtime-secret");
-        await Assert.That(canonical["Authentication:Provider"]).IsEqualTo("keycloak");
-        await Assert.That(canonical["Authentication:AtprotoLoginEnabled"]).IsEqualTo("false");
+        await Assert.That(configured["Authentication:Provider"]).IsEqualTo("keycloak");
+        await Assert.That(configured["Authentication:AtprotoLoginEnabled"]).IsEqualTo("false");
     }
 
     [Test]
@@ -283,7 +283,7 @@ public sealed class ConfigurationExtensionsTests
     }
 
     [Test]
-    public async Task AddSecretAuthorityConfiguration_DoesNotOverrideCanonicalPrivacyErasureAuthorityKeys()
+    public async Task AddSecretAuthorityConfiguration_DoesNotOverrideConfiguredPrivacyErasureAuthorityKeys()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {

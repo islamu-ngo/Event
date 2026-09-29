@@ -75,10 +75,10 @@ public class BffCookieForwardingHandler : DelegatingHandler
             return;
         }
 
-        request.Options.TryGetValue(AtprotoBootstrapRequestOptions.CanonicalActorIdKey, out Guid? canonicalActorId);
+        request.Options.TryGetValue(AtprotoBootstrapRequestOptions.TargetActorIdKey, out Guid? targetActorId);
         request.Options.TryGetValue(
-            AtprotoBootstrapRequestOptions.ExpectedCanonicalActorConcurrencyStampKey,
-            out Guid? expectedCanonicalActorConcurrencyStamp);
+            AtprotoBootstrapRequestOptions.ExpectedTargetActorConcurrencyStampKey,
+            out Guid? expectedTargetActorConcurrencyStamp);
 
         request.Headers.TryAddWithoutValidation(
             AtprotoBootstrapAssertionService.HeaderName,
@@ -88,8 +88,8 @@ public class BffCookieForwardingHandler : DelegatingHandler
                 classification,
                 request.Method,
                 AtprotoBootstrapAssertionService.BridgePath,
-                canonicalActorId,
-                expectedCanonicalActorConcurrencyStamp));
+                targetActorId,
+                expectedTargetActorConcurrencyStamp));
     }
 
     private static bool IsExactPath(Uri? uri, string expectedPath)
@@ -249,16 +249,16 @@ public static class AtprotoBootstrapRequestOptions
     internal static readonly HttpRequestOptionsKey<Guid> TenantIdKey = new("AtprotoBootstrapTenantId");
     internal static readonly HttpRequestOptionsKey<string> DidKey = new("AtprotoBootstrapDid");
     internal static readonly HttpRequestOptionsKey<string> ClassificationKey = new("AtprotoBootstrapClassification");
-    internal static readonly HttpRequestOptionsKey<Guid?> CanonicalActorIdKey = new("AtprotoBootstrapCanonicalActorId");
-    internal static readonly HttpRequestOptionsKey<Guid?> ExpectedCanonicalActorConcurrencyStampKey = new("AtprotoBootstrapExpectedCanonicalActorConcurrencyStamp");
+    internal static readonly HttpRequestOptionsKey<Guid?> TargetActorIdKey = new("AtprotoBootstrapTargetActorId");
+    internal static readonly HttpRequestOptionsKey<Guid?> ExpectedTargetActorConcurrencyStampKey = new("AtprotoBootstrapExpectedTargetActorConcurrencyStamp");
 
     public static void Bind(
         HttpRequestMessage request,
         Guid tenantId,
         string did,
         string rawClassification,
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null)
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (tenantId == Guid.Empty
@@ -267,17 +267,17 @@ public static class AtprotoBootstrapRequestOptions
         {
             throw new ArgumentException("ATProto bootstrap binding is invalid.");
         }
-        if (canonicalActorId.HasValue != expectedCanonicalActorConcurrencyStamp.HasValue
-            || canonicalActorId == Guid.Empty
-            || expectedCanonicalActorConcurrencyStamp == Guid.Empty)
+        if (targetActorId.HasValue != expectedTargetActorConcurrencyStamp.HasValue
+            || targetActorId == Guid.Empty
+            || expectedTargetActorConcurrencyStamp == Guid.Empty)
         {
-            throw new ArgumentException("ATProto canonical Actor target is invalid.");
+            throw new ArgumentException("ATProto target Actor is invalid.");
         }
 
         request.Options.Set(TenantIdKey, tenantId);
         request.Options.Set(DidKey, did);
         request.Options.Set(ClassificationKey, AtprotoSubjectClassifications.Normalize(rawClassification));
-        request.Options.Set(CanonicalActorIdKey, canonicalActorId);
-        request.Options.Set(ExpectedCanonicalActorConcurrencyStampKey, expectedCanonicalActorConcurrencyStamp);
+        request.Options.Set(TargetActorIdKey, targetActorId);
+        request.Options.Set(ExpectedTargetActorConcurrencyStampKey, expectedTargetActorConcurrencyStamp);
     }
 }

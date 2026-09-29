@@ -13,7 +13,7 @@
 
 <PageTitle>@(DisplayName ?? T("ui.actor.profile.title", "Actor profile"))</PageTitle>
 <HeadContent>
-    <link rel="canonical" href="@CanonicalUrlHelper.Build(Navigation, ActorId == Guid.Empty ? null : $"/actors/{ActorId:D}")" />
+    <link rel="canonical" href="@AbsoluteUrlBuilder.Build(Navigation, ActorId == Guid.Empty ? null : $"/actors/{ActorId:D}")" />
 </HeadContent>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="actor-profile">
@@ -50,7 +50,7 @@
                         <MudText Typo="Typo.body2" Color="Color.Secondary">
                             @(IsTenantContext
                                 ? T("ui.actor.profile.tenant_context", "Tenant profile")
-                                : T("ui.actor.profile.global_context", "Canonical global profile"))
+                                : T("ui.actor.profile.global_context", "Global profile"))
                         </MudText>
                     </div>
                     <ActorSubscriptionButton TargetActorId="@ActorId"
@@ -94,7 +94,7 @@
                 @if (IsTenantContext)
                 {
                     <AppButton Variant="Variant.Text" Href="@($"/actors/{ActorId:D}")">
-                        @T("ui.actor.profile.view_canonical", "View canonical profile")
+                        @T("ui.actor.profile.view_global", "View global profile")
                     </AppButton>
                 }
             </div>

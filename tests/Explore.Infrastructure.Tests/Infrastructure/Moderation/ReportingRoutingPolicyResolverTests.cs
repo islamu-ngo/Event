@@ -26,7 +26,7 @@ public sealed class ReportingRoutingPolicyResolverTests
 
         ReportingRoutingPolicy policy = await resolver.ResolveAsync();
 
-        await Assert.That(policy.LocalCanonicalRequired).IsTrue();
+        await Assert.That(policy.LocalReportingRequired).IsTrue();
         await Assert.That(policy.ExternalSyncEnabled).IsTrue();
         await Assert.That(policy.InstanceOspreyEnabled).IsTrue();
         await Assert.That(policy.TenantOspreyEnabled).IsFalse();
@@ -74,7 +74,7 @@ public sealed class ReportingRoutingPolicyResolverTests
     }
 
     [Test]
-    public async Task ResolveAsync_WithLocalOnlyStaticMode_DisablesAllExternalTargetsButKeepsLocalCanonical()
+    public async Task ResolveAsync_WithLocalOnlyStaticMode_DisablesAllExternalTargetsButKeepsLocalReporting()
     {
         var delegation = new TenantDelegationSettingGroup();
         delegation.Populate(UnlockedProviderSettings());
@@ -92,7 +92,7 @@ public sealed class ReportingRoutingPolicyResolverTests
 
         ReportingRoutingPolicy policy = await resolver.ResolveAsync();
 
-        await Assert.That(policy.LocalCanonicalRequired).IsTrue();
+        await Assert.That(policy.LocalReportingRequired).IsTrue();
         await Assert.That(policy.ExternalSyncEnabled).IsFalse();
         await Assert.That(policy.InstanceOspreyEnabled).IsFalse();
         await Assert.That(policy.TenantOspreyEnabled).IsFalse();

@@ -12,7 +12,7 @@ Pinned tuple: `GOOGLE_FORMS|GOOGLE_WORKSPACE|v1|ISLAMU_EVENT_GOOGLE_FORMS_PUBSUB
 - Google Forms watches are Pub/Sub only; durable authenticated watch state, sweep, callback verification, and renewal are deferred to the downstream subscription-state worker.
 - Pub/Sub notifications do not carry a response ID suitable for unauthenticated completion; this adapter fails callback verification closed until the authenticated Task12.3 lifecycle resolves response IDs by server-side read/sweep.
 - Google Forms file-upload questions require Drive-backed uploads and are not supported here because this adapter intentionally requests no Drive scope.
-- OAuth refresh exchanges are always sent to Google's canonical token endpoint (`https://oauth2.googleapis.com/token`); tenant-supplied `token_uri` metadata is ignored so refresh/client secrets cannot be posted to arbitrary hosts.
+- OAuth refresh exchanges are always sent to Google's fixed token endpoint (`https://oauth2.googleapis.com/token`); tenant-supplied `token_uri` metadata is ignored so refresh/client secrets cannot be posted to arbitrary hosts.
 - Google Forms preserves choice labels, not ISLAMU option identifiers. Managed provisioning rejects duplicate labels because they would make submission answers ambiguous; compatible option keys use the label fingerprint that remote schema reads can reproduce.
 - Google Forms long text is represented by `textQuestion.paragraph == true`; schema reads preserve it as `LongText` instead of collapsing to short text.
 - Unsupported question shapes are imported as opaque external/blocking fields, never guessed as `ShortText`, so drift review fails closed instead of silently changing semantics.

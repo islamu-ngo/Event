@@ -12,7 +12,7 @@ namespace Explore.API.Extensions;
 /// When no version is specified, defaults to the current version (<see cref="ApiVersioningOptions.DefaultApiVersion"/>).
 ///
 /// URL-segment versioning (e.g. <c>/api/v0.1/actor</c>) is intentionally disallowed. Every endpoint has
-/// exactly one canonical path (<c>/api/actor</c>), enforced by <c>NoUrlSegmentVersioning</c> in the
+/// exactly one primary path (<c>/api/actor</c>), enforced by <c>NoUrlSegmentVersioning</c> in the
 /// architecture test suite. This keeps <c>operationId</c>, <c>RouteNames</c>, and HAL link generation stable.
 /// </summary>
 public static class ApiVersioningExtensions

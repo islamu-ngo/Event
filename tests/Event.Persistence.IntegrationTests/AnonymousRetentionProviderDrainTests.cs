@@ -312,7 +312,7 @@ public sealed class AnonymousRetentionProviderDrainTests
             var ticket = await fixture.SeedTicketAsync(target.Id);
             var workflow = RegistrationWorkflow.Create(fixture.TenantId, target.Id, "RETENTION", createdAt);
             var requirement = RegistrationRequirement.Create(workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
-                RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+                RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_SYNC,
                 RegistrationRequirementSubjectTypeEnum.AllOrders, null, createdAt);
             workflow.AddRequirement(requirement);
             var form = RegistrationForm.Create(fixture.TenantId, target.Id, "registration", "retention", "Retention", createdAt);

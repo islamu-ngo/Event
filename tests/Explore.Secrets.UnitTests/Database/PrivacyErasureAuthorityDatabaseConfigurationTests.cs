@@ -66,7 +66,7 @@ public sealed class PrivacyErasureAuthorityDatabaseConfigurationTests
     }
 
     [Test]
-    public async Task DiscreteSecretsProjectIntoCanonicalSection()
+    public async Task DiscreteSecretsProjectIntoAuthoritativeSection()
     {
         string runtimePassword = SecretsTestValues.CreateSecret();
         string migratorPassword = SecretsTestValues.CreateSecret();
@@ -97,7 +97,7 @@ public sealed class PrivacyErasureAuthorityDatabaseConfigurationTests
     }
 
     [Test]
-    public async Task DatabaseErasureCanonicalSectionBindsDirectly()
+    public async Task DatabaseErasureAuthoritativeSectionBindsDirectly()
     {
         string runtimePassword = SecretsTestValues.CreateSecret();
         string migratorPassword = SecretsTestValues.CreateSecret();

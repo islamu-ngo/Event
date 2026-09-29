@@ -11,7 +11,7 @@
 
 <PageTitle>@(_organization?.FullName ?? "Organization Profile")</PageTitle>
 <HeadContent>
-    <link rel="canonical" href="@CanonicalUrlHelper.Build(Navigation, _organization is null ? null : $"/organization/profile/{_organization.Id}")" />
+    <link rel="canonical" href="@AbsoluteUrlBuilder.Build(Navigation, _organization is null ? null : $"/organization/profile/{_organization.Id}")" />
 </HeadContent>
 
 @if (_isLoading)

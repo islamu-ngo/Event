@@ -168,11 +168,11 @@ public static class OfflinePortabilityWorkflow
             return new OfflinePortabilityResult(null, diagnostics);
         try
         {
-            byte[] canonical = Serialize(document);
+            byte[] serialized = Serialize(document);
             if (document.Manifest is not null)
-                _ = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(canonical);
+                _ = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(serialized);
             else
-                _ = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(canonical);
+                _ = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(serialized);
             ValidateLegal(document);
             SetupTransitionResult validated = document.State == SetupWorkflowState.Draft
                 ? SetupWorkflow.Transition(document.State, SetupWorkflowAction.Validate)

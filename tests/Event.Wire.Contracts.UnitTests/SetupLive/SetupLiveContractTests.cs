@@ -188,7 +188,7 @@ public sealed class SetupLiveContractTests
     }
 
     [Test]
-    public async Task CapabilitySyntaxIsCanonicalAndStringRepresentationsAreRedacted()
+    public async Task CapabilitySyntaxIsStandardAndStringRepresentationsAreRedacted()
     {
         Type capabilityType = RequireType("SetupEnrollmentCapability");
         string candidate = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))

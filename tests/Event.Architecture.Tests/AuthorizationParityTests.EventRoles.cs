@@ -85,8 +85,8 @@ public partial class AuthorizationParityTests
 
     [Test]
     [Category("PaidEventCommerceAuthorization")]
-    [DisplayName("Paid event commerce uses the canonical event action catalog and finance principal attrs")]
-    public async Task PaidEventCommerce_ShouldUse_CanonicalEventActionAndFinancePrincipalAttributes()
+    [DisplayName("Paid event commerce uses the event action contract and finance principal attrs")]
+    public async Task PaidEventCommerce_ShouldUse_EventActionContractAndFinancePrincipalAttributes()
     {
         await Assert.That(AuthorizationActions.Events.ManagePaidEventCommerce)
             .IsEqualTo("manage-paid-event-commerce");

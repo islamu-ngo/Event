@@ -94,13 +94,13 @@ public readonly record struct SetupCompositionFailure
 
 public sealed class SetupCompositionResult
 {
-    private readonly byte[]? _canonicalBytes;
+    private readonly byte[]? _serializedBytes;
 
     private SetupCompositionResult(
         SetupCompositionArtifactKind artifactKind,
         ConfigurationManifestV1Alpha2? manifest,
         TenantConfigurationPackageV1Alpha2? tenantPackage,
-        byte[]? canonicalBytes,
+        byte[]? serializedBytes,
         ArtifactDigest digest,
         SetupCompositionFailure failure)
     {
@@ -108,7 +108,7 @@ public sealed class SetupCompositionResult
         Manifest = manifest;
         TenantPackage = tenantPackage;
         Artifact = (object?)manifest ?? tenantPackage;
-        _canonicalBytes = canonicalBytes is null ? null : (byte[])canonicalBytes.Clone();
+        _serializedBytes = serializedBytes is null ? null : (byte[])serializedBytes.Clone();
         Digest = digest;
         Failure = failure;
     }
@@ -118,8 +118,8 @@ public sealed class SetupCompositionResult
     public object? Artifact { get; }
     public ConfigurationManifestV1Alpha2? Manifest { get; }
     public TenantConfigurationPackageV1Alpha2? TenantPackage { get; }
-    public ReadOnlyMemory<byte> CanonicalBytes =>
-        _canonicalBytes is null ? ReadOnlyMemory<byte>.Empty : new((byte[])_canonicalBytes.Clone());
+    public ReadOnlyMemory<byte> SerializedBytes =>
+        _serializedBytes is null ? ReadOnlyMemory<byte>.Empty : new((byte[])_serializedBytes.Clone());
     public ArtifactDigest Digest { get; }
     public SetupCompositionFailure Failure { get; }
 

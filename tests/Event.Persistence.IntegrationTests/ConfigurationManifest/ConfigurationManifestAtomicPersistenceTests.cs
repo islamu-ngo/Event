@@ -248,7 +248,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
     }
 
     [Test]
-    public async Task Bootstrap_GuardedAndOrdinarySettingsCommitThroughCanonicalBoundaries()
+    public async Task Bootstrap_GuardedAndOrdinarySettingsCommitThroughNormalizedBoundaries()
     {
         string databasePath = TemporaryDatabasePath();
         try

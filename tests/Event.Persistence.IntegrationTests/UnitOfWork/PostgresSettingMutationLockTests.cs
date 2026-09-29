@@ -5,9 +5,9 @@ namespace Event.Persistence.IntegrationTests.UnitOfWork;
 public sealed class RelationalSettingMutationLockTests
 {
     [Test]
-    public async Task NormalizeCanonicalKeys_ReturnsDistinctOrdinalOrder()
+    public async Task NormalizeSettingKeys_ReturnsDistinctOrdinalOrder()
     {
-        string[] normalized = RelationalSettingMutationLock.NormalizeCanonicalKeys(
+        string[] normalized = RelationalSettingMutationLock.NormalizeSettingKeys(
             [" Zebra ", "beta", "ALPHA", "alpha"]);
 
         await Assert.That(normalized.SequenceEqual(

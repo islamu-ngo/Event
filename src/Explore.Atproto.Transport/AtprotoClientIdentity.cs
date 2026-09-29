@@ -21,7 +21,7 @@ public static class AtprotoClientIdentityFactory
             || !string.IsNullOrEmpty(publicUri.Query)
             || !string.IsNullOrEmpty(publicUri.Fragment)
             || Uri.CheckHostName(publicUri.Host) is UriHostNameType.Unknown
-            || !TryCanonicalCallbackPath(configuredCallbackPath, out var callbackPath))
+            || !TryGetNormalizedCallbackPath(configuredCallbackPath, out var callbackPath))
         {
             return false;
         }
@@ -43,7 +43,7 @@ public static class AtprotoClientIdentityFactory
         return true;
     }
 
-    private static bool TryCanonicalCallbackPath(string? configuredPath, out string callbackPath)
+    private static bool TryGetNormalizedCallbackPath(string? configuredPath, out string callbackPath)
     {
         callbackPath = "/signin-atproto";
         if (string.IsNullOrWhiteSpace(configuredPath))
@@ -55,7 +55,7 @@ public static class AtprotoClientIdentityFactory
             || configuredPath[0] != '/'
             || configuredPath[1] == '/'
             || configuredPath.Contains("//", StringComparison.Ordinal)
-            || configuredPath.Any(character => !IsCanonicalPathCharacter(character))
+            || configuredPath.Any(character => !IsStandardPathCharacter(character))
             || configuredPath.Split('/', StringSplitOptions.None).Any(segment => segment is "." or ".."))
         {
             return false;
@@ -65,6 +65,6 @@ public static class AtprotoClientIdentityFactory
         return true;
     }
 
-    private static bool IsCanonicalPathCharacter(char character) =>
+    private static bool IsStandardPathCharacter(char character) =>
         char.IsAsciiLetterOrDigit(character) || character is '/' or '-' or '_' or '.' or '~';
 }

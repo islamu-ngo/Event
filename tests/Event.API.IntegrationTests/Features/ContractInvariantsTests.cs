@@ -16,7 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Event.Api.IntegrationTests.Features;
 
 /// <summary>
-/// Invariants every canonical OpenAPI document MUST satisfy. These are enforced at the
+/// Invariants every authoritative OpenAPI document MUST satisfy. These are enforced at the
 /// contract boundary so drift is caught at CI time, not at client-generation time.
 ///
 /// Strategy:
@@ -247,7 +247,7 @@ public class ContractInvariantsTests
     }
 
     [Test]
-    public async Task SettingsControllers_ExposeCanonicalPatchActionsWithoutLegacyPutAttributes()
+    public async Task SettingsControllers_ExposePrimaryPatchActionsWithoutLegacyPutAttributes()
     {
         (MethodInfo Action, string Template, string OperationId)[] patchActions =
         [
@@ -284,7 +284,7 @@ public class ContractInvariantsTests
     }
 
     [Test]
-    public async Task OpenApiDocument_CanonicalSettingsRoutesUsePatchAndNoLegacyPut()
+    public async Task OpenApiDocument_PrimarySettingsRoutesUsePatchAndNoLegacyPut()
     {
         using var document = await GetOpenApiDocumentAsync();
         var paths = document.RootElement.GetProperty("paths");
@@ -450,7 +450,7 @@ public class ContractInvariantsTests
 
         await Assert.That(GetSchemaReference(content.GetProperty("application/hal+json; v=0.1")))
             .IsEqualTo("#/components/schemas/HalCollectionResourceOfEventDiscoveryItemDto")
-            .Because("The canonical HAL event list response must reference the HAL collection wrapper schema.");
+            .Because("The primary HAL event list response must reference the HAL collection wrapper schema.");
         await Assert.That(GetSchemaReference(content.GetProperty("application/json; v=0.1")))
             .IsEqualTo("#/components/schemas/HalCollectionResourceOfEventDiscoveryItemDto")
             .Because("The versioned JSON event list response must stay aligned with the HAL collection wrapper schema.");

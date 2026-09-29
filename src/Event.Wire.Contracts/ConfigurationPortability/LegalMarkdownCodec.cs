@@ -166,7 +166,7 @@ public static class LegalMarkdownCodec
         if (markdown.Contains('\r', StringComparison.Ordinal))
         {
             throw new LegalMarkdownContractException(
-                "Legal Markdown must use canonical line endings.",
+                "Legal Markdown must use normalized line endings.",
                 nameof(markdown));
         }
 

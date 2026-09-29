@@ -87,8 +87,8 @@ public class EventCalendarController : EventControllerBase
             return this.ToNotFoundProblem(EventNotFoundProblem);
         }
 
-        Uri canonicalUrl = new(_publicUrlBuilder.GetEventUrl(export.EventId));
-        string calendarContent = _calendarFileBuilder.Build(export, canonicalUrl);
+        Uri publicUrl = new(_publicUrlBuilder.GetEventUrl(export.EventId));
+        string calendarContent = _calendarFileBuilder.Build(export, publicUrl);
         string fileName = $"{SanitizeCalendarFileName(export.Slug ?? export.Title)}.ics";
 
         return File(
@@ -123,8 +123,8 @@ public class EventCalendarController : EventControllerBase
             return this.ToNotFoundProblem(EventNotFoundProblem);
         }
 
-        Uri canonicalUrl = new(_publicUrlBuilder.GetEventUrl(export.EventId));
-        string calendarContent = _calendarFileBuilder.Build(export, canonicalUrl);
+        Uri publicUrl = new(_publicUrlBuilder.GetEventUrl(export.EventId));
+        string calendarContent = _calendarFileBuilder.Build(export, publicUrl);
         string fileName = $"{SanitizeCalendarFileName(export.Slug ?? export.Title)}.ics";
 
         return File(

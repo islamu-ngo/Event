@@ -13,7 +13,7 @@ public sealed record CapabilityTokenHash
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ArgumentException("Capability token hash must be a canonical SHA-256 hash.", nameof(value));
+            throw new ArgumentException("Capability token hash must be a normalized SHA-256 hash.", nameof(value));
         }
 
         byte[] bytes;
@@ -24,12 +24,12 @@ public sealed record CapabilityTokenHash
         }
         catch (FormatException exception)
         {
-            throw new ArgumentException("Capability token hash must be a canonical SHA-256 hash.", nameof(value), exception);
+            throw new ArgumentException("Capability token hash must be a normalized SHA-256 hash.", nameof(value), exception);
         }
 
         if (bytes.Length != 32 || !string.Equals(Convert.ToBase64String(bytes), value, StringComparison.Ordinal))
         {
-            throw new ArgumentException("Capability token hash must be a canonical SHA-256 hash.", nameof(value));
+            throw new ArgumentException("Capability token hash must be a normalized SHA-256 hash.", nameof(value));
         }
 
         return new CapabilityTokenHash(value);

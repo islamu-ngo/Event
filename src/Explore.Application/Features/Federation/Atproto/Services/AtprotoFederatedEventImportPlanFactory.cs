@@ -25,7 +25,7 @@ public static class AtprotoFederatedEventImportPlanFactory
             || string.IsNullOrWhiteSpace(record.Collection)
             || string.IsNullOrWhiteSpace(record.RecordKey))
         {
-            throw new ValidationException("The canonical ATProto event identity is invalid.");
+            throw new ValidationException("The primary ATProto event identity is invalid.");
         }
 
         var importInput = new AtprotoFederatedEventImportInput(

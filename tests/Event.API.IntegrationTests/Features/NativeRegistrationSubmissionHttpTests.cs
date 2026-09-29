@@ -817,7 +817,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
         RegistrationRequirement requirement = RegistrationRequirement.Create(
             requirementId, workflow, 1, RegistrationRequirementCriticalityEnum.Optional, true,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, now);
         RegistrationChannel channel = RegistrationChannel.Create(channelId, requirement, 1, true, null, now);
         requirement.AddChannel(channel);
@@ -898,7 +898,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
             RegistrationProviderPresentationModeEnum.Redirect,
             RegistrationProviderCollectionModeEnum.ProviderHosted,
             RegistrationProviderCompletionModeEnum.Callback,
-            RegistrationProviderTrustLevelEnum.FullCanonical,
+            RegistrationProviderTrustLevelEnum.FullSync,
             null,
             now);
         binding.AddCapability(RegistrationProviderCapability.Create(

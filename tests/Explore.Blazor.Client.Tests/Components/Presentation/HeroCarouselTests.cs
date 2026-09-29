@@ -185,7 +185,7 @@ public sealed class HeroCarouselTests : IDisposable
     }
 
     [Test]
-    public async Task HeroCarouselUsesImageHelperFallbackForCanonicalPlaceholder()
+    public async Task HeroCarouselUsesImageHelperFallbackForDefaultPlaceholder()
     {
         var events = CreateEvents(1);
         events[0] = events[0] with { FeaturedImageUri = "https://placeholder.islamu.org/event-default.jpg" };

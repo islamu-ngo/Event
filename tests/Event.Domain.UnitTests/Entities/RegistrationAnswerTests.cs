@@ -155,7 +155,7 @@ public sealed class RegistrationAnswerTests
         RegistrationRequirement requirement = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL, requirementSubjectType, requirementSubjectId, UtcNow);
+            RegistrationAnswerSyncModeEnum.FULL_SYNC, requirementSubjectType, requirementSubjectId, UtcNow);
         RegistrationChannel channel = RegistrationChannel.Create(requirement, 1, true, null, UtcNow);
         RegistrationForm form = RegistrationForm.Create(tenantId, eventId, "platform.registration", "answers", "Answers", UtcNow);
         RegistrationFormVersion version = RegistrationFormVersion.Create(form, 1, "en", null, null, UtcNow);

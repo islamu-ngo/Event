@@ -86,7 +86,7 @@ public sealed class AtprotoAuthorizationServerMetadataHandler(
 
             outboundPolicy.ValidateUri(issuerUri);
             if (!string.IsNullOrEmpty(issuerUri.Query)
-                || !IsCanonicalIssuerText(issuer, issuerUri))
+                || !IsNormalizedIssuerText(issuer, issuerUri))
             {
                 throw new AtprotoOAuthSecurityException("invalid_issuer");
             }
@@ -140,7 +140,7 @@ public sealed class AtprotoAuthorizationServerMetadataHandler(
         return element.EnumerateObject().Any(property => !names.Add(property.Name));
     }
 
-    private static bool IsCanonicalIssuerText(string issuer, Uri issuerUri)
+    private static bool IsNormalizedIssuerText(string issuer, Uri issuerUri)
     {
         if (issuerUri.AbsolutePath != "/")
         {

@@ -248,7 +248,7 @@ public sealed class EventReportingServiceTests
     }
 
     [Test]
-    public async Task UpdateCommunicationConsentAsync_WhenCanonicalHrefHasSafeSuffixes_Dispatches()
+    public async Task UpdateCommunicationConsentAsync_WhenExpectedHrefHasSafeSuffixes_Dispatches()
     {
         var reportId = Guid.NewGuid();
         var hrefs = new[]

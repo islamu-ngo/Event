@@ -1,7 +1,7 @@
 namespace Explore.Application.Authorization;
 
 /// <summary>
-/// Canonical catalog of authorization action strings used across the application.
+/// Authoritative catalog of authorization action strings used across the application.
 /// All values match Cerbos policy action definitions exactly.
 /// <para>
 /// Top-level constants define shared action verbs reused across resource kinds.

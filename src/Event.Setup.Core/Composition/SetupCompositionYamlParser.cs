@@ -160,14 +160,14 @@ internal static class SetupCompositionYamlParser
             return new CompositionScalar(CompositionScalarKind.Boolean, value);
         if (value == "null")
             return new CompositionScalar(CompositionScalarKind.Null, null);
-        if (IsCanonicalInteger(value))
+        if (IsPlainInteger(value))
             return new CompositionScalar(CompositionScalarKind.Integer, value);
         if (IsAmbiguousPlainScalar(value))
             throw new SetupCompositionException(SetupCompositionFailureCode.InvalidScalar);
         return new CompositionScalar(CompositionScalarKind.String, value);
     }
 
-    private static bool IsCanonicalInteger(string value)
+    private static bool IsPlainInteger(string value)
     {
         if (value == "0")
             return true;

@@ -28,7 +28,7 @@ public partial class SecretBinding : IAuditableEntity
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Canonical setting key, e.g. <c>smtp.password</c>, <c>postgresql.host</c>. Must correspond to a known
+    /// Normalized setting key, e.g. <c>smtp.password</c>, <c>postgresql.host</c>. Must correspond to a known
     /// key in <see cref="Explore.Domain.Secrets.SecretDefinitionRegistry"/>.
     /// </summary>
     public required string SettingKey { get; set; }

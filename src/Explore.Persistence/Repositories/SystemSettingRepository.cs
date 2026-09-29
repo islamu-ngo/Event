@@ -197,9 +197,9 @@ public class SystemSettingRepository : ISystemSettingRepository
 
         // The policy lock protects the next read, but EF's identity map can still contain
         // an earlier transaction's row. Detaching preserves a same-instance request's values.
-        string canonicalKey = RelationalSettingMutationLock.NormalizeCanonicalKey(key);
+        string normalizedKey = RelationalSettingMutationLock.NormalizeSettingKey(key);
         var entries = _dbContext.ChangeTracker.Entries<SystemSetting>()
-            .Where(entry => RelationalSettingMutationLock.NormalizeCanonicalKey(entry.Entity.SettingKey) == canonicalKey)
+            .Where(entry => RelationalSettingMutationLock.NormalizeSettingKey(entry.Entity.SettingKey) == normalizedKey)
             .ToArray();
         foreach (var entry in entries)
             entry.State = EntityState.Detached;

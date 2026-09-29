@@ -69,7 +69,7 @@ public sealed class AtprotoFederatedEventImportPlanFactoryTests
     }
 
     [Test]
-    public async Task CreateAsync_ValidIanaTimezoneAndGenericThumbnailBlob_AreMappedFromCanonicalRecordJson()
+    public async Task CreateAsync_ValidIanaTimezoneAndGenericThumbnailBlob_AreMappedFromPrimaryRecordJson()
     {
         AtprotoRecord record = CreateRecord("""
             {

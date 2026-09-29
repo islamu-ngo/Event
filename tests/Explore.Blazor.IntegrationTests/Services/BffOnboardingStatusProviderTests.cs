@@ -36,7 +36,7 @@ public sealed class BffOnboardingStatusProviderTests
     [Arguments("InteractivePending", "Interactive", "Keycloak", BffOnboardingDisposition.InteractivePending)]
     [Arguments("InteractivePending", "Interactive", "Atproto", BffOnboardingDisposition.InteractivePending)]
     [Arguments("ConfiguredAdministratorPending", "ConfiguredAdministrator", "Atproto", BffOnboardingDisposition.ConfiguredAdministratorPending)]
-    public async Task GetStatusAsync_ClassifiesCanonicalPendingStates(
+    public async Task GetStatusAsync_ClassifiesAuthoritativePendingStates(
         string state,
         string mode,
         string? provider,

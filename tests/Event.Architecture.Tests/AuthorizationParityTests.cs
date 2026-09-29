@@ -62,7 +62,7 @@ public partial class AuthorizationParityTests
 
     /// <summary>
     /// All constant string values declared on <see cref="ResourceKinds"/>.
-    /// This is the canonical source of truth for resource kind identifiers.
+    /// This is the authoritative source of truth for resource kind identifiers.
     /// </summary>
     private static IReadOnlySet<string> GetResourceKindConstants()
     {
@@ -324,8 +324,8 @@ public partial class AuthorizationParityTests
     }
 
     [Test]
-    [DisplayName("Legacy bare Cerbos resource kinds are absent from canonical contracts")]
-    public async Task LegacyBareResourceKinds_ShouldBeAbsent_FromCanonicalContracts()
+    [DisplayName("Legacy bare Cerbos resource kinds are absent from namespaced contracts")]
+    public async Task LegacyBareResourceKinds_ShouldBeAbsent_FromNamespacedContracts()
     {
         var constants = GetResourceKindConstants();
         var cerbosPolicies = GetCerbosPolicyResourceKinds();
@@ -451,7 +451,7 @@ public partial class AuthorizationParityTests
                 if (!action.StartsWith("AuthorizationActions.", StringComparison.Ordinal)
                     && !string.Equals(action, "action", StringComparison.Ordinal))
                 {
-                    violations.Add($"{fileName}: RequirePermission call uses noncanonical action '{action}' at index {match.Index}");
+                    violations.Add($"{fileName}: RequirePermission call uses an unrecognized action '{action}' at index {match.Index}");
                 }
             }
         }

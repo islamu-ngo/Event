@@ -196,17 +196,17 @@ public sealed class TenantIdentityActivationConcurrencyTests
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
-            ExecuteManyAsync([canonicalSettingKey], operation, cancellationToken);
+            ExecuteManyAsync([settingKey], operation, cancellationToken);
 
         public async Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
-            string[] keys = canonicalSettingKeys.Order(StringComparer.Ordinal).ToArray();
+            string[] keys = settingKeys.Order(StringComparer.Ordinal).ToArray();
             foreach (string key in keys)
                 ObservedKeys.Enqueue(key);
 

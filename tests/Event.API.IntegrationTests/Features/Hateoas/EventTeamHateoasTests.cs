@@ -28,7 +28,7 @@ namespace Event.Api.IntegrationTests.Features.Hateoas;
 public sealed class EventTeamHateoasTests
 {
     [Test]
-    public async Task GetTeam_DispatchesScopedQueryAndReturnsCanonicalHalCollection()
+    public async Task GetTeam_DispatchesScopedQueryAndReturnsStandardHalCollection()
     {
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();

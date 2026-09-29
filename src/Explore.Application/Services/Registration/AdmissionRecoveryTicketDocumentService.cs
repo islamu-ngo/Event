@@ -54,7 +54,7 @@ public sealed class AdmissionRecoveryTicketDocumentService(
         string payloadText = AdmissionQrPayloadCodec.Prefix + material.PlaintextCredential;
         if (!AdmissionQrPayloadCodec.TryDecode(payloadText, out AdmissionQrPayload? payload))
         {
-            throw new InvalidOperationException("Rotated admission credential is not canonical.");
+            throw new InvalidOperationException("Rotated admission credential is not normalized.");
         }
 
         AdmissionQrSvg qr = qrRenderer.Render(payload!);

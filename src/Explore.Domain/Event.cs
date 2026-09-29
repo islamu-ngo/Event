@@ -222,9 +222,9 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
     {
         ArgumentNullException.ThrowIfNull(calculator);
 
-        var canonicalTimeZoneId = ScheduleTimeZoneResolver.NormalizeOrUtc(timezoneId);
-        EventTimeZoneId = canonicalTimeZoneId;
-        Timezone = canonicalTimeZoneId;
+        var normalizedTimeZoneId = ScheduleTimeZoneResolver.NormalizeOrUtc(timezoneId);
+        EventTimeZoneId = normalizedTimeZoneId;
+        Timezone = normalizedTimeZoneId;
 
         var daysByDate = Days
             .Where(day => !day.IsDeleted)
@@ -235,13 +235,13 @@ public class Event : ITenantEntity, IAuditableEntity, ISoftDeletable, IConcurren
 
         foreach (var session in Sessions.Where(session => !session.IsDeleted))
         {
-            session.ReprojectLocalTimes(canonicalTimeZoneId, calculator);
+            session.ReprojectLocalTimes(normalizedTimeZoneId, calculator);
             session.EventDayId = session.LocalStartDate is not null && daysByDate.TryGetValue(session.LocalStartDate.Value, out var day) ? day.Id : null;
         }
 
         foreach (var agendaItem in AgendaItems.Where(item => !item.IsDeleted))
         {
-            agendaItem.ReprojectLocalTimes(canonicalTimeZoneId, calculator);
+            agendaItem.ReprojectLocalTimes(normalizedTimeZoneId, calculator);
             agendaItem.EventDayId = daysByDate.TryGetValue(agendaItem.LocalStartDate, out var day) ? day.Id : null;
         }
 

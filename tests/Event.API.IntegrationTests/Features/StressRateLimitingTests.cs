@@ -221,7 +221,7 @@ public class StressRateLimitingTests(StressApiFixture fixture)
     }
 
     [Test]
-    public async Task SetupSecretBudget_IsSharedAcrossSetupEndpointAndCanonicalProviderPatches_WhileBearerWritesRemainIndependent()
+    public async Task SetupSecretBudget_IsSharedAcrossSetupEndpointAndPrimaryProviderPatches_WhileBearerWritesRemainIndependent()
     {
         await _fixture.ResetDatabaseAsync();
 

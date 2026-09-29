@@ -4,8 +4,10 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application;
 using Explore.Application.Features.ControlPlane.Handlers.Commands;
+using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Notifications;
+using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
@@ -37,34 +39,12 @@ public sealed class SettingMutationBoundaryArchitectureTests
             [typeof(SettingUpsertService)] = [typeof(IPublicationPolicyMutationBoundary)]
         };
 
-    private static readonly IReadOnlyDictionary<Type, string[]> GuardedKeyRejectionEntryPoints =
-        new Dictionary<Type, string[]>
-        {
-            [typeof(TenantSettingRepository)] =
-            [
-                "SetValueAsync",
-                "RemoveOverrideAsync",
-                "LockAsync",
-                "UnlockAsync",
-                "UpsertManyForTenantAsync"
-            ],
-            [typeof(SystemSettingRepository)] = ["UpsertAsync", "UpsertLockAsync"],
-            [typeof(HierarchicalSettingsResolver)] =
-            ["SetValueAsync", "RemoveOverrideAsync", "LockAsync", "UnlockAsync"]
-        };
-
-    private static readonly Type[] GuardedTenantLockRejectionOwners =
-    [
-        typeof(LockControlPlaneTenantSettingCommandHandler),
-        typeof(UnlockControlPlaneTenantSettingCommandHandler)
-    ];
-
     private static readonly Type[] GuardedSettingRowWriteAllowlist =
     [
         typeof(CoordinatedSettingMutationRepository)
     ];
 
-    private static readonly string[] CanonicalPublicationPolicyKeys =
+    private static readonly string[] ExpectedPublicationPolicyKeys =
     [
         "event_reporting.intake_enabled",
         "events.require_approval",
@@ -79,7 +59,7 @@ public sealed class SettingMutationBoundaryArchitectureTests
         MethodInfo? method = typeof(ISettingMutationLock).GetMethod("ExecuteManyAsync");
 
         await Assert.That(method).IsNotNull()
-            .Because("tenant policy batches must acquire all canonical setting locks in deterministic order");
+            .Because("tenant policy batches must acquire all publication-policy setting locks in deterministic order");
     }
 
     [Test]
@@ -192,73 +172,99 @@ public sealed class SettingMutationBoundaryArchitectureTests
     }
 
     [Test]
-    public async Task GuardedMutationOwnersMustDispatchGuardedKeysBeforeUsingGenericMutationApis()
+    public async Task GuardedMutationOwnersMustDeclareTypedBoundaryContracts()
     {
-        Type[] genericMutationOwners =
+        Type[] mutationOwners =
         [
             typeof(SetControlPlaneTenantSettingCommandHandler),
             typeof(UpdateSettingCommandHandler),
             typeof(UpdateSettingBatchCommandHandler)
         ];
-        string[] violations = genericMutationOwners
-            .Where(type =>
-            {
-                string source = ReadSource(type);
-                return !source.Contains("PublicationPolicySettingKeys", StringComparison.Ordinal)
-                    || !source.Contains("IPublicationPolicyMutationBoundary", StringComparison.Ordinal);
-            })
+        string[] violations = mutationOwners
+            .Where(type => !type.GetConstructors().Single().GetParameters()
+                .Any(parameter => parameter.ParameterType == typeof(IPublicationPolicyMutationBoundary)))
             .Select(type => type.FullName!)
             .ToArray();
+        MethodInfo[] boundaryMethods = typeof(IPublicationPolicyMutationBoundary).GetMethods();
 
         await Assert.That(violations).IsEmpty()
-            .Because("generic setting APIs may still resolve or persist unguarded keys, but must dispatch guarded keys to the boundary first.");
+            .Because("generic setting APIs must receive the typed publication-policy boundary.");
+        await Assert.That(boundaryMethods.Select(method => method.Name))
+            .IsEquivalentTo(
+            [
+                nameof(IPublicationPolicyMutationBoundary.ApplyTenantAsync),
+                nameof(IPublicationPolicyMutationBoundary.ApplyTenantInCurrentTransactionAsync),
+                nameof(IPublicationPolicyMutationBoundary.ApplyInstanceAsync),
+                nameof(IPublicationPolicyMutationBoundary.ApplyInstanceInCurrentTransactionAsync)
+            ]);
+        await Assert.That(boundaryMethods.All(method =>
+                method.ReturnType == typeof(Task<PublicationPolicyMutationResult>)))
+            .IsTrue();
     }
 
     [Test]
-    public async Task GuardedTenantLockHandlersMustRejectGuardedKeysBeforeLockAcquisition()
+    public async Task GuardedTenantLockHandlersMustRejectPublicationPolicyKeys()
     {
-        string[] violations = GuardedTenantLockRejectionOwners
-            .Where(type =>
-            {
-                string source = ReadSource(type);
-                int guardedKeyPreflight = source.IndexOf(
-                    "PublicationPolicySettingKeys.All.Contains",
-                    StringComparison.Ordinal);
-                int lockAcquisition = source.IndexOf("mutationLock.ExecuteAsync", StringComparison.Ordinal);
-                if (guardedKeyPreflight < 0 || lockAcquisition < 0 || guardedKeyPreflight > lockAcquisition)
-                    return true;
+        Guid tenantId = Guid.CreateVersion7();
+        var currentUser = new FixedCurrentUserService(Guid.CreateVersion7());
+        var lockHandler = new LockControlPlaneTenantSettingCommandHandler(
+            null!, null!, null!, currentUser, null!, [], null!, null!, null!);
+        var unlockHandler = new UnlockControlPlaneTenantSettingCommandHandler(
+            null!, null!, null!, currentUser, null!, [], null!, null!, null!);
 
-                string preflight = source[guardedKeyPreflight..lockAcquisition];
-                return !preflight.Contains("return ControlPlaneTenantSettingSecurity.Failure", StringComparison.Ordinal)
-                    || !preflight.Contains("\"setting_not_lockable\"", StringComparison.Ordinal);
-            })
-            .Select(type => type.FullName!)
-            .ToArray();
+        foreach (string key in PublicationPolicySettingKeys.All)
+        {
+            BaseCommandResponse<Guid> lockResponse = await lockHandler.ExecuteAsync(
+                new LockControlPlaneTenantSettingCommand(tenantId, key),
+                CancellationToken.None);
+            BaseCommandResponse<Guid> unlockResponse = await unlockHandler.ExecuteAsync(
+                new UnlockControlPlaneTenantSettingCommand(tenantId, key),
+                CancellationToken.None);
 
-        await Assert.That(violations).IsEmpty()
-            .Because("tenant lock handlers must reject coordinated publication-policy keys before generic lock acquisition.");
+            await Assert.That(lockResponse.IsSuccess).IsFalse();
+            await Assert.That(lockResponse.FailureCode).IsEqualTo("setting_not_lockable");
+            await Assert.That(unlockResponse.IsSuccess).IsFalse();
+            await Assert.That(unlockResponse.FailureCode).IsEqualTo("setting_not_lockable");
+        }
     }
 
     [Test]
-    public async Task OnlyCoordinatedRepositoryMayWriteGuardedSettingRows()
+    public async Task GenericMutationEntryPointsMustRejectPublicationPolicyKeys()
     {
         await Assert.That(GuardedSettingRowWriteAllowlist.Length).IsEqualTo(1);
         await Assert.That(GuardedSettingRowWriteAllowlist.Single())
             .IsEqualTo(typeof(CoordinatedSettingMutationRepository));
 
-        string[] violations = GuardedKeyRejectionEntryPoints
-            .SelectMany(entry => entry.Value
-                .Where(methodName =>
-                {
-                    string methodBody = ReadMethodBody(ReadSource(entry.Key), methodName);
-                    return !methodBody.Contains("PublicationPolicySettingKeys", StringComparison.Ordinal)
-                        || !methodBody.Contains("throw", StringComparison.Ordinal);
-                })
-                .Select(methodName => $"{entry.Key.FullName}.{methodName}"))
-            .ToArray();
+        var tenantRepository = new TenantSettingRepository(null!, null!);
+        var systemRepository = new SystemSettingRepository(null!, null!);
+        var resolver = new HierarchicalSettingsResolver(
+            null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        Guid tenantId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
 
-        await Assert.That(violations).IsEmpty()
-            .Because("regular setting repositories and the hierarchical resolver must reject guarded keys instead of writing their rows directly.");
+        foreach (string key in PublicationPolicySettingKeys.All)
+        {
+            Func<Task>[] attempts =
+            [
+                () => tenantRepository.SetValueAsync(tenantId, key, "true"),
+                async () => await tenantRepository.RemoveOverrideAsync(tenantId, key),
+                async () => await tenantRepository.LockAsync(tenantId, key, actorId),
+                async () => await tenantRepository.UnlockAsync(tenantId, key, actorId),
+                () => tenantRepository.UpsertManyForTenantAsync(
+                    tenantId,
+                    [new TenantSettingOverrideUpsert(key, "true", IsLocked: false)],
+                    actorId),
+                async () => await systemRepository.UpsertAsync(CreateSystemSetting(key)),
+                async () => await systemRepository.UpsertLockAsync(CreateSystemSetting(key)),
+                () => resolver.SetValueAsync(key, "true", SettingScope.Tenant, tenantId, actorId),
+                () => resolver.RemoveOverrideAsync(key, SettingScope.Tenant, tenantId, actorId),
+                () => resolver.LockAsync(key, SettingScope.Tenant, tenantId, actorId),
+                () => resolver.UnlockAsync(key, SettingScope.Tenant, tenantId, actorId)
+            ];
+
+            foreach (Func<Task> attempt in attempts)
+                await Assert.That(async () => await attempt()).Throws<InvalidOperationException>();
+        }
     }
 
     [Test]
@@ -305,9 +311,9 @@ public sealed class SettingMutationBoundaryArchitectureTests
     {
         string[] guardedKeys = PublicationPolicySettingKeys.All.ToArray();
 
-        await Assert.That(guardedKeys.Length).IsEqualTo(CanonicalPublicationPolicyKeys.Length);
+        await Assert.That(guardedKeys.Length).IsEqualTo(ExpectedPublicationPolicyKeys.Length);
         await Assert.That(guardedKeys.Order(StringComparer.Ordinal).SequenceEqual(
-            CanonicalPublicationPolicyKeys.Order(StringComparer.Ordinal))).IsTrue();
+            ExpectedPublicationPolicyKeys.Order(StringComparer.Ordinal))).IsTrue();
         await Assert.That(guardedKeys.All(key => SettingRegistry.Get(key)?.RequiresCoordinatedMutation == true))
             .IsTrue();
     }
@@ -363,46 +369,16 @@ public sealed class SettingMutationBoundaryArchitectureTests
         await Assert.That(resolvedTenantSettingRepository).IsNull();
     }
 
-    private static string ReadSource(Type type) => type switch
+    private static SystemSetting CreateSystemSetting(string key) => new()
     {
-        _ when type == typeof(TenantSettingRepository) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Persistence", "Repositories", "TenantSettingRepository.cs")),
-        _ when type == typeof(SystemSettingRepository) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Persistence", "Repositories", "SystemSettingRepository.cs")),
-        _ when type == typeof(HierarchicalSettingsResolver) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Infrastructure", "Services", "HierarchicalSettingsResolver.cs")),
-        _ when type == typeof(SetControlPlaneTenantSettingCommandHandler) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Application", "Features", "ControlPlane", "Handlers", "Commands", "SetControlPlaneTenantSettingCommandHandler.cs")),
-        _ when type == typeof(LockControlPlaneTenantSettingCommandHandler) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Application", "Features", "ControlPlane", "Handlers", "Commands", "LockControlPlaneTenantSettingCommandHandler.cs")),
-        _ when type == typeof(UnlockControlPlaneTenantSettingCommandHandler) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Application", "Features", "ControlPlane", "Handlers", "Commands", "UnlockControlPlaneTenantSettingCommandHandler.cs")),
-        _ when type == typeof(UpdateSettingCommandHandler) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Application", "Features", "Settings", "Handlers", "Commands", "UpdateSettingCommandHandler.cs")),
-        _ when type == typeof(UpdateSettingBatchCommandHandler) => File.ReadAllText(ContextSystemHelpers.RepoPath(
-            "Explore.Application", "Features", "Settings", "Handlers", "Commands", "UpdateSettingBatchCommandHandler.cs")),
-        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "No focused source path is registered.")
+        Id = Guid.CreateVersion7(),
+        SettingKey = key,
+        Value = "true"
     };
 
-    private static string ReadMethodBody(string source, string methodName)
+    private sealed class FixedCurrentUserService(Guid userId) : ICurrentUserService
     {
-        int methodStart = source.IndexOf($" {methodName}(", StringComparison.Ordinal);
-        if (methodStart < 0)
-            throw new InvalidOperationException($"Method '{methodName}' was not found.");
-
-        int bodyStart = source.IndexOf('{', methodStart);
-        if (bodyStart < 0)
-            throw new InvalidOperationException($"Method '{methodName}' has no body.");
-
-        int depth = 0;
-        for (int index = bodyStart; index < source.Length; index++)
-        {
-            if (source[index] == '{')
-                depth++;
-            else if (source[index] == '}' && --depth == 0)
-                return source[bodyStart..(index + 1)];
-        }
-
-        throw new InvalidOperationException($"Method '{methodName}' body is not balanced.");
+        public Guid? UserId => userId;
+        public bool IsAuthenticated => true;
     }
 }

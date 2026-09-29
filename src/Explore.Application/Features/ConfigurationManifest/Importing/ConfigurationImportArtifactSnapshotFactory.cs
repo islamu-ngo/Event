@@ -92,7 +92,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
     {
         ArgumentNullException.ThrowIfNull(sections);
         return ConfigurationImportDigest.Compute(sections.Select(section =>
-            $"{section.SectionKey}\u001f{section.CanonicalDigest}"));
+            $"{section.SectionKey}\u001f{section.NormalizedDigest}"));
     }
 
     private static ConfigurationImportSectionSnapshot TenantProjection(
@@ -127,7 +127,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
                 }
                 else
                 {
-                    WriteCanonical(writer, spec.GetProperty(propertyName));
+                    WriteNormalized(writer, spec.GetProperty(propertyName));
                 }
                 writer.WriteEndObject();
             }
@@ -144,7 +144,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
         var buffer = new ArrayBufferWriter<byte>();
         using (var writer = new Utf8JsonWriter(buffer))
         {
-            WriteCanonical(writer, value);
+            WriteNormalized(writer, value);
         }
         return Section(sectionKey, buffer.WrittenSpan);
     }
@@ -169,26 +169,26 @@ public static class ConfigurationImportArtifactSnapshotFactory
             "displayName",
             spec.GetProperty("displayName").GetString());
         writer.WritePropertyName("settings");
-        WriteCanonical(writer, spec.GetProperty("settings"));
+        WriteNormalized(writer, spec.GetProperty("settings"));
         writer.WriteEndObject();
     }
 
     private static ConfigurationImportSectionSnapshot Section(
         string sectionKey,
-        ReadOnlySpan<byte> canonicalBytes)
+        ReadOnlySpan<byte> normalizedBytes)
     {
         ConfigurationPortabilitySectionDescriptor descriptor =
             ConfigurationPortabilityRegistry.Sections[sectionKey];
         return new ConfigurationImportSectionSnapshot(
             sectionKey,
-            ConfigurationImportDigest.ComputeBytes(canonicalBytes),
+            ConfigurationImportDigest.ComputeBytes(normalizedBytes),
             descriptor.PortabilityClass,
             descriptor.SupportsPreview,
             descriptor.SupportsDiff,
             requiresExternalSetup: false);
     }
 
-    private static void WriteCanonical(
+    private static void WriteNormalized(
         Utf8JsonWriter writer,
         JsonElement value)
     {
@@ -200,7 +200,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
                              .OrderBy(property => property.Name, StringComparer.Ordinal))
                 {
                     writer.WritePropertyName(property.Name);
-                    WriteCanonical(writer, property.Value);
+                    WriteNormalized(writer, property.Value);
                 }
                 writer.WriteEndObject();
                 break;
@@ -208,7 +208,7 @@ public static class ConfigurationImportArtifactSnapshotFactory
                 writer.WriteStartArray();
                 foreach (JsonElement item in value.EnumerateArray())
                 {
-                    WriteCanonical(writer, item);
+                    WriteNormalized(writer, item);
                 }
                 writer.WriteEndArray();
                 break;

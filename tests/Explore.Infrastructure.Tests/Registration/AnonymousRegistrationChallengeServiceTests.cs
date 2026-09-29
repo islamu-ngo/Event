@@ -86,10 +86,10 @@ public sealed class AnonymousRegistrationChallengeServiceTests
         string nonce = Solve(challenge);
         var invalidBindings = new[]
         {
-            new AnonymousRegistrationChallengeBinding(Guid.CreateVersion7(), binding.EventId, binding.CanonicalRequestDigest, binding.IdempotencyKey),
-            new AnonymousRegistrationChallengeBinding(binding.TenantId, Guid.CreateVersion7(), binding.CanonicalRequestDigest, binding.IdempotencyKey),
+            new AnonymousRegistrationChallengeBinding(Guid.CreateVersion7(), binding.EventId, binding.NormalizedRequestDigest, binding.IdempotencyKey),
+            new AnonymousRegistrationChallengeBinding(binding.TenantId, Guid.CreateVersion7(), binding.NormalizedRequestDigest, binding.IdempotencyKey),
             new AnonymousRegistrationChallengeBinding(binding.TenantId, binding.EventId, Convert.ToHexString(SHA256.HashData(RandomNumberGenerator.GetBytes(32))), binding.IdempotencyKey),
-            new AnonymousRegistrationChallengeBinding(binding.TenantId, binding.EventId, binding.CanonicalRequestDigest, Guid.CreateVersion7().ToString("N"))
+            new AnonymousRegistrationChallengeBinding(binding.TenantId, binding.EventId, binding.NormalizedRequestDigest, Guid.CreateVersion7().ToString("N"))
         };
         foreach (var invalid in invalidBindings)
             await Assert.That(service.Validate(invalid, challenge.ProtectedChallenge, nonce)).IsNull();
@@ -206,7 +206,7 @@ public sealed class AnonymousRegistrationChallengeServiceTests
         await Assert.That(raw).IsNotNull();
         await Assert.That(raw!.Matches(intended)).IsFalse();
         var handler = new ConsumeAnonymousRegistrationChallengeCommandHandler(new TenantScope(binding.TenantId), service);
-        var command = new ConsumeAnonymousRegistrationChallengeCommand(binding.EventId, binding.CanonicalRequestDigest,
+        var command = new ConsumeAnonymousRegistrationChallengeCommand(binding.EventId, binding.NormalizedRequestDigest,
             binding.IdempotencyKey, challenge.ProtectedChallenge, nonce, intended);
         var authority = await handler.ExecuteAsync(command, CancellationToken.None);
         await Assert.That(authority).IsNotNull();
@@ -237,7 +237,7 @@ public sealed class AnonymousRegistrationChallengeServiceTests
         await Assert.That(() => JsonSerializer.Deserialize<AnonymousRegistrationChallengeAuthority>("{}")).Throws<NotSupportedException>();
         await Assert.That(typeof(AnonymousRegistrationChallengeAuthority).GetConstructors()).IsEmpty();
         await Assert.That(await handler.ExecuteAsync(command with { EventId = Guid.CreateVersion7() }, CancellationToken.None)).IsNull();
-        await Assert.That(await handler.ExecuteAsync(command with { CanonicalRequestDigest = string.Empty }, CancellationToken.None)).IsNull();
+        await Assert.That(await handler.ExecuteAsync(command with { NormalizedRequestDigest = string.Empty }, CancellationToken.None)).IsNull();
     }
 
     [Test]

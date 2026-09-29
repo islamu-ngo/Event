@@ -368,7 +368,7 @@ public sealed class StripeCheckoutAdapterTests
     }
 
     [Test]
-    public async Task CreateAsync_UsesCanonicalTrimmedCheckoutHostSet()
+    public async Task CreateAsync_UsesNormalizedTrimmedCheckoutHostSet()
     {
         var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, """
             {"id":"cs_test_123","object":"checkout.session","livemode":false,"url":"https://checkout.stripe.example.test/c/pay/cs_test","status":"open","payment_status":"unpaid"}

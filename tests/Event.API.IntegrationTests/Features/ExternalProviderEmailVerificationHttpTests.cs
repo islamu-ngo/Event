@@ -99,8 +99,8 @@ public sealed class ExternalProviderEmailVerificationHttpTests
             OAuthClientKeyId: factory.AtprotoOAuthKeyId,
             Classification: classification.ToString().ToLowerInvariant(),
             OAuthSession: JsonSerializer.SerializeToElement(new { subject = did.Value }),
-            CanonicalActorId: null,
-            ExpectedCanonicalActorConcurrencyStamp: null);
+            TargetActorId: null,
+            ExpectedTargetActorConcurrencyStamp: null);
         BffAtprotoSessionBridgeResponse? firstSession = null;
         await using ExploreDbContext before = factory.CreateDatabase();
         int usersBefore = await before.Users.CountAsync();

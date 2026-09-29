@@ -186,7 +186,7 @@ public sealed class AtprotoTransientAuthenticationTests(AtprotoTransientApiFixtu
     [Arguments("read/")]
     [Arguments("READ")]
     [Arguments("read?unexpected=value")]
-    public async Task NonCanonicalPath_CannotAuthenticate(string operation)
+    public async Task NonstandardPath_CannotAuthenticate(string operation)
     {
         byte[] body = fixture.ReadBody();
         using var request = fixture.Request(body, fixture.Sign(body), operation);

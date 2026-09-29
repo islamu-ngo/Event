@@ -20,7 +20,7 @@ public sealed class TenantDirectoryOperatorIdentityAdminService(
 {
     private const string EditLinkRelation = "edit";
     private const string PatchMethod = "PATCH";
-    private const string CanonicalEditHref =
+    private const string DirectoryEditHref =
         "/api/tenant/settings/documents/directory-operator-identity";
 
     public async Task<TenantDirectoryOperatorIdentityAdminModel> GetAsync(
@@ -142,7 +142,7 @@ public sealed class TenantDirectoryOperatorIdentityAdminService(
         links is not null
         && links.TryGetValue(EditLinkRelation, out HalLink? edit)
         && string.Equals(edit.Method, PatchMethod, StringComparison.Ordinal)
-        && string.Equals(edit.Href, CanonicalEditHref, StringComparison.Ordinal);
+        && string.Equals(edit.Href, DirectoryEditHref, StringComparison.Ordinal);
 
     private static OptionalUpdateOfstring Update(string? value) => new()
     {

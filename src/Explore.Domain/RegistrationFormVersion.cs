@@ -461,10 +461,10 @@ public sealed class RegistrationFormVersion : ITenantEntity, IAuditableEntity, I
         ConcurrencyStamp = Guid.CreateVersion7();
     }
 
-    internal void PinGeneratedSchemaBundle(string canonicalSchemaBundle, DateTime publishedAt)
+    internal void PinGeneratedSchemaBundle(string normalizedSchemaBundle, DateTime publishedAt)
     {
         EnsureDraft();
-        ArgumentException.ThrowIfNullOrWhiteSpace(canonicalSchemaBundle);
+        ArgumentException.ThrowIfNullOrWhiteSpace(normalizedSchemaBundle);
         FormVersionRules.RequireUtc(publishedAt, nameof(publishedAt));
         if (_sections.Count == 0 || _sections.SelectMany(section => section.Fields).Any(field =>
                 field.FieldTypeId == (int)RegistrationFieldTypeEnum.OpaqueExternal && field.IsRequired))
@@ -477,7 +477,7 @@ public sealed class RegistrationFormVersion : ITenantEntity, IAuditableEntity, I
             ValidateRuleReferences(rule);
         }
 
-        using JsonDocument bundle = JsonDocument.Parse(canonicalSchemaBundle);
+        using JsonDocument bundle = JsonDocument.Parse(normalizedSchemaBundle);
         JsonElement root = bundle.RootElement;
         if (root.ValueKind != JsonValueKind.Object ||
             !root.TryGetProperty("$schema", out JsonElement schema) ||
@@ -488,14 +488,14 @@ public sealed class RegistrationFormVersion : ITenantEntity, IAuditableEntity, I
             !versionNumber.TryGetInt32(out int bundleVersion) || bundleVersion != Version ||
             !root.TryGetProperty("languageTag", out JsonElement languageTag) || languageTag.GetString() != LanguageTag)
         {
-            throw new ArgumentException("Schema bundle identity must match this form version.", nameof(canonicalSchemaBundle));
+            throw new ArgumentException("Schema bundle identity must match this form version.", nameof(normalizedSchemaBundle));
         }
 
         string dataSchemaArtifact = RequiredArtifact(root, "data");
         string uiSchemaArtifact = RequiredArtifact(root, "ui");
         string logicSchemaArtifact = RequiredArtifact(root, "logic");
         string mappingArtifact = RequiredArtifact(root, "mapping");
-        string schemaHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalSchemaBundle)));
+        string schemaHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedSchemaBundle)));
 
         DataSchemaArtifact = dataSchemaArtifact;
         UiSchemaArtifact = uiSchemaArtifact;
@@ -688,7 +688,7 @@ public sealed class RegistrationFormVersion : ITenantEntity, IAuditableEntity, I
     {
         if (!root.TryGetProperty(name, out JsonElement artifact) || artifact.ValueKind != JsonValueKind.Object)
         {
-            throw new ArgumentException($"Schema bundle requires an object artifact named '{name}'.", "canonicalSchemaBundle");
+            throw new ArgumentException($"Schema bundle requires an object artifact named '{name}'.", "normalizedSchemaBundle");
         }
 
         return artifact.GetRawText();

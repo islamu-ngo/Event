@@ -137,19 +137,19 @@ public sealed class PublishRegistrationProviderBindingCommandHandler(IRegistrati
 
     private static RegistrationEvidenceHash ComputeMappingRevisionHash(RegistrationProviderBinding binding)
     {
-        StringBuilder canonical = new();
-        canonical.Append("registration-provider-mapping-v2\n");
-        canonical.Append("form-version:").Append(binding.RegistrationFormVersionId).Append('\n');
+        StringBuilder normalized = new();
+        normalized.Append("registration-provider-mapping-v2\n");
+        normalized.Append("form-version:").Append(binding.RegistrationFormVersionId).Append('\n');
         if (binding.Connection is not null)
         {
-            canonical.Append("tuple:").Append(binding.Connection.TupleKey.Length).Append(':').Append(binding.Connection.TupleKey).Append('\n');
+            normalized.Append("tuple:").Append(binding.Connection.TupleKey.Length).Append(':').Append(binding.Connection.TupleKey).Append('\n');
         }
 
-        canonical.Append("provider-survey:").Append(binding.ProviderSurveyId?.Length ?? 0).Append(':').Append(binding.ProviderSurveyId).Append('\n');
-        canonical.Append("provider-survey-revision:").Append(binding.ProviderSurveyRevisionId?.Length ?? 0).Append(':').Append(binding.ProviderSurveyRevisionId).Append('\n');
+        normalized.Append("provider-survey:").Append(binding.ProviderSurveyId?.Length ?? 0).Append(':').Append(binding.ProviderSurveyId).Append('\n');
+        normalized.Append("provider-survey-revision:").Append(binding.ProviderSurveyRevisionId?.Length ?? 0).Append(':').Append(binding.ProviderSurveyRevisionId).Append('\n');
         foreach (RegistrationProviderFieldMapping field in binding.FieldMappings.Where(field => !field.IsDeleted).OrderBy(field => field.PlatformFieldKey, StringComparer.Ordinal))
         {
-            canonical.Append("field:").Append(field.PlatformFieldKey.Length).Append(':').Append(field.PlatformFieldKey)
+            normalized.Append("field:").Append(field.PlatformFieldKey.Length).Append(':').Append(field.PlatformFieldKey)
                 .Append(':').Append(field.ProviderFieldKey.Length).Append(':').Append(field.ProviderFieldKey)
                 .Append(':').Append(field.IsRequired ? '1' : '0').Append('\n');
         }
@@ -160,12 +160,12 @@ public sealed class PublishRegistrationProviderBindingCommandHandler(IRegistrati
             .ThenBy(option => option.PlatformOptionKey, StringComparer.Ordinal))
         {
             string fieldKey = fieldKeys[option.RegistrationProviderFieldMappingId];
-            canonical.Append("option:").Append(fieldKey.Length).Append(':').Append(fieldKey)
+            normalized.Append("option:").Append(fieldKey.Length).Append(':').Append(fieldKey)
                 .Append(':').Append(option.PlatformOptionKey.Length).Append(':').Append(option.PlatformOptionKey)
                 .Append(':').Append(option.ProviderOptionKey.Length).Append(':').Append(option.ProviderOptionKey).Append('\n');
         }
 
-        return RegistrationEvidenceHash.Create(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString()))));
+        return RegistrationEvidenceHash.Create(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(normalized.ToString()))));
     }
 
     private static RegistrationProviderDriftClassEnum ToDomain(RegistrationProviderSchemaDriftClass driftClass) => driftClass switch

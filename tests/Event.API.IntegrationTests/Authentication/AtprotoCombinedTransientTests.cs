@@ -98,7 +98,7 @@ public sealed class AtprotoCombinedTransientTests(AtprotoRelationalLoginFixture 
             ["PrivacyErasure:Authority:Topology"] = "CoLocated",
             ["Scheduler:Quartz:Enabled"] = "false",
             ["ConnectionStrings:cache"] = string.Empty,
-            ["Atproto:PublicUrl"] = AtprotoRelationalLoginFixture.CanonicalOrigin,
+            ["Atproto:PublicUrl"] = AtprotoRelationalLoginFixture.PublicOrigin,
             ["Atproto:CallbackPath"] = "/signin-atproto",
             ["Explore:MultiTenancy:DefaultTenantId"] = fixture.TenantId.ToString("D"),
             ["Explore:MultiTenancy:DefaultTenant"] = fixture.TenantSlug,
@@ -181,7 +181,7 @@ public sealed class AtprotoCombinedTransientTests(AtprotoRelationalLoginFixture 
         var observations = new MachineIdentityObservation();
         await using var host = await CreateHostAsync(observations);
         var cookies = new CookieContainer();
-        using var browser = AtprotoRelationalLoginFixture.BrowserClient(host, AtprotoRelationalLoginFixture.CanonicalOrigin, cookies);
+        using var browser = AtprotoRelationalLoginFixture.BrowserClient(host, AtprotoRelationalLoginFixture.PublicOrigin, cookies);
         await Assert.That(host.Services.GetRequiredService<IHostEnvironment>().IsProduction()).IsTrue();
         using var status = await browser.GetAsync("/auth/status");
         await Assert.That(status.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -190,7 +190,7 @@ public sealed class AtprotoCombinedTransientTests(AtprotoRelationalLoginFixture 
             Content = JsonContent.Create(new { handle = "alice.example", classification = "person", returnPath = "/events" })
         };
         request.Headers.Add("X-CSRF-TOKEN", Uri.UnescapeDataString(cookies.GetCookies(browser.BaseAddress!)["XSRF-TOKEN"]!.Value));
-        request.Headers.Add("Origin", AtprotoRelationalLoginFixture.CanonicalOrigin);
+        request.Headers.Add("Origin", AtprotoRelationalLoginFixture.PublicOrigin);
         using var challenge = await browser.SendAsync(request);
         await Assert.That(challenge.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var body = JsonDocument.Parse(await challenge.Content.ReadAsStringAsync());

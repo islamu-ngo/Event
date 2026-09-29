@@ -318,7 +318,7 @@ public sealed class WebhooksControllerTests
     [Arguments(WebhookConsumerKind.Organization)]
     [Arguments(WebhookConsumerKind.Group)]
     [Arguments(WebhookConsumerKind.User)]
-    public async Task WebhookCreateCollectionLinks_UseCanonicalTypedOwnerAuthorization(
+    public async Task WebhookCreateCollectionLinks_UseAuthoritativeTypedOwnerAuthorization(
         WebhookConsumerKind ownerKind)
     {
         var ownerId = ownerKind == WebhookConsumerKind.Tenant

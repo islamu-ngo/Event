@@ -8,8 +8,8 @@ internal static class SetupCliCatalogueEnvironmentHandlers
     internal static SetupCliCommandResult Catalogue(SetupCliCommand command, SetupCliInvocation invocation)
     {
         EnvironmentVariableDefinition[] definitions = command.Operation == "list"
-            ? CanonicalEnvironmentCatalogue.Catalogue.Definitions.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray()
-            : CanonicalEnvironmentCatalogue.Catalogue.Lookup(command.Key!) is { } definition ? [definition] : [];
+            ? PlatformEnvironmentCatalogue.Catalogue.Definitions.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray()
+            : PlatformEnvironmentCatalogue.Catalogue.Lookup(command.Key!) is { } definition ? [definition] : [];
         if (definitions.Length == 0) return SetupCliResults.Failure(SetupCliExitCode.Validation, "catalogue-key-unknown", "$.key");
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
@@ -35,7 +35,7 @@ internal static class SetupCliCatalogueEnvironmentHandlers
                 : SetupCliResults.EnvironmentFailure(parsed.Diagnostics, SetupCliExitCode.Data);
         }
 
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         string topology = command.Topology ?? "standalone";
         string[] capabilities = command.Capabilities.Count == 0 ? ["database", "platform", "storage"] : command.Capabilities.ToArray();
         string[] providers = command.Providers.Count == 0 ? ["environment", "local", "sqlite"] : command.Providers.ToArray();

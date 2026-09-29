@@ -42,7 +42,7 @@ public sealed class AdmissionIssuanceOrchestrationRedTests
         await Assert.That(scenario.TransactionCommits).IsEqualTo(commitsAfterFirst + 1);
         await Assert.That(scenario.IssuanceDispatchCommitCounts.All(value => value == 1)).IsTrue();
         await Assert.That(scenario.PendingDeliveryIntentIds).IsEmpty();
-        await AssertCanonicalCredentialChildrenAsync(scenario.TicketsByAssignment.Values);
+        await AssertNormalizedCredentialChildrenAsync(scenario.TicketsByAssignment.Values);
     }
 
     [Test]
@@ -171,7 +171,7 @@ public sealed class AdmissionIssuanceOrchestrationRedTests
         ];
     }
 
-    private static async Task AssertCanonicalCredentialChildrenAsync(IEnumerable<AdmissionTicket> tickets)
+    private static async Task AssertNormalizedCredentialChildrenAsync(IEnumerable<AdmissionTicket> tickets)
     {
         foreach (AdmissionTicket ticket in tickets)
         {

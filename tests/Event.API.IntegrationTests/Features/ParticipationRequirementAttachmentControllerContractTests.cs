@@ -26,7 +26,7 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class ParticipationRequirementAttachmentControllerContractTests
 {
     [Test]
-    public async Task ControllerExposesCanonicalAttachmentAndQuestionnaireRoutes()
+    public async Task ControllerExposesPrimaryAttachmentAndQuestionnaireRoutes()
     {
         MethodInfo? attach = typeof(EventParticipationController).GetMethod("AttachRequirement");
         MethodInfo? detach = typeof(EventParticipationController).GetMethod("DetachRequirement");

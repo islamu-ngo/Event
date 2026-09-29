@@ -38,7 +38,7 @@ public sealed class AdmissionCheckInOpenApiContractTests
             Type? generatedType = typeof(IAdmissionCheckInClient).Assembly.GetType(
                 $"Explore.Blazor.Client.Clients.{schemaName}");
             await Assert.That(generatedType).IsNotNull()
-                .Because($"NSwag must generate {schemaName} from its canonical OpenAPI component");
+                .Because($"NSwag must generate {schemaName} from its authoritative OpenAPI component");
             await Assert.That(generatedType!.IsEnum).IsTrue();
         }
 

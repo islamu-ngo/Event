@@ -236,7 +236,7 @@ public sealed class ModerationReportController : EventControllerBase
 
     [HttpPost("{reportId:guid}/decision/execute", Name = RouteNames.ExecuteModerationReportDecision)]
     [EndpointSummary("Execute Moderation Report Decision")]
-    [EndpointDescription("Executes a decision-ready report case through the canonical event moderation command path.")]
+    [EndpointDescription("Executes a decision-ready report case through the primary event moderation command path.")]
     [Consumes(HateoasConstants.JsonMediaType)]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]

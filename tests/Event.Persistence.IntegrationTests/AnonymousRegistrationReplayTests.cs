@@ -63,7 +63,7 @@ public sealed class AnonymousRegistrationReplayTests
             Key = proof.Binding.IdempotencyKey,
             RequestMethod = "POST",
             RequestTarget = $"/api/events/{target.Id}/registration-orders/guest",
-            RequestBodyHash = proof.Binding.CanonicalRequestDigest,
+            RequestBodyHash = proof.Binding.NormalizedRequestDigest,
             PrincipalFingerprint = Guid.CreateVersion7().ToString("N"),
             StatusCode = IdempotencyRecord.InProgressStatusCode,
             CreatedAt = DateTime.UtcNow,

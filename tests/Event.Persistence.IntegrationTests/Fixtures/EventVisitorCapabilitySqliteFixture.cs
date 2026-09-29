@@ -234,7 +234,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         return (catalog.Id, ticket.Id);
     }
 
-    // The API owns canonical request identity. This native lane supplies an opaque trusted digest and
+    // The API owns normalized request identity. This native lane supplies an opaque trusted digest and
     // tests the real protected-envelope/typed-command boundary rather than reimplementing HTTP hashing.
     internal async Task<GuestAllocationProof> IssueGuestProofAsync(StartGuestRegistrationOrderCommand request)
     {
@@ -251,7 +251,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     {
         var authority = await services.GetRequiredService<ICommandHandler<ConsumeAnonymousRegistrationChallengeCommand,
             AnonymousRegistrationChallengeAuthority?>>().ExecuteAsync(new(proof.Request.EventId,
-                proof.Binding.CanonicalRequestDigest, proof.Binding.IdempotencyKey,
+                proof.Binding.NormalizedRequestDigest, proof.Binding.IdempotencyKey,
                 proof.Challenge.ProtectedChallenge, proof.Nonce, proof.Request), CancellationToken.None);
         return proof.Request with
         {

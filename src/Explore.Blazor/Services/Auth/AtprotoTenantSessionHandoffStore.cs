@@ -69,8 +69,8 @@ public sealed class AtprotoTenantSessionHandoffStore(ApiBackedAtprotoTransientSt
     private bool ValidSession(AtprotoOAuthFlowSeed seed, AtprotoBffSessionResult? session) => session is not null
         && session.UserId != Guid.Empty && session.ActorId != Guid.Empty && session.ParticipationId != Guid.Empty
         && session.Did == seed.ExpectedDid && session.Classification == seed.Classification
-        && session.CanonicalActorId == seed.CanonicalActorId
-        && session.ExpectedCanonicalActorConcurrencyStamp == seed.ExpectedCanonicalActorConcurrencyStamp
+        && session.TargetActorId == seed.TargetActorId
+        && session.ExpectedTargetActorConcurrencyStamp == seed.ExpectedTargetActorConcurrencyStamp
         && !string.IsNullOrWhiteSpace(session.AccessToken) && session.AccessToken.Length <= 16 * 1024
         && session.ExpiresAt > clock.GetUtcNow();
 }

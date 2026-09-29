@@ -29,13 +29,13 @@ public static class AtprotoOAuthEndpointExtensions
         IOptions<AtprotoAuthenticationOptions> configuredOptions,
         AtprotoClientKeyProvider keyProvider)
     {
-        if (!TryGetCanonicalBaseUri(context.Request, configuredOptions.Value, keyProvider, out var baseUri))
+        if (!TryGetPublicBaseUri(context.Request, configuredOptions.Value, keyProvider, out var baseUri))
         {
             return Results.NotFound();
         }
 
         var options = configuredOptions.Value;
-        if (!TryGetCanonicalCallbackPath(options.CallbackPath, out var callbackPath))
+        if (!TryGetStandardCallbackPath(options.CallbackPath, out var callbackPath))
         {
             return Results.NotFound();
         }
@@ -65,7 +65,7 @@ public static class AtprotoOAuthEndpointExtensions
         IOptions<AtprotoAuthenticationOptions> configuredOptions,
         AtprotoClientKeyProvider keyProvider)
     {
-        if (!TryGetCanonicalBaseUri(context.Request, configuredOptions.Value, keyProvider, out _))
+        if (!TryGetPublicBaseUri(context.Request, configuredOptions.Value, keyProvider, out _))
         {
             return Results.NotFound();
         }
@@ -86,7 +86,7 @@ public static class AtprotoOAuthEndpointExtensions
         return Results.Bytes(payload, "application/json", enableRangeProcessing: false);
     }
 
-    private static bool TryGetCanonicalBaseUri(
+    private static bool TryGetPublicBaseUri(
         HttpRequest request,
         AtprotoAuthenticationOptions options,
         AtprotoClientKeyProvider keyProvider,
@@ -123,7 +123,7 @@ public static class AtprotoOAuthEndpointExtensions
         return true;
     }
 
-    private static bool TryGetCanonicalCallbackPath(string? configuredPath, out string callbackPath)
+    private static bool TryGetStandardCallbackPath(string? configuredPath, out string callbackPath)
     {
         callbackPath = "/signin-atproto";
         if (string.IsNullOrWhiteSpace(configuredPath))
@@ -135,7 +135,7 @@ public static class AtprotoOAuthEndpointExtensions
             || configuredPath[0] != '/'
             || configuredPath[1] == '/'
             || configuredPath.Contains("//", StringComparison.Ordinal)
-            || configuredPath.Any(character => !IsCanonicalCallbackPathCharacter(character))
+            || configuredPath.Any(character => !IsStandardCallbackPathCharacter(character))
             || configuredPath.Split('/', StringSplitOptions.None).Any(segment => segment is "." or ".."))
         {
             return false;
@@ -145,7 +145,7 @@ public static class AtprotoOAuthEndpointExtensions
         return true;
     }
 
-    private static bool IsCanonicalCallbackPathCharacter(char character) =>
+    private static bool IsStandardCallbackPathCharacter(char character) =>
         char.IsAsciiLetterOrDigit(character) || character is '/' or '-' or '_' or '.' or '~';
 
     private static string? OptionalText(string? value) =>

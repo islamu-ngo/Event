@@ -19,7 +19,7 @@ public sealed class EventModerationSet<T> : IReadOnlyCollection<T>, IEquatable<E
     public override int GetHashCode() => values.Aggregate(0, (hash, value) => hash ^ value.GetHashCode());
 }
 
-/// <summary>Canonical native permission lists preserve multiplicity, which custom policies may inspect.</summary>
+/// <summary>Authoritative native permission lists preserve multiplicity, which custom policies may inspect.</summary>
 public sealed class EventModerationList<T> : IReadOnlyCollection<T>, IEquatable<EventModerationList<T>> where T : notnull, IComparable<T>
 {
     private readonly T[] values;

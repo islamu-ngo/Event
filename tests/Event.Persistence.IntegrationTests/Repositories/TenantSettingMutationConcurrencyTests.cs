@@ -331,7 +331,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     }
 
     [Test]
-    public async Task ExecuteManyAsync_WithReverseOrder_UsesOneCanonicalWaitOrder()
+    public async Task ExecuteManyAsync_WithReverseOrder_UsesOneStableWaitOrder()
     {
         await fixture.ResetAsync();
         await using ExploreDbContext firstContext = fixture.CreateDbContext();

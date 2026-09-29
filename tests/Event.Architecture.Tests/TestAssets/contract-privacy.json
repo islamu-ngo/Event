@@ -1,6 +1,6 @@
 {
   "_aboutme": [
-    "ABOUTME: Sanitized promotion contract privacy evidence derived from the canonical OpenAPI and generated client.",
+    "ABOUTME: Sanitized promotion contract privacy evidence derived from the authoritative OpenAPI and generated client.",
     "ABOUTME: Captures response-type splits and quota tenant-field absence without exposing runtime values."
   ],
   "promotionCommandResponses": {

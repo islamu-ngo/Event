@@ -21,14 +21,14 @@
         <meta property="og:title" content="@TruncateTitle(_eventDetails.Title)" />
         <meta property="og:description" content="@GetMetaDescription()" />
         <meta property="og:type" content="event" />
-        <meta property="og:url" content="@GetCanonicalUrl()" />
+        <meta property="og:url" content="@GetAbsoluteEventUrl()" />
         <meta property="og:image" content="@GetOgImageUrl()" />
         <meta property="og:site_name" content="@BrandDisplayName" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="@TruncateTitle(_eventDetails.Title)" />
         <meta name="twitter:description" content="@GetMetaDescription()" />
         <meta name="twitter:image" content="@GetOgImageUrl()" />
-        <link rel="canonical" href="@GetCanonicalUrl()" />
+        <link rel="canonical" href="@GetAbsoluteEventUrl()" />
         @if (ShouldNoIndexEvent())
         {
             <meta name="robots" content="noindex, nofollow" />

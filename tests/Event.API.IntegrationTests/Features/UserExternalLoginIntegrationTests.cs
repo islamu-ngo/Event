@@ -177,7 +177,7 @@ public class UserExternalLoginIntegrationTests
                 Record("verify");
                 return AtprotoOAuthVerificationResult.Verified(new AtprotoVerifiedOAuthSession(
                     did,
-                    "canonical.example.test",
+                    "primary.example.test",
                     new Uri("https://pds.example.test"),
                     "oauth-key",
                     new byte[] { 1 }));
@@ -339,7 +339,7 @@ public class UserExternalLoginIntegrationTests
         gateway.VerifyAsync(Arg.Any<AtprotoOAuthVerificationInput>(), Arg.Any<CancellationToken>())
             .Returns(AtprotoOAuthVerificationResult.Verified(new AtprotoVerifiedOAuthSession(
                 did,
-                "canonical.example.test",
+                "primary.example.test",
                 new Uri("https://pds.example.test"),
                 "oauth-key",
                 new byte[] { 1 })));
@@ -413,7 +413,7 @@ public class UserExternalLoginIntegrationTests
         Guid userId = Guid.CreateVersion7();
         var verified = new AtprotoVerifiedOAuthSession(
             did,
-            "canonical.example.test",
+            "primary.example.test",
             new Uri("https://pds.example.test"),
             "oauth-key",
             new byte[] { 1 });
@@ -475,7 +475,7 @@ public class UserExternalLoginIntegrationTests
         Guid userId = Guid.CreateVersion7();
         var verified = new AtprotoVerifiedOAuthSession(
             did,
-            "canonical.example.test",
+            "primary.example.test",
             new Uri("https://pds.example.test"),
             "oauth-key",
             new byte[] { 1 });
@@ -718,12 +718,12 @@ public class UserExternalLoginIntegrationTests
     private sealed class ImmediateSettingMutationLock : ISettingMutationLock
     {
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => operation(cancellationToken);
 
         public Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) => operation(cancellationToken);
     }

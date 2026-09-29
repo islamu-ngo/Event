@@ -33,17 +33,17 @@ public sealed class AtprotoTenantOriginResolver(
             }
         }
 
-        var canonical = ParseCanonicalOrigin();
+        var publicOrigin = ParsePublicOrigin();
         var tenant = tenantConfiguration.Value;
-        if (OriginsEqual(origin, canonical) && tenant.DefaultTenantId != Guid.Empty && IsValidTenantSlug(tenant.DefaultTenant))
+        if (OriginsEqual(origin, publicOrigin) && tenant.DefaultTenantId != Guid.Empty && IsValidTenantSlug(tenant.DefaultTenant))
         {
-            return new(canonical, tenant.DefaultTenantId, tenant.DefaultTenant.Trim().ToLowerInvariant());
+            return new(publicOrigin, tenant.DefaultTenantId, tenant.DefaultTenant.Trim().ToLowerInvariant());
         }
 
         throw new InvalidOperationException("The ATProto login origin is not mapped to a tenant.");
     }
 
-    public Uri ParseCanonicalOrigin()
+    public Uri ParsePublicOrigin()
     {
         var publicUrl = configuredOptions.Value.PublicUrl;
         var policy = new AtprotoOutboundPolicy(
@@ -54,7 +54,7 @@ public sealed class AtprotoTenantOriginResolver(
                 policy,
                 out var identity))
         {
-            throw new InvalidOperationException("ATProto canonical client identity is invalid.");
+            throw new InvalidOperationException("ATProto public client identity is invalid.");
         }
 
         var callbackUri = new Uri(identity.CallbackUri, UriKind.Absolute);

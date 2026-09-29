@@ -10,7 +10,7 @@ public sealed class ConfigurationImportBoundaryContractTests
         typeof(RateLimitingExtensions).Assembly;
 
     [Test]
-    public async Task ImportBoundary_UsesCanonicalArtifactSizeLimit()
+    public async Task ImportBoundary_UsesConfiguredArtifactSizeLimit()
     {
         Type boundary = RequireType("ConfigurationImportApiBoundary");
         int maximumBytes = ReadStatic<int>(boundary, "MaximumUploadBytes");

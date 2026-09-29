@@ -100,8 +100,8 @@ public sealed class EventResourceGovernancePolicy : IEquatable<EventResourceGove
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxActiveResources, MaximumActiveResources);
 
         var origins = SnapshotStrings(externalOrigins, nameof(externalOrigins));
-        if (origins.Any(origin => !IsCanonicalHttpsOrigin(origin)))
-            throw new ArgumentException("External origins must be canonical HTTPS origin authorities.", nameof(externalOrigins));
+        if (origins.Any(origin => !IsNormalizedHttpsOrigin(origin)))
+            throw new ArgumentException("External origins must be normalized HTTPS origin authorities.", nameof(externalOrigins));
 
         return new(
             deliveryTypes,
@@ -144,7 +144,7 @@ public sealed class EventResourceGovernancePolicy : IEquatable<EventResourceGove
     }
 
     public bool AllowsExternalOrigin(string origin) =>
-        IsCanonicalHttpsOrigin(origin) && _externalOrigins.Contains(origin);
+        IsNormalizedHttpsOrigin(origin) && _externalOrigins.Contains(origin);
 
     public bool Equals(EventResourceGovernancePolicy? other) =>
         other is not null
@@ -179,13 +179,13 @@ public sealed class EventResourceGovernancePolicy : IEquatable<EventResourceGove
         foreach (string? value in values)
         {
             if (string.IsNullOrWhiteSpace(value))
-                throw new ArgumentException("Values must be nonempty canonical strings.", parameterName);
+                throw new ArgumentException("Values must be nonempty normalized strings.", parameterName);
             result.Add(value);
         }
         return result.ToImmutable();
     }
 
-    private static bool IsCanonicalHttpsOrigin(string? origin)
+    private static bool IsNormalizedHttpsOrigin(string? origin)
     {
         if (string.IsNullOrWhiteSpace(origin)
             || origin.Contains('*', StringComparison.Ordinal)

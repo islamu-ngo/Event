@@ -12,7 +12,7 @@ public sealed class AdmissionCheckInInvariantRedTests
     private static readonly DateTime ClosesAt = new(2026, 8, 26, 18, 0, 0, DateTimeKind.Utc);
 
     [Test]
-    public async Task TargetsPoliciesAndState_CarryCanonicalScopeTenantAndConcurrencyState()
+    public async Task TargetsPoliciesAndState_CarryNormalizedScopeTenantAndConcurrencyState()
     {
         AdmissionFixture fixture = CreateAdmission();
         Guid dayId = Guid.CreateVersion7();

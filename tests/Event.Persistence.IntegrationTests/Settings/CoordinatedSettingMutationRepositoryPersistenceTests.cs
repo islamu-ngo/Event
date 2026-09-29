@@ -236,7 +236,7 @@ public sealed class CoordinatedSettingMutationRepositoryPersistenceTests(Postgre
     }
 
     [Test]
-    public async Task WriteInstanceSetRecreatesMissingGuardedRowWithCanonicalDefinitionMetadata()
+    public async Task WriteInstanceSetRecreatesMissingGuardedRowWithExpectedDefinitionMetadata()
     {
         SeededTenants tenants = await SeedContractStateAsync();
         string key = GuardedKeys[4];
@@ -620,7 +620,7 @@ public sealed class CoordinatedSettingMutationRepositoryPersistenceTests(Postgre
     }
 
     [Test]
-    public async Task LookupSeedMaterializesCanonicalReportingIntakeSystemSettingAndDefinitionSemantics()
+    public async Task LookupSeedMaterializesPrimaryReportingIntakeSystemSettingAndDefinitionSemantics()
     {
         await fixture.ResetAsync();
         await using (ExploreDbContext resetContext = fixture.CreateDbContext())

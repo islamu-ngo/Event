@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace Explore.Persistence.Security;
 
 /// <summary>
-/// Derives the canonical set of tenant-scoped relational tables requiring PostgreSQL Row-Level Security.
+/// Derives the complete set of tenant-scoped relational tables requiring PostgreSQL Row-Level Security.
 /// Derives table metadata directly from EF Core model named query filters (QueryFilterNames.Tenant)
 /// to prevent drift between domain configuration and database security policies.
 /// </summary>

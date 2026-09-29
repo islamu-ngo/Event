@@ -137,7 +137,7 @@ public sealed class AgentBrowserPersonaHttpTests
     }
 
     [Test]
-    public async Task DeniedMutationAndCanonicalTenantRoutesDoNotCrossEventBoundaries()
+    public async Task DeniedMutationAndPrimaryTenantRoutesDoNotCrossEventBoundaries()
     {
         await using var fixture = await AgentBrowserPersonaFixture.CreateAsync();
         await fixture.RunAsync();

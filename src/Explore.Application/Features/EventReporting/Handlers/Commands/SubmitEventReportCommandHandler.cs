@@ -110,14 +110,14 @@ public sealed class SubmitEventReportCommandHandler(
                 request.SubmissionChannel,
                 request.Request.SubcategoryCode)
         };
-        SubmitEventReportCommand canonicalRequest = request with
+        SubmitEventReportCommand validatedRequest = request with
         {
             Request = submission
         };
         var options = NormalizeOptions(optionsAccessor.Value);
 
         var validationResult = await new SubmitEventReportCommandValidator(options)
-            .ValidateAsync(canonicalRequest, cancellationToken);
+            .ValidateAsync(validatedRequest, cancellationToken);
         if (!validationResult.IsValid)
         {
             return await MaskIfFencedAsync(

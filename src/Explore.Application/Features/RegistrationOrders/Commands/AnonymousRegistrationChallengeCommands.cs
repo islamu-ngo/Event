@@ -21,14 +21,14 @@ using Explore.Domain.Settings.Definitions;
 namespace Explore.Application.Features.RegistrationOrders.Commands;
 
 public sealed record IssueAnonymousRegistrationChallengeCommand(
-    Guid EventId, string CanonicalRequestDigest, string IdempotencyKey)
+    Guid EventId, string NormalizedRequestDigest, string IdempotencyKey)
     : ICommand<AnonymousRegistrationChallengeIssueResult>
 {
     public override string ToString() => "IssueAnonymousRegistrationChallengeCommand { Redacted = true }";
 }
 
 public sealed record ConsumeAnonymousRegistrationChallengeCommand(
-    Guid EventId, string CanonicalRequestDigest, string IdempotencyKey,
+    Guid EventId, string NormalizedRequestDigest, string IdempotencyKey,
     string? ProtectedChallenge, string? Nonce, StartGuestRegistrationOrderCommand IntendedRequest)
     : ICommand<AnonymousRegistrationChallengeAuthority?>
 {
@@ -70,7 +70,7 @@ public sealed class IssueAnonymousRegistrationChallengeCommandHandler(
         AnonymousRegistrationChallengeBinding binding;
         try
         {
-            binding = new(tenant.TenantId, command.EventId, command.CanonicalRequestDigest, command.IdempotencyKey);
+            binding = new(tenant.TenantId, command.EventId, command.NormalizedRequestDigest, command.IdempotencyKey);
         }
         catch (ArgumentException)
         {
@@ -165,7 +165,7 @@ public sealed class ConsumeAnonymousRegistrationChallengeCommandHandler(
         AnonymousRegistrationChallengeBinding binding;
         try
         {
-            binding = new(tenant.TenantId, command.EventId, command.CanonicalRequestDigest, command.IdempotencyKey);
+            binding = new(tenant.TenantId, command.EventId, command.NormalizedRequestDigest, command.IdempotencyKey);
         }
         catch (ArgumentException)
         {

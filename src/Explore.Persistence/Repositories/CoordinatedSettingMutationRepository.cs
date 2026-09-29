@@ -17,7 +17,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
         "Coordinated setting writes require an active transaction.";
 
     private const string TenantFilterBypassReason =
-        "Coordinated publication-policy snapshots enumerate only bounded canonical setting keys across tenants; tenant-specific reads also apply an exact tenant predicate.";
+        "Coordinated publication-policy snapshots enumerate only bounded normalized setting keys across tenants; tenant-specific reads also apply an exact tenant predicate.";
 
     private static readonly string[] GuardedKeys = PublicationPolicySettingKeys.All.ToArray();
 
@@ -158,7 +158,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
             {
                 dbContext.SystemSettings.Add(new SystemSetting
                 {
-                    Id = CanonicalSystemSettingId(mutation.Key),
+                    Id = StableSystemSettingId(mutation.Key),
                     SettingKey = mutation.Key,
                     Value = newValue,
                     ValueType = definition.ValueType,
@@ -166,7 +166,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
                     AllowedValues = allowedValues,
                     Description = definition.Description,
                     Category = definition.Category,
-                    DisplayOrder = CanonicalDisplayOrder(mutation.Key),
+                    DisplayOrder = StableDisplayOrder(mutation.Key),
                     CreatedAt = occurredAtUtc,
                     CreatedBy = actorUserId
                 });
@@ -180,7 +180,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
                 || !string.Equals(existing.AllowedValues, allowedValues, StringComparison.Ordinal)
                 || !string.Equals(existing.Description, definition.Description, StringComparison.Ordinal)
                 || !string.Equals(existing.Category, definition.Category, StringComparison.Ordinal)
-                || existing.DisplayOrder != CanonicalDisplayOrder(mutation.Key);
+                || existing.DisplayOrder != StableDisplayOrder(mutation.Key);
             if (!hasChange)
                 continue;
 
@@ -191,7 +191,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
             existing.AllowedValues = allowedValues;
             existing.Description = definition.Description;
             existing.Category = definition.Category;
-            existing.DisplayOrder = CanonicalDisplayOrder(mutation.Key);
+            existing.DisplayOrder = StableDisplayOrder(mutation.Key);
             existing.UpdatedAt = occurredAtUtc;
             existing.UpdatedBy = actorUserId;
             changes.Add(new CoordinatedSettingValueChange(mutation.Key, oldValue, newValue));
@@ -214,7 +214,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
         IEnumerable<TenantSetting> tenantRows)
     {
         ImmutableArray<PublicationPolicySystemValueSnapshot> systemValues = systemRows
-            .OrderBy(row => CanonicalOrder(row.SettingKey))
+            .OrderBy(row => StableOrder(row.SettingKey))
             .Select(row => new PublicationPolicySystemValueSnapshot(
                 row.SettingKey,
                 row.Value,
@@ -222,7 +222,7 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
             .ToImmutableArray();
         ImmutableArray<PublicationPolicyTenantValueSnapshot> tenantValues = tenantRows
             .OrderBy(row => row.TenantId)
-            .ThenBy(row => CanonicalOrder(row.SettingKey))
+            .ThenBy(row => StableOrder(row.SettingKey))
             .Select(row => new PublicationPolicyTenantValueSnapshot(
                 row.TenantId,
                 row.SettingKey,
@@ -346,11 +346,11 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
 
     private static IEnumerable<PublicationPolicySettingMutation> OrderMutations(
         ImmutableArray<PublicationPolicySettingMutation> mutations) =>
-        mutations.OrderBy(mutation => CanonicalOrder(mutation.Key));
+        mutations.OrderBy(mutation => StableOrder(mutation.Key));
 
-    private static int CanonicalOrder(string key) => Array.IndexOf(GuardedKeys, key);
+    private static int StableOrder(string key) => Array.IndexOf(GuardedKeys, key);
 
-    private static Guid CanonicalSystemSettingId(string key) => CanonicalOrder(key) switch
+    private static Guid StableSystemSettingId(string key) => StableOrder(key) switch
     {
         0 => SeedIds.SystemSettingEventReportingIntakeEnabledId,
         1 => SeedIds.SystemSettingRequireApprovalId,
@@ -360,5 +360,5 @@ public sealed class CoordinatedSettingMutationRepository(ExploreDbContext dbCont
         _ => throw new ArgumentException("The setting key is not guarded.", nameof(key))
     };
 
-    private static int CanonicalDisplayOrder(string key) => CanonicalOrder(key) + 1;
+    private static int StableDisplayOrder(string key) => StableOrder(key) + 1;
 }

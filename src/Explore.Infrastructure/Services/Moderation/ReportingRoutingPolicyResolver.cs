@@ -50,7 +50,7 @@ public sealed class ReportingRoutingPolicyResolver(
             reporting.CoopApiKey);
 
         return new ReportingRoutingPolicy(
-            LocalCanonicalRequired: true,
+            LocalReportingRequired: true,
             ExternalSyncEnabled: externalSyncEnabled,
             InstanceOspreyEnabled: instanceOspreyEnabled,
             TenantOspreyEnabled: tenantOspreyEnabled,

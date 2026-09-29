@@ -12,16 +12,16 @@ public sealed record BootstrapAtprotoSessionCommand : ICommand<AtprotoSessionBoo
         string OAuthClientKeyId,
         AtprotoSubjectClassification Classification,
         ReadOnlyMemory<byte> OAuthSessionPayload,
-        Guid? CanonicalActorId = null,
-        Guid? ExpectedCanonicalActorConcurrencyStamp = null)
+        Guid? TargetActorId = null,
+        Guid? ExpectedTargetActorConcurrencyStamp = null)
     {
         this.ExpectedDid = ExpectedDid;
         this.ExpectedPdsUri = ExpectedPdsUri;
         this.OAuthClientKeyId = OAuthClientKeyId;
         this.Classification = Classification;
         this.OAuthSessionPayload = OAuthSessionPayload.ToArray();
-        this.CanonicalActorId = CanonicalActorId;
-        this.ExpectedCanonicalActorConcurrencyStamp = ExpectedCanonicalActorConcurrencyStamp;
+        this.TargetActorId = TargetActorId;
+        this.ExpectedTargetActorConcurrencyStamp = ExpectedTargetActorConcurrencyStamp;
     }
 
     public AtprotoDid ExpectedDid { get; }
@@ -29,6 +29,6 @@ public sealed record BootstrapAtprotoSessionCommand : ICommand<AtprotoSessionBoo
     public string OAuthClientKeyId { get; }
     public AtprotoSubjectClassification Classification { get; }
     public ReadOnlyMemory<byte> OAuthSessionPayload { get; }
-    public Guid? CanonicalActorId { get; }
-    public Guid? ExpectedCanonicalActorConcurrencyStamp { get; }
+    public Guid? TargetActorId { get; }
+    public Guid? ExpectedTargetActorConcurrencyStamp { get; }
 }

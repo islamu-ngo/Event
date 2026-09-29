@@ -1003,7 +1003,7 @@ public sealed class SetupAssistantArchitectureTests
                 violations.Add("_metadata properties must match the exact generated set");
             if (!TryGetString(metadata, "generatedBy", out string? generatedBy)
                 || generatedBy != "eng/setup-assistant/GenerateSetupAssistantRatchets.cs")
-                violations.Add("_metadata.generatedBy must name the canonical generator");
+                violations.Add("_metadata.generatedBy must name the authoritative generator");
             if (!metadata.TryGetProperty("about", out JsonElement about)
                 || about.ValueKind != JsonValueKind.Array
                 || !about.EnumerateArray().Select(item => item.GetString()).SequenceEqual(

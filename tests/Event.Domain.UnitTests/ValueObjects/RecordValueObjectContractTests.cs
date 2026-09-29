@@ -7,7 +7,7 @@ public sealed class RecordValueObjectContractTests
     [Test]
     public async Task CapabilityTokenHashEqualValuesAndRecordCopiesPreserveTheValidatedHash()
     {
-        string value = CanonicalHash(17);
+        string value = NormalizedHash(17);
         CapabilityTokenHash original = CapabilityTokenHash.Create(value);
         CapabilityTokenHash equal = CapabilityTokenHash.Create(value);
         CapabilityTokenHash copy = original with { };
@@ -22,8 +22,8 @@ public sealed class RecordValueObjectContractTests
     [Test]
     public async Task CapabilityTokenHashDifferentValidatedValuesAreNotEqual()
     {
-        CapabilityTokenHash first = CapabilityTokenHash.Create(CanonicalHash(17));
-        CapabilityTokenHash second = CapabilityTokenHash.Create(CanonicalHash(18));
+        CapabilityTokenHash first = CapabilityTokenHash.Create(NormalizedHash(17));
+        CapabilityTokenHash second = CapabilityTokenHash.Create(NormalizedHash(18));
 
         await Assert.That(first).IsNotEqualTo(second);
     }
@@ -108,6 +108,6 @@ public sealed class RecordValueObjectContractTests
         await Assert.That(() => VerifiedPurchaserIdentity.Email(" ")).Throws<ArgumentException>();
     }
 
-    private static string CanonicalHash(byte fill) =>
+    private static string NormalizedHash(byte fill) =>
         Convert.ToBase64String(Enumerable.Repeat(fill, 32).ToArray());
 }

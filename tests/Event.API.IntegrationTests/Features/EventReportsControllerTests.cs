@@ -283,7 +283,7 @@ public sealed class EventReportsControllerTests
     }
 
     [Test]
-    public async Task Submit_WhenIntakeIsDisabled_DelegatesCanonicalConflictMapping()
+    public async Task Submit_WhenIntakeIsDisabled_DelegatesStandardConflictMapping()
     {
         _submitReportHandler.ExecuteAsync(Arg.Any<SubmitEventReportCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Failure<Guid>(

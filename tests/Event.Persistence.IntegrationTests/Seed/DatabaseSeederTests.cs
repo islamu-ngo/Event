@@ -181,7 +181,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
         Guid[] CarrierEventLocationIds);
 
     [Test]
-    public async Task LookupSeedAsync_RepairsCanonicalNotificationDeliveryRowsByStableId()
+    public async Task LookupSeedAsync_RepairsExpectedNotificationDeliveryRowsByStableId()
     {
         await fixture.ResetAsync();
 

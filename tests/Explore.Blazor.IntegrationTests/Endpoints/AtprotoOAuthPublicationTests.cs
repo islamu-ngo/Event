@@ -78,7 +78,7 @@ public sealed class AtprotoOAuthPublicationTests
     }
 
     [Test]
-    public async Task PublicationOnNonCanonicalHostReturnsNotFoundWithoutRedirect()
+    public async Task PublicationOnUnexpectedHostReturnsNotFoundWithoutRedirect()
     {
         await using var factory = CreateFactory(CreatePrivateJwks(("active", "active")));
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -115,7 +115,7 @@ public sealed class AtprotoOAuthPublicationTests
     [Arguments("https://user:password@events.example.com", "https://events.example.com")]
     [Arguments("https://events.example.com.", "https://events.example.com.")]
     [Arguments("https://évents.example.com", "https://évents.example.com")]
-    public async Task ClientMetadataRejectsNonCanonicalOrCredentialBearingPublicAuthority(
+    public async Task ClientMetadataRejectsMalformedOrCredentialBearingPublicAuthority(
         string publicUrl,
         string requestBaseAddress)
     {
@@ -205,13 +205,13 @@ public sealed class AtprotoOAuthPublicationTests
     }
 
     [Test]
-    public async Task KeyProviderRejectsNonCanonicalBase64UrlCoordinatesAndPrivateScalar()
+    public async Task KeyProviderRejectsInvalidBase64UrlCoordinatesAndPrivateScalar()
     {
-        var canonicalRing = CreatePrivateJwks(("active", "active"));
+        var validRing = CreatePrivateJwks(("active", "active"));
 
-        await Assert.That(CreateProvider(ReplaceWithNonCanonicalBase64Url(canonicalRing, "x")).IsReady).IsFalse();
-        await Assert.That(CreateProvider(ReplaceWithNonCanonicalBase64Url(canonicalRing, "y")).IsReady).IsFalse();
-        await Assert.That(CreateProvider(ReplaceWithNonCanonicalBase64Url(canonicalRing, "d")).IsReady).IsFalse();
+        await Assert.That(CreateProvider(ReplaceWithInvalidBase64Url(validRing, "x")).IsReady).IsFalse();
+        await Assert.That(CreateProvider(ReplaceWithInvalidBase64Url(validRing, "y")).IsReady).IsFalse();
+        await Assert.That(CreateProvider(ReplaceWithInvalidBase64Url(validRing, "d")).IsReady).IsFalse();
     }
 
     [Test]
@@ -284,16 +284,16 @@ public sealed class AtprotoOAuthPublicationTests
     private static string Base64Url(byte[] value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    private static string ReplaceWithNonCanonicalBase64Url(string ring, string propertyName)
+    private static string ReplaceWithInvalidBase64Url(string ring, string propertyName)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         using var document = JsonDocument.Parse(ring);
-        var canonical = document.RootElement.GetProperty("keys")[0].GetProperty(propertyName).GetString()!;
-        var lastCharacterIndex = alphabet.IndexOf(canonical[^1]);
-        var nonCanonical = canonical[..^1] + alphabet[lastCharacterIndex + 1];
+        var encoded = document.RootElement.GetProperty("keys")[0].GetProperty(propertyName).GetString()!;
+        var lastCharacterIndex = alphabet.IndexOf(encoded[^1]);
+        var invalid = encoded[..^1] + alphabet[lastCharacterIndex + 1];
         return ring.Replace(
-            $"\"{propertyName}\":\"{canonical}\"",
-            $"\"{propertyName}\":\"{nonCanonical}\"",
+            $"\"{propertyName}\":\"{encoded}\"",
+            $"\"{propertyName}\":\"{invalid}\"",
             StringComparison.Ordinal);
     }
 }

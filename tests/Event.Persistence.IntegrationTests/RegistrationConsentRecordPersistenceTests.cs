@@ -149,7 +149,7 @@ public sealed class RegistrationConsentRecordPersistenceTests
             RegistrationWorkflow workflow = RegistrationWorkflow.Create(tenant.Id, eventId, $"CONSENT_{Guid.NewGuid():N}", UtcNow);
             RegistrationRequirement requirement = RegistrationRequirement.Create(
                 workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
-                RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+                RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_SYNC,
                 subjectType, null, UtcNow);
             RegistrationChannel channel = RegistrationChannel.Create(requirement, 1, true, null, UtcNow);
             requirement.AddChannel(channel);

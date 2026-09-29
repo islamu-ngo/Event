@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace Explore.Infrastructure.Services;
 
 /// <summary>
-/// Builds absolute, canonical public URLs using the current HTTP request context.
+/// Builds absolute public URLs using the current HTTP request context.
 /// Uses request values normalized by trusted forwarded-header middleware and applies path base.
 /// </summary>
 public class PublicUrlBuilder : IPublicUrlBuilder

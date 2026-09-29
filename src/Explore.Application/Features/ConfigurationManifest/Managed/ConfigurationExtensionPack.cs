@@ -130,7 +130,7 @@ public static class ConfigurationExtensionPackValidator
                     "configuration_extension_descriptor_invalid");
             }
 
-            string payloadDigest = CanonicalJson.Digest(section);
+            string payloadDigest = NormalizedJson.Digest(section);
             if (!string.Equals(
                     payloadDigest,
                     descriptor.PayloadDigest,
@@ -258,7 +258,7 @@ public static class ConfigurationExtensionPackValidator
         return false;
     }
 
-    private static class CanonicalJson
+    private static class NormalizedJson
     {
         public static string Digest(JsonElement element)
         {

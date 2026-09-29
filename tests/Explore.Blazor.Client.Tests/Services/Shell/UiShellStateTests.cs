@@ -78,7 +78,7 @@ public sealed class UiShellStateTests : IDisposable
     [Test]
     [Arguments("settings/personal", "/settings/personal")]
     [Arguments("/SETTINGS/PERSONAL/APPEARANCE?custom=true", "/settings/personal/appearance?custom=true")]
-    public async Task PersonalSettingsContractNormalizesCanonicalRoutes(string destination, string expectedRoute)
+    public async Task PersonalSettingsContractNormalizesStandardRoutes(string destination, string expectedRoute)
     {
         var navigation = _context.Services.GetRequiredService<NavigationManager>();
         using var state = new UiShellState(navigation, new WorkspaceRouteClassifier(new WorkspaceRegistry()));
@@ -112,7 +112,7 @@ public sealed class UiShellStateTests : IDisposable
     [Arguments("/settings/personal/appearance/advanced")]
     [Arguments("/settings/personal/%2Fadvanced")]
     [Arguments("https://example.test/settings/personal")]
-    public async Task PersonalSettingsContractRejectsNonCanonicalDestinations(string destination)
+    public async Task PersonalSettingsContractRejectsNonStandardDestinations(string destination)
     {
         using var state = CreateState();
 

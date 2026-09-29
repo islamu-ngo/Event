@@ -19,7 +19,7 @@ internal sealed class SetupClientChallengeJsonConverter
                 out SetupClientChallenge? challenge))
         {
             throw new JsonException(
-                "Setup client challenge must use canonical SHA-256 Base64url syntax.");
+                "Setup client challenge must use standard SHA-256 Base64url syntax.");
         }
 
         return challenge!;

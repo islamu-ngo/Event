@@ -17,12 +17,12 @@ public sealed class RegistrationRequirementFulfillmentTests
         RegistrationRequirement optional = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Optional, true,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
         RegistrationRequirement required = RegistrationRequirement.Create(
             workflow, 2, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
 
         RegistrationRequirementFulfillment skipped = RegistrationRequirementFulfillment.CreateSkipped(

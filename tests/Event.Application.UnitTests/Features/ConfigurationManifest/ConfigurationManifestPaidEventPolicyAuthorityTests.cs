@@ -15,7 +15,7 @@ public sealed class ConfigurationManifestPaidEventPolicyAuthorityTests
     private const string SuppliedValue = "sovereign-value-sentinel";
 
     [Test]
-    public async Task InstanceDocumentCatalog_ContainsOnlyCanonicalPaidEventPolicy()
+    public async Task InstanceDocumentCatalog_ContainsOnlyPrimaryPaidEventPolicy()
     {
         PropertyInfo? property = typeof(ConfigurationManifestCatalog).GetProperty(
             "InstanceDocuments",

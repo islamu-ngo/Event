@@ -175,10 +175,10 @@ public sealed class InfisicalConfigurationProviderTests
     [Test]
     public async Task ConvertToConfigurationKey_WhenDatabaseErasureTopologySecretsProvided_MapsToPrivacyErasureTopology()
     {
-        var canonical = await ConvertToConfigurationKey("ERASURE_DATABASE_TOPOLOGY", "/database");
+        var settingKey = await ConvertToConfigurationKey("ERASURE_DATABASE_TOPOLOGY", "/database");
         var subfolder = await ConvertToConfigurationKey("ERASURE_DATABASE_TOPOLOGY", "/database/erasure");
 
-        await Assert.That(canonical).IsEqualTo("PrivacyErasure:Authority:Topology");
+        await Assert.That(settingKey).IsEqualTo("PrivacyErasure:Authority:Topology");
         await Assert.That(subfolder).IsEqualTo("PrivacyErasure:Authority:Topology");
     }
 

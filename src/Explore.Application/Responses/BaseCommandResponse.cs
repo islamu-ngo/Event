@@ -181,7 +181,7 @@ public record BaseCommandResponse<TKey>
     public string? Message { get; }
     public IReadOnlyList<string>? Errors { get; }
 
-    /// <summary>Machine-readable canonical or feature-owned failure code.</summary>
+    /// <summary>Machine-readable standard or feature-owned failure code.</summary>
     public string? FailureCode { get; }
 
     /// <summary>Structured quota metadata for quota failures.</summary>
@@ -221,7 +221,7 @@ public record BaseCommandResponse<TKey>
 
             if (quotaExceeded is not null)
             {
-                throw new ArgumentException("Quota metadata requires the canonical quota failure code.");
+                throw new ArgumentException("Quota metadata requires the standard quota failure code.");
             }
 
             return;

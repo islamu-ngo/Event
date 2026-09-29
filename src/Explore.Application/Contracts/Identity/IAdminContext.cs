@@ -17,8 +17,8 @@ public interface IAdminContext
     Guid? UserId { get; }
 
     /// <summary>
-    /// Resolves the current user's platform ID through canonical authenticated identity semantics.
-    /// Provider identities require an exact external-login binding; other principals use canonical claims.
+    /// Resolves the current user's platform ID through authoritative authenticated identity semantics.
+    /// Provider identities require an exact external-login binding; other principals use authoritative claims.
     /// Provider bindings, including missing results, are not cached: onboarding may create a binding
     /// between calls in the same scope. Email and administrator claims are not identity fallbacks.
     /// </summary>

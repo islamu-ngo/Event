@@ -10,10 +10,10 @@ public sealed class IcalNetEventCalendarFileBuilder : IEventCalendarFileBuilder
 {
     private const string ProductIdentifier = "-//ISLAMU//Event Platform//EN";
 
-    public string Build(EventCalendarExportDto calendarExport, Uri canonicalUrl)
+    public string Build(EventCalendarExportDto calendarExport, Uri publicUrl)
     {
         ArgumentNullException.ThrowIfNull(calendarExport);
-        ArgumentNullException.ThrowIfNull(canonicalUrl);
+        ArgumentNullException.ThrowIfNull(publicUrl);
 
         return BuildCalendar(
             calendarExport.EventId,
@@ -22,13 +22,13 @@ public sealed class IcalNetEventCalendarFileBuilder : IEventCalendarFileBuilder
             calendarExport.StartsAtUtc,
             calendarExport.EndsAtUtc,
             calendarExport.Location,
-            canonicalUrl);
+            publicUrl);
     }
 
-    public string Build(AttendeeEventCalendarExportDto calendarExport, Uri canonicalUrl)
+    public string Build(AttendeeEventCalendarExportDto calendarExport, Uri publicUrl)
     {
         ArgumentNullException.ThrowIfNull(calendarExport);
-        ArgumentNullException.ThrowIfNull(canonicalUrl);
+        ArgumentNullException.ThrowIfNull(publicUrl);
 
         return BuildCalendar(
             calendarExport.EventId,
@@ -37,7 +37,7 @@ public sealed class IcalNetEventCalendarFileBuilder : IEventCalendarFileBuilder
             calendarExport.StartsAtUtc,
             calendarExport.EndsAtUtc,
             calendarExport.Location,
-            canonicalUrl);
+            publicUrl);
     }
 
     private static string BuildCalendar(
@@ -47,7 +47,7 @@ public sealed class IcalNetEventCalendarFileBuilder : IEventCalendarFileBuilder
         DateTimeOffset startsAtUtc,
         DateTimeOffset endsAtUtc,
         string? location,
-        Uri canonicalUrl)
+        Uri publicUrl)
     {
         var calendar = new Ical.Net.Calendar
         {
@@ -58,12 +58,12 @@ public sealed class IcalNetEventCalendarFileBuilder : IEventCalendarFileBuilder
         var calendarEvent = new CalendarEvent
         {
             Summary = title,
-            Description = BuildDescription(title, description, canonicalUrl),
+            Description = BuildDescription(title, description, publicUrl),
             DtStart = new CalDateTime(startsAtUtc.UtcDateTime),
             DtEnd = new CalDateTime(endsAtUtc.UtcDateTime),
             DtStamp = new CalDateTime(startsAtUtc.UtcDateTime),
             Uid = eventId.ToString("D"),
-            Url = canonicalUrl
+            Url = publicUrl
         };
 
         if (!string.IsNullOrWhiteSpace(location))
@@ -78,12 +78,12 @@ public sealed class IcalNetEventCalendarFileBuilder : IEventCalendarFileBuilder
             ?? throw new InvalidOperationException("iCalendar serialization returned no content.");
     }
 
-    private static string BuildDescription(string title, string? description, Uri canonicalUrl)
+    private static string BuildDescription(string title, string? description, Uri publicUrl)
     {
         string value = string.IsNullOrWhiteSpace(description)
             ? title
             : description.Trim();
 
-        return $"{value}{Environment.NewLine}{Environment.NewLine}{canonicalUrl}";
+        return $"{value}{Environment.NewLine}{Environment.NewLine}{publicUrl}";
     }
 }

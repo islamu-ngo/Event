@@ -122,7 +122,7 @@ internal static class ConfigurationManifestExportJsonSerializer
                      .OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
             writer.WritePropertyName(key);
-            WriteCanonicalJson(writer, value);
+            WriteNormalizedJson(writer, value);
         }
         writer.WriteEndObject();
 
@@ -135,7 +135,7 @@ internal static class ConfigurationManifestExportJsonSerializer
             writer.WriteStartObject();
             writer.WriteNumber("schemaVersion", document.SchemaVersion);
             writer.WritePropertyName("payload");
-            WriteCanonicalJson(writer, document.Payload);
+            WriteNormalizedJson(writer, document.Payload);
             writer.WriteEndObject();
         }
         writer.WriteEndObject();
@@ -154,13 +154,13 @@ internal static class ConfigurationManifestExportJsonSerializer
                 legalDocument,
                 ConfigurationPortabilityJsonContext.Default
                     .ConfigurationManifestLegalDocumentV1Alpha2);
-            WriteCanonicalJson(writer, element);
+            WriteNormalizedJson(writer, element);
         }
 
         writer.WriteEndObject();
     }
 
-    private static void WriteCanonicalJson(Utf8JsonWriter writer, JsonElement element)
+    private static void WriteNormalizedJson(Utf8JsonWriter writer, JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -178,7 +178,7 @@ internal static class ConfigurationManifestExportJsonSerializer
             foreach (JsonProperty property in properties)
             {
                 writer.WritePropertyName(property.Name);
-                WriteCanonicalJson(writer, property.Value);
+                WriteNormalizedJson(writer, property.Value);
             }
             writer.WriteEndObject();
             return;
@@ -188,7 +188,7 @@ internal static class ConfigurationManifestExportJsonSerializer
         {
             writer.WriteStartArray();
             foreach (JsonElement item in element.EnumerateArray())
-                WriteCanonicalJson(writer, item);
+                WriteNormalizedJson(writer, item);
             writer.WriteEndArray();
             return;
         }

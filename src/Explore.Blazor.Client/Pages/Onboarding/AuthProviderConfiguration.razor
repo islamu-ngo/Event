@@ -616,7 +616,7 @@
             }
             if (IsVisitorPolicyConflict(response.FailureCode))
             {
-                await ReloadCanonicalAuthProviderConfigurationAsync();
+                await ReloadAuthoritativeAuthProviderConfigurationAsync();
             }
             return;
         }
@@ -716,13 +716,14 @@
         Navigation.NavigateTo("/setup", forceLoad: true);
     }
 
-    private async Task ReloadCanonicalAuthProviderConfigurationAsync()
+    private async Task ReloadAuthoritativeAuthProviderConfigurationAsync()
     {
-        AuthProviderConfigurationDto canonical = await InstanceOnboardingService.GetAuthProviderConfigurationAsync();
-        canonical.KeycloakClientSecret = string.Empty;
-        canonical.GoogleClientSecret = string.Empty;
-        _model = canonical;
-        _googleSecretAlreadyConfigured = canonical.GoogleSsoEnabled == true;
+        AuthProviderConfigurationDto authoritativeConfiguration =
+            await InstanceOnboardingService.GetAuthProviderConfigurationAsync();
+        authoritativeConfiguration.KeycloakClientSecret = string.Empty;
+        authoritativeConfiguration.GoogleClientSecret = string.Empty;
+        _model = authoritativeConfiguration;
+        _googleSecretAlreadyConfigured = authoritativeConfiguration.GoogleSsoEnabled == true;
     }
 
     private static bool IsVisitorPolicyConflict(string? failureCode) => failureCode is

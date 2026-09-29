@@ -101,7 +101,7 @@ public sealed class ConfigurationManifestCompilerTests
     }
 
     [Test]
-    public async Task Compile_PreservesCanonicalJsonAndStableProvenance()
+    public async Task Compile_PreservesNormalizedJsonAndStableProvenance()
     {
         ConfigurationManifestV1Alpha2 manifest = CreateManifest(
             CreateTenant(
@@ -278,7 +278,7 @@ public sealed class ConfigurationManifestCompilerTests
     }
 
     [Test]
-    public async Task Compile_InstanceSectionDigestIsCanonicalAndTenantIndependent()
+    public async Task Compile_InstanceSectionDigestIsNormalizedAndTenantIndependent()
     {
         var firstSettings = new Dictionary<string, JsonElement>(
             StringComparer.Ordinal)

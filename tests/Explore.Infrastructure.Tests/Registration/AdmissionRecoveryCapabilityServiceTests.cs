@@ -16,7 +16,7 @@ public sealed class AdmissionRecoveryCapabilityServiceTests
     private static readonly DateTimeOffset UtcNow = new(2026, 8, 25, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task IssueCreatesDistinctCanonicalMaterialWithFixedExpiry()
+    public async Task IssueCreatesDistinctNormalizedMaterialWithFixedExpiry()
     {
         var service = Service(
             new RecoverySecretResolver(new Dictionary<int, string> { [7] = Key(7) }),

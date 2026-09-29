@@ -25,7 +25,7 @@ public sealed class WebhookConsumerOwnershipTests
     [Arguments(WebhookConsumerKind.Organization, "018f0000-0000-7000-8000-000000000002", null, "018f0000-0000-7000-8000-000000000003", null, null)]
     [Arguments(WebhookConsumerKind.Group, "018f0000-0000-7000-8000-000000000002", null, null, "018f0000-0000-7000-8000-000000000004", null)]
     [Arguments(WebhookConsumerKind.User, "018f0000-0000-7000-8000-000000000002", null, null, null, "018f0000-0000-7000-8000-000000000005")]
-    public async Task Create_AcceptsOneCanonicalOwnerReference(
+    public async Task Create_AcceptsOnePrimaryOwnerReference(
         WebhookConsumerKind ownerKind,
         string? tenantId,
         string? instanceId,

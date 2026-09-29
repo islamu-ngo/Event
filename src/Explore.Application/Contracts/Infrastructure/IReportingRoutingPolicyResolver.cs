@@ -9,7 +9,7 @@ public interface IReportingRoutingPolicyResolver
 }
 
 public sealed record ReportingRoutingPolicy(
-    bool LocalCanonicalRequired,
+    bool LocalReportingRequired,
     bool ExternalSyncEnabled,
     bool InstanceOspreyEnabled,
     bool TenantOspreyEnabled,

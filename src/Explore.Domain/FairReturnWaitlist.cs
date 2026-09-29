@@ -379,7 +379,7 @@ public sealed class FairReturnSupplyUnit :
         if (normalized.Length != 44)
         {
             throw new ArgumentException(
-                "Digest must be canonical SHA-256 base64.",
+                "Digest must be normalized SHA-256 base64.",
                 parameterName);
         }
         try
@@ -393,14 +393,14 @@ public sealed class FairReturnSupplyUnit :
                     StringComparison.Ordinal))
             {
                 throw new ArgumentException(
-                    "Digest must be canonical SHA-256 base64.",
+                    "Digest must be normalized SHA-256 base64.",
                     parameterName);
             }
         }
         catch (FormatException exception)
         {
             throw new ArgumentException(
-                "Digest must be canonical SHA-256 base64.",
+                "Digest must be normalized SHA-256 base64.",
                 parameterName,
                 exception);
         }

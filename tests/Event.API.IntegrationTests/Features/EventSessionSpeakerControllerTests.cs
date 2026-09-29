@@ -23,7 +23,7 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class EventSessionSpeakerControllerTests
 {
     [Test]
-    public async Task ManagementRoutes_UseStableCanonicalRouteNames()
+    public async Task ManagementRoutes_UseStablePrimaryRouteNames()
     {
         await AssertRoute(
             nameof(EventSessionSpeakerController.GetBySession),
@@ -64,7 +64,7 @@ public sealed class EventSessionSpeakerControllerTests
     }
 
     [Test]
-    public async Task DetailEditLink_UsesOnlyRelationshipIdForCanonicalPatchRoute()
+    public async Task DetailEditLink_UsesOnlyRelationshipIdForPrimaryPatchRoute()
     {
         var assignmentId = Guid.NewGuid();
         var policy = new EventSessionSpeakerDetailLinkPolicy();
@@ -85,7 +85,7 @@ public sealed class EventSessionSpeakerControllerTests
     }
 
     [Test]
-    public async Task CollectionEditLink_UsesOnlyRelationshipIdForCanonicalPatchRoute()
+    public async Task CollectionEditLink_UsesOnlyRelationshipIdForPrimaryPatchRoute()
     {
         var assignmentId = Guid.NewGuid();
         var edit = new EventSessionSpeakerCollectionLinkPolicy()

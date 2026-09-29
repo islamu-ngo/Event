@@ -152,9 +152,9 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
         await Assert.That(pii.Scope).IsEqualTo(ConfigurationPortabilityScope.Excluded);
         await Assert.That(pii.ArtifactKinds).IsEmpty();
 
-        byte[] canonical = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(
+        byte[] serializedManifest = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(
             CreateEmptyManifest());
-        JsonObject root = JsonNode.Parse(canonical)!.AsObject();
+        JsonObject root = JsonNode.Parse(serializedManifest)!.AsObject();
         root["configuredAdministrator"] = new JsonObject
         {
             ["provider"] = "keycloak",

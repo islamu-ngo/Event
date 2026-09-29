@@ -166,7 +166,7 @@ public sealed class DataProtectionAddressSelectionProtector
     private static string CreateConfigurationFingerprint(
         PhotonGeocodingOptions options)
     {
-        string canonical = string.Join(
+        string normalized = string.Join(
             '|',
             options.Provider.Trim().ToUpperInvariant(),
             options.Endpoint?.GetLeftPart(UriPartial.Authority).ToUpperInvariant() ?? string.Empty,
@@ -175,7 +175,7 @@ public sealed class DataProtectionAddressSelectionProtector
             string.Join(',', options.CountryCodes
                 .Select(code => code.Trim().ToUpperInvariant())
                 .Order(StringComparer.Ordinal)));
-        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
+        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
         return Convert.ToHexString(digest);
     }
 

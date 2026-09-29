@@ -55,22 +55,22 @@ public sealed class AtprotoSessionController(
             return ProblemResponse(StatusCodes.Status400BadRequest, "Invalid ATProto subject classification");
         }
 
-        if (!TryGetCanonicalActorTarget(
-                request.CanonicalActorId,
-                request.ExpectedCanonicalActorConcurrencyStamp,
-                out var canonicalActorId,
-                out var expectedCanonicalActorConcurrencyStamp))
+        if (!TryGetTargetActor(
+                request.TargetActorId,
+                request.ExpectedTargetActorConcurrencyStamp,
+                out var targetActorId,
+                out var expectedTargetActorConcurrencyStamp))
         {
-            return ProblemResponse(StatusCodes.Status400BadRequest, "Invalid ATProto canonical Actor target");
+            return ProblemResponse(StatusCodes.Status400BadRequest, "Invalid ATProto target Actor");
         }
 
-        if (!TryGetCanonicalActorTarget(
-                User.FindAll(AtprotoJwtOptions.CanonicalActorIdClaim).Select(claim => claim.Value).ToArray(),
-                User.FindAll(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim).Select(claim => claim.Value).ToArray(),
-                out var claimedCanonicalActorId,
-                out var claimedExpectedCanonicalActorConcurrencyStamp)
-            || canonicalActorId != claimedCanonicalActorId
-            || expectedCanonicalActorConcurrencyStamp != claimedExpectedCanonicalActorConcurrencyStamp)
+        if (!TryGetTargetActor(
+                User.FindAll(AtprotoJwtOptions.TargetActorIdClaim).Select(claim => claim.Value).ToArray(),
+                User.FindAll(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim).Select(claim => claim.Value).ToArray(),
+                out var claimedTargetActorId,
+                out var claimedExpectedTargetActorConcurrencyStamp)
+            || targetActorId != claimedTargetActorId
+            || expectedTargetActorConcurrencyStamp != claimedExpectedTargetActorConcurrencyStamp)
         {
             return ProblemResponse(StatusCodes.Status401Unauthorized, "ATProto bootstrap target binding mismatch");
         }
@@ -98,8 +98,8 @@ public sealed class AtprotoSessionController(
             request.OAuthClientKeyId,
             classification,
             sessionPayload,
-            canonicalActorId,
-            expectedCanonicalActorConcurrencyStamp), cancellationToken);
+            targetActorId,
+            expectedTargetActorConcurrencyStamp), cancellationToken);
 
         if (result.Success
             && result.UserId is { } userId
@@ -108,8 +108,8 @@ public sealed class AtprotoSessionController(
             && result.Classification is { } resultClassification
             && result.Token is { } token
             && result.ExpiresAt is { } expiresAt
-            && result.CanonicalActorId == canonicalActorId
-            && result.ExpectedCanonicalActorConcurrencyStamp == expectedCanonicalActorConcurrencyStamp)
+            && result.TargetActorId == targetActorId
+            && result.ExpectedTargetActorConcurrencyStamp == expectedTargetActorConcurrencyStamp)
         {
             return Ok(new BffAtprotoSessionBridgeResponse(
                 userId,
@@ -119,8 +119,8 @@ public sealed class AtprotoSessionController(
                 ToContractValue(resultClassification),
                 token,
                 expiresAt,
-                canonicalActorId,
-                expectedCanonicalActorConcurrencyStamp));
+                targetActorId,
+                expectedTargetActorConcurrencyStamp));
         }
 
         return result.FailureCode switch
@@ -243,48 +243,48 @@ public sealed class AtprotoSessionController(
         _ => throw new ArgumentOutOfRangeException(nameof(classification))
     };
 
-    private static bool TryGetCanonicalActorTarget(
-        Guid? canonicalActorId,
-        Guid? expectedCanonicalActorConcurrencyStamp,
-        out Guid? parsedCanonicalActorId,
-        out Guid? parsedExpectedCanonicalActorConcurrencyStamp)
+    private static bool TryGetTargetActor(
+        Guid? targetActorId,
+        Guid? expectedTargetActorConcurrencyStamp,
+        out Guid? parsedTargetActorId,
+        out Guid? parsedExpectedTargetActorConcurrencyStamp)
     {
-        parsedCanonicalActorId = canonicalActorId;
-        parsedExpectedCanonicalActorConcurrencyStamp = expectedCanonicalActorConcurrencyStamp;
-        return canonicalActorId.HasValue == expectedCanonicalActorConcurrencyStamp.HasValue
-               && canonicalActorId != Guid.Empty
-               && expectedCanonicalActorConcurrencyStamp != Guid.Empty;
+        parsedTargetActorId = targetActorId;
+        parsedExpectedTargetActorConcurrencyStamp = expectedTargetActorConcurrencyStamp;
+        return targetActorId.HasValue == expectedTargetActorConcurrencyStamp.HasValue
+               && targetActorId != Guid.Empty
+               && expectedTargetActorConcurrencyStamp != Guid.Empty;
     }
 
-    private static bool TryGetCanonicalActorTarget(
-        string[] canonicalActorIdClaims,
-        string[] expectedCanonicalActorConcurrencyStampClaims,
-        out Guid? canonicalActorId,
-        out Guid? expectedCanonicalActorConcurrencyStamp)
+    private static bool TryGetTargetActor(
+        string[] targetActorIdClaims,
+        string[] expectedTargetActorConcurrencyStampClaims,
+        out Guid? targetActorId,
+        out Guid? expectedTargetActorConcurrencyStamp)
     {
-        canonicalActorId = null;
-        expectedCanonicalActorConcurrencyStamp = null;
-        if (canonicalActorIdClaims.Length != expectedCanonicalActorConcurrencyStampClaims.Length
-            || canonicalActorIdClaims.Length > 1)
+        targetActorId = null;
+        expectedTargetActorConcurrencyStamp = null;
+        if (targetActorIdClaims.Length != expectedTargetActorConcurrencyStampClaims.Length
+            || targetActorIdClaims.Length > 1)
         {
             return false;
         }
 
-        if (canonicalActorIdClaims.Length == 0)
+        if (targetActorIdClaims.Length == 0)
         {
             return true;
         }
 
-        if (!Guid.TryParseExact(canonicalActorIdClaims[0], "D", out var parsedActorId)
+        if (!Guid.TryParseExact(targetActorIdClaims[0], "D", out var parsedActorId)
             || parsedActorId == Guid.Empty
-            || !Guid.TryParseExact(expectedCanonicalActorConcurrencyStampClaims[0], "D", out var parsedConcurrencyStamp)
+            || !Guid.TryParseExact(expectedTargetActorConcurrencyStampClaims[0], "D", out var parsedConcurrencyStamp)
             || parsedConcurrencyStamp == Guid.Empty)
         {
             return false;
         }
 
-        canonicalActorId = parsedActorId;
-        expectedCanonicalActorConcurrencyStamp = parsedConcurrencyStamp;
+        targetActorId = parsedActorId;
+        expectedTargetActorConcurrencyStamp = parsedConcurrencyStamp;
         return true;
     }
 

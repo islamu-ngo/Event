@@ -4,7 +4,7 @@ public sealed record ReportingRoutingStateDto
 {
     public Guid TenantId { get; init; }
 
-    public bool LocalCanonicalRequired { get; init; }
+    public bool LocalReportingRequired { get; init; }
 
     public bool ExternalSyncEnabled { get; init; }
 

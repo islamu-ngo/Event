@@ -39,7 +39,7 @@ public sealed partial class EventResourceDiscoveryQueryTests
     }
 
     [Test]
-    public Task CanonicalSqliteCursorDiscoveryUsesProviderContract() =>
+    public Task NormalizedSqliteCursorDiscoveryUsesProviderContract() =>
         Database.EventResourceProviderContractAssertions.AssertCursorDiscoveryIsBoundedAsync(() => database.CreateContext());
 
     [Test]

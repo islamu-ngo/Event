@@ -810,10 +810,10 @@
         _siteProfile.SiteName = profile.SiteName;
         _siteProfile.SupportEmail = profile.SupportEmail;
         _siteProfile.Locale = profile.Locale;
-        if (Uri.TryCreate(profile.CanonicalUrl, UriKind.Absolute, out _))
-            _siteProfile.CanonicalUrl = profile.CanonicalUrl;
-        else if (string.IsNullOrWhiteSpace(_siteProfile.CanonicalUrl))
-            _siteProfile.CanonicalUrl = RequestOrigin.Url;
+        if (Uri.TryCreate(profile.PublicUrl, UriKind.Absolute, out _))
+            _siteProfile.PublicUrl = profile.PublicUrl;
+        else if (string.IsNullOrWhiteSpace(_siteProfile.PublicUrl))
+            _siteProfile.PublicUrl = RequestOrigin.Url;
     }
 
     private async Task SaveProfileAsync()
@@ -987,7 +987,7 @@
     {
         SiteName = _siteProfile.SiteName?.Trim(),
         SupportEmail = NormalizeOptional(_siteProfile.SupportEmail),
-        CanonicalUrl = NormalizeOptional(_siteProfile.CanonicalUrl),
+        PublicUrl = NormalizeOptional(_siteProfile.PublicUrl),
         Locale = string.IsNullOrWhiteSpace(_siteProfile.Locale) ? "en" : _siteProfile.Locale.Trim(),
         TimeZone = string.IsNullOrWhiteSpace(_siteProfile.TimeZone) ? "UTC" : _siteProfile.TimeZone.Trim(),
         Purpose = NormalizeOptional(_siteProfile.Purpose)

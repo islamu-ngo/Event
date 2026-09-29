@@ -28,7 +28,7 @@ public class EventSessionGroupControllerTests
     }
 
     [Test]
-    public async Task ProgramUpdateRoutes_AreCanonicalPatchContracts()
+    public async Task ProgramUpdateRoutes_ArePrimaryPatchContracts()
     {
         var agendaRoute = typeof(EventSessionAgendaItemController)
             .GetMethod(nameof(EventSessionAgendaItemController.Update))!

@@ -984,7 +984,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
             ?? (_selectedEvent?.Id is { } id ? $"/events/{id}" : null);
         if (path is null) return;
 
-        var url = CanonicalUrlHelper.Build(Navigation, path);
+        var url = AbsoluteUrlBuilder.Build(Navigation, path);
         if (await BrowserActionInterop.CopyTextAsync(url))
         {
             Snackbar.Add("Link copied to clipboard", Severity.Success, options => options.VisibleStateDuration = 2000);
@@ -1016,7 +1016,7 @@ public partial class EventList : ComponentBase, IAsyncDisposable
             return;
         }
 
-        var url = CanonicalUrlHelper.Build(Navigation, path);
+        var url = AbsoluteUrlBuilder.Build(Navigation, path);
 
         if (await BrowserActionInterop.ShareAsync(eventToShare.Title ?? "Event", url))
         {

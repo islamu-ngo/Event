@@ -19,7 +19,7 @@ namespace Event.Persistence.IntegrationTests.Federation;
 public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture fixture)
 {
     [Test]
-    public async Task CompleteSnapshot_ReconcilesCanonicalStateWithoutLocalAggregatesOrCursorMutation()
+    public async Task CompleteSnapshot_ReconcilesStoredStateWithoutLocalAggregatesOrCursorMutation()
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
@@ -103,12 +103,12 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         const string did = "did:plc:snapshot-owner";
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(Tenant(tenantId));
-        AtprotoRecord canonical = Record(did, "3mcanonical22", 200, now);
-        context.AtprotoRecords.Add(canonical);
-        context.AtprotoEventProjections.Add(Projection(canonical, 200, now));
-        context.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, canonical, 200, now));
+        AtprotoRecord storedRecord = Record(did, "3mstoredrec22", 200, now);
+        context.AtprotoRecords.Add(storedRecord);
+        context.AtprotoEventProjections.Add(Projection(storedRecord, 200, now));
+        context.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, storedRecord, 200, now));
         await context.SaveChangesAsync();
-        AtprotoRecord older = Record(did, canonical.RecordKey, 0, now);
+        AtprotoRecord older = Record(did, storedRecord.RecordKey, 0, now);
         older.Cid = "bafy-older";
         older.RecordJson = "{\"name\":\"older\"}";
         AtprotoEventProjection olderProjection = Projection(older, 0, now);
@@ -135,7 +135,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
             .AsNoTracking()
             .SingleAsync();
         await Assert.That(persisted.SourceVersion).IsEqualTo(200);
-        await Assert.That(persisted.Cid).IsEqualTo(canonical.Cid);
+        await Assert.That(persisted.Cid).IsEqualTo(storedRecord.Cid);
         await Assert.That(projection.SourceVersion).IsEqualTo(200);
         await Assert.That(presentation.SourceVersion).IsEqualTo(200);
     }
@@ -259,7 +259,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         Guid leaseToken = Guid.CreateVersion7();
         const string service = "https://jetstream.example";
         const string did = "did:plc:snapshot-owner";
-        AtprotoRecord canonical = Record(did, "3mretryrec222", 100, now);
+        AtprotoRecord storedRecord = Record(did, "3mretryrec222", 100, now);
         var failure = new FailAfterSaveChangesInterceptor();
         await using ExploreDbContext fixtureContext = fixture.CreateDbContext(failure);
         DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>(
@@ -280,13 +280,13 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
                 LeaseFence = 1,
                 UpdatedAt = now
             });
-            seedContext.AtprotoRecords.Add(canonical);
-            seedContext.AtprotoEventProjections.Add(Projection(canonical, 100, now));
-            seedContext.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, canonical, 100, now));
+            seedContext.AtprotoRecords.Add(storedRecord);
+            seedContext.AtprotoEventProjections.Add(Projection(storedRecord, 100, now));
+            seedContext.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, storedRecord, 100, now));
             await seedContext.SaveChangesAsync();
         }
 
-        AtprotoRecord recovered = Record(did, canonical.RecordKey, 0, now);
+        AtprotoRecord recovered = Record(did, storedRecord.RecordKey, 0, now);
         recovered.Cid = "bafy-recovered";
         recovered.RecordJson = "{\"name\":\"recovered\"}";
         AtprotoEventProjection recoveredProjection = Projection(recovered, 0, now);
@@ -381,7 +381,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         Guid leaseToken = Guid.CreateVersion7();
         const string service = "https://jetstream.example/cancelled-reconcile";
         const string did = "did:plc:snapshot-cancel";
-        AtprotoRecord canonical = Record(did, "3mcancelrec22", 100, now);
+        AtprotoRecord storedRecord = Record(did, "3mcancelrec22", 100, now);
 
         await using (ExploreDbContext seedContext = fixture.CreateDbContext())
         {
@@ -397,15 +397,15 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
                 LeaseFence = 1,
                 UpdatedAt = now
             });
-            seedContext.AtprotoRecords.Add(canonical);
-            seedContext.AtprotoEventProjections.Add(Projection(canonical, 100, now));
-            seedContext.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, canonical, 100, now));
+            seedContext.AtprotoRecords.Add(storedRecord);
+            seedContext.AtprotoEventProjections.Add(Projection(storedRecord, 100, now));
+            seedContext.AtprotoRecordTenantPresentations.Add(Presentation(tenantId, storedRecord, 100, now));
             await seedContext.SaveChangesAsync();
         }
 
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancelAfterSave = new CancelAfterSaveChangesInterceptor(cancellation);
-        AtprotoRecord recovered = Record(did, canonical.RecordKey, 0, now);
+        AtprotoRecord recovered = Record(did, storedRecord.RecordKey, 0, now);
         recovered.Cid = "bafy-recovered";
         recovered.RecordJson = "{\"name\":\"recovered\"}";
         AtprotoEventProjection recoveredProjection = Projection(recovered, 0, now);
@@ -448,7 +448,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
             AtprotoJetstreamConsumerState rolledBackState = await freshContext.AtprotoJetstreamConsumerStates.SingleAsync();
             await Assert.That(rolledBack.SourceVersion).IsEqualTo(100);
             await Assert.That(rolledBack.SourceCursor).IsEqualTo(100);
-            await Assert.That(rolledBack.Cid).IsEqualTo(canonical.Cid);
+            await Assert.That(rolledBack.Cid).IsEqualTo(storedRecord.Cid);
             await Assert.That(rolledBackState.Cursor).IsEqualTo(0);
             bool applied = await new AtprotoJetstreamRepository(freshContext)
                 .TryReconcileAsync(request, recovery.Token);
@@ -478,17 +478,17 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         const string did = "did:plc:snapshot-owner";
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(Tenant(tenantId));
-        AtprotoRecord canonical = Record(did, "3mmaterial222", 100, now);
-        AtprotoRecord nonTidCanonical = Record(did, "self", 100, now);
-        context.AtprotoRecords.AddRange(canonical, nonTidCanonical);
+        AtprotoRecord storedRecord = Record(did, "3mmaterial222", 100, now);
+        AtprotoRecord nonTidRecord = Record(did, "self", 100, now);
+        context.AtprotoRecords.AddRange(storedRecord, nonTidRecord);
         context.AtprotoEventProjections.AddRange(
-            Projection(canonical, 100, now),
-            Projection(nonTidCanonical, 100, now));
+            Projection(storedRecord, 100, now),
+            Projection(nonTidRecord, 100, now));
         context.AtprotoRecordTenantPresentations.AddRange(
-            Presentation(tenantId, canonical, 100, now),
-            Presentation(tenantId, nonTidCanonical, 100, now));
+            Presentation(tenantId, storedRecord, 100, now),
+            Presentation(tenantId, nonTidRecord, 100, now));
         await context.SaveChangesAsync();
-        AtprotoRecord recovered = Record(did, canonical.RecordKey, 0, now);
+        AtprotoRecord recovered = Record(did, storedRecord.RecordKey, 0, now);
         string validPresentOnlyKey = new('a', 512);
         var validRequest = new AtprotoPdsSnapshotApplyRequest(
             claim,
@@ -498,7 +498,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
                 [
                     new(recovered.Collection, recovered.RecordKey),
                     new(recovered.Collection, validPresentOnlyKey),
-                    new(nonTidCanonical.Collection, nonTidCanonical.RecordKey)
+                    new(nonTidRecord.Collection, nonTidRecord.RecordKey)
                 ],
                 [new(recovered, Projection(recovered, 0, now))])],
             [tenantId],
@@ -531,7 +531,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         bool dotDotRejected = await repository.TryReconcileAsync(
             WithPresentOnlyKey(".."),
             CancellationToken.None);
-        AtprotoRecord rejectedMaterialization = Record(did, nonTidCanonical.RecordKey, 0, now);
+        AtprotoRecord rejectedMaterialization = Record(did, nonTidRecord.RecordKey, 0, now);
         bool nonTidMaterializationRejected = await repository.TryReconcileAsync(
             validRequest with
             {
@@ -557,19 +557,19 @@ public sealed class AtprotoPdsSnapshotRepositoryTests(PostgreSqlContainerFixture
         AtprotoRecordTenantPresentation rejectedPresentation = await context.AtprotoRecordTenantPresentations
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .SingleAsync(value => value.AtprotoRecordId == nonTidCanonical.Id);
+            .SingleAsync(value => value.AtprotoRecordId == nonTidRecord.Id);
         await Assert.That(applied).IsTrue();
         await Assert.That(oversizedRejected).IsFalse();
         await Assert.That(dotRejected).IsFalse();
         await Assert.That(dotDotRejected).IsFalse();
         await Assert.That(nonTidMaterializationRejected).IsFalse();
         await Assert.That(records).Count().IsEqualTo(2);
-        await Assert.That(records[canonical.RecordKey].SourceVersion).IsEqualTo(200);
-        await Assert.That(records[canonical.RecordKey].TombstonedAt).IsNull();
-        await Assert.That(records[nonTidCanonical.RecordKey].SourceVersion).IsEqualTo(100);
-        await Assert.That(records[nonTidCanonical.RecordKey].TombstonedAt).IsNull();
+        await Assert.That(records[storedRecord.RecordKey].SourceVersion).IsEqualTo(200);
+        await Assert.That(records[storedRecord.RecordKey].TombstonedAt).IsNull();
+        await Assert.That(records[nonTidRecord.RecordKey].SourceVersion).IsEqualTo(100);
+        await Assert.That(records[nonTidRecord.RecordKey].TombstonedAt).IsNull();
         await Assert.That(await context.AtprotoEventProjections
-            .AnyAsync(value => value.AtprotoRecordId == nonTidCanonical.Id)).IsFalse();
+            .AnyAsync(value => value.AtprotoRecordId == nonTidRecord.Id)).IsFalse();
         await Assert.That(rejectedPresentation.IsVisible).IsFalse();
         await Assert.That(rejectedPresentation.SourceVersion).IsEqualTo(200);
     }

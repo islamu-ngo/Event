@@ -38,7 +38,7 @@ public sealed class EmailDeliveryDisableTokenServiceTests
     }
 
     [Test]
-    public async Task Matches_BindsTenantSelectionAndCanonicalizesLargeAffectedSet()
+    public async Task Matches_BindsTenantSelectionAndNormalizesLargeAffectedSet()
     {
         var service = new EmailDeliveryDisableTokenService(new EphemeralDataProtectionProvider());
         var actor = Guid.NewGuid();

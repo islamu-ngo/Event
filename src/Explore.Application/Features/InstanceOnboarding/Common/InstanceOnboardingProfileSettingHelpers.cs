@@ -18,7 +18,7 @@ internal static class InstanceOnboardingProfileSettingHelpers
             ? fallbackSiteName?.Trim() ?? string.Empty
             : profile.SiteName.Trim(),
             SupportEmail = string.IsNullOrWhiteSpace(profile.SupportEmail) ? null : profile.SupportEmail.Trim(),
-            CanonicalUrl = string.IsNullOrWhiteSpace(profile.CanonicalUrl) ? null : profile.CanonicalUrl.Trim(),
+            PublicUrl = string.IsNullOrWhiteSpace(profile.PublicUrl) ? null : profile.PublicUrl.Trim(),
             Locale = string.IsNullOrWhiteSpace(profile.Locale) ? "en" : profile.Locale.Trim(),
             TimeZone = string.IsNullOrWhiteSpace(profile.TimeZone) ? "UTC" : profile.TimeZone.Trim(),
             Purpose = string.IsNullOrWhiteSpace(profile.Purpose) ? null : profile.Purpose.Trim()
@@ -31,7 +31,7 @@ internal static class InstanceOnboardingProfileSettingHelpers
         CancellationToken cancellationToken)
     {
         var configuredUrl = PublicAddressResolver.ReadOverride(configuration);
-        var canonicalUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : profile.CanonicalUrl;
+        var publicUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : profile.PublicUrl;
         await UpsertAsync(
             systemSettingRepository,
             GovernanceSettingKeys.Branding.DisplayName,
@@ -50,12 +50,12 @@ internal static class InstanceOnboardingProfileSettingHelpers
             "Public support contact for the instance site",
             cancellationToken);
 
-        if (PublicAddressResolver.IsValid(canonicalUrl))
+        if (PublicAddressResolver.IsValid(publicUrl))
         {
             await UpsertAsync(
                 systemSettingRepository,
                 GovernanceSettingKeys.Domains.PublicBaseUrl,
-                JsonSerializer.Serialize(canonicalUrl),
+                JsonSerializer.Serialize(publicUrl),
                 "Domains", 2, "Public address established during authorized setup", cancellationToken);
         }
 

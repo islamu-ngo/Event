@@ -21,7 +21,7 @@ public sealed class OnboardingWireContractTests
             SiteProfile = new()
             {
                 SiteName = "Community",
-                CanonicalUrl = "https://events.example.test",
+                PublicUrl = "https://events.example.test",
                 Locale = "en",
                 TimeZone = "UTC"
             }
@@ -30,11 +30,8 @@ public sealed class OnboardingWireContractTests
         var bound = JsonSerializer.Deserialize<Server.CompleteInstanceOnboardingRequest>(json, ApiOptions);
 
         await Assert.That(bound!.SiteProfile.SiteName).IsEqualTo("Community");
+        await Assert.That(bound.SiteProfile.PublicUrl).IsEqualTo("https://events.example.test");
         await Assert.That(bound.ExpectedJourneyGeneration).IsEqualTo("reviewed-generation");
-
-        var profileJson = JsonSerializer.Serialize(request.SiteProfile, ClientOptions);
-        var profile = JsonSerializer.Deserialize<Server.SelfHostOnboardingProfileDto>(profileJson, ApiOptions);
-        await Assert.That(profile!.CanonicalUrl).IsEqualTo("https://events.example.test");
 
         var localJson = JsonSerializer.Serialize(new Client.CompleteLocalInstanceOnboardingRequestDto
         {
@@ -49,7 +46,7 @@ public sealed class OnboardingWireContractTests
     public async Task ReadOnlyJourneyMetadata_IsNotAcceptedInSubmittedProfile()
     {
         var profile = new Client.SelfHostOnboardingProfileDto { SiteName = "Community" };
-        profile.AdditionalProperties["canonicalUrlManagedByDeployment"] = true;
+        profile.AdditionalProperties["readOnlyJourneyMetadata"] = true;
         var json = JsonSerializer.Serialize(profile, ClientOptions);
 
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Server.SelfHostOnboardingProfileDto>(json, ApiOptions));

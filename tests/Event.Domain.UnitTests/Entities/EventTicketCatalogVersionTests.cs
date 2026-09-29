@@ -330,7 +330,7 @@ public sealed class EventTicketCatalogVersionTests
     }
 
     [Test]
-    public async Task Entitlements_RejectDuplicateCanonicalTargetScopesOnAddAndReplacement()
+    public async Task Entitlements_RejectDuplicateTargetScopesOnAddAndReplacement()
     {
         EventTicketCatalogVersion catalog = CreateCatalog();
         EventTicketType ticketType = CreateTicket(catalog, "USD", TicketPricingModeEnum.Free, null, null, null);

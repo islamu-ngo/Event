@@ -421,7 +421,7 @@ public sealed record KeycloakTarget
             || !string.IsNullOrEmpty(parsed.Fragment))
         {
             throw new ArgumentException(
-                "A canonical absolute provider authority is required.",
+                "A normalized absolute provider authority is required.",
                 nameof(authority));
         }
 

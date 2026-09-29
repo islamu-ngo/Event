@@ -339,7 +339,7 @@ public class IdempotencyMiddlewareRealRuntimeTests(RealRuntimeApiFixture fixture
     }
 
     [Test]
-    public async Task Identity_UsesCanonicalGuidPriorityAndSkipsMalformedClaims()
+    public async Task Identity_UsesAuthoritativeGuidPriorityAndSkipsMalformedClaims()
     {
         Guid subject = Guid.CreateVersion7();
         Guid nameIdentifier = Guid.CreateVersion7();

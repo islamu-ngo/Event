@@ -43,7 +43,7 @@ public sealed class PublicationPolicyMutationBoundaryTests
     }
 
     [Test]
-    public async Task TenantNotifications_MapScrambledNeutralChangesInCanonicalOrder()
+    public async Task TenantNotifications_MapScrambledNeutralChangesInPolicyOrder()
     {
         using var cancellation = new CancellationTokenSource();
         var mutationLock = new RecordingMutationLock();
@@ -262,7 +262,7 @@ public sealed class PublicationPolicyMutationBoundaryTests
     }
 
     [Test]
-    public async Task InstanceNotifications_MapScrambledNeutralChangesInCanonicalOrder()
+    public async Task InstanceNotifications_MapScrambledNeutralChangesInPolicyOrder()
     {
         var mutationLock = new RecordingMutationLock();
         var store = new RecordingStore(mutationLock)
@@ -613,13 +613,13 @@ public sealed class PublicationPolicyMutationBoundaryTests
         public void Attach(RecordingStore store) => _store = store;
 
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("The coordinated boundary must use ExecuteManyAsync.");
 
         public async Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
@@ -628,7 +628,7 @@ public sealed class PublicationPolicyMutationBoundaryTests
             if (Failure is not null)
                 throw Failure;
 
-            Keys = canonicalSettingKeys.ToArray();
+            Keys = settingKeys.ToArray();
             CancellationToken = cancellationToken;
             T result = default!;
             for (int attempt = 0; attempt < attemptCount; attempt++)

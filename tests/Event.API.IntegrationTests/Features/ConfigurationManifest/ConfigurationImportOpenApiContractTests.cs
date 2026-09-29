@@ -18,7 +18,7 @@ public sealed class ConfigurationImportOpenApiContractTests(
         "/api/tenants/{tenantId}/configuration-import/sessions";
 
     [Test]
-    public async Task NativeDocument_ExposesCanonicalBinaryUploadsAndActions()
+    public async Task NativeDocument_ExposesPrimaryBinaryUploadsAndActions()
     {
         using JsonDocument document = await ReadDocument();
         JsonElement paths = document.RootElement.GetProperty("paths");

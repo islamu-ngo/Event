@@ -25,11 +25,11 @@ public interface IAnonymousRegistrationChallengeService
 
 public sealed record AnonymousRegistrationChallengeBinding
 {
-    public AnonymousRegistrationChallengeBinding(Guid tenantId, Guid eventId, string canonicalRequestDigest, string idempotencyKey)
+    public AnonymousRegistrationChallengeBinding(Guid tenantId, Guid eventId, string normalizedRequestDigest, string idempotencyKey)
     {
         if (tenantId == Guid.Empty || eventId == Guid.Empty
-            || canonicalRequestDigest is not { Length: 64 }
-            || canonicalRequestDigest.Any(character => character is not (>= '0' and <= '9' or >= 'A' and <= 'F'))
+            || normalizedRequestDigest is not { Length: 64 }
+            || normalizedRequestDigest.Any(character => character is not (>= '0' and <= '9' or >= 'A' and <= 'F'))
             || idempotencyKey is not { Length: >= 1 and <= 128 }
             || idempotencyKey.Any(character => character is < '!' or > '~'))
         {
@@ -38,13 +38,13 @@ public sealed record AnonymousRegistrationChallengeBinding
 
         TenantId = tenantId;
         EventId = eventId;
-        CanonicalRequestDigest = canonicalRequestDigest;
+        NormalizedRequestDigest = normalizedRequestDigest;
         IdempotencyKey = idempotencyKey;
     }
 
     public Guid TenantId { get; }
     public Guid EventId { get; }
-    public string CanonicalRequestDigest { get; }
+    public string NormalizedRequestDigest { get; }
     public string IdempotencyKey { get; }
     public override string ToString() => "AnonymousRegistrationChallengeBinding { Redacted = true }";
 }

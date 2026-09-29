@@ -18,7 +18,7 @@ public sealed class AdminCacheDiagnosticsControllerTests : IDisposable
     private readonly IdentityQueryTestScope _identity = new();
     public void Dispose() => _identity.Dispose();
     [Test]
-    public async Task SnapshotInDevelopmentUsesCanonicalResolutionAndOwnedDiagnosticClaimNames()
+    public async Task SnapshotInDevelopmentUsesAuthoritativeResolutionAndOwnedDiagnosticClaimNames()
     {
         Guid subject = Guid.Parse("018e4e5c-7f00-7000-8000-000000000081");
         Guid internalUser = Guid.Parse("018e4e5c-7f00-7000-8000-000000000082");

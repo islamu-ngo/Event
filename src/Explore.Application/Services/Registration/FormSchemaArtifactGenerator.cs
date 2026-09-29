@@ -57,15 +57,15 @@ public sealed class FormSchemaArtifactGenerator : IFormSchemaArtifactGenerator
             ["logic"] = logic.DeepClone(),
             ["mapping"] = mapping.DeepClone()
         };
-        string canonicalBundle = Serialize(bundle);
+        string normalizedBundle = Serialize(bundle);
 
         return new FormSchemaArtifactBundle(
             Serialize(data),
             Serialize(ui),
             Serialize(logic),
             Serialize(mapping),
-            canonicalBundle,
-            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalBundle))));
+            normalizedBundle,
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedBundle))));
     }
 
     private static JsonObject DataArtifact(IEnumerable<RegistrationFormField> fields)

@@ -5,7 +5,7 @@ namespace Event.Domain.UnitTests.ValueObjects;
 public sealed class CapabilityTokenHashTests
 {
     [Test]
-    public async Task Create_RoundTripsCanonicalSha256Hash()
+    public async Task Create_RoundTripsNormalizedSha256Hash()
     {
         string value = Convert.ToBase64String(new byte[32]);
 
@@ -15,7 +15,7 @@ public sealed class CapabilityTokenHashTests
     }
 
     [Test]
-    public async Task Create_UsesValueEqualityForCanonicalHashes()
+    public async Task Create_UsesValueEqualityForNormalizedHashes()
     {
         string value = Convert.ToBase64String(new byte[32]);
         byte[] differentBytes = new byte[32];
@@ -41,7 +41,7 @@ public sealed class CapabilityTokenHashTests
     }
 
     [Test]
-    public async Task Create_RejectsNonCanonicalOrNonSha256Representations()
+    public async Task Create_RejectsNonNormalizedOrNonSha256Representations()
     {
         string[] invalidValues =
         [

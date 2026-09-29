@@ -26,7 +26,7 @@ public sealed class LocationPrivacyLookupContractTests
     }
 
     [Test]
-    public async Task LocationKindHasOnlyCanonicalLookupFields()
+    public async Task LocationKindHasOnlyExpectedLookupFields()
     {
         var propertyNames = typeof(LocationKind)
             .GetProperties()

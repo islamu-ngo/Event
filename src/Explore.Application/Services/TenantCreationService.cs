@@ -82,7 +82,7 @@ public sealed class TenantCreationService(
                 TenantDirectoryOperatorIdentityDocumentDefaults.DefaultsVersion,
                 StringComparison.Ordinal))
         {
-            throw new ArgumentException("Tenant creation requires canonical mandatory document metadata.", nameof(request));
+            throw new ArgumentException("Tenant creation requires authoritative mandatory document metadata.", nameof(request));
         }
     }
 

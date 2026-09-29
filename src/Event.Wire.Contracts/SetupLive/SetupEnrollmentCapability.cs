@@ -32,7 +32,7 @@ public sealed class SetupEnrollmentCapability
         out SetupEnrollmentCapability? capability)
     {
         capability = null;
-        if (!SetupLiveBase64Url32.IsCanonical(candidate))
+        if (!SetupLiveBase64Url32.HasStandardEncoding(candidate))
             return false;
 
         capability = new SetupEnrollmentCapability(candidate!);

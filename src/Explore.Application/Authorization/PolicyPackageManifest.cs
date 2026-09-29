@@ -5,7 +5,7 @@ namespace Explore.Application.Authorization;
 /// </summary>
 /// <param name="PackageId">Stable product-owned package identifier.</param>
 /// <param name="Version">Content or semantic version for the package.</param>
-/// <param name="ContentHash">Lowercase SHA-256 hex digest over the canonical artifact set.</param>
+/// <param name="ContentHash">Lowercase SHA-256 hex digest over the normalized artifact set.</param>
 /// <param name="GeneratedAt">UTC timestamp when this manifest was generated.</param>
 /// <param name="Artifacts">Artifacts included in the package.</param>
 public sealed record PolicyPackageManifest(

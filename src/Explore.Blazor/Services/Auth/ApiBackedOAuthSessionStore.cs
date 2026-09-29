@@ -36,8 +36,8 @@ public sealed class ApiBackedOAuthSessionStore(
             binding.Seed.OAuthClientKeyId,
             binding.Seed.Classification,
             sessionElement,
-            binding.Seed.CanonicalActorId,
-            binding.Seed.ExpectedCanonicalActorConcurrencyStamp);
+            binding.Seed.TargetActorId,
+            binding.Seed.ExpectedTargetActorConcurrencyStamp);
         var body = JsonSerializer.SerializeToUtf8Bytes(requestBody, JsonOptions);
         if (body.Length > MaximumSessionJsonBytes)
         {
@@ -55,8 +55,8 @@ public sealed class ApiBackedOAuthSessionStore(
             binding.Seed.TenantId,
             binding.Seed.ExpectedDid,
             binding.Seed.Classification,
-            binding.Seed.CanonicalActorId,
-            binding.Seed.ExpectedCanonicalActorConcurrencyStamp);
+            binding.Seed.TargetActorId,
+            binding.Seed.ExpectedTargetActorConcurrencyStamp);
         request.Headers.TryAddWithoutValidation(
             AtprotoBootstrapAssertionService.HeaderName,
             assertionService.Issue(
@@ -65,8 +65,8 @@ public sealed class ApiBackedOAuthSessionStore(
                 binding.Seed.Classification,
                 HttpMethod.Post,
                 AtprotoBootstrapAssertionService.BridgePath,
-                binding.Seed.CanonicalActorId,
-                binding.Seed.ExpectedCanonicalActorConcurrencyStamp));
+                binding.Seed.TargetActorId,
+                binding.Seed.ExpectedTargetActorConcurrencyStamp));
 
         var started = Stopwatch.GetTimestamp();
         var outcome = AtprotoAuthenticationOutcome.InternalFailure;
@@ -97,8 +97,8 @@ public sealed class ApiBackedOAuthSessionStore(
                 bridgeResult.Classification,
                 bridgeResult.AccessToken,
                 bridgeResult.ExpiresAt,
-                bridgeResult.CanonicalActorId,
-                bridgeResult.ExpectedCanonicalActorConcurrencyStamp));
+                bridgeResult.TargetActorId,
+                bridgeResult.ExpectedTargetActorConcurrencyStamp));
             outcome = AtprotoAuthenticationOutcome.Success;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -243,8 +243,8 @@ public sealed class ApiBackedOAuthSessionStore(
             || result.ParticipationId == Guid.Empty
             || !string.Equals(result.Did, binding.Seed.ExpectedDid, StringComparison.Ordinal)
             || !string.Equals(result.Classification, binding.Seed.Classification, StringComparison.Ordinal)
-            || result.CanonicalActorId != binding.Seed.CanonicalActorId
-            || result.ExpectedCanonicalActorConcurrencyStamp != binding.Seed.ExpectedCanonicalActorConcurrencyStamp
+            || result.TargetActorId != binding.Seed.TargetActorId
+            || result.ExpectedTargetActorConcurrencyStamp != binding.Seed.ExpectedTargetActorConcurrencyStamp
             || string.IsNullOrWhiteSpace(result.AccessToken)
             || result.AccessToken.Length > MaximumPlatformTokenBytes
             || result.ExpiresAt <= now
@@ -263,8 +263,8 @@ public sealed class ApiBackedOAuthSessionStore(
         string OAuthClientKeyId,
         string Classification,
         JsonElement OAuthSession,
-        Guid? CanonicalActorId,
-        Guid? ExpectedCanonicalActorConcurrencyStamp);
+        Guid? TargetActorId,
+        Guid? ExpectedTargetActorConcurrencyStamp);
 
     private sealed record BffAtprotoSessionBridgeResponse(
         Guid UserId,
@@ -274,8 +274,8 @@ public sealed class ApiBackedOAuthSessionStore(
         string Classification,
         string AccessToken,
         DateTimeOffset ExpiresAt,
-        Guid? CanonicalActorId,
-        Guid? ExpectedCanonicalActorConcurrencyStamp);
+        Guid? TargetActorId,
+        Guid? ExpectedTargetActorConcurrencyStamp);
 
     private sealed record BffAtprotoStoredSessionBridgeResponse(
         string Did,

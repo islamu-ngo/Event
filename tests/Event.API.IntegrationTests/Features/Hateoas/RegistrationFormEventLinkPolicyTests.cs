@@ -199,7 +199,7 @@ public sealed class RegistrationFormEventLinkPolicyTests
     }
 
     [Test]
-    public async Task ProviderCollectionHal_EmitsCanonicalMutationRelationsWithExactAuthorization()
+    public async Task ProviderCollectionHal_EmitsPrimaryMutationRelationsWithExactAuthorization()
     {
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();

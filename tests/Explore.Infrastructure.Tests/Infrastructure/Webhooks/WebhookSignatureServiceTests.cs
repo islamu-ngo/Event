@@ -24,7 +24,7 @@ public sealed class WebhookSignatureServiceTests
     }
 
     [Test]
-    public async Task Sign_UsesStandardWebhookCanonicalBytes()
+    public async Task Sign_UsesStandardWebhookNormalizedBytes()
     {
         var service = CreateService();
         var secret = CreateSecret("current-secret");

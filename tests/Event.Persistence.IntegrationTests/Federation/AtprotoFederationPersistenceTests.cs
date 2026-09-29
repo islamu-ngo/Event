@@ -768,7 +768,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
     }
 
     [Test]
-    public async Task PdsSettlement_ReclaimedFenceRollsBackCanonicalAndOwnershipWrites()
+    public async Task PdsSettlement_ReclaimedFenceRollsBackRecordAndOwnershipWrites()
     {
         await fixture.ResetAsync();
         var scope = await SeedScopeAsync("pds-fence");
@@ -938,7 +938,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
     }
 
     [Test]
-    public async Task PdsSettlement_LinksCanonicalRecordBackToCommittedLocalEvent()
+    public async Task PdsSettlement_LinksStoredRecordBackToCommittedLocalEvent()
     {
         await fixture.ResetAsync();
         FederationScope scope = await SeedScopeAsync("pds-event-link");
@@ -1103,7 +1103,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
     }
 
     [Test]
-    public async Task PdsSettlement_CompensationUpdateAcceptsObservedCanonicalBaseOnFirstAttempt()
+    public async Task PdsSettlement_CompensationUpdateAcceptsObservedStoredBaseOnFirstAttempt()
     {
         await fixture.ResetAsync();
         FederationScope scope = await SeedScopeAsync("pds-compensation-first");

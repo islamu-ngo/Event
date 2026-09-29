@@ -386,7 +386,7 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         _webhookMessagesCreated = meter.CreateCounter<long>(
             "explore.webhooks.messages_created",
             unit: "{message}",
-            description: "Total canonical webhook messages created by event type, provider, and bounded outcome");
+            description: "Total standard webhook messages created by event type, provider, and bounded outcome");
 
         _webhookDeliveryAttempts = meter.CreateCounter<long>(
             "explore.webhooks.delivery_attempts",

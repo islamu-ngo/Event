@@ -14,7 +14,7 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
     public void Dispose() => _ctx.Dispose();
 
     [Test]
-    public async Task Render_WithBothHalCapabilitiesShowsOnlyCanonicalDownloadActions()
+    public async Task Render_WithBothHalCapabilitiesShowsOnlyPrimaryDownloadActions()
     {
         var service = ExportService(Overview(OverridesRelation, PortableRelation));
         _ctx.Services.AddSingleton(service);

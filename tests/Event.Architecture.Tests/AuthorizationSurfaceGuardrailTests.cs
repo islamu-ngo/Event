@@ -91,7 +91,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
         new(
             "Explore.Application.Features.Authentication.Local.Requests.Commands.CreateLocalIdentityCommand",
             "handler-current-instance-administrator",
-            "Canonical user and fresh persisted platform-admin membership are rechecked before mutation and one-time disclosure; creation/reconciliation cannot replay plaintext. Evidence: LocalCredentialAdministrationHttpTests.EveryRouteRequiresCurrentPersistedInstanceAuthority and PlaintextIsOneTimeAndNeverStoredByGenericIdempotency."),
+            "Authoritative user and fresh persisted platform-admin membership are rechecked before mutation and one-time disclosure; creation/reconciliation cannot replay plaintext. Evidence: LocalCredentialAdministrationHttpTests.EveryRouteRequiresCurrentPersistedInstanceAuthority and PlaintextIsOneTimeAndNeverStoredByGenericIdempotency."),
         new(
             "Explore.Application.Features.Authentication.Local.Requests.Commands.ReconcileLocalCredentialOperationCommand",
             "handler-current-instance-administrator",
@@ -139,7 +139,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
         new(
             "Explore.Application.Features.RegistrationOrders.Commands.ConsumeAnonymousRegistrationChallengeCommand",
             "trusted-adapter-bound-proof-consumption",
-            "AnonymousRegistrationChallengeBoundary bounds/canonicalizes transport; native validation binds tenant/event/digest/key/envelope/nonce and snapshots intended typed selection before allocation or cached disclosure. Evidence: AnonymousRegistrationChallengeHttpTests.GuestStartWithoutProofFailsBeforeAllocationOrReplay and ChangedTenantAndCapabilityScopeCannotDiscloseCommittedReplay; AnonymousRegistrationChallengeServiceTests."),
+            "AnonymousRegistrationChallengeBoundary bounds and normalizes transport; native validation binds tenant/event/digest/key/envelope/nonce and snapshots intended typed selection before allocation or cached disclosure. Evidence: AnonymousRegistrationChallengeHttpTests.GuestStartWithoutProofFailsBeforeAllocationOrReplay and ChangedTenantAndCapabilityScopeCannotDiscloseCommittedReplay; AnonymousRegistrationChallengeServiceTests."),
         new(
             "Explore.Application.Features.RegistrationOrders.Commands.IssueAnonymousRegistrationChallengeCommand",
             "handler-bounded-public-proof-issuance",

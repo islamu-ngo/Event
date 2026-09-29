@@ -156,7 +156,7 @@ internal sealed class SetupTerminalArtifactOperation(
                 ["platform"],
                 ["environment", "local", "sqlite"]);
             DotenvCompositionResult composition = DotenvComposer.ComposeWithSecrets(
-                CanonicalEnvironmentCatalogue.Catalogue,
+                PlatformEnvironmentCatalogue.Catalogue,
                 context,
                 [new DotenvEntry(
                     "SETUP_SECRET",

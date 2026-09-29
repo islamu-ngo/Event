@@ -10,7 +10,7 @@ public sealed class ParticipantAdmissionEligibilityRepository(
     ExploreDbContext dbContext) :
     IParticipantAdmissionEligibilityRepository
 {
-    public const string CanonicalFenceOrder =
+    public const string FenceOrder =
         "assignment>eligibility>ticket>transfer";
 
     public Task<ParticipantAdmissionEligibility?> GetAsync(

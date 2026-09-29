@@ -11,7 +11,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     [Test]
     public async Task PublicUrlOverride_IsOptionalForSingleInstanceSetup()
     {
-        var definition = CanonicalEnvironmentCatalogue.Catalogue.Lookup("PUBLIC_BASE_URL")!;
+        var definition = PlatformEnvironmentCatalogue.Catalogue.Lookup("PUBLIC_BASE_URL")!;
         await Assert.That(definition.Requirement).IsEqualTo(EnvironmentVariableRequirement.Optional);
         await Assert.That(definition.SafeDefault).IsNull();
     }
@@ -111,9 +111,9 @@ public sealed class EnvironmentCatalogueInvariantTests
     }
 
     [Test]
-    public async Task CanonicalMetadataDistinguishesRequirementsDefaultsValidatorsRestartAndActivation()
+    public async Task PlatformMetadataDistinguishesRequirementsDefaultsValidatorsRestartAndActivation()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         EnvironmentVariableDefinition database = catalogue.Lookup("DATABASE_PROVIDER")!;
         EnvironmentVariableDefinition identity = catalogue.Lookup("KEYCLOAK_ENDPOINT")!;
         EnvironmentVariableDefinition provider = catalogue.Lookup("INFISICAL_CLIENT_ID")!;
@@ -164,7 +164,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     [Arguments("QUEUELIMIT", "0")]
     public async Task AnonymousChallengeLimiterControlsHavePublicRestartBoundMetadata(string suffix, string defaultValue)
     {
-        EnvironmentVariableDefinition? definition = CanonicalEnvironmentCatalogue.Catalogue
+        EnvironmentVariableDefinition? definition = PlatformEnvironmentCatalogue.Catalogue
             .Lookup("RATELIMITING__ANONYMOUSREGISTRATION__" + suffix);
 
         await Assert.That(definition).IsNotNull();
@@ -179,7 +179,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     [Test]
     public async Task LocalIdentityCatalogueDefinesTwoAxisProviderAndExternalDatabaseContract()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         string[] expectedKeys =
         [
             "AUTHENTICATION_PROVIDER",
@@ -206,7 +206,7 @@ public sealed class EnvironmentCatalogueInvariantTests
             .ToArray();
 
         await Assert.That(missing).IsEmpty()
-            .Because("the canonical catalogue must own every local authentication deployment key");
+            .Because("the platform catalogue must own every local authentication deployment key");
 
         EnvironmentVariableDefinition provider = catalogue.Lookup("AUTHENTICATION_PROVIDER")!;
         EnvironmentVariableDefinition atproto = catalogue.Lookup("ATPROTO_LOGIN_ENABLED")!;
@@ -235,7 +235,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     [Test]
     public async Task ConfiguredBootstrapCatalogueHasExactClosedKeysAndValueSafeMetadata()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         string[] expectedKeys =
         [
             "INSTANCE_BOOTSTRAP_MODE",
@@ -353,7 +353,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     [Test]
     public async Task AgentBrowserSecretIsVisibleOnlyToAnExplicitLocalSplitProfile()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         EnvironmentVariableDefinition password = catalogue.Lookup("AGENT_BROWSER_PERSONA_PASSWORD")!;
         EnvironmentVariableDefinition cachePassword = catalogue.Lookup("AGENT_BROWSER_REDIS_PASSWORD")!;
         EnvironmentVariableDefinition optIn = catalogue.Lookup("AGENT_BROWSER_SEED_ENABLED")!;
@@ -404,7 +404,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     [Test]
     public async Task RelevanceUsesTopologyCapabilityAndProviderPolicies()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         var split = new EnvironmentActivationContext(
             "split",
             ["database", "deployment", "identity", "integration", "security"],
@@ -482,7 +482,7 @@ public sealed class EnvironmentCatalogueInvariantTests
         await Assert.That(templateKeys.Distinct(StringComparer.Ordinal).Count()).IsEqualTo(templateKeys.Length);
         await Assert.That(templateKeys.All(definitionKeys.Contains)).IsTrue();
         await Assert.That(catalogue.DotenvEnvironmentKeys.SequenceEqual(
-            CanonicalEnvironmentCatalogue.DotenvEnvironmentKeys, StringComparer.Ordinal)).IsTrue();
+            PlatformEnvironmentCatalogue.DotenvEnvironmentKeys, StringComparer.Ordinal)).IsTrue();
         await Assert.That(compose.Keys.SequenceEqual(catalogue.ComposeEnvironmentKeys, StringComparer.Ordinal)).IsTrue();
         await Assert.That(compose.RequiredKeys).IsEquivalentTo(catalogue.ComposeRequiredEnvironmentKeys);
         await Assert.That(catalogue.DotenvEnvironmentKeys.All(definitionKeys.Contains)).IsTrue();
@@ -491,7 +491,7 @@ public sealed class EnvironmentCatalogueInvariantTests
         await Assert.That(catalogue.Definitions.Any(item => item.Sensitivity == "secret" && item.HasSafeDefault)).IsFalse();
         await Assert.That(catalogue.Definitions.Any(item => item.Sensitivity == "sensitive" && item.HasSafeDefault)).IsFalse();
         await Assert.That(definitionKeys).IsEquivalentTo(
-            CanonicalEnvironmentCatalogue.Catalogue.Definitions.Select(item => item.Key));
+            PlatformEnvironmentCatalogue.Catalogue.Definitions.Select(item => item.Key));
         await Assert.That(catalogue.Definitions.All(item =>
             item.ValidatorId.Length > 0
             && item.RestartBehavior.Length > 0

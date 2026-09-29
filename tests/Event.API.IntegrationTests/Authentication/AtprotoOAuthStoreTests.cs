@@ -51,21 +51,21 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
     }
 
     [Test]
-    public async Task StateRoundTripsCanonicalActorTargetOnlyWhenTheCompletePairIsPresent()
+    public async Task StateRoundTripsTargetActorOnlyWhenTheCompletePairIsPresent()
     {
         await using var browser = await CreateFixtureAsync();
         var seed = browser.Seed with
         {
-            CanonicalActorId = Guid.CreateVersion7(),
-            ExpectedCanonicalActorConcurrencyStamp = Guid.CreateVersion7()
+            TargetActorId = Guid.CreateVersion7(),
+            ExpectedTargetActorConcurrencyStamp = Guid.CreateVersion7()
         };
         string token = NewToken();
         await browser.Store.StoreAsync(token, CreateState(seed));
 
         await Assert.That(await browser.Store.ConsumeAsync(token)).IsNotNull();
-        await Assert.That(browser.Flow.Binding!.Seed.CanonicalActorId).IsEqualTo(seed.CanonicalActorId);
-        await Assert.That(browser.Flow.Binding.Seed.ExpectedCanonicalActorConcurrencyStamp)
-            .IsEqualTo(seed.ExpectedCanonicalActorConcurrencyStamp);
+        await Assert.That(browser.Flow.Binding!.Seed.TargetActorId).IsEqualTo(seed.TargetActorId);
+        await Assert.That(browser.Flow.Binding.Seed.ExpectedTargetActorConcurrencyStamp)
+            .IsEqualTo(seed.ExpectedTargetActorConcurrencyStamp);
     }
 
     [Test]
@@ -82,10 +82,10 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
         await using var browser = await CreateFixtureAsync();
         var seed = corruption switch
         {
-            "actor-only" => browser.Seed with { CanonicalActorId = Guid.CreateVersion7() },
-            "stamp-only" => browser.Seed with { ExpectedCanonicalActorConcurrencyStamp = Guid.CreateVersion7() },
-            "empty-actor" => browser.Seed with { CanonicalActorId = Guid.Empty, ExpectedCanonicalActorConcurrencyStamp = Guid.CreateVersion7() },
-            "empty-stamp" => browser.Seed with { CanonicalActorId = Guid.CreateVersion7(), ExpectedCanonicalActorConcurrencyStamp = Guid.Empty },
+            "actor-only" => browser.Seed with { TargetActorId = Guid.CreateVersion7() },
+            "stamp-only" => browser.Seed with { ExpectedTargetActorConcurrencyStamp = Guid.CreateVersion7() },
+            "empty-actor" => browser.Seed with { TargetActorId = Guid.Empty, ExpectedTargetActorConcurrencyStamp = Guid.CreateVersion7() },
+            "empty-stamp" => browser.Seed with { TargetActorId = Guid.CreateVersion7(), ExpectedTargetActorConcurrencyStamp = Guid.Empty },
             "pds" => browser.Seed with { ExpectedPdsUri = new("https://other-pds.example/") },
             "return-path" => browser.Seed with { ReturnPath = "//attacker.example/" },
             "tenant" => browser.Seed with { TenantId = Guid.Empty },
@@ -154,7 +154,7 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
     }
 
     [Test]
-    public async Task CrossOriginCanonicalCallbackCanConsumeWithoutTheTenantHostCookie()
+    public async Task CrossOriginPublicCallbackCanConsumeWithoutTheTenantHostCookie()
     {
         await using var browser = await CreateFixtureAsync(origin: "https://tenant.example/");
         browser.HttpContext.Request.Headers.Cookie = string.Empty;
@@ -199,22 +199,22 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
     }
 
     [Test]
-    public async Task HandoffPreservesCompleteCanonicalActorTargetPair()
+    public async Task HandoffPreservesCompleteTargetActorPair()
     {
         await using var browser = await CreateFixtureAsync(origin: "https://tenant.example/");
         browser.HttpContext.Request.Host = new("tenant.example");
         var seed = browser.Seed with
         {
-            CanonicalActorId = Guid.CreateVersion7(),
-            ExpectedCanonicalActorConcurrencyStamp = Guid.CreateVersion7()
+            TargetActorId = Guid.CreateVersion7(),
+            ExpectedTargetActorConcurrencyStamp = Guid.CreateVersion7()
         };
         string code = await browser.Handoffs.CreateAsync(seed, CreateSession(seed), default);
 
         var handoff = await browser.Handoffs.ConsumeAsync(code, browser.HttpContext.Request, default);
         await Assert.That(handoff).IsNotNull();
-        await Assert.That(handoff!.Seed.CanonicalActorId).IsEqualTo(seed.CanonicalActorId);
-        await Assert.That(handoff.Session.ExpectedCanonicalActorConcurrencyStamp)
-            .IsEqualTo(seed.ExpectedCanonicalActorConcurrencyStamp);
+        await Assert.That(handoff!.Seed.TargetActorId).IsEqualTo(seed.TargetActorId);
+        await Assert.That(handoff.Session.ExpectedTargetActorConcurrencyStamp)
+            .IsEqualTo(seed.ExpectedTargetActorConcurrencyStamp);
         await Assert.That(handoff.ExpiresAt).IsEqualTo(fixture.Clock.GetUtcNow().AddMinutes(2));
     }
 
@@ -292,7 +292,7 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
 
     private BffAuth.AtprotoBffSessionResult CreateSession(BffAuth.AtprotoOAuthFlowSeed seed) => new(
         Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), seed.ExpectedDid, seed.Classification,
-        NewToken(), fixture.Clock.GetUtcNow().AddMinutes(5), seed.CanonicalActorId, seed.ExpectedCanonicalActorConcurrencyStamp);
+        NewToken(), fixture.Clock.GetUtcNow().AddMinutes(5), seed.TargetActorId, seed.ExpectedTargetActorConcurrencyStamp);
 
     private static BffAuth.AtprotoTenantOriginResolver CreateOriginResolver(Guid tenant, string slug, string origin)
     {

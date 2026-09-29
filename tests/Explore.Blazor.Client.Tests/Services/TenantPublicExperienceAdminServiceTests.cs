@@ -82,11 +82,11 @@ public class TenantPublicExperienceAdminServiceTests
         await Assert.That(result.IsAvailable).IsFalse();
         await Assert.That(result.CanEditAny).IsFalse();
 
-        result.EventCatalogLabel = "Changed without a canonical read";
+        result.EventCatalogLabel = "Changed without an authoritative read";
         PublicExperienceAdminSaveResult save = await _service.SaveAsync(result);
 
         await Assert.That(save.Success).IsFalse();
-        await Assert.That(save.CanonicalStateRestored).IsFalse();
+        await Assert.That(save.AuthoritativeStateRestored).IsFalse();
         await _apiClient.DidNotReceiveWithAnyArgs().UpdateTenantSettingsBatchAsync(
             default!, default!, default, default, default);
     }
@@ -273,7 +273,7 @@ public class TenantPublicExperienceAdminServiceTests
 
 
     [Test]
-    public async Task SaveAsync_WhenPolicyIsRejected_ReloadsCanonicalModeAndLock()
+    public async Task SaveAsync_WhenPolicyIsRejected_ReloadsAuthoritativeModeAndLock()
     {
         var model = new TenantPublicExperienceAdminModel
         {
@@ -309,14 +309,14 @@ public class TenantPublicExperienceAdminServiceTests
         PublicExperienceAdminSaveResult result = await _service.SaveAsync(model);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.CanonicalStateRestored).IsTrue();
+        await Assert.That(result.AuthoritativeStateRestored).IsTrue();
         await Assert.That(model.IsAvailable).IsTrue();
         await Assert.That(model.VisitorAccessMode).IsEqualTo(VisitorAccessMode.AnonymousOnly);
         await Assert.That(model.CanEditVisitorAccessMode).IsFalse();
     }
 
     [Test]
-    public async Task SaveAsync_WhenCanonicalReloadFails_PreservesSelectionAndDisablesFurtherWrites()
+    public async Task SaveAsync_WhenAuthoritativeReloadFails_PreservesSelectionAndDisablesFurtherWrites()
     {
         var model = new TenantPublicExperienceAdminModel
         {
@@ -340,12 +340,12 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .ThrowsAsync(new HttpRequestException("canonical reload unavailable"));
+            .ThrowsAsync(new HttpRequestException("authoritative reload unavailable"));
 
         PublicExperienceAdminSaveResult result = await _service.SaveAsync(model);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.CanonicalStateRestored).IsFalse();
+        await Assert.That(result.AuthoritativeStateRestored).IsFalse();
         await Assert.That(model.IsAvailable).IsFalse();
         await Assert.That(model.Mode).IsEqualTo("OrganizationCentric");
         await Assert.That(model.VisitorAccessMode).IsEqualTo(VisitorAccessMode.DirectoryListingOnly);

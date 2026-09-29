@@ -254,10 +254,10 @@ public sealed class EventTicketType : ITenantEntity, IAuditableEntity, ISoftDele
 
     internal void AddEntitlement(TicketTypeEntitlement entitlement)
     {
-        if (_entitlements.Any(existing => HasSameCanonicalScope(existing, entitlement)))
+        if (_entitlements.Any(existing => HasSameScope(existing, entitlement)))
         {
             throw new ArgumentException(
-                "A ticket type can grant only one entitlement for each canonical target scope.",
+                "A ticket type can grant only one entitlement for each target scope.",
                 nameof(entitlement));
         }
 
@@ -279,7 +279,7 @@ public sealed class EventTicketType : ITenantEntity, IAuditableEntity, ISoftDele
             .Any(group => group.Count() > 1))
         {
             throw new ArgumentException(
-                "A ticket type can grant only one entitlement for each canonical target scope.",
+                "A ticket type can grant only one entitlement for each target scope.",
                 nameof(entitlements));
         }
 
@@ -287,7 +287,7 @@ public sealed class EventTicketType : ITenantEntity, IAuditableEntity, ISoftDele
         _entitlements.AddRange(replacements);
     }
 
-    private static bool HasSameCanonicalScope(
+    private static bool HasSameScope(
         TicketTypeEntitlement left,
         TicketTypeEntitlement right) =>
         left.TenantId == right.TenantId &&

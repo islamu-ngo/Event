@@ -411,7 +411,7 @@ public static class AtprotoEventSourceFieldManifest
                 "Event.Actor.Organization.Country", "Event.Actor.Organization.FullName",
                 "EventSession.Speaker.Actor.DisplayName"
             ],
-            "not-mapped alias; the canonical PII extension value is classified separately"),
+            "not-mapped alias; the primary PII extension value is classified separately"),
 
         .. ExcludedMany(
             [
@@ -537,7 +537,7 @@ public static class AtprotoEventSourceFieldManifest
         {
             yield return Excluded(
                 $"{prefix}.{suffix}",
-                "duplicate relationship view; the canonical option collection renders this field");
+                "duplicate relationship view; the primary option collection renders this field");
         }
 
         foreach (string suffix in new[]

@@ -354,7 +354,7 @@ public class HateoasAuthorizationEvaluatorTests
 
     /// <summary>
     /// Two checks that name the same resource with equal facts collapse to one provider call. Facts are
-    /// records, so equality is structural and needs no canonicalization step of its own.
+    /// records, so equality is structural and needs no normalization step of its own.
     /// </summary>
     [Test]
     [DisplayName("Dedup key is equal for structurally equal facts")]

@@ -40,7 +40,7 @@ public sealed class SaveInstanceOnboardingProfileCommandHandler(
         var configuredUrl = PublicAddressResolver.ReadOverride(configuration);
         var profile = InstanceOnboardingProfileSettingHelpers.Normalize(request.Profile) with
         {
-            CanonicalUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : request.Profile.CanonicalUrl
+            PublicUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl : request.Profile.PublicUrl
         };
         var validation = await validator.ValidateAsync(profile, cancellationToken);
         if (!validation.IsValid)

@@ -42,7 +42,7 @@ public sealed class LocationTextNormalizationTests
     }
 
     [Test]
-    public async Task SourceBoundaryAndCanonicalExpansionRetainTheEntireSearchableSuffix()
+    public async Task SourceBoundaryAndNormalizedExpansionRetainTheEntireSearchableSuffix()
     {
         Location location = NewLocation();
         string source = new string('a', 493) + " suffix";

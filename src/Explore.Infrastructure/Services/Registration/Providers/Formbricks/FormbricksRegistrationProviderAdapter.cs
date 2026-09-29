@@ -513,21 +513,21 @@ public sealed class FormbricksRegistrationProviderAdapter(
 
     private static string Fingerprint(RegistrationProviderSchemaSnapshot snapshot)
     {
-        StringBuilder canonical = new();
+        StringBuilder normalized = new();
         foreach (RegistrationProviderSchemaFieldSnapshot field in snapshot.Fields)
         {
-            canonical.Append(field.Key.Length).Append(':').Append(field.Key)
+            normalized.Append(field.Key.Length).Append(':').Append(field.Key)
                 .Append('|').Append(field.Label.Length).Append(':').Append(field.Label)
                 .Append('|').Append(field.Type)
                 .Append('|').Append(field.IsRequired ? '1' : '0').Append('\n');
             foreach (RegistrationProviderSchemaOptionSnapshot option in field.Options)
             {
-                canonical.Append(option.Key.Length).Append(':').Append(option.Key)
+                normalized.Append(option.Key.Length).Append(':').Append(option.Key)
                     .Append('|').Append(option.Label.Length).Append(':').Append(option.Label).Append('\n');
             }
         }
 
-        return "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+        return "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalized.ToString())));
     }
 
     private static object BuildSurveyQuestion(RegistrationFormField field)

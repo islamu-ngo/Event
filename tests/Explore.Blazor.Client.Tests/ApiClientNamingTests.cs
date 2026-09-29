@@ -191,7 +191,7 @@ public class ApiClientNamingTests
     }
 
     [Test]
-    public async Task GeneratedClient_TenantSettingsMethodsUseCanonicalNamesWithoutCompatibilityOverloads()
+    public async Task GeneratedClient_TenantSettingsMethodsUsePrimaryNamesWithoutCompatibilityOverloads()
     {
         var generatedClientSource = GetGeneratedClientSource();
         var generatedMethodNames = GetGeneratedAsyncMethodDeclarationNames(generatedClientSource);

@@ -10,7 +10,7 @@ public sealed class WebhookEventTypeRegistryTests
     private readonly WebhookEventSchemaProvider _schemaProvider = new();
 
     [Test]
-    public async Task GetAll_ReturnsInitialCanonicalEventCatalog()
+    public async Task GetAll_ReturnsInitialAuthoritativeEventCatalog()
     {
         var eventTypes = _registry.GetAll().ToArray();
 

@@ -38,7 +38,7 @@ public sealed class AnonymousRegistrationChallengeQuota(ExploreDbContext context
         {
             string? value = JsonSerializer.Deserialize<string>(HierarchicalSettingMerge.Resolve(definition.Key, system, tenant)!.Value);
             if (value is null || !definition.AllowedValues!.Contains(value))
-                throw new InvalidOperationException("The canonical anonymous challenge quota setting is invalid.");
+                throw new InvalidOperationException("The normalized anonymous challenge quota setting is invalid.");
             return int.Parse(value, CultureInfo.InvariantCulture);
         }
         int tenantLimit = Limit(AnonymousRegistrationChallengeSettingDefinitions.TenantPermitsPerMinute);

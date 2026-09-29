@@ -71,9 +71,9 @@ public sealed partial class AdmissionTicketApiRedContractTests
         var scenario = new AdmissionApiScenario();
         var dispatcher = new AdmissionScenarioDispatcher(scenario, AdmissionApiRequestContracts.ForProbe());
         string validCapability = scenario.IssueValidCapability();
-        var wrongMember = new CanonicalProbeRequests.RedeemAdmissionTicketRecoveryCommand(
+        var wrongMember = new StandardProbeRequests.RedeemAdmissionTicketRecoveryCommand(
             Capability: string.Empty, WrongMember: validCapability);
-        var nestedTicket = new CanonicalProbeRequests.GetCurrentAdmissionTicketQuery(
+        var nestedTicket = new StandardProbeRequests.GetCurrentAdmissionTicketQuery(
             Guid.Empty, new ProbeNestedTicket(scenario.AccountTicketId));
 
         await Assert.That(() => dispatcher.Dispatch(
@@ -82,12 +82,12 @@ public sealed partial class AdmissionTicketApiRedContractTests
         await Assert.That(dispatcher.Dispatch(wrongMember, typeof(ProbeResponse))).IsNull();
         await Assert.That(dispatcher.Dispatch(nestedTicket, typeof(ProbeResponse))).IsNull();
         await Assert.That(() => dispatcher.Dispatch(
-            new CanonicalProbeRequests.RequestAdmissionTicketRecoveryCommand(scenario.PresentIdentity),
+            new StandardProbeRequests.RequestAdmissionTicketRecoveryCommand(scenario.PresentIdentity),
             typeof(WrongProbeResponse))).Throws<InvalidOperationException>();
     }
 
     [Test]
-    public async Task AdmissionRoutesExposeCanonicalMachineContracts()
+    public async Task AdmissionRoutesExposeStandardMachineContracts()
     {
         var violations = new List<string>();
         foreach (ApiRouteContract expected in AllRoutes())

@@ -295,7 +295,7 @@
                 _errorMessage = response.Message ?? "Participation configuration could not be saved.";
                 _errors = response.Errors?.ToList() ?? [];
                 await Announcer.AnnounceAssertiveAsync(_errorMessage);
-                if (IsCanonicalReloadRequired(response.FailureCode))
+                if (RequiresAuthoritativeReload(response.FailureCode))
                 {
                     await OnReloadRequested.InvokeAsync();
                 }
@@ -326,7 +326,7 @@
         _ => false
     };
 
-    private static bool IsCanonicalReloadRequired(string? failureCode) => failureCode is
+    private static bool RequiresAuthoritativeReload(string? failureCode) => failureCode is
         "event_participation_configuration_concurrency_conflict"
         or "event_visitor_account_onboarding_required"
         or "visitor_access_account_required_conflict"

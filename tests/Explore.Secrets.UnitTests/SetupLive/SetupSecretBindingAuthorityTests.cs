@@ -296,7 +296,7 @@ public sealed class SetupSecretBindingAuthorityTests
     }
 
     [Test]
-    public async Task RegisteredCommitmentAuthorityUsesCanonicalPurposeAndSelectedResolver()
+    public async Task RegisteredCommitmentAuthorityUsesAuthoritativePurposeAndSelectedResolver()
     {
         byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
         byte[] secret = RandomNumberGenerator.GetBytes(64);
@@ -444,7 +444,7 @@ public sealed class SetupSecretBindingAuthorityTests
     [Test]
     [Arguments(SecretProviderType.Environment, SecretSourceType.EnvironmentVariable)]
     [Arguments(SecretProviderType.Infisical, SecretSourceType.Infisical)]
-    public async Task RegisteredCommitmentAuthorityUsesRealResolverAndCanonicalDefinition(
+    public async Task RegisteredCommitmentAuthorityUsesRealResolverAndAuthoritativeDefinition(
         SecretProviderType selectedProvider,
         SecretSourceType selectedSource)
     {

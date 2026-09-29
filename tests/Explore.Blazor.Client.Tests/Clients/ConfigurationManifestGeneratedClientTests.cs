@@ -5,7 +5,7 @@ using System.Reflection;
 public sealed class ConfigurationManifestGeneratedClientTests
 {
     [Test]
-    public async Task CanonicalExportPreservesTypedBinaryContract()
+    public async Task DeterministicExportPreservesTypedBinaryContract()
     {
         MethodInfo method = typeof(IControl_Plane_ConfigurationClient).GetMethod(
             nameof(IControl_Plane_ConfigurationClient.ExportConfigurationManifestAsync),
@@ -16,7 +16,7 @@ public sealed class ConfigurationManifestGeneratedClientTests
                 typeof(CancellationToken)
             ])
             ?? throw new InvalidOperationException(
-                "Generated canonical manifest export method is missing.");
+                "Generated deterministic manifest export method is missing.");
 
         await Assert.That(method.ReturnType.GetGenericArguments().Single())
             .IsEqualTo(typeof(FileResponse));
@@ -31,7 +31,7 @@ public sealed class ConfigurationManifestGeneratedClientTests
     }
 
     [Test]
-    public async Task CanonicalViewPreservesGovernedWireValues()
+    public async Task DeterministicViewPreservesGovernedWireValues()
     {
         await Assert.That(Enum.GetNames<ConfigurationManifestExportView>())
             .IsEquivalentTo(
@@ -59,7 +59,7 @@ public sealed class ConfigurationManifestGeneratedClientTests
     }
 
     [Test]
-    public async Task ImportUploadsUseCanonicalBinaryStreams()
+    public async Task ImportUploadsUseDeterministicBinaryStreams()
     {
         MethodInfo instance = RequireMethod(
             nameof(IControl_Plane_ConfigurationClient.CreateInstanceConfigurationImportSessionAsync));

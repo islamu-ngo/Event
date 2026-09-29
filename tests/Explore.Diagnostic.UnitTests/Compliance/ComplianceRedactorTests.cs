@@ -77,8 +77,8 @@ public class ComplianceRedactorTests
     }
 
     [Test]
-    [DisplayName("DataTaxonomy attributes map to canonical classifications")]
-    public async Task DataTaxonomyAttributes_MapToCanonicalClassifications()
+    [DisplayName("DataTaxonomy attributes map to declared classifications")]
+    public async Task DataTaxonomyAttributes_MapToDeclaredClassifications()
     {
         var piiAttr = new PiiDataAttribute();
         var sensitiveAttr = new SensitiveDataAttribute();

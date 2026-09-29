@@ -97,18 +97,18 @@ public sealed partial class NotificationFanoutTemplateJsonContext : JsonSerializ
 public static class NotificationFanoutTemplateJson
 {
     public static string Serialize(NotificationFanoutChangeSetV1 value) =>
-        JsonSerializer.Serialize(Canonicalize(value), NotificationFanoutTemplateJsonContext.Default.NotificationFanoutChangeSetV1);
+        JsonSerializer.Serialize(Normalize(value), NotificationFanoutTemplateJsonContext.Default.NotificationFanoutChangeSetV1);
 
     public static string Serialize(NotificationFanoutSnapshotV1 value) =>
-        JsonSerializer.Serialize(Canonicalize(value), NotificationFanoutTemplateJsonContext.Default.NotificationFanoutSnapshotV1);
+        JsonSerializer.Serialize(Normalize(value), NotificationFanoutTemplateJsonContext.Default.NotificationFanoutSnapshotV1);
 
-    public static NotificationFanoutChangeSetV1 Canonicalize(NotificationFanoutChangeSetV1 value) =>
+    public static NotificationFanoutChangeSetV1 Normalize(NotificationFanoutChangeSetV1 value) =>
         value with
         {
             Fields = value.Fields.OrderBy(field => (int)field).ToImmutableArray()
         };
 
-    public static NotificationFanoutSnapshotV1 Canonicalize(NotificationFanoutSnapshotV1 value) =>
+    public static NotificationFanoutSnapshotV1 Normalize(NotificationFanoutSnapshotV1 value) =>
         value.SessionDisplayTimes is null
             ? value
             : value with

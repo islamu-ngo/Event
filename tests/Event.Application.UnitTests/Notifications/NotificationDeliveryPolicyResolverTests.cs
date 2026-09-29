@@ -6,7 +6,7 @@ namespace Event.Application.UnitTests.Notifications;
 public sealed class NotificationDeliveryPolicyResolverTests
 {
     [Test]
-    public async Task ResolveRecognizesCanonicalVersionOnePolicies()
+    public async Task ResolveRecognizesStandardVersionOnePolicies()
     {
         var resolver = new NotificationDeliveryPolicyResolver();
 

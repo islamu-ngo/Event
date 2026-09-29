@@ -22,7 +22,7 @@ public sealed class GetReportingRoutingStateRequestHandler(
         return new ReportingRoutingStateDto
         {
             TenantId = tenantId,
-            LocalCanonicalRequired = policy.LocalCanonicalRequired,
+            LocalReportingRequired = policy.LocalReportingRequired,
             ExternalSyncEnabled = policy.ExternalSyncEnabled,
             TenantProviderConfigurationLocked = policy.TenantProviderConfigurationLocked,
             TenantOspreyProviderLocked = policy.TenantOspreyProviderLocked,

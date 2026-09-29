@@ -8,7 +8,7 @@ namespace Event.Application.UnitTests.Features.Authentication.Atproto;
 public sealed class BootstrapAtprotoSessionCommandValidatorTests
 {
     [Test]
-    public async Task ValidateAcceptsOmittedOrCompleteCanonicalActorTargetPair()
+    public async Task ValidateAcceptsOmittedOrCompleteTargetActorPair()
     {
         var validator = new BootstrapAtprotoSessionCommandValidator();
 
@@ -22,7 +22,7 @@ public sealed class BootstrapAtprotoSessionCommandValidatorTests
     [Test]
     [Arguments(true, false)]
     [Arguments(false, true)]
-    public async Task ValidateRejectsEmptyOrHalfCanonicalActorTargetPair(bool includeActorId, bool includeStamp)
+    public async Task ValidateRejectsEmptyOrHalfTargetActorPair(bool includeActorId, bool includeStamp)
     {
         var validator = new BootstrapAtprotoSessionCommandValidator();
         var result = await validator.ValidateAsync(CreateCommand(
@@ -33,7 +33,7 @@ public sealed class BootstrapAtprotoSessionCommandValidatorTests
     }
 
     [Test]
-    public async Task ValidateRejectsEmptyCanonicalActorId()
+    public async Task ValidateRejectsEmptyTargetActorId()
     {
         var result = await new BootstrapAtprotoSessionCommandValidator().ValidateAsync(CreateCommand(Guid.Empty, Guid.NewGuid()));
 
@@ -57,13 +57,13 @@ public sealed class BootstrapAtprotoSessionCommandValidatorTests
     }
 
     private static BootstrapAtprotoSessionCommand CreateCommand(
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null) => new(
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null) => new(
         AtprotoDid.Parse("did:plc:alice"),
         "https://pds.example/",
         "oauth-active",
         AtprotoSubjectClassification.Person,
         new byte[] { 1 },
-        canonicalActorId,
-        expectedCanonicalActorConcurrencyStamp);
+        targetActorId,
+        expectedTargetActorConcurrencyStamp);
 }

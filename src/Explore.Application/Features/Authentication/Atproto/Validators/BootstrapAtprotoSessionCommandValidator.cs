@@ -15,7 +15,7 @@ public sealed class BootstrapAtprotoSessionCommandValidator : AbstractValidator<
         RuleFor(command => command.ExpectedPdsUri)
             .NotEmpty()
             .MaximumLength(2048)
-            .Must(BeCanonicalHttpsOrigin);
+            .Must(BeValidHttpsOrigin);
         RuleFor(command => command.OAuthClientKeyId)
             .NotEmpty()
             .MaximumLength(128)
@@ -24,13 +24,13 @@ public sealed class BootstrapAtprotoSessionCommandValidator : AbstractValidator<
         RuleFor(command => command.OAuthSessionPayload)
             .Must(payload => payload.Length is > 0 and <= MaximumSessionPayloadBytes);
         RuleFor(command => command)
-            .Must(command => command.CanonicalActorId.HasValue == command.ExpectedCanonicalActorConcurrencyStamp.HasValue
-                             && command.CanonicalActorId != Guid.Empty
-                             && command.ExpectedCanonicalActorConcurrencyStamp != Guid.Empty)
-            .WithMessage("Canonical Actor target must be supplied as a complete non-empty pair.");
+            .Must(command => command.TargetActorId.HasValue == command.ExpectedTargetActorConcurrencyStamp.HasValue
+                             && command.TargetActorId != Guid.Empty
+                             && command.ExpectedTargetActorConcurrencyStamp != Guid.Empty)
+            .WithMessage("Target Actor must be supplied as a complete non-empty pair.");
     }
 
-    private static bool BeCanonicalHttpsOrigin(string value)
+    private static bool BeValidHttpsOrigin(string value)
     {
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
                && uri.Scheme == Uri.UriSchemeHttps

@@ -42,7 +42,7 @@ public sealed class AdmissionTicketContractTests
 
         await Assert.That(() => contract.Issue(fixture, identity with { LookupDigest = string.Empty }))
             .Throws<ArgumentException>();
-        await Assert.That(() => contract.Issue(fixture, identity with { LookupDigest = "not-canonical-base64" }))
+        await Assert.That(() => contract.Issue(fixture, identity with { LookupDigest = "not-normalized-base64" }))
             .Throws<ArgumentException>();
         await Assert.That(() => contract.Issue(
                 fixture,

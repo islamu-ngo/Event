@@ -61,7 +61,7 @@ public sealed class TicketPurchaseGovernanceRepository(
         return await TicketPurchaseProviderOperations
             .ExecuteSerializableAsync(
                 dbContext,
-                CreateCanonicalLockScopes(request),
+                CreateLockScopes(request),
                 async operationCancellationToken =>
             {
                 TicketPurchaseOperation? existing =
@@ -183,7 +183,7 @@ public sealed class TicketPurchaseGovernanceRepository(
                 cancellationToken);
     }
 
-    private static IReadOnlyList<string> CreateCanonicalLockScopes(
+    private static IReadOnlyList<string> CreateLockScopes(
         TicketPurchaseReservationRequest request) =>
         new[]
         {

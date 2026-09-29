@@ -13,7 +13,7 @@ public sealed class FairReturnOrchestrationRepository(
     ExploreDbContext dbContext) :
     IFairReturnOrchestrationRepository
 {
-    public const string CanonicalFenceOrder =
+    public const string FenceOrder =
         "effect>payment-intent>binding>" +
         "replacement-payment>reserved-refund>" +
         "refund-intent>outbox";

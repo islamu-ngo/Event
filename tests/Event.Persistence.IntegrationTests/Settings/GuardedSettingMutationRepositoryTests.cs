@@ -212,13 +212,13 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         internal static readonly RejectingMutationLock Instance = new();
 
         public Task<T> ExecuteAsync<T>(
-            string canonicalSettingKey,
+            string settingKey,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             throw new MutationLockReachedException();
 
         public Task<T> ExecuteManyAsync<T>(
-            IEnumerable<string> canonicalSettingKeys,
+            IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation,
             CancellationToken cancellationToken = default) =>
             throw new MutationLockReachedException();

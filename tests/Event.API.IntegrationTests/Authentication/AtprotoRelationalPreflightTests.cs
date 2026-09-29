@@ -23,7 +23,7 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var client = BrowserClient(host, CanonicalOrigin, cookies);
+        using var client = BrowserClient(host, PublicOrigin, cookies);
         string[] payloads =
         [
             "{}", "{\"handle\":\"\",\"classification\":\"person\"}",
@@ -56,7 +56,7 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
     {
         await using var host = fixture.CreateBff();
         var cookies = new CookieContainer();
-        using var client = BrowserClient(host, CanonicalOrigin, cookies);
+        using var client = BrowserClient(host, PublicOrigin, cookies);
         int beforePar = fixture.External.PushedAuthorizationRequests;
         foreach (string payload in new[] { "{\"handle\":\"alice.example\"}", "{\"handle\":\"alice.example\",\"classification\":\"bot\"}" })
         {
@@ -85,7 +85,7 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
         {
             await using var host = fixture.CreateBff();
             var cookies = new CookieContainer();
-            using var client = BrowserClient(host, CanonicalOrigin, cookies);
+            using var client = BrowserClient(host, PublicOrigin, cookies);
             int beforePar = fixture.External.PushedAuthorizationRequests;
             int beforeMetadata = fixture.External.AuthorizationMetadataRequests;
             using var response = await ChallengeAsync(client, cookies, "{\"handle\":\"alice.example\",\"classification\":\"person\"}");
@@ -110,7 +110,7 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
         {
             await using var host = fixture.CreateBff();
             var cookies = new CookieContainer();
-            using var client = BrowserClient(host, CanonicalOrigin, cookies);
+            using var client = BrowserClient(host, PublicOrigin, cookies);
             int beforePar = fixture.External.PushedAuthorizationRequests;
             int beforeDocuments = fixture.External.DidDocumentRequests;
             using var response = await ChallengeAsync(client, cookies, "{\"handle\":\"alice.example\",\"classification\":\"person\"}");
@@ -130,11 +130,11 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
         await timedFixture.InitializeAsync();
         await using var host = timedFixture.CreateBff();
         var cookies = new CookieContainer();
-        using var client = BrowserClient(host, CanonicalOrigin, cookies);
+        using var client = BrowserClient(host, PublicOrigin, cookies);
         const string payload = "{\"handle\":\"alice.example\",\"classification\":\"person\"}";
         using var initial = await ChallengeAsync(client, cookies, payload);
         await Assert.That(initial.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var origin = new Uri(CanonicalOrigin);
+        var origin = new Uri(PublicOrigin);
         string originalCookie = cookies.GetCookies(origin)[BffAuth.AtprotoBrowserProof.CookieName]!.Value;
         var proof = host.Services.GetRequiredService<BffAuth.AtprotoBrowserProof>();
         var context = new DefaultHttpContext();
@@ -165,13 +165,13 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
     {
         using var status = await client.GetAsync("/auth/status");
         await Assert.That(status.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        string xsrf = Uri.UnescapeDataString(cookies.GetCookies(new Uri(CanonicalOrigin))["XSRF-TOKEN"]!.Value);
+        string xsrf = Uri.UnescapeDataString(cookies.GetCookies(new Uri(PublicOrigin))["XSRF-TOKEN"]!.Value);
         using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/atproto/challenge")
         {
             Content = new StringContent(payload, Encoding.UTF8, "application/json")
         };
         request.Headers.Add("X-CSRF-TOKEN", xsrf);
-        request.Headers.Add("Origin", CanonicalOrigin);
+        request.Headers.Add("Origin", PublicOrigin);
         return await client.SendAsync(request);
     }
 

@@ -232,8 +232,8 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
         {
             RegistrationAnswerSyncModeEnum.COMPLETION_ONLY => await PersistCompletionOnlyAsync(
                 attempt, submission, requirement, expectedAttemptConcurrencyStamp, cancellationToken),
-            RegistrationAnswerSyncModeEnum.SELECTED_FIELDS or RegistrationAnswerSyncModeEnum.FULL_CANONICAL =>
-                await PersistCanonicalAsync(
+            RegistrationAnswerSyncModeEnum.SELECTED_FIELDS or RegistrationAnswerSyncModeEnum.FULL_SYNC =>
+                await PersistNormalizedAsync(
                     attempt, submission, binding, envelope, expectedAttemptConcurrencyStamp, cancellationToken),
             _ => await PersistEvidenceOnlyAsync(submission, "UNSUPPORTED_SYNC_MODE", cancellationToken)
         };
@@ -271,7 +271,7 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
             cancellationToken);
     }
 
-    private async Task<RegistrationSubmissionPersistenceResult> PersistCanonicalAsync(
+    private async Task<RegistrationSubmissionPersistenceResult> PersistNormalizedAsync(
         RegistrationAttempt attempt,
         RegistrationSubmission submission,
         RegistrationProviderBinding binding,
@@ -397,7 +397,7 @@ public sealed class ProcessProviderSubmissionEffectCommandHandler(
     {
         RegistrationAnswerSyncModeEnum.COMPLETION_ONLY => binding.TrustLevelId >= (int)RegistrationProviderTrustLevelEnum.CompletionOnly,
         RegistrationAnswerSyncModeEnum.SELECTED_FIELDS => binding.TrustLevelId >= (int)RegistrationProviderTrustLevelEnum.SelectedFields,
-        RegistrationAnswerSyncModeEnum.FULL_CANONICAL => binding.TrustLevelId >= (int)RegistrationProviderTrustLevelEnum.FullCanonical,
+        RegistrationAnswerSyncModeEnum.FULL_SYNC => binding.TrustLevelId >= (int)RegistrationProviderTrustLevelEnum.FullSync,
         RegistrationAnswerSyncModeEnum.MIRROR_ONLY => false,
         RegistrationAnswerSyncModeEnum.NONE => true,
         _ => false

@@ -35,7 +35,7 @@ public sealed class SettingsLayoutTests : IDisposable
     public void Dispose() => _ctx.Dispose();
 
     [Test]
-    public async Task PersonalSettingsNavigation_UsesCanonicalSectionLinksAndOneCurrentItem()
+    public async Task PersonalSettingsNavigation_UsesStandardSectionLinksAndOneCurrentItem()
     {
         var cut = RenderLayout("security");
 
@@ -50,7 +50,7 @@ public sealed class SettingsLayoutTests : IDisposable
     }
 
     [Test]
-    public async Task RootDefaultsToViewAllWithSearchAndCanonicalCurrentLink()
+    public async Task RootDefaultsToViewAllWithSearchAndStandardCurrentLink()
     {
         var cut = RenderLayout();
 
@@ -62,7 +62,7 @@ public sealed class SettingsLayoutTests : IDisposable
     }
 
     [Test]
-    public async Task ViewAllRendersNineCanonicalSectionsInOrderWithOnePageHeading()
+    public async Task ViewAllRendersNineStandardSectionsInOrderWithOnePageHeading()
     {
         var cut = RenderLayout();
         var sections = cut.FindAll("section[data-settings-section]");

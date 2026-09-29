@@ -10,7 +10,7 @@ namespace Explore.API.OpenApi;
 /// Runs on every OpenAPI document request; in the <c>Development</c> environment any violation
 /// aggregates into a single <see cref="InvalidOperationException"/>. In non-Development
 /// environments violations are silently ignored so that production startup is never blocked
-/// by a transient misconfiguration. The canonical fix is always to add
+/// by a transient misconfiguration. The required fix is always to add
 /// <c>[HttpVerb(Name = RouteNames.Xxx)]</c> on the offending controller action so that
 /// ASP.NET Core's <c>Name</c>-to-operationId propagation yields a stable identifier.
 /// </summary>

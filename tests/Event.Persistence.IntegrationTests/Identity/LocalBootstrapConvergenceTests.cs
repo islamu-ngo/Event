@@ -148,7 +148,7 @@ public sealed class LocalBootstrapConvergenceTests
     }
 
     [Test]
-    public async Task ConfiguredBootstrapWithoutEmailKeepsTheCanonicalUsernameAndExactBinding()
+    public async Task ConfiguredBootstrapWithoutEmailKeepsTheNormalizedUsernameAndExactBinding()
     {
         await using Fixture fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         fixture.Configuration["INSTANCE_BOOTSTRAP_ADMIN_EMAIL"] = null;

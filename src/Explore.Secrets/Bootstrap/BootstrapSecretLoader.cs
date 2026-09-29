@@ -39,7 +39,7 @@ namespace Explore.Secrets.Bootstrap;
 /// </remarks>
 public static class BootstrapSecretLoader
 {
-    /// <summary>Canonical Infisical folder path for Postgres secrets.</summary>
+    /// <summary>Authoritative Infisical folder path for Postgres secrets.</summary>
     public const string InfisicalPath = "/postgresql";
 
     /// <summary>Expected Infisical secret key for the Postgres host.</summary>

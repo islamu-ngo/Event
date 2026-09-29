@@ -197,7 +197,7 @@ public sealed class StartupRoutingServiceTests
     [Arguments("singletenant")]
     [Arguments(" ")]
     [Arguments("")]
-    public async Task GetRootDecisionAsync_ReturnsUnavailable_WhenCompletedDeploymentModeIsNotCanonical(string mode)
+    public async Task GetRootDecisionAsync_ReturnsUnavailable_WhenCompletedDeploymentModeIsUnsupported(string mode)
     {
         var instanceOnboarding = CreateInstanceOnboardingService(Completed(
             selectedDeploymentMode: mode,

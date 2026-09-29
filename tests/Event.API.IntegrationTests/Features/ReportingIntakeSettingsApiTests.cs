@@ -169,7 +169,7 @@ public sealed class ReportingIntakeSettingsApiTests
     }
 
     [Test]
-    public async Task HalPolicy_EmitsCanonicalSelfAndEditPermissionFactsWhenUnlocked()
+    public async Task HalPolicy_EmitsPrimarySelfAndEditPermissionFactsWhenUnlocked()
     {
         var policy = new TenantReportingIntakePolicyLinkPolicy();
 

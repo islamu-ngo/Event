@@ -74,7 +74,7 @@ public sealed class GeneratedInitMigrationBehaviorTests(
     }
 
     [Test]
-    public async Task ExploreIntegration_PreservesPopulatedInitAndRejectsLocalBootstrapRollback()
+    public async Task ExploreInitial_AppliesRollsBackAndReapplies()
     {
         await ResetDatabaseAsync();
         try

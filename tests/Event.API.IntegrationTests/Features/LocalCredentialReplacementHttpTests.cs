@@ -53,7 +53,7 @@ public sealed class LocalCredentialReplacementHttpTests
         LifetimeTooLong,
         FutureIssuedAt,
         MalformedIssuedAt,
-        NoncanonicalSubject,
+        NonstandardSubject,
         EmptyGuidSubject,
         ForbiddenEmail,
         ForbiddenRole,
@@ -415,7 +415,7 @@ public sealed class LocalCredentialReplacementHttpTests
     [Arguments(InvalidChallenge.LifetimeTooLong)]
     [Arguments(InvalidChallenge.FutureIssuedAt)]
     [Arguments(InvalidChallenge.MalformedIssuedAt)]
-    [Arguments(InvalidChallenge.NoncanonicalSubject)]
+    [Arguments(InvalidChallenge.NonstandardSubject)]
     [Arguments(InvalidChallenge.EmptyGuidSubject)]
     [Arguments(InvalidChallenge.ForbiddenEmail)]
     [Arguments(InvalidChallenge.ForbiddenRole)]
@@ -585,7 +585,7 @@ public sealed class LocalCredentialReplacementHttpTests
             case InvalidChallenge.MalformedIssuedAt:
                 payload[JwtRegisteredClaimNames.Iat] = "not-an-integer";
                 break;
-            case InvalidChallenge.NoncanonicalSubject:
+            case InvalidChallenge.NonstandardSubject:
                 payload[JwtRegisteredClaimNames.Sub] = Guid.Parse(issued.Subject).ToString("N");
                 break;
             case InvalidChallenge.EmptyGuidSubject:

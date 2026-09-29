@@ -15,7 +15,7 @@
 
 <PageTitle>Organization Details</PageTitle>
 <HeadContent>
-    <link rel="canonical" href="@CanonicalUrlHelper.Build(NavigationManager, Id == Guid.Empty ? null : $"/organization/{Id}")" />
+    <link rel="canonical" href="@AbsoluteUrlBuilder.Build(NavigationManager, Id == Guid.Empty ? null : $"/organization/{Id}")" />
 </HeadContent>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-8">

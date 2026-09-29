@@ -20,7 +20,7 @@ internal static class ConfigurationManifestInstanceSectionDigest
                          .OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 writer.WritePropertyName(key);
-                WriteCanonicalJson(writer, value);
+                WriteNormalizedJson(writer, value);
             }
 
             writer.WriteEndObject();
@@ -38,7 +38,7 @@ internal static class ConfigurationManifestInstanceSectionDigest
                     "schemaVersion",
                     document.SchemaVersion);
                 writer.WritePropertyName("payload");
-                WriteCanonicalJson(writer, document.Payload);
+                WriteNormalizedJson(writer, document.Payload);
                 writer.WriteEndObject();
             }
 
@@ -50,7 +50,7 @@ internal static class ConfigurationManifestInstanceSectionDigest
             SHA256.HashData(stream.ToArray()));
     }
 
-    private static void WriteCanonicalJson(
+    private static void WriteNormalizedJson(
         Utf8JsonWriter writer,
         JsonElement element)
     {
@@ -71,7 +71,7 @@ internal static class ConfigurationManifestInstanceSectionDigest
             foreach (JsonProperty property in properties)
             {
                 writer.WritePropertyName(property.Name);
-                WriteCanonicalJson(writer, property.Value);
+                WriteNormalizedJson(writer, property.Value);
             }
 
             writer.WriteEndObject();
@@ -83,7 +83,7 @@ internal static class ConfigurationManifestInstanceSectionDigest
             writer.WriteStartArray();
             foreach (JsonElement item in element.EnumerateArray())
             {
-                WriteCanonicalJson(writer, item);
+                WriteNormalizedJson(writer, item);
             }
 
             writer.WriteEndArray();

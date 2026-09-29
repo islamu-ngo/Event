@@ -41,10 +41,10 @@ public sealed class AtprotoRelationalLoginFlowTests(AtprotoRelationalLoginFixtur
                     .AddHttpMessageHandler(() => new ExpireAfterAuthorityResponse(clock));
         }));
         await using var second = fixture.CreateBff(rotateKeys: true);
-        string origin = crossHost ? AtprotoRelationalLoginFixture.TenantOrigin : AtprotoRelationalLoginFixture.CanonicalOrigin;
+        string origin = crossHost ? AtprotoRelationalLoginFixture.TenantOrigin : AtprotoRelationalLoginFixture.PublicOrigin;
         var browser = new CookieContainer();
         using var login = BrowserClient(first, origin, browser);
-        using var callbackClient = BrowserClient(second, AtprotoRelationalLoginFixture.CanonicalOrigin, browser);
+        using var callbackClient = BrowserClient(second, AtprotoRelationalLoginFixture.PublicOrigin, browser);
         foreach (var replica in new[] { first, second })
         {
             await Assert.That(replica.Services.GetRequiredService<IHostEnvironment>().IsProduction()).IsTrue();
@@ -87,7 +87,7 @@ public sealed class AtprotoRelationalLoginFlowTests(AtprotoRelationalLoginFixtur
             .IsEqualTo(first.Services.GetRequiredService<BffAuth.AtprotoClientKeyProvider>().ActiveKeyId);
         if (crossHost)
         {
-            await Assert.That(browser.GetCookies(new Uri(AtprotoRelationalLoginFixture.CanonicalOrigin))[".AspNetCore.Cookies"]).IsNull();
+            await Assert.That(browser.GetCookies(new Uri(AtprotoRelationalLoginFixture.PublicOrigin))[".AspNetCore.Cookies"]).IsNull();
             var handoff = callback.Headers.Location!;
             await Assert.That(handoff.GetLeftPart(UriPartial.Authority)).IsEqualTo(origin);
             await Assert.That(handoff.AbsolutePath).IsEqualTo("/auth/atproto/handoff");
@@ -162,10 +162,10 @@ public sealed class AtprotoRelationalLoginFlowTests(AtprotoRelationalLoginFixtur
                 .AddHttpMessageHandler(() => boundary);
         }));
         await using var issuer = fixture.CreateBff(rotateKeys: true);
-        string origin = crossHost ? TenantOrigin : CanonicalOrigin;
+        string origin = crossHost ? TenantOrigin : PublicOrigin;
         var browser = new CookieContainer();
         using var login = BrowserClient(crossHost ? consumer : issuer, origin, browser);
-        using var callbackClient = BrowserClient(crossHost ? issuer : consumer, CanonicalOrigin, browser);
+        using var callbackClient = BrowserClient(crossHost ? issuer : consumer, PublicOrigin, browser);
         using var status = await login.GetAsync("/auth/status");
         await Assert.That(status.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var flow = await StartFlowAsync(login, browser, "/events?attempt=expiry", CancellationToken.None);
@@ -215,13 +215,13 @@ public sealed class AtprotoRelationalLoginFlowTests(AtprotoRelationalLoginFixtur
         await using var first = fixture.CreateBff();
         await using var second = fixture.CreateBff(rotateKeys: true);
         var browser = new CookieContainer();
-        using var firstClient = BrowserClient(first, CanonicalOrigin, browser);
-        using var secondClient = BrowserClient(second, CanonicalOrigin, browser);
+        using var firstClient = BrowserClient(first, PublicOrigin, browser);
+        using var secondClient = BrowserClient(second, PublicOrigin, browser);
         using var status = await firstClient.GetAsync("/auth/status");
         await Assert.That(status.StatusCode).IsEqualTo(HttpStatusCode.OK);
         _ = second.Services;
         if (!coldBrowser) _ = await StartFlowAsync(firstClient, browser, "/events?attempt=warm", CancellationToken.None);
-        string? originalProof = browser.GetCookies(new Uri(CanonicalOrigin))[BffAuth.AtprotoBrowserProof.CookieName]?.Value;
+        string? originalProof = browser.GetCookies(new Uri(PublicOrigin))[BffAuth.AtprotoBrowserProof.CookieName]?.Value;
 
         int entered = 0;
         var bothParRequests = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -244,7 +244,7 @@ public sealed class AtprotoRelationalLoginFlowTests(AtprotoRelationalLoginFixtur
             fixture.External.BeforeParResponse = null;
         }
         await Assert.That(flows[0].Callback).IsNotEqualTo(flows[1].Callback);
-        string keptProof = browser.GetCookies(new Uri(CanonicalOrigin))[BffAuth.AtprotoBrowserProof.CookieName]!.Value;
+        string keptProof = browser.GetCookies(new Uri(PublicOrigin))[BffAuth.AtprotoBrowserProof.CookieName]!.Value;
         if (coldBrowser)
         {
             await Assert.That(flows[0].ProofCookie).IsNotNull();
@@ -269,7 +269,7 @@ public sealed class AtprotoRelationalLoginFlowTests(AtprotoRelationalLoginFixtur
                 await Assert.That(callback.Headers.Location?.OriginalString).IsEqualTo(flow.ReturnPath);
                 successes++;
             }
-            await Assert.That(browser.GetCookies(new Uri(CanonicalOrigin))[BffAuth.AtprotoBrowserProof.CookieName]!.Value)
+            await Assert.That(browser.GetCookies(new Uri(PublicOrigin))[BffAuth.AtprotoBrowserProof.CookieName]!.Value)
                 .IsEqualTo(keptProof);
         }
         await Assert.That(successes).IsEqualTo(coldBrowser ? 1 : 2);

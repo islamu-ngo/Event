@@ -44,7 +44,7 @@ public sealed record AiContextDisclosureEntry(
     public string Key => BuildKey(EntityName, FieldName);
 
     /// <summary>
-    /// Builds the canonical lookup key. Centralised so callers (registry, reflection test)
+    /// Builds the standard lookup key. Centralised so callers (registry, reflection test)
     /// cannot drift on the format.
     /// </summary>
     public static string BuildKey(string entityName, string fieldName)

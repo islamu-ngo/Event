@@ -155,7 +155,7 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
     }
 
     [Test]
-    public async Task PostgreSqlUnicodeCorpusUsesCanonicalLiteralBoundaryAndOrdinalOrdering()
+    public async Task PostgreSqlUnicodeCorpusUsesNormalizedLiteralBoundaryAndOrdinalOrdering()
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();

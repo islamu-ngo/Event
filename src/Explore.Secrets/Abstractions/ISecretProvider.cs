@@ -30,7 +30,7 @@ public interface ISecretProvider
     /// <summary>
     /// Retrieves a secret value by key.
     /// </summary>
-    /// <param name="key">The canonical key (e.g., "Database:ConnectionString").</param>
+    /// <param name="key">The authoritative key (e.g., "Database:ConnectionString").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The secret value, or null if not found.</returns>
     Task<string?> GetSecretAsync(string key, CancellationToken cancellationToken = default);
@@ -38,7 +38,7 @@ public interface ISecretProvider
     /// <summary>
     /// Retrieves a secret with full metadata.
     /// </summary>
-    /// <param name="key">The canonical key.</param>
+    /// <param name="key">The authoritative key.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The secret value with metadata, or null if not found.</returns>
     Task<SecretValue?> GetSecretWithMetadataAsync(string key, CancellationToken cancellationToken = default);

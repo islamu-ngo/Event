@@ -11,7 +11,7 @@ namespace Explore.Infrastructure.Tests.Telemetry;
 public sealed class EventLocationPrivacyMetricsTests
 {
     [Test]
-    public async Task Meter_UsesTheCanonicalEventLocationPrivacyName()
+    public async Task Meter_UsesTheAuthoritativeEventLocationPrivacyName()
     {
         await Assert.That(EventLocationPrivacyMetrics.MeterName)
             .IsEqualTo("Explore.EventLocationPrivacy");

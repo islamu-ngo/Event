@@ -16,12 +16,12 @@ public sealed class RegistrationDataCollectionTask71Tests
         RegistrationRequirement first = RegistrationRequirement.Create(
             Id(70), workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now);
         RegistrationRequirement duplicateRequirementOrdinal = RegistrationRequirement.Create(
             Id(71), workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now);
         RegistrationChannel firstChannel = RegistrationChannel.Create(Id(72), first, 1, true, null, Now);
         RegistrationChannel duplicateChannelOrdinal = RegistrationChannel.Create(Id(73), first, 1, true, null, Now);
@@ -36,7 +36,7 @@ public sealed class RegistrationDataCollectionTask71Tests
         await Assert.That(() => RegistrationRequirement.Create(
             Id(74), workflow, 0, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now)).Throws<ArgumentOutOfRangeException>();
         await Assert.That(() => RegistrationChannel.Create(Id(75), first, 0, true, null, Now))
             .Throws<ArgumentOutOfRangeException>();
@@ -210,27 +210,27 @@ public sealed class RegistrationDataCollectionTask71Tests
         await Assert.That(() => RegistrationRequirement.Create(
             Guid.Empty, workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now)).Throws<ArgumentException>();
         await Assert.That(() => RegistrationRequirement.Create(
             Id(2), workflow, 1, (RegistrationRequirementCriticalityEnum)999, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now)).Throws<ArgumentException>();
         await Assert.That(() => RegistrationRequirement.Create(
             Id(2), workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             (RegistrationRequirementCompletionEffectEnum)999,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now)).Throws<ArgumentException>();
         await Assert.That(() => RegistrationRequirement.Create(
             Id(2), workflow, 1, RegistrationRequirementCriticalityEnum.Required, true,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now)).Throws<ArgumentException>();
         await Assert.That(() => RegistrationRequirement.Create(
             Id(2), workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.EnrichesRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now)).Throws<ArgumentException>();
         await Assert.That(() => RegistrationRequirement.Create(
             Id(2), workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
@@ -240,7 +240,7 @@ public sealed class RegistrationDataCollectionTask71Tests
         await Assert.That(() => RegistrationRequirement.Create(
             Id(2), workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             (RegistrationRequirementSubjectTypeEnum)999, null, Now)).Throws<ArgumentException>();
         await Assert.That(() => RegistrationRequirementSubjectContext.Create(Guid.Empty, workflow.Id))
             .Throws<ArgumentException>();
@@ -302,7 +302,7 @@ public sealed class RegistrationDataCollectionTask71Tests
         RegistrationRequirementCriticalityEnum criticality = RegistrationRequirementCriticalityEnum.Required,
         bool canSkip = false,
         RegistrationRequirementCompletionEffectEnum effect = RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-        RegistrationAnswerSyncModeEnum sync = RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+        RegistrationAnswerSyncModeEnum sync = RegistrationAnswerSyncModeEnum.FULL_SYNC,
         RegistrationRequirementSubjectTypeEnum subject = RegistrationRequirementSubjectTypeEnum.AllOrders,
         Guid? appliesToSubjectId = null) => RegistrationRequirement.Create(
             Id(id), workflow, id, criticality, canSkip, effect, sync, subject, appliesToSubjectId, Now);

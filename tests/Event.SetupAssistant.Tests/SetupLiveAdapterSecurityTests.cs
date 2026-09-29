@@ -1659,9 +1659,9 @@ public sealed class SetupLiveAdapterSecurityTests
     private static async Task AssertUuid7(string value)
     {
         await Assert.That(Guid.TryParse(value, out Guid parsed)).IsTrue();
-        string canonical = parsed.ToString("D");
-        await Assert.That(canonical[14]).IsEqualTo('7');
-        await Assert.That(canonical[19] is '8' or '9' or 'a' or 'b').IsTrue();
+        string formatted = parsed.ToString("D");
+        await Assert.That(formatted[14]).IsEqualTo('7');
+        await Assert.That(formatted[19] is '8' or '9' or 'a' or 'b').IsTrue();
     }
 
     private static async Task AssertCanaryPlacement(

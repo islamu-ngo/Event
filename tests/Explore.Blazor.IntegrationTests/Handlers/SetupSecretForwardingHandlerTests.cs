@@ -442,7 +442,7 @@ public class SetupSecretForwardingHandlerTests
     [Test]
     [Arguments("/api/instance/settings/auth-provider")]
     [Arguments("/api/instance/settings/authz-provider")]
-    public async Task SendAsync_CanonicalInstanceProviderGet_WithInboundHeaderAndSessionSecret_ForwardsTrustedSecret(
+    public async Task SendAsync_AllowedInstanceProviderGet_WithInboundHeaderAndSessionSecret_ForwardsTrustedSecret(
         string path)
     {
         var userId = Guid.NewGuid().ToString();
@@ -473,7 +473,7 @@ public class SetupSecretForwardingHandlerTests
     [Test]
     [Arguments("/api/instance/settings/auth-provider")]
     [Arguments("/api/instance/settings/authz-provider")]
-    public async Task SendAsync_CanonicalInstanceProviderPatch_WithInboundHeaderAndSessionSecret_ForwardsTrustedSecret(
+    public async Task SendAsync_AllowedInstanceProviderPatch_WithInboundHeaderAndSessionSecret_ForwardsTrustedSecret(
         string path)
     {
         var userId = Guid.NewGuid().ToString();
@@ -531,7 +531,7 @@ public class SetupSecretForwardingHandlerTests
     [Arguments("GET", "/api/instance/settings/auth-provider/status")]
     [Arguments("GET", "/api/instance/settings/authz-provider/status")]
     [Arguments("GET", "/api/instance/settings-extra/branding")]
-    public async Task SendAsync_NonCanonicalInstanceProviderRequest_StripsClientHeaderWithoutAddingTrustedSecret(
+    public async Task SendAsync_DisallowedInstanceProviderRequest_StripsClientHeaderWithoutAddingTrustedSecret(
         string method,
         string path)
     {
@@ -565,7 +565,7 @@ public class SetupSecretForwardingHandlerTests
     [Test]
     [Arguments("/api/instance/settings/auth-provider")]
     [Arguments("/api/instance/settings/authz-provider")]
-    public async Task SendAsync_CanonicalInstanceProviderPatch_WithoutResolverSecret_DoesNotForwardClientHeader(
+    public async Task SendAsync_AllowedInstanceProviderPatch_WithoutResolverSecret_DoesNotForwardClientHeader(
         string path)
     {
         var httpContext = new DefaultHttpContext();

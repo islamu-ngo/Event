@@ -41,7 +41,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
             Profile = new()
             {
                 SiteName = "Community",
-                CanonicalUrl = "https://request.example.test/community"
+                PublicUrl = "https://request.example.test/community"
             }
         }, CancellationToken.None);
 
@@ -87,7 +87,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         var preflight = await scenario.Preflight.QueryAsync(new(), CancellationToken.None);
 
         await Assert.That(preflight.WarningChecks.Any(check => check.Code == "email_public_address")).IsEqualTo(warning);
-        await Assert.That(preflight.BlockingChecks.Any(check => check.Code is "canonical_host" or "email_public_address")).IsFalse();
+        await Assert.That(preflight.BlockingChecks.Any(check => check.Code is "public_host" or "email_public_address")).IsFalse();
     }
 
     [Test]
@@ -116,7 +116,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         var journey = await scenario.Journey.QueryAsync(new(), CancellationToken.None);
 
-        await Assert.That(journey.Profile!.CanonicalUrl).IsEqualTo(configured ? "https://platform.example.test" : null);
+        await Assert.That(journey.Profile!.PublicUrl).IsEqualTo(configured ? "https://platform.example.test" : null);
     }
 
     [Test]
@@ -139,7 +139,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
     {
         var scenario = new OnboardingCompletionScenario(interactive: true);
         scenario.HostConfiguration["PUBLIC_BASE_URL"] = "https://platform.example.test:9443/community";
-        var profile = new SelfHostOnboardingProfileDto { SiteName = "Public site", CanonicalUrl = "https://other.example.test" };
+        var profile = new SelfHostOnboardingProfileDto { SiteName = "Public site", PublicUrl = "https://other.example.test" };
         if (complete)
         {
             var command = await scenario.InteractiveCommandAsync();
@@ -158,7 +158,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         scenario.HostConfiguration["PUBLIC_BASE_URL"] = "";
         scenario.HostConfiguration["PublicBaseUrl"] = "";
         var snapshot = await scenario.GenerationReader.ReadSnapshotAsync(CancellationToken.None);
-        await Assert.That(snapshot.Profile.CanonicalUrl).IsEqualTo("https://platform.example.test:9443/community");
+        await Assert.That(snapshot.Profile.PublicUrl).IsEqualTo("https://platform.example.test:9443/community");
         var domain = await scenario.SystemSettings.GetByKey(GovernanceSettingKeys.Domains.InstanceBaseDomain);
         await Assert.That(domain).IsNull();
     }
@@ -285,7 +285,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         var preflight = await scenario.Preflight.QueryAsync(new(), CancellationToken.None);
 
-        await Assert.That(preflight.BlockingChecks.Any(check => check.Code == "canonical_host")).IsFalse();
+        await Assert.That(preflight.BlockingChecks.Any(check => check.Code == "public_host")).IsFalse();
         await Assert.That(preflight.WarningChecks.Any(check => check.Code == "dns_wildcard_tenant")).IsFalse();
     }
 
@@ -304,7 +304,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         await Assert.That(journey.State).IsEqualTo("Available");
         await Assert.That(journey.Profile!.SiteName).IsEqualTo("Snapshot site");
         await Assert.That(journey.Profile.SupportEmail).IsEqualTo("support@example.test");
-        await Assert.That(journey.Profile.CanonicalUrl).IsEqualTo("https://example.test:9443/events");
+        await Assert.That(journey.Profile.PublicUrl).IsEqualTo("https://example.test:9443/events");
         await Assert.That(journey.Profile.Locale).IsEqualTo("fr");
         await Assert.That(scenario.FullSettingsReads).IsEqualTo(2);
         await Assert.That(scenario.SettingKeysRead).DoesNotContain(GovernanceSettingKeys.Branding.DisplayName);
@@ -340,7 +340,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
     }
 
     [Test]
-    public async Task ConfiguredCompletion_WithoutIdentity_CreatesCanonicalDrafts()
+    public async Task ConfiguredCompletion_WithoutIdentity_CreatesAuthoritativeDrafts()
     {
         var scenario = new OnboardingCompletionScenario();
         scenario.Configuration = scenario.Configuration with { DirectoryOperatorIdentity = null };

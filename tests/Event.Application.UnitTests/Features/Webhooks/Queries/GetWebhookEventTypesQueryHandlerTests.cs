@@ -12,7 +12,7 @@ namespace Event.Application.UnitTests.Features.Webhooks.Queries;
 public sealed class GetWebhookEventTypesQueryHandlerTests
 {
     [Test]
-    public async Task Handle_ReturnsCanonicalCatalogWithSchemaExamplesAndFields()
+    public async Task Handle_ReturnsAuthoritativeCatalogWithSchemaExamplesAndFields()
     {
         var persistedId = Guid.CreateVersion7();
         var eventTypeRepository = Substitute.For<IWebhookEventTypeRepository>();

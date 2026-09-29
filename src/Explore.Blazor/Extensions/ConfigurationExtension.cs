@@ -62,7 +62,7 @@ public static class ConfigurationExtensions
     }
 
     /// <summary>
-    /// Adds Infisical secrets and maps them to canonical .NET configuration keys for Blazor Server.
+    /// Adds Infisical secrets and maps them to standard .NET configuration keys for Blazor Server.
     /// </summary>
     public static void AddSecretAuthorityConfiguration(
         this IConfigurationBuilder configBuilder,
@@ -137,7 +137,7 @@ public static class ConfigurationExtensions
     /// Maps Infisical secret names to .NET configuration keys for Blazor Server.
     /// </summary>
     /// <remarks>
-    /// Canonical Infisical keys:
+    /// Standard Infisical keys:
     ///   /keycloak: KEYCLOAK_ENDPOINT, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, KEYCLOAK_BLAZOR_CLIENT_SECRET
     ///   /blazor:   API_ENDPOINT, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
     /// </remarks>

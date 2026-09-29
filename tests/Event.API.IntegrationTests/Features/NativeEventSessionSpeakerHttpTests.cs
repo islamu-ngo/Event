@@ -238,8 +238,8 @@ public sealed class NativeEventSessionSpeakerHttpTests
         using var response = await client.GetAsync("/openapi/islamu-event.json");
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var runtime = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
-        await using var canonicalStream = File.OpenRead(Path.Combine(RepositoryRoot(), "schemas", "openapi_islamu-event.json"));
-        using var canonical = await JsonDocument.ParseAsync(canonicalStream);
+        await using var primaryStream = File.OpenRead(Path.Combine(RepositoryRoot(), "schemas", "openapi_islamu-event.json"));
+        using var primary = await JsonDocument.ParseAsync(primaryStream);
         (string Path, string Verb, string Operation)[] expected =
         [
             ("/api/eventsessionspeaker/management/by-session/{eventSessionId}", "get", "GetEventSessionSpeakersBySession"),
@@ -248,14 +248,14 @@ public sealed class NativeEventSessionSpeakerHttpTests
             ("/api/eventsessionspeaker/management/by-session/{eventSessionId}/{id}", "delete", "DeleteEventSessionSpeaker")
         ];
         var paths = runtime.RootElement.GetProperty("paths");
-        var canonicalPaths = canonical.RootElement.GetProperty("paths");
+        var primaryPaths = primary.RootElement.GetProperty("paths");
         foreach (var route in expected)
         {
             var operation = paths.GetProperty(route.Path).GetProperty(route.Verb);
             await Assert.That(operation.GetProperty("operationId").GetString()).IsEqualTo(route.Operation);
             await Assert.That(operation.GetProperty("x-endpoint-class").GetString()).IsEqualTo("Authenticated");
             await Assert.That(JsonElement.DeepEquals(
-                paths.GetProperty(route.Path), canonicalPaths.GetProperty(route.Path))).IsTrue();
+                paths.GetProperty(route.Path), primaryPaths.GetProperty(route.Path))).IsTrue();
         }
     }
 

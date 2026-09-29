@@ -26,7 +26,7 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class RegistrationFormsControllerContractTests
 {
     [Test]
-    public async Task Preflight_UsesCanonicalPostRouteAndOperationId()
+    public async Task Preflight_UsesPrimaryPostRouteAndOperationId()
     {
         HttpPostAttribute route = typeof(RegistrationFormsController)
             .GetMethod(nameof(RegistrationFormsController.Preflight))!

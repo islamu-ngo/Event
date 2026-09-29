@@ -18,7 +18,7 @@ namespace Event.Application.UnitTests.Features.EventRoleAssignments;
 public sealed class EventTeamAuthorizationBoundaryTests
 {
     [Test]
-    public async Task ExternallyCallableEventTeamRequests_DeclareTheCanonicalManageTeamBoundary()
+    public async Task ExternallyCallableEventTeamRequests_DeclareTheAuthoritativeManageTeamBoundary()
     {
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();

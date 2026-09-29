@@ -8,13 +8,13 @@ public sealed class ActorMergeTests
     public async Task Create_WithVerifiedEvidence_PreservesImmutableMergeFacts()
     {
         var sourceActorId = Guid.CreateVersion7();
-        var canonicalActorId = Guid.CreateVersion7();
+        var targetActorId = Guid.CreateVersion7();
         var mergedAt = new DateTime(2026, 7, 27, 12, 0, 0, DateTimeKind.Utc);
         var mergedBy = Guid.CreateVersion7();
 
         var merge = ActorMerge.Create(
             sourceActorId,
-            canonicalActorId,
+            targetActorId,
             ActorMergeProofKind.VerifiedDid,
             "  did-proof:sha256:abc123  ",
             mergedAt,
@@ -22,7 +22,7 @@ public sealed class ActorMergeTests
 
         await Assert.That(merge.Id).IsNotEqualTo(Guid.Empty);
         await Assert.That(merge.SourceActorId).IsEqualTo(sourceActorId);
-        await Assert.That(merge.CanonicalActorId).IsEqualTo(canonicalActorId);
+        await Assert.That(merge.TargetActorId).IsEqualTo(targetActorId);
         await Assert.That(merge.ProofKind).IsEqualTo(ActorMergeProofKind.VerifiedDid);
         await Assert.That(merge.EvidenceReference).IsEqualTo("did-proof:sha256:abc123");
         await Assert.That(merge.MergedAt).IsEqualTo(mergedAt);
@@ -30,7 +30,7 @@ public sealed class ActorMergeTests
     }
 
     [Test]
-    public async Task Create_WithSameSourceAndCanonicalActor_IsRejected()
+    public async Task Create_WithSameSourceAndTargetActor_IsRejected()
     {
         var actorId = Guid.CreateVersion7();
 

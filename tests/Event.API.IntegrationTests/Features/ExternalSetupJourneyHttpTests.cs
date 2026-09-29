@@ -76,7 +76,7 @@ public sealed class ExternalSetupJourneyHttpTests
             await Assert.That(body.RootElement.GetProperty("bootstrap").GetProperty("isAuthenticated").GetBoolean()).IsTrue();
             await Assert.That(body.RootElement.GetProperty("_links").TryGetProperty("save-profile", out _)).IsTrue();
             using var profile = await client.PatchAsJsonAsync("/api/instanceonboarding/profile",
-                new SelfHostOnboardingProfileDto { SiteName = "External setup", CanonicalUrl = "https://example.test" }, cancellationToken);
+                new SelfHostOnboardingProfileDto { SiteName = "External setup", PublicUrl = "https://example.test" }, cancellationToken);
             await Assert.That(profile.StatusCode).IsEqualTo(HttpStatusCode.OK);
             using var readyResponse = await client.GetAsync("/api/instanceonboarding/journey", cancellationToken);
             await Assert.That(readyResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -88,7 +88,7 @@ public sealed class ExternalSetupJourneyHttpTests
             using var completed = await client.PostAsJsonAsync("/api/instanceonboarding/complete",
                 new CompleteInstanceOnboardingRequest
                 {
-                    SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "External setup", CanonicalUrl = "https://example.test" },
+                    SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "External setup", PublicUrl = "https://example.test" },
                     ExpectedJourneyGeneration = ready.RootElement.GetProperty("generation").GetString()
                 }, cancellationToken);
             await Assert.That(completed.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -123,7 +123,7 @@ public sealed class ExternalSetupJourneyHttpTests
         if (authority is "missing" or "forged" or "expired")
         {
             using var rejected = await client.PatchAsJsonAsync("/api/instanceonboarding/profile",
-                new SelfHostOnboardingProfileDto { SiteName = "Rejected", CanonicalUrl = "https://untrusted.example.test" }, cancellationToken);
+                new SelfHostOnboardingProfileDto { SiteName = "Rejected", PublicUrl = "https://untrusted.example.test" }, cancellationToken);
             await Assert.That(rejected.IsSuccessStatusCode).IsFalse();
             using var scope = configured.Services.CreateScope();
             var settings = scope.ServiceProvider.GetRequiredService<Explore.Application.Contracts.Persistence.ISystemSettingRepository>();

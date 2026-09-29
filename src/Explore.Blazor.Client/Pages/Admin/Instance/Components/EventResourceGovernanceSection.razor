@@ -54,7 +54,7 @@
                     <textarea id="@field.Key" data-resource-field="@field.Key" disabled="@(!editable)" rows="3"
                               aria-describedby="@DescribedBy(field)"
                               @onchange="e => Change(field, setting, e.Value?.ToString())">@Draft(field.Key, setting.Value)</textarea>
-                    <p id="@(field.Key + "-hint")">@T("admin.resources.originsHint", "JSON array of canonical HTTPS origins only (no paths or credentials).")</p>
+                    <p id="@(field.Key + "-hint")">@T("admin.resources.originsHint", "JSON array of normalized HTTPS origins only (no paths or credentials).")</p>
                 }
                 else
                 {

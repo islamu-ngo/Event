@@ -132,7 +132,7 @@ public sealed class SetupCliApplicationTests
     }
 
     [Test]
-    public async Task InputUsesCanonicalFourMiBBoundAndFailsAtPlusOne()
+    public async Task InputUsesExactFourMiBBoundAndFailsAtPlusOne()
     {
         var exactInput = new SizedInput(4 * 1024 * 1024);
         var tooLargeInput = new SizedInput((4 * 1024 * 1024) + 1);

@@ -77,7 +77,7 @@ public sealed class CommandResponseResultMapperTests
     }
 
     [Test]
-    public async Task ToEventReportProblem_WhenIntakeIsDisabled_ReturnsCanonicalConflictProblemDetails()
+    public async Task ToEventReportProblem_WhenIntakeIsDisabled_ReturnsStandardConflictProblemDetails()
     {
         var controller = CreateController();
         var response = BaseCommandResponse.Failure<Guid>(
@@ -226,7 +226,7 @@ public sealed class CommandResponseResultMapperTests
         "Storage quota has been exceeded.")]
     [Arguments(FailureCodes.StorageUploadWriteFailed, 503, ServiceUnavailableType, "storage_upload_write_failed",
         "Storage provider returned invalid upload metadata.")]
-    public async Task ToStorageUploadProblem_MapsEveryStatusBranchAndCanonicalDetail(
+    public async Task ToStorageUploadProblem_MapsEveryStatusBranchAndStandardDetail(
         string failureCode,
         int expectedStatus,
         string expectedType,

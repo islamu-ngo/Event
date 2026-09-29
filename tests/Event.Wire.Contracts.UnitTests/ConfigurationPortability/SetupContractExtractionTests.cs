@@ -73,7 +73,7 @@ public sealed class SetupContractExtractionTests
     }
 
     [Test]
-    public async Task CanonicalJsonBytesDigestRecordsAndCollectionsAreStable()
+    public async Task DeterministicJsonBytesDigestRecordsAndCollectionsAreStable()
     {
         if (!_runtime.IsComplete)
             return;

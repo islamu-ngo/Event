@@ -145,7 +145,7 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
             "deployment-mode", deploymentMode.ToString(),
             "site-name", settings.SiteProfile.SiteName,
             "support-email", settings.SiteProfile.SupportEmail ?? string.Empty,
-            "canonical-url", settings.SiteProfile.CanonicalUrl ?? string.Empty,
+            "public-url", settings.SiteProfile.PublicUrl ?? string.Empty,
             "locale", settings.SiteProfile.Locale,
             "time-zone", settings.SiteProfile.TimeZone,
             "purpose", settings.SiteProfile.Purpose ?? string.Empty,
@@ -200,7 +200,7 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
             {
                 SiteName = identity?.PublicName ?? "ISLAMU Event",
                 SupportEmail = identity?.PublicContactEmail,
-                CanonicalUrl = identity?.OfficialOrigin,
+                PublicUrl = identity?.OfficialOrigin,
                 Locale = "en",
                 TimeZone = "UTC"
             },

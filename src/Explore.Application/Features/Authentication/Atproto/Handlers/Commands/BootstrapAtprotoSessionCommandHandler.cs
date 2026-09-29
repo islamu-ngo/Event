@@ -224,8 +224,8 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
             persistence.ParticipationId,
             request.Classification,
             issued,
-            request.CanonicalActorId,
-            request.ExpectedCanonicalActorConcurrencyStamp);
+            request.TargetActorId,
+            request.ExpectedTargetActorConcurrencyStamp);
     }
 
     private static bool IsExactLinkedLogin(UserExternalLogin? login, ProviderAccountKey accountKey) =>

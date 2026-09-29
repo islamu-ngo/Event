@@ -214,7 +214,7 @@ public sealed class SecretResolver : ISecretResolver, IRetainedSecretResolver
     }
 
     /// <summary>
-    /// Walks Tenant -> Instance -> canonical registry default. A null return means
+    /// Walks Tenant -> Instance -> authoritative registry default. A null return means
     /// the key is unknown or unavailable for instance scope.
     /// </summary>
     private async Task<SecretBinding?> ResolveBindingAsync(

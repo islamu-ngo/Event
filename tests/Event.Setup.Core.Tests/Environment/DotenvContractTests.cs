@@ -25,7 +25,7 @@ public sealed class DotenvContractTests
     public async Task SyntheticDialectBreakerRejectsInjectionExpansionMalformedInputAndControls()
     {
         await Assert.That(EnvironmentInvariantVerifier.VerifyDotenvText(
-            Encoding.UTF8.GetString(EnvironmentContractExpectedVectors.CanonicalDotenv))).IsEmpty();
+            Encoding.UTF8.GetString(EnvironmentContractExpectedVectors.ExpectedDotenv))).IsEmpty();
         foreach (DotenvRejectionFixture fixture in EnvironmentContractExpectedVectors.DotenvRejections)
         {
             string[] failures = EnvironmentInvariantVerifier.VerifyDotenvText(fixture.Text);
@@ -96,34 +96,34 @@ public sealed class DotenvContractTests
         ]);
         object withNewline = _runtime.RenderDotenv(document, true);
         object withoutNewline = _runtime.RenderDotenv(document, false);
-        byte[] canonical = EnvironmentContractExpectedVectors.CanonicalDotenv;
+        byte[] expectedBytes = EnvironmentContractExpectedVectors.ExpectedDotenv;
 
-        await Assert.That(EnvironmentContractRuntime.RenderedBytes(withNewline)).IsEquivalentTo(canonical);
+        await Assert.That(EnvironmentContractRuntime.RenderedBytes(withNewline)).IsEquivalentTo(expectedBytes);
         await Assert.That(EnvironmentContractRuntime.RenderedBytes(withoutNewline))
-            .IsEquivalentTo(canonical[..^1]);
-        await Assert.That(canonical[0] == 0xEF && canonical[1] == 0xBB && canonical[2] == 0xBF).IsFalse();
-        await Assert.That(canonical.Contains((byte)'\r')).IsFalse();
+            .IsEquivalentTo(expectedBytes[..^1]);
+        await Assert.That(expectedBytes[0] == 0xEF && expectedBytes[1] == 0xBB && expectedBytes[2] == 0xBF).IsFalse();
+        await Assert.That(expectedBytes.Contains((byte)'\r')).IsFalse();
     }
 
     [Test]
-    public async Task QuotingEscapingUnicodeAndCommentsRoundTripToOneCanonicalForm()
+    public async Task QuotingEscapingUnicodeAndCommentsRoundTripToOneNormalizedForm()
     {
         if (!_runtime.IsDotenvComplete()) return;
 
         byte[] input = Encoding.UTF8.GetBytes(
-            "# ignored on canonical render\nUNICODE_NAME=\"سلام\"\nHASH_TEXT=\"value # text\"\nQUOTE_TEXT=\"a\\\"b\\\\c\"\n");
+            "# ignored on normalized render\nUNICODE_NAME=\"سلام\"\nHASH_TEXT=\"value # text\"\nQUOTE_TEXT=\"a\\\"b\\\\c\"\n");
         byte[] expected = Encoding.UTF8.GetBytes(
             "HASH_TEXT=\"value # text\"\nQUOTE_TEXT=\"a\\\"b\\\\c\"\nUNICODE_NAME=\"سلام\"\n");
         object first = _runtime.ParseDotenv(input);
         object rendered = _runtime.RenderDotenv(
             EnvironmentContractRuntime.RequiredProperty(first, "Document"), true);
-        byte[] canonical = EnvironmentContractRuntime.RenderedBytes(rendered);
-        object second = _runtime.ParseDotenv(canonical);
+        byte[] normalized = EnvironmentContractRuntime.RenderedBytes(rendered);
+        object second = _runtime.ParseDotenv(normalized);
         object rerendered = _runtime.RenderDotenv(
             EnvironmentContractRuntime.RequiredProperty(second, "Document"), true);
 
         await Assert.That(EnvironmentContractRuntime.DiagnosticCodes(first)).IsEmpty();
-        await Assert.That(canonical).IsEquivalentTo(expected);
+        await Assert.That(normalized).IsEquivalentTo(expected);
         await Assert.That(EnvironmentContractRuntime.RenderedBytes(rerendered)).IsEquivalentTo(expected);
     }
 
@@ -305,7 +305,7 @@ public sealed class DotenvContractTests
     [Test]
     public async Task ConfiguredBootstrapReadinessIsExactForInteractiveKeycloakAndAtprotoModes()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         EnvironmentVariableDefinition[] bootstrap = catalogue.Definitions
             .Where(item => item.Key.StartsWith("INSTANCE_BOOTSTRAP_", StringComparison.Ordinal))
             .ToArray();
@@ -362,7 +362,7 @@ public sealed class DotenvContractTests
     [Test]
     public async Task LocalBootstrapNeedsItsSecretButNotAnEmailAddress()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         var context = new EnvironmentActivationContext("standalone", ["identity"], ["configured-administrator", "local"]);
         DotenvEntry[] selectors =
         [
@@ -386,7 +386,7 @@ public sealed class DotenvContractTests
     [Test]
     public async Task ConfiguredBootstrapInvariantBreakersUseProductionCompositionAndReadiness()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         var keycloakContext = new EnvironmentActivationContext(
             "standalone", ["identity"], ["configured-administrator", "keycloak"]);
         var atprotoContext = new EnvironmentActivationContext(
@@ -496,7 +496,7 @@ public sealed class DotenvContractTests
     [Test]
     public async Task ConfiguredBootstrapSensitiveInputsAreRejectedAndNeverRendered()
     {
-        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        EnvironmentCatalogue catalogue = PlatformEnvironmentCatalogue.Catalogue;
         var context = new EnvironmentActivationContext(
             "standalone", ["identity"], ["configured-administrator", "atproto"]);
         string[] markers =

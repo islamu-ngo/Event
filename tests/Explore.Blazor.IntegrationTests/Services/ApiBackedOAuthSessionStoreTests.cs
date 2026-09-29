@@ -37,20 +37,20 @@ public sealed class ApiBackedOAuthSessionStoreTests
     }
 
     [Test]
-    public async Task StorePreservesCanonicalActorTargetAndRejectsBridgeTargetSubstitution()
+    public async Task StorePreservesTargetActorAndRejectsBridgeTargetSubstitution()
     {
         using var dpopKey = await DPoPKeyPair.GenerateAsync();
-        var canonicalActorId = Guid.NewGuid();
+        var targetActorId = Guid.NewGuid();
         var expectedConcurrencyStamp = Guid.NewGuid();
-        var flow = BoundFlow(canonicalActorId, expectedConcurrencyStamp);
-        var handler = new BridgeHandler("did:plc:alice", canonicalActorId, expectedConcurrencyStamp);
+        var flow = BoundFlow(targetActorId, expectedConcurrencyStamp);
+        var handler = new BridgeHandler("did:plc:alice", targetActorId, expectedConcurrencyStamp);
         var store = CreateStore(flow, handler);
 
         await store.StoreAsync("did:plc:alice", CreateSession(dpopKey));
 
-        await Assert.That(flow.SessionResult!.CanonicalActorId).IsEqualTo(canonicalActorId);
-        await Assert.That(flow.SessionResult.ExpectedCanonicalActorConcurrencyStamp).IsEqualTo(expectedConcurrencyStamp);
-        await Assert.That(handler.RequestBody).Contains(canonicalActorId.ToString("D"));
+        await Assert.That(flow.SessionResult!.TargetActorId).IsEqualTo(targetActorId);
+        await Assert.That(flow.SessionResult.ExpectedTargetActorConcurrencyStamp).IsEqualTo(expectedConcurrencyStamp);
+        await Assert.That(handler.RequestBody).Contains(targetActorId.ToString("D"));
         await Assert.That(handler.BootstrapAssertion).Contains(".");
     }
 
@@ -146,8 +146,8 @@ public sealed class ApiBackedOAuthSessionStoreTests
     }
 
     private static AtprotoOAuthFlowContext BoundFlow(
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null)
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null)
     {
         var flow = new AtprotoOAuthFlowContext();
         var challengeContext = new DefaultHttpContext();
@@ -165,8 +165,8 @@ public sealed class ApiBackedOAuthSessionStoreTests
                 "/events",
                 "oauth-active",
                 "person",
-                canonicalActorId,
-                expectedCanonicalActorConcurrencyStamp)
+                targetActorId,
+                expectedTargetActorConcurrencyStamp)
             { BrowserBinding = browserBinding },
             new("https://issuer.example/")));
         return flow;
@@ -225,8 +225,8 @@ public sealed class ApiBackedOAuthSessionStoreTests
 
     private sealed class BridgeHandler(
         string responseDid,
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null,
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null,
         OAuthSessionData? storedSession = null) : HttpMessageHandler
     {
         public int CallCount { get; private set; }
@@ -276,8 +276,8 @@ public sealed class ApiBackedOAuthSessionStoreTests
                 participationId = Guid.NewGuid(),
                 did = responseDid,
                 classification = "person",
-                canonicalActorId,
-                expectedCanonicalActorConcurrencyStamp,
+                targetActorId,
+                expectedTargetActorConcurrencyStamp,
                 accessToken = "opaque-platform-token",
                 expiresAt = DateTimeOffset.UtcNow.AddMinutes(10)
             });

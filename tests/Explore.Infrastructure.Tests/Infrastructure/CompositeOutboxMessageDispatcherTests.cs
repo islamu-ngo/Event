@@ -199,7 +199,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
     }
 
     [Test]
-    public async Task DispatchAsync_WithHistoricalHeavyPayload_ScrubsAtRestBeforeCanonicalDispatch()
+    public async Task DispatchAsync_WithHistoricalHeavyPayload_ScrubsAtRestBeforeStandardDispatch()
     {
         var moderationFanoutService = Substitute.For<IEventModerationNotificationFanoutService>();
         var outboxRepository = Substitute.For<IOutboxRepository>();

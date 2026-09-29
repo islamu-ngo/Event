@@ -32,7 +32,7 @@ public sealed class InstanceOnboardingGenerationReader(
         {
             SiteName = ReadValue(byKey, GovernanceSettingKeys.Branding.DisplayName) ?? string.Empty,
             SupportEmail = ReadValue(byKey, GovernanceSettingKeys.Branding.SupportEmail),
-            CanonicalUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl
+            PublicUrl = PublicAddressResolver.IsValid(configuredUrl) ? configuredUrl
                 : ReadValue(byKey, GovernanceSettingKeys.Domains.PublicBaseUrl),
             Locale = ReadValue(byKey, GovernanceSettingKeys.Localization.DefaultLanguage) ?? "en"
         });

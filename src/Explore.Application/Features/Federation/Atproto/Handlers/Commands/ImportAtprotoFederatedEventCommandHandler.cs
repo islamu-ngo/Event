@@ -52,7 +52,7 @@ public sealed class ImportAtprotoFederatedEventCommandHandler(
         }
 
         AtprotoRecord record = applyRequest.Record
-            ?? throw new ValidationException("An event projection requires a canonical ATProto record.");
+            ?? throw new ValidationException("An event projection requires a primary ATProto record.");
         IEnumerable<Guid> tenantIds = applyRequest.Presentations
             .Where(presentation => presentation.IsVisible)
             .Select(presentation => presentation.TenantId);

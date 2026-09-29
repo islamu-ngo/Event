@@ -119,8 +119,8 @@ public sealed record AtprotoSessionBootstrapResult(
     AtprotoSubjectClassification? Classification = null,
     string? Token = null,
     DateTimeOffset? ExpiresAt = null,
-    Guid? CanonicalActorId = null,
-    Guid? ExpectedCanonicalActorConcurrencyStamp = null)
+    Guid? TargetActorId = null,
+    Guid? ExpectedTargetActorConcurrencyStamp = null)
 {
     public static AtprotoSessionBootstrapResult Failed(string code) => new(false, code);
 
@@ -130,8 +130,8 @@ public sealed record AtprotoSessionBootstrapResult(
         Guid? participationId,
         AtprotoSubjectClassification classification,
         AtprotoIssuedSessionToken token,
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null) =>
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null) =>
         new(
             true,
             string.Empty,
@@ -141,6 +141,6 @@ public sealed record AtprotoSessionBootstrapResult(
             classification,
             token.Token,
             token.ExpiresAt,
-            canonicalActorId,
-            expectedCanonicalActorConcurrencyStamp);
+            targetActorId,
+            expectedTargetActorConcurrencyStamp);
 }

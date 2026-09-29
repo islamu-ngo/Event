@@ -37,7 +37,7 @@ public class SelfHostOnboardingProfileDtoValidatorTests
         var result = await _validator.ValidateAsync(new SelfHostOnboardingProfileDto
         {
             SiteName = "Community Events",
-            CanonicalUrl = url
+            PublicUrl = url
         });
         await Assert.That(result.IsValid).IsEqualTo(valid);
     }
@@ -49,13 +49,13 @@ public class SelfHostOnboardingProfileDtoValidatorTests
         {
             SiteName = "Community Events",
             SupportEmail = "not-an-email",
-            CanonicalUrl = "ftp://example.org",
+            PublicUrl = "ftp://example.org",
             TimeZone = "Not/AZone"
         });
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Any(e => e.PropertyName == nameof(SelfHostOnboardingProfileDto.SupportEmail))).IsTrue();
-        await Assert.That(result.Errors.Any(e => e.PropertyName == nameof(SelfHostOnboardingProfileDto.CanonicalUrl))).IsTrue();
+        await Assert.That(result.Errors.Any(e => e.PropertyName == nameof(SelfHostOnboardingProfileDto.PublicUrl))).IsTrue();
         await Assert.That(result.Errors.Any(e => e.PropertyName == nameof(SelfHostOnboardingProfileDto.TimeZone))).IsTrue();
     }
 }

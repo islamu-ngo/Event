@@ -128,7 +128,7 @@ public sealed class AtprotoOAuthTransportTests
     }
 
     [Test]
-    public async Task MetadataIndependentCapabilityAndCanonicalEndpointMatrixFailsClosed()
+    public async Task MetadataIndependentCapabilityAndStandardEndpointMatrixFailsClosed()
     {
         var invalidDocuments = new List<string>();
         foreach (var property in new[]

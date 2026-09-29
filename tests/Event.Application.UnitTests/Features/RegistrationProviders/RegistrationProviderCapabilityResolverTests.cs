@@ -297,7 +297,7 @@ public sealed class RegistrationProviderCapabilityResolverTests
     private static RegistrationProviderBinding Binding(Guid? formVersionId = null) => RegistrationProviderBinding.Create(
         Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), formVersionId ?? Guid.CreateVersion7(),
         RegistrationProviderPresentationModeEnum.Redirect, RegistrationProviderCollectionModeEnum.ProviderHosted,
-        RegistrationProviderCompletionModeEnum.Callback, RegistrationProviderTrustLevelEnum.FullCanonical, null, Now);
+        RegistrationProviderCompletionModeEnum.Callback, RegistrationProviderTrustLevelEnum.FullSync, null, Now);
 
     private static void AddCapabilityTuple(RegistrationProviderBinding binding, RegistrationProviderTuple tuple, params string[] codes)
     {

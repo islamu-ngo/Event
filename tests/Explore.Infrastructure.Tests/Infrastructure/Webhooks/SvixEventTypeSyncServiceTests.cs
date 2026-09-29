@@ -11,7 +11,7 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Webhooks;
 public sealed class SvixEventTypeSyncServiceTests
 {
     [Test]
-    public async Task SyncAsync_WhenSvixSyncEnabled_UpsertsCanonicalPublicEventTypes()
+    public async Task SyncAsync_WhenSvixSyncEnabled_UpsertsAuthoritativePublicEventTypes()
     {
         var fixture = new Fixture();
         List<SvixEventTypeSyncRequest> requests = [];

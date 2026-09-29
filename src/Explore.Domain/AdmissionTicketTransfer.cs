@@ -458,7 +458,7 @@ public sealed class AdmissionTicketTransfer :
         if (!TryDecodeDigest(value, out _))
         {
             throw new ArgumentException(
-                "Capability digest must be canonical SHA-256.",
+                "Capability digest must be normalized SHA-256.",
                 nameof(value));
         }
 

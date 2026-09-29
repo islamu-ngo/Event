@@ -401,7 +401,7 @@ public static class LookupTableSeeder
         await AddMissingLookupRowsAsync(context.WebhookPayloadProvenances,
         [
             new() { Id = (int)WebhookPayloadProvenance.ExactBytes, MasterCode = "EXACT_BYTES", FullName = "Exact bytes", Description = "Persisted bytes are the authoritative received or serialized sequence" },
-            new() { Id = (int)WebhookPayloadProvenance.LegacyJsonCanonicalized, MasterCode = "LEGACY_JSON_CANONICALIZED", FullName = "Legacy JSON canonicalized", Description = "Legacy jsonb was canonicalized because original byte formatting cannot be recovered" },
+            new() { Id = (int)WebhookPayloadProvenance.LegacyJsonNormalized, MasterCode = "LEGACY_JSON_NORMALIZED", FullName = "Legacy JSON normalized", Description = "Legacy jsonb was normalized because original byte formatting cannot be recovered" },
             new() { Id = (int)WebhookPayloadProvenance.NormalizedProviderEnvelope, MasterCode = "NORMALIZED_PROVIDER_ENVELOPE", FullName = "Normalized provider envelope", Description = "Provider callback retained only as a minimal normalized envelope after exact-byte signature verification" }
         ], cancellationToken);
 
@@ -890,7 +890,7 @@ public static class LookupTableSeeder
 
     private static async Task SeedNotificationPreferenceChannelsAsync(ExploreDbContext context, CancellationToken ct)
     {
-        await RepairCanonicalLookupRowsAsync(
+        await RepairLookupRowsAsync(
             context,
             new NotificationPreferenceChannel[]
             {
@@ -899,12 +899,12 @@ public static class LookupTableSeeder
                 new() { Id = (int)NotificationPreferenceChannelEnum.Push, MasterCode = NotificationPreferenceChannelCodes.Push, FullName = "Browser Push", Description = "Browser Web Push delivery through a user-owned subscription", SortOrder = 30 }
             },
             row => row.Id,
-            static (existing, canonical) =>
+            static (existing, expected) =>
             {
-                existing.MasterCode = canonical.MasterCode;
-                existing.FullName = canonical.FullName;
-                existing.Description = canonical.Description;
-                existing.SortOrder = canonical.SortOrder;
+                existing.MasterCode = expected.MasterCode;
+                existing.FullName = expected.FullName;
+                existing.Description = expected.Description;
+                existing.SortOrder = expected.SortOrder;
             },
             ct);
     }
@@ -962,7 +962,7 @@ public static class LookupTableSeeder
 
     private static async Task SeedNotificationDeliveryStatusesAsync(ExploreDbContext context, CancellationToken ct)
     {
-        await RepairCanonicalLookupRowsAsync(
+        await RepairLookupRowsAsync(
             context,
             new NotificationDeliveryStatus[]
             {
@@ -977,18 +977,18 @@ public static class LookupTableSeeder
                 new() { Id = (int)NotificationDeliveryStatusEnum.Superseded, MasterCode = "SUPERSEDED", FullName = "Superseded", Description = "Newer authoritative work replaced this unsent delivery" }
             },
             row => row.Id,
-            static (existing, canonical) =>
+            static (existing, expected) =>
             {
-                existing.MasterCode = canonical.MasterCode;
-                existing.FullName = canonical.FullName;
-                existing.Description = canonical.Description;
+                existing.MasterCode = expected.MasterCode;
+                existing.FullName = expected.FullName;
+                existing.Description = expected.Description;
             },
             ct);
     }
 
     private static async Task SeedNotificationDeliveryPoliciesAsync(ExploreDbContext context, CancellationToken ct)
     {
-        await RepairCanonicalLookupRowsAsync(
+        await RepairLookupRowsAsync(
             context,
             new NotificationDeliveryPolicy[]
             {
@@ -1002,11 +1002,11 @@ public static class LookupTableSeeder
                 new() { Id = (int)NotificationDeliveryPolicyEnum.TenantAdministrationRequired, MasterCode = "TENANT_ADMINISTRATION_REQUIRED", FullName = "Tenant administration required", Description = "Required tenant administration notification" }
             },
             row => row.Id,
-            static (existing, canonical) =>
+            static (existing, expected) =>
             {
-                existing.MasterCode = canonical.MasterCode;
-                existing.FullName = canonical.FullName;
-                existing.Description = canonical.Description;
+                existing.MasterCode = expected.MasterCode;
+                existing.FullName = expected.FullName;
+                existing.Description = expected.Description;
             },
             ct);
     }
@@ -1083,9 +1083,9 @@ public static class LookupTableSeeder
         await context.SaveChangesAsync(ct);
     }
 
-    private static async Task RepairCanonicalLookupRowsAsync<TLookup>(
+    private static async Task RepairLookupRowsAsync<TLookup>(
         ExploreDbContext context,
-        IReadOnlyCollection<TLookup> canonicalRows,
+        IReadOnlyCollection<TLookup> expectedRows,
         Func<TLookup, int> idSelector,
         Action<TLookup, TLookup> repair,
         CancellationToken ct)
@@ -1094,16 +1094,16 @@ public static class LookupTableSeeder
         var existingRows = await context.Set<TLookup>().ToListAsync(ct);
         var existingById = existingRows.ToDictionary(idSelector);
 
-        foreach (TLookup canonical in canonicalRows)
+        foreach (TLookup expected in expectedRows)
         {
-            int id = idSelector(canonical);
+            int id = idSelector(expected);
             if (existingById.TryGetValue(id, out TLookup? existing))
             {
-                repair(existing, canonical);
+                repair(existing, expected);
             }
             else
             {
-                context.Set<TLookup>().Add(canonical);
+                context.Set<TLookup>().Add(expected);
             }
         }
 
@@ -1546,7 +1546,7 @@ public static class LookupTableSeeder
             context,
             new EventPublicActionKind[]
             {
-                new() { Id = (int)EventPublicActionKindEnum.OriginalSource, MasterCode = "ORIGINAL_SOURCE", FullName = "Original source", Description = "Canonical source for the event listing" },
+                new() { Id = (int)EventPublicActionKindEnum.OriginalSource, MasterCode = "ORIGINAL_SOURCE", FullName = "Original source", Description = "Primary source for the event listing" },
                 new() { Id = (int)EventPublicActionKindEnum.ExternalEventPage, MasterCode = "EXTERNAL_EVENT_PAGE", FullName = "External event page", Description = "External page containing event information" },
                 new() { Id = (int)EventPublicActionKindEnum.ExternalRegistration, MasterCode = "EXTERNAL_REGISTRATION", FullName = "External registration", Description = "External registration destination" },
                 new() { Id = (int)EventPublicActionKindEnum.OptionalQuestionnaire, MasterCode = "OPTIONAL_QUESTIONNAIRE", FullName = "Optional questionnaire", Description = "Optional external questionnaire" },
@@ -1721,7 +1721,7 @@ public static class LookupTableSeeder
             new RegistrationAnswerSyncMode { Id = (int)RegistrationAnswerSyncModeEnum.NONE, MasterCode = "NONE", FullName = "None" },
             new RegistrationAnswerSyncMode { Id = (int)RegistrationAnswerSyncModeEnum.COMPLETION_ONLY, MasterCode = "COMPLETION_ONLY", FullName = "Completion only" },
             new RegistrationAnswerSyncMode { Id = (int)RegistrationAnswerSyncModeEnum.SELECTED_FIELDS, MasterCode = "SELECTED_FIELDS", FullName = "Selected fields" },
-            new RegistrationAnswerSyncMode { Id = (int)RegistrationAnswerSyncModeEnum.FULL_CANONICAL, MasterCode = "FULL_CANONICAL", FullName = "Full canonical" },
+            new RegistrationAnswerSyncMode { Id = (int)RegistrationAnswerSyncModeEnum.FULL_SYNC, MasterCode = "FULL_SYNC", FullName = "Full sync" },
             new RegistrationAnswerSyncMode { Id = (int)RegistrationAnswerSyncModeEnum.MIRROR_ONLY, MasterCode = "MIRROR_ONLY", FullName = "Mirror only" }
         ], row => row.Id, ct);
 
@@ -1868,7 +1868,7 @@ public static class LookupTableSeeder
             new RegistrationProviderTrustLevel { Id = (int)RegistrationProviderTrustLevelEnum.Untrusted, MasterCode = "UNTRUSTED", FullName = "Untrusted" },
             new RegistrationProviderTrustLevel { Id = (int)RegistrationProviderTrustLevelEnum.CompletionOnly, MasterCode = "COMPLETION_ONLY", FullName = "Completion only" },
             new RegistrationProviderTrustLevel { Id = (int)RegistrationProviderTrustLevelEnum.SelectedFields, MasterCode = "SELECTED_FIELDS", FullName = "Selected fields" },
-            new RegistrationProviderTrustLevel { Id = (int)RegistrationProviderTrustLevelEnum.FullCanonical, MasterCode = "FULL_CANONICAL", FullName = "Full canonical" }
+            new RegistrationProviderTrustLevel { Id = (int)RegistrationProviderTrustLevelEnum.FullSync, MasterCode = "FULL_SYNC", FullName = "Full sync" }
         ], row => row.Id, ct);
         await SeedMissingLookupRowsAsync(context,
         [

@@ -110,8 +110,8 @@ internal static partial class PortableRelationalModelPolicy
             string columns = string.Join(
                 '_',
                 index.Properties.Select(property => property.GetColumnName(storeObject)));
-            string canonicalName = $"ix_{tableName}_{columns}".ToLowerInvariant();
-            index.SetDatabaseName(ShortenIdentifier(canonicalName, maximumIdentifierLength));
+            string normalizedName = $"ix_{tableName}_{columns}".ToLowerInvariant();
+            index.SetDatabaseName(ShortenIdentifier(normalizedName, maximumIdentifierLength));
         }
 
         foreach (IMutableForeignKey foreignKey in entityType.GetForeignKeys())
@@ -125,10 +125,10 @@ internal static partial class PortableRelationalModelPolicy
             string columns = string.Join(
                 '_',
                 foreignKey.Properties.Select(property => property.GetColumnName(storeObject)));
-            string canonicalName =
+            string normalizedName =
                 $"fk_{tableName}_{principalTableName}_{columns}".ToLowerInvariant();
             foreignKey.SetConstraintName(
-                ShortenIdentifier(canonicalName, maximumIdentifierLength));
+                ShortenIdentifier(normalizedName, maximumIdentifierLength));
         }
 
         foreach (IMutableCheckConstraint checkConstraint in entityType.GetCheckConstraints())

@@ -20,7 +20,7 @@ namespace Explore.Infrastructure.Tests.Infrastructure.Webhooks;
 public sealed class WebhookDeliveryDrainServiceTests
 {
     [Test]
-    public async Task ProcessBatchAsync_WhenCanonicalTargetIsPending_DrainsImmutableTarget()
+    public async Task ProcessBatchAsync_WhenPrimaryTargetIsPending_DrainsImmutableTarget()
     {
         var handler = new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
         var fixture = new Fixture(handler);
@@ -382,7 +382,7 @@ public sealed class WebhookDeliveryDrainServiceTests
     }
 
     [Test]
-    public async Task ScheduleManualRetryAsync_WhenAttemptAndTargetAreTerminal_ReopensCanonicalTarget()
+    public async Task ScheduleManualRetryAsync_WhenAttemptAndTargetAreTerminal_ReopensPrimaryTarget()
     {
         var fixture = new Fixture(new RecordingMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent)));
         var attempt = CreateAttempt();
@@ -534,7 +534,7 @@ public sealed class WebhookDeliveryDrainServiceTests
         var message = WebhookMessage.Create(
             tenantId,
             "event.published",
-            "canonical-local-target",
+            "primary-local-target",
             "Event",
             Guid.CreateVersion7(),
             consumerId,

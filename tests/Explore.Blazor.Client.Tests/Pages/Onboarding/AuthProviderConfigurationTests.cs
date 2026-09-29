@@ -134,7 +134,7 @@ public sealed class AuthProviderConfigurationTests : IDisposable
     }
 
     [Test]
-    public async Task VisitorPolicyConflictReloadsCanonicalProviderConfiguration()
+    public async Task VisitorPolicyConflictReloadsAuthoritativeProviderConfiguration()
     {
         var attempted = new AuthProviderConfigurationDto
         {
@@ -145,13 +145,13 @@ public sealed class AuthProviderConfigurationTests : IDisposable
             KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
             KeycloakPublicSignupUrl = "https://identity.example.test/registrations"
         };
-        var canonical = new AuthProviderConfigurationDto
+        var authoritative = new AuthProviderConfigurationDto
         {
             PrimaryProviderId = 4,
             PrimaryProviderCode = "LOCAL",
             KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Denied
         };
-        _onboarding.GetAuthProviderConfigurationAsync().Returns(attempted, canonical);
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(attempted, authoritative);
         _onboarding.UpdateAuthProviderConfigurationAsAdminAsync(attempted)
             .Returns(new BaseCommandResponseOfGuid
             {

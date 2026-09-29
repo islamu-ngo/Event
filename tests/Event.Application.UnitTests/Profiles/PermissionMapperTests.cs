@@ -14,7 +14,7 @@ public sealed class PermissionMapperTests
     [Arguments(3, "GROUP", "Group")]
     [Arguments(4, "EVENT", "Event")]
     [Arguments(-7, "UNKNOWN", "Unknown")]
-    public async Task Projection_DisclosesOnlyListFieldsAndCanonicalScope(int scopeId, string code, string name)
+    public async Task Projection_DisclosesOnlyListFieldsAndAuthoritativeScope(int scopeId, string code, string name)
     {
         var actual = JsonSerializer.SerializeToNode(PermissionMapper.ToListItem(Source(scopeId)), JsonSerializerOptions.Web);
         var expected = JsonNode.Parse("""{"id":59,"masterCode":"event:update","fullName":"Edit event","resourceKind":"event","action":"update","groupName":"Events"}""")!;
@@ -25,7 +25,7 @@ public sealed class PermissionMapperTests
     }
 
     [Test]
-    public async Task MissingNavigation_PreservesCanonicalMetadata()
+    public async Task MissingNavigation_PreservesAuthoritativeMetadata()
     {
         var source = Source(4);
         source.RoleScope = null!;

@@ -11,8 +11,8 @@ public class ActorMerge
     public Guid Id { get; private set; }
     public Guid SourceActorId { get; private set; }
     public Actor SourceActor { get; private set; } = null!;
-    public Guid CanonicalActorId { get; private set; }
-    public Actor CanonicalActor { get; private set; } = null!;
+    public Guid TargetActorId { get; private set; }
+    public Actor TargetActor { get; private set; } = null!;
     public ActorMergeProofKind ProofKind { get; private set; }
     public string EvidenceReference { get; private set; } = string.Empty;
     public DateTime MergedAt { get; private set; }
@@ -20,15 +20,15 @@ public class ActorMerge
 
     public static ActorMerge Create(
         Guid sourceActorId,
-        Guid canonicalActorId,
+        Guid targetActorId,
         ActorMergeProofKind proofKind,
         string evidenceReference,
         DateTime mergedAt,
         Guid mergedBy)
     {
-        if (sourceActorId == canonicalActorId)
+        if (sourceActorId == targetActorId)
         {
-            throw new ArgumentException("Source and canonical Actor must differ.", nameof(canonicalActorId));
+            throw new ArgumentException("Source and target Actor must differ.", nameof(targetActorId));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(evidenceReference);
@@ -36,7 +36,7 @@ public class ActorMerge
         {
             Id = Guid.CreateVersion7(),
             SourceActorId = sourceActorId,
-            CanonicalActorId = canonicalActorId,
+            TargetActorId = targetActorId,
             ProofKind = proofKind,
             EvidenceReference = evidenceReference.Trim(),
             MergedAt = mergedAt,

@@ -23,7 +23,7 @@ internal static class EnvironmentContractExpectedVectors
         "EnvironmentGenerationSurface",
         "EnvironmentRestartBehavior",
         "EnvironmentDocumentationMetadata",
-        "CanonicalEnvironmentCatalogue",
+        "PlatformEnvironmentCatalogue",
     ];
 
     internal static readonly string[] RequiredDotenvProductTypes =
@@ -145,9 +145,9 @@ internal static class EnvironmentContractExpectedVectors
         new("case-collision",
             [ValidDefinitions[0], ValidDefinitions[0] with { Key = "database_password", Order = 11 }],
             "catalogue-key-case-collision"),
-        new("noncanonical",
+        new("invalid-format",
             [ValidDefinitions[0] with { Key = "Database_Password" }],
-            "catalogue-key-noncanonical"),
+            "catalogue-key-invalid"),
         new("duplicate-order",
             [ValidDefinitions[0], ValidDefinitions[1] with { Order = 10 }],
             "catalogue-order-duplicate"),
@@ -159,7 +159,7 @@ internal static class EnvironmentContractExpectedVectors
             "catalogue-sensitive-default"),
     ];
 
-    internal static readonly byte[] CanonicalDotenv = Encoding.UTF8.GetBytes(
+    internal static readonly byte[] ExpectedDotenv = Encoding.UTF8.GetBytes(
         "DATABASE_PASSWORD=\nMAIL_FROM_NAME=\nMAIL_PORT=587\n");
 
     internal static readonly IReadOnlyList<DotenvRejectionFixture> DotenvRejections =

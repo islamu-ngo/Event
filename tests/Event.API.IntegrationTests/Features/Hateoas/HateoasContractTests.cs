@@ -43,8 +43,8 @@ public class HateoasContractTests(ContractApiFixture fixture)
 
         await Assert.That(json.RootElement.TryGetProperty("_links", out var links)).IsTrue();
 
-        var hasCanonicalLink = links.TryGetProperty("self", out _) || links.TryGetProperty("first", out _);
-        await Assert.That(hasCanonicalLink).IsTrue();
+        var hasPrimaryLink = links.TryGetProperty("self", out _) || links.TryGetProperty("first", out _);
+        await Assert.That(hasPrimaryLink).IsTrue();
 
         await Assert.That(json.RootElement.TryGetProperty("_embedded", out var embedded)).IsTrue();
         await Assert.That(embedded.TryGetProperty("items", out var items)).IsTrue();

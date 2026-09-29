@@ -166,7 +166,7 @@ public sealed class TenantOnboardingTests : IDisposable
     }
 
     [Test]
-    public async Task AlreadyCompletedTenantAdministrator_ShowsCanonicalHandoffChoicesWithoutSettingsCall()
+    public async Task AlreadyCompletedTenantAdministrator_ShowsPrimaryHandoffChoicesWithoutSettingsCall()
     {
         _tenantOnboardingService.GetStatusAsync().Returns(CreateStatus(
             Guid.NewGuid(),

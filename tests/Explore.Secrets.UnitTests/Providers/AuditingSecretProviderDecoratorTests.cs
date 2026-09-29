@@ -89,7 +89,7 @@ public sealed class AuditingSecretProviderDecoratorTests
     }
 
     [Test]
-    public async Task MutationAuditUsesCanonicalConflictingClaimPriority()
+    public async Task MutationAuditUsesAuthoritativeConflictingClaimPriority()
     {
         var subUserId = Guid.NewGuid();
         var internalUserId = Guid.NewGuid();

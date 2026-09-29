@@ -18,7 +18,7 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class EventSessionAgendaItemControllerTests
 {
     [Test]
-    public async Task UpdateRoute_UsesAuthenticatedCanonicalPatchWithoutLegacyPut()
+    public async Task UpdateRoute_UsesAuthenticatedPrimaryPatchWithoutLegacyPut()
     {
         MethodInfo action = typeof(EventSessionAgendaItemController)
             .GetMethod(nameof(EventSessionAgendaItemController.Update))!;

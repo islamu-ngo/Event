@@ -11,7 +11,7 @@ public sealed class SetupCliContractTests
     private static readonly string[] InvocationPropertyNames = ["Arguments", "Mode", "Io", "Environment"];
 
     [Test]
-    public async Task CheckedMachineSchemaIsCanonicalClosedBoundedAndFutureGeneratorOwned()
+    public async Task CheckedMachineSchemaIsDeterministicClosedBoundedAndFutureGeneratorOwned()
     {
         byte[] bytes = await File.ReadAllBytesAsync(RepositoryPath("schemas", "event-setup-command-v1.schema.json"));
         JsonObject schema = SetupCliMachineContractVerifier.ParseSchema(bytes);
@@ -27,7 +27,7 @@ public sealed class SetupCliContractTests
     }
 
     [Test]
-    public async Task MachineFixtureIsExactlyOneCanonicalValueSafeObject()
+    public async Task MachineFixtureIsExactlyOneDeterministicValueSafeObject()
     {
         byte[] fixture = SetupCliMachineContractVerifier.GoodFixture();
 

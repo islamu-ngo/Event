@@ -42,7 +42,7 @@ public sealed class LocalIdentitySynchronizationTests
     public enum InvalidLocalBinding
     {
         MalformedSubject,
-        NoncanonicalSubject,
+        NonstandardSubject,
         SubjectBelongsToAnotherUser,
         MissingPersonalActor,
         SuspendedPersonalActor,
@@ -243,7 +243,7 @@ public sealed class LocalIdentitySynchronizationTests
     }
 
     [Test]
-    public async Task ExistingLocalBindingUsesCanonicalSubjectWithoutAllocatingAnotherGraph()
+    public async Task ExistingLocalBindingUsesAuthoritativeSubjectWithoutAllocatingAnotherGraph()
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         Graph local = await SeedLocalGraphAsync(factory);
@@ -260,7 +260,7 @@ public sealed class LocalIdentitySynchronizationTests
 
     [Test]
     [Arguments(InvalidLocalBinding.MalformedSubject)]
-    [Arguments(InvalidLocalBinding.NoncanonicalSubject)]
+    [Arguments(InvalidLocalBinding.NonstandardSubject)]
     [Arguments(InvalidLocalBinding.SubjectBelongsToAnotherUser)]
     [Arguments(InvalidLocalBinding.MissingPersonalActor)]
     [Arguments(InvalidLocalBinding.SuspendedPersonalActor)]
@@ -273,7 +273,7 @@ public sealed class LocalIdentitySynchronizationTests
         string subject = defect switch
         {
             InvalidLocalBinding.MalformedSubject => "not-a-local-subject",
-            InvalidLocalBinding.NoncanonicalSubject => local.UserId.ToString("N"),
+            InvalidLocalBinding.NonstandardSubject => local.UserId.ToString("N"),
             InvalidLocalBinding.SubjectBelongsToAnotherUser => Guid.CreateVersion7().ToString("D"),
             _ => local.UserId.ToString("D")
         };

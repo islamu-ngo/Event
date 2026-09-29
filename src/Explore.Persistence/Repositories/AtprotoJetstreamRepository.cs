@@ -267,14 +267,14 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                     .SelectMany(snapshot => snapshot.Items.Select(item =>
                         (snapshot.Did, item.Record.Collection, item.Record.RecordKey)))
                     .ToHashSet();
-                List<AtprotoRecord> canonicalRecords = await _dbContext.AtprotoRecords
+                List<AtprotoRecord> storedRecords = await _dbContext.AtprotoRecords
                     .Where(value =>
                         scannedDids.Contains(value.Did)
                         && (value.Collection == EventCollection || value.Collection == RsvpCollection))
                     .ToListAsync(cancellationToken);
-                Dictionary<(string Did, string Collection, string RecordKey), AtprotoRecord> canonicalByIdentity =
-                    canonicalRecords.ToDictionary(value => (value.Did, value.Collection, value.RecordKey));
-                AtprotoRecord[] missing = canonicalRecords
+                Dictionary<(string Did, string Collection, string RecordKey), AtprotoRecord> recordByIdentity =
+                    storedRecords.ToDictionary(value => (value.Did, value.Collection, value.RecordKey));
+                AtprotoRecord[] missing = storedRecords
                     .Where(value =>
                         value.Direction != AtprotoRecordDirection.Outbound
                         && value.SourceVersion < request.SnapshotVersion
@@ -305,11 +305,11 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                     .Where(value => !accepted.Contains((value.Did, value.Collection, value.RecordKey)))
                     .Select(value => value.Id)
                     .ToArray();
-                Guid[] canonicalIds = canonicalRecords.Select(value => value.Id).ToArray();
+                Guid[] storedRecordIds = storedRecords.Select(value => value.Id).ToArray();
                 Dictionary<Guid, AtprotoEventProjection> projections = await _dbContext.AtprotoEventProjections
-                    .Where(value => canonicalIds.Contains(value.AtprotoRecordId))
+                    .Where(value => storedRecordIds.Contains(value.AtprotoRecordId))
                     .ToDictionaryAsync(value => value.AtprotoRecordId, cancellationToken);
-                Guid[] presentationRecordIds = canonicalIds.Concat(dependentRecordIds).Distinct().ToArray();
+                Guid[] presentationRecordIds = storedRecordIds.Concat(dependentRecordIds).Distinct().ToArray();
                 List<AtprotoRecordTenantPresentation> presentations = await _dbContext
                     .AtprotoRecordTenantPresentations
                     .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation)
@@ -329,23 +329,23 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                                 string.Equals(value.Did, did, StringComparison.Ordinal)
                                 && string.Equals(value.AtUri, item.Record.Uri, StringComparison.Ordinal))
                             .ToArray();
-                        if (!canonicalByIdentity.TryGetValue(identity, out AtprotoRecord? canonical))
+                        if (!recordByIdentity.TryGetValue(identity, out AtprotoRecord? storedRecord))
                         {
-                            canonical = item.Record;
-                            canonical.Id = canonical.Id == Guid.Empty ? Guid.CreateVersion7() : canonical.Id;
-                            canonical.Direction = AtprotoRecordDirection.Inbound;
-                            canonical.Provenance = AtprotoRecordProvenance.Jetstream;
-                            canonicalByIdentity.Add(identity, canonical);
-                            await _dbContext.AtprotoRecords.AddAsync(canonical, cancellationToken);
+                            storedRecord = item.Record;
+                            storedRecord.Id = storedRecord.Id == Guid.Empty ? Guid.CreateVersion7() : storedRecord.Id;
+                            storedRecord.Direction = AtprotoRecordDirection.Inbound;
+                            storedRecord.Provenance = AtprotoRecordProvenance.Jetstream;
+                            recordByIdentity.Add(identity, storedRecord);
+                            await _dbContext.AtprotoRecords.AddAsync(storedRecord, cancellationToken);
                         }
-                        else if (canonical.SourceVersion > request.SnapshotVersion)
+                        else if (storedRecord.SourceVersion > request.SnapshotVersion)
                         {
                             continue;
                         }
-                        else if (canonical.SourceVersion == request.SnapshotVersion)
+                        else if (storedRecord.SourceVersion == request.SnapshotVersion)
                         {
                             await ApplyEventImportsAsync(
-                                canonical,
+                                storedRecord,
                                 eventImports,
                                 request.ObservedAt,
                                 TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
@@ -356,22 +356,22 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                         }
                         else
                         {
-                            ApplySnapshotRecord(canonical, item.Record);
+                            ApplySnapshotRecord(storedRecord, item.Record);
                         }
 
-                        canonical.SourceVersion = request.SnapshotVersion;
-                        canonical.SourceCursor = null;
-                        canonical.UpdatedAt = request.ObservedAt;
-                        canonical.TombstonedAt = null;
-                        ApplySnapshotProjection(canonical, item.EventProjection, projections, request);
+                        storedRecord.SourceVersion = request.SnapshotVersion;
+                        storedRecord.SourceCursor = null;
+                        storedRecord.UpdatedAt = request.ObservedAt;
+                        storedRecord.TombstonedAt = null;
+                        ApplySnapshotProjection(storedRecord, item.EventProjection, projections, request);
                         ReconcilePresentations(
-                            canonical,
+                            storedRecord,
                             visibleTenantIds,
                             presentations,
                             presentationByKey,
                             request);
                         await ApplyEventImportsAsync(
-                            canonical,
+                            storedRecord,
                             eventImports,
                             request.ObservedAt,
                             TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
@@ -383,21 +383,21 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
 
                 foreach ((string did, string collection, string recordKey) in present.Except(accepted))
                 {
-                    if (!canonicalByIdentity.TryGetValue((did, collection, recordKey), out AtprotoRecord? canonical)
-                        || canonical.SourceVersion >= request.SnapshotVersion)
+                    if (!recordByIdentity.TryGetValue((did, collection, recordKey), out AtprotoRecord? storedRecord)
+                        || storedRecord.SourceVersion >= request.SnapshotVersion)
                     {
                         continue;
                     }
 
                     if (collection == EventCollection
-                        && projections.Remove(canonical.Id, out AtprotoEventProjection? projection))
+                        && projections.Remove(storedRecord.Id, out AtprotoEventProjection? projection))
                     {
                         _dbContext.AtprotoEventProjections.Remove(projection);
                     }
 
-                    HidePresentations(canonical.Id, presentations, request);
+                    HidePresentations(storedRecord.Id, presentations, request);
                     await ApplyEventImportsAsync(
-                        canonical,
+                        storedRecord,
                         [],
                         request.ObservedAt,
                         TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
@@ -407,27 +407,27 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                         forceTombstone: true);
                 }
 
-                foreach (AtprotoRecord canonical in missing)
+                foreach (AtprotoRecord storedRecord in missing)
                 {
-                    canonical.Cid = null;
-                    canonical.RecordJson = null;
-                    canonical.RecordHash = null;
-                    canonical.SubjectUri = null;
-                    canonical.SubjectCid = null;
-                    canonical.IndexedAt = request.ObservedAt;
-                    canonical.SourceVersion = request.SnapshotVersion;
-                    canonical.SourceCursor = null;
-                    canonical.UpdatedAt = request.ObservedAt;
-                    canonical.TombstonedAt = request.ObservedAt;
-                    if (canonical.Collection == EventCollection
-                        && projections.Remove(canonical.Id, out AtprotoEventProjection? projection))
+                    storedRecord.Cid = null;
+                    storedRecord.RecordJson = null;
+                    storedRecord.RecordHash = null;
+                    storedRecord.SubjectUri = null;
+                    storedRecord.SubjectCid = null;
+                    storedRecord.IndexedAt = request.ObservedAt;
+                    storedRecord.SourceVersion = request.SnapshotVersion;
+                    storedRecord.SourceCursor = null;
+                    storedRecord.UpdatedAt = request.ObservedAt;
+                    storedRecord.TombstonedAt = request.ObservedAt;
+                    if (storedRecord.Collection == EventCollection
+                        && projections.Remove(storedRecord.Id, out AtprotoEventProjection? projection))
                     {
                         _dbContext.AtprotoEventProjections.Remove(projection);
                     }
 
-                    HidePresentations(canonical.Id, presentations, request);
+                    HidePresentations(storedRecord.Id, presentations, request);
                     await ApplyEventImportsAsync(
-                        canonical,
+                        storedRecord,
                         [],
                         request.ObservedAt,
                         TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
@@ -548,39 +548,39 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         && TidAlphabet.IndexOf(recordKey[0], StringComparison.Ordinal) is >= 0 and <= 15
         && recordKey.All(TidAlphabet.Contains);
 
-    private static void ApplySnapshotRecord(AtprotoRecord canonical, AtprotoRecord supplied)
+    private static void ApplySnapshotRecord(AtprotoRecord storedRecord, AtprotoRecord supplied)
     {
-        bool isEcho = canonical.Direction is AtprotoRecordDirection.Outbound or AtprotoRecordDirection.Reconciled;
-        canonical.Direction = isEcho ? AtprotoRecordDirection.Reconciled : AtprotoRecordDirection.Inbound;
-        canonical.Provenance = isEcho
+        bool isEcho = storedRecord.Direction is AtprotoRecordDirection.Outbound or AtprotoRecordDirection.Reconciled;
+        storedRecord.Direction = isEcho ? AtprotoRecordDirection.Reconciled : AtprotoRecordDirection.Inbound;
+        storedRecord.Provenance = isEcho
             ? AtprotoRecordProvenance.JetstreamEcho
             : AtprotoRecordProvenance.Jetstream;
-        canonical.Cid = supplied.Cid;
-        canonical.Uri = supplied.Uri;
-        canonical.RecordJson = supplied.RecordJson;
-        canonical.RecordHash = supplied.RecordHash;
-        canonical.SubjectUri = supplied.SubjectUri;
-        canonical.SubjectCid = supplied.SubjectCid;
-        canonical.IndexedAt = supplied.IndexedAt;
+        storedRecord.Cid = supplied.Cid;
+        storedRecord.Uri = supplied.Uri;
+        storedRecord.RecordJson = supplied.RecordJson;
+        storedRecord.RecordHash = supplied.RecordHash;
+        storedRecord.SubjectUri = supplied.SubjectUri;
+        storedRecord.SubjectCid = supplied.SubjectCid;
+        storedRecord.IndexedAt = supplied.IndexedAt;
     }
 
     private void ApplySnapshotProjection(
-        AtprotoRecord canonical,
+        AtprotoRecord storedRecord,
         AtprotoEventProjection? supplied,
         IDictionary<Guid, AtprotoEventProjection> projections,
         AtprotoPdsSnapshotApplyRequest request)
     {
-        if (canonical.Collection != EventCollection || supplied is null)
+        if (storedRecord.Collection != EventCollection || supplied is null)
         {
             return;
         }
 
-        if (!projections.TryGetValue(canonical.Id, out AtprotoEventProjection? existing))
+        if (!projections.TryGetValue(storedRecord.Id, out AtprotoEventProjection? existing))
         {
-            supplied.AtprotoRecordId = canonical.Id;
+            supplied.AtprotoRecordId = storedRecord.Id;
             supplied.SourceVersion = request.SnapshotVersion;
             supplied.MaterializedAt = request.ObservedAt;
-            projections.Add(canonical.Id, supplied);
+            projections.Add(storedRecord.Id, supplied);
             _dbContext.AtprotoEventProjections.Add(supplied);
             return;
         }
@@ -600,14 +600,14 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
     }
 
     private void ReconcilePresentations(
-        AtprotoRecord canonical,
+        AtprotoRecord storedRecord,
         IReadOnlySet<Guid> visibleTenantIds,
         ICollection<AtprotoRecordTenantPresentation> presentations,
         IDictionary<(Guid TenantId, Guid RecordId), AtprotoRecordTenantPresentation> presentationByKey,
         AtprotoPdsSnapshotApplyRequest request)
     {
         foreach (AtprotoRecordTenantPresentation presentation in presentations
-                     .Where(value => value.AtprotoRecordId == canonical.Id))
+                     .Where(value => value.AtprotoRecordId == storedRecord.Id))
         {
             presentation.IsVisible = visibleTenantIds.Contains(presentation.TenantId);
             presentation.SourceVersion = request.SnapshotVersion;
@@ -616,7 +616,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
 
         foreach (Guid tenantId in visibleTenantIds)
         {
-            if (presentationByKey.ContainsKey((tenantId, canonical.Id)))
+            if (presentationByKey.ContainsKey((tenantId, storedRecord.Id)))
             {
                 continue;
             }
@@ -624,13 +624,13 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             var presentation = new AtprotoRecordTenantPresentation
             {
                 TenantId = tenantId,
-                AtprotoRecordId = canonical.Id,
+                AtprotoRecordId = storedRecord.Id,
                 IsVisible = true,
                 SourceVersion = request.SnapshotVersion,
                 EvaluatedAt = request.ObservedAt
             };
             presentations.Add(presentation);
-            presentationByKey.Add((tenantId, canonical.Id), presentation);
+            presentationByKey.Add((tenantId, storedRecord.Id), presentation);
             _dbContext.AtprotoRecordTenantPresentations.Add(presentation);
         }
     }
@@ -695,22 +695,22 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         CancellationToken cancellationToken)
     {
         var incoming = request.Record!;
-        var canonical = await _dbContext.AtprotoRecords.SingleOrDefaultAsync(value =>
+        var storedRecord = await _dbContext.AtprotoRecords.SingleOrDefaultAsync(value =>
             value.Did == incoming.Did &&
             value.Collection == incoming.Collection &&
             value.RecordKey == incoming.RecordKey,
             cancellationToken);
-        if (canonical is not null && incoming.SourceVersion < canonical.SourceVersion)
+        if (storedRecord is not null && incoming.SourceVersion < storedRecord.SourceVersion)
         {
             return true;
         }
 
-        if (canonical is not null && incoming.SourceVersion == canonical.SourceVersion)
+        if (storedRecord is not null && incoming.SourceVersion == storedRecord.SourceVersion)
         {
-            if (canonical.Collection == EventCollection)
+            if (storedRecord.Collection == EventCollection)
             {
                 await ApplyEventImportsAsync(
-                    canonical,
+                    storedRecord,
                     request.EventImports,
                     request.ObservedAt,
                     TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization,
@@ -722,46 +722,46 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             return true;
         }
 
-        if (canonical is null)
+        if (storedRecord is null)
         {
-            canonical = incoming;
-            if (canonical.Id == Guid.Empty)
+            storedRecord = incoming;
+            if (storedRecord.Id == Guid.Empty)
             {
-                canonical.Id = Guid.CreateVersion7();
+                storedRecord.Id = Guid.CreateVersion7();
             }
-            canonical.Direction = AtprotoRecordDirection.Inbound;
-            canonical.Provenance = AtprotoRecordProvenance.Jetstream;
-            await _dbContext.AtprotoRecords.AddAsync(canonical, cancellationToken);
+            storedRecord.Direction = AtprotoRecordDirection.Inbound;
+            storedRecord.Provenance = AtprotoRecordProvenance.Jetstream;
+            await _dbContext.AtprotoRecords.AddAsync(storedRecord, cancellationToken);
         }
         else
         {
-            canonical.Direction = canonical.Direction is AtprotoRecordDirection.Outbound or AtprotoRecordDirection.Reconciled
+            storedRecord.Direction = storedRecord.Direction is AtprotoRecordDirection.Outbound or AtprotoRecordDirection.Reconciled
                 ? AtprotoRecordDirection.Reconciled
                 : AtprotoRecordDirection.Inbound;
-            canonical.Provenance = canonical.Direction == AtprotoRecordDirection.Reconciled
+            storedRecord.Provenance = storedRecord.Direction == AtprotoRecordDirection.Reconciled
                 ? AtprotoRecordProvenance.JetstreamEcho
                 : AtprotoRecordProvenance.Jetstream;
-            canonical.Cid = incoming.Cid;
-            canonical.Uri = incoming.Uri;
-            canonical.RecordJson = incoming.RecordJson;
-            canonical.RecordHash = incoming.RecordHash;
-            canonical.SubjectUri = incoming.SubjectUri;
-            canonical.SubjectCid = incoming.SubjectCid;
-            canonical.IndexedAt = incoming.IndexedAt;
-            canonical.SourceVersion = incoming.SourceVersion;
-            canonical.SourceCursor = request.NextCursor;
-            canonical.UpdatedAt = request.ObservedAt;
-            canonical.TombstonedAt = incoming.TombstonedAt;
+            storedRecord.Cid = incoming.Cid;
+            storedRecord.Uri = incoming.Uri;
+            storedRecord.RecordJson = incoming.RecordJson;
+            storedRecord.RecordHash = incoming.RecordHash;
+            storedRecord.SubjectUri = incoming.SubjectUri;
+            storedRecord.SubjectCid = incoming.SubjectCid;
+            storedRecord.IndexedAt = incoming.IndexedAt;
+            storedRecord.SourceVersion = incoming.SourceVersion;
+            storedRecord.SourceCursor = request.NextCursor;
+            storedRecord.UpdatedAt = request.ObservedAt;
+            storedRecord.TombstonedAt = incoming.TombstonedAt;
         }
 
-        canonical.SourceCursor = request.NextCursor;
-        canonical.UpdatedAt = request.ObservedAt;
+        storedRecord.SourceCursor = request.NextCursor;
+        storedRecord.UpdatedAt = request.ObservedAt;
 
-        if (canonical.Collection == "community.lexicon.calendar.event")
+        if (storedRecord.Collection == "community.lexicon.calendar.event")
         {
-            await ApplyEventProjectionAsync(canonical, request, cancellationToken);
+            await ApplyEventProjectionAsync(storedRecord, request, cancellationToken);
             await ApplyEventImportsAsync(
-                canonical,
+                storedRecord,
                 request.EventImports,
                 request.ObservedAt,
                 TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization,
@@ -775,36 +775,36 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             var presentation = await _dbContext.AtprotoRecordTenantPresentations
                 .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization)
                 .SingleOrDefaultAsync(value =>
-                    value.TenantId == supplied.TenantId && value.AtprotoRecordId == canonical.Id,
+                    value.TenantId == supplied.TenantId && value.AtprotoRecordId == storedRecord.Id,
                     cancellationToken);
             if (presentation is null)
             {
-                supplied.AtprotoRecordId = canonical.Id;
-                supplied.SourceVersion = canonical.SourceVersion;
+                supplied.AtprotoRecordId = storedRecord.Id;
+                supplied.SourceVersion = storedRecord.SourceVersion;
                 supplied.EvaluatedAt = request.ObservedAt;
                 await _dbContext.AtprotoRecordTenantPresentations.AddAsync(supplied, cancellationToken);
             }
             else
             {
-                presentation.IsVisible = supplied.IsVisible && canonical.TombstonedAt is null;
-                presentation.SourceVersion = canonical.SourceVersion;
+                presentation.IsVisible = supplied.IsVisible && storedRecord.TombstonedAt is null;
+                presentation.SourceVersion = storedRecord.SourceVersion;
                 presentation.EvaluatedAt = request.ObservedAt;
             }
         }
 
-        if (canonical.TombstonedAt is not null)
+        if (storedRecord.TombstonedAt is not null)
         {
             await _dbContext.AtprotoRecordTenantPresentations
                 .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization)
-                .Where(value => value.AtprotoRecordId == canonical.Id)
+                .Where(value => value.AtprotoRecordId == storedRecord.Id)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(value => value.IsVisible, false)
                     .SetProperty(value => value.EvaluatedAt, request.ObservedAt), cancellationToken);
 
-            if (canonical.Uri is not null)
+            if (storedRecord.Uri is not null)
             {
                 var dependentIds = _dbContext.AtprotoRecords
-                    .Where(value => value.SubjectUri == canonical.Uri)
+                    .Where(value => value.SubjectUri == storedRecord.Uri)
                     .Select(value => value.Id);
                 await _dbContext.AtprotoRecordTenantPresentations
                     .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization)
@@ -819,7 +819,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
     }
 
     private async Task ApplyEventImportsAsync(
-        AtprotoRecord canonical,
+        AtprotoRecord storedRecord,
         IReadOnlyList<AtprotoFederatedEventImportPlan> imports,
         DateTime observedAt,
         string filterBypassReason,
@@ -828,17 +828,17 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         CancellationToken cancellationToken,
         bool forceTombstone = false)
     {
-        if (canonical.Collection != EventCollection)
+        if (storedRecord.Collection != EventCollection)
         {
             return;
         }
 
-        if (canonical.TombstonedAt is not null || forceTombstone)
+        if (storedRecord.TombstonedAt is not null || forceTombstone)
         {
-            DateTime deletedAt = canonical.TombstonedAt ?? observedAt;
+            DateTime deletedAt = storedRecord.TombstonedAt ?? observedAt;
             List<Explore.Domain.Event> importedEvents = await _dbContext.Events
                 .IgnoreAllFilters(filterBypassReason)
-                .Where(value => value.AtprotoRecordId == canonical.Id)
+                .Where(value => value.AtprotoRecordId == storedRecord.Id)
                 .ToListAsync(cancellationToken);
             foreach (Explore.Domain.Event importedEvent in importedEvents)
             {
@@ -933,12 +933,12 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                 .Select(entry => entry.Entity)
                 .SingleOrDefault(value =>
                     value.TenantId == import.TenantId
-                    && value.AtprotoRecordId == canonical.Id);
+                    && value.AtprotoRecordId == storedRecord.Id);
             importedEvent ??= await _dbContext.Events
                 .IgnoreAllFilters(filterBypassReason)
                 .SingleOrDefaultAsync(value =>
                     value.TenantId == import.TenantId
-                    && value.AtprotoRecordId == canonical.Id,
+                    && value.AtprotoRecordId == storedRecord.Id,
                     cancellationToken);
             bool preserveHealthyEvent = importedEvent is not null && !updateExisting;
             EventStatusEnum synchronizedEventStatus = MapEventStatus(import.Status);
@@ -960,8 +960,8 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                     EventStatus = null!,
                     EventFormatId = MapEventFormat(import.Mode),
                     EventFormat = null!,
-                    AtprotoRecordId = canonical.Id,
-                    AtprotoRecord = canonical,
+                    AtprotoRecordId = storedRecord.Id,
+                    AtprotoRecord = storedRecord,
                     EventTimeZoneId = import.TimeZoneId,
                     Timezone = import.TimeZoneId,
                     CreatedAt = import.CreatedAt.UtcDateTime
@@ -980,8 +980,8 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
                 importedEvent.EventFormatId = MapEventFormat(import.Mode);
                 importedEvent.EventTimeZoneId = import.TimeZoneId;
                 importedEvent.Timezone = import.TimeZoneId;
-                importedEvent.AtprotoRecordId = canonical.Id;
-                importedEvent.AtprotoRecord = canonical;
+                importedEvent.AtprotoRecordId = storedRecord.Id;
+                importedEvent.AtprotoRecord = storedRecord;
                 importedEvent.ProvenanceSource = "atproto";
                 importedEvent.ProvenanceExternalId = import.AtUri.Length <= 200
                     ? import.AtUri
@@ -1480,13 +1480,13 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             : string.Concat(description.EnumerateRunes().Take(150).Select(rune => rune.ToString()));
 
     private async Task ApplyEventProjectionAsync(
-        AtprotoRecord canonical,
+        AtprotoRecord storedRecord,
         AtprotoJetstreamApplyRequest request,
         CancellationToken cancellationToken)
     {
         AtprotoEventProjection? existing = await _dbContext.AtprotoEventProjections
-            .SingleOrDefaultAsync(value => value.AtprotoRecordId == canonical.Id, cancellationToken);
-        if (canonical.TombstonedAt is not null)
+            .SingleOrDefaultAsync(value => value.AtprotoRecordId == storedRecord.Id, cancellationToken);
+        if (storedRecord.TombstonedAt is not null)
         {
             if (existing is not null)
             {
@@ -1496,14 +1496,14 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         }
 
         AtprotoEventProjection? supplied = request.EventProjection;
-        if (supplied is null || supplied.SourceVersion != canonical.SourceVersion)
+        if (supplied is null || supplied.SourceVersion != storedRecord.SourceVersion)
         {
             return;
         }
 
         if (existing is null)
         {
-            supplied.AtprotoRecordId = canonical.Id;
+            supplied.AtprotoRecordId = storedRecord.Id;
             await _dbContext.AtprotoEventProjections.AddAsync(supplied, cancellationToken);
             return;
         }
@@ -1527,7 +1527,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
     /// <para>
     /// Scoped to <see cref="AtprotoRecordDirection.Inbound"/> so locally authored outbound records are
     /// never touched by a remote account signal. Records are tombstoned rather than deleted, keeping the
-    /// canonical row available for idempotent replay, while projections are removed and presentations
+    /// stored row available for idempotent replay, while projections are removed and presentations
     /// hidden so nothing stays publicly visible.
     /// </para>
     /// </summary>
@@ -1570,18 +1570,18 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         CancellationToken cancellationToken)
     {
         AtprotoEventProjectionInvalidation invalidation = request.EventProjectionInvalidation!;
-        AtprotoRecord? canonical = await _dbContext.AtprotoRecords.SingleOrDefaultAsync(value =>
+        AtprotoRecord? storedRecord = await _dbContext.AtprotoRecords.SingleOrDefaultAsync(value =>
             value.Did == invalidation.Did
             && value.Collection == invalidation.Collection
             && value.RecordKey == invalidation.RecordKey,
             cancellationToken);
-        if (canonical is null || invalidation.SourceVersion <= canonical.SourceVersion)
+        if (storedRecord is null || invalidation.SourceVersion <= storedRecord.SourceVersion)
         {
             return;
         }
 
         AtprotoEventProjection? projection = await _dbContext.AtprotoEventProjections
-            .SingleOrDefaultAsync(value => value.AtprotoRecordId == canonical.Id, cancellationToken);
+            .SingleOrDefaultAsync(value => value.AtprotoRecordId == storedRecord.Id, cancellationToken);
         if (projection is not null)
         {
             _dbContext.AtprotoEventProjections.Remove(projection);
@@ -1589,7 +1589,7 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
 
         await _dbContext.AtprotoRecordTenantPresentations
             .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoJetstreamGlobalMaterialization)
-            .Where(value => value.AtprotoRecordId == canonical.Id)
+            .Where(value => value.AtprotoRecordId == storedRecord.Id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.IsVisible, false)
                 .SetProperty(value => value.SourceVersion, invalidation.SourceVersion)

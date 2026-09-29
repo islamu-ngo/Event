@@ -64,7 +64,7 @@ public class InstanceOnboardingControllerTests
             && check.TryGetProperty("restartRequired", out _)
             && check.TryGetProperty("reasonCode", out _))).IsTrue();
         using var save = CreateInstanceAdminRequest(HttpMethod.Patch, $"{BaseUrl}/profile", Guid.CreateVersion7(),
-            new SelfHostOnboardingProfileDto { SiteName = "Journey profile", CanonicalUrl = "https://journey.example.org" }, true);
+            new SelfHostOnboardingProfileDto { SiteName = "Journey profile", PublicUrl = "https://journey.example.org" }, true);
         using var saved = await client.SendAsync(save);
         await Assert.That(saved.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var afterResponse = await client.GetAsync($"{BaseUrl}/journey");
@@ -73,7 +73,7 @@ public class InstanceOnboardingControllerTests
         await Assert.That(after.RootElement.GetProperty("generation").GetString())
             .IsNotEqualTo(snapshot.GetProperty("generation").GetString());
         await Assert.That(after.RootElement.GetProperty("preflight").GetProperty("blockingChecks").EnumerateArray()
-            .Any(check => check.GetProperty("code").GetString() == "canonical_host")).IsFalse();
+            .Any(check => check.GetProperty("code").GetString() == "public_host")).IsFalse();
     }
 
     [Test]
@@ -134,7 +134,7 @@ public class InstanceOnboardingControllerTests
         {
             SiteName = "  Community Events  ",
             SupportEmail = "  support@example.org  ",
-            CanonicalUrl = "https://Events.Example.Org/onboarding",
+            PublicUrl = "https://Events.Example.Org/onboarding",
             Locale = " EN ",
             TimeZone = "UTC",
             Purpose = "Keep this operator note out of persisted settings."
@@ -259,7 +259,7 @@ public class InstanceOnboardingControllerTests
         {
             SiteName = string.Empty,
             SupportEmail = "not-an-email",
-            CanonicalUrl = "not-a-valid-url",
+            PublicUrl = "not-a-valid-url",
             Locale = string.Empty,
             TimeZone = string.Empty
         };
@@ -559,7 +559,7 @@ public class InstanceOnboardingControllerTests
         await Assert.That(preflight).IsNotNull();
         await Assert.That(preflight!.IsReadyToLaunch).IsTrue()
             .Because(string.Join(",", preflight.BlockingChecks.Where(check => check.Status != OnboardingPreflightCheckStatus.Pass).Select(check => check.Code)));
-        await Assert.That(preflight.BlockingChecks.Any(check => check.Code == "canonical_host")).IsFalse();
+        await Assert.That(preflight.BlockingChecks.Any(check => check.Code == "public_host")).IsFalse();
         await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "auth_config").Status)
             .IsEqualTo(OnboardingPreflightCheckStatus.Pass);
 

@@ -584,7 +584,7 @@ public class RuntimeAuthorizationProviderTests
     [Arguments(true)]
     [Arguments(false)]
     public async Task AuthorizeBatchAsync_InLocalMode_UsesTypedStorageUploadContract(
-        bool canonicalResourceId)
+        bool authoritativeResourceId)
     {
         var fixture = CreateRuntimeProviderFixture();
         var userId = Guid.NewGuid();
@@ -597,7 +597,7 @@ public class RuntimeAuthorizationProviderTests
         [
             TestAuthorizationRequest.Create(
                 ResourceKinds.StorageObject,
-                canonicalResourceId
+                authoritativeResourceId
                     ? nameof(CreateStorageUploadSessionCommand)
                     : "019ecd1d-6b34-7b05-9945-970edd3c1440",
                 AuthorizationActions.Create,
@@ -611,9 +611,9 @@ public class RuntimeAuthorizationProviderTests
 
         await Assert.That(results).Count().IsEqualTo(1);
         await Assert.That(results[0].Outcome).IsEqualTo(
-            canonicalResourceId ? AuthorizationDecisionOutcome.Allow : AuthorizationDecisionOutcome.Deny);
+            authoritativeResourceId ? AuthorizationDecisionOutcome.Allow : AuthorizationDecisionOutcome.Deny);
         await Assert.That(results[0].ReasonCode).IsEqualTo(
-            canonicalResourceId ? AuthorizationDecisionReasonCodes.Allowed : AuthorizationDecisionReasonCodes.Denied);
+            authoritativeResourceId ? AuthorizationDecisionReasonCodes.Allowed : AuthorizationDecisionReasonCodes.Denied);
         await Assert.That(results[0].Provider).IsEqualTo(AuthorizationProviderMetadata.Local);
         await Assert.That(results[0].Provider.ObservedRevision).IsNull();
         await fixture.CerbosClient.DidNotReceive().CheckResourcesAsync(

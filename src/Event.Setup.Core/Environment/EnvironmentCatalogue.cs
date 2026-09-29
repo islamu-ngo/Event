@@ -127,7 +127,7 @@ public sealed class EnvironmentCatalogue
         {
             EnvironmentVariableDefinition item = definitions[index];
             string path = $"$.definitions[{index}]";
-            if (!IsCanonicalKey(item.Key)) Add("catalogue-key-noncanonical", path, item, diagnostics);
+            if (!IsValidEnvironmentKey(item.Key)) Add("catalogue-key-invalid", path, item, diagnostics);
             if (!exactKeys.Add(item.Key)) Add("catalogue-duplicate-key", path, item, diagnostics);
             else if (!foldedKeys.Add(item.Key)) Add("catalogue-key-case-collision", path, item, diagnostics);
             if (item.Order < 0 || !orders.Add(item.Order))
@@ -268,7 +268,7 @@ public sealed class EnvironmentCatalogue
         ICollection<EnvironmentDiagnostic> diagnostics) =>
         diagnostics.Add(new EnvironmentDiagnostic(code, path, definition.Key, "catalogue"));
 
-    private static bool IsCanonicalKey(string key)
+    private static bool IsValidEnvironmentKey(string key)
     {
         if (string.IsNullOrEmpty(key) || key.Length > 128 || key[0] is < 'A' or > 'Z'
             || key[^1] == '_' || key.Contains("___", StringComparison.Ordinal)) return false;

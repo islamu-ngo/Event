@@ -142,7 +142,7 @@ public sealed partial class NativeAgendaProjectionHttpTests
     }
 
     [Test]
-    public async Task CanonicalEligibility_RechecksActorSuspensionInsteadOfTrustingPublishedStatus()
+    public async Task PrimaryEligibility_RechecksActorSuspensionInsteadOfTrustingPublishedStatus()
     {
         await using var factory = await ProjectionFactory.CreateAsync();
         using var client = factory.CreateClient();

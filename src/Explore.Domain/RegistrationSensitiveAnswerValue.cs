@@ -51,12 +51,12 @@ public sealed class RegistrationSensitiveAnswerValue : ITenantEntity, IAuditable
             byte[] envelope = Convert.FromBase64String(ciphertext);
             if (envelope.Length < 29 || !string.Equals(Convert.ToBase64String(envelope), ciphertext, StringComparison.Ordinal))
             {
-                throw new ArgumentException("Ciphertext must be a canonical AES-GCM envelope.", nameof(ciphertext));
+                throw new ArgumentException("Ciphertext must be a normalized AES-GCM envelope.", nameof(ciphertext));
             }
         }
         catch (FormatException exception)
         {
-            throw new ArgumentException("Ciphertext must be a canonical AES-GCM envelope.", nameof(ciphertext), exception);
+            throw new ArgumentException("Ciphertext must be a normalized AES-GCM envelope.", nameof(ciphertext), exception);
         }
 
         return new RegistrationSensitiveAnswerValue

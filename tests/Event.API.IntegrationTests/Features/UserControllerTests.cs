@@ -132,7 +132,7 @@ public class UserControllerTests
         using var request = CreateOidcSyncRequest(
             subject,
             "https://auth.example.test/realms/ISLAMU",
-            "canonical@example.test");
+            "primary@example.test");
         using HttpResponseMessage response = await client.SendAsync(request);
         BaseCommandResponse<Guid>? body = await response.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>();
 

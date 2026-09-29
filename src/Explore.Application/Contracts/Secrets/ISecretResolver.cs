@@ -16,7 +16,7 @@ public interface ISecretResolver
     /// scope only if no tenant-scoped binding exists. The fallback is at the <em>binding-lookup</em>
     /// layer, never at the <em>source</em> layer.
     /// </summary>
-    /// <param name="settingKey">Canonical setting key from <see cref="Explore.Domain.Secrets.SecretDefinitionRegistry.Keys"/>.</param>
+    /// <param name="settingKey">Authoritative setting key from <see cref="Explore.Domain.Secrets.SecretDefinitionRegistry.Keys"/>.</param>
     /// <param name="tenantId">The active tenant id, or <c>null</c> to resolve against the instance scope only.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>

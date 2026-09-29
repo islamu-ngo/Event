@@ -17,7 +17,7 @@ public interface ISecretBindingRepository : IGenericRepository<SecretBinding, Gu
     /// <summary>
     /// Gets the binding for a specific setting key at a specific scope, if any.
     /// </summary>
-    /// <param name="settingKey">Canonical setting key from <c>SecretDefinitionRegistry.Keys</c>.</param>
+    /// <param name="settingKey">Authoritative setting key from <c>SecretDefinitionRegistry.Keys</c>.</param>
     /// <param name="scope">The scope at which the binding is declared.</param>
     /// <param name="scopeId">Tenant id when <paramref name="scope"/> is <see cref="SecretScope.Tenant"/>; must be <c>null</c> when <see cref="SecretScope.Instance"/>.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

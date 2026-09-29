@@ -92,10 +92,10 @@ public sealed class SetupCompositionCompiler
             ConfigurationManifestV1Alpha2 parsed =
                 ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(normalizedJson);
             cancellationToken.ThrowIfCancellationRequested();
-            byte[] canonical = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(parsed);
+            byte[] serialized = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(parsed);
             cancellationToken.ThrowIfCancellationRequested();
             ConfigurationManifestV1Alpha2 final =
-                ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(canonical);
+                ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(serialized);
             byte[] finalBytes = ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(final);
             return SetupCompositionResult.ManifestSuccess(final, finalBytes);
         }
@@ -105,10 +105,10 @@ public sealed class SetupCompositionCompiler
             TenantConfigurationPackageV1Alpha2 parsed =
                 ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(normalizedJson);
             cancellationToken.ThrowIfCancellationRequested();
-            byte[] canonical = ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(parsed);
+            byte[] serialized = ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(parsed);
             cancellationToken.ThrowIfCancellationRequested();
             TenantConfigurationPackageV1Alpha2 final =
-                ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(canonical);
+                ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(serialized);
             byte[] finalBytes = ConfigurationPortabilityJsonCodec.SerializeTenantConfigurationPackage(final);
             return SetupCompositionResult.PackageSuccess(final, finalBytes);
         }

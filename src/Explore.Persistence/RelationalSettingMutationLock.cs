@@ -35,26 +35,26 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     }
 
     public Task<T> ExecuteAsync<T>(
-        string canonicalSettingKey,
+        string settingKey,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(canonicalSettingKey);
-        return ExecuteManyAsync([canonicalSettingKey], operation, cancellationToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
+        return ExecuteManyAsync([settingKey], operation, cancellationToken);
     }
 
     public Task<T> ExecuteManyAsync<T>(
-        IEnumerable<string> canonicalSettingKeys,
+        IEnumerable<string> settingKeys,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(canonicalSettingKeys);
-        string[] orderedKeys = NormalizeCanonicalKeys(canonicalSettingKeys);
+        ArgumentNullException.ThrowIfNull(settingKeys);
+        string[] orderedKeys = NormalizeSettingKeys(settingKeys);
         if (orderedKeys.Length == 0)
         {
             throw new ArgumentException(
-                "At least one canonical setting key is required.",
-                nameof(canonicalSettingKeys));
+                "At least one setting key is required.",
+                nameof(settingKeys));
         }
 
         bool visitorPolicy = RequiresVisitorAccessFence(orderedKeys);
@@ -98,19 +98,19 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     }
 
     public Task<T> ExecuteOrderedGroupsAsync<T>(
-        IEnumerable<IEnumerable<string>> canonicalSettingKeyGroups,
+        IEnumerable<IEnumerable<string>> settingKeyGroups,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(canonicalSettingKeyGroups);
+        ArgumentNullException.ThrowIfNull(settingKeyGroups);
         ArgumentNullException.ThrowIfNull(operation);
-        string[] orderedKeys = NormalizeOrderedCanonicalKeyGroups(
-            canonicalSettingKeyGroups);
+        string[] orderedKeys = NormalizeOrderedSettingKeyGroups(
+            settingKeyGroups);
         if (orderedKeys.Length == 0)
         {
             throw new ArgumentException(
-                "At least one canonical setting-key group is required.",
-                nameof(canonicalSettingKeyGroups));
+                "At least one setting-key group is required.",
+                nameof(settingKeyGroups));
         }
 
         if (_dbContext.Database.CurrentTransaction is not null)
@@ -126,18 +126,18 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             var leases = new List<IAsyncDisposable>(orderedKeys.Length);
             try
             {
-                foreach (string canonicalSettingKey in orderedKeys)
+                foreach (string settingKey in orderedKeys)
                 {
                     if (_beforeOuterLockAcquisition is not null)
                     {
                         await _beforeOuterLockAcquisition(
-                            canonicalSettingKey,
+                            settingKey,
                             cancellationToken);
                     }
 
                     leases.Add(await RelationalNamedLock.AcquireSessionAsync(
                         _dbContext,
-                        $"explore:setting-mutation:{canonicalSettingKey}",
+                        $"explore:setting-mutation:{settingKey}",
                         cancellationToken));
                 }
 
@@ -165,27 +165,27 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     }
 
     private async Task<T> ExecuteInsideTransactionAsync<T>(
-        IReadOnlyList<string> canonicalSettingKeys,
+        IReadOnlyList<string> settingKeys,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken)
     {
-        var leases = new List<IAsyncDisposable>(canonicalSettingKeys.Count);
+        var leases = new List<IAsyncDisposable>(settingKeys.Count);
         try
         {
             IReadOnlySet<string>? outerOrderedKeys =
                 _outerOrderedKeys.Value;
-            foreach (string canonicalSettingKey in canonicalSettingKeys)
+            foreach (string settingKey in settingKeys)
             {
                 // The outer session/process lease already owns this resource. Reacquiring it
                 // can self-block on SQLite or SQL Server and increments MySQL lock ownership.
-                if (outerOrderedKeys?.Contains(canonicalSettingKey) == true)
+                if (outerOrderedKeys?.Contains(settingKey) == true)
                 {
                     continue;
                 }
 
                 leases.Add(await RelationalNamedLock.AcquireTransactionAsync(
                     _dbContext,
-                    $"explore:setting-mutation:{canonicalSettingKey}",
+                    $"explore:setting-mutation:{settingKey}",
                     cancellationToken));
             }
 
@@ -200,15 +200,15 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
         }
     }
 
-    internal static long ComputeStableLockKey(string canonicalSettingKey) =>
+    internal static long ComputeStableLockKey(string settingKey) =>
         RelationalNamedLock.ComputeStableKey(
-            $"explore:setting-mutation:{canonicalSettingKey.Trim().ToLowerInvariant()}");
+            $"explore:setting-mutation:{settingKey.Trim().ToLowerInvariant()}");
 
-    internal static string[] NormalizeCanonicalKeys(
-        IEnumerable<string> canonicalSettingKeys)
+    internal static string[] NormalizeSettingKeys(
+        IEnumerable<string> settingKeys)
     {
-        string[] normalizedKeys = canonicalSettingKeys
-            .Select(NormalizeCanonicalKey)
+        string[] normalizedKeys = settingKeys
+            .Select(NormalizeSettingKey)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToArray();
@@ -226,15 +226,15 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             : normalizedKeys;
     }
 
-    internal static string[] NormalizeOrderedCanonicalKeyGroups(
-        IEnumerable<IEnumerable<string>> canonicalSettingKeyGroups)
+    internal static string[] NormalizeOrderedSettingKeyGroups(
+        IEnumerable<IEnumerable<string>> settingKeyGroups)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var ordered = new List<string>();
-        foreach (IEnumerable<string> group in canonicalSettingKeyGroups)
+        foreach (IEnumerable<string> group in settingKeyGroups)
         {
             ArgumentNullException.ThrowIfNull(group);
-            foreach (string key in NormalizeCanonicalKeys(group))
+            foreach (string key in NormalizeSettingKeys(group))
             {
                 if (seen.Add(key))
                 {
@@ -263,16 +263,16 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     }
 
     internal static bool RequiresVisitorAccessFence(IEnumerable<string> keys) =>
-        keys.Select(NormalizeCanonicalKey).Any(VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains);
+        keys.Select(NormalizeSettingKey).Any(VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains);
 
     internal static bool RequiresEventResourceGovernanceFence(IEnumerable<string> keys) =>
-        keys.Select(NormalizeCanonicalKey).Any(EventResourceSettingMutationGuard.Handles);
+        keys.Select(NormalizeSettingKey).Any(EventResourceSettingMutationGuard.Handles);
 
     internal static bool RequiresEmailDeliveryFence(IEnumerable<string> keys) =>
-        keys.Select(NormalizeCanonicalKey).Any(key => key == GovernanceSettingKeys.TenantDelegation.LockSmtp
+        keys.Select(NormalizeSettingKey).Any(key => key == GovernanceSettingKeys.TenantDelegation.LockSmtp
             || EmailSettingDefinitions.All.Any(definition => definition.Key == key));
 
-    internal static string NormalizeCanonicalKey(string key)
+    internal static string NormalizeSettingKey(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         return key.Trim().ToLowerInvariant();

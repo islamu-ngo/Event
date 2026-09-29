@@ -73,7 +73,7 @@ public sealed class TicketTransferDomainTests
     }
 
     [Test]
-    public async Task OfferPinsGenerationAndMatchesOnlyCanonicalDigest()
+    public async Task OfferPinsGenerationAndMatchesOnlyNormalizedDigest()
     {
         AdmissionTicket ticket = Ticket();
         TicketTransferPolicy policy = Policy();
@@ -116,7 +116,7 @@ public sealed class TicketTransferDomainTests
             .IsFalse();
         await Assert.That(
                 transfer.MatchesCapability(
-                    NonCanonicalDigest(
+                    NonNormalizedDigest(
                         capabilityDigest)))
             .IsFalse();
     }
@@ -1120,17 +1120,17 @@ public sealed class TicketTransferDomainTests
             SHA256.HashData(
                 Encoding.UTF8.GetBytes(value)));
 
-    private static string NonCanonicalDigest(
-        string canonical)
+    private static string NonNormalizedDigest(
+        string normalized)
     {
-        char current = canonical[^2];
+        char current = normalized[^2];
         int index =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
                 .IndexOf(current);
         char replacement =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[
                 index ^ 1];
-        char[] mutated = canonical.ToCharArray();
+        char[] mutated = normalized.ToCharArray();
         mutated[^2] = replacement;
         return new string(mutated);
     }

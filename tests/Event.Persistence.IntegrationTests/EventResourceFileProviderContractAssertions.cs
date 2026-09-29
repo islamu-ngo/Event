@@ -576,7 +576,7 @@ internal static class EventResourceFileProviderContractAssertions
 
 [NotInParallel("PrimaryDatabaseProviderBehaviorContract")]
 [ClassDataSource<EventResourceFileUploadTests.Database>(Shared = SharedType.PerClass)]
-public sealed class CanonicalSqliteEventResourceFileProviderContractTests(
+public sealed class NormalizedSqliteEventResourceFileProviderContractTests(
     EventResourceFileUploadTests.Database database)
 {
     [Test]

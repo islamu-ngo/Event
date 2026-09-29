@@ -11,6 +11,6 @@ public sealed class WebhookPayloadProvenanceLookup
 public enum WebhookPayloadProvenance
 {
     ExactBytes = 1,
-    LegacyJsonCanonicalized = 2,
+    LegacyJsonNormalized = 2,
     NormalizedProviderEnvelope = 3
 }

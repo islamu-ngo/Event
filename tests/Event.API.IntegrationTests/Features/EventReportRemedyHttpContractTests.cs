@@ -152,11 +152,11 @@ public sealed class EventReportRemedyHttpContractTests
     // In-memory persistence has no relational locks; execute every protected handler callback.
     private sealed class ImmediateSettingMutationLock : ISettingMutationLock
     {
-        public Task<T> ExecuteAsync<T>(string canonicalSettingKey,
+        public Task<T> ExecuteAsync<T>(string settingKey,
             Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
             operation(cancellationToken);
 
-        public Task<T> ExecuteManyAsync<T>(IEnumerable<string> canonicalSettingKeys,
+        public Task<T> ExecuteManyAsync<T>(IEnumerable<string> settingKeys,
             Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
             operation(cancellationToken);
     }

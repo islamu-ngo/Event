@@ -266,7 +266,7 @@ public sealed class ModerationProviderResolverTests
     private static ReportingRoutingPolicy CreatePolicy(
         IReadOnlyList<ReportingProviderTarget>? ospreyTargets = null,
         IReadOnlyList<ReportingProviderTarget>? coopTargets = null) => new(
-        LocalCanonicalRequired: true,
+        LocalReportingRequired: true,
         ExternalSyncEnabled: true,
         InstanceOspreyEnabled: ospreyTargets?.Count > 0,
         TenantOspreyEnabled: false,

@@ -15,7 +15,7 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 /// <summary>
 /// Lightweight container fixture scoped to projection integration tests. It does not rely on
 /// migration files, constructs schema directly from the current model via
-/// <see cref="DatabaseFacade.EnsureCreatedAsync"/>, and repairs canonical lookup rows before use.
+/// <see cref="DatabaseFacade.EnsureCreatedAsync"/>, and repairs expected lookup rows before use.
 /// </summary>
 public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposable
 {

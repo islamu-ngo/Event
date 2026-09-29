@@ -234,7 +234,7 @@ public partial class EventPreviewWorkspace : ComponentBase, IDisposable
         }
 
         var path = EventUrlHelper.BuildPublicPath(eventToShare.Slug, eventToShare.PublicCode) ?? $"/events/{eventId}";
-        var url = CanonicalUrlHelper.Build(Navigation, path);
+        var url = AbsoluteUrlBuilder.Build(Navigation, path);
 
         if (await BrowserActionInterop.ShareAsync(eventToShare.Title ?? "Event", url))
         {
@@ -373,7 +373,7 @@ public partial class EventPreviewWorkspace : ComponentBase, IDisposable
         }
 
         var path = EventUrlHelper.BuildPublicPath(_selectedEvent?.Slug, _selectedEvent?.PublicCode) ?? $"/events/{eventId}";
-        var url = CanonicalUrlHelper.Build(Navigation, path);
+        var url = AbsoluteUrlBuilder.Build(Navigation, path);
         await CopyEventLinkToClipboardAsync(url);
     }
 

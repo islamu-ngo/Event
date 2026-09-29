@@ -119,11 +119,11 @@ internal static class IdempotencyRequestIdentityFactory
 
         bodyStream.Position = 0;
         if (IsJsonContentType(request.ContentType)
-            && TryCanonicalizeJson(bodyStream, streamManager, preserveAmbiguousMemberOrder, out var canonicalJson))
+            && TryNormalizeJson(bodyStream, streamManager, preserveAmbiguousMemberOrder, out var normalizedJson))
         {
-            using (canonicalJson)
+            using (normalizedJson)
             {
-                return ComputeSha256Hex(canonicalJson.ToArray());
+                return ComputeSha256Hex(normalizedJson.ToArray());
             }
         }
 
@@ -133,32 +133,32 @@ internal static class IdempotencyRequestIdentityFactory
             : ComputeSha256Hex(bodyStream.ToArray());
     }
 
-    private static bool TryCanonicalizeJson(
+    private static bool TryNormalizeJson(
         Stream jsonStream,
         RecyclableMemoryStreamManager streamManager,
         bool preserveAmbiguousMemberOrder,
-        out MemoryStream canonicalJson)
+        out MemoryStream normalizedJson)
     {
-        canonicalJson = streamManager.GetStream("idempotency-canonical-json");
+        normalizedJson = streamManager.GetStream("idempotency-normalized-json");
 
         try
         {
             using var document = JsonDocument.Parse(jsonStream);
-            using var writer = new Utf8JsonWriter(canonicalJson);
-            WriteCanonicalJson(document.RootElement, writer, preserveAmbiguousMemberOrder);
+            using var writer = new Utf8JsonWriter(normalizedJson);
+            WriteNormalizedJson(document.RootElement, writer, preserveAmbiguousMemberOrder);
             writer.Flush();
-            canonicalJson.Position = 0;
+            normalizedJson.Position = 0;
             return true;
         }
         catch (JsonException)
         {
-            canonicalJson.Dispose();
-            canonicalJson = new MemoryStream(0);
+            normalizedJson.Dispose();
+            normalizedJson = new MemoryStream(0);
             return false;
         }
     }
 
-    private static void WriteCanonicalJson(
+    private static void WriteNormalizedJson(
         JsonElement element, Utf8JsonWriter writer, bool preserveAmbiguousMemberOrder)
     {
         switch (element.ValueKind)
@@ -175,7 +175,7 @@ internal static class IdempotencyRequestIdentityFactory
                 foreach (var property in properties)
                 {
                     writer.WritePropertyName(property.Name);
-                    WriteCanonicalJson(property.Value, writer, preserveAmbiguousMemberOrder);
+                    WriteNormalizedJson(property.Value, writer, preserveAmbiguousMemberOrder);
                 }
                 writer.WriteEndObject();
                 break;
@@ -183,7 +183,7 @@ internal static class IdempotencyRequestIdentityFactory
                 writer.WriteStartArray();
                 foreach (var item in element.EnumerateArray())
                 {
-                    WriteCanonicalJson(item, writer, preserveAmbiguousMemberOrder);
+                    WriteNormalizedJson(item, writer, preserveAmbiguousMemberOrder);
                 }
                 writer.WriteEndArray();
                 break;
@@ -247,21 +247,21 @@ internal static class IdempotencyRequestIdentityFactory
 
     private static string CapabilityScope(HttpRequest request)
     {
-        var canonical = new StringBuilder();
+        var normalized = new StringBuilder();
         foreach (string headerName in CapabilityHeaders)
         {
             string[] values = request.Headers[headerName]
                 .Select(value => value ?? string.Empty)
                 .Order(StringComparer.Ordinal)
                 .ToArray();
-            canonical.Append(headerName).Append(':').Append(values.Length).Append(':');
+            normalized.Append(headerName).Append(':').Append(values.Length).Append(':');
             foreach (string value in values)
             {
-                canonical.Append(value.Length).Append(':').Append(value).Append('|');
+                normalized.Append(value.Length).Append(':').Append(value).Append('|');
             }
         }
 
-        return ComputeSha256Hex(canonical.ToString());
+        return ComputeSha256Hex(normalized.ToString());
     }
 
     private static string? NormalizeContentType(string? contentType)

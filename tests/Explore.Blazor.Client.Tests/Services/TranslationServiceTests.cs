@@ -74,7 +74,7 @@ public sealed class TranslationServiceTests : IDisposable
     }
 
     [Test]
-    public async Task GetTranslationsAsync_WhenLanguageHasCaseOrWhitespace_FetchesCanonicalApiLanguage()
+    public async Task GetTranslationsAsync_WhenLanguageHasCaseOrWhitespace_FetchesNormalizedApiLanguage()
     {
         var translations = new Dictionary<string, string>
         {

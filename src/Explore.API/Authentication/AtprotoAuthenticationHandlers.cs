@@ -57,11 +57,11 @@ public sealed class AtprotoBootstrapAuthenticationHandler(
             new Claim(AtprotoJwtOptions.DidClaim, identity.Did),
             new Claim(AtprotoJwtOptions.ClassificationClaim, identity.Classification)
         ], ApiAuthenticationSchemeNames.AtprotoBootstrap));
-        if (identity.CanonicalActorId is { } canonicalActorId)
+        if (identity.TargetActorId is { } targetActorId)
         {
             ((ClaimsIdentity)principal.Identity!).AddClaims([
-                new(AtprotoJwtOptions.CanonicalActorIdClaim, canonicalActorId.ToString("D")),
-                new(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim, identity.ExpectedCanonicalActorConcurrencyStamp!.Value.ToString("D"))
+                new(AtprotoJwtOptions.TargetActorIdClaim, targetActorId.ToString("D")),
+                new(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim, identity.ExpectedTargetActorConcurrencyStamp!.Value.ToString("D"))
             ]);
         }
         return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name));

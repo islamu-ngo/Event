@@ -31,7 +31,7 @@ public sealed class WebhookDeliveryClaimIntegrationTests : IAsyncInitializer, IA
     }
 
     [Test]
-    public async Task ClaimDue_WithRetryingExecutionStrategy_ClaimsCanonicalTargetAsRetriableUnit()
+    public async Task ClaimDue_WithRetryingExecutionStrategy_ClaimsPrimaryTargetAsRetriableUnit()
     {
         await ResetDatabaseAsync();
         var now = DateTimeOffset.UtcNow;

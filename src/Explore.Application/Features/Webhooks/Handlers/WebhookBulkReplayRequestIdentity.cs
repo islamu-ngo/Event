@@ -9,7 +9,7 @@ internal static class WebhookBulkReplayRequestIdentity
 {
     public static string Compute(ScheduleWebhookBulkReplayCommand command)
     {
-        var canonical = string.Join('|',
+        var normalized = string.Join('|',
             command.TenantId.ToString("N"),
             command.FromUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             command.ToUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
@@ -18,6 +18,6 @@ internal static class WebhookBulkReplayRequestIdentity
             command.EventType?.Trim() ?? string.Empty,
             command.MaxItems.ToString(CultureInfo.InvariantCulture),
             command.ReasonCode.Trim().ToLowerInvariant());
-        return $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant()}";
+        return $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant()}";
     }
 }

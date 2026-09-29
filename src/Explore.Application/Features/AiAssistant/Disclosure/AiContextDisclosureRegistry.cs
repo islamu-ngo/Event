@@ -64,7 +64,7 @@ public sealed class AiContextDisclosureRegistry
     public int Count => _entriesByKey.Count;
 
     /// <summary>
-    /// Constructs the canonical registry seeded from
+    /// Constructs the standard registry seeded from
     /// <c>field-classification-matrix.md</c> §4. The seed is hand-curated and reviewed;
     /// adding a <c>*Pii</c> property without a matrix row fails the build (Task 1.5).
     /// </summary>

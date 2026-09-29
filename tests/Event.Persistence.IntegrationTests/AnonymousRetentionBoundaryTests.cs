@@ -159,7 +159,7 @@ public sealed class AnonymousRetentionBoundaryTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task CanonicalNormalizationCapsPlaintextAndCiphertextAndRefusesExpiredWrites(bool held)
+    public async Task NormalizationCapsPlaintextAndCiphertextAndRefusesExpiredWrites(bool held)
     {
         await using var fixture = await WriterFixture.CreateAsync();
         DateTime now = fixture.Clock.Now.UtcDateTime;
@@ -167,7 +167,7 @@ public sealed class AnonymousRetentionBoundaryTests
         var ticket = await fixture.Inner.SeedTicketAsync(target.Id);
         var workflow = RegistrationWorkflow.Create(fixture.TenantId, target.Id, "RETENTION", now);
         var requirement = RegistrationRequirement.Create(workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
-            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, now);
         var channel = RegistrationChannel.Create(requirement, 1, true, null, now);
         requirement.AddChannel(channel);

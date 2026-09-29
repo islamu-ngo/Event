@@ -59,7 +59,7 @@ public sealed class CompletionGenerationRaceHttpTests
         if (provider == AuthenticationProviderKind.Keycloak)
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 factory.CreateExternalProviderToken(Guid.CreateVersion7(), "operator@example.test", true));
-        var profile = new SelfHostOnboardingProfileDto { SiteName = "P0", CanonicalUrl = "https://example.test" };
+        var profile = new SelfHostOnboardingProfileDto { SiteName = "P0", PublicUrl = "https://example.test" };
         using var saved = await client.PatchAsJsonAsync("/api/instanceonboarding/profile", profile, token);
         await Assert.That(saved.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var journeyResponse = await client.GetAsync("/api/instanceonboarding/journey", token);

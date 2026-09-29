@@ -32,7 +32,7 @@ public sealed partial class AdmissionTicketApiRedContractTests
     [Arguments("replayed")]
     [Arguments("wrong-purpose")]
     [Arguments("wrong-tenant")]
-    public async Task InvalidRecoveryCapabilityReturnsCanonicalNotFoundProblem(string invalidState)
+    public async Task InvalidRecoveryCapabilityReturnsStandardNotFoundProblem(string invalidState)
     {
         await RequireRoute(RecoveryConsume);
         var scenario = new AdmissionApiScenario();

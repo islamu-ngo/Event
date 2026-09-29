@@ -51,17 +51,17 @@ internal sealed class AdmissionApiRequestContracts
     }
 
     internal static AdmissionApiRequestContracts ForProbe() => new(
-        Exact(typeof(CanonicalProbeRequests.RequestAdmissionTicketRecoveryCommand),
+        Exact(typeof(StandardProbeRequests.RequestAdmissionTicketRecoveryCommand),
             typeof(ProbeResponse), "Email"),
-        Exact(typeof(CanonicalProbeRequests.RedeemAdmissionTicketRecoveryCommand),
+        Exact(typeof(StandardProbeRequests.RedeemAdmissionTicketRecoveryCommand),
             typeof(ProbeResponse), "Capability"),
-        Exact(typeof(CanonicalProbeRequests.GetCurrentAdmissionTicketsQuery),
+        Exact(typeof(StandardProbeRequests.GetCurrentAdmissionTicketsQuery),
             typeof(IReadOnlyList<ProbeResponse>)),
-        Exact(typeof(CanonicalProbeRequests.GetCurrentAdmissionTicketQuery),
+        Exact(typeof(StandardProbeRequests.GetCurrentAdmissionTicketQuery),
             typeof(ProbeResponse), "TicketId"),
-        Exact(typeof(CanonicalProbeRequests.ReissueCurrentAdmissionTicketQrCommand),
+        Exact(typeof(StandardProbeRequests.ReissueCurrentAdmissionTicketQrCommand),
             typeof(ProbeResponse), "TicketId"),
-        Exact(typeof(CanonicalProbeRequests.ReissueCurrentAdmissionTicketPrintCommand),
+        Exact(typeof(StandardProbeRequests.ReissueCurrentAdmissionTicketPrintCommand),
             typeof(ProbeResponse), "TicketId"));
 
     private static AdmissionRequestContract Exact(
@@ -100,7 +100,7 @@ internal sealed record AdmissionRequestContract(
     Type ResponseType,
     IReadOnlyList<PropertyInfo> ConsumedProperties);
 
-internal static class CanonicalProbeRequests
+internal static class StandardProbeRequests
 {
     internal sealed record RequestAdmissionTicketRecoveryCommand(string Email) : ICommand<ProbeResponse>;
     internal sealed record RedeemAdmissionTicketRecoveryCommand(string Capability, string WrongMember)

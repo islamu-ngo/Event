@@ -7,7 +7,7 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 public sealed class ConfigurationImportArtifactSnapshotFactoryTests
 {
     [Test]
-    public async Task ManifestProjection_CoversCanonicalInstanceAndTenantSections()
+    public async Task ManifestProjection_CoversAuthoritativeInstanceAndTenantSections()
     {
         ConfigurationManifestV1Alpha2 manifest =
             ConfigurationManifestTestData.Valid();
@@ -36,7 +36,7 @@ public sealed class ConfigurationImportArtifactSnapshotFactoryTests
     }
 
     [Test]
-    public async Task TenantPackageAndTargetTenant_UseSameCanonicalDigests()
+    public async Task TenantPackageAndTargetTenant_UseSameNormalizedDigests()
     {
         ConfigurationManifestV1Alpha2 manifest =
             ConfigurationManifestTestData.Valid();
@@ -62,9 +62,9 @@ public sealed class ConfigurationImportArtifactSnapshotFactoryTests
                 "tenant.documents",
                 "tenant.legal_documents"
             ]);
-        await Assert.That(source.Select(section => section.CanonicalDigest))
+        await Assert.That(source.Select(section => section.NormalizedDigest))
             .IsEquivalentTo(
-                target.Select(section => section.CanonicalDigest));
+                target.Select(section => section.NormalizedDigest));
     }
 
     [Test]
@@ -157,13 +157,13 @@ public sealed class ConfigurationImportArtifactSnapshotFactoryTests
                 .FromTenantPackage(package)
                 .Single(section =>
                     section.SectionKey == "tenant.settings")
-                .CanonicalDigest;
+                .NormalizedDigest;
         string targetDigest =
             ConfigurationImportArtifactSnapshotFactory
                 .FromManifestTenant(target, tenant.Metadata.Name)
                 .Single(section =>
                     section.SectionKey == "tenant.settings")
-                .CanonicalDigest;
+                .NormalizedDigest;
 
         await Assert.That(sourceDigest).IsEqualTo(targetDigest);
     }

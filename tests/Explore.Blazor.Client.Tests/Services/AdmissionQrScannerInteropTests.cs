@@ -105,7 +105,7 @@ public sealed class AdmissionQrScannerInteropTests
     {
         AdmissionQrNativeResult missingStatus =
             JsonSerializer.Deserialize<AdmissionQrNativeResult>("{}")!;
-        AdmissionQrNativeResult canonicalStatus =
+        AdmissionQrNativeResult emptyStatus =
             JsonSerializer.Deserialize<AdmissionQrNativeResult>("{\"status\":\"noCode\"}")!;
         Assert.Throws<JsonException>(() =>
             JsonSerializer.Deserialize<AdmissionQrNativeResult>("{\"status\":\"unknown\"}"));
@@ -120,7 +120,7 @@ public sealed class AdmissionQrScannerInteropTests
         AdmissionQrScanResult nullResult = await nullReply.DetectAsync(default);
 
         await Assert.That(missingStatus.Status).IsEqualTo(AdmissionQrNativeStatus.Unknown);
-        await Assert.That(canonicalStatus.Status).IsEqualTo(AdmissionQrNativeStatus.NoCode);
+        await Assert.That(emptyStatus.Status).IsEqualTo(AdmissionQrNativeStatus.NoCode);
         await Assert.That(malformedCapability.NativeQrAvailable).IsFalse();
         await Assert.That(malformedResult.Outcome).IsEqualTo(AdmissionQrScanOutcome.Failure);
         await Assert.That(malformedResult.Credential).IsNull();

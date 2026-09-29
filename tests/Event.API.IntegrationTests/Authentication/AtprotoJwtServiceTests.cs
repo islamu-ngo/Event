@@ -76,39 +76,39 @@ public sealed class AtprotoJwtServiceTests
     }
 
     [Test]
-    public async Task BootstrapValidationRejectsDuplicateMalformedOrHalfCanonicalActorTargetClaims()
+    public async Task BootstrapValidationRejectsDuplicateMalformedOrHalfTargetActorClaims()
     {
         using var keys = new TestKeyMaterial();
         var service = CreateService(keys);
         var tenantId = Guid.NewGuid();
-        var canonicalActorId = Guid.NewGuid();
+        var targetActorId = Guid.NewGuid();
         var valid = CreateBootstrapToken(
             keys.OAuthKey,
             tenantId,
-            canonicalActorId: canonicalActorId,
-            expectedCanonicalActorConcurrencyStamp: Guid.NewGuid());
+            targetActorId: targetActorId,
+            expectedTargetActorConcurrencyStamp: Guid.NewGuid());
         var duplicate = CreateBootstrapToken(
             keys.OAuthKey,
             tenantId,
-            canonicalActorId: canonicalActorId,
-            expectedCanonicalActorConcurrencyStamp: Guid.NewGuid(),
-            extraClaims: [new Claim(AtprotoJwtOptions.CanonicalActorIdClaim, Guid.NewGuid().ToString("D"))]);
+            targetActorId: targetActorId,
+            expectedTargetActorConcurrencyStamp: Guid.NewGuid(),
+            extraClaims: [new Claim(AtprotoJwtOptions.TargetActorIdClaim, Guid.NewGuid().ToString("D"))]);
         var malformed = CreateBootstrapToken(
             keys.OAuthKey,
             tenantId,
-            canonicalActorId: Guid.Empty,
-            expectedCanonicalActorConcurrencyStamp: Guid.NewGuid());
+            targetActorId: Guid.Empty,
+            expectedTargetActorConcurrencyStamp: Guid.NewGuid());
         var malformedStamp = CreateBootstrapToken(
             keys.OAuthKey,
             tenantId,
-            canonicalActorId: canonicalActorId,
-            extraClaims: [new Claim(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim, "not-a-guid")]);
+            targetActorId: targetActorId,
+            extraClaims: [new Claim(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim, "not-a-guid")]);
         var emptyStamp = CreateBootstrapToken(
             keys.OAuthKey,
             tenantId,
-            canonicalActorId: canonicalActorId,
-            extraClaims: [new Claim(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim, Guid.Empty.ToString("D"))]);
-        var half = CreateBootstrapToken(keys.OAuthKey, tenantId, canonicalActorId: canonicalActorId);
+            targetActorId: targetActorId,
+            extraClaims: [new Claim(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim, Guid.Empty.ToString("D"))]);
+        var half = CreateBootstrapToken(keys.OAuthKey, tenantId, targetActorId: targetActorId);
 
         await Assert.That(await service.ValidateBootstrapAsync(valid, tenantId, HttpMethods.Post, AtprotoJwtOptions.BridgePath, CancellationToken.None)).IsNotNull();
         foreach (var attack in new[] { duplicate, malformed, malformedStamp, emptyStamp, half })
@@ -133,7 +133,7 @@ public sealed class AtprotoJwtServiceTests
         await Assert.That(principal!.FindFirstValue(JwtRegisteredClaimNames.Sub)).IsEqualTo(userId.ToString("D"));
         await Assert.That(principal.FindFirstValue(AtprotoJwtOptions.TenantClaim)).IsEqualTo(tenantId.ToString("D"));
         await Assert.That(principal.FindFirstValue(AtprotoJwtOptions.DidClaim)).IsEqualTo(did);
-        await Assert.That(principal.Claims.Any(claim => claim.Type is AtprotoJwtOptions.CanonicalActorIdClaim or AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim)).IsFalse();
+        await Assert.That(principal.Claims.Any(claim => claim.Type is AtprotoJwtOptions.TargetActorIdClaim or AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim)).IsFalse();
         await Assert.That(await service.ValidateSessionAsync(issued.Token, Guid.NewGuid(), CancellationToken.None)).IsNull();
 
         var oauthSignedSession = CreateSessionToken(keys.OAuthKey, userId, tenantId, did);
@@ -361,8 +361,8 @@ public sealed class AtprotoJwtServiceTests
         DateTimeOffset? issuedAt = null,
         bool includeIssuedAt = true,
         string? classification = "person",
-        Guid? canonicalActorId = null,
-        Guid? expectedCanonicalActorConcurrencyStamp = null,
+        Guid? targetActorId = null,
+        Guid? expectedTargetActorConcurrencyStamp = null,
         IEnumerable<Claim>? extraClaims = null)
     {
         var claims = new List<Claim>
@@ -378,13 +378,13 @@ public sealed class AtprotoJwtServiceTests
         {
             claims.Add(new(AtprotoJwtOptions.ClassificationClaim, classification));
         }
-        if (canonicalActorId is not null)
+        if (targetActorId is not null)
         {
-            claims.Add(new(AtprotoJwtOptions.CanonicalActorIdClaim, canonicalActorId.Value.ToString("D")));
+            claims.Add(new(AtprotoJwtOptions.TargetActorIdClaim, targetActorId.Value.ToString("D")));
         }
-        if (expectedCanonicalActorConcurrencyStamp is not null)
+        if (expectedTargetActorConcurrencyStamp is not null)
         {
-            claims.Add(new(AtprotoJwtOptions.ExpectedCanonicalActorConcurrencyStampClaim, expectedCanonicalActorConcurrencyStamp.Value.ToString("D")));
+            claims.Add(new(AtprotoJwtOptions.ExpectedTargetActorConcurrencyStampClaim, expectedTargetActorConcurrencyStamp.Value.ToString("D")));
         }
         if (extraClaims is not null)
         {

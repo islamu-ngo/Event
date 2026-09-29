@@ -138,9 +138,9 @@ public sealed class SetupCompositionInvariantTests
             "tenant-user-authority");
 
     [Test]
-    public async Task CanonicalParityMatrixPinsEveryCoreAuthority() =>
+    public async Task DeterministicParityMatrixPinsEveryCoreAuthority() =>
         await AssertMatrix(
-            CompositionMatrix.CanonicalParity,
+            CompositionMatrix.DeterministicParity,
             "json",
             "yaml",
             "directory",

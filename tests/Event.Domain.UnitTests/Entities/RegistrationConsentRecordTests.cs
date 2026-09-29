@@ -50,7 +50,7 @@ public sealed class RegistrationConsentRecordTests
         RegistrationWorkflow workflow = RegistrationWorkflow.Create(tenantId, eventId, "ATTENDEE_REGISTRATION", UtcNow);
         RegistrationRequirement requirement = RegistrationRequirement.Create(workflow, 1,
             RegistrationRequirementCriticalityEnum.Required, false,
-            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
         RegistrationChannel channel = RegistrationChannel.Create(requirement, 1, true, null, UtcNow);
         requirement.AddChannel(channel);

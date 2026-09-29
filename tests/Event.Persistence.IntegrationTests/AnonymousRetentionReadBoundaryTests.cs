@@ -663,7 +663,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
         fixture.Context.AddRange(participant, assignment);
         var workflow = RegistrationWorkflow.Create(fixture.TenantId, order.EventId, "RETENTION", Now);
         var requirement = RegistrationRequirement.Create(workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
-            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, Now);
         var channel = RegistrationChannel.Create(requirement, 1, true, null, Now);
         requirement.AddChannel(channel);

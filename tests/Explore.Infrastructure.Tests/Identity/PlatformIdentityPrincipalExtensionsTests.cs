@@ -18,7 +18,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
         OtherAuthenticationScheme,
         Unauthenticated,
         MultipleAuthenticatedIdentities,
-        NoncanonicalSubject,
+        NonstandardSubject,
         UppercaseSubject,
         MalformedSubject,
         EmptySubject,
@@ -35,7 +35,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     {
         MissingIssuer,
         OtherIssuer,
-        NoncanonicalSubject,
+        NonstandardSubject,
         UppercaseSubject,
         PaddedSubject,
         MalformedSubject,
@@ -107,7 +107,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     [Arguments(InvalidLocalSessionPrincipal.OtherAuthenticationScheme)]
     [Arguments(InvalidLocalSessionPrincipal.Unauthenticated)]
     [Arguments(InvalidLocalSessionPrincipal.MultipleAuthenticatedIdentities)]
-    [Arguments(InvalidLocalSessionPrincipal.NoncanonicalSubject)]
+    [Arguments(InvalidLocalSessionPrincipal.NonstandardSubject)]
     [Arguments(InvalidLocalSessionPrincipal.UppercaseSubject)]
     [Arguments(InvalidLocalSessionPrincipal.MalformedSubject)]
     [Arguments(InvalidLocalSessionPrincipal.EmptySubject)]
@@ -125,7 +125,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
             subjectId: subjectId, securityStamp: Guid.CreateVersion7().ToString("N"), emailVerified: true).ToList();
         (string? ClaimType, string? Value) replacement = defect switch
         {
-            InvalidLocalSessionPrincipal.NoncanonicalSubject => ("sub", subjectId.ToString("N")),
+            InvalidLocalSessionPrincipal.NonstandardSubject => ("sub", subjectId.ToString("N")),
             InvalidLocalSessionPrincipal.UppercaseSubject => ("sub", subjectId.ToString("D").ToUpperInvariant()),
             InvalidLocalSessionPrincipal.MalformedSubject => ("sub", "invalid-subject"),
             InvalidLocalSessionPrincipal.EmptySubject => ("sub", string.Empty),
@@ -168,7 +168,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     [Arguments(" false ")]
     [Arguments("1")]
     [Arguments("")]
-    public async Task LocalSessionAuthorityRejectsNoncanonicalVerificationBoolean(string verificationValue)
+    public async Task LocalSessionAuthorityRejectsNonstandardVerificationBoolean(string verificationValue)
     {
         List<Claim> claims = LocalSessionClaims(
             subjectId: Guid.CreateVersion7(), securityStamp: Guid.CreateVersion7().ToString("N"), emailVerified: true).ToList();
@@ -190,7 +190,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     ];
 
     [Test]
-    public async Task NativeLocalIssuerProjectsCanonicalSubjectAsExactLocalAccountKey()
+    public async Task NativeLocalIssuerProjectsAuthoritativeSubjectAsExactLocalAccountKey()
     {
         string subject = Guid.CreateVersion7().ToString("D");
         ClaimsPrincipal principal = Principal(ApiAuthenticationSchemeNames.LocalIdentity,
@@ -212,18 +212,18 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     [Test]
     [Arguments(InvalidLocalProviderProjection.MissingIssuer)]
     [Arguments(InvalidLocalProviderProjection.OtherIssuer)]
-    [Arguments(InvalidLocalProviderProjection.NoncanonicalSubject)]
+    [Arguments(InvalidLocalProviderProjection.NonstandardSubject)]
     [Arguments(InvalidLocalProviderProjection.UppercaseSubject)]
     [Arguments(InvalidLocalProviderProjection.PaddedSubject)]
     [Arguments(InvalidLocalProviderProjection.MalformedSubject)]
     [Arguments(InvalidLocalProviderProjection.EmptySubject)]
     [Arguments(InvalidLocalProviderProjection.EmptyGuidSubject)]
-    public async Task LocalProviderProjectionRejectsUntrustedIssuerOrNoncanonicalSubject(InvalidLocalProviderProjection defect)
+    public async Task LocalProviderProjectionRejectsUntrustedIssuerOrNonstandardSubject(InvalidLocalProviderProjection defect)
     {
         Guid subjectId = Guid.Parse("abcdefab-cdef-4abc-8def-abcdefabcdef");
         string subject = defect switch
         {
-            InvalidLocalProviderProjection.NoncanonicalSubject => subjectId.ToString("N"),
+            InvalidLocalProviderProjection.NonstandardSubject => subjectId.ToString("N"),
             InvalidLocalProviderProjection.UppercaseSubject => subjectId.ToString("D").ToUpperInvariant(),
             InvalidLocalProviderProjection.PaddedSubject => $" {subjectId:D} ",
             InvalidLocalProviderProjection.MalformedSubject => "not-a-local-subject",
@@ -436,7 +436,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     [Arguments(1, NameIdentifierUserId)]
     [Arguments(2, SidUserId)]
     [Arguments(3, InternalUserId)]
-    public async Task CanonicalResolverUsesEveryDocumentedFallbackPosition(
+    public async Task AuthoritativeResolverUsesEveryDocumentedFallbackPosition(
         int selectedPosition,
         string expectedUserId)
     {
@@ -453,7 +453,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     }
 
     [Test]
-    public async Task CanonicalResolverSelectsSubWhenGuidClaimsConflict()
+    public async Task AuthoritativeResolverSelectsSubWhenGuidClaimsConflict()
     {
         ClaimsPrincipal principal = Principal(
             "Bearer",
@@ -466,7 +466,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     }
 
     [Test]
-    public async Task CanonicalResolverRejectsUnauthenticatedPrincipalEvenWithGuidClaim()
+    public async Task AuthoritativeResolverRejectsUnauthenticatedPrincipalEvenWithGuidClaim()
     {
         ClaimsPrincipal principal = Principal(null, new Claim("sub", SubUserId));
 
@@ -546,7 +546,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     [Arguments(ClaimTypes.NameIdentifier, "{not-a-guid}")]
     [Arguments("sid", " ")]
     [Arguments("internal_user_id", "00000000-0000-0000-0000-00000000000z")]
-    public async Task CanonicalResolverRejectsMalformedGuidClaim(string claimType, string claimValue)
+    public async Task AuthoritativeResolverRejectsMalformedGuidClaim(string claimType, string claimValue)
     {
         ClaimsPrincipal principal = Principal("Bearer", new Claim(claimType, claimValue));
 
@@ -554,7 +554,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     }
 
     [Test]
-    public async Task CanonicalResolverFallsThroughNonGuidProviderSubjectToInternalUserId()
+    public async Task AuthoritativeResolverFallsThroughNonGuidProviderSubjectToInternalUserId()
     {
         ClaimsPrincipal principal = Principal(
             "Google",
@@ -565,7 +565,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     }
 
     [Test]
-    public async Task CanonicalResolverDoesNotReinterpretNonGuidProviderSubjectAsPlatformIdentity()
+    public async Task AuthoritativeResolverDoesNotReinterpretNonGuidProviderSubjectAsPlatformIdentity()
     {
         ClaimsPrincipal principal = Principal(
             "Atproto",
@@ -579,11 +579,11 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     [Arguments(ApiAuthenticationSchemeNames.SetupSecret, "setup_authority", "active")]
     [Arguments(ApiAuthenticationSchemeNames.AdmissionScanner, "admission_scanner_capability_id", NameIdentifierUserId)]
     [Arguments(ApiAuthenticationSchemeNames.ManagedControlPlane, "managed_instance_id", SidUserId)]
-    [Arguments(ApiAuthenticationSchemeNames.AtprotoBootstrap, "canonical_actor_id", InternalUserId)]
+    [Arguments(ApiAuthenticationSchemeNames.AtprotoBootstrap, "target_actor_id", InternalUserId)]
     [Arguments(ApiAuthenticationSchemeNames.AtprotoSession, "did", "did:web:session.example.test")]
     [Arguments("Atproto", "sub", "did:plc:provider-subject")]
     [Arguments(ApiAuthenticationSchemeNames.PrivacyErasureReceipt, "privacy_erasure_intent_id", SubUserId)]
-    public async Task CanonicalResolverDoesNotReinterpretPurposeBoundSchemeClaims(
+    public async Task AuthoritativeResolverDoesNotReinterpretPurposeBoundSchemeClaims(
         string authenticationScheme,
         string claimType,
         string claimValue)
@@ -641,7 +641,7 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
 
     [Test]
     [Category("MigrationAnchor")]
-    public async Task MigrationAnchorCurrentUserServiceMatchesCanonicalConflictingClaimPriority()
+    public async Task MigrationAnchorCurrentUserServiceMatchesAuthoritativeConflictingClaimPriority()
     {
         ClaimsPrincipal principal = Principal(
             "Bearer",
@@ -649,16 +649,16 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
             new Claim(ClaimTypes.NameIdentifier, NameIdentifierUserId),
             new Claim("sid", SidUserId),
             new Claim("internal_user_id", InternalUserId));
-        Guid? canonicalUserId = principal.GetPlatformUserId();
+        Guid? authoritativeUserId = principal.GetPlatformUserId();
         var accessor = new HttpContextAccessor
         {
             HttpContext = new DefaultHttpContext { User = principal }
         };
         var duplicatedCaller = new CurrentUserService(accessor);
 
-        await Assert.That(canonicalUserId).IsEqualTo(Guid.Parse(SubUserId));
+        await Assert.That(authoritativeUserId).IsEqualTo(Guid.Parse(SubUserId));
         await Assert.That(duplicatedCaller.UserId)
-            .IsEqualTo(canonicalUserId)
+            .IsEqualTo(authoritativeUserId)
             .Because("CurrentUserService must preserve sub -> nameidentifier -> sid -> internal_user_id priority.");
     }
 

@@ -145,9 +145,9 @@ public sealed class SetupSecretRateLimitMetadataTests
     }
 
     [Test]
-    public async Task CanonicalProviderPatchActionsUseWritePolicyAndAdvertiseRateLimitProblemDetails()
+    public async Task PrimaryProviderPatchActionsUseWritePolicyAndAdvertiseRateLimitProblemDetails()
     {
-        foreach (var method in CanonicalProviderPatchActions())
+        foreach (var method in PrimaryProviderPatchActions())
         {
             var rateLimit = method.GetCustomAttribute<EnableRateLimitingAttribute>();
 
@@ -160,9 +160,9 @@ public sealed class SetupSecretRateLimitMetadataTests
     }
 
     [Test]
-    public async Task CanonicalProviderGetActionsAdvertiseRateLimitProblemDetailsWithoutNamedRateLimitMetadata()
+    public async Task PrimaryProviderGetActionsAdvertiseRateLimitProblemDetailsWithoutNamedRateLimitMetadata()
     {
-        foreach (var method in CanonicalProviderGetActions())
+        foreach (var method in PrimaryProviderGetActions())
         {
             var rateLimit = method.GetCustomAttribute<EnableRateLimitingAttribute>();
 
@@ -176,7 +176,7 @@ public sealed class SetupSecretRateLimitMetadataTests
     [Test]
     [Arguments("/api/instance/settings/auth-provider")]
     [Arguments("/api/instance/settings/authz-provider")]
-    public async Task CanonicalProviderPatch_WithAuthenticatedSetupIdentity_UsesSetupSecretPolicy(string path)
+    public async Task PrimaryProviderPatch_WithAuthenticatedSetupIdentity_UsesSetupSecretPolicy(string path)
     {
         var context = CreateContext(HttpMethods.Patch, path, ApiAuthenticationSchemeNames.SetupSecret);
 
@@ -190,7 +190,7 @@ public sealed class SetupSecretRateLimitMetadataTests
     [Arguments("GET", "/api/instance/settings/authz-provider")]
     [Arguments("PATCH", "/api/instance/settings/auth-provider")]
     [Arguments("PATCH", "/api/instance/settings/authz-provider")]
-    public async Task CanonicalProviderRoute_WithSetupSecretHeaderAndFailedAuthentication_UsesSetupSecretPolicy(
+    public async Task PrimaryProviderRoute_WithSetupSecretHeaderAndFailedAuthentication_UsesSetupSecretPolicy(
         string method,
         string path)
     {
@@ -205,7 +205,7 @@ public sealed class SetupSecretRateLimitMetadataTests
     [Test]
     [Arguments("/api/instance/settings/auth-provider")]
     [Arguments("/api/instance/settings/authz-provider")]
-    public async Task CanonicalProviderPatch_WithAuthenticatedBearerAdmin_UsesWritePolicy(string path)
+    public async Task PrimaryProviderPatch_WithAuthenticatedBearerAdmin_UsesWritePolicy(string path)
     {
         var context = CreateContext(HttpMethods.Patch, path, JwtBearerDefaults.AuthenticationScheme);
         context.User.AddIdentity(new ClaimsIdentity(
@@ -242,7 +242,7 @@ public sealed class SetupSecretRateLimitMetadataTests
             .ToArray();
     }
 
-    private static IReadOnlyList<MethodInfo> CanonicalProviderPatchActions() =>
+    private static IReadOnlyList<MethodInfo> PrimaryProviderPatchActions() =>
     [
         typeof(InstanceAuthenticationSettingsController).GetMethod(nameof(InstanceAuthenticationSettingsController.UpdateAuthProviderConfiguration))
             ?? throw new InvalidOperationException("The auth-provider PATCH action is missing."),
@@ -250,7 +250,7 @@ public sealed class SetupSecretRateLimitMetadataTests
             ?? throw new InvalidOperationException("The authz-provider PATCH action is missing.")
     ];
 
-    private static IReadOnlyList<MethodInfo> CanonicalProviderGetActions() =>
+    private static IReadOnlyList<MethodInfo> PrimaryProviderGetActions() =>
     [
         typeof(InstanceAuthenticationSettingsController).GetMethod(nameof(InstanceAuthenticationSettingsController.GetAuthProviderConfiguration))
             ?? throw new InvalidOperationException("The auth-provider GET action is missing."),

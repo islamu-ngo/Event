@@ -223,7 +223,7 @@ public sealed class AdmissionTicket : ITenantEntity, IAuditableEntity, IConcurre
     {
         if ((AdmissionTicketStatusEnum)AdmissionTicketStatusId != AdmissionTicketStatusEnum.Active ||
             credentialVersion <= 0 || lookupKeyVersion <= 0 ||
-            !TryDecodeCanonicalDigest(lookupDigest, out byte[] candidateDigest))
+            !TryDecodeDigest(lookupDigest, out byte[] candidateDigest))
         {
             return false;
         }
@@ -408,7 +408,7 @@ public sealed class AdmissionTicket : ITenantEntity, IAuditableEntity, IConcurre
         }
     }
 
-    private static bool TryDecodeCanonicalDigest(string value, out byte[] digest)
+    private static bool TryDecodeDigest(string value, out byte[] digest)
     {
         digest = [];
         if (string.IsNullOrWhiteSpace(value))

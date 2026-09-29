@@ -263,7 +263,7 @@ public partial class ExploreDbContext
             if (!validScope)
             {
                 throw new InvalidOperationException(
-                    "Admission targets must persist one known canonical event, day, or session scope.");
+                    "Admission targets must persist one known event, day, or session scope.");
             }
         }
 
@@ -432,16 +432,16 @@ public partial class ExploreDbContext
 
     internal static byte[] ComputeMySqlUniquenessHash(params string[] components)
     {
-        var canonical = new StringBuilder();
+        var digestInput = new StringBuilder();
         foreach (var component in components)
         {
             var byteLength = Encoding.UTF8.GetByteCount(component);
-            canonical.Append(byteLength.ToString("D10", CultureInfo.InvariantCulture));
-            canonical.Append(':');
-            canonical.Append(component);
+            digestInput.Append(byteLength.ToString("D10", CultureInfo.InvariantCulture));
+            digestInput.Append(':');
+            digestInput.Append(component);
         }
 
-        return SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString()));
+        return SHA256.HashData(Encoding.UTF8.GetBytes(digestInput.ToString()));
     }
 
     private void ValidateEventLocationCarrierConsistency()

@@ -18,7 +18,7 @@
 @{
     // Read the language cookie server-side for correct SSR lang/dir attributes.
     // Raw cookie values are never trusted: we resolve through CultureRegistry, which is the
-    // compile-time allowlist. Anything outside it degrades to the canonical default ("en").
+    // compile-time allowlist. Anything outside it degrades to the registry default ("en").
     var langCookie = HttpContextAccessor.HttpContext?.Request.Cookies["lang"];
     var pageLang = BffCultureRegistry.TryNormalize(langCookie, out var resolvedLanguage)
         ? resolvedLanguage

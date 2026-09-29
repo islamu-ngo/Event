@@ -19,7 +19,7 @@ public sealed record RegistrationFieldNormalizationSpec(
     string? AllowedUrlSchemes);
 
 public sealed record NormalizedRegistrationValue(
-    string Canonical,
+    string Normalized,
     string? Text = null,
     long? IntegerValue = null,
     decimal? DecimalValue = null,

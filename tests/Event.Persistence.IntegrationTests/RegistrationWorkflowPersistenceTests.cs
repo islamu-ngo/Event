@@ -112,7 +112,7 @@ public sealed class RegistrationWorkflowPersistenceTests
             (1, "NONE", "None"),
             (2, "COMPLETION_ONLY", "Completion only"),
             (3, "SELECTED_FIELDS", "Selected fields"),
-            (4, "FULL_CANONICAL", "Full canonical"),
+            (4, "FULL_SYNC", "Full sync"),
             (5, "MIRROR_ONLY", "Mirror only")
         ]);
         await AssertRowsAsync(context.RegistrationRequirementSubjectTypes,

@@ -66,15 +66,15 @@ public sealed class ConfigurationImportArtifactParserTests
     [Test]
     public async Task Parse_DuplicateOrUnknownMemberFailsClosed()
     {
-        string canonical = Encoding.UTF8.GetString(
+        string normalized = Encoding.UTF8.GetString(
             JsonSerializer.SerializeToUtf8Bytes(
                 ConfigurationManifestTestData.Valid(),
                 ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2));
-        string duplicate = canonical.Replace(
+        string duplicate = normalized.Replace(
             "\"kind\":\"ConfigurationManifest\",",
             "\"kind\":\"ConfigurationManifest\",\"kind\":\"ConfigurationManifest\",",
             StringComparison.Ordinal);
-        string unknown = canonical.Replace(
+        string unknown = normalized.Replace(
             "\"kind\":\"ConfigurationManifest\",",
             "\"kind\":\"ConfigurationManifest\",\"unexpected\":true,",
             StringComparison.Ordinal);

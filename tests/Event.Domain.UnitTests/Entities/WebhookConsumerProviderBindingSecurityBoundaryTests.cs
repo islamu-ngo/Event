@@ -43,7 +43,7 @@ public sealed class WebhookConsumerProviderBindingSecurityBoundaryTests
         var tenantId = Guid.CreateVersion7();
         var consumerId = Guid.CreateVersion7();
         var initialInstanceId = Guid.CreateVersion7();
-        var canonicalInstanceId = Guid.CreateVersion7();
+        var primaryInstanceId = Guid.CreateVersion7();
         var profile = CreateProfile();
         var binding = WebhookConsumerProviderBinding.CreatePending(
             tenantId,
@@ -55,7 +55,7 @@ public sealed class WebhookConsumerProviderBindingSecurityBoundaryTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Task.Run(() =>
             binding.RepairAndVerifyOwnership(
-                canonicalInstanceId,
+                primaryInstanceId,
                 tenantId,
                 Guid.CreateVersion7(),
                 "app_substituted",
@@ -64,7 +64,7 @@ public sealed class WebhookConsumerProviderBindingSecurityBoundaryTests
                 DomainTestClock.UtcNowOffset)));
 
         binding.RepairAndVerifyOwnership(
-            canonicalInstanceId,
+            primaryInstanceId,
             tenantId,
             consumerId,
             "app_verified",
@@ -72,9 +72,9 @@ public sealed class WebhookConsumerProviderBindingSecurityBoundaryTests
             WebhookProviderCapability.AppPortal,
             DomainTestClock.UtcNowOffset);
 
-        await Assert.That(binding.InstanceId).IsEqualTo(canonicalInstanceId);
+        await Assert.That(binding.InstanceId).IsEqualTo(primaryInstanceId);
         await Assert.That(binding.ApplicationUid)
-            .IsEqualTo(WebhookConsumerProviderBinding.CreateApplicationUid(canonicalInstanceId, consumerId));
+            .IsEqualTo(WebhookConsumerProviderBinding.CreateApplicationUid(primaryInstanceId, consumerId));
         await Assert.That(binding.IsVerifiedFor(tenantId, consumerId)).IsTrue();
         await Assert.That(binding.ConcurrencyVersion).IsEqualTo(2);
         await Assert.That(binding.VerificationFence).IsEqualTo(2);

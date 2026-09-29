@@ -9,7 +9,7 @@
     <OpenApiGenerateDocumentsOnBuild Condition="'$(Configuration)' == 'Release'">true</OpenApiGenerateDocumentsOnBuild>
     <OpenApiGenerateDocumentsOnBuild Condition="'$(Configuration)' != 'Release'">false</OpenApiGenerateDocumentsOnBuild>
     <OpenApiDocumentsDirectory>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/openapi', '$(MSBuildProjectDirectory)'))</OpenApiDocumentsDirectory>
-    <CanonicalOpenApiDocument>$(MSBuildProjectDirectory)/../../schemas/openapi_islamu-event.json</CanonicalOpenApiDocument>
+    <PrimaryOpenApiDocument>$(MSBuildProjectDirectory)/../../schemas/openapi_islamu-event.json</PrimaryOpenApiDocument>
     <OpenApiGenerateDocumentsOptions>--document-name islamu-event --file-name openapi</OpenApiGenerateDocumentsOptions>
   </PropertyGroup>
 
@@ -103,7 +103,7 @@
   </Target>
 
   <Target Name="PublishOpenApiDocument" AfterTargets="GenerateOpenApiDocuments" DependsOnTargets="BuildGeneratedContractTool">
-    <Exec Command="dotnet &quot;$(GeneratedContractToolAssembly)&quot; publish-schema &quot;$(OpenApiDocumentsDirectory)/openapi_islamu-event.json&quot; &quot;$(CanonicalOpenApiDocument)&quot;" />
+    <Exec Command="dotnet &quot;$(GeneratedContractToolAssembly)&quot; publish-schema &quot;$(OpenApiDocumentsDirectory)/openapi_islamu-event.json&quot; &quot;$(PrimaryOpenApiDocument)&quot;" />
   </Target>
 
   <Target Name="GetOpenApiContractInput" DependsOnTargets="Build;GenerateOpenApiDocuments" Returns="@(OpenApiContractInput)">

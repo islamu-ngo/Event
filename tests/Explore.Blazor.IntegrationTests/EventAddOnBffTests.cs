@@ -18,7 +18,7 @@ public sealed class EventAddOnBffTests
     private const string IdempotencyHeader = "Idempotency-Key";
 
     [Test]
-    public async Task PublicReadsForwardCanonicalRoutesAndKeepCapabilitiesOutOfUrlsAndResponses()
+    public async Task PublicReadsForwardExpectedRoutesAndKeepCapabilitiesOutOfUrlsAndResponses()
     {
         AddOnScope scope = AddOnScope.Create();
         var transport = new RecordingApiTransport(scope);
@@ -151,7 +151,7 @@ public sealed class EventAddOnBffTests
     }
 
     [Test]
-    public async Task AuthenticatedWritesForwardCanonicalRoutesHeadersAndJsonPayloads()
+    public async Task AuthenticatedWritesForwardExpectedRoutesHeadersAndJsonPayloads()
     {
         AddOnScope scope = AddOnScope.Create();
         Guid userId = Guid.CreateVersion7();

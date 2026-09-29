@@ -36,7 +36,7 @@ public sealed class RoleMapperTests
     }
 
     [Test]
-    public async Task MissingNavigation_DoesNotEraseCanonicalMetadata()
+    public async Task MissingNavigation_DoesNotEraseAuthoritativeMetadata()
     {
         var source = Source(3);
         source.RoleScope = null!;

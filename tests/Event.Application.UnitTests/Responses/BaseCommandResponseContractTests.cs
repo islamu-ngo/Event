@@ -71,7 +71,7 @@ public sealed class BaseCommandResponseContractTests
     private static readonly string[] QuotaMachineErrors = ["quota.machine"];
     private static readonly string[] FeatureErrors = ["feature.alpha", "feature.beta"];
     private static readonly string[] ConcreteFactoryNames = ["Failure", "Success"];
-    private static readonly string[] CanonicalFactoryFailureCodes =
+    private static readonly string[] StandardFactoryFailureCodes =
     [
         FailureCodes.NotFound,
         FailureCodes.ConcurrencyConflict,
@@ -384,7 +384,7 @@ public sealed class BaseCommandResponseContractTests
     [Arguments("Conflict", FailureCodes.ConcurrencyConflict, true)]
     [Arguments("Authorization", FailureCodes.AdminRequired, false)]
     [Arguments("Authentication", FailureCodes.AuthenticationRequired, false)]
-    public async Task NamedFailureFactorySetsItsCanonicalCodeInternally(
+    public async Task NamedFailureFactorySetsItsStandardCodeInternally(
         string factoryName,
         string expectedFailureCode,
         bool preservesId)
@@ -447,7 +447,7 @@ public sealed class BaseCommandResponseContractTests
     }
 
     [Test]
-    public async Task FeatureFailureRejectsBlankOwnedCodesCanonicalCodesInvalidErrorsAndQuotaFacts()
+    public async Task FeatureFailureRejectsBlankOwnedCodesStandardCodesInvalidErrorsAndQuotaFacts()
     {
         MethodInfo factory = RequireFactory(typeof(BaseCommandResponse<Guid>), "Failure");
 
@@ -455,9 +455,9 @@ public sealed class BaseCommandResponseContractTests
             .Throws<ArgumentException>();
         await Assert.That(() => InvokeFactory(factory, Facts(("failureCode", " "))))
             .Throws<ArgumentException>();
-        foreach (string canonicalCode in CanonicalFactoryFailureCodes)
+        foreach (string standardCode in StandardFactoryFailureCodes)
         {
-            await Assert.That(() => InvokeFactory(factory, Facts(("failureCode", canonicalCode))))
+            await Assert.That(() => InvokeFactory(factory, Facts(("failureCode", standardCode))))
                 .Throws<ArgumentException>();
         }
 
@@ -557,7 +557,7 @@ public sealed class BaseCommandResponseContractTests
     }
 
     [Test]
-    public async Task QuotaFactoryPreservesMetadataCanonicalCodeAndFallbackError()
+    public async Task QuotaFactoryPreservesMetadataStandardCodeAndFallbackError()
     {
         var quota = CreateQuota();
         object explicitResponse = InvokeFactory(typeof(BaseCommandResponse<Guid>), "Quota", Facts(
@@ -1090,7 +1090,7 @@ public sealed class BaseCommandResponseContractTests
             await Assert.That(json["challenge"] is null).IsTrue();
             await Assert.That(json.ToJsonString()).DoesNotContain(SyntheticReveal);
         }
-        string?[] invalidCodes = [null, "", " ", FailureCodes.QuotaExceeded, .. CanonicalFactoryFailureCodes];
+        string?[] invalidCodes = [null, "", " ", FailureCodes.QuotaExceeded, .. StandardFactoryFailureCodes];
         foreach (string? invalidCode in invalidCodes)
         {
             await Assert.That(() => AnonymousRegistrationChallengeIssueResult.Denied(RelatedId, invalidCode!))

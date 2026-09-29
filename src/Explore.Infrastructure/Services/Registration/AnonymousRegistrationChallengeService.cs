@@ -27,7 +27,7 @@ public sealed class AnonymousRegistrationChallengeService(
 
         DateTimeOffset issuedAt = timeProvider.GetUtcNow();
         var envelope = new Envelope(1, binding.TenantId, binding.EventId, Operation,
-            binding.CanonicalRequestDigest, HashKey(binding.IdempotencyKey), Guid.CreateVersion7(),
+            binding.NormalizedRequestDigest, HashKey(binding.IdempotencyKey), Guid.CreateVersion7(),
             issuedAt, issuedAt.AddSeconds(120), difficulty, capabilities.Issue().RawToken);
         return new AnonymousRegistrationChallengeDto(_protector.Protect(JsonSerializer.Serialize(envelope)),
             envelope.ExpiresAt, envelope.Difficulty, envelope.Version);
@@ -57,7 +57,7 @@ public sealed class AnonymousRegistrationChallengeService(
         DateTimeOffset now = timeProvider.GetUtcNow();
         if (envelope is null || envelope.Version != 1 || envelope.Operation != Operation
             || envelope.TenantId != binding.TenantId || envelope.EventId != binding.EventId
-            || envelope.CanonicalRequestDigest != binding.CanonicalRequestDigest
+            || envelope.NormalizedRequestDigest != binding.NormalizedRequestDigest
             || envelope.IdempotencyKeyDigest != HashKey(binding.IdempotencyKey)
             || envelope.OrderId == Guid.Empty || envelope.OrderId.Version != 7
             || envelope.Difficulty is < 16 or > 22
@@ -94,7 +94,7 @@ public sealed class AnonymousRegistrationChallengeService(
             envelope.ExpiresAt, envelope.GuestCapabilityToken, hash);
 
     private sealed record Envelope(int Version, Guid TenantId, Guid EventId, string Operation,
-        string CanonicalRequestDigest, string IdempotencyKeyDigest, Guid OrderId, DateTimeOffset IssuedAt,
+        string NormalizedRequestDigest, string IdempotencyKeyDigest, Guid OrderId, DateTimeOffset IssuedAt,
         DateTimeOffset ExpiresAt, int Difficulty, string GuestCapabilityToken)
     {
         public override string ToString() => "AnonymousRegistrationChallengeEnvelope { Redacted = true }";

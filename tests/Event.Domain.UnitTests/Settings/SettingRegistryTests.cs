@@ -284,7 +284,7 @@ public class SettingRegistryTests
     }
 
     [Test]
-    public async Task Registry_ReportingIntakeEnabledIsCanonicalTenantPolicy()
+    public async Task Registry_ReportingIntakeEnabledIsPrimaryTenantPolicy()
     {
         const string intakeEnabledKey = "event_reporting.intake_enabled";
 

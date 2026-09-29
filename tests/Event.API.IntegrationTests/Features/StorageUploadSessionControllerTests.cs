@@ -263,7 +263,7 @@ public sealed class StorageUploadSessionControllerTests
     }
 
     [Test]
-    public async Task UploadSessionContent_WhenProviderFailureContainsInternalData_ReturnsCanonicalProblemDetails()
+    public async Task UploadSessionContent_WhenProviderFailureContainsInternalData_ReturnsStandardProblemDetails()
     {
         const string unsafeMessage = "S3 SignatureDoesNotMatch at https://storage.internal.example/bucket/tenants/tenant-1/raw-key?X-Amz-Signature=secret";
         _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
@@ -290,7 +290,7 @@ public sealed class StorageUploadSessionControllerTests
     }
 
     [Test]
-    public async Task UploadSessionContent_WhenValidationFailureContainsInternalData_ReturnsCanonicalValidationProblem()
+    public async Task UploadSessionContent_WhenValidationFailureContainsInternalData_ReturnsStandardValidationProblem()
     {
         const string unsafeMessage = "ContentType must equal application/private-tenant-secret; objectKey=tenants/tenant-1/raw-key";
         _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())

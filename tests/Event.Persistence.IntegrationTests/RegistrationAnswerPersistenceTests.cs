@@ -110,7 +110,7 @@ public sealed class RegistrationAnswerPersistenceContractTests
 
         RegistrationWorkflow workflow = RegistrationWorkflow.Create(tenant.Id, @event.Id, "ANALYTICS", AnalyticsNow);
         RegistrationRequirement requirement = RegistrationRequirement.Create(workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
-            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationRequirementCompletionEffectEnum.BlocksRegistration, RegistrationAnswerSyncModeEnum.FULL_SYNC,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, AnalyticsNow);
         RegistrationChannel channel = RegistrationChannel.Create(requirement, 1, true, null, AnalyticsNow);
         requirement.AddChannel(channel);
@@ -551,7 +551,7 @@ public sealed class RegistrationAnswerPostgreSqlPersistenceTests(PostgreSqlConta
         RegistrationRequirement requirement = RegistrationRequirement.Create(
             workflow, 1, RegistrationRequirementCriticalityEnum.Required, false,
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
-            RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
+            RegistrationAnswerSyncModeEnum.FULL_SYNC,
             useWrongTicketTypeAssignment
                 ? RegistrationRequirementSubjectTypeEnum.SpecificTicketType
                 : RegistrationRequirementSubjectTypeEnum.AllOrders,

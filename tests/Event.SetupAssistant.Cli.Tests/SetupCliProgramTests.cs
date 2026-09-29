@@ -1,9 +1,60 @@
 using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 
 namespace ISLAMU.SetupAssistant.Cli.Tests;
 
 public sealed class SetupCliProgramTests
 {
+    [Test]
+    public async Task EmptyInvocationAndHelpShowAvailableCommands()
+    {
+        ProcessResult empty = await ExecuteAsync([]);
+        ProcessResult help = await ExecuteAsync(["--help"]);
+
+        await Assert.That(empty.ExitCode).IsEqualTo(0);
+        await Assert.That(empty.StandardError).IsEmpty();
+        string usage = Encoding.UTF8.GetString(empty.StandardOutput);
+        foreach (string family in SetupCliContractSpecification.Operations.Keys)
+            await Assert.That(usage).Contains(family);
+        await Assert.That(usage).Contains("event-setup doctor --machine");
+        await Assert.That(help.ExitCode).IsEqualTo(0);
+        await Assert.That(help.StandardOutput).IsEquivalentTo(empty.StandardOutput);
+    }
+
+    [Test]
+    public async Task IncompleteCommandsExplainRequiredOptionsWithoutChangingMachineDiagnostics()
+    {
+        var cases = new (string[] Arguments, string Code, string Example)[]
+        {
+            (["catalogue", "list"], "output-required", "event-setup catalogue list --output -"),
+            (["catalogue", "show"], "key-required", "event-setup catalogue show --key API_HTTP_PORT --output -"),
+            (["manifest", "create"], "output-required", "event-setup manifest create --output instance-manifest.json")
+        };
+
+        foreach ((string[] arguments, string code, string example) in cases)
+        {
+            ProcessResult text = await ExecuteAsync(arguments);
+            await Assert.That(text.ExitCode).IsEqualTo(64);
+            await Assert.That(text.StandardError).IsEmpty();
+            string guidance = Encoding.UTF8.GetString(text.StandardOutput);
+            await Assert.That(guidance).Contains(code);
+            await Assert.That(guidance).Contains(example);
+
+            ProcessResult machine = await ExecuteAsync([.. arguments, "--machine"]);
+            await Assert.That(machine.ExitCode).IsEqualTo(64);
+            await Assert.That(machine.StandardError).IsEmpty();
+            await Assert.That(SetupCliMachineContractVerifier.Validate(machine.StandardOutput)).IsEmpty();
+            using JsonDocument result = JsonDocument.Parse(machine.StandardOutput);
+            await Assert.That(result.RootElement.GetProperty("diagnostics")[0].GetProperty("code").GetString())
+                .IsEqualTo(code);
+        }
+
+        ProcessResult rejected = await ExecuteAsync(["catalogue", "show", "--key", "person@example.invalid"]);
+        await Assert.That(Encoding.UTF8.GetString(rejected.StandardOutput))
+            .DoesNotContain("person@example.invalid");
+    }
+
     [Test]
     public async Task OversizedMachineArgumentProducesOneUsageObjectWithoutStderr()
     {

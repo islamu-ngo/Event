@@ -12,6 +12,9 @@ Terminal UI for interactive human workflows.
 The CLI does not store credentials, connect to a live instance, or replace the
 instance administration surface.
 
+Run `event-setup` or `event-setup --help` to list the available commands; neither
+starts the interactive Terminal UI.
+
 ## Choose a release target
 
 | Host | Runtime identifier | Release executable |
@@ -53,6 +56,19 @@ event-setup doctor --machine
 Command families are bare first arguments. Do not prefix them with `setup`.
 For example, `event-setup catalogue ...` is valid; `setup catalogue ...` is
 not an executable command.
+
+Commands that produce an artifact require an explicit output destination.
+Use `--output -` to write public catalogue data to standard output. To try the
+three common commands from a terminal:
+
+```bash
+event-setup catalogue list --output -
+event-setup catalogue show --key API_HTTP_PORT --output -
+event-setup manifest create --output instance-manifest.json
+```
+
+The manifest command creates a new file and rejects an existing destination.
+Use `--dry-run` to preview a write without producing the file.
 
 Use machine mode for scripts and CI:
 

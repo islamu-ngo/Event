@@ -21,7 +21,7 @@ internal static class SetupCliParser
         string[] args = invocation.Arguments.ToArray();
         bool machine = invocation.Mode == SetupCliMode.Machine || args.Contains("--machine", StringComparer.Ordinal);
         if (args.Length == 1 && args[0] == "--help") return Empty("doctor", "doctor", machine) with { Help = true };
-        if (args.Length == 0) return Empty("doctor", "doctor", machine) with { Error = "command-missing" };
+        if (args.Length == 0) return Empty("doctor", "doctor", machine) with { Help = true };
         string family = args[0];
         if (!Operations.TryGetValue(family, out string[]? allowed)) return Empty(family, string.Empty, machine) with { Error = "command-unknown" };
         bool self = family == "doctor";

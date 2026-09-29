@@ -12,7 +12,30 @@ internal static class SetupCliMachineOutput
             invocation.Io.Output.Write("-", Serialize(command, result, invocation.Io.MaximumCharacters), invocation.Io.MaximumCharacters);
             return;
         }
-        string line = result.Exit == SetupCliExitCode.Success ? "success\n" : $"{SetupCliResults.Lower(result.Exit)}-error $.arguments\n";
+        if (command.Help && result.Exit == SetupCliExitCode.Success)
+        {
+            string usage = "Usage: event-setup <command> [operation] [options]\n\nCommands:\n"
+                + string.Join('\n', SetupCliParser.Operations.Select(entry => entry.Key == "doctor"
+                    ? "  doctor"
+                    : $"  {entry.Key} <{string.Join('|', entry.Value)}>"))
+                + "\n\nExample: event-setup doctor --machine\n";
+            invocation.Io.Output.Write("-", Encoding.UTF8.GetBytes(usage), invocation.Io.MaximumCharacters);
+            return;
+        }
+        string? guidance = result.Exit == SetupCliExitCode.Usage
+            ? (command.Family, command.Operation, result.Diagnostics.FirstOrDefault()?.Code) switch
+            {
+                ("catalogue", "list", "output-required") =>
+                    "usage-error output-required: pass --output <file|->.\nTry: event-setup catalogue list --output -\n",
+                ("catalogue", "show", "key-required") =>
+                    "usage-error key-required: pass --key <CATALOGUE_KEY> and --output <file|->.\nTry: event-setup catalogue show --key API_HTTP_PORT --output -\n",
+                ("manifest", "create", "output-required") =>
+                    "usage-error output-required: pass --output <file|->.\nTry: event-setup manifest create --output instance-manifest.json\n",
+                _ => null
+            }
+            : null;
+        string line = result.Exit == SetupCliExitCode.Success ? "success\n"
+            : guidance ?? $"{SetupCliResults.Lower(result.Exit)}-error $.arguments\n";
         byte[] text = Encoding.UTF8.GetBytes(line);
         ISetupCliWriter writer = command.Output == "-" && result.Exit == SetupCliExitCode.Success
             ? invocation.Io.Error : invocation.Io.Output;

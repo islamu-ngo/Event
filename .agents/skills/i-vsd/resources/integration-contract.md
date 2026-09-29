@@ -25,7 +25,7 @@ Use when the user invokes I-VSD directly for a consultation, compliance-style re
 2. Covered context but no clear action: infer the likely actions and ask the user to confirm; do not create a report yet.
 3. Named action with missing material context: stop and ask only the questions whose answers could change scope, findings, recommendations, evidence level, or output identity.
 4. Guided discovery: continue in question batches until its readiness gate is met.
-5. Sufficient context and agreement: create or update the canonical subject report from [report-contract.md](report-contract.md).
+5. Sufficient context and agreement: create or update the matching subject report from [report-contract.md](report-contract.md).
 
 Refusals, menus, context inventories, clarification questions, and agreement prompts are routing responses, not substantive I-VSD outputs. They remain conversational. Findings, recommendations, advisories, audits, and consultations are substantive and must be persisted.
 

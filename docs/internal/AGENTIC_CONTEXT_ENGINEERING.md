@@ -4,7 +4,7 @@
 # Agentic Context Engineering & AI Workflow Architecture
 
 > **Audience:** Contributors | AI Agents | Platform Architects | Maintainers  
-> **Status:** Canonical & Implemented  
+> **Status:** Authoritative & Implemented
 > **Last Verified:** 2026-09-13 Europe/Brussels<br>
 > **Source Anchors:** [`AGENTS.md`](../../AGENTS.md), [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md), [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml), [`implementation-plan`](../../.agents/skills/implementation-plan/SKILL.md), [`senior-cto-feedback`](../../.agents/skills/senior-cto-feedback/SKILL.md), [`implement-tasks`](../../.agents/skills/implement-tasks/SKILL.md), [`conventional-commit`](../../.agents/skills/conventional-commit/SKILL.md), [`i-vsd`](../../.agents/skills/i-vsd/SKILL.md), [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md)
 
@@ -35,8 +35,8 @@ flowchart TB
         Gemini["Gemini / Antigravity"]
     end
 
-    subgraph CoreContract["Canonical Contract & Bootloader"]
-        AgentsMD["AGENTS.md (Canonical Entrypoint)"]
+    subgraph CoreContract["Governing contract & Bootloader"]
+        AgentsMD["AGENTS.md (Primary entrypoint)"]
         IntentsYaml[".agents/contract/intents.yaml"]
         ContextEng[".agents/CONTEXT_ENGINEERING.md"]
     end
@@ -75,7 +75,7 @@ The repository's agentic system divides its 40+ skills into three distinct tiers
 2. **Plan-Authoring Phase Closure Tier (Commit Contract Dependency & Standalone Human Tool)**: The `conventional-commit` skill is a dependency of `implementation-plan` and `senior-cto-feedback`, used during planning and review to pre-author and validate declarative commit contracts in `tasks.md`. The active execution loop does NOT load `conventional-commit` (saving context tokens); it directly executes the pre-authored contract. Human developers also invoke `conventional-commit` standalone when making changes directly or for ad-hoc commits.
 3. **Indirectly-Invoked Domain Execution Tier (Autonomous Machine Guardrails)**: Technical domain patterns, Clean Architecture rules, and tool wrappers that the AI activates autonomously in the background based on edited file paths, matched intents, and domain patterns.
 
-### The Canonical 5-Stage Human-in-the-Loop Lifecycle
+### The Authoritative 5-Stage Human-in-the-Loop Lifecycle
 
 This is the standard, end-to-end path for implementing substantial features and architectural changes:
 
@@ -212,10 +212,10 @@ The portable authority is root `AGENTS.md` plus the intent/skill/rule system. Ha
 
 ```mermaid
 flowchart TD
-    subgraph Canonical["Portable Repository Contract"]
-        AgentsMD["AGENTS.md\nCanonical authority"]
+    subgraph Authoritative["Portable Repository Contract"]
+        AgentsMD["AGENTS.md\nPrimary authority"]
         IntentRouter[".agents/contract/intents.yaml\nIntent routing"]
-        CanonicalAgentRule[".agents/rules/*.md\nContract-system rules"]
+        ContractSystemRule[".agents/rules/*.md\nContract-system rules"]
     end
 
     subgraph Adapters["Current Harness Adapters"]
@@ -230,12 +230,12 @@ flowchart TD
         OmOTwinRule[".omo/rules/*.md\nOmO-native copies"]
     end
 
-    AgentsMD --> IntentRouter --> CanonicalAgentRule
+    AgentsMD --> IntentRouter --> ContractSystemRule
     OmOHook --> OmOTwinRule
     ClaudeAdapter --> AgentsMD
     CopilotAdapter --> AgentsMD
     SessionAdapter -.-> AgentsMD
-    CanonicalAgentRule <-->|"Twin Sync Contract\n(Exact Copy, No Symlinks)"| OmOTwinRule
+    ContractSystemRule <-->|"Twin Sync Contract\n(Exact Copy, No Symlinks)"| OmOTwinRule
 ```
 
 Current adapter facts:
@@ -268,7 +268,7 @@ stateDiagram-v2
     [*] --> Draft: Task Initiated
 
     state "dev/active/<task>/" as ActiveWorkstream {
-        state "plan.md (Canonical Design)" as PlanDoc
+        state "plan.md (Authoritative Design)" as PlanDoc
         state "tasks.md (Hot Execution Ledger)" as TasksDoc
         state "context.md (Ephemeral Working Memory)" as ContextDoc
         
@@ -302,7 +302,7 @@ stateDiagram-v2
 
 ### Triad Single Responsibility Matrix
 
-| Artifact | Canonical Responsibility | Strictly Forbidden Content | Update Frequency |
+| Artifact | Authoritative Responsibility | Strictly Forbidden Content | Update Frequency |
 |---|---|---|---|
 | `*-plan.md` | High-level architecture, design decisions, RFC 2119 contracts, `WHEN`/`THEN` scenarios, phase exit criteria, rollback handling. | Granular task checklists, `- [ ]` checkboxes, dynamic statuses (`IN PROGRESS`), ephemeral session progress. | Only when architectural direction or scope shifts. |
 | `*-tasks.md` | Hot execution ledger, granular Red/Green/Refactor tasks, exact phase-owned paths, verification commands, declarative planned commit contracts, and task statuses (`[ ]`, `[x]`). | Long architectural narratives, trade-off debates, session handoff logs, commit hash recording. | During planning, after each subtask, and after each phase commit. |
@@ -317,7 +317,7 @@ No conversational memory, hidden assumptions, or chat dialogue survives session 
 
 The repository strictly prohibits writing standalone `*-cto-review.md` or `*-research.md` sidecar files in `dev/active/<task>/`. In practice, separate review markdown files became **orphaned sidecars**—implementing agents rarely opened them, causing the review's stress-tests and mitigations to drift out of sync with code execution.
 
-Instead, **100% of the CTO review's analytical depth and research findings are absorbed directly into canonical locations across the triad**:
+Instead, **100% of the CTO review's analytical depth and research findings are absorbed directly into authoritative locations across the triad**:
 
 | Review Dimension / Element | Destination in the Triad | How & Why It Is Preserved |
 |---|---|---|
@@ -375,7 +375,7 @@ Before executing or resuming, the agent discovers the active execution topology 
 |---|---|---|---|---|
 | **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<task>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. |
 | **Case B: In-Tree / Develop In-Flight** | `dev/active/<task>` exists in repo root with work already in progress (`[x]` tasks, commits, or explicit develop mandate) | Repository root (`.`) | `dev/active/<task>/` | **Respect in-tree execution**: Resume directly in the root workspace on the active branch. Do NOT create a worktree or move files. |
-| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Canonical worktree isolation**: Add branch and worktree, move the plan directory, and copy developer overrides:<br>`git fetch origin develop && git worktree add -b feat/<task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/` |
+| **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Authoritative worktree isolation**: Add branch and worktree, move the plan directory, and copy developer overrides:<br>`git fetch origin develop && git worktree add -b feat/<task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/` |
 | **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke)** | Whole-codebase migrations spanning dozens of cohorts (e.g. 100+ entities) | `.worktrees/<task>` (Lead Hub)<br>`.worktrees/<task>--<cohort>` (Spokes) | `.worktrees/<task>/dev/active/<task>/` | **Hub-and-Spoke with Hyphenated Namespacing & Bounded Pooling**: Lead hub worktree acts as orchestrator and commit aggregator on `feat/<task>`. Spoke cohorts execute in temporary worktrees namespaced as `.worktrees/<task>--<cohort>` on `feat/<task>--<cohort>` with strict `*-ownership.md` disjoint paths.<br>**Prune-As-You-Go Rule**: Active worktrees are bounded to $\le 3–5$. Once a spoke cohort is verified and integrated into the hub branch, the agent **immediately prunes** the spoke worktree (`git worktree remove` and `git branch -d`). |
 
 > [!IMPORTANT]
@@ -409,7 +409,7 @@ When cold-starting or resuming an in-flight workstream:
 Each phase follows a rigorous Red $\rightarrow$ Green $\rightarrow$ Refactor cycle in the target execution context:
 1. **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails with an assertion failure at runtime.
 2. **Green**: Implement minimal production code to satisfy invariants.
-3. **Progressive Verification**: Run Ring 1 sliced test (< 2s) $\rightarrow$ Ring 2 phase build & canonical provider test (< 15s).
+3. **Progressive Verification**: Run Ring 1 sliced test (< 2s) $\rightarrow$ Ring 2 phase build & designated provider test (< 15s).
 4. **Three-Tier Failure Triage**:
    - **Class A (Direct Feature Regressions)**: Failing assertions in code touched by this feature. Must resolve in-phase before commit.
    - **Class B (Feature-Induced Integration Ripple)**: Unmodified callers/fixtures broken by changed contracts. If minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
@@ -530,7 +530,7 @@ flowchart TD
     end
 
     subgraph Ring2["Ring 2: Phase Exit Gate (Phase Level)"]
-        R2Scope["Scope: Single Modified Project + Release Build\nLatency Budget: < 15 seconds\nInfrastructure: 1 Canonical Provider (e.g. SQLite / single Postgres)\nSuites: Target project only (dotnet build -c Release -v q)"]
+        R2Scope["Scope: Single Modified Project + Release Build\nLatency Budget: < 15 seconds\nInfrastructure: 1 Designated provider (e.g. SQLite / single Postgres)\nSuites: Target project only (dotnet build -c Release -v q)"]
     end
 
     subgraph Ring3["Ring 3: Plan Exit Gate (Workstream Level)"]
@@ -566,7 +566,7 @@ flowchart TD
 3. **No Tautological Assertions**: Expected values must originate from an independent known-good literal or specification. Assertions that recompute expected values using the same formula as production code (`Assert.Equal(items.Sum(x => x.Price), result.Total)`) are strictly forbidden.
 4. **No Interface Bypassing**: Tests must verify state transitions through the public interface. A test must not bypass the domain aggregate to assert directly against raw database tables.
 5. **Mock Boundary Rule**: Mock **ONLY** external third-party infrastructure (payment gateways, external email delivery, system clock, random generators). **NEVER mock internal domain entities, aggregate roots, repositories, or MediatR handlers.** Use real domain entities and in-memory or Testcontainers-backed databases.
-6. **The 3-Ring Progressive Verification Hierarchy**: Subtasks run fast in-memory sliced tests (< 2s). Phase exits run single-project Release builds + single canonical provider tests (< 15s). Multi-database provider matrices, migration checks, and architecture rules run strictly at plan exit.
+6. **The 3-Ring Progressive Verification Hierarchy**: Subtasks run fast in-memory sliced tests (< 2s). Phase exits run single-project Release builds + single designated provider tests (< 15s). Multi-database provider matrices, migration checks, and architecture rules run strictly at plan exit.
 7. **The Yak-Shaving Quarantine Rule**: Unrelated pre-existing test suite rot or container flakiness is quarantined and logged under `*-context.md` / `dev/backlog/`, never repaired during unrelated feature work.
 8. **Pure Domain Invariants over Persistence Queries**: 90%+ of algorithmic, normalization, validation, and state-machine checks live in `Event.Domain.UnitTests` without Docker dependencies.
 
@@ -631,7 +631,7 @@ flowchart TD
 
 | # | Code Smell | Diagnostic Tell in Diff | Required Refactoring Action |
 |---|---|---|---|
-| 1 | **Mysterious Name** | Vague identifiers (`data`, `temp`, `res`, `process()`) that obscure intent. | Rename using canonical domain glossary terms. |
+| 1 | **Mysterious Name** | Vague identifiers (`data`, `temp`, `res`, `process()`) that obscure intent. | Rename using authoritative domain glossary terms. |
 | 2 | **Duplicated Code** | Similar logic shapes recurring across multiple handlers/controllers. | Extract to shared domain aggregate or application service. |
 | 3 | **Feature Envy** | Method repeatedly reaching into another object's fields to perform calculations. | Move the method onto the object that owns the data. |
 | 4 | **Primitive Obsession** | Raw `string`, `int`, or `Guid` representing domain concepts (e.g. email, money). | Encapsulate into a strongly-typed Value Object or Enum. |
@@ -726,15 +726,15 @@ dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWor
 dotnet run --project eng/agent-workflow/src/ISLAMU.AgentWorkflow/ISLAMU.AgentWorkflow.csproj -- validate-commit -- git commit --only -m "message" -- src/ExactFile.cs docs/ExactFile.md
 ```
 
-The first command checks that the canonical intents catalog is one bounded,
+The first command checks that the authoritative intents catalog is one bounded,
 valid UTF-8 YAML document. The second checks only that a described `git commit`
 uses distinct literal file pathspecs after `--`; it rejects `.`, directories,
 globs, traversal, rooted paths, Git pathspec magic, controls, and duplicates.
 The guard never executes Git or mutates repository state.
 
-## 11. Related Documentation & Canonical Anchors
+## 11. Related Documentation & Authoritative Anchors
 
-- [`AGENTS.md`](../../AGENTS.md) — Canonical agent contract and entrypoint.
+- [`AGENTS.md`](../../AGENTS.md) — Authoritative agent contract and entrypoint.
 - [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md) — Context budget policy and retrieval limits.
 - [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml) — Machine-readable task and intent registry.
 - [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md) — Global invariant quick reference.

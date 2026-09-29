@@ -14,7 +14,7 @@ policy governs release invariants; [ADR-025](adr/ADR-025-provider-neutral-releas
 explains their architecture; [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) defines operator
 steps.
 
-## Canonical release contract
+## Governed release contract
 
 - **The tag is the release.** `refs/tags/v<major>.<minor>.<patch>[-prerelease]` MUST be
   the sole immutable release identity. Attestation MUST read only the annotated tag
@@ -29,10 +29,10 @@ steps.
   classifies the release; it is not a ref and nothing may derive a branch name from it.
   `develop` MUST NOT receive generated `Unreleased` changelog writes.
 - ISLAMU policy MUST decide commit validity, visibility, impacts, grouping inputs,
-  SemVer, range/tag selection, trust, and canonical evidence. git-cliff MUST render
+  SemVer, range/tag selection, trust, and authoritative evidence. git-cliff MUST render
   normalized context only and MUST NOT decide any of those matters.
-- Canonical inputs MUST be provider-neutral. Provider metadata MAY appear only in a
-  separate, noncanonical publication view and MUST NOT alter canonical checksums.
+- Normalized input MUST be provider-neutral. Provider metadata MAY appear only in a
+  separate, non-authoritative publication view and MUST NOT alter content hash.
 - The trusted release bundle MUST contain the authoritative engine, policy, context
   contract, renderer configuration, tool pin, and signer roots. Final attestation
   MUST verify that promoted bundle before reading candidate data.
@@ -73,8 +73,8 @@ steps.
 - A correction record MUST NOT be a branch alias, wildcard, range mapping,
   reused replacement, or authority to reinterpret any other commit. Candidate
   preparation applies the replacement before fragment linkage and records the
-  resulting commit OID plus effective Change-Id in canonical context. Relevant
-  correction records are included in the candidate's canonical release-source
+  resulting commit OID plus effective Change-Id in authoritative context. Relevant
+  correction records are included in the candidate's governed release-source
   digest together with linked fragments.
 
 ## Ref namespace
@@ -94,7 +94,7 @@ steps.
 - The renderer MUST run from the trusted bundle with explicit configuration,
   `--offline`, and `--no-exec`; it MUST NOT use provider APIs, network configuration,
   or command processors.
-- Canonical files MUST use UTF-8 without BOM, LF, NFC, invariant ordering, a fixed
+- Primary file MUST use UTF-8 without BOM, LF, NFC, invariant ordering, a fixed
   `release.yaml` date, and no current-clock fields. Evidence MUST retain full object
   IDs; abbreviated display IDs require collision-safe validation.
 - Release tags MUST be SSH-signed annotated tags. Lightweight, unsigned,
@@ -114,7 +114,7 @@ steps.
   stable SemVer tags as its lower bound.
 - Candidate and final manifests MUST be distinct: the pre-tag candidate digest MAY
   be referenced by tag text, while post-tag evidence MUST record the tag object ID.
-- Canonical artifacts MUST omit author/committer identities, raw commit bodies,
+- Release artifact MUST omit author/committer identities, raw commit bodies,
   provider identities, tokens, and unbounded error text.
 
 ## Disclosure and operation

@@ -255,7 +255,7 @@ a reusable backdoor into a completed instance.
 | Input | Required value |
 |---|---|
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | `local`, `keycloak` or `atproto`, matching your authentication selection |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Local canonical UUIDv7 (also its username), exact Keycloak subject or canonical AT Protocol DID |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Lowercase, hyphenated UUIDv7 also used as the Local username, exact Keycloak subject, or authoritative AT Protocol DID |
 | `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | Positive integer |
 | `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | Required for external providers; optional for Local |
 | `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME`, `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | Both or neither |

@@ -173,7 +173,7 @@ The currently approved R5 scenario guarantees optional add-ons in the original m
   stock atomically or persists
   `provider_confirmed_inventory_release_pending` for recovery; provider truth
   is never rolled back to pending because local stock repair failed.
-- The add-on allocation, canonical provider-neutral refund attempt, and
+- The add-on allocation, designated provider-neutral refund attempt, and
   identifiers-only dispatch outbox commit in one serializable transaction.
   Provider dispatch/reconciliation then synchronizes terminal truth back to
   the add-on allocation idempotently.
@@ -217,7 +217,7 @@ Pin access mode, accepted terms, purchaser actor/context, and effective policy l
 
 ### IVSD-M002 — Make Completion And Approval Admission Preconditions
 
-Declare order versus participant scope, keep typed answers canonical, require subject-correct consent/approval, and withhold active credentials until all required participant facts are complete.
+Declare order versus participant scope, keep typed answers authoritative, require subject-correct consent/approval, and withhold active credentials until all required participant facts are complete.
 
 ### IVSD-M003 — Use Atomic Future-Holder And Credential Rotation
 

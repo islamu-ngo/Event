@@ -10,4 +10,4 @@ Read resources in this order:
 3. [Operational Artifacts](operational-artifacts.md) — use when writing synchronized context and tasks files.
 4. [Quality Gates](quality-gates.md) — use before handing the planning workstream to the user or an implementation agent.
 
-This skill and its resources are the canonical tool-neutral implementation-planning workflow.
+This skill and its resources are the standard tool-neutral implementation-planning workflow.

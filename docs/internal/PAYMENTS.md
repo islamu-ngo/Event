@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical architectural and operational documentation for the provider-neutral payment subsystem. -->
+<!-- ABOUTME: Authoritative architectural and operational documentation for the provider-neutral payment subsystem. -->
 <!-- ABOUTME: Covers OrganizerDirect, Stripe Connect adapter, multi-tenant policy hierarchy, and provider extension guide. -->
 
 # Payments Architecture And Provider Integration
@@ -40,7 +40,7 @@ Hard cross-order ceilings use only stable authority:
 - a verified guest uses the SHA-256 hash of the persisted, verified normalized contact; and
 - name-only access is honestly order-scoped and receives no claimed per-person cross-order guarantee.
 
-The pinned effective ceiling is the literal minimum of instance, tenant, and event policy versions. PostgreSQL serializes a canonical operation/authority lock set before opening the serializable transaction, then records cumulative authority usage and the tenant-qualified durable operation outcome. An exact key and fingerprint replays the original result. Reusing a key with a different tenant, principal, route-equivalent command scope, policy, quantity, actor context, or body conflicts rather than duplicating authority.
+The pinned effective ceiling is the literal minimum of instance, tenant, and event policy versions. PostgreSQL serializes an authoritative operation/authority lock set before opening the serializable transaction, then records cumulative authority usage and the tenant-qualified durable operation outcome. An exact key and fingerprint replays the original result. Reusing a key with a different tenant, principal, route-equivalent command scope, policy, quantity, actor context, or body conflicts rather than duplicating authority.
 
 These local database steps perform no payment-provider call. Provider claims and dispatch remain later durable operations, preserving the rule that remote I/O never occurs inside the purchase-governance transaction.
 
@@ -507,8 +507,8 @@ Create an incoming webhook verifier and handler in `src/Explore.Infrastructure/P
 Tenant bootstrap may declare only the provider-neutral narrowing document
 `tenant.paid_event_policy`. The document is pinned to the active
 `instancePolicyVersion`, validated with `PaidEventPolicyRules`, and applied
-through the canonical serializable `PaidEventPolicyMutationBoundary` in the
-same transaction as tenant creation and manifest audit.
+through `PaidEventPolicyMutationBoundary` under serializable transaction
+isolation in the same transaction as tenant creation and manifest audit.
 
 Allowed values narrow payment enablement, organizer kinds, local verification,
 currencies/default currency, refund-protection floors, integer minor-unit and
@@ -580,7 +580,7 @@ for recovery instead of reverting it to pending.
 
 The add-on allocation, generic `RefundAttempt`, and PII-free refund dispatch
 outbox message commit in one serializable transaction. `RefundOperationId`
-therefore identifies the canonical `RefundAttempt`; it is not a browser-
+therefore identifies the authoritative `RefundAttempt`; it is not a browser-
 invented provider authority. Dispatch and reconciliation synchronize terminal
 provider evidence back into the add-on allocation idempotently.
 

@@ -37,7 +37,7 @@ D6 owning inventory:
 
 - Both Infisical providers above and focused unit/integration tests, host folder projections and selected-authority composition.
 - `.env.example`, `docker-compose.yml`, `docker/keycloak/keycloak-init.sh`, `src/Explore.AppHost/AppHost.cs`.
-- `src/Event.Setup.Core/Environment/CanonicalEnvironmentCatalogue.cs`, `CanonicalEnvironmentMetadata.cs`; Setup Core/Diagnostic/Standalone/Architecture tests.
+- `src/Event.Setup.Core/Environment/PlatformEnvironmentCatalogue.cs`, `PlatformEnvironmentMetadata.cs`; Setup Core/Diagnostic/Standalone/Architecture tests.
 - Public Infisical/environment/secrets/Compose/Coolify/troubleshooting docs; internal secrets/configuration/self-hosting/security/operations/troubleshooting contracts and delivered release evidence.
 
 ADR/journal/backlog graduation originally listed in D6 is already the documentation purpose of KG-101/Packet K, not proof of deployed root isolation.
@@ -69,4 +69,4 @@ Forward-fix configuration and provision fresh runtime values. Restore prior runt
 
 ## Verification Contract
 
-Red tests precede composition changes; use owning Secrets/host class slices. Per intermediate phase run one Release build and at most one selected project/canonical provider (D6 selects `Explore.Secrets.UnitTests`). At PR exit run owning executable host/Setup Core/Diagnostic/Standalone/Architecture checks, selected-authority and consumer-isolation integration, applicable release/intent checks and anonymized security/operations MAD. Reuse earlier custody/provider evidence only with explicit revision applicability; run any newly affected supported-provider gates rather than calling skipped providers passed. Capture value-free evidence, quarantine unrelated failures, and do not manufacture source/prose-pinning tests. This graduation executes none of these future runtime gates.
+Red tests precede composition changes; use owning Secrets/host class slices. Per intermediate phase run one Release build and at most one selected project/designated provider (D6 selects `Explore.Secrets.UnitTests`). At PR exit run owning executable host/Setup Core/Diagnostic/Standalone/Architecture checks, selected-authority and consumer-isolation integration, applicable release/intent checks and anonymized security/operations MAD. Reuse earlier custody/provider evidence only with explicit revision applicability; run any newly affected supported-provider gates rather than calling skipped providers passed. Capture value-free evidence, quarantine unrelated failures, and do not manufacture source/prose-pinning tests. This graduation executes none of these future runtime gates.

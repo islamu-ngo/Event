@@ -124,7 +124,7 @@ Start with [Repository README](../../README.md) or the [Documentation Hub](../RE
 - [TESTING.md](TESTING.md) - TUnit framework, test projects, TDD workflow.
 - [TEST_RELIABILITY.md](TEST_RELIABILITY.md) - flaky/deferred runtime, stress, and manual-test tracking.
 - [BENCHMARKS.md](BENCHMARKS.md) - BenchmarkDotNet runtime benchmarks, API pipeline benchmarks, PostgreSQL/Testcontainers benchmark runs, and cold-start agent benchmark boundaries.
-- [AGENTIC_CONTEXT_ENGINEERING.md](AGENTIC_CONTEXT_ENGINEERING.md) - canonical visual guide to the agentic context engineering system, cold-start lifecycle, multi-harness bootloaders, twin rules, dev-doc triad, and QA evidence gates.
+- [AGENTIC_CONTEXT_ENGINEERING.md](AGENTIC_CONTEXT_ENGINEERING.md) - authoritative visual guide to the agentic context engineering system, cold-start lifecycle, multi-harness bootloaders, twin rules, dev-doc triad, and QA evidence gates.
 - [AI_RAG_FOUNDATION.md](AI_RAG_FOUNDATION.md) - tenant-safe summary-only boundary for future AI vector/RAG support.
 - [AI_AGENT_CONTRACT_INVENTORY.md](AI_AGENT_CONTRACT_INVENTORY.md) - generated inventory of registry-governed AI agent tool contracts.
 - [AI_AGENT_EXPERIENCE_HARDENING.md](AI_AGENT_EXPERIENCE_HARDENING.md) - guarded context summaries, proposal-only plan previews, and fake/replay AI usability reports.

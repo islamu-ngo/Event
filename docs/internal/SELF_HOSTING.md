@@ -1,5 +1,5 @@
 <!-- ABOUTME: Architectural specification for self-hosting boundaries, headless onboarding, and runtime identity gates. -->
-<!-- ABOUTME: Directs operational deployment runbooks to canonical public documentation. -->
+<!-- ABOUTME: Directs operational deployment runbooks to authoritative public documentation. -->
 
 # Self-Hosting Architecture & Invariants
 
@@ -12,7 +12,7 @@
 ---
 
 > 📖 **Authoritative Operator Runbooks (Single Source of Truth):**  
-> Operational deployment guides, Docker Compose topologies, volume persistence, reverse proxies (Traefik/Caddy/Nginx), and step-by-step upgrade procedures have been migrated to the **canonical public documentation**:
+> Operational deployment guides, Docker Compose topologies, volume persistence, reverse proxies (Traefik/Caddy/Nginx), and step-by-step upgrade procedures have been migrated to the **authoritative public documentation**:
 > 
 > * 🚀 **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)**
 > * 🐳 **[Docker Standalone Runbook (SQLite Monolith)](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-standalone)**
@@ -39,12 +39,12 @@ Set `INSTANCE_BOOTSTRAP_MODE=ConfiguredAdministrator` plus the provider key
 administrator email; Local credential email is optional. Supply both profile
 names together or neither. Local additionally requires
 `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` from the selected secret authority and a
-canonical UUIDv7 subject, used as its username. Under `Interactive`, leave the
+UUIDv7 subject, used as its username. Under `Interactive`, leave the
 configured administrator inputs unset. See [CONFIGURATION.md](CONFIGURATION.md)
 for the closed options matrix.
 
 For `keycloak`, the subject is paired with your existing `Keycloak:Authority`
-issuer. For `atproto`, use the canonical DID. Deployment mode stays on the
+issuer. For `atproto`, use the authoritative DID. Deployment mode stays on the
 existing `Deployment:Mode` setting.
 
 Startup order is fixed in both Split and Standalone:
@@ -105,7 +105,7 @@ intent still require their own guarded administration.
 Runtime operator identity is stored under `instance.operator_identity` and managed
 at `/settings/instance?section=operator-identity` through
 `GET/PUT /api/instance-operator-identity`. It is not an installation prerequisite.
-Completion creates missing canonical identity drafts without inventing legal facts.
+Completion creates missing stable identity drafts without inventing legal facts.
 A new SingleTenant default directory remains Provisioning; existing directories
 and their documents are preserved. MultiTenant creates no default directory.
 Administrators reach `/settings/instance?section=getting-started` after sign-in;
@@ -130,7 +130,7 @@ are explicit and do not erase existing values. Registration stays optional.
 - **Fail-Closed Consumer Gating:** When operator identity is incomplete, public legal notices return HTTP 503 Service Unavailable, and new paid ticket sales/checkout fail closed (`instance_operator_identity_unavailable`) before payment reservation or provider handoff. First-run setup and administrative repair remain accessible.
 
 Required fields include:
-* `OperatorId`: Canonical UUIDv7 identifier (server-managed).
+* `OperatorId`: UUIDv7 identifier (server-managed).
 * `PublicName`: User-facing organization name.
 * `LegalName`: Legally registered entity name.
 * `PublicContactEmail`: Public operator contact.
@@ -230,7 +230,7 @@ Dispatch backlog, retention and optional RabbitMQ have separate checks in
 exhaustive catalogue. Compose leaves SMTP projections empty and defaults
 `EMAIL_DISPATCH_RABBITMQ_ENABLED=false`, because base Compose has no broker.
 Starting the optional `mail` profile does not persist SMTP policy or enable it.
-Canonical setup metadata retains `MAILPIT_UI_PORT` (default 8025) and the supported
+Authoritative setup metadata retains `MAILPIT_UI_PORT` (default 8025) and the supported
 `MAIL_SMTP_*` inputs. `MAILPIT_TAG`, `MAILPIT_SMTP_PORT` and
 `MAILPIT_MAX_MESSAGES` are not supported inputs: image identity, private SMTP and
 the capture count are fixed by Compose rather than operator interpolation.

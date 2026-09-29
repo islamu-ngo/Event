@@ -1,5 +1,5 @@
 <!-- ABOUTME: Index of path-scoped rules auto-loaded by Claude Code for this repository. -->
-<!-- ABOUTME: Explains how rule files refine intent-scoped context without duplicating canonical docs. -->
+<!-- ABOUTME: Explains how rule files refine intent-scoped context without duplicating governing docs. -->
 
 # Path-Scoped Rules
 
@@ -10,8 +10,8 @@ Claude Code auto-loads rule files in this folder when the file being edited matc
 | Principle | Meaning |
 |---|---|
 | Intent first | `intents.yaml` is primary; path rules refine it |
-| Canonical docs win | `docs/internal/QUICK_REFERENCE.md` and `docs/internal/GOVERNANCE.md` outrank every rule here |
-| Cross-reference only | Rules point at canonical docs; they must not duplicate them |
+| Governing docs win | `docs/internal/QUICK_REFERENCE.md` and `docs/internal/GOVERNANCE.md` outrank every rule here |
+| Cross-reference only | Rules point at governing docs; they must not duplicate them |
 | Surgical context | Keep rules specific to file paths, not whole-project summaries |
 
 See [`_schema.md`](_schema.md) before adding or editing any rule file.

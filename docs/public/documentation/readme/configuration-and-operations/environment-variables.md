@@ -16,7 +16,7 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 ## Guided Setup Adds No Environment Inputs
 
 Legal identity seeds are optional during installation. Configure disclosure and
-paid-event identity later through authenticated administration; canonical
+paid-event identity later through authenticated administration; authoritative
 kind/country choices come from the server rather than another environment list.
 The [getting-started groups](../administration-and-branding/admin-guide.md#getting-started-after-setup)
 do not change provider responsibility, secret authority or SQLite processing bounds.
@@ -237,7 +237,7 @@ The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/era
 | `SETUP_SECRET` | **Baseline** | None | Pre-shared secret to unlock `/setup`. If left blank, generated automatically in volume. |
 | `INSTANCE_BOOTSTRAP_MODE` | **Baseline** | `Interactive` | Mode: `Interactive` (web wizard at `/setup`) or `ConfiguredAdministrator` (headless). |
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | Advanced | None | Required if headless: `local`, `keycloak` or `atproto`. |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Advanced | None | Exact provider subject: a canonical UUIDv7 Local username, Keycloak `sub`, or ATProto DID. |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Advanced | None | Exact provider subject: a lowercase, hyphenated UUIDv7 also used as the Local username, Keycloak `sub`, or ATProto DID. |
 | `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | Advanced | None | Required if headless: positive integer generation counter. |
 | `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | Advanced | None | Optional administrator account email; this does not replace required directory legal/public contact details. |
 | `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` / `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | Advanced | None | Optional profile names; supply both or neither. |
@@ -259,7 +259,7 @@ Mandatory legal identity fields required before production traffic can be served
 | `INSTANCE__OPERATORIDENTITY__OPERATORID` | **Baseline** | None | UUIDv7 unique identifier for the operating legal entity. |
 | `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | **Baseline** | None | Public brand name of the deploying organization. |
 | `INSTANCE__OPERATORIDENTITY__LEGALNAME` | **Baseline** | None | Full legal registered entity name. |
-| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | **Baseline** | `false` | True only for the canonical upstream project deployment. |
+| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | **Baseline** | `false` | True only for the authoritative upstream project deployment. |
 | `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | **Baseline** | `community` | Operator-kind code validated by the instance identity policy. |
 | `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | **Baseline** | `US` | Two-letter jurisdiction country code, such as `US`, `GB`, or `FR`. |
 | `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | **Baseline** | None | Public contact email for legal and privacy inquiries. |

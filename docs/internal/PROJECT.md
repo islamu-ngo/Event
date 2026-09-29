@@ -45,8 +45,8 @@ ISLAMU Event operates strictly in the **Blue Ocean**:
 ## Federation Status
 Implemented AT Protocol surface:
 - Confidential-client OAuth links an already-associated DID to a platform account without exposing AT credentials to the browser.
-- Local event publication commits before immutable PDS delivery intent; a fenced worker delivers eligible event/RSVP records and settles canonical URI/CID state.
-- A globally leased, exact-collection Jetstream consumer with optional DID curation materializes canonical community event/RSVP records for governed tenant discovery.
+- Local event publication commits before immutable PDS delivery intent; a fenced worker delivers eligible event/RSVP records and settles normalized URI/CID state.
+- A globally leased, exact-collection Jetstream consumer with optional DID curation materializes authoritative community event/RSVP records for governed tenant discovery.
 - Administrator capability/profile controls, user publication consent, safe source HAL, and delivery status are available through the API and Blazor client.
 
 Roadmap protocol surface:

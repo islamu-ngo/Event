@@ -27,8 +27,8 @@ AT Protocol OAuth authentication is implemented for accounts that are already li
 - **Safe public API**: `GET /api/event` returns a typed local-or-federated discovery collection. Federated items receive only a policy-produced `source` relation to `GET /api/event/federated/{atprotoRecordId}/source`; no raw `AtprotoRecord` read or mutation API exists.
 - **Governance**: `federation.atproto_events_enabled` controls inbound tenant presentation/stream demand and eligible outbound enqueue. `federation.atproto_event_validation_profile` selects platform or community-lexicon publication requirements, subject to instance locks; the community profile relaxes only required local business fields. `federation.atproto_publish_my_events` remains self-scoped user consent.
 - **Projection**: one typed community event record maps native lexicon fields and renders every other public event value—including all sessions, aspects, resolved lookups, and EAV values—into one deterministic description. Coverage, privacy, or exact-size failures prevent enqueue; values are never silently dropped or truncated.
-- **Inbound ingestion and local import**: one leased CarpaNet Jetstream consumer accepts exactly the community event and RSVP collections from a fixed endpoint. An empty DID filter discovers all public publishers of those collections; a configured `AllowedDids` list restricts ingestion to curated publishers. Accepted event records keep one global canonical DID/collection/record-key row and the complete source JSON, then an internal MediatR command creates or updates one tenant-local `Event` and one `EventSession` for each visible tenant. Canonical state, typed projection, tenant presentation, local aggregates, tombstone/quarantine effects, and cursor advancement commit atomically.
-- **Outbound delivery**: event lifecycle handlers atomically commit the local publication and immutable `PdsSyncOutbox` intent. A fenced worker rechecks capability, self-consent, linked session, source version, payload, and public-location privacy immediately before CarpaNet PDS I/O, then settles URI/CID and links the canonical record back to the committed local event.
+- **Inbound ingestion and local import**: one leased CarpaNet Jetstream consumer accepts exactly the community event and RSVP collections from a fixed endpoint. An empty DID filter discovers all public publishers of those collections; a configured `AllowedDids` list restricts ingestion to curated publishers. Accepted event records keep one global authoritative DID/collection/record-key row and the complete source JSON, then an internal MediatR command creates or updates one tenant-local `Event` and one `EventSession` for each visible tenant. Authoritative state, typed projection, tenant presentation, local aggregates, tombstone/quarantine effects, and cursor advancement commit atomically.
+- **Outbound delivery**: event lifecycle handlers atomically commit the local publication and immutable `PdsSyncOutbox` intent. A fenced worker rechecks capability, self-consent, linked session, source version, payload, and public-location privacy immediately before CarpaNet PDS I/O, then settles URI/CID and links the primary record back to the committed local event.
 - **Client surfaces**: instance administrators manage defaults/locks, unlocked tenant administrators manage effective capability/profile, and users manage only their own publication consent. Federated cards and local delivery status use text plus color and render actions only from HAL.
 - **Authorization fallback**: local fallback authorization treats actor records as read-only for authenticated users and denies ATProto record/indexed DID writes except for instance-admin bypass.
 
@@ -40,7 +40,7 @@ Local discoverability requires an active global Actor plus either an approved vi
 
 The API computes a request-local, non-serialized discoverability marker for Actor HAL assembly. Organization and Group resources advertise `subscribe` and `subscription` only when that marker is true and the normal authorization pipeline also allows the operation. Global collections do not advertise tenant-local subscription actions; clients must use `_links` rather than infer them from Actor kind, participation, roles, or claims.
 
-Blazor renders only `/actors/{actorId}`, backed by the canonical global detail
+Blazor renders only `/actors/{actorId}`, backed by the authoritative global detail
 read. No tenant-contextual Actor profile page is implemented. The separate exact
 `GET /api/actor/by-tenant/{tenantId}/{id}` API lookup applies the same fail-closed
 discoverability predicate as the tenant collection, can return approved public
@@ -161,17 +161,17 @@ The diagram below is a product-level illustration, not the record-shape contract
 
 Inbound federation is an internal import path, not a public create endpoint and not a second outbound publication path. The application deliberately keeps two representations:
 
-1. **Canonical protocol record** — `AtprotoRecord` owns the global DID, collection, record key, CID, AT URI, source cursor/version, tombstone state, complete accepted `RecordJson`, and `RecordHash`. `AtprotoEventProjection` stores bounded fields used by discovery.
+1. **Authoritative protocol record** — `AtprotoRecord` owns the global DID, collection, record key, CID, AT URI, source cursor/version, tombstone state, complete accepted `RecordJson`, and `RecordHash`. `AtprotoEventProjection` stores bounded fields used by discovery.
 2. **Tenant-local application aggregates** — one normal `Event` and one implicit `EventSession` are created or synchronized for every tenant whose `AtprotoRecordTenantPresentation` is visible. These rows participate in the normal event/session data model and are linked back through `Event.AtprotoRecordId`.
 
-This separation is the no-data-loss boundary. Semantically compatible fields become first-class local values; producer-specific, unsupported, or future fields remain available in the canonical JSON rather than being forced into unrelated columns. Structurally invalid records are not imported: they are quarantined with bounded hashes and reason codes.
+This separation is the no-data-loss boundary. Semantically compatible fields become first-class local values; producer-specific, unsupported, or future fields remain available in the normalized JSON rather than being forced into unrelated columns. Structurally invalid records are not imported: they are quarantined with bounded hashes and reason codes.
 
 ### Runtime Flow
 
 ```text
 Jetstream commit or bounded PDS snapshot
     -> generated community-calendar parsing and semantic validation
-    -> canonical AtprotoRecord + typed AtprotoEventProjection
+    -> authoritative AtprotoRecord + typed AtprotoEventProjection
     -> AtprotoJetstreamRuntimeStore
     -> MediatR: ImportAtprotoFederatedEventCommand
     -> AtprotoFederatedEventImportPlanFactory
@@ -179,7 +179,7 @@ Jetstream commit or bounded PDS snapshot
        -> one plan per visible tenant
     -> optional thumbnail fetch/stage through the verified DID/PDS boundary
     -> AtprotoJetstreamRepository fenced transaction
-       -> canonical record/projection/presentation
+       -> primary record/projection/presentation
        -> global Actor + tenant Event + EventSession (+ StorageObject when valid)
        -> cursor or complete-snapshot settlement
 ```
@@ -201,7 +201,7 @@ Validators are instantiated inside the Application path, following the repositor
 
 ### Lexicon-To-Application Mapping
 
-| Community calendar value | Canonical/typed storage | Local application mapping |
+| Community calendar value | Authoritative/typed storage | Local application mapping |
 | --- | --- | --- |
 | DID + collection + record key + CID + source cursor | `AtprotoRecord` identity and source version | `Event.AtprotoRecordId`; `ProvenanceSource = "atproto"`; `ProvenanceExternalId` is the bounded AT URI |
 | Complete accepted record | `AtprotoRecord.RecordJson` plus SHA-256 `RecordHash` | Remains the lossless source for producer extensions that have no compatible local field |
@@ -219,7 +219,7 @@ Validators are instantiated inside the Application path, following the repositor
 | `media[]` thumbnail | Blob metadata remains in `RecordJson`; a validated candidate carries DID, CID, MIME type, and declared size | Verified bytes become a public event-image `StorageObject`, linked through `Event.FeaturedImageId` |
 | `theme`, `preferences`, `createdWith`, `bskyPostRef`, additional URIs/media, aspect ratios, and future producer extensions | Complete accepted values remain in `AtprotoRecord.RecordJson` | No unrelated relational field is invented; future mappings can be added without losing the original record |
 
-Imported events reference one global external `Actor` keyed by the exact source DID, even when separate tenant Events materialize from the same publisher. Observation creates no tenant participation. Protocol record state remains canonical in `AtprotoRecord`, while `AtprotoIdentity` is the exact-DID identity authority for the represented Actor.
+Imported events reference one global external `Actor` keyed by the exact source DID, even when separate tenant Events materialize from the same publisher. Observation creates no tenant participation. Protocol record state remains authoritative in `AtprotoRecord`, while `AtprotoIdentity` is the exact-DID identity authority for the represented Actor.
 
 ### Thumbnail Blob Boundary
 
@@ -241,19 +241,19 @@ The command handler fetches and stages the optional image before opening the EF 
 
 Missing, unknown, active-content, malformed-container, or MIME/container-mismatched optional media fails soft: the event still imports and the complete original media metadata remains in `RecordJson`, but no image is staged or linked. If the database apply is rejected or throws, staged but unconsumed bytes are deleted. Replacement marks the previous image for lifecycle deletion; a record tombstone clears the featured image and requests deletion of owned storage objects.
 
-The gateway and PostgreSQL materialization boundary both consume the Application-owned `SafeRasterContentPolicy`; Infrastructure does not keep a second raster parser or SVG fallback. Persistence revalidates the staged MIME, declared and actual size, provider metadata, and CID-bound SHA-256 checksum before creating storage metadata. Rejecting an optional image never rewrites the accepted canonical `RecordJson`, local Event/EventSession graph, or ingestion cursor settlement.
+The gateway and PostgreSQL materialization boundary both consume the Application-owned `SafeRasterContentPolicy`; Infrastructure does not keep a second raster parser or SVG fallback. Persistence revalidates the staged MIME, declared and actual size, provider metadata, and CID-bound SHA-256 checksum before creating storage metadata. Rejecting an optional image never rewrites the accepted authoritative `RecordJson`, local Event/EventSession graph, or ingestion cursor settlement.
 
 ### Atomicity, Replay, And Tombstones
 
 - The consumer lease token and monotonic fence are rechecked before commit.
-- Canonical record/projection changes, tenant presentation, `Event`, `EventSession`, optional `StorageObject`, quarantine effects, and cursor advancement share one transaction.
+- Primary record/projection changes, tenant presentation, `Event`, `EventSession`, optional `StorageObject`, quarantine effects, and cursor advancement share one transaction.
 - Local identity is `(TenantId, AtprotoRecordId)`, so replay updates the existing aggregate instead of duplicating it.
 - A healthy imported event is preserved when an older or non-authoritative replay does not permit replacement.
 - A current update synchronizes mapped fields and revives previously tombstoned rows.
-- A canonical event tombstone soft-deletes the tenant-local event and all its sessions, clears `FeaturedImageId`, and requests storage deletion.
+- A primary event tombstone soft-deletes the tenant-local event and all its sessions, clears `FeaturedImageId`, and requests storage deletion.
 - Inbound imports never enqueue `PdsSyncOutbox` and never echo the source record back to a PDS.
 
-After a successful mutation, the discovery cache is invalidated. Public discovery de-duplicates the canonical projection against the tenant-local event linked by `AtprotoRecordId`, so clients see one event rather than a projection/import pair.
+After a successful mutation, the discovery cache is invalidated. Public discovery de-duplicates the authoritative projection against the tenant-local event linked by `AtprotoRecordId`, so clients see one event rather than a projection/import pair.
 
 ## CID
 ```
@@ -339,7 +339,7 @@ The current login paths converge on the existing platform user identifier so aut
 
 Inbound observation creates one global `ExternalUnclassified` Actor per exact DID and never creates tenant participation. During verified onboarding, explicit Organization or Group classification may promote that Actor in place. This preserves its identity and imported Event references while creating participation only in the onboarding tenant.
 
-An explicit canonical Actor target is not authorized by DID verification alone. The request carries a signed canonical Actor ID and expected concurrency stamp, and the authenticated User must already be an active administrator of the matching approved OrganizationTenant or GroupTenant in the current tenant. Same-kind consolidation moves active operational references, writes immutable `ActorMerge` evidence using a bounded DID digest, and retires the external source. Cross-kind, User-owned, stale, suspended, deleted, unauthorized, or inferred matches fail closed.
+An explicit authoritative Actor target is not authorized by DID verification alone. The request carries a signed authoritative Actor ID and expected concurrency stamp, and the authenticated User must already be an active administrator of the matching approved OrganizationTenant or GroupTenant in the current tenant. Same-kind consolidation moves active operational references, writes immutable `ActorMerge` evidence using a bounded DID digest, and retires the external source. Cross-kind, User-owned, stale, suspended, deleted, unauthorized, or inferred matches fail closed.
 
 ### Public projection and outbound compensation
 
@@ -347,7 +347,7 @@ Inbound event projections use the current tenant presentation, record source ver
 
 Outbound publication checks the exact active DID identity at planning and again immediately before delivery. An ineligible Create with no grounded remote mutation is skipped. Grounded `PdsSyncOutbox` work that becomes ineligible because of Actor or exact-DID suspension transactionally converts to a fenced Delete. Moderation reconciliation includes settled ownership and pending or processing Event mutations; exact-identity moderation limits unsettled work to the affected DID. Delete delivery requires the original tenant, user, DID, PDS session, source version, exact outbound-owned record, collection, record key, and, when present, CID to still match. Once those fences pass, a Delete may compensate for later Actor, identity, participation, Event, or payload ineligibility. Source Events remain selectable after soft deletion so privileged remote cleanup can finish. In-flight Create compensation waits beyond the predecessor retry or processing lease safety window. RSVP planning and delivery retain their existing behavior.
 
-Public Event eligibility differs by record ownership. Outbound-owned records and local echoes remain local only when exact outbound ownership and current local eligibility both pass. Inbound records require the current visible tenant presentation, a non-tombstoned canonical record, and the exact active, unsuspended, non-deleted DID identity owned by the Event Actor. The same central Event eligibility gate protects public actions, locations, program, agenda, days, sessions, session languages, aspects, sitemap, AI reference search, and Open Graph reads before disclosure, counting, or pagination.
+Public Event eligibility differs by record ownership. Outbound-owned records and local echoes remain local only when exact outbound ownership and current local eligibility both pass. Inbound records require the current visible tenant presentation, a non-tombstoned primary record, and the exact active, unsuspended, non-deleted DID identity owned by the Event Actor. The same central Event eligibility gate protects public actions, locations, program, agenda, days, sessions, session languages, aspects, sitemap, AI reference search, and Open Graph reads before disclosure, counting, or pagination.
 
 Authorized management reads are separate from anonymous reads. Event days, session languages, Islamic aspects, and Tech aspects expose dedicated authenticated management routes that recheck `view-management` on the parent Event. The generated client, MCP management context, and Blazor management flow use those routes instead of weakening public eligibility. Management Event collections emit management detail/session affordances and omit public-only report links; the request-local management marker is not serialized.
 
@@ -390,7 +390,7 @@ The key insight is that DID creation is **async**. Here's how to handle it:
 
 ## Operator And Product Guidance
 
-- Treat `federation.atproto_events_enabled` as one governed capability for both canonical Jetstream ingestion and eligible outbound PDS delivery. Keep it disabled until migrations, worker configuration, and operator recovery procedures are ready.
+- Treat `federation.atproto_events_enabled` as one governed capability for both authoritative Jetstream ingestion and eligible outbound PDS delivery. Keep it disabled until migrations, worker configuration, and operator recovery procedures are ready.
 - The `community_lexicon` validation profile changes required local publication fields only; it never authorizes invalid supplied values, incomplete projections, private disclosure, or oversized records.
 - Treat `auth.atproto_login_enabled` as authentication only; it does not enable event federation or user publication consent.
 - Keep public-facing release notes precise: AT Protocol OAuth, event discovery, Jetstream ingestion, and lifecycle-owned PDS publication are implemented; ActivityPub interoperability and first-party PDS hosting remain roadmap work.

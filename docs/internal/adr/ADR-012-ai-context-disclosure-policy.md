@@ -34,7 +34,7 @@ Adopt the **AI Context Disclosure Policy** as the authoritative framework for an
 
 1. **Classification enums** (`Explore.Domain/Enums/`): `AiContextSensitivityEnum`, `AiContextDisclosureRuleEnum`, `AiProviderTrustTierEnum`, `AiAdministrativeContextScopeEnum`.
 2. **Disclosure registry** (`Explore.Application/Features/AiAssistant/Disclosure/`): `AiContextDisclosureRegistry` seeded from `dev/active/ai-context-disclosure-policy/field-classification-matrix.md`, with `AiContextDisclosureEntry` rows per persisted `*Pii` property.
-3. **Canonical policy doc** (`docs/AI_CONTEXT_SECURITY.md`): the human-readable counterpart to this ADR.
+3. **Governing policy doc** (`docs/AI_CONTEXT_SECURITY.md`): the human-readable counterpart to this ADR.
 4. **Reflection test** (`Event.Architecture.Tests/AiContextDisclosureSchemaTests.cs`): machine-enforces that every `*Pii` property has a registry entry.
 5. **AI Context Gateway** (`IAiContextGateway` — Phase 2): the single evaluation point where effective disclosure rules are computed and where sanitized envelopes are emitted. No AI flow may bypass it.
 6. **Consent engine** (Phase 2): `AiContextConsent` domain model capturing per-user, per-tenant consent records.

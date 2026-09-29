@@ -77,6 +77,6 @@ The API cookbook treats template-sync `409 Conflict` as a reload-and-retry case.
 ## Related Documentation
 
 - [ADMIN_GUIDE.md](ADMIN_GUIDE.md) - admin workflow overview.
-- [API.md](API.md) - canonical API route and error conventions.
+- [API.md](API.md) - authoritative API route and error conventions.
 - [API_COOKBOOK.md](API_COOKBOOK.md) - template-sync conflict handling for integrators.
 - [AUTHORIZATION_PATTERNS.md](AUTHORIZATION_PATTERNS.md) - resource authorization patterns.

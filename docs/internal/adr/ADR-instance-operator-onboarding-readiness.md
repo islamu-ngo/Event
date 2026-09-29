@@ -57,7 +57,7 @@ Rather than crashing the host or returning misleading placeholder values, depend
 As refined by [ADR-032](ADR-032-progressive-instance-onboarding.md),
 `InstanceOnboardingCompletionOperation.PersistAsync` no longer evaluates legal
 readiness as an installation gate. It creates a missing instance draft and, in
-SingleTenant mode, a missing Provisioning default directory with canonical identity
+SingleTenant mode, a missing Provisioning default directory with stable identity
 and branding drafts inside the completion transaction. Existing documents and
 tenant lifecycle are preserved. MultiTenant creates no directory. Administrator
 bootstrap, transactional finality and rollback remain unchanged.

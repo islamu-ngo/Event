@@ -77,7 +77,7 @@ Planned outputs:
 Tell me "agreed" and I will check whether these mapped reports already exist, then run the deep review and update or create the Markdown files. Or point me to additional context first.
 ```
 
-If the user confirms, run the standalone [Grill-Me alignment gate](action-routing.md#standalone-alignment-gate), then check for the canonical report identity, perform the deeper artifact/context search, and update or create the report. If the user adds paths or connects tools, include them in the evidence plan before writing. If the user declines or changes scope, reroute through [action-routing.md](action-routing.md).
+If the user confirms, run the standalone [Grill-Me alignment gate](action-routing.md#standalone-alignment-gate), then check for the report identity, perform the deeper artifact/context search, and update or create the report. If the user adds paths or connects tools, include them in the evidence plan before writing. If the user declines or changes scope, reroute through [action-routing.md](action-routing.md).
 
 ## Sources To Search
 
@@ -102,7 +102,7 @@ Also check external or non-workspace context sources when visible and relevant:
 1. Identify the requested I-VSD action and likely domains from [action-routing.md](action-routing.md).
 2. Inventory local docs/internal/text artifacts, relevant context-retrieval skills, visible project-context MCPs/integrations, user-provided paths, and relevant authenticated CLIs before reading code-heavy areas.
 3. Send the concise first response contract to the user, listing only relevant available context, material missing context, planned output files, and whether project-context MCP/CLI/filesystem context would improve the review.
-4. After user confirmation, run the standalone alignment gate and check whether the canonical subject report already exists so the work can update it instead of writing from scratch. For `guided-discovery`, run its interview with one material question per response before writing the report.
+4. After user confirmation, run the standalone alignment gate and check whether the subject report already exists so the work can update it instead of writing from scratch. For `guided-discovery`, run its interview with one material question per response before writing the report.
 5. Search for value-bearing terms such as privacy, consent, retention, telemetry, tracking, ads, pricing, billing, refund, cancellation, moderation, appeal, abuse, safety, accessibility, security, admin, partner, sponsor, AI, model, ranking, recommendation, policy, terms, rights, user data, deletion, export, lock-in, incident, and support.
 6. Search for project-specific vocabulary from the user prompt, product name, feature name, domain model, connected project tools, or action under review.
 7. Read the most relevant documents and external context records; cite them in `Evidence Reviewed` with paths, tool/source names, record identifiers, URLs, or clear descriptions.

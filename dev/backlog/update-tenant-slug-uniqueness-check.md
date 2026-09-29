@@ -16,7 +16,7 @@ and leaves concurrent slug changes without the create flow's explicit slug lock.
 ## Required Change
 
 When an update actually changes the normalized slug, serialize against the same
-canonical slug mutation lock used by creation. Inside that boundary, query the
+authoritative slug mutation lock used by creation. Inside that boundary, query the
 slug owner, exclude the tenant being updated, and return a validation failure when
 the slug is already allocated. Retain the database unique index as final race
 defense and refresh the tenant-slug cache only after a successful commit.

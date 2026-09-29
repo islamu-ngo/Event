@@ -33,7 +33,7 @@ This assessment covers the provider-controlled decision to recommend Local
 Identity by default, offer passwordless AT Protocol for public-HTTPS
 self-hosters, retain Keycloak for advanced operators, and publish five
 resource-proportional deployment presets. It evaluates whether generated
-environment projections, canonical Compose fragments, scenario entrypoints,
+environment projections, authoritative Compose fragments, scenario entrypoints,
 CI, quickstarts, secrets, recovery guidance, and public/internal documentation
 make those choices real, safe, and understandable.
 
@@ -63,7 +63,7 @@ dependencies, and recoverable operations.
 - **Risk:** operators are told they selected a low-dependency provider while
   still paying Keycloak's memory, database, startup, patching, and failure
   costs.
-- **Mitigation:** `IVSD-M001` establishes five canonical preset contexts,
+- **Mitigation:** `IVSD-M001` establishes five authoritative preset contexts,
   generated env examples, and thin Compose scenarios. Standalone Local excludes
   every external service; Split Local and Split AT Protocol exclude Keycloak;
   Split Keycloak preserves its complete initialization chain; External
@@ -102,7 +102,7 @@ dependencies, and recoverable operations.
 - **Stakeholders:** self-hosters, SaaS operators, account holders
 - **Provider-controlled decision:** provider ordering, prerequisite disclosure,
   password-custody explanation, and administration guidance
-- **Evidence:** the canonical provider guide states Local first, AT Protocol
+- **Evidence:** the designated provider guide states Local first, AT Protocol
   second for public HTTPS, and Keycloak for advanced SSO/MFA; multiple landing,
   federation, admin, and request-flow pages still describe Keycloak as the only
   or universal path.
@@ -145,11 +145,11 @@ dependencies, and recoverable operations.
 - **Claim type:** promise-keeping and maintainability
 - **Principle/domain:** sidq, amanah, ihsan; governance and operations
 - **Stakeholders:** operators, maintainers, support contributors
-- **Provider-controlled decision:** source anchors, canonical names, drift
+- **Provider-controlled decision:** source anchors, stable key, drift
   detection, and documentation lifecycle
 - **Evidence:** operator identity names, Keycloak endpoint/realm/client
   defaults, request-flow diagrams, metadata blocks, and internal indexes
-  disagree with current options, canonical metadata, realm export, or
+  disagree with current options, authoritative metadata, realm export, or
   authentication architecture.
 - **Risk:** valid-looking configuration fails closed, support guidance points
   at the wrong dependency, and maintainers repeat the same reconciliation.
@@ -202,7 +202,7 @@ dependencies, and recoverable operations.
    administration.
 3. Keep secrets in the selected authority and expose only logical binding
    names, readiness states, rotation order, and bounded recovery outcomes.
-4. Use the existing canonical authentication pages as the technical source;
+4. Use the existing authoritative authentication pages as the technical source;
    landing pages should link rather than reproduce the full provider matrix.
 5. Add no new dependency and perform no external product/source research.
 6. Generate all five environment examples from typed activation contexts and
@@ -277,7 +277,7 @@ here.
 - `InstanceOperatorIdentityOptions`,
   `ConfiguredAdministratorBootstrapProvider`, and
   `AtprotoInfrastructureOptions`.
-- `CanonicalEnvironmentMetadata`, Keycloak realm export, authentication
+- `PlatformEnvironmentMetadata.cs`, Keycloak realm export, authentication
   provider dispatch, and Local Identity persistence/service ownership.
 - Public provider, authentication, self-hosting, environment, secrets,
   troubleshooting, federation, admin, and quickstart pages.

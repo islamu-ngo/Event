@@ -48,7 +48,7 @@ Descriptive domain headings are allowed. Do not add `When to Load`, `When NOT to
 ## Manual Checks
 
 - Confirm no ASCII diagrams.
-- Confirm no long stack overview that belongs in canonical docs.
+- Confirm no long stack overview that belongs in governing docs.
 - Confirm no duplicate copy of `docs/internal/QUICK_REFERENCE.md` rules beyond what the skill must operationalize.
 - Confirm no activation section repeats the catalog description.
 - Confirm the body removes advice a capable agent would infer without the skill.

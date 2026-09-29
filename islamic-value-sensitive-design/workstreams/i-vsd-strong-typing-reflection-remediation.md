@@ -66,12 +66,12 @@ It does not provide stakeholder interviews, production incident evidence, deploy
 - **Domain:** Technical; Governance
 - **Stakeholders:** authenticated users, tenant members, instance operators, support operators
 - **Provider-controlled decision:** which code is authorized to translate claims into platform identity, provider subject, and session identity
-- **Evidence:** canonical `PlatformIdentityPrincipalExtensions`; bypassing claim readers in API, BFF, Infrastructure, HATEOAS, rate limiting, idempotency, diagnostics, and logging
+- **Evidence:** authoritative `PlatformIdentityPrincipalExtensions`; bypassing claim readers in API, BFF, Infrastructure, HATEOAS, rate limiting, idempotency, diagnostics, and logging
 - **Validation level:** implementation traceability
 - **Risk:** divergent fallback order or semantic conflation may misidentify a caller, alter rate partitions, expose diagnostics, or weaken tenant/resource checks
 - **Mitigation:** `IVSD-M002`
 - **Owner / next validation:** identity consolidation and Tier 1 adversarial verification tasks
-- **Escalation boundary:** implementation must stop if a purpose-bound authentication scheme cannot use the canonical platform-identity semantics without widening authority
+- **Escalation boundary:** implementation must stop if a purpose-bound authentication scheme cannot use the authoritative platform-identity semantics without widening authority
 
 ### IVSD-F003 — Blanket value-object and catalog creation would turn clarity into maintenance burden
 
@@ -240,7 +240,7 @@ Generated OpenAPI, client, and API inventory remain byte-identical to the approv
 ## Escalation Needed
 
 - No qualified Islamic scholarly review is required for this engineering refactor.
-- Security escalation is required if canonical platform identity cannot replace a caller without changing the caller's purpose-bound scheme semantics.
+- Security escalation is required if authoritative platform identity cannot replace a caller without changing the caller's purpose-bound scheme semantics.
 - Governance escalation is required before any task widens permissions, removes critical coverage without replacement, or changes public wire/database contracts outside the approved plan.
 
 ## Evidence Reviewed

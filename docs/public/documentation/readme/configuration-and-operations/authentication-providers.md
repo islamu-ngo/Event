@@ -119,7 +119,7 @@ approval before destructive reset.
 
 ## Keycloak Account Claims
 
-Keycloak must issue the same canonical account `sub` in the ID token and API
+Keycloak must issue the same authoritative account `sub` in the ID token and API
 access token, with its configured issuer. A successful browser callback alone is
 not enough if the API access token has no subject. Session IDs and platform user
 IDs are not substitutes.

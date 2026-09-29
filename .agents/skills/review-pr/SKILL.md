@@ -93,7 +93,7 @@ dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.cs
 - [ ] `docs/internal/QUICK_REFERENCE.md` updated if a new invariant was introduced.
 - [ ] `docs/internal/API_CHANGELOG.md` updated if a public contract changed.
 - [ ] `dev/_journal/journal.md` appended if a non-obvious finding emerged.
-- [ ] `docs/internal/index.md` cross-references still resolve; use [`AGENTS.md`](../../../AGENTS.md) and [`docs/internal/OPERATIONS.md`](../../../docs/internal/OPERATIONS.md) as the canonical verification entrypoints.
+- [ ] `docs/internal/index.md` cross-references still resolve; use [`AGENTS.md`](../../../AGENTS.md) and [`docs/internal/OPERATIONS.md`](../../../docs/internal/OPERATIONS.md) as the primary verification entrypoints.
 
 ## Step 7 — Forbidden-Without-Approval Gate
 

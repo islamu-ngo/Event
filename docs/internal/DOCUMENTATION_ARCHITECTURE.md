@@ -9,7 +9,7 @@ ABOUTME: Keeps docs source-grounded, audience-oriented, and safe to evolve witho
 > **Last Verified:** 2026-09-02
 > **Source Anchors:** `README.md`, `docs/index.md`, `docs/DOCUMENTATION_STYLE_GUIDE.md`
 
-This repository uses Markdown-first documentation as the canonical operator, contributor, and agent knowledge base, complemented by our [official hosted public documentation portal](https://islamu.gitbook.io/islamu-event).
+This repository uses Markdown-first documentation as the authoritative operator, contributor, and agent knowledge base, complemented by our [official hosted public documentation portal](https://islamu.gitbook.io/islamu-event).
 
 ## Intent Model
 
@@ -38,11 +38,11 @@ Use `README.md` as the public entry point. It should route new readers by task a
 | Contributors | `DEVELOPER_GUIDE.md` | `ARCHITECTURE_OVERVIEW.md`, `REQUEST_FLOWS.md`, `CONTRIBUTOR_RECIPES.md`, `CONTRIBUTING.md`, `QUICK_REFERENCE.md` |
 | AI agents | `AGENTS.md` | `.agents/contract/README.md`, `.agents/contract/intents.yaml`, `dev/_journal/README.md` |
 
-## Canonical Docs And Owners
+## Primary documentation And Owners
 
-Each canonical doc has an owner category. Ownership means the category is responsible for accuracy, not that only that team may edit it.
+Each primary documentation has an owner category. Ownership means the category is responsible for accuracy, not that only that team may edit it.
 
-| Owner | Canonical Docs |
+| Owner | Primary documentation |
 |---|---|
 | Platform/Ops | `SELF_HOSTING.md`, `BACKUP_RESTORE_UPGRADE.md`, `OPERATIONS.md`, `CONFIGURATION.md`, `RELEASE_CHECKLIST.md` |
 | Security | `SECURITY_OVERVIEW.md`, `SECURITY-MODEL.md`, `SECRETS.md`, `AUTHORIZATION_PATTERNS.md`, `DEPLOYMENT_TIERS.md` |
@@ -54,7 +54,7 @@ Each canonical doc has an owner category. Ownership means the category is respon
 
 ## Metadata Policy
 
-New canonical docs and operator-critical docs must include this block immediately below the title:
+New primary documentation and operator-critical docs must include this block immediately below the title:
 
 ```markdown
 > **Audience:** Operators | Contributors | Admins | Integrators | AI agents

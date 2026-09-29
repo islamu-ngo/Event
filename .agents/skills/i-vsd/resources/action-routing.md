@@ -3,7 +3,7 @@
 
 # Action Routing
 
-Use this resource in standalone mode after applying [scope-boundaries.md](scope-boundaries.md). [Integration contract](integration-contract.md) owns mode selection; [report contract](report-contract.md) owns canonical report identity and schema.
+Use this resource in standalone mode after applying [scope-boundaries.md](scope-boundaries.md). [Integration contract](integration-contract.md) owns mode selection; [report contract](report-contract.md) owns report identity and schema.
 
 ## Routing Rule
 
@@ -13,14 +13,14 @@ Use this resource in standalone mode after applying [scope-boundaries.md](scope-
 4. If a covered provider-mediated software request includes religious-legal subquestions, continue only with design reasoning and put the excluded ruling parts under `Escalation Needed`.
 5. If the user invokes `i-vsd` without product, artifact, repository, business, architecture, policy, incident, or report context, do not guess. Return the action menu in `Available Actions`, ask the user to choose one or more actions, and create no report.
 6. If the user gives covered context but no action, infer the most relevant actions and ask for confirmation before writing files unless the requested outcome is obvious. This routing response creates no report.
-7. If the user names one covered action and gives enough context, run the concise context inventory gate from [context-discovery.md](context-discovery.md), obtain agreement, then run the standalone alignment gate below before creating or updating the canonical report.
-8. If the user names multiple covered actions, run the context inventory gate, name all canonical report paths, obtain agreement, then run one shared standalone alignment gate before creating one report per action and an index.
+7. If the user names one covered action and gives enough context, run the concise context inventory gate from [context-discovery.md](context-discovery.md), obtain agreement, then run the standalone alignment gate below before creating or updating the matching report.
+8. If the user names multiple covered actions, run the context inventory gate, name all matching report paths, obtain agreement, then run one shared standalone alignment gate before creating one report per action and an index.
 9. If the user chooses `guided-discovery`, run the context gate, then interview the user using [guided-discovery-workflow.md](guided-discovery-workflow.md) with the one-question discipline below; do not treat the absence of existing context as a blocker.
 10. If the user chooses `moral-diff-review`, collect the complete outgoing changeset using [moral-diff-review-workflow.md](moral-diff-review-workflow.md), including unpushed commits, commit titles/bodies, target/upstream branch context, code, docs, configs, tests, generated files, staged changes, unstaged changes, and untracked files intended for review. When the user explicitly asks to run the review, proceed without a separate agreement step unless the diff source, comparison base, or output location is ambiguous.
 11. If required evidence is missing for non-discovery actions, still produce the report when useful, but mark gaps as `Missing Evidence` or `Not Reviewed`; do not invent facts.
 12. If the action involves finance/riba, religious guidance, high-stakes AI, public harm, vulnerable users, contested moderation, or halal/haram/makrooh/wajib language, include a scholarly or expert escalation section.
 13. For artifact-based actions, run the context discovery protocol in [context-discovery.md](context-discovery.md) before writing findings so docs, text artifacts, policies, plans, relevant project-context integrations, user-provided paths, and implementation evidence are reviewed together.
-14. Persist every **substantive** I-VSD finding, consultation, advisory, or recommendation to the canonical Markdown report. Refusals, action menus, context inventories, clarification questions, and agreement prompts are routing responses and must not create report files.
+14. Persist every **substantive** I-VSD finding, consultation, advisory, or recommendation to the matching Markdown report. Refusals, action menus, context inventories, clarification questions, and agreement prompts are routing responses and must not create report files.
 
 ## Standalone Alignment Gate
 
@@ -41,13 +41,13 @@ When producing reports, write them under the appropriate tier folder relative to
 - `islamic-value-sensitive-design/consultations/` for substantive feature and domain consultations, audits, and compliance reviews.
 - `islamic-value-sensitive-design/workstreams/` for active implementation-planning assessments and moral diff reviews.
 
-Create subdirectories if needed. Every generated report file must use the `i-vsd-*.md` naming pattern. Derive the canonical subject-and-report-kind path from [report-contract.md](report-contract.md); the filenames in `Action Map` identify report kinds and legacy one-subject examples. For multiple actions, also create or update `i-vsd-review-index.md` or index them in `islamic-value-sensitive-design/README.md`.
+Create subdirectories if needed. Every generated report file must use the `i-vsd-*.md` naming pattern. Derive the subject-and-report-kind path from [report-contract.md](report-contract.md); the filenames in `Action Map` identify report kinds and legacy one-subject examples. For multiple actions, also create or update `i-vsd-review-index.md` or index them in `islamic-value-sensitive-design/README.md`.
 
 If the user specifies another output path, ask for confirmation before using it. The default remains partitioned under `islamic-value-sensitive-design/`, and filenames must still use the `i-vsd-*.md` prefix pattern.
 
 ## Existing Report Rule
 
-After the context gate, user agreement, and standalone alignment gate, check whether the canonical subject-and-report-kind path already exists. Update only a report with matching identity. Preserve useful prior findings, stable IDs, resolved history, evidence notes, and open gaps unless new evidence supersedes them.
+After the context gate, user agreement, and standalone alignment gate, check whether the subject-and-report-kind path already exists. Update only a report with matching identity. Preserve useful prior findings, stable IDs, resolved history, evidence notes, and open gaps unless new evidence supersedes them.
 
 When updating an existing report, follow the lifecycle and normalization rules in [report-contract.md](report-contract.md).
 
@@ -138,7 +138,7 @@ Map common user phrasing to actions:
 
 ## Report File Contract
 
-Use [report-contract.md](report-contract.md) as the single authority for report identity, metadata, required headings, stable findings, lifecycle, and planning handoffs. Action-specific resources may add sections but cannot remove the canonical fields.
+Use [report-contract.md](report-contract.md) as the single authority for report identity, metadata, required headings, stable findings, lifecycle, and planning handoffs. Action-specific resources may add sections but cannot remove the required fields.
 
 ## Multi-Report Index Contract
 

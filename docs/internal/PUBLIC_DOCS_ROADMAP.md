@@ -9,13 +9,13 @@ ABOUTME: Keeps public-site planning separate from the current repository Markdow
 > **Last Verified:** 2026-09-02
 > **Source Anchors:** `docs/DOCUMENTATION_ARCHITECTURE.md`, `docs/index.md`, `docs/docs-website/README.md`
 
-The [official public documentation portal](https://islamu.gitbook.io/islamu-event) is live. The repository Markdown documentation remains the canonical engineering source of truth for technical constraints and implementation details.
+The [official public documentation portal](https://islamu.gitbook.io/islamu-event) is live. The repository Markdown documentation remains the authoritative engineering source of truth for technical constraints and implementation details.
 
 ## Deferred Until Repository Docs Are Stable
 
 Do not introduce a docs-site generator, publishing pipeline, or public-site navigation model until:
 
-1. canonical repository docs pass metadata, source-anchor, placeholder, and link validation;
+1. authoritative repository docs pass metadata, source-anchor, placeholder, and link validation;
 2. release documentation and operator runbooks are accurate enough for self-hosters;
 3. the project chooses which pages are safe for public mirroring;
 4. ownership is clear for keeping mirrored public pages synchronized with source docs.

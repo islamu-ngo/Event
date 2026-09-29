@@ -74,7 +74,7 @@ Parent/child aggregate rule:
 
 - `Event` remains the parent program/container aggregate
 - `EventSession` remains the scheduled child aggregate
-- sessions may appear like first-class items in UI/search, but canonical persistence stays parent/child
+- sessions may appear like first-class items in UI/search, but authoritative persistence stays parent/child
 
 ## List Filtering And Module Guards
 

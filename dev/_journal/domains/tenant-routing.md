@@ -41,7 +41,7 @@ normalization, BFF fallback configuration, middleware, and circuit navigation.
 
 **Why this matters:** Configuration semantics must survive end to end. A fallback
 must not change the public URL contract. Safety during resolver-config failure
-comes from the reserved slug set and canonical slug grammar, not from
+comes from the reserved slug set and authoritative slug grammar, not from
 substituting another URL shape.
 
 **References:**

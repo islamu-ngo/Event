@@ -85,7 +85,7 @@ Accept: application/hal+json;v=0.1
 X-Api-Version: 0.1
 ```
 
-or `?api-version=0.1`. Requests without an explicit version default to `0.1`. URL-segment versioning is intentionally unsupported so canonical paths, operation IDs, and HAL links remain stable.
+or `?api-version=0.1`. Requests without an explicit version default to `0.1`. URL-segment versioning is intentionally unsupported so primary path, operation IDs, and HAL links remain stable.
 
 ## Contract rules
 

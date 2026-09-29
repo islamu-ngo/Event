@@ -25,7 +25,7 @@ Impacts:
   OpenAPI:
     Reference: docs/internal/API_CHANGELOG.md
     Disposition: documented
-    Detail: Existing BrandingSettingsDto gains nullable supportEmail; canonical OpenAPI and generated clients are regenerated without adding an endpoint.
+    Detail: Existing BrandingSettingsDto gains nullable supportEmail; authoritative OpenAPI and generated clients are regenerated without adding an endpoint.
   Operator:
     Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
     Disposition: documented

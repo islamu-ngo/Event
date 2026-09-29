@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical schema every SKILL.md in this repo must satisfy. -->
+<!-- ABOUTME: Schema every SKILL.md in this repo must satisfy. -->
 <!-- ABOUTME: Defines routing-first descriptions, progressive disclosure, and practical skill content. -->
 
 # Skill Schema (Authoritative)
@@ -70,7 +70,7 @@ Section names beyond these are allowed when they communicate the domain more dir
 - Follow [Context Engineering](../CONTEXT_ENGINEERING.md).
 - `SKILL.md` is the only default load. Resource indexes route deeper retrieval; resource files load only for the named unresolved decision.
 - Do not reread `AGENTS.md`, the resolved intent, a skill, rule, document heading, or source symbol already present at the same revision.
-- Prefer links and exact headings over copied canonical rules. Repetition with different wording is still duplication.
+- Prefer links and exact headings over copied governing rules. Repetition with different wording is still duplication.
 - Broad read-only discovery belongs to an economical scout using the cap in [Context Engineering](../CONTEXT_ENGINEERING.md); the main agent owns decisions and synthesis.
 
 ## 6. Forbidden Content

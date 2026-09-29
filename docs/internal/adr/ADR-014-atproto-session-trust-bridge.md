@@ -34,7 +34,7 @@ OAuth state and cross-host handoff are atomic and single-use through the private
 
 One origin-protected, host-only `__Host-event-atproto-proof` cookie holds a separate 256-bit browser proof for a fixed fifteen minutes. It is Secure, HttpOnly, SameSite=Lax and smaller than 1 KiB. Established cookies are reused without sliding or per-flow deletion; independent random flow identifiers derive HMAC-SHA256 bindings stored inside protected state. Cold first-cookie races fail closed for the losing binding. Near-expiry challenges return a bounded retry deadline without replacing proof under active flows.
 
-The adapters read/decrypt and validate issuer, PDS, current tenant/origin mapping and proof before candidate-bound consumption. Same-origin callbacks check browser possession; a canonical callback originating elsewhere can exchange the provider result but issues only an opaque handoff. Its destination validates the initiating browser before consuming and issuing a cookie. Cookie sign-in rechecks proof after provider exchange. State expiry reserves the two-minute handoff budget; a post-callback handoff is capped by proof expiry, not by already-consumed state expiry.
+The adapters read/decrypt and validate issuer, PDS, current tenant/origin mapping and proof before candidate-bound consumption. Same-origin callbacks check browser possession; an authoritative callback originating elsewhere can exchange the provider result but issues only an opaque handoff. Its destination validates the initiating browser before consuming and issuing a cookie. Cookie sign-in rechecks proof after provider exchange. State expiry reserves the two-minute handoff budget; a post-callback handoff is capped by proof expiry, not by already-consumed state expiry.
 
 ### Relational transient storage authority
 
@@ -44,7 +44,7 @@ The database-backed cutover introduces two instance-owned lifecycle entities:
 BFF transient consumers now use this authority through private HTTP contracts.
 
 These entities deliberately do not implement the business tenant-filter
-contract. A canonical OAuth callback cannot know its originating tenant until
+contract. A authoritative OAuth callback cannot know its originating tenant until
 it restores protected state. Real authentication records nevertheless require
 a nonempty tenant binding; only a separately constructed, internal health
 probe may omit it. Handoff reads and all authentication consumes require the
@@ -167,7 +167,7 @@ Three instance-scoped, rotation-capable secret purposes are mandatory:
 
 Keys are never reused across these purposes. ES256 signing rings have unique nonblank `kid` values and exactly one active key. Retired public OAuth client keys remain in `/oauth/jwks.json` for the overlap window required by in-flight assertions and bound sessions. Private `d` values remain server-only and are excluded from public JSON, logs, health output, exceptions, traces, and diagnostics. A malformed OAuth-client ring fails BFF readiness closed; malformed session-encryption or session-JWT rings fail closed when their Infrastructure or API consumer uses them.
 
-The BFF's URL-form client ID is its exact canonical HTTPS `/oauth/client-metadata.json` URL. The anonymous metadata and JWKS endpoints serve exact JSON without redirects only on that configured host, use bounded public caching and document size, advertise `private_key_jwt` with ES256 and DPoP-bound access tokens, and publish only EC P-256 public parameters. Loopback helpers may be used only in Development where CarpaNet explicitly supports them; they cannot weaken production canonical-host, HTTPS, key, or egress policy.
+The BFF's URL-form client ID is its exact authoritative HTTPS `/oauth/client-metadata.json` URL. The anonymous metadata and JWKS endpoints serve exact JSON without redirects only on that configured host, use bounded public caching and document size, advertise `private_key_jwt` with ES256 and DPoP-bound access tokens, and publish only EC P-256 public parameters. Loopback helpers may be used only in Development where CarpaNet explicitly supports them; they cannot weaken production authoritative-host, HTTPS, key, or egress policy.
 
 ## Rejected alternatives
 

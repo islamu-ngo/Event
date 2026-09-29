@@ -155,7 +155,7 @@ mismatched identifier comparison.
 | `event_resources.audit_retention_days` | 30 days; allowed range 0–90. Zero disables collection; tenants may shorten retention. |
 | `event_resources.max_active_resources` | 500; allowed range 0–500. Zero prevents new resource creation. |
 
-Origin entries are canonical HTTPS authorities, such as
+Origin entries are authoritative HTTPS authorities, such as
 `https://materials.example.org`. Do not include a trailing slash, path, query,
 fragment, credentials or wildcard. Alternate spellings, including uppercase
 hosts and explicit default ports, are rejected rather than silently normalized.

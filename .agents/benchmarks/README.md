@@ -15,7 +15,7 @@ Last Updated: 2026-08-30
 
 | File | Purpose |
 |---|---|
-| [`cold-start-tasks.yaml`](cold-start-tasks.yaml) | 13 canonical scenarios with acceptance criteria, context budgets, and expected intent classification |
+| [`cold-start-tasks.yaml`](cold-start-tasks.yaml) | 13 reference scenarios with acceptance criteria, context budgets, and expected intent classification |
 
 The YAML structure is documented by the scenario format below.
 
@@ -87,7 +87,7 @@ A failing benchmark is a **signal**, not a bug. Triage in this order:
 2. **Context overflow or duplication** → the agent loaded full registries/files, repeated unchanged context, or returned raw scout output.
    - Fix: improve intent routing, retrieve one heading/symbol, deduplicate by `path + heading/symbol + revision`, or tighten the scout output contract. Do not solve this by adding more must-reads.
 3. **Missing evidence** → a concrete decision lacked required context.
-   - Fix: add the smallest canonical heading or symbol to the intent/skill route; a whole-file must-read is the last resort.
+   - Fix: add the smallest relevant heading or symbol to the intent/skill route; a whole-file must-read is the last resort.
 4. **Out-of-scope edits** → the agent touched files outside the intent's `paths_in_scope`.
    - Fix: sharpen `paths_in_scope` / `paths_forbidden` on the intent.
 5. **Skipped verification** → the agent did not run `verification_commands`.

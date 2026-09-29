@@ -64,7 +64,7 @@ the current HAL action is granted.
 write-only, idempotency-revalidated input from a current resource manager. It
 validates absolute HTTPS without userinfo, literal IP or recognized local
 hosts, deceptive IDN authority, control/format characters or hostname suffix
-matching. The canonical origin must be in the **current intersected** instance
+matching. The authoritative origin must be in the **current intersected** instance
 and tenant allow-list; no origin is enabled by default. Only the normalized
 origin and a Data Protection envelope are stored. Draft, audit, export,
 federation and ordinary audience DTOs never contain raw links or ciphertext.
@@ -446,7 +446,7 @@ that do not change the provider's immediate boolean decision.
 
 `EventResourceAccessRules` suppresses attendee disclosure when the resource uses
 a disabled delivery type or audience. External delivery also requires an allowed
-canonical HTTPS origin. Existing resource repair, withdrawal and deletion remain
+authoritative HTTPS origin. Existing resource repair, withdrawal and deletion remain
 subject to their normal management authority rather than being disabled by a
 tightened delivery policy. Creation requires enabled delivery/audience choices
 and positive capacity. Publication additionally requires a governed resource

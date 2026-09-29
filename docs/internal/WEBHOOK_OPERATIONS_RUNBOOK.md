@@ -145,7 +145,7 @@ increase(explore_webhooks_retention_cleanup_runs_total{outcome=~"failed|partial_
 3. Use the publication resource's `reconcile` HAL relation when present. The supported self-hosted
    v1.96.1 profile cannot prove request-hash tags through list/get, so unresolved ambiguity normally
    becomes manual reconciliation.
-4. Compare provider evidence and the canonical request hash through approved operator surfaces.
+4. Compare provider evidence and the normalized input hash through approved operator surfaces.
    Never copy payloads, tokens, portal URLs, signatures, or raw provider errors into incident notes.
 5. Use `abandon` only when its HAL relation is present and an authorized operator has recorded the
    reason. Abandonment is a terminal administrative decision, not proof that Svix did not accept.

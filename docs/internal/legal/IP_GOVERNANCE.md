@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical policy for IP provenance, clean-room research, dependency licensing, and audit evidence. -->
+<!-- ABOUTME: Governing policy for IP provenance, clean-room research, dependency licensing, and audit evidence. -->
 <!-- ABOUTME: Protects ISLAMU's CLA-backed alternative-licensing options without relicensing third-party material. -->
 
 # IP Protection, Clean-Room Governance, And Audit Readiness
@@ -103,7 +103,7 @@ This repository uses those concepts only to classify risk. A `scènes à faire` 
 
 ## Research Artifact Storage Decision
 
-Sanitized feature-specific research belongs in `dev/active/<workstream>/` by default. Promote only durable, implementation-independent requirements into canonical `docs/` pages. Do not create “non-attribution” reports: audit readiness requires source identity and access provenance, while clean-room isolation requires excluding source expression. Raw excerpts, screenshots, downloads, or source-derived artifacts must remain outside the repository and outside implementation contexts.
+Sanitized feature-specific research belongs in `dev/active/<workstream>/` by default. Promote only durable, implementation-independent requirements into authoritative `docs/` pages. Do not create “non-attribution” reports: audit readiness requires source identity and access provenance, while clean-room isolation requires excluding source expression. Raw excerpts, screenshots, downloads, or source-derived artifacts must remain outside the repository and outside implementation contexts.
 
 ## Dependency And License Gate
 

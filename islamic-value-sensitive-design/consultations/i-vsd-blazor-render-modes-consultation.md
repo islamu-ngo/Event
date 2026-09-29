@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical I-VSD consultation report on Blazor WebApp render modes, self-hosting autonomy, and multi-tenant economics. -->
+<!-- ABOUTME: Authoritative I-VSD consultation report on Blazor WebApp render modes, self-hosting autonomy, and multi-tenant economics. -->
 <!-- ABOUTME: Evaluates InteractiveServer, InteractiveWebAssembly, and InteractiveAuto across justice, resource stewardship, and sovereignty. -->
 
 # Blazor WebApp Render Modes, Self-Hosting Autonomy, And Multi-Tenant Economics — I-VSD Consultation Report
@@ -399,4 +399,4 @@ Because this repository is in active pre-release greenfield development with 0 e
 
 | Date | Previous Status | New Status | Trigger | Evidence / Replacement |
 |---|---|---|---|---|
-| 2026-09-13 | None | Current | User requested I-VSD consultation on Blazor WebApp render modes, self-hosting autonomy, and multi-tenant economics | Canonical report written to `islamic-value-sensitive-design/consultations/i-vsd-blazor-render-modes-consultation.md` based on working-tree inspection. |
+| 2026-09-13 | None | Current | User requested I-VSD consultation on Blazor WebApp render modes, self-hosting autonomy, and multi-tenant economics | Authoritative report written to `islamic-value-sensitive-design/consultations/i-vsd-blazor-render-modes-consultation.md` based on working-tree inspection. |

@@ -205,7 +205,7 @@ Use cards to create visual, clickable navigation elements. Cards are HTML tables
 
 **When to use:** Dashboards, feature overviews, linking to related pages, showcasing multiple resources.
 
-**Canonical pattern — full-row clickable card with hidden target column:**
+**Standard pattern — full-row clickable card with hidden target column:**
 
 The cleanest card-table uses `data-hidden` on the link column so the entire card tile becomes clickable, rather than showing a visible "Read more" link column which clutters the layout:
 

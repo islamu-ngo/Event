@@ -48,7 +48,7 @@ Match the planned work to one or more intent entries. For each match, copy into 
 - `unique_acceptance` and PR checklist items;
 - `forbidden_without_approval`.
 
-If no intent matches, create a clearly labeled fallback contract from the agent contract, canonical docs, applicable skills/rules, inferred file scope, and proportional tests. Add a planning task to consider a reusable intent only when this work category is likely to recur.
+If no intent matches, create a clearly labeled fallback contract from the agent contract, governing docs, applicable skills/rules, inferred file scope, and proportional tests. Add a planning task to consider a reusable intent only when this work category is likely to recur.
 
 ## 6. Load Scope-Specific Sources
 

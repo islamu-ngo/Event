@@ -13,7 +13,7 @@ Impacts:
     Disposition: documented
     Detail: >-
       The duplicate System preflight endpoint and generated method are removed
-      without aliases. Setup clients consume the canonical onboarding journey.
+      without aliases. Setup clients consume the authoritative onboarding journey.
   OpenAPI:
     Reference: docs/internal/API.md
     Disposition: documented

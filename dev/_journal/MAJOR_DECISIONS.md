@@ -83,9 +83,9 @@ Last Updated: 2026-04-30 Europe/Brussels
 - **Impact:** 10 intents v1 covering the primary change categories (add-get-endpoint, add-write-endpoint, add-hal-link, add-cqrs-handler, add-ef-migration, update-repository-query, blazor-component-affordance, bff-auth-bug, cerbos-policy-change, openapi-contract-change). Validated against `.claude/contract/schema.json` (JSON Schema 2020-12) by `AgentContextIntentManifestTests`. Benchmarked by 8 cold-start scenarios at `.agents/benchmarks/cold-start-tasks.yaml` which map one-to-one onto the intents.
 - **Consequence:** Adding a new change type now requires adding an intent; skipping that step means the change is "off-contract" and noted in the PR description. Drift is bounded by CI, not goodwill.
 
-### AGENTS.md is the canonical AI-agent contract; AGENTS.md is a 3-line redirect stub
+### AGENTS.md is the authoritative AI-agent contract; AGENTS.md is a 3-line redirect stub
 
-- **Decision:** After initially making `AGENTS.md` the canonical tool-neutral entrypoint and `AGENTS.md` a thin Claude-specific bootloader (Phase 1), the final state (per user request m0102) inverts this: `AGENTS.md` carries the full 14-section AI-agent contract (344 lines including Contribution Contract, Canonical Artifacts, Cold-Start Flow, Rule Authority Order, 7 general + 13 non-inferable CRITICAL RULES, Task-Routing Entrypoints, Absolute Fetch Rule, Verification Policy, Blazor UI Workflow pointer, Claude-Specific Operational Rules, Coding & File Standards, Collaboration, Tool-Specific Bootloaders, Enforcement, Shell Behavior Rules Appendix, See Also footer). `AGENTS.md` becomes exactly:
+- **Decision:** After initially making `AGENTS.md` the authoritative tool-neutral entrypoint and `AGENTS.md` a thin Claude-specific bootloader (Phase 1), the final state (per user request m0102) inverts this: `AGENTS.md` carries the full 14-section AI-agent contract (344 lines including Contribution Contract, Release artifact, Cold-Start Flow, Rule Authority Order, 7 general + 13 non-inferable CRITICAL RULES, Task-Routing Entrypoints, Absolute Fetch Rule, Verification Policy, Blazor UI Workflow pointer, Claude-Specific Operational Rules, Coding & File Standards, Collaboration, Tool-Specific Bootloaders, Enforcement, Shell Behavior Rules Appendix, See Also footer). `AGENTS.md` becomes exactly:
 
   ```
   # AI Agents
@@ -93,7 +93,7 @@ Last Updated: 2026-04-30 Europe/Brussels
   See [AGENTS.md](AGENTS.md) for AI agent instructions.
   ```
 
-- **Why:** The user preferred a single canonical file (`AGENTS.md`) with a pointer for tools that auto-discover `AGENTS.md`, rather than two files that both carry content. This eliminates cross-file duplication while preserving cross-tool compatibility via the one-line redirect.
+- **Why:** The user preferred a single primary file (`AGENTS.md`) with a pointer for tools that auto-discover `AGENTS.md`, rather than two files that both carry content. This eliminates cross-file duplication while preserving cross-tool compatibility via the one-line redirect.
 - **Impact:** All agents still link to `AGENTS.md` in their Mandatory Reads — the link resolves (stub exists), redirects to `AGENTS.md` (which holds the content). `ContextSystemHelpers.RepoRoot` continues to walk up looking for both files and finds both. `AgentContextDuplicationTests` keeps preventing any agent from inlining the now-CLAUDE-owned project context. `.github/copilot-instructions.md` points at `AGENTS.md` and inherits the redirect for free.
 - **Consequence:** The "tool-neutral entrypoint" guarantee is now provided by the pointer stub, not by content parity. Every other tool (Codex, Cursor, Gemini, Zed, Aider) that discovers `AGENTS.md` will follow the single link with zero ambiguity.
 
@@ -319,7 +319,7 @@ Last Updated: 2026-04-30 Europe/Brussels
 
 ### Provenance Matching: Two-Pass Algorithm
 - Decision: Match existing runtime definitions to template definitions first by `SourceTemplateDefinitionId` (exact lineage), then unmatched by normalized `Namespace+Key` (repair/backfill). Track consumed matches to prevent double-matching.
-- Why: SourceId is the canonical provenance link. Namespace+Key fallback only for definitions that lost their lineage (manual creation, data migration).
+- Why: SourceId is the authoritative provenance link. Namespace+Key fallback only for definitions that lost their lineage (manual creation, data migration).
 
 ### Event Creation: Optional TemplateId (Guid?)
 - Decision: `CreateEventDto.TemplateId` is `Guid?`. Null = no template, existing flow untouched. Non-null = fetch template, guard published+active, instantiate inside existing transaction.
@@ -463,7 +463,7 @@ Last Updated: 2026-04-30 Europe/Brussels
 ## 2026-02-23 18:47 Europe/Brussels - Admin Consolidation Implementation Completed
 
 - Decision: Complete the consolidation by deleting legacy standalone admin pages/routes after embedding equivalent capabilities into panel sections.
-- Why: Prevent duplicate administrative entry points and keep one canonical settings-style admin UX per role.
+- Why: Prevent duplicate administrative entry points and keep one authoritative settings-style admin UX per role.
 - Outcome:
   - Tenant administration now hosts organizations + lookup management.
   - Instance administration now hosts SMTP settings + test connection.

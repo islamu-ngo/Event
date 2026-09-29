@@ -25,7 +25,7 @@ Turn ambiguous or cross-cutting requests into a verified architecture decision a
 ## When NOT to Use
 
 - Not for implementing handlers, repositories, controllers, or components; hand off to the owning implementation agent.
-- Not for an atomic design choice already established by canonical docs and a matching skill.
+- Not for an atomic design choice already established by governing docs and a matching skill.
 - Not for build/test diagnosis; use [quality-verifier-agent](quality-verifier-agent.md).
 - Not for PR-level defect review; use [change-reviewer-agent](change-reviewer-agent.md).
 
@@ -61,7 +61,7 @@ Stop when the decision is explicit, evidence-backed, operable, and executable wi
 
 ## Allowed Tools
 
-- **Read/Glob/Grep**: Inspect canonical docs, plans, source boundaries, and tests.
+- **Read/Glob/Grep**: Inspect governing docs, plans, source boundaries, and tests.
 - **Bash**: Run read-only graph, dependency, diff, and validation commands.
 - **Write/Edit**: Modify only architecture docs, ADRs, and planning artifacts authorized by the matched intent.
 

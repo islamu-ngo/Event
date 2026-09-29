@@ -24,7 +24,7 @@ The **Contribution Contract** is this repository's operating model for AI-assist
 
 | File | Purpose |
 |---|---|
-| `intents.yaml` | The canonical intent catalog. Each entry is a machine-readable contract for one category of change. |
+| `intents.yaml` | The authoritative intent catalog. Each entry is a machine-readable contract for one category of change. |
 | `schema.json` | JSON Schema describing the structure of `intents.yaml` for compatible editors and tools. |
 | `README.md` | This file. Human-facing explanation and usage. |
 
@@ -72,6 +72,6 @@ provenance, while branches and worktrees provide native concurrency isolation.
 ## Related
 
 - `AGENTS.md` — tool-neutral root entrypoint for any AI agent or contributor
-- `docs/index.md` — canonical navigation root for the docs tree
+- `docs/index.md` — documentation navigation root for the docs tree
 - `.agents/rules/` — path-scoped rule files, referenced from `intents.yaml`
 - `.agents/benchmarks/cold-start-tasks.yaml` — evaluation harness validating cold-start agent performance against these intents

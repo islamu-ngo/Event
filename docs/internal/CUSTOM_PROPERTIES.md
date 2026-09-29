@@ -21,7 +21,7 @@ The product boundary is locked by [ADR-006: Custom Properties Runtime Boundary](
 
 `EventSession` remains the scheduled child aggregate.
 
-Sessions may appear as first-class cards in UI/search, but canonical write modeling remains parent/child.
+Sessions may appear as first-class cards in UI/search, but authoritative write modeling remains parent/child.
 
 ## Hard Boundary
 
@@ -222,7 +222,7 @@ Aggregate read/view rule:
 
 - parent event views may embed session summaries and selected session projections,
 - aggregate event-with-sessions views are read models only,
-- canonical event/session contracts stay separate.
+- primary event/session contracts stay separate.
 
 Lifecycle:
 
@@ -431,9 +431,9 @@ Template changes do not silently rewrite existing events or sessions.
 
 ## Projection And Moderation Boundary
 
-Layer 3 projections may support moderation workflows, but they are not the canonical truth for sector-standard moderation semantics.
+Layer 3 projections may support moderation workflows, but they are not the authoritative truth for sector-standard moderation semantics.
 
-Canonical moderation and policy truth must remain on Layer 1 core fields or Layer 2 typed schema whenever the concept is standard or policy-critical.
+Authoritative moderation and policy truth must remain on Layer 1 core fields or Layer 2 typed schema whenever the concept is standard or policy-critical.
 
 Layer 3 enriches curation and local extension. It must not become the hidden replacement for typed domain schema.
 
@@ -473,7 +473,7 @@ Choose scope first, then layer.
 
 ## Lexicon / Contract Direction
 
-Canonical contracts should stay separate:
+Governing contract should stay separate:
 
 - `...event.core`
 - `...eventsession.core`
@@ -495,7 +495,7 @@ Aggregate read contracts may merge them:
 - `...event.view`
 - `...event.withSessions.view`
 
-Do not make the merged event-with-sessions view the canonical write contract.
+Do not make the merged event-with-sessions view the authoritative write contract.
 
 Soft deletion and retirement behavior must be explicit. Re-creation semantics must not be left accidental.
 

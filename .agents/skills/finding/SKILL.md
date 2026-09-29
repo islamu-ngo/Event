@@ -10,7 +10,7 @@ priority: medium
 
 ## Command Template
 
-<!-- ABOUTME: Append a durable finding to dev/_journal/journal.md using the canonical template. -->
+<!-- ABOUTME: Append a durable finding to dev/_journal/journal.md using the established template. -->
 <!-- ABOUTME: Use for non-obvious behaviors, bug root causes, and insights worth surviving a session boundary. -->
 
 # /finding — Record a Durable Finding
@@ -42,7 +42,7 @@ Read [`dev/_journal/FINDING_TEMPLATE.md`](../../../dev/_journal/FINDING_TEMPLATE
 
 ### 2. Fill In the Fields
 
-- **Date prefix**: `[YYYY-MM-DD Europe/Brussels]` — today's date in the repo's canonical timezone.
+- **Date prefix**: `[YYYY-MM-DD Europe/Brussels]` — today's date in the repository timezone.
 - **Title**: one short sentence summarizing the finding.
 - **Context**: what you were doing when the finding emerged (1-3 sentences).
 - **Symptom / Observation**: the surprising behavior or fact (1-3 sentences).

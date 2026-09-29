@@ -2,7 +2,7 @@ Change-Id: CHG-01M2ZX72N4T02P8DWM9CXAQRJB
 Title: "guide operators from setup to safe publication"
 Type: feat
 Scope: self-hosting
-Summary: "Present categorized server-owned readiness, optional setup details and canonical operator identity choices without changing publication or commerce authority."
+Summary: "Present categorized server-owned readiness, optional setup details and authoritative operator identity choices without changing publication or commerce authority."
 Supersedes: []
 Impacts:
   Breaking:

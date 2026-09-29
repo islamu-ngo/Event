@@ -32,7 +32,7 @@ priority: high
      - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace.
    - **Case C: Fresh Worktree Setup (Default New Implementation)**:
      If starting a brand-new plan where `dev/active/<task-name>` exists at the root, `.worktrees/<task-name>` does not exist, and user did not mandate in-tree execution:
-     - Canonical root-scoped worktree isolation applies:
+     - Repository-root scoped worktree isolation applies:
        ```bash
        git fetch origin develop
        git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
@@ -72,7 +72,7 @@ priority: high
    - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
    - **Green**: Implement production code to satisfy invariants.
    - **Ring 1 Sliced Verification (Inner Loop, < 2s)**: Run targeted test class via `--treenode-filter "/*/*/*<TestClass>/*"` in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`). Zero Docker containers, zero network I/O, zero database setup lag.
-   - **Ring 2 Phase Verification (Phase Exit Gate, < 15s)**: Run Release build (`dotnet build -c Release -v q`) and at most ONE selected project test against ONE canonical provider within the execution context. Forbid multi-database provider matrices during intermediate phases.
+   - **Ring 2 Phase Verification (Phase Exit Gate, < 15s)**: Run Release build (`dotnet build -c Release -v q`) and at most ONE selected project test against ONE selected provider within the execution context. Forbid multi-database provider matrices during intermediate phases.
    - **Three-Tier Failure Triage**:
      - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
      - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.

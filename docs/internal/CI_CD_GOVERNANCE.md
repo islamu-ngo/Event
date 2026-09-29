@@ -27,11 +27,11 @@ yet. This section defines the approved future boundary without claiming activati
 When implemented, every release MUST declare the version-line label
 `v<major>.<minor>` it belongs to. That label is a classification, not a ref: nothing
 derives a branch name from it, and attestation MUST NOT resolve any `refs/heads/*`.
-`develop` MUST NOT receive generated `[Unreleased]` changelog writes. The canonical release contract is provider-neutral:
+`develop` MUST NOT receive generated `[Unreleased]` changelog writes. The governed release contract is provider-neutral:
 the engine receives complete local Git objects, explicit inputs, and a previously
 promoted trusted tool bundle. Provider adapters MAY transport those inputs, retained
 artifacts, and protected ref actions, but MUST NOT classify changes, choose a version,
-alter canonical notes, or add provider metadata to canonical checksums.
+alter authoritative notes, or add provider metadata to content hash.
 
 The authoritative final lane MUST use the promoted bundle rather than candidate
 engine source, policy, templates, renderer configuration, or signer roots. It MUST
@@ -45,7 +45,7 @@ ISLAMU policy MUST own release selection, inclusion, impacts, SemVer validation,
 range selection, trust, and evidence. git-cliff MAY render only already-normalized
 context with an explicit packaged configuration, offline mode, and executable
 processors disabled. The sole human-owned per-release inputs are `release.yaml` and
-`summary.md`; `release-notes.md` MUST be fully generated. Canonical bytes MUST be
+`summary.md`; `release-notes.md` MUST be fully generated. Normalized bytes MUST be
 deterministic and provider-neutral. Embargoed security detail MUST stay in a
 restricted lane outside the public checkout and normal public artifacts until an
 authorized disclosure boundary.
@@ -66,7 +66,7 @@ The range check compares effective IDs in `develop..<feature-head>` against IDs
 reachable from `develop`, rejects duplicates in the feature range, and requires
 the exact fragment. A committed collision is repaired only by an exact
 commit-OID-bound `change-id-rename.v1` record plus a generated replacement
-fragment. The record is canonical release input; it does not alter the old
+fragment. The record is governed release input; it does not alter the old
 footer or weaken target uniqueness.
 
 ### Prospective release provider adapters
@@ -99,7 +99,7 @@ command, mutable action/image, or nonliteral execution. Any activated release ex
 must migrate to default-branch proof before running release logic. Provider plans may
 transport full Git object IDs, immutable bundle paths and hashes, artifact retention
 details, required checks, and protected-ref compare-and-swap inputs; they must not
-enrich or replace canonical release identity. Provider manifests cannot self-assert
+enrich or replace governed release identity. Provider manifests cannot self-assert
 external operator evidence for unsupported capabilities; Tangled protected-ref or
 release publication planning requires a separate bounded external-control evidence
 input to the validator.
@@ -122,28 +122,28 @@ workflows must not also expose final events.
 The candidate lane may compile and test candidate release-engine source but has no
 signing, protected-ref, publication, deployment, registry-write, OIDC, or promoted
 artifact-store credentials. The final lane starts from an independently promoted
-bundle plus a separately supplied immutable canonical promotion receipt and detached
+bundle plus a separately supplied immutable authoritative promotion receipt and detached
 SSH signature. The previously promoted verifier resolves the promoter trust root only
 from its fixed protected application directory; requests and candidate sibling files
 cannot select, replace, or reset promotion authority. The verifier checks the receipt
 before reading candidate data and never resolves policy, configuration, tool locks,
 signer roots, or promotion authority from the checkout under release. The signed
-  receipt binds the canonical manifest digest plus bundle, policy, configuration, and
+  receipt binds the authoritative manifest digest plus bundle, policy, configuration, and
   trust versions and digests. Reusing it for the same immutable bundle is idempotent;
   using it for any different bundle fails without relying on a verifier-side replay
   registry. Wrong signers or roots, self-created receipts, root aliases, hardlinked
   bundle files, bounded-input violations, normalized or case-insensitive path
-  collisions, tampered bundle files, and candidate-local overrides fail before canonical
+  collisions, tampered bundle files, and candidate-local overrides fail before authoritative
   candidate data is trusted. Exact receipt reuse for the exact bound manifest adds no
   authority, so the public request has no caller-resettable replay set.
 
 Restricted security input is a separate access-controlled input, not a candidate or
-canonical artifact. It is mounted only where candidate executables cannot run. Public
+release artifact. It is mounted only where candidate executables cannot run. Public
 logs and artifacts receive only stable diagnostic codes until disclosure is approved;
 after approval, only a reviewed public disposition and advisory reference may cross,
 and neither may exactly alias restricted fields after Unicode and whitespace
 normalization. The storage provider remains intentionally undecided and cannot affect
-canonical identity. Final jobs must reverify the promoted bundle immediately before
+stable identity. Final jobs must reverify the promoted bundle immediately before
 use from immutable promoted storage.
 
 Task 5 must derive release-signer booleans, dates, principal, fingerprint, and tag
@@ -152,15 +152,15 @@ metadata cannot satisfy the signer policy.
 
 Task 5.3 binds the existing durable evidence bundle to that final local evidence.
 Release-mode bundle generation MUST find exactly one `release-evidence.v1.json` in
-the retained artifact tree, parse it as the canonical final identity, and reject
+the retained artifact tree, parse it as the authoritative final identity, and reject
 missing, duplicate, malformed, stale, tampered, or disagreeing manifests. The bundle
 MUST verify the final manifest's version, tag name, tag object ID, final `B`,
 candidate-manifest digest, release descriptor/summary/context/notes hashes, and
 trusted bundle/tool/policy/config/trust hashes against explicit inputs and retained
 artifacts. Workflow run IDs, provider URLs, collection time, CLA status, and artifact
-transport fields are noncanonical metadata only and MUST NOT change release identity.
-Canonical ingestion rejects unknown/duplicate fields, invalid UTF-8, non-NFC or
-noncanonical JSON, case/NFC/path aliases, symlinks, oversized trees/files, and
+transport fields are non-authoritative metadata only and MUST NOT change release identity.
+Authoritative ingestion rejects unknown/duplicate fields, invalid UTF-8, non-NFC or
+non-authoritative JSON, case/NFC/path aliases, symlinks, oversized trees/files, and
 malformed metadata with bounded stable diagnostics. Validation finishes before the
 bundle output is published, so rejected input cannot leave a partial final bundle.
 The durable checksum manifest MUST be produced through `.ci/scripts/write-artifact-checksums.cs`
@@ -363,7 +363,7 @@ lane restores in locked mode, builds all six focused test projects in Release,
 then executes every project with a nonzero TUnit test-count safeguard. It also
 executes the isolated 35-test `SetupLiveAuthoritySecurityTests` Tier 1 class and
 retains its TRX report. The main Assistant suite currently executes 52 tests.
-The Terminal suite independently guards canonical Core output, localization,
+The Terminal suite independently guards authoritative Core output, localization,
 and the secret boundary. Live release capabilities and browser runtime remain
 disabled.
 

@@ -5,7 +5,7 @@ Last Updated: 2026-09-24
 ## Review Metadata
 
 - Mode: standalone
-- Subject: Trust-based event publication and canonical event discovery
+- Subject: Trust-based event publication and primary event discovery
 - Workstream: none
 - Report kind: consultation
 - Report status: draft
@@ -22,20 +22,20 @@ This covers personal, group and organization publishers; organization approval; 
 
 The related launch consultation records an Official Instance with open personal posting, groups and administrator-approved organizations in one tenant. That is relevant working-tree context, not independently verified deployment state. Recommendations also identify where other operators need configuration. [E02]
 
-**Confirmed:** one real event is represented by one canonical event listing, with its sessions underneath it. Splitting sessions or regional appearances merely to occupy more cards contradicts the requested product policy. **Not yet confirmed:** exact quota numbers, staffing, automatic promotion rules, and whether a new personal publisher's first event requires human review. The latter was asked during this consultation; recommendations below remain provisional pending that answer.
+**Confirmed:** one real event is represented by one primary event listing, with its sessions underneath it. Splitting sessions or regional appearances merely to occupy more cards contradicts the requested product policy. **Not yet confirmed:** exact quota numbers, staffing, automatic promotion rules, and whether a new personal publisher's first event requires human review. The latter was asked during this consultation; recommendations below remain provisional pending that answer.
 
 ## Executive Recommendation
 
-**Use publication budgets, canonical event identity, and fair discovery together. A rate limiter alone cannot deliver one card per event.**
+**Use publication budgets, primary event identity, and fair discovery together. A rate limiter alone cannot deliver one card per event.**
 
 1. Keep a small, useful starter allowance. Account age is a weak risk signal, not proof of honesty, and a seven-day wait should not be the default barrier to every first event.
 2. Assign budgets to the accountable publisher, not merely the logged-in employee. Organization verification can justify greater capacity but must not buy immunity, religious endorsement, or extra ranking.
-3. Enforce one canonical identity per discovery result and across home sections. Separately help users correct multiple records that describe the same real event.
+3. Enforce one stable identity per discovery result and across home sections. Separately help users correct multiple records that describe the same real event.
 4. Make the correct action easy: **add a session, date or location to an existing event**. Show how that event will appear in each relevant region.
 5. Offer **Request higher limits** in-product, with a reasoned decision, visible status, scoped grants and an appeal. Self-service submission does not mean automatic approval.
 6. Keep edits, cancellation, attendee-safety notices and correction available when publication capacity is exhausted.
 
-The platform can guarantee that a known canonical identity is rendered once. It cannot guarantee that two deliberately disguised submissions describe different real-world events. That residual problem needs evidence, organizer cooperation, reporting and accountable moderation.
+The platform can guarantee that a known stable identity is rendered once. It cannot guarantee that two deliberately disguised submissions describe different real-world events. That residual problem needs evidence, organizer cooperation, reporting and accountable moderation.
 
 ## Claim Boundary
 
@@ -66,7 +66,7 @@ The founder's Hetzner example is used only as an analogy for graduated access an
 - **Stakeholders / controlled decision:** Attendees, small organizers and prolific publishers; what counts as an event and how many cards it receives.
 - **Evidence / validation:** Founder requirement; event/session model; event-level local query; stable-identity federation grouping; independent home sections. [E01, E03, E08-E10] Design validation and bounded implementation traceability only.
 - **Risk:** A publisher can obey a quota while splitting one workshop into several records. The platform can also repeat a correctly modeled event across home sections.
-- **Mitigation:** **IVSD-M001** - Define the event/session/series distinction, enforce page-wide canonical identity, and provide a separate correction process for real-world duplicates.
+- **Mitigation:** **IVSD-M001** - Define the event/session/series distinction, enforce page-wide stable identity, and provide a separate correction process for real-world duplicates.
 - **Owner / next validation:** Product steward and discovery maintainer; validate examples with organizers and exercise multi-session, multi-region and overlapping-section cases.
 - **Escalation boundary:** Disputed real-world identity requires human review; similarity is not proof of misconduct.
 
@@ -152,7 +152,7 @@ Use continuity of purpose, program, organizer responsibility and attendee expect
 | A weekly course with twelve lessons | One course event with twelve sessions, including session-level participation where supported. |
 | The same coherent workshop program delivered in three cities | One event with city-specific sessions/locations; relevant regional views each find it. |
 | An in-person event with a livestream | One event with the appropriate physical/digital participation structure. |
-| The same event listed by a user and its actual organizer | One discoverable canonical event; preserve provenance and resolve organizer authority. |
+| The same event listed by a user and its actual organizer | One discoverable primary event; preserve provenance and resolve organizer authority. |
 | Two independently organized lectures with the same title | Separate events unless evidence establishes they are the same offering. |
 | The 2026 and 2027 editions of a conference | Normally separate events, optionally in a series; they are distinct commitments and lifecycles. |
 | Two genuinely independent regional programs under one brand | Separate events can be justified by distinct programs, responsibility and attendee commitments; geography alone does not justify duplication. |
@@ -164,7 +164,7 @@ Do not force unrelated activities into an enormous umbrella event merely to evad
 
 ### 2. Make the discovery invariant precise
 
-Within one event-list result set, including its paginated continuation, each canonical identity receives at most one card. Within one home response, the same applies across hero, upcoming, spotlight, popular, curated and recently-added sections. Switching to another search or returning later is a new discovery context, not a lifetime prohibition on seeing an event again.
+Within one event-list result set, including its paginated continuation, each stable identity receives at most one card. Within one home response, the same applies across hero, upcoming, spotlight, popular, curated and recently-added sections. Switching to another search or returning later is a new discovery context, not a lifetime prohibition on seeing an event again.
 
 - Filter eligible **sessions/occurrences**, then select their parent events. When a user requests a region and a date, the **same eligible session** must satisfy both. Do not combine a Brussels session next month with an Antwerp session today and falsely match "Brussels today."
 - Choose the card's next matching session, not blindly the event's earliest session anywhere. Show a compact summary such as "Brussels, Saturday; 4 other sessions" where disclosure permits.
@@ -299,7 +299,7 @@ A normalized title is useful for candidate retrieval, not a uniqueness constrain
 
 Never reveal a private or cross-tenant candidate to an unauthorized publisher. Security-limited explanations may be necessary, but should offer review instead of implying publicly proven misconduct.
 
-Prefer a **reversible canonical discovery relationship** before destructive merging. Choose the canonical record by verified responsibility and event continuity, not simply the oldest timestamp or highest view count. Preserve source attribution and links. Existing registrations, tickets, refunds, attendance permissions, notifications and audit history require explicit domain-safe reconciliation; do not move them automatically because two cards look similar.
+Prefer a **reversible identity discovery relationship** before destructive merging. Choose the primary record by verified responsibility and event continuity, not simply the oldest timestamp or highest view count. Preserve source attribution and links. Existing registrations, tickets, refunds, attendance permissions, notifications and audit history require explicit domain-safe reconciliation; do not move them automatically because two cards look similar.
 
 Begin with guidance and assistance for honest mistakes. Remove repeated exposure where warranted, escalate repeated evasion proportionately, and record correction/reversal paths. Unverified user reports must not automatically reduce somebody's capacity; otherwise coordinated reporting becomes an attack.
 
@@ -340,7 +340,7 @@ First validate organizer understanding and the authoritative invariants; then en
 
 | Measure | Owner / source / cadence | Initial action threshold | Stakeholders and limitation |
 |---|---|---|---|
-| Repeated known canonical identities | Discovery owner; deterministic fixtures and sampled composed results; every release and weekly pilot review | Any confirmed repeat triggers correction | Readers/organizers; cannot detect all semantic duplicates. |
+| Repeated known stable identity | Discovery owner; deterministic fixtures and sampled composed results; every release and weekly pilot review | Any confirmed repeat triggers correction | Readers/organizers; cannot detect all semantic duplicates. |
 | Incorrect publication charges or over-cap commits | Engineering; ledger reconciliation and concurrency evidence; every release and incident | Any confirmed accounting error triggers investigation and correction | Publishers/operators; requires reliable audit evidence. |
 | Legitimate publishers blocked | Policy owner; reviewed denials and support cases; weekly | Each urgent or wrongly denied case gets review; repeated same-cause cases reopen the tier | New/small organizers; raw denial count does not establish unfairness. |
 | Request/appeal handling | Operator; queue age and outcomes; daily during pilot | Any case exceeds the displayed response expectation, or a time-critical event is at risk | Organizers/reviewers; use an expectation only after staffing is agreed. |

@@ -51,7 +51,7 @@ Append to the relevant domain ledger under `domains/` or [`journal.md`](journal.
 
 ---
 
-## 4. Promotion Rules (Journal → Canonical Docs)
+## 4. Promotion Rules (Journal → Primary documentation)
 
 A finding is not meant to live in the journal forever. See [`PROMOTION_RULES.md`](PROMOTION_RULES.md) for the promotion policy.
 
@@ -69,6 +69,6 @@ A finding is not meant to live in the journal forever. See [`PROMOTION_RULES.md`
 
 - [`journal.md`](journal.md) — central index & recent findings.
 - [`MAJOR_DECISIONS.md`](MAJOR_DECISIONS.md) — system-wide decisions.
-- [`FINDING_TEMPLATE.md`](FINDING_TEMPLATE.md) — canonical entry format.
+- [`FINDING_TEMPLATE.md`](FINDING_TEMPLATE.md) — authoritative entry format.
 - [`PROMOTION_RULES.md`](PROMOTION_RULES.md) — journal-to-docs promotion policy.
 - [`AGENTS.md`](../../AGENTS.md) §8 — Memory & Findings.

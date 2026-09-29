@@ -116,7 +116,7 @@ POST .../decision/execute
     -> ExecuteReportDecisionCommand (enforce, receipt, complete, notify)
 ```
 
-The second call is the canonical completion seam. Reporter outcome and needs-more-information notification intents are created there only after the exact decision enforcement receipt is valid. This keeps Osprey recommendations advisory while local and Coop decisions converge on one execution and notification owner.
+The second call is the authoritative completion seam. Reporter outcome and needs-more-information notification intents are created there only after the exact decision enforcement receipt is valid. This keeps Osprey recommendations advisory while local and Coop decisions converge on one execution and notification owner.
 
 ---
 
@@ -127,4 +127,4 @@ The second call is the canonical completion seam. Reporter outcome and needs-mor
 * **Callback API:** `src/Explore.API/Controllers/ModerationIntegrationController.cs`
 * **Signal Callback Handler:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/RecordOspreySignalCallbackCommandHandler.cs`
 * **Local Decision Capture:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/DecideEventReportCommandHandler.cs`
-* **Canonical Decision Executor:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/ExecuteReportDecisionCommandHandler.cs`
+* **Authoritative Decision Executor:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/ExecuteReportDecisionCommandHandler.cs`

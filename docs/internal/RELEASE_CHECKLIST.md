@@ -39,7 +39,7 @@ The advisory activation dry run required before any of this becomes required is 
 executable specification, not a document: see
 `eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ReleaseActivationDryRunTests.cs` and
 `TagAnchoredReVerificationTests.cs`. They walk prepare, exact-`B` candidate attestation,
-canonical tag message, SSH-signed annotated tag, final evidence, and the stable-`main`
+authoritative tag message, SSH-signed annotated tag, final evidence, and the stable-`main`
 proposal against a disposable repository, then re-verify an already-closed release after
 its branch has moved and after it has been deleted.
 
@@ -53,13 +53,13 @@ its branch has moved and after it has been deleted.
 
 ## Release Evidence Bundle
 
-Before publishing a GitHub Release, download the retained CI/CD artifacts listed in this checklist into a local evidence directory. For governed release-mode bundles, the artifact tree must contain exactly one final canonical manifest from `verify-tag`:
+Before publishing a GitHub Release, download the retained CI/CD artifacts listed in this checklist into a local evidence directory. For governed release-mode bundles, the artifact tree must contain exactly one final authoritative manifest from `verify-tag`:
 
 ```text
 docs/internal/releases/<version>/release-evidence.v1.json
 ```
 
-That manifest exclusively owns release identity: version, line, tag name, tag object, final commit `B`, candidate-manifest digest, release descriptor/summary/context/notes hashes, and trusted bundle/tool/policy/config/trust hashes. Bundle collection time, workflow/provider run IDs, URLs, CLA status, and transport metadata are noncanonical and cannot override it.
+That manifest exclusively owns release identity: version, line, tag name, tag object, final commit `B`, candidate-manifest digest, release descriptor/summary/context/notes hashes, and trusted bundle/tool/policy/config/trust hashes. Bundle collection time, workflow/provider run IDs, URLs, CLA status, and transport metadata are non-authoritative and cannot override it.
 
 Set `RELEASE_VERSION`, `GITHUB_SHA`, `GITHUB_REF`, `RELEASE_TAG_OBJECT_ID`, `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, and `CLA_STATUS` when generating the bundle outside GitHub Actions. `RELEASE_VERSION`, `GITHUB_SHA`, `GITHUB_REF`, and `RELEASE_TAG_OBJECT_ID` must agree with the final manifest or the bundle fails closed. Then generate the durable bundle:
 
@@ -187,7 +187,7 @@ Use `Not applicable` only when the change has no release-impact category. If the
 - [ ] Deployment evidence includes environment, component, commit SHA, expected immutable image tag, expected image digest, promotion evidence path, webhook result, smoke-check result, whether smoke was required, deployment-freeze state, override reason if any, workflow run link, and rollback note.
 - [ ] Production deployment approval and branch restrictions are configured in GitHub Environment settings.
 - [ ] Long-lived release evidence is copied from expiring GitHub Actions artifacts into release notes or durable storage when required.
-- [ ] The durable release evidence bundle accepted exactly one `release-evidence.v1.json`; its canonical identity matched `RELEASE_VERSION`, `GITHUB_SHA`, `GITHUB_REF`, `RELEASE_TAG_OBJECT_ID`, and all retained source/tool/checksum artifacts.
+- [ ] The durable release evidence bundle accepted exactly one `release-evidence.v1.json`; its stable identity matched `RELEASE_VERSION`, `GITHUB_SHA`, `GITHUB_REF`, `RELEASE_TAG_OBJECT_ID`, and all retained source/tool/checksum artifacts.
 - [ ] Any failed gate rerun or emergency override follows [CI_CD_RUNBOOKS.md](CI_CD_RUNBOOKS.md) and records owner, reason, evidence, compensating control, and removal condition.
 
 Expected artifact names:

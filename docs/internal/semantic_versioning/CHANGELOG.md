@@ -5,7 +5,7 @@ ABOUTME: v0.1.0 implemented scope mirrors API WORK ITEMS.md and v1.0.0 planned s
 
 > **Frozen pre-automation planning/history:** This file predates the governed
 > release engine. It is preserved as planning and historical classification only,
-> not generated release history, not canonical release evidence, and not proof that
+> not generated release history, not governed release evidence, and not proof that
 > any SemVer tag or public version has been published.
 
 > All notable changes are documented in version files.

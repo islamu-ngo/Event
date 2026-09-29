@@ -118,7 +118,7 @@ needs a governed change fragment under `docs/internal/releases/changes/<change-i
 matching `Change-Id:` footer. A backport records the original commit in that fragment's
 `Backport-Of` field as a full object ID.
 
-Canonical release notes deliberately carry **no** author or committer identity, email,
+Governed release notes deliberately carry **no** author or committer identity, email,
 raw commit body, or provider handle. Release artifacts are signed, mirrored, and
 permanent, so contributor recognition is kept out of them on purpose; see
 [i-vsd-release-governance.md](../../islamic-value-sensitive-design/governance/i-vsd-release-governance.md)

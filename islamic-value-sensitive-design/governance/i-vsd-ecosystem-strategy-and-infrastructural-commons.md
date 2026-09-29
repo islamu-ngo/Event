@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical I-VSD strategy review on ISLAMU Event's role within the broader ISLAMU software ecosystem. -->
+<!-- ABOUTME: Authoritative I-VSD strategy review on ISLAMU Event's role within the broader ISLAMU software ecosystem. -->
 <!-- ABOUTME: Synthesizes the infrastructural commons paradigm, cooperative community market positioning, and sustainable builder stewardship. -->
 
 # I-VSD Strategy Review — ISLAMU Event Ecosystem Positioning, Infrastructural Commons, and Multi-Project Stewardship

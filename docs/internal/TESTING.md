@@ -50,7 +50,7 @@ To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck
 | Ring | Scope & Cadence | Budget | Permitted Suites & Infrastructure | Purpose |
 |---|---|---|---|---|
 | **Ring 1: Inner Loop** | Subtask level (during active coding) | **< 2s** | In-memory TUnit slicing (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 containers, 0 network, 0 DB lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
-| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15s** | Release build (`dotnet build -c Release -v q`) + at most **one** selected project test against **one canonical provider** (e.g. SQLite in-memory or single PostgreSQL container). | Ensure project-level integrity without matrix delays. |
+| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15s** | Release build (`dotnet build -c Release -v q`) + at most **one** selected project test against **one designated provider** (e.g. SQLite in-memory or single PostgreSQL container). | Ensure project-level integrity without matrix delays. |
 | **Ring 3: Plan Exit Gate** | Workstream boundary (before PR) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
 
 ### Fast-Loop In-Memory Slicing vs Containerized Persistence Testing
@@ -85,8 +85,8 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Explore.Diagnostic.UnitTests` | Diagnostic tooling | Doctor exit codes, bounded command evidence, and redaction | No |
 | `ISLAMU.AgentWorkflow.Tests` | Repository tooling | Intents YAML syntax and literal-file commit guard | No |
 | `Event.Standalone.IntegrationTests` | Standalone host | In-process transport, combined host graph, configuration, and API parity | No |
-| `Event.SetupAssistant.Terminal.Tests` | Setup terminal | Terminal.Gui adapter, canonical Core output parity, localization, and secret-boundary invariants | No |
-| `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, canonical artifacts, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
+| `Event.SetupAssistant.Terminal.Tests` | Setup terminal | Terminal.Gui adapter, authoritative Core output parity, localization, and secret-boundary invariants | No |
+| `ISLAMU.ReleaseEngineering.Tests` | Release engineering | Commit/scope policy, release artifact, Git trust, renderer, tag-anchored attestation, provider adapter plans | No (spawns `git`, `ssh-keygen`, and disposable repositories under the temp directory) |
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
 ### Run Commands
@@ -323,7 +323,7 @@ dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence
   --treenode-filter '/*/*/PrimaryDatabaseProviderBehaviorContractTests/MigratedProviderExecutesUnicodeAddressSuggestionContract'
 ```
 
-The corpus checks complete 500-unit text and normalization expansion, canonical/script
+The corpus checks complete 500-unit text and normalization expansion, authoritative/script
 semantics, literal wildcard characters, SQL membership and limit, provider-local ordering,
 unsupported revisions, tenant/membership/governance canaries, a two-context stale write
 after committed erasure, and four rejected handler PATCH scenarios using real repositories,

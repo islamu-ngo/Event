@@ -23,7 +23,7 @@ To build enterprise-grade software reliably with AI, ISLAMU Event enforces five 
 
 ---
 
-## The Canonical 5-Stage Agentic Lifecycle
+## The Authoritative 5-Stage Agentic Lifecycle
 
 Substantial features and refactors in ISLAMU Event flow through an optimal 5-stage pipeline:
 

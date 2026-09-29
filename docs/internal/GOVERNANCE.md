@@ -21,7 +21,7 @@ ABOUTME: Replaces generic template guidance with repo-specific constraints and l
 5. [Design Principles](#design-principles)
 6. [Pattern Selection Guide](#pattern-selection-guide)
 7. [Decision Framework](#decision-framework)
-8. [Canonical Record-Selection Policy](#canonical-record-selection-policy)
+8. [Primary Record-Selection Policy](#primary-record-selection-policy)
 9. [API Contract Rules](#api-contract-rules)
 10. [CI/CD Governance](#cicd-governance)
 
@@ -319,7 +319,7 @@ The primary intent owns Tier 1 authority, confidentiality, reset, convergence, a
 
 ---
 
-## Canonical Record-Selection Policy
+## Primary Record-Selection Policy
 
 Use records for handwritten contracts whose meaning is immutable data with value equality. Apply this policy by horizontal Clean Architecture ownership only: Domain, then Application, then API/OpenAPI, then generated client/Blazor; do not organize the migration as feature vertical slices.
 
@@ -530,7 +530,7 @@ Before approving any command handler PR, verify:
 - **Retry-safety**: All `Guid.NewGuid()` / timestamps used as IDs must be generated before the lambda (captured via closure). No HTTP calls, broker publishes, or emails inside the lambda.
 - **No nested transactions**: Handlers must not call services that internally use `IUnitOfWork` while already inside a transaction.
 
-See `dev/active/unitofwork-pattern/unitofwork-pattern-context.md` for the canonical reference implementation.
+See `dev/active/unitofwork-pattern/unitofwork-pattern-context.md` for the authoritative reference implementation.
 
 ---
 
@@ -589,4 +589,4 @@ If no intent matches, stop and propose a new one per `.agents/contract/README.md
 
 - Benchmark scenarios live in `.agents/benchmarks/cold-start-tasks.yaml` to measure cold-start agent success.
 
-If a rule in `.agents/rules/` appears to conflict with `QUICK_REFERENCE.md` or this file, the canonical doc wins and the rule file must be fixed per [`AGENTS.md`](../../AGENTS.md) §4.
+If a rule in `.agents/rules/` appears to conflict with `QUICK_REFERENCE.md` or this file, the primary documentation wins and the rule file must be fixed per [`AGENTS.md`](../../AGENTS.md) §4.

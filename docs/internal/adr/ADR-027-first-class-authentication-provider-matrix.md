@@ -42,7 +42,7 @@ authorization, safe administrator bootstrap, and old-session continuity.
    after a provider switch. New-login discovery follows the new primary
    authority immediately after cache invalidation.
 10. Offline recovery may grant only `platform.admin` to an existing exact
-    linked DID after migration-current and canonical-role checks. It may not
+    linked DID after migration-current and authoritative-role checks. It may not
     create identities or grant tenant authority.
 
 ## Consequences

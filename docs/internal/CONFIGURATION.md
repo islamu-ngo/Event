@@ -27,7 +27,7 @@ subdomain routing is enabled; path-based multi-tenancy does not require it.
 The guided administrator checklist introduces no environment keys, configuration
 store or provider fallback. Existing journey/preflight projections remain the
 source of requirement categories and remediation authority. Value-free operator
-form metadata supplies canonical choices; persisted identity and revision remain
+form metadata supplies authoritative choices; persisted identity and revision remain
 in the existing document. See [SELF_HOSTING.md](SELF_HOSTING.md#2-operator-identity-governance--readiness-gate).
 
 ## Anonymous Registration Intake Controls
@@ -40,7 +40,7 @@ concurrency and queue capacity are bounded, and invalid values reject startup.
 These are the first layer, not distributed quota or seat authority.
 
 `AnonymousRegistrationChallengeSettingDefinitions` owns live governed difficulty
-and durable quota limits. Difficulty is the canonical string choice 16 through
+and durable quota limits. Difficulty is the authoritative string choice 16 through
 22, default 18. Tenant and event per-minute limits are finite positive choices,
 default 600 and 120. The issuer reads effective values and locks without stale
 caches under the complete visitor/quota/difficulty setting lease before opening
@@ -57,7 +57,7 @@ and [operator behavior](../public/documentation/readme/events-and-ticketing/modu
 
 ## Anonymous Registration Retention
 
-The governed setting `anonymous_registration.retention_days` uses canonical
+The governed setting `anonymous_registration.retention_days` uses authoritative
 decimal-string choices `"0"` through `"30"`, default `"7"`, at instance or tenant
 scope with existing parent locks. It is a persisted setting, not a new
 environment variable.
@@ -81,7 +81,7 @@ absent.
 |---|---|---|
 | `INSTANCE_BOOTSTRAP_MODE` | `Interactive` | `ConfiguredAdministrator` |
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | must be absent/empty | required, `local`, `keycloak` or `atproto` |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | must be absent/empty | required, exact provider subject; Local uses a canonical UUIDv7 |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | must be absent/empty | required, exact provider subject; Local requires UUIDv7 |
 | `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | must be absent/empty | required, positive integer |
 | `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | must be absent/empty | optional credential/profile address, validated when supplied |
 | `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | must be absent/empty | optional, only with last name |
@@ -95,13 +95,13 @@ failure, not a warning.
 
 Subject meaning depends on the provider key:
 
-- `local`: the canonical UUIDv7 is the stable Local subject and username.
+- `local`: the UUIDv7 value is the stable Local subject and username.
   The selected bootstrap password creates a temporary credential; neither a
   configured subject nor an email address grants an ordinary session.
 - `keycloak`: the subject is paired with the existing `Keycloak:Authority`
   issuer. That issuer stays where it already lives; onboarding never introduces
   a second issuer setting.
-- `atproto`: the subject must be the canonical ATProto DID for the account.
+- `atproto`: the subject must be the authoritative ATProto DID for the account.
 
 Deployment mode authority is unchanged too. `Deployment:Mode` remains ordinary
 existing configuration; onboarding reads it and never redefines it.
@@ -137,7 +137,7 @@ General instance accountability is stored in the database under system setting
 `/settings/instance?section=operator-identity`
 (`GET/PUT /api/instance-operator-identity`). Setup authority can still use the
 identity API, but legal identity is not required to finish installation. Completion
-creates a canonical draft only when no instance identity document exists; existing
+ creates an authoritative draft only when no instance identity document exists; existing
 identity and directory documents are not replaced. The `.env` representation uses
 `INSTANCE__OPERATORIDENTITY__*` as an optional bootstrap seed for headless
 `ConfiguredAdministrator` mode, including the UUIDv7 operator ID, public and
@@ -150,7 +150,7 @@ incomplete. OpenAPI generation uses its explicit build-time mode and does not
 weaken runtime hosts.
 
 Tenant directory identity is not an environment setting. Each tenant owns one
-canonical `tenant.directory-operator-identity` typed settings document created
+authoritative `tenant.directory-operator-identity` typed settings document created
 atomically with the tenant and branding document. `Payments:CheckoutGovernance`
 contains payment operations only: complaint/refund/dispute/reconciliation
 owners, activation status, refund language, statement descriptor, and charge
@@ -167,7 +167,7 @@ identity fallback.
 
 ## Environment Variables & Secrets Authority
 
-The canonical reference catalogue of all deployment, identity, database, and integration environment variables is maintained in the **public documentation**:
+The authoritative reference catalogue of all deployment, identity, database, and integration environment variables is maintained in the **public documentation**:
 
 👉 **[Environment Variables Reference (Public Documentation)](../public/documentation/readme/configuration-and-operations/environment-variables.md)**
 
@@ -279,7 +279,7 @@ Recovery is to revoke the enrollment and clear the adapter's in-memory state;
 there is no credential-persistence recovery path.
 
 `eng/setup-assistant/generated/setup-live-release-capabilities.json` is the
-canonical release gate. D2 closes with `targetEnabled` and every live-control
+governed release gate. D2 closes with `targetEnabled` and every live-control
 capability set to `false`; the backend and outer adapter therefore do not imply
 an activated CLI, browser, desktop, or shared-presentation workflow.
 
@@ -447,11 +447,11 @@ The separately packaged Standalone image already defaults to SQLite and runs
 its migrations in-process; `docker-compose.yml` describes the Split services,
 not a second Standalone packaging path.
 
-The three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`) therefore share one API route convention: `/api/...` is canonical and API versioning uses `Accept`, `?api-version=`, or `X-Api-Version`; do not add a path-version segment (see [the support matrix](ARCHITECTURE.md#hosting-topology)). Switching back to the Split default changes only AppHost composition; it is not a data rollback.
+The three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`) therefore share one API route convention: `/api/...` is authoritative and API versioning uses `Accept`, `?api-version=`, or `X-Api-Version`; do not add a path-version segment (see [the support matrix](ARCHITECTURE.md#hosting-topology)). Switching back to the Split default changes only AppHost composition; it is not a data rollback.
 
 ### Keycloak onboarding metadata
 
-The API compatibility layer maps `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_BLAZOR_CLIENT_ID` to `Keycloak:ClientId`. It maps the server-only `KEYCLOAK_BLAZOR_CLIENT_SECRET` or `Keycloak:BlazorClientSecret` value to `Keycloak:ClientSecret`. Existing canonical `Keycloak:*` values retain precedence because compatibility aliases only fill missing keys. `Keycloak:Audience` identifies the API audience and is never used as the browser client ID.
+The API compatibility layer maps `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_BLAZOR_CLIENT_ID` to `Keycloak:ClientId`. It maps the server-only `KEYCLOAK_BLAZOR_CLIENT_SECRET` or `Keycloak:BlazorClientSecret` value to `Keycloak:ClientSecret`. Existing authoritative `Keycloak:*` values retain precedence because compatibility aliases only fill missing keys. `Keycloak:Audience` identifies the API audience and is never used as the browser client ID.
 
 The deployment tuple is the only runtime authority. Endpoint, realm, BFF client
 ID, optional API audience and BFF client secret must resolve together from the
@@ -1063,10 +1063,10 @@ AT Protocol login is enabled by the instance governance setting `auth.atproto_lo
 | `Atproto:StateLifetimeSeconds` | `300` | SDK state lifetime, clamped to 30–600 seconds; storage additionally caps expiry at the browser-proof deadline minus the two-minute handoff budget. |
 | `Atproto:TenantOrigins` | empty | Explicit HTTPS login origins with tenant ID and slug; recovered state must still match the current configured mapping. |
 | `Atproto:ClientName` | empty | Optional display name in client metadata. |
-| `Atproto:ClientUri` | empty | Optional canonical HTTPS client homepage in client metadata. Invalid values are omitted. |
-| `Atproto:LogoUri` | empty | Optional canonical HTTPS logo URL in client metadata. Invalid values are omitted. |
-| `Atproto:PolicyUri` | empty | Optional canonical HTTPS privacy-policy URL in client metadata. Invalid values are omitted. |
-| `Atproto:TermsOfServiceUri` | empty | Optional canonical HTTPS terms URL in client metadata. Invalid values are omitted. |
+| `Atproto:ClientUri` | empty | Optional authoritative HTTPS client homepage in client metadata. Invalid values are omitted. |
+| `Atproto:LogoUri` | empty | Optional authoritative HTTPS logo URL in client metadata. Invalid values are omitted. |
+| `Atproto:PolicyUri` | empty | Optional authoritative HTTPS privacy-policy URL in client metadata. Invalid values are omitted. |
+| `Atproto:TermsOfServiceUri` | empty | Optional authoritative HTTPS terms URL in client metadata. Invalid values are omitted. |
 | `Atproto:Jwt:SessionLifetime` | `00:15:00` | First-party API session JWT lifetime. API startup validation requires one through sixty minutes. |
 | `RateLimiting:AtprotoAuthentication:PermitLimit` | `10` | Per-IP fixed-window limit shared by the ATProto challenge and callback endpoints; runtime clamps it to 1–1000. |
 | `RateLimiting:AtprotoAuthentication:WindowSeconds` | `60` | ATProto authentication rate-limit window; runtime clamps it to 1–3600 seconds. |
@@ -1101,7 +1101,7 @@ ATProto login and ATProto Events are independent. The effective administrator ca
 | `Atproto:PdsSync:HealthDeadLetterWarningThreshold` | `1` | Aggregate terminal-row readiness threshold. |
 | `Atproto:Jetstream:Endpoint` | `https://jetstream1.us-east.bsky.network` | Fixed HTTPS origin without credentials, path, query, or fragment. |
 | `Atproto:Jetstream:MaxMessageSizeBytes` | `2113536` | Bounded near the verified community-record maximum; startup validation accepts 2,097,152–2,162,688 bytes. |
-| `Atproto:Jetstream:LeaseDurationSeconds` | `60` | One shared canonical consumer lease; startup validation accepts 15–300 seconds. |
+| `Atproto:Jetstream:LeaseDurationSeconds` | `60` | One shared authoritative consumer lease; startup validation accepts 15–300 seconds. |
 | `Atproto:Jetstream:LeaseRenewalSeconds` | `20` | Renews the shared lease every 5–120 seconds and must remain shorter than `LeaseDurationSeconds`. |
 | `Atproto:Jetstream:CapabilityPollMilliseconds` | `5000` | Polls for an effective enabled scope without opening per-tenant sockets. |
 | `Atproto:Jetstream:RetryMinimumMilliseconds` | `1000` | Reconnect backoff floor; startup validation accepts 10–60,000 milliseconds. |
@@ -1177,7 +1177,7 @@ through the selected Environment, Infisical, or local User Secrets authority. Th
 |---|---:|---|
 | `Webhooks:Enabled` | `true` | Master switch for outgoing product webhooks. |
 | `Webhooks:Provider` | `Local` | Supported values are `Disabled`, `Local`, `Svix`, `Composite`, and `DryRun`. |
-| `Webhooks:DefaultPayloadRetentionDays` | `14` | Default retention window for canonical webhook payload bodies. |
+| `Webhooks:DefaultPayloadRetentionDays` | `14` | Default retention window for authoritative webhook payload bodies. |
 | `Webhooks:Local:MaxAttempts` | `8` | LocalProvider retry ceiling. |
 | `Webhooks:Local:TimeoutSeconds` | `15` | LocalProvider total request timeout. |
 | `Webhooks:Local:ConnectTimeoutSeconds` | `3` | LocalProvider connect timeout. |
@@ -1187,7 +1187,7 @@ through the selected Environment, Infisical, or local User Secrets authority. Th
 | `Webhooks:Svix:AuthTokenSecretRef` | `webhooks.svix.auth_token` | Server-side secret binding for the Svix API token. |
 | `Webhooks:Svix:OperationalWebhookSecretRef` | `webhooks.svix.operational_webhook_secret` | Secret binding for incoming Svix operational callback verification. |
 | `Webhooks:Svix:AppPortalEnabled` | `true` | Enables backend-only App Portal access URL generation. |
-| `Webhooks:Svix:SyncEventTypesOnStartup` | `true` | Syncs the canonical event catalog to Svix when provider mode is `Svix` or `Composite`. |
+| `Webhooks:Svix:SyncEventTypesOnStartup` | `true` | Syncs the primary event catalog to Svix when provider mode is `Svix` or `Composite`. |
 
 The existing `WebhookDeliveryProcessor` section now configures Quartz `local-webhook-delivery-drain`: `Enabled`, `InitialDelaySeconds`, and `PollingIntervalSeconds` control registration and cadence, while batch, concurrency, fairness, lease, and health keys still configure the Infrastructure drain. `WebhookProviderPublicationProcessor` similarly configures `webhook-provider-publication-drain`; it remains disabled by default, and its provider-identity, unknown-outcome, retry, and reconciliation settings are unchanged.
 
@@ -1237,7 +1237,7 @@ Changing `ActiveKeyVersion` changes only new code writes. Lookup reads inspect t
 
 ### Reporting Static Configuration
 
-`Reporting:*` controls local event-report intake and the moderation-provider runtime mode introduced by the event-reporting bounded context. Submission remains local-first: it creates the canonical report, event target, encrypted reporter-text evidence, local case, and provider-sync outbox intent before any external integration can run.
+`Reporting:*` controls local event-report intake and the moderation-provider runtime mode introduced by the event-reporting bounded context. Submission remains local-first: it creates the authoritative report, event target, encrypted reporter-text evidence, local case, and provider-sync outbox intent before any external integration can run.
 
 Provider runtime keys are infrastructure-only switches. They control `RuntimeModerationProviderResolver` and do not disable local report submission:
 
@@ -1258,7 +1258,7 @@ Control-plane health uses additional static reporting keys. These affect only ag
 | `Reporting:Health:StuckProviderSyncMinutes` | `120` | Pending provider-sync links older than this window are counted as stuck in the control-plane `moderation-reporting` operations card. |
 | `Reporting:Health:FailedProviderSyncWarningThreshold` | `1` | Failed provider-sync links at or above this count produce the `moderation_reporting_provider_sync_failures` warning. |
 
-Hierarchical reporting settings add tenant provider targets on top of the instance baseline. Static `Reporting:*`, `Reporting:Osprey:*`, and `Reporting:Coop:*` remain the instance-level runtime authority, and local canonical reporting is always required before any external provider sync. Tenant settings are additive only: they can enable tenant-owned Osprey or Coop targets when instance administrators unlock them, but they cannot weaken an enabled instance Osprey or Coop baseline.
+Hierarchical reporting settings add tenant provider targets on top of the instance baseline. Static `Reporting:*`, `Reporting:Osprey:*`, and `Reporting:Coop:*` remain the instance-level runtime authority, and local authoritative reporting is always required before any external provider sync. Tenant settings are additive only: they can enable tenant-owned Osprey or Coop targets when instance administrators unlock them, but they cannot weaken an enabled instance Osprey or Coop baseline.
 
 | Hierarchical key | Default | Scope | Description |
 |---|---:|---|---|
@@ -1402,7 +1402,7 @@ The `ai-provider` readiness check reports safe booleans such as `endpointConfigu
 
 Cerbos runtime settings are the first implemented consumer of the shared secrets ownership metadata:
 
-- `Authorization:Provider` is the authoritative deployment selector. `AUTHORIZATION_PROVIDER` maps to it without overriding an existing canonical value. Accepted values are blank, `local`, and `cerbos`; any other explicit value fails startup validation.
+- `Authorization:Provider` is the authoritative deployment selector. `AUTHORIZATION_PROVIDER` maps to it without overriding an existing authoritative value. Accepted values are blank, `local`, and `cerbos`; any other explicit value fails startup validation.
 - Blank/unset provider intent does not infer Cerbos from endpoint or credential presence. The onboarding page selects Local RBAC by default and keeps Cerbos behind the native **Advanced: use Cerbos PDP** disclosure.
 - Explicit `local` is deployment-managed, reports authorization ready, skips the provider-choice page, and performs no Cerbos endpoint or policy call.
 - Explicit `cerbos` is deployment-managed and selected by runtime authorization immediately, so failures deny rather than falling back to Local. The API background worker verifies the instance PDP gRPC health service and then publishes the bundled policy package specifically to the instance Admin API, never an ambient tenant BYO target. It retries transient startup failures within the configured bound. Configured status becomes ready only after both operations succeed; automatic navigation skips the choice page while reconciliation is pending or ready, and a final failure is exposed as locked remediation from the instance setup task.
@@ -1706,7 +1706,7 @@ After authentication, onboarding is presented as one server-derived task overvie
 
 ## API Compatibility Mapping (Infisical -> .NET keys)
 
-`Explore.API.Extensions.ConfigurationExtensions` maps compatibility names into canonical .NET keys. Most mappings use `TrySet`, so existing canonical keys are not overwritten; `CERBOS_GRPC_ENDPOINT` explicitly assigns `Cerbos:GrpcEndpoint` when present.
+`Explore.API.Extensions.ConfigurationExtensions` maps compatibility names into authoritative .NET keys. Most mappings use `TrySet`, so existing stable key are not overwritten; `CERBOS_GRPC_ENDPOINT` explicitly assigns `Cerbos:GrpcEndpoint` when present.
 
 - `DEPLOYMENT_MODE` (Infisical `/api`) -> `Deployment:Mode` (`single_tenant`/`multi_tenant` normalized to `SingleTenant`/`MultiTenant`)
 - `MCP_ENABLED`, `MCP_ENDPOINT_PATH`, `MCP_STATELESS`, `MCP_ENABLE_LEGACY_SSE` (Infisical `/api` or `/mcp`) -> `Mcp:Enabled`, `Mcp:EndpointPath`, `Mcp:Stateless`, `Mcp:EnableLegacySse`; when absent, defaults are `true`, `/mcp`, `true`, and `true`; bare endpoint paths such as `mcp` normalize to `/mcp`, and `MCP_ENABLE_LEGACY_SSE` is a startup ceiling only
@@ -1721,7 +1721,7 @@ After authentication, onboarding is presented as one server-derived task overvie
 - `AUTHORIZATION_PROVIDER` (Infisical `/api` or `/cerbos`) -> `Authorization:Provider` (blank, `local`, or `cerbos`)
 - `CERBOS_GRPC_ENDPOINT` (Infisical `/cerbos`) -> `Cerbos:GrpcEndpoint`
 - `CERBOS_HTTP_ENDPOINT` (Infisical `/cerbos`) -> `Cerbos:HttpEndpoint` and the instance Admin API endpoint list
-- `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are canonical Environment-authority names; they are never remapped into `IConfiguration`
+- `CERBOS_ADMIN_USERNAME` and `CERBOS_ADMIN_PASSWORD` are authoritative Environment-authority names; they are never remapped into `IConfiguration`
 - `CERBOS_USE_POLICY_SCOPE` (Infisical `/cerbos`) -> `Cerbos:UsePolicyScope` (`true`/`false`, also accepts `1`/`0`, `yes`/`no`, `on`/`off`)
 - S3 credentials use only `STORAGE_S3_ACCESS_KEY_ID` and
   `STORAGE_S3_SECRET_ACCESS_KEY` under Environment authority. Legacy
@@ -1734,7 +1734,7 @@ Storage naming rules:
 - local filesystem runtime settings use `Storage:Local:*`;
 - local filesystem Compose/environment overrides use `Storage__Local__*`;
 - optional S3-compatible governance uses `s3.*` settings;
-- optional S3-compatible credentials use canonical `STORAGE_S3_ACCESS_KEY_ID` and
+- optional S3-compatible credentials use authoritative `STORAGE_S3_ACCESS_KEY_ID` and
   `STORAGE_S3_SECRET_ACCESS_KEY` only when Environment authority is selected;
 - reconciliation worker settings use `StorageReconciliation:*` or `StorageReconciliation__*`;
 - Infisical/domain secret definitions use the `STORAGE_S3_*` key family under storage paths;
@@ -1864,7 +1864,7 @@ The default `null` layout means no server snapshot exists yet, which allows the 
 
 AI assistant configuration is governed through `ai_assistant.*` keys. The Application layer resolves these into `AiAssistantSettingGroup`; provider SDKs and concrete network clients stay behind Infrastructure adapters and must not leak into Domain, Application DTOs, browser responses, logs, or tests.
 
-Canonical keys:
+Stable key:
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -1900,7 +1900,7 @@ Important notes:
 
 Admin support access is governed through instance-only `support_access.*` keys. Defaults are fail-closed: support access is disabled, write mode is disabled, ticket/reference capture is required, and each actor is restricted to one active session.
 
-Canonical keys:
+Stable key:
 
 | Key | Type | Default | Scope | Description |
 |---|---|---|---|---|
@@ -1921,7 +1921,7 @@ Analytics configuration is governed entirely through `analytics.*` keys.
 The runtime abstraction is optional by design: instance admins can lock a shared provider,
 leave settings unlocked so tenants can bring their own provider, or disable analytics entirely.
 
-Canonical keys:
+Stable key:
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -1935,8 +1935,8 @@ Canonical keys:
 
 Important notes:
 
-- `analytics.endpoint_url` is the canonical endpoint key. Do not introduce `analytics.endpoint`.
-- There is no canonical `analytics.site_id` governance key in the current abstraction.
+- `analytics.endpoint_url` is the authoritative endpoint key. Do not introduce `analytics.endpoint`.
+- There is no authoritative `analytics.site_id` governance key in the current abstraction.
 - The analytics settings follow the standard settings cascade: system setting -> tenant override -> system default.
 - Sensitive keys should still be treated carefully in UI and operational workflows even when stored as governance values.
 - `analytics.transport_mode=relay` is the only mode that does not require a browser-exposed `analytics.api_key`; the browser posts first-party events to `/api/a/t` and the server uses the resolved provider settings.
@@ -2100,7 +2100,7 @@ restore evidence belong to the operator deployment manifest described in
 [SELF_HOSTING.md](SELF_HOSTING.md), not application options or secrets.
 
 The API compatibility projection maps every documented `GEOCODING_*` key to
-the canonical `Geocoding:*` options section. Comma-separated country codes and
+the authoritative `Geocoding:*` options section. Comma-separated country codes and
 retry delays become indexed configuration values. Explicit structured
 `Geocoding:*` values take precedence. Aspire forwards the same contract to both
 split API and standalone topologies; Compose forwards it through the
@@ -2194,7 +2194,7 @@ Delivery policy is server-owned. Account-security refreshes retain for 5 minutes
 
 | Deployment input | .NET key / secret binding | Default | Purpose |
 |---|---|---|---|
-| `PublicBaseUrl` | `PublicBaseUrl` | blank | Canonical public HTTPS base URL used for Checkout return URLs |
+| `PublicBaseUrl` | `PublicBaseUrl` | blank | Authoritative public HTTPS base URL used for Checkout return URLs |
 | `Payments__Stripe__Mode` | `Payments:Stripe:Mode` | `Test` | Isolates Test and Live evidence and key prefixes |
 | `Payments__Stripe__AllowedCheckoutHosts__0` | `Payments:Stripe:AllowedCheckoutHosts:0` | `checkout.stripe.com` | Built-in HTTPS Checkout destination host; no wildcard syntax |
 | `Payments__OrganizerDirect__ProviderCode` | `Payments:OrganizerDirect:ProviderCode` | blank | Non-secret provider identity required for paid publication |
@@ -2241,7 +2241,7 @@ from `CONFIGURATION_MANIFEST_HOST_DIRECTORY`; Compose sets
 container-visible path, and host mount directory; it never contains manifest
 business values and setting a path does not mount or copy a file.
 
-The canonical JSON Schema is
+The normalized JSON Schema is
 `schemas/configuration-manifest-v1alpha2.schema.json`. Container images also
 publish it at
 `/app/schemas/configuration-manifest-v1alpha2.schema.json`. Schema validation
@@ -2252,7 +2252,7 @@ is an authoring aid; startup always reruns the complete server-owned validator.
 `instance.paid_event_policy` and `tenant.paid_event_policy` are the only
 payment-related manifest documents. Both are typed `schemaVersion: 1`
 documents. Public input cannot select a stored revision. The first bootstrap
-creates or revises the instance policy through the canonical paid-policy
+creates or revises the instance policy through the authoritative paid-policy
 mutation boundary, and each tenant narrowing is bound internally to the exact
 effective instance revision selected by the same transaction. Same-section
 reruns use the fresh active Day 2 revision instead of replaying historical
@@ -2271,7 +2271,7 @@ unsupported currencies, invalid risk pairs, weaker refund protection,
 instance-ceiling broadening, stale authority, and direct tenant identifiers
 fail closed. The manifest handler then calls the same
 `PaidEventPolicyMutationBoundary` used by paid-policy CQRS commands inside the
-outer manifest transaction and canonical instance/tenant named locks.
+outer manifest transaction and authoritative instance/tenant named locks.
 
 Manifests do **not** own operator identity, official origin or status, provider
 profiles or credentials, connected accounts, charge type, buyer acceptance,

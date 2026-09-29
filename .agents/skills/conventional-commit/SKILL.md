@@ -26,7 +26,7 @@ priority: high
 13. **Oversized Commit Gate**: A large dirty tree is evidence that more clustering is required, not permission for one umbrella commit. Split independent behaviors, refactors, tests, documentation, plans, cleanup, provider integrations, and operational changes even when they share a capability scope.
 14. **Rare Large-Commit Exception**: A commit may touch dozens or hundreds of files only when the same indivisible change necessarily applies across them—for example a mechanical repository-wide rename, generated artifacts from one source change, or one schema/migration regeneration whose files cannot build or remain truthful independently. State that necessity in the commit plan; “same feature,” “same workstream,” or “all currently dirty” is never sufficient.
 
-## Canonical Scope Registry
+## Scope Registry
 
 | Category | Allowed Scopes | Description |
 |---|---|---|
@@ -75,7 +75,7 @@ Changelog-Reason: concise explanation of why commit is excluded from public rele
 ```bash
 # Vertical feature commit (single-outcome staging)
 git add path/to/Domain.cs path/to/Page.razor path/to/ApiClient.g.cs
-git commit -m "feat(registration): present tenant-branded intermediary disclaimer on paid events" -m "Format canonical directory notice dynamically based on tenant branding."
+git commit -m "feat(registration): present tenant-branded intermediary disclaimer on paid events" -m "Format primary directory notice dynamically based on tenant branding."
 
 # Internal nonbreaking commit (with required skip trailers)
 git add path/to/ProjectionUpdater.cs
@@ -99,7 +99,7 @@ git show --name-only --format=fuller HEAD
 | `fix(persistence): retry query` | `fix(database): wrap session projection in execution strategy` | `persistence` is a layer; use `database` scope. |
 | `chore: update client` | *[Bundle in originating feature commit]* | Never split generated client from triggering feature. |
 | `docs: update cla` | `docs(documentation): clarify legal entity status` | Explicit engineering scope and benefit-led subject. |
-| `test: update tests` | `test(testing): harden persistence integration tests` | Descriptive subject and canonical scope. |
+| `test: update tests` | `test(testing): harden persistence integration tests` | Descriptive subject and specific scope. |
 | One commit for an entire multi-feature dirty tree | Separate commits for each independently reviewable behavior | Shared timing or scope does not make changes atomic. |
 | “Vertical slice” containing hundreds of loosely related files | Large commit only for one provably indivisible transformation or generated set | Atomic means smallest complete outcome, not largest complete workstream. |
 | Normal `git commit` while unrelated paths are already staged | Explicit path-limited commit plus post-commit file-list verification | Shared index state must not leak another contributor's work into the commit. |

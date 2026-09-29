@@ -238,11 +238,11 @@ inferred from a default value or added to the Domain setting registry.
 | `event_resources.enabled_delivery_types` | Exact `EventResourceDeliveryTypeEnum` names: `StoredFile`, `ExternalLink` |
 | `event_resources.enabled_audiences` | Exact `EventResourceAudienceKindEnum` names |
 | `event_resources.permitted_file_types` | The closed PDF, DOCX, and PPTX MIME constants on `EventResourceGovernancePolicy` |
-| `event_resources.external_origins` | Canonical HTTPS origin strings, validated by the native Domain policy |
+| `event_resources.external_origins` | Authoritative HTTPS origin strings, validated by the native Domain policy |
 
 The schemas emit `type: array` and string `items`, with ordinal `enum` values for
 the first three settings. Origins remain typed strings in the schema: native
-validation additionally rejects unsafe or noncanonical authorities, paths,
+validation additionally rejects unsafe or non-authoritative authorities, paths,
 credentials, queries, and fragments. Schema validation alone is not a substitute
 for native policy validation or coordinated non-widening tenant mutation.
 
@@ -325,7 +325,7 @@ reporting intake while leaving unsafe unapproved publication open is rejected.
 There is no generic instance-document table and no arbitrary JSON document
 escape hatch.
 
-If `tenant.branding` is omitted, tenant creation still writes the canonical
+If `tenant.branding` is omitted, tenant creation still writes the authoritative
 branding document using `spec.displayName`. If it is supplied, its nullable
 `displayName`, `logoUrl`, `faviconUrl`, and `customCssUrl` fields overlay that
 baseline.
@@ -381,7 +381,7 @@ All seven refund-protection IDs are currently mandatory:
 | `6` | Card-dispute rights are not waived |
 | `7` | Cancelled-event platform amounts are refunded by default |
 
-Currency codes are canonical three-letter uppercase monetary codes. Every risk
+Currency codes are authoritative three-letter uppercase monetary codes. Every risk
 limit must reference an allowed currency. Positive money values use integer
 minor units.
 
@@ -469,7 +469,7 @@ The implemented control flow is:
 5. `ConfigurationManifestValidator` checks the envelope, explicit catalogs,
    types, documents, publication safety, and paid-policy narrowing.
 6. `ConfigurationManifestCompiler` creates typed instance and tenant plans,
-   deterministic key order, a full-file digest, and a canonical instance-section
+    deterministic key order, a full-file digest, and an authoritative instance-section
    digest that is independent of JSON object insertion order.
 7. Initial preflight reads bootstrap state, existing tenants, setting/document
    locks, publication state, and paid-policy authority without writes.
@@ -479,7 +479,7 @@ The implemented control flow is:
 9. Preflight runs again inside the fresh transaction while every lease remains
    held.
 10. Instance settings and instance paid policy apply first through their
-    canonical in-transaction mutation boundaries.
+    authoritative in-transaction mutation boundaries.
 11. Each absent tenant is created in deterministic slug order with its
     directory-operator identity, branding, settings, and optional paid policy.
 12. The operation audit, per-tenant results, and payload-free outbox effect are
@@ -634,7 +634,7 @@ default `Split` topology the migration project owns the manifest. With
 
 ### Direct standalone container
 
-Mount the source read-only and pass the canonical in-container path:
+Mount the source read-only and pass the authoritative in-container path:
 
 ```bash
 docker run --rm --name islamu-event-standalone \
@@ -757,7 +757,7 @@ concrete native handler or depending on runtime authorization services. The
 applier continues to own ordered locks, serializable writes and effect delivery.
 
 `TenantConfigurationPackageSerializer` retains tenant-only authority and emits
-the canonical `PaidEventPolicyAuthorityMetadata.SovereignLockedFields` omission
+the authoritative `PaidEventPolicyAuthorityMetadata.SovereignLockedFields` omission
 list in both export views. The tenant-package validator requires that same
 list; an empty list makes an otherwise valid exported package non-importable.
 These metadata names describe excluded authority, not portable credentials or
@@ -778,7 +778,7 @@ The administration workspace follows one server-owned state machine:
    fidelity digest, omissions, and typed post-commit effect status without
    configuration values.
 
-An apply commits all selected canonical mutations, the protected pre-apply
+An apply commits all selected authoritative mutations, the protected pre-apply
 snapshot, append-only operation evidence, and the payload-free effect outbox or
 commits none of them. Cache refresh and other effects may remain `Pending`; the
 configuration transaction is not replayed to repair an effect.
@@ -869,7 +869,7 @@ evidence.
 | Code or condition | Meaning | Safe action |
 |---|---|---|
 | `configuration_manifest_mode_invalid` | Mode is not exact `Off`, `ValidateOnly`, or `Bootstrap` | Correct the case-sensitive mode |
-| `configuration_manifest_path_invalid` | Explicit path is not absolute | Use the canonical absolute container path |
+| `configuration_manifest_path_invalid` | Explicit path is not absolute | Use the authoritative absolute container path |
 | `configuration_manifest_file_missing` | Explicit source does not exist | Restore/mount the intended source or correct the path |
 | Convention file absent with no explicit path | No manifest was discovered | No-op by design; configure an explicit path if absence must fail |
 | `configuration_manifest_file_unreadable` | Permissions or I/O prevented the read | Fix non-root read access and mount health; do not broaden file contents into logs |
@@ -886,7 +886,7 @@ evidence.
 | Code | Meaning | Safe action |
 |---|---|---|
 | `configuration_manifest_contract_invalid` | Envelope, required shape, name, or export metadata is invalid | Compare against the checked-in schema and minimal example |
-| `configuration_manifest_tenant_duplicate` | Tenant slugs are not ordinally unique | Give each tenant one canonical slug |
+| `configuration_manifest_tenant_duplicate` | Tenant slugs are not ordinally unique | Give each tenant one authoritative slug |
 | `configuration_manifest_key_not_allowed` | Key is unknown or belongs to another scope | Remove it or use its authoritative Day 2/deployment surface |
 | `configuration_manifest_sensitive_key_forbidden` | A secret-bearing key was attempted | Move the secret to Infisical or `.env`; never encode a reference in the manifest |
 | `configuration_manifest_value_invalid` | JSON type, enum, length, or URL policy is invalid | Correct the typed value without coercion |
@@ -904,7 +904,7 @@ evidence.
 | `configuration_manifest_paid_policy_unavailable` | No valid active instance paid policy exists | Establish or repair the active instance policy through its authoritative workflow |
 | `configuration_manifest_paid_policy_stale` | Policy revision changed during planning/apply | Rerun from `ValidateOnly` against current authority |
 | `configuration_manifest_paid_policy_broadening` | Tenant policy exceeds the instance ceiling | Narrow the tenant policy |
-| `configuration_manifest_write_conflict` | A canonical mutation boundary rejected a concurrent/stale write | Reload current state, correct the source, and rerun |
+| `configuration_manifest_write_conflict` | A authoritative mutation boundary rejected a concurrent/stale write | Reload current state, correct the source, and rerun |
 | `configuration_manifest_apply_failed` | Transaction failed and no manifest configuration was applied | Use the operation ID and database health evidence; repair the dependency and rerun |
 
 ### Post-commit and export failures
@@ -940,7 +940,7 @@ Before exposing a new field, answer:
 1. Is it non-secret and free of PII?
 2. Is it portable across supported deployment topologies?
 3. Does a concrete Domain/Application owner already exist?
-4. Is there a canonical transaction-aware mutation path?
+ 4. Is there an authoritative transaction-aware mutation path?
 5. Can it be exported without credentials, operational state, or sovereign
    authority?
 6. Is the correct scope instance, tenant, or neither?
@@ -952,7 +952,7 @@ If any answer is unclear, do not add the field to the catalog.
 
 ### Add an approved scalar setting
 
-1. Define or verify the canonical `SettingDefinition` and registry entry in the
+1. Define or verify the authoritative `SettingDefinition` and registry entry in the
    owning settings group.
 2. Confirm its scope range includes the intended manifest scope and
    `IsSensitive` is false.
@@ -972,7 +972,7 @@ If any answer is unclear, do not add the field to the catalog.
    boundary.
 2. Add a typed payload contract with unmapped-member rejection.
 3. Add a scope-tagged `ConfigurationManifestDocumentCatalogEntry`.
-4. Extend validator, compiler/preflight, canonical mutation, and export mapping.
+4. Extend validator, compiler/preflight, authoritative mutation, and export mapping.
 5. Preserve instance-before-tenant authority if the document constrains tenant
    state.
 6. Extend deterministic schema generation; do not hand-edit the schema.
@@ -1033,7 +1033,7 @@ partial instance export.
 | Validation | Envelope, types, sensitivity, cross-policy checks | `src/Explore.Application/Features/ConfigurationManifest/Validation/ConfigurationManifestValidator.cs` |
 | Compilation | Typed plans, deterministic ordering, instance-section digest | `src/Explore.Application/Features/ConfigurationManifest/Compilation/` |
 | Preflight | Existing-tenant disposition, lifecycle, locks, current policy | `src/Explore.Application/Features/ConfigurationManifest/Preflight/ConfigurationManifestPreflight.cs` |
-| Apply | Lock hierarchy, serializable transaction, canonical boundaries, snapshots, receipts, and effect outbox | `src/Explore.Application/Features/ConfigurationManifest/Application/ConfigurationManifestApplier.cs`, `src/Explore.Application/Features/ConfigurationManifest/Importing/ConfigurationImportApplyService.cs` |
+| Apply | Lock hierarchy, serializable transaction, authoritative boundaries, snapshots, receipts, and effect outbox | `src/Explore.Application/Features/ConfigurationManifest/Application/ConfigurationManifestApplier.cs`, `src/Explore.Application/Features/ConfigurationManifest/Importing/ConfigurationImportApplyService.cs` |
 | Export state | Shared trusted snapshots beneath separately authorized instance and tenant operations | `src/Explore.Application/Features/ConfigurationManifest/Application/ConfigurationManifestCurrentStateReader.cs` |
 | Persistence | Entity-first repositories, protected artifacts, append-only evidence, isolated failure recorder | `src/Explore.Persistence/Repositories/ConfigurationManifestOperationRepository.cs`, `src/Explore.Persistence/Repositories/ConfigurationImportOperationRepository.cs`, `src/Explore.Persistence/Repositories/ConfigurationImportArtifactStore.cs` |
 | Infrastructure | Options, strict reader/scanner, startup runner | `src/Explore.Infrastructure/ConfigurationManifest/` |

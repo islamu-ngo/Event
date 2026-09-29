@@ -427,7 +427,7 @@ Configures the headless administrator account when `INSTANCE_BOOTSTRAP_MODE=Conf
 |---|---|
 | `MODE` | Headless bootstrap mode: `ConfiguredAdministrator`. |
 | `ADMIN_PROVIDER` | Headless bootstrap provider: `local`, `keycloak`, or `atproto`. |
-| `ADMIN_SUBJECT` | Headless bootstrap subject: canonical UUIDv7 username, Keycloak `sub`, or ATProto DID. |
+| `ADMIN_SUBJECT` | Headless bootstrap subject: lowercase, hyphenated UUIDv7 also used as the Local username, Keycloak `sub`, or ATProto DID. |
 | `BINDING_GENERATION` | Headless bootstrap generation counter (positive integer). |
 | `ADMIN_EMAIL` | Optional administrator account email. |
 | `ADMIN_FIRST_NAME` | Optional administrator first name. |
@@ -443,8 +443,8 @@ Configures legal and branding metadata for the deploying entity in headless depl
 | `OPERATOR_ID` | UUIDv7 unique identifier for the operating legal entity. |
 | `PUBLIC_NAME` | Public brand name of the deploying organization. |
 | `LEGAL_NAME` | Full legal registered entity name. |
-| `IS_OFFICIAL_INSTANCE` | `true` only for the canonical upstream project deployment. |
-| `OFFICIAL_ORIGIN` | Canonical origin URL for official instances. |
+| `IS_OFFICIAL_INSTANCE` | `true` only for the authoritative upstream project deployment. |
+| `OFFICIAL_ORIGIN` | Authoritative origin URL for official instances. |
 | `OPERATOR_KIND_CODE` | Operator-kind code (e.g., `community`). |
 | `JURISDICTION_COUNTRY_CODE` | Two-letter jurisdiction country code (`US`, `GB`, `FR`, etc.). |
 | `PUBLIC_CONTACT_EMAIL` | Public contact email for legal and privacy inquiries. |

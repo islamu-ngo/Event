@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical policy for AI Context Disclosure across Blazor rail, Application, and MCP. -->
+<!-- ABOUTME: Governing policy for AI Context Disclosure across Blazor rail, Application, and MCP. -->
 <!-- ABOUTME: Backed by ADR-012 and the field-classification-matrix; enforced by AiContextDisclosureSchemaTests. -->
 
 # AI Context Security
@@ -7,7 +7,7 @@
 **Authority:** `docs/adr/ADR-012-ai-context-disclosure-policy.md`
 **Last Updated:** 2026-07-04
 
-This document is the **canonical policy** that governs how platform data may be disclosed to AI model providers, persisted into prompt transcripts, and surfaced through MCP tool responses. It is the human-readable counterpart to ADR-012 and the field classification matrix.
+This document is the **governing policy** that governs how platform data may be disclosed to AI model providers, persisted into prompt transcripts, and surfaced through MCP tool responses. It is the human-readable counterpart to ADR-012 and the field classification matrix.
 
 ---
 

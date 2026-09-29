@@ -159,11 +159,11 @@ SQLite/MySQL names remain correct.
 
 `EmergencyAdminProvisioningOperation` resolves one global
 `UserExternalLogin` by exact AT Protocol provider ID and ordinal DID, verifies
-the linked user is active, and verifies all canonical role invariants:
+the linked user is active, and verifies all authoritative role invariants:
 `RoleEnum.Admin`, `platform.admin`, and platform scope. It then converges a
 single `PlatformUserRole` under serializable isolation. Optional reassignment
 removes every other `platform.admin` grant only after the replacement binding
-and canonical role have been verified. The unique
+and authoritative role have been verified. The unique
 `(UserId, RoleId)` index makes retries and concurrent execution idempotent.
 `GrantedBy = null` records that no authenticated actor performed the offline
 grant.
@@ -614,7 +614,7 @@ aspire describe explore-api --apphost src/Explore.AppHost/Explore.AppHost.csproj
 aspire describe mailpit --apphost src/Explore.AppHost/Explore.AppHost.csproj --format Json
 ```
 
-Detached Aspire commands remain useful for CLI lifecycle investigation, but they are not the current canonical launch proof path for this workspace. Official Aspire CLI documentation says `aspire start` starts an AppHost in the background and leaves it inspectable with `aspire ps`, `aspire describe`, `aspire logs`, and `aspire stop`. On 2026-07-04, local Aspire CLI `13.4.6` repeatedly returned detached startup JSON after AppHost readiness, then the AppHost process disappeared and `aspire ps --format Json` returned `[]`. If that reproduces, use the foreground `aspire run --isolated` path above and inspect the detached child log under `~/.aspire/logs/`.
+Detached Aspire commands remain useful for CLI lifecycle investigation, but they are not the current authoritative launch proof path for this workspace. Official Aspire CLI documentation says `aspire start` starts an AppHost in the background and leaves it inspectable with `aspire ps`, `aspire describe`, `aspire logs`, and `aspire stop`. On 2026-07-04, local Aspire CLI `13.4.6` repeatedly returned detached startup JSON after AppHost readiness, then the AppHost process disappeared and `aspire ps --format Json` returned `[]`. If that reproduces, use the foreground `aspire run --isolated` path above and inspect the detached child log under `~/.aspire/logs/`.
 
 Maintainer modes:
 
@@ -641,7 +641,7 @@ To reset only the local app database while keeping the persistent Postgres conta
 
 Secret and connection priority:
 
-- `local-full` uses the explicit Environment authority, clears Infisical bootstrap identifiers, and forwards only canonical environment names. Optional local services require their credentials in `.env`; AppHost does not generate or hard-code them.
+- `local-full` uses the explicit Environment authority, clears Infisical bootstrap identifiers, and forwards only authoritative environment names. Optional local services require their credentials in `.env`; AppHost does not generate or hard-code them.
 - AppHost injects structured `Database__*` fields and only the credential role
   required by each process. Raw application connection strings are not a
   deployment input.
@@ -1627,7 +1627,7 @@ Alert and recovery policy:
 - `explore.email_dispatch.tenant_backlog` (`sample_rank`) — active backlog samples ranked within the bounded health sample; no tenant identifier is exported.
 - `explore.email_dispatch.oldest_pending_age` — oldest active due-row age in seconds without labels.
 - `explore.email_dispatch.optional_reminder_deferral` — current persisted optional-reminder deferral state (`0` or `1`) as an observable gauge without labels.
-- `explore.queue_drains.health_checks` (`job_name`, `outcome`) — bounded per-lane readiness outcomes using only canonical scheduled-job names and `healthy`, `degraded`, `disabled`, or `unhealthy`.
+- `explore.queue_drains.health_checks` (`job_name`, `outcome`) — bounded per-lane readiness outcomes using only authoritative scheduled-job names and `healthy`, `degraded`, `disabled`, or `unhealthy`.
 - `explore.queue_drains.backlog` (`job_name`) and `explore.queue_drains.stale_work` (`job_name`) — tenant-free aggregate queue counts; labels never include tenant, row, user, provider, endpoint, or payload identity.
 - `explore.email_dispatch.rabbitmq.publishes` (`outcome`, `failure_category`) — optional RabbitMQ pointer-publish outcomes with closed-vocabulary labels; labels intentionally exclude tenant, recipient, subject, body, provider message ID, raw broker error text, and connection strings.
 - `explore.email_dispatch.rabbitmq.consumes` (`outcome`, `failure_category`) — manual-ack RabbitMQ delivery outcomes with closed-vocabulary labels; labels intentionally exclude tenant, recipient, subject, body, provider message ID, publish event ID, delivery tag, raw broker error text, and connection strings.
@@ -1637,7 +1637,7 @@ Alert and recovery policy:
 - `explore.event_reports.workflow_actions` (`tenant_id`, `action`, `outcome`, `failure_category`) — moderation report triage/assign/decide/execute outcomes; labels intentionally exclude report IDs, case IDs, decision IDs, moderator IDs, reporter evidence, safe notes, and raw errors.
 - `explore.event_reports.provider_syncs` (`tenant_id`, `provider`, `outcome`, `failure_category`) — report provider sync outcomes for local/Osprey/Coop/composite paths; labels intentionally exclude provider URLs, credentials, external case/signal IDs, payload bodies, reporter evidence, and raw provider errors.
 - `explore.event_reports.provider_callbacks` (`tenant_id`, `provider`, `outcome`, `failure_category`) — provider callback outcomes; labels intentionally exclude callback bodies, signatures, provider decision IDs, provider message IDs, report IDs, event IDs, case IDs, reporter evidence, and raw parse/auth errors. Anonymous public-ingestion callbacks such as Svix operational webhooks use the default tenant tag even when a verified payload contains a tenant identifier.
-- `explore.webhooks.messages_created` (`event_type`, `provider`, `outcome`) — canonical outgoing webhook message creation outcomes; labels intentionally exclude tenant/resource IDs, payloads, aggregate titles/slugs/URLs, endpoint URLs, and secrets.
+- `explore.webhooks.messages_created` (`event_type`, `provider`, `outcome`) — authoritative outgoing webhook message creation outcomes; labels intentionally exclude tenant/resource IDs, payloads, aggregate titles/slugs/URLs, endpoint URLs, and secrets.
 - `explore.webhooks.delivery_attempts` (`event_type`, `outcome`, `failure_category`) — LocalProvider delivery attempt outcomes; labels intentionally exclude tenant/resource IDs, endpoint URLs, request payloads, response bodies, headers, and raw transport errors.
 - `explore.webhooks.delivery_success` (`event_type`) — LocalProvider successful delivery count without tenant/resource identity.
 - `explore.webhooks.delivery_failure` (`event_type`, `outcome`, `failure_category`) — LocalProvider failed delivery count with bounded failure categories only.
@@ -2604,7 +2604,7 @@ of letting a provider retry select another batch; the next scheduled pass
 resumes cleanup. Failed passes can have committed partial work.
 There is no 24-hour idempotency grace. The owned job remains registered when
 ATProto is disabled, but `Scheduler:Quartz:Enabled=false` stops it along with
-other scheduler work. Successful passes use the canonical log event
+other scheduler work. Successful passes use the authoritative log event
 `Scheduled job {JobName} completed.` with `JobName=atproto-transient-cleanup`.
 
 Keep every BFF/API host within five seconds of trusted UTC and monitor clock
@@ -2641,7 +2641,7 @@ closed until the consistency manifest matches the configured release/schema,
 retained key inventory, authority floor, provider cursor, durable idempotency
 floor, and worker fence. The configured manifest-signing key is a server-only
 Infisical/environment secret; health and operator output expose only the
-canonical key reference and retained integer versions.
+stable key reference and retained integer versions.
 
 The ordered controls are:
 
@@ -2714,7 +2714,7 @@ Lifecycle classes:
 | Compliance evidence | Security, admin, audit, or consent evidence | Retain by default; purge only through documented operator retention policy and legal-hold checks. |
 | Durable side-effect ledger | Outbox intent, attempts, receipts, and delivery evidence | Completed rows may age out after operator-safe windows; unresolved rows stay until parked/replayed/resolved. |
 | User-facing operational state | User inbox or active workflow state | Keep active rows; archive/delete only after user/admin lifecycle rules are explicit. |
-| Rebuildable projection/cache | Derived from canonical tables | Safe to rebuild; cleanup should be tied to source deletion or projection rebuild/drain semantics. |
+| Rebuildable projection/cache | Derived from authoritative tables | Safe to rebuild; cleanup should be tied to source deletion or projection rebuild/drain semantics. |
 | Ephemeral safety cache | Short-lived duplicate/retry protection | Delete after expiry plus a small clock-skew buffer. |
 | External mirror/index | Copy of another system or object-store metadata | Retention follows source/integration policy; never assume local rows can be dropped without reconciliation. |
 
@@ -3032,7 +3032,7 @@ Event-bound add-ons use six tenant-qualified persistence concepts:
 - fulfillment outcome;
 - refund allocation.
 
-Inventory mutation follows the canonical
+Inventory mutation follows the authoritative
 `catalog-item > order > line > inventory > fulfillment > refund` fence order.
 The PostgreSQL one-winner test uses independent contexts and an exact event
 barrier; it contains no sleeps or timing-based pass condition. Serialization
@@ -3048,7 +3048,7 @@ Operational interpretation:
 - `provider_failed` reopens refundable quantity without releasing stock;
 - `provider_confirmed_inventory_release_pending` preserves confirmed provider
   truth while recovery repairs the stock-release anomaly;
-- add-on refund allocation, canonical `RefundAttempt`, and dispatch outbox
+- add-on refund allocation, authoritative `RefundAttempt`, and dispatch outbox
   commit atomically under the payment-capacity and add-on fence order;
 - a local refund allocation never releases stock; only a later
   provider-confirmed refund transition may return add-on stock, and it never

@@ -89,7 +89,7 @@ dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-
    fast-forward to exactly `B`. Prereleases and older-line patches do not move
    `main` backwards.
 9. The provider adapter retains artifacts and may publish a derived enriched view,
-   but it cannot alter canonical notes, identity, or approval.
+   but it cannot alter authoritative notes, identity, or approval.
 
 ### Provider adapter planning
 
@@ -111,7 +111,7 @@ manifest SHA-256, tag name, and dirty-worktree status. The validator rejects pat
 aliases, short object IDs, checksum drift, preview secrets, final candidate-code
 authority, preview write/OIDC permissions, mutable GitHub Actions pins, missing
 required checks, provider/action misrepresentation, symlink/reparse/hardlink aliases,
-and metadata-canonical plans before publishing output.
+and metadata-authoritative plans before publishing output.
 
 For a provider action whose capability is unsupported, pass separate external control
 evidence only after an operator has recorded the provider-side control:
@@ -165,7 +165,7 @@ config, and trust versions through `ISLAMU_RELEASE_TRUSTED_BUNDLE`,
 The command verifies that promotion before rendering, reads the descriptor and
 summary, derives the complete local Git range from `Previous-Published-Tag` to the
 checked-out `HEAD`, validates linked public fragments and impact evidence,
-atomically creates `release-notes.md`, and writes canonical
+atomically creates `release-notes.md`, and writes authoritative
 `release-context.v1.json` next to the release inputs. The generated notes always
 use this order: maintainer summary, release-visible details only, then complete
 provider-neutral full commit range. Empty detail/impact sections are omitted.
@@ -180,7 +180,7 @@ or write failure stops without changing `release.yaml` or `summary.md`.
 
 Promote the updated engine and packaged template together; replacing a file
 inside an accepted bundle is not promotion. A formatter change can change
-canonical Markdown bytes even when its canonical release context is identical.
+authoritative Markdown bytes even when its governed release context is identical.
 
 Before committing `B`, preserve reviewed hand-authored `release.yaml` and
 `summary.md`, remove only the uncommitted generated `release-context.v1.json`
@@ -270,7 +270,7 @@ or dirty committed generated artifact stops before tagging or publication.
 
 ### Tag message and final tag verification commands
 
-After `verify-candidate` succeeds, generate the annotated-tag message from canonical
+After `verify-candidate` succeeds, generate the annotated-tag message from authoritative
 release sources. Operators do not edit the tag narrative independently:
 
 ```sh
@@ -278,7 +278,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
   tag-message docs/internal/releases/<version> > /tmp/islamu-release-tag-message.txt
 ```
 
-The message contains only the canonical tag name, version, release line, exact
+The message contains only the authoritative tag name, version, release line, exact
 candidate `B`, candidate-manifest SHA-256, and release-note SHA-256. It has no
 independently editable summary or final-manifest digest and omits current time,
 provider UI state, identities, emails, raw commit bodies, tokens, and secrets.
@@ -383,7 +383,7 @@ after this local proof. On any failure, discard the protected-ref action and rep
 candidate/tag/main verification from current local objects.
 
 - The authoritative job MUST download and verify a separately promoted bundle before
-  processing candidate data. An operator/provider supplies an immutable canonical
+  processing candidate data. An operator/provider supplies an immutable authoritative
   promotion receipt and detached SSH signature separately from both the bundle and
   candidate checkout. The previously promoted verifier resolves its promoter trust
   root from its own fixed protected application directory, never from a request,
@@ -399,7 +399,7 @@ candidate/tag/main verification from current local objects.
 - `B`, the candidate record, the tag target, the committed notes, and the stable
   `main` target MUST be checked as one exact full-object identity. No branch head takes
   part in that identity; a branch head appears only as a push precondition.
-- Public canonical artifacts MUST be deterministic and provider-neutral. Capture
+- Public release artifact MUST be deterministic and provider-neutral. Capture
   required hashes and inputs without wall-clock, provider, author, raw-body, or token
   data.
 - Restricted security inputs MUST remain in the embargo lane outside the public
@@ -419,11 +419,11 @@ A publication failure cannot rewrite or invalidate a signed release.
 
 ### Publication projection and drift reporting
 
-Publishing to a forge release page is a derived, noncanonical view of the signed tag. Canonical
+Publishing to a forge release page is a derived, non-authoritative view of the signed tag. Authoritative
 truth stays the tag object plus `release-notes.md` committed at `B`. A release is complete without
 any published page.
 
-Each published page MUST carry the canonical `release-notes.md` SHA-256 and its tag reference, and
+Each published page MUST carry the authoritative `release-notes.md` SHA-256 and its tag reference, and
 MUST attach `release-evidence.v1.json`, `artifacts.sha256`, container image digests, and SBOM.
 Those assets are self-verifying; forge-generated source archives may be linked but are never
 treated as reproducible artifacts.
@@ -439,13 +439,13 @@ dotnet run --file .ci/scripts/report-publication-drift.cs -- \
 
 The projection input is a bounded `release-publication-projection.v1` document that the operator or
 adapter assembles from what each forge currently shows. For each provider it records `state`
-(`published`, `unavailable`, or `unsupported`), the `declaredCanonicalNotesSha256`, the
+(`published`, `unavailable`, or `unsupported`), the `declaredReleaseNotesSha256`, the
 `declaredTagRef`, the attached `assets`, and either the `publishedBody` or its
 `publishedBodySha256`.
 
 Outcomes:
 
-- `in-sync` — the page carries the canonical hash and tag reference and the required assets.
+- `in-sync` — the page carries the content hash and tag reference and the required assets.
 - `drift` — reported with specific findings. The command still exits `0`; drift never invalidates a
   release, and the tool never edits a page. Pass `--fail-on-drift` if you want a blocking gate.
 - `recorded-no-op` — the provider has no release API, or the forge was unavailable, and an
@@ -453,7 +453,7 @@ Outcomes:
   silent omission cannot pass as a deliberate no-op.
 
 If the local `release-notes.md` no longer hashes to the value in `release-evidence.v1.json`, the
-command fails closed with `drift_canonical_notes_mismatch`. That is a local checkout problem, not a
+command fails closed with `drift_release_notes_mismatch`. That is a local checkout problem, not a
 forge problem: fix the checkout before drawing conclusions about a published page.
 
 ### Maintenance lines (open on demand, delete freely)
@@ -567,10 +567,10 @@ approval, and an SSH-signed annotated tooling tag. Later upgrades use the same
 separate promotion lane and cite the previously promoted bundle; candidate checkout
 content is never promotion evidence.
 
-Final attestation receives the promoted bundle plus its separately stored canonical
+Final attestation receives the promoted bundle plus its separately stored authoritative
 receipt and detached signature. The already promoted verifier uses only its protected
 runtime trust root to verify the receipt before using the receipt-bound manifest
-SHA-256, then verifies canonical manifest bytes, required and complete file sets,
+SHA-256, then verifies authoritative manifest bytes, required and complete file sets,
   every file hash, and policy/config/trust versions and digests. Reusing the same signed
   receipt for the exact same manifest is an idempotent read-only verification, not a
   replay decision; the verifier stores no receipt registry and accepts no caller replay
@@ -600,12 +600,12 @@ baseline tag, signed release tag, or versioned release directory from placeholde
 ### Restricted security input
 
 Embargo input is a separate access-controlled input mounted only after candidate code
-has stopped. It must not enter the public checkout, candidate bundle, canonical
+has stopped. It must not enter the public checkout, candidate bundle, authoritative
 context, notes, manifests, checksums, retained diagnostics, logs, or provider
 metadata. Diagnostics use bounded codes only and never echo paths, identities,
 secrets, provider data, restricted values, or raw exception text. After disclosure
 authorization, only the reviewed public disposition and public advisory reference may
-cross into canonical generation, and neither field may exactly alias restricted
+cross into authoritative generation, and neither field may exactly alias restricted
 details, secret material, identities, storage paths, or provider metadata after
 Unicode and whitespace normalization; otherwise the release stops.
 
@@ -621,4 +621,4 @@ Unicode and whitespace normalization; otherwise the release stops.
   restricted value, and use the security incident process before retrying.
 - If provider transport fails after local verification, retain local evidence and
   resolve the protected adapter failure. The provider adapter is not permitted to
-  regenerate or reinterpret the canonical release.
+  regenerate or reinterpret the governed release.

@@ -44,7 +44,7 @@ ISLAMU uses one record for the complete public event graph:
 
 `federation.atproto_event_validation_profile=community_lexicon` relaxes only which local business fields must be present to publish: title, tenant, owner, and status remain required. It does not relax validation of supplied values, authorization, moderation, privacy, complete source-field disposition, or final record validation.
 
-For inbound records, `name` and `createdAt` are likewise the only required producer values. Accepted source JSON is retained completely in `AtprotoRecord.RecordJson`; a separate validated import plan maps compatible fields into one tenant-local `Event` and one implicit `EventSession`. This includes canonical slug generation, UTC/IANA-aware scheduling, mode/status/RSVP mapping, the first safe source URI, and an optional CID-verified thumbnail. Producer extensions with no compatible local field remain in the canonical JSON. See [FEDERATION.md](FEDERATION.md#inbound-event-import-and-database-materialization) for the complete mapping and lifecycle.
+For inbound records, `name` and `createdAt` are likewise the only required producer values. Accepted source JSON is retained completely in `AtprotoRecord.RecordJson`; a separate validated import plan maps compatible fields into one tenant-local `Event` and one implicit `EventSession`. This includes authoritative slug generation, UTC/IANA-aware scheduling, mode/status/RSVP mapping, the first safe source URI, and an optional CID-verified thumbnail. Producer extensions with no compatible local field remain in the normalized JSON. See [FEDERATION.md](FEDERATION.md#inbound-event-import-and-database-materialization) for the complete mapping and lifecycle.
 
 ## Community RSVP Record
 
@@ -63,7 +63,7 @@ The local outbound contract is intentionally narrower:
 
 Lexicons define wire shapes, not mutation authority. Local event and registration lifecycle handlers are the only outbound authority and write immutable `PdsSyncOutbox` intents inside the local transaction. CarpaNet PDS I/O happens only after commit and under a renewable fenced worker claim.
 
-Inbound records are globally canonical by DID, collection, and record key with one current source version. `ImportAtprotoFederatedEventCommand` builds one validated plan per visible tenant; canonical materialization, typed event projection, tenant presentation, tenant-local `Event`/`EventSession`, optional thumbnail `StorageObject`, tombstone/quarantine effects, and cursor advancement are atomic under the one leased consumer. Bounded PDS snapshot reconciliation uses the same plan factory and persistence path. Tenant discovery remains separately gated by the effective `federation.atproto_events_enabled` capability, and inbound imports never enqueue an outbound echo.
+Inbound records are globally authoritative by DID, collection, and record key with one current source version. `ImportAtprotoFederatedEventCommand` builds one validated plan per visible tenant; authoritative materialization, typed event projection, tenant presentation, tenant-local `Event`/`EventSession`, optional thumbnail `StorageObject`, tombstone/quarantine effects, and cursor advancement are atomic under the one leased consumer. Bounded PDS snapshot reconciliation uses the same plan factory and persistence path. Tenant discovery remains separately gated by the effective `federation.atproto_events_enabled` capability, and inbound imports never enqueue an outbound echo.
 
 ## Evolution Rules
 
@@ -77,5 +77,5 @@ Inbound records are globally canonical by DID, collection, and record key with o
 
 - [FEDERATION.md](FEDERATION.md) — governance, DB-first delivery, Jetstream ownership, and roadmap boundary.
 - [API.md](API.md#at-protocol-event-federation-contract) — typed discovery, safe source redirect, and absent raw mutation surface.
-- [ADR-015](adr/ADR-015-atproto-event-federation-ownership.md) — canonical ingress and lifecycle-owned egress decision.
+- [ADR-015](adr/ADR-015-atproto-event-federation-ownership.md) — authoritative ingress and lifecycle-owned egress decision.
 - [OUTBOX_PATTERN.md](OUTBOX_PATTERN.md) — generic and PDS-specific transactional outbox boundaries.

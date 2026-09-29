@@ -216,7 +216,7 @@ Design constraints the implementation must satisfy (these become plan acceptance
 - IVSD-M008: no validation decorator in this migration; validators remain manually instantiated per QUICK_REFERENCE rule #2. If the Steward wants DI-resolved validators, that is a separate governance decision with its own rule change.
 - IVSD-M009: no blanket transaction decorator; transaction ownership stays in handlers. A future decorator requires a handler-by-handler inventory proving no nesting across all five database providers.
 - IVSD-M010: per controller, choose action-level `[FromServices]` handler injection or splitting by aggregate; no constructor may grow past the repository's existing parameter-count analyzer threshold.
-- IVSD-M002: after both migrations, delete the dual-versioning plumbing in one commit: conditional groups in `Directory.Packages.props`, `DefineConstants` and locked-mode split in `Directory.Build.props`, both Dockerfile `ARG`s, the `#if USE_COMMERCIAL_LUCKYPENNY_LIBS` blocks, the four environment variables from the canonical catalogue and metadata, `docker-compose.yml:154-157`, the `NuGetAuditSuppress` entry, `DUAL_VERSIONING.md`, and the corresponding rows in the public environment-variable and Infisical guides.
+- IVSD-M002: after both migrations, delete the dual-versioning plumbing in one commit: conditional groups in `Directory.Packages.props`, `DefineConstants` and locked-mode split in `Directory.Build.props`, both Dockerfile `ARG`s, the `#if USE_COMMERCIAL_LUCKYPENNY_LIBS` blocks, the four environment variables from the authoritative catalogue and metadata, `docker-compose.yml:154-157`, the `NuGetAuditSuppress` entry, `DUAL_VERSIONING.md`, and the corresponding rows in the public environment-variable and Infisical guides.
 
 ### Operational changes
 - IVSD-M006: add the authorization architecture test (every resolvable handler is the authorization decorator at its outermost layer, including a handler type added after the helper was written) and a zero-PII log assertion for the decorators' exception paths (log the request *type*, never serialize the request).
@@ -316,7 +316,7 @@ Positive outcomes of doing this responsibly: one auditable image; no vendor-froz
 
 - Repository documentation: `docs/internal/DUAL_VERSIONING.md`, `docs/internal/legal/IP_GOVERNANCE.md` (referenced via rule), `docs/public/documentation/readme/configuration-and-operations/{environment-variables,infisical}.md`.
 - Build and deploy: `Directory.Build.props`, `Directory.Packages.props`, `src/Explore.API/Dockerfile`, `src/Explore.Blazor/Dockerfile`, `docker-compose.yml`, `.ci/`, `.github/`.
-- Code: `src/Explore.Application/{Profiles,Behaviors,Notifications}/`, `ApplicationServicesRegistration.cs`, `src/Explore.API/Extensions/ConfigurationExtensions.cs`, `src/Event.Setup.Core/Environment/CanonicalEnvironment{Catalogue,Metadata}.cs`.
+- Code: `src/Explore.Application/{Profiles,Behaviors,Notifications}/`, `ApplicationServicesRegistration.cs`, `src/Explore.API/Extensions/ConfigurationExtensions.cs`, `src/Event.Setup.Core/Environment/{PlatformEnvironmentCatalogue,PlatformEnvironmentMetadata}.cs`.
 - Tests: `tests/Event.Application.UnitTests/` (`#if USE_COMMERCIAL_LUCKYPENNY_LIBS` guards), MediatR/AutoMapper-referencing test files per E07/E08.
 - Prior I-VSD reports: `i-vsd-licensing-and-commercial-strategy.md`, `i-vsd-records-adoption.md` (precedent for classification-first migration slicing).
 - External: Mapperly license file and NuGet listing (E10, E11). No third-party source code was read.

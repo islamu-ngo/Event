@@ -14,7 +14,7 @@ Keycloak writes require an expiring, credential-free, server-authored receipt.
 Runtime authentication credentials remain deployment-owned. Existing provider
 resources are preserved except for exact approved subject/audience mapper
 repair; realm/client provisioning is create-only after fresh absence proof.
-Startup imports no sample realm and performs no reconciliation. Canonical
+Startup imports no sample realm and performs no reconciliation. Authoritative
 decision:
 [`ADR-033`](../../../docs/internal/adr/ADR-033-keycloak-operator-mutation-boundary.md).
 

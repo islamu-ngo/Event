@@ -40,7 +40,7 @@ Local storage is the default provider. Its filesystem root is deployment-managed
 | Secrets | `storage.s3.access_key_id`, `storage.s3.secret_access_key` | External-authority bindings only; see [SECRETS.md](SECRETS.md). |
 | Tenant delegation | `governance.lock_tenant_storage` | Controls whether tenant-level storage overrides are locked. |
 
-Environment authority reads canonical `STORAGE_S3_ACCESS_KEY_ID` and
+Environment authority reads authoritative `STORAGE_S3_ACCESS_KEY_ID` and
 `STORAGE_S3_SECRET_ACCESS_KEY`; Infisical reads the matching `/storage` keys.
 Neither path maps credentials into .NET configuration or governance settings.
 `Storage__Local__*` keys are deployment/runtime configuration only and must not

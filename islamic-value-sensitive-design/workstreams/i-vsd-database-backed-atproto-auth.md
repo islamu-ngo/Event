@@ -59,7 +59,7 @@ Repository inspection establishes current code behavior; official specifications
 - Provider decision and mechanism: encryption is not single-use or initiating-browser proof. The implementation now binds flows to proof, but final review demonstrated that a successful consume response could cross transient expiry while proof remained live.
 - Evidence: `ApiBackedOAuthStateStore`, `AtprotoTenantSessionHandoffStore`, `BffAuthEndpoints`, `AtprotoAuthenticationHandler`; `AtprotoRelationalLoginFlowTests.CommittedConsumeArrivingAtExpiry_CannotIssueCookieOrReplay` observed the expired-handoff failure, then the seven-case class passed after shared post-response freshness validation. RFC 9700 Sections2.1 and4.7 remain historical protocol references.
 - Linked mitigation: IVSD-M002 — preserve atomic consumption and browser binding; reject successful responses at or after transient expiry without retrying deletion.
-- Recommendation: preserve exactly-one-winner consumption; bind each flow to a host-only stable browser proof at the initiating origin using a distinct per-flow HMAC; never issue an authenticated cookie at the canonical callback for a different initiating origin. Keep one bounded fifteen-minute proof cookie, require HTTPS, and never overwrite established proof during parallel flows.
+- Recommendation: preserve exactly-one-winner consumption; bind each flow to a host-only stable browser proof at the initiating origin using a distinct per-flow HMAC; never issue an authenticated cookie at the authoritative callback for a different initiating origin. Keep one bounded fifteen-minute proof cookie, require HTTPS, and never overwrite established proof during parallel flows.
 - Validation requirement: races, stolen callback/handoff URLs in a second browser, absent/tampered proof, parallel logins, expiry boundaries, and interrupted consumption.
 - Owner: BFF authentication implementation owner
 - Resolution evidence: real BFF/private API/PostgreSQL flows cover proof rejection, contention and lost responses. The expiry regression first failed for handoff cookie issuance; after the shared post-response freshness guard, its seven-case class and the final complete API/BFF gates pass. Committed deletion stays final. Cookie attributes are verified at the HTTP surface; actual browser enforcement remains outside this evidence.
@@ -72,7 +72,7 @@ Repository inspection establishes current code behavior; official specifications
 - Evidence level: repository-grounded; design inference
 - Principle/domain: accountability and trust; architecture and governance
 - Affected stakeholders: all tenants sharing an instance
-- Provider decision and mechanism: a canonical callback cannot infer the originating tenant before reading protected OAuth state. Existing session bootstrap requires DID/tenant context, so reusing it unchanged creates circular authentication or an unsafe tenant fallback.
+- Provider decision and mechanism: an authoritative callback cannot infer the originating tenant before reading protected OAuth state. Existing session bootstrap requires DID/tenant context, so reusing it unchanged creates circular authentication or an unsafe tenant fallback.
 - Evidence: `AtprotoAuthenticationHandler.CompleteCallbackAsync`, `AtprotoJwtService`, `ApiTenantResolutionMiddleware`, ADR-014.
 - Linked mitigation: IVSD-M003 — dedicated machine authority and durable replay claims retained across the supported replica-clock difference, plus rejection when an in-flight INSERT commits at or after original assertion expiry. Real HTTP/PostgreSQL regressions reproduced both gaps; the replay-only cleanup margin and postcommit admission check passed focused verification, independent review and final owning gates.
 - Recommendation: a dedicated machine-authenticated, instance-owned transient-auth boundary with no listing, no browser access, purpose-bound assertions, replay protection, and explicit tenant checks once the protected binding is recovered. Do not bypass tenant filters on business entities.
@@ -187,7 +187,7 @@ Context7 MCP was explicitly requested but is not available in this session's too
 
 ## Context Inventory
 
-The canonical local workstream is `dev/active/database-backed-atproto-auth/`, containing `database-backed-atproto-auth-plan.md`, `database-backed-atproto-auth-tasks.md`, and `database-backed-atproto-auth-context.md`. These gitignored files are local working memory, not a durable dependency of this report. Durable implementation decisions graduate to ADR-014 and operator documentation before workstream closure.
+The authoritative local workstream is `dev/active/database-backed-atproto-auth/`, containing `database-backed-atproto-auth-plan.md`, `database-backed-atproto-auth-tasks.md`, and `database-backed-atproto-auth-context.md`. These gitignored files are local working memory, not a durable dependency of this report. Durable implementation decisions graduate to ADR-014 and operator documentation before workstream closure.
 
 ## Review Lifecycle
 

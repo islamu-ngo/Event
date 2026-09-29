@@ -13,9 +13,9 @@ One public document, `docs/public/changelog/README.md`, contains every authorize
 
 The page exists solely to list dated changelog entries. Do not add or preserve a static introduction, current-mainline overview, generic release policy, or how-to guidance. Explanatory information belongs in the other public/internal documentation; release-specific summaries, changes, evidence links and upgrade actions belong within their dated entry. This explicit user clarification supersedes the predecessor's static-introduction preservation requirement.
 
-Flow: prepare canonical notes/context → commit `B` → candidate verification → human-controlled signing → final tag verification → retained authorization inventory → docs proposal → protected docs-branch acceptance → mutable GitBook sync mirror → observed GitBook delivery.
+Flow: prepare authoritative notes/context → commit `B` → candidate verification → human-controlled signing → final tag verification → retained authorization inventory → docs proposal → protected docs-branch acceptance → mutable GitBook sync mirror → observed GitBook delivery.
 
-Keep publication receipts distinct: `verified`, `publication-pending`, `publication-delivered`, `publication-failed`, `publication-drift`. No new domain service is needed. GitBook/forge failure leaves the signed release valid; unsuccessful publication cannot claim delivery. Retry never retags, rebuilds binaries, moves stable `main` or changes canonical notes.
+Keep publication receipts distinct: `verified`, `publication-pending`, `publication-delivered`, `publication-failed`, `publication-drift`. No new domain service is needed. GitBook/forge failure leaves the signed release valid; unsuccessful publication cannot claim delivery. Retry never retags, rebuilds binaries, moves stable `main` or changes authoritative notes.
 
 ## P1 — Offline Single-Page Generator
 
@@ -23,11 +23,11 @@ Add `sync-public-changelog` write and `--check` modes to the existing C# engine.
 
 Directory existence or unsigned notes is not release proof. Preserve all previously accepted release identities: omission of any existing entry fails closed. A fresh rebuild uses the last accepted manifest plus the complete retained inventory of human-authorized, finally verified releases, not one branch's directories or just the triggering version. The inventory is retained by the final lane with tag-object IDs and disclosure authorization before dispatch; the publisher reads it but cannot grant authorization. This uses the existing retained evidence authority, not a new database or queue. A release whose dispatch is coalesced or never delivered must still be discovered on reconciliation. Missing complete inventory fails closed. Maintenance-line publication must retain newer-line entries. Historical final evidence may live in retained artifacts rather than at `B`; never assume it is committed or regenerate it with today's bundle.
 
-Use explicit generated-region sentinels outside any required non-rendered GitBook YAML metadata. The rendered body contains only dated release entries, with no static introduction or surrounding explanatory prose. Rebuild the region from verified inputs rather than reparsing arbitrary Markdown headings. Missing/multiple/reversed markers, invalid UTF-8, unsupported inputs, oversized files, traversal, symlinked ancestors/files and unexpected content fail with a bounded diagnostic and no replacement. Reuse canonical/path checks, no generic parser framework.
+Use explicit generated-region sentinels outside any required non-rendered GitBook YAML metadata. The rendered body contains only dated release entries, with no static introduction or surrounding explanatory prose. Rebuild the region from verified inputs rather than reparsing arbitrary Markdown headings. Missing/multiple/reversed markers, invalid UTF-8, unsupported inputs, oversized files, traversal, symlinked ancestors/files and unexpected content fail with a bounded diagnostic and no replacement. Reuse authoritative/path checks, no generic parser framework.
 
 `--check` is read-only and nonzero on missing/stale content. Identical generation changes no bytes/file; repeated dispatch creates no duplicate entry. Drift from the last accepted projection is reported before any overwrite and requires a reviewed correction. Valid new content is staged and published through atomic replacement; I/O failure cannot truncate accepted history.
 
-Sort by descending descriptor release date, then descending parsed SemVer precedence for equal dates, then ordinal canonical version as final tie-break. Never filesystem/workflow time, locale or lexical version ordering. A newer `1.2.9` maintenance release may precede `2.0.0` by date. Label authorized prereleases **Pre-release**, retain them after stable publication, and identify the highest stable version separately from the latest dated entry. Do not invent supported/EOL policy. Backport IDs may appear in different releases, once within each.
+Sort by descending descriptor release date, then descending parsed SemVer precedence for equal dates, then ordinal authoritative version as final tie-break. Never filesystem/workflow time, locale or lexical version ordering. A newer `1.2.9` maintenance release may precede `2.0.0` by date. Label authorized prereleases **Pre-release**, retain them after stable publication, and identify the highest stable version separately from the latest dated entry. Do not invent supported/EOL policy. Backport IDs may appear in different releases, once within each.
 
 Each entry contains:
 
@@ -35,11 +35,11 @@ Each entry contains:
 - Stable/pre-release label, release line and curated outcome summary.
 - Breaking Changes and Upgrade actions before ordinary changes; security/migration/configuration/API impact evidence and applicable adopter instructions.
 - Features, Bug Fixes, Performance and Other Improvements only when nonempty; no author handles, raw bodies or PR noise.
-- Compact Verify this release section with tag reference, canonical-notes SHA-256 and durable canonical/evidence links. Include verified tag-object/B information where useful; no self-referential hash in bytes defining `B`.
+- Compact Verify this release section with tag reference, authoritative-notes SHA-256 and durable authoritative/evidence links. Include verified tag-object/B information where useful; no self-referential hash in bytes defining `B`.
 
-Compose from validated summary/context/impact fields through shared presentation code; do not regex-extract arbitrary Markdown or duplicate classification. Security is fragment impact, not a title heuristic. Keep the complete technical range available via canonical notes. Invalid/missing required upgrade evidence blocks publication; do not invent “safe upgrade” or rollback claims.
+Compose from validated summary/context/impact fields through shared presentation code; do not regex-extract arbitrary Markdown or duplicate classification. Security is fragment impact, not a title heuristic. Keep the complete technical range available via authoritative notes. Invalid/missing required upgrade evidence blocks publication; do not invent “safe upgrade” or rollback claims.
 
-Links must resolve from the GitBook changelog space: use public upgrade routes or a configured publication base with immutable tag/path, not internal-only relative links. A publication base is noncanonical metadata. Validate schemes/escaping. Only generator-owned callouts/anchors may introduce GitBook syntax; untrusted prose cannot inject HTML/scripts/directives. Semantic headings and text carry meaning independently of emoji.
+Links must resolve from the GitBook changelog space: use public upgrade routes or a configured publication base with immutable tag/path, not internal-only relative links. A publication base is non-authoritative metadata. Validate schemes/escaping. Only generator-owned callouts/anchors may introduce GitBook syntax; untrusted prose cannot inject HTML/scripts/directives. Semantic headings and text carry meaning independently of emoji.
 
 GitBook's current troubleshooting documentation states a 100 MB individual-file transfer ceiling (accessed 2026-09-10). This is not a usable-page rendering budget. Start with an explicit **1 MiB UTF-8 generated-page budget** as an ISLAMU design choice, including required metadata/markers; verify desktop/mobile rendering and synchronization at that bound during activation. The existing engine cap is not evidence of hosted support. Add near-limit and over-limit cases. Fail explicitly rather than truncating history, raising the cap silently or splitting the user's single document; revisit with measured evidence if the ceiling is reached.
 
@@ -65,7 +65,7 @@ Generator needs no credentials. Adapter secrets use approved environment/secret 
 
 ## P3 — Recovery, Drift and Retained Evidence
 
-Reuse `report-publication-drift`: canonical tag/hash attribution, advisory discrepancy, `autoRepair: false`, no signed-release invalidation. Record tag object/version, input-set/projection digests, expected/actual docs commit, attempt, status and bounded diagnostic. No credentials, contributor identity or restricted prose. Retain publication receipts and canonical bundles beyond expiring CI artifacts without a new database.
+Reuse `report-publication-drift`: authoritative tag/hash attribution, advisory discrepancy, `autoRepair: false`, no signed-release invalidation. Record tag object/version, input-set/projection digests, expected/actual docs commit, attempt, status and bounded diagnostic. No credentials, contributor identity or restricted prose. Retain publication receipts and authoritative bundles beyond expiring CI artifacts without a new database.
 
 | Failure | Required outcome/recovery |
 | --- | --- |
@@ -79,7 +79,7 @@ Reuse `report-publication-drift`: canonical tag/hash attribution, advisory discr
 | GitBook writes back into sync mirror | Drift against protected accepted digest; no reverse merge or silent repair. |
 | Tag moved/deleted, evidence mismatch | Integrity failure; quarantine proposal, never substitute current tag silently. |
 | Manual page mutation/missing history | Retain drift evidence; explicit reviewed repair only. |
-| Correction after signing | Forward release correction; any public clarification is visibly dated/noncanonical and cannot replace signed notes. |
+| Correction after signing | Forward release correction; any public clarification is visibly dated/non-authoritative and cannot replace signed notes. |
 | Revoked token/wrong sync branch | Actionable diagnostic and pending status; no broader-permission fallback. |
 
 ## Red-First Verification and Activation
@@ -102,6 +102,6 @@ Interface facts accessed 2026-09-10: [GitBook monorepos](https://gitbook.com/doc
 
 Owner: release-engine maintainer; schedule a separate narrowly scoped correction before this publisher claims literal title display or generic template safety. At reviewed source `a312b9190`, `PresentationConfigGrammar` records loop presence without balancing/counting; `GitCliffRenderer` checks `EscapeUntrustedMarkdown(...).IsValid` but discards escaped output. These are pre-existing gaps, not a proven runtime exploit and not tasks hidden inside the category-formatting commit.
 
-During follow-up planning, choose literal-title semantics explicitly and apply escaping once at presentation boundaries without altering canonical context or double-escaping composed sections. Red cases must exercise real output for Markdown punctuation, existing forbidden identity/HTML input, duplicate/nested/reversed loops and any supported new template form. Keep policy validation, presentation and trusted-bundle promotion separate. Graduate this prerequisite into its own atomic commit contract before implementing the publisher; do not create a generic parser or a compatibility template mode.
+During follow-up planning, choose literal-title semantics explicitly and apply escaping once at presentation boundaries without altering authoritative context or double-escaping composed sections. Red cases must exercise real output for Markdown punctuation, existing forbidden identity/HTML input, duplicate/nested/reversed loops and any supported new template form. Keep policy validation, presentation and trusted-bundle promotion separate. Graduate this prerequisite into its own atomic commit contract before implementing the publisher; do not create a generic parser or a compatibility template mode.
 
 Done means the single page and publication/recovery path are implemented, verified and activated. A formatter-only PR, print-only workflow or successful no-op cannot satisfy this workstream.

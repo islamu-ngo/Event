@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical I-VSD report on optional Sentry and GlitchTip error tracking integration. -->
+<!-- ABOUTME: Authoritative I-VSD report on optional Sentry and GlitchTip error tracking integration. -->
 <!-- ABOUTME: Governs open-source sponsorship, self-hoster parity, zero-telemetry defaults, and strict PII redaction. -->
 
 # Sentry And GlitchTip Error Tracking — I-VSD Architectural Decision Report

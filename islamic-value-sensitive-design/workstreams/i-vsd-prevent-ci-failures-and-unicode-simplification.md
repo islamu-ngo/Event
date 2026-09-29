@@ -43,7 +43,7 @@ Claims describe the repository at Git revision `224a479a4e962686d2cc5ee78a067d30
 ## Recommendations
 
 - `IVSD-M001`: Create a single, deterministic pre-push verification script (`eng/scripts/verify-ratchets.sh`) and wire it into a repository git hook (`.githooks/pre-push`). In CI, fail with clear self-healing guidance that outputs the exact copy-paste command required to synchronize generated assets.
-- `IVSD-M002`: Retire the 1.1M-scalar golden digest test. Anchor Unicode determinism with focused invariant tests asserting canonical equivalence (NFC vs NFD), case folding invariance, and multi-script stability without binding to host ICU versions.
+- `IVSD-M002`: Retire the 1.1M-scalar golden digest test. Anchor Unicode determinism with focused invariant tests asserting authoritative equivalence (NFC vs NFD), case folding invariance, and multi-script stability without binding to host ICU versions.
 - `IVSD-M003`: Replace `UnicodeScalarKeyV1.cs` and 14,000-character columns with `UnicodeSearchKey` storing pre-normalized UTF-8 in standard `VARCHAR(300)` columns. Remove arbitrary `% 7 = 0` constraints.
 - `IVSD-M004`: Enforce C# normalization (`text.Normalize(NormalizationForm.FormC).ToUpperInvariant()`) on both write and query paths, backed by explicit ordinal/binary collation in EF Core across all 5 supported database engines (PostgreSQL: `C`, SQLite: `BINARY`, SQL Server: `Latin1_General_100_BIN2`, MySQL: `utf8mb4_bin`).
 - `IVSD-M005`: Scoped relative documentation link checks in `docs-lint.yml` to public documentation surfaces, and synchronize CI path arguments across workflows whenever docs are reorganized.

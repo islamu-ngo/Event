@@ -10,5 +10,5 @@ Read only the resources needed for the current phase:
 3. [Dependency License Gate](dependency-license-gate.md) — outbound-license compatibility, CI evidence, exceptions, and the AutoMapper/MediatR precedent.
 4. [Audit Record Template](audit-record-template.md) — source register, attestation, review decision, and journal/PR evidence fields.
 
-The canonical authority is [IP Governance](../../../../docs/internal/legal/IP_GOVERNANCE.md). These resources operationalize it and do not provide legal advice.
+The governing authority is [IP Governance](../../../../docs/internal/legal/IP_GOVERNANCE.md). These resources operationalize it and do not provide legal advice.
 

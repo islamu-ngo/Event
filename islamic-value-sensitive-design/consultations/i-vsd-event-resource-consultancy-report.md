@@ -605,7 +605,7 @@ organizer authority, publication state, metadata-disclosure mode, audience
 policy summary, delivery type, and availability result.
 
 Parent Event authority may grant management, but access to content is always a
-decision on the individual EventResource. Add every action across the canonical
+decision on the individual EventResource. Add every action across the authoritative
 action catalog, descriptor/fact projection, Cerbos policy, local evaluator,
 HAL policy, and parity tests.
 

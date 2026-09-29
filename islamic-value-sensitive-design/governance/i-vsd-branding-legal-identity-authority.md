@@ -35,7 +35,7 @@ old compatibility/fallback paths.
 
 ## Context And Current Evidence
 
-- Tenant creation atomically creates a canonical `tenant.branding` typed
+- Tenant creation atomically creates an authoritative `tenant.branding` typed
   settings document seeded from `Tenant.FullName`.
 - Single-tenant onboarding seeds the default tenant branding document from the
   instance site name, and later single-tenant instance-name updates synchronize

@@ -102,7 +102,7 @@ For hardware sizing recommendations, reference architecture blueprints, and capa
 
 ISLAMU Event is built from the ground up for sovereign white-label community use:
 
-- **Instance Name & Domain:** Configure custom instance naming, base URLs, and canonical hosts.
+- **Instance Name & Domain:** Configure custom instance naming, base URLs, and preferred hosts.
 - **Logos, Favicons & UI Themes:** Customize brand primary/secondary colors and typography — see [White-Labeling & Branding](https://islamu.gitbook.io/islamu-event/documentation/readme/administration-and-branding/white-labeling).
 - **Custom Vanity Domains:** Map external domains to specific tenants with automatic TLS and routing — see [Custom Domains & SEO](https://islamu.gitbook.io/islamu-event/documentation/readme/administration-and-branding/custom-domains-and-seo).
 - **Administrative Governance:** Manage organizations, verification badges, and event categories — see [Administration Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/administration-and-branding/admin-guide).
@@ -216,7 +216,7 @@ ISLAMU Event maintains a deliberate separation between **Public Adopter Document
 
 For developers contributing code, architecture reviewers, and AI agents, use the authoritative in-repository specifications in [`docs/internal/`](docs/internal/index.md):
 
-| Engineering Concern | Canonical In-Repository Markdown File | What You Will Learn |
+| Engineering Concern | Authoritative In-Repository Markdown File | What You Will Learn |
 |---|---|---|
 | **Developer Mental Model** | [`docs/internal/DEVELOPER_GUIDE.md`](docs/internal/DEVELOPER_GUIDE.md) | 5-minute onboarding, project structure, and local dev loop. |
 | **Global Project Invariants** | [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md) | Single source of truth for architectural constraints and forbidden patterns. |
@@ -229,7 +229,7 @@ For developers contributing code, architecture reviewers, and AI agents, use the
 | **Blazor WebAssembly Frontend** | [`docs/internal/BLAZOR.md`](docs/internal/BLAZOR.md) & [`BLAZOR_DEV_WORKFLOW.md`](docs/internal/BLAZOR_DEV_WORKFLOW.md) | MudBlazor UI conventions, BFF session cookie proxying, and CSS isolation. |
 | **Security & Threat Model** | [`docs/internal/SECURITY-MODEL.md`](docs/internal/SECURITY-MODEL.md) | Fail-closed auth boundaries, token handling, and multi-tenant isolation. |
 | **Self-Hosting Technical Specs** | [`docs/internal/SELF_HOSTING.md`](docs/internal/SELF_HOSTING.md) | Low-level container wiring, ports, volume configurations, and profiles. |
-| **AI Agent Canonical Contract** | [`AGENTS.md`](AGENTS.md) & [`.agents/contract/intents.yaml`](.agents/contract/intents.yaml) | Contribution contract, task intents, and strict agent execution guardrails. |
+| **AI Agent Contribution Contract** | [`AGENTS.md`](AGENTS.md) & [`.agents/contract/intents.yaml`](.agents/contract/intents.yaml) | Contribution contract, task intents, and strict agent execution guardrails. |
 | **Full Internal Specs Index** | [`docs/internal/index.md`](docs/internal/index.md) | Master sitemap cataloging all 140+ internal technical specifications. |
 
 ---

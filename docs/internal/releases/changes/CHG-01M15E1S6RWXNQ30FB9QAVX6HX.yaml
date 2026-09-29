@@ -48,7 +48,7 @@ Impacts:
     Reference: docs/API.md
     Disposition: documented
     Detail: >-
-      Canonical OpenAPI and the generated Blazor client expose HAL-gated tenant
+      Authoritative OpenAPI and the generated Blazor client expose HAL-gated tenant
       identity administration, structured public operators, and grouped paid
       acceptance.
   Operator:

@@ -505,7 +505,7 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/api/VAPID_PRIVATE_KEY` | `WebPush:VapidPrivateKey` |
 | Environment authority + `STORAGE_S3_*` | consumed by the S3 resolver only when Environment is selected |
 
-The three ATProto rows use the same uppercase name as their default environment-variable name as well as their Infisical key. Private credentials use only the canonical registry names; there are no .NET double-underscore credential aliases. Storage accepts the documented `STORAGE_S3_*` variables only under Environment authority. Primary database bootstrap uses discrete structured fields rather than a connection string. SMTP uses the canonical `MAIL_SMTP_*` names. Registration-provider credentials are tenant-scoped secret definitions and must be bound through `SecretBinding`; use the bounded `Qualifier` field when several tenant connections need distinct API tokens or webhook secrets for the same key. Browser contracts never carry secret values or provider source coordinates.
+The three ATProto rows use the same uppercase name as their default environment-variable name as well as their Infisical key. Private credentials use only the authoritative registry names; there are no .NET double-underscore credential aliases. Storage accepts the documented `STORAGE_S3_*` variables only under Environment authority. Primary database bootstrap uses discrete structured fields rather than a connection string. SMTP uses the authoritative `MAIL_SMTP_*` names. Registration-provider credentials are tenant-scoped secret definitions and must be bound through `SecretBinding`; use the bounded `Qualifier` field when several tenant connections need distinct API tokens or webhook secrets for the same key. Browser contracts never carry secret values or provider source coordinates.
 
 Stripe secrets are instance-scoped, server-only, and optional while paid events are disabled. `Payments:Stripe:Mode=Test` requires a platform key beginning `sk_test_`; `Live` requires `sk_live_`. The Connect endpoint uses only the dedicated webhook binding, never the platform key or an outgoing-webhook secret. Rotate platform and endpoint secrets deliberately with the matching Stripe mode and endpoint configuration; retain no secret value in logs, support artifacts, browser DTOs, OpenAPI, or the DBML reference.
 
@@ -572,7 +572,7 @@ returns only diagnostic code, readiness counts, and artifact digest.
 
 The Terminal.Gui field stores bullet count only; the real input never enters
 its `Text` or undo history. Terminal composition sends a nonsecret placeholder
-through the canonical string-based Core workflow, then replaces it with
+through the authoritative string-based Core workflow, then replaces it with
 clearable URL-safe UTF-8 bytes. Mutable secret buffers are zeroed after the
 write attempt. .NET, the operating system, and storage hardware still cannot
 guarantee physical erasure of every runtime, kernel, or device-level copy; do

@@ -120,7 +120,7 @@ Reject:
 
 Require:
 
-- canonical routes,
+- stable routes,
 - stable operation names,
 - DTO version/shape rationale,
 - OpenAPI regeneration,

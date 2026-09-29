@@ -4,7 +4,7 @@ Change-Id: CHG-01M1ETXMS84KS8ASDW4GR22Q3J
 Title: "Authority-qualified provider account keys"
 Type: feat
 Scope: self-hosting
-Summary: "Provider accounts are matched only by an authority-qualified key: normalized OIDC issuer with exact subject, or a canonical verified ATProto DID."
+Summary: "Provider accounts are matched only by an authority-qualified key: normalized OIDC issuer with exact subject, or an authoritative verified ATProto DID."
 Group: headless-instance-onboarding
 Supersedes: []
 Impacts:

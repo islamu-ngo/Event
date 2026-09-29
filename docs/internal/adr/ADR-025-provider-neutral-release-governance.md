@@ -16,7 +16,7 @@ research/provenance record, not architecture authority.
 
 ## Decision
 
-1. The canonical release core is provider-neutral. Every release declares a
+1. The governed release core is provider-neutral. Every release declares a
    version-line label `v<major>.<minor>`, which classifies the release and never names
    a ref. `develop` has no generated `Unreleased` changelog writes.
 2. ISLAMU-owned release-engine policy decides commit validity, inclusion, impact,
@@ -41,7 +41,7 @@ research/provenance record, not architecture authority.
 5. `release.yaml` and `summary.md` are the only human-owned release inputs.
    `release-notes.md` is fully generated; no mixed ownership markers or manual tag
    message duplication are used.
-6. Canonical context, notes, and manifests are deterministic: UTF-8 without BOM,
+6. Authoritative context, notes, and manifests are deterministic: UTF-8 without BOM,
    LF, NFC, invariant ordering, explicit release date, full object IDs, and no
    wall-clock, provider identity, or author identity. Candidate and final manifests
    are separate so post-tag identity does not create a hash cycle.
@@ -52,8 +52,8 @@ research/provenance record, not architecture authority.
    normal candidate artifacts. Only approved disclosure fields cross the public
    boundary.
 9. Provider adapters transport explicit inputs, trusted bundles, artifacts, and
-   protected ref operations. They may create noncanonical enrichment, but cannot
-   affect canonical release identity. No compatibility shim is needed for the
+   protected ref operations. They may create non-authoritative enrichment, but cannot
+   affect governed release identity. No compatibility shim is needed for the
    unshipped report design.
 
 ## Consequences

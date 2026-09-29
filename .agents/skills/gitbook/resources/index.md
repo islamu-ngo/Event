@@ -51,4 +51,4 @@ Load these for specific syntax rules, schemas, or implementation patterns:
 - [env.example](env.example) — Template for `.env` secrets (`GITBOOK_TOKEN`, `SLACK_WEBHOOK_URL`).
 - [gitbook-review.config.json](gitbook-review.config.json) — Reference configuration template for space and page IDs.
 - [example-site/](example-site/README.md) — Snapshot of a production multi-space documentation site illustrating real-world structure, vars, and blocks.
-  > **Note**: For the ISLAMU Event platform, the canonical live project reference is our repository's own [`docs/public/`](file:///home/amir/ISLAMU/Github/Event/docs/public/) portal configured via [`docs/public/gitbook-docs.yaml`](file:///home/amir/ISLAMU/Github/Event/docs/public/gitbook-docs.yaml).
+  > **Note**: For the ISLAMU Event platform, the primary live project reference is our repository's own [`docs/public/`](file:///home/amir/ISLAMU/Github/Event/docs/public/) portal configured via [`docs/public/gitbook-docs.yaml`](file:///home/amir/ISLAMU/Github/Event/docs/public/gitbook-docs.yaml).

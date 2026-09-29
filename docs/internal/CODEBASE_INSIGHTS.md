@@ -180,7 +180,7 @@ When creating/updating events, the `StrategyResolver` picks the right strategy b
 
 Lookup tables are the persistence source of truth for stable reference data. Persisted entities store normalized FK IDs (`RoleScopeId`, `SettingValueTypeId`, `ExternalApiKeyOwnerTypeId`, etc.) plus navigations to lookup rows. Domain enum convenience properties may remain for internal switches, but EF configurations ignore those wrappers and map only the FK columns.
 
-### Canonical Lookup Row Shape
+### Authoritative Lookup Row Shape
 
 Normalized lookup entities use:
 
@@ -407,7 +407,7 @@ validation, not ambient user identity, and collapsing them into the chain above 
 
 `ApiCompiledBoundaryTests` keeps `HttpContext.RequestServices` out of
 controllers through compiled call metadata. Principal-extension and controller
-behavior tests protect the canonical identity chain and purpose-bound protocol
+behavior tests protect the stable identity chain and purpose-bound protocol
 schemes without a source-file allowlist.
 
 ---
@@ -749,7 +749,7 @@ The analytics system is not a future concept anymore; it already follows the sam
 
 Do not assume every provider supports the same semantics. The abstraction is designed around safe degradation, not fake parity.
 
-### Canonical governance keys
+### Authoritative governance keys
 
 - `analytics.provider`
 - `analytics.enabled`
@@ -757,7 +757,7 @@ Do not assume every provider supports the same semantics. The abstraction is des
 - `analytics.endpoint_url`
 - `analytics.personal_api_key`
 
-`analytics.endpoint_url` is canonical. `analytics.endpoint` and `analytics.site_id` are legacy drift, not valid runtime contract keys.
+`analytics.endpoint_url` is authoritative. `analytics.endpoint` and `analytics.site_id` are legacy drift, not valid runtime contract keys.
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## Acceptance
 
-- Define the same-anchor relative-order invariant in the canonical EF entity configuration while preserving the existing absolute-order and nullable-boundary semantics. A relative window with distinct anchors must continue to use schedule-aware resolution, not a false offset-only comparison.
+- Define the same-anchor relative-order invariant in the authoritative EF entity configuration while preserving the existing absolute-order and nullable-boundary semantics. A relative window with distinct anchors must continue to use schedule-aware resolution, not a false offset-only comparison.
 - Prove a malformed direct insert/update is rejected at the persistence boundary and a valid same-anchor or different-anchor value round-trips. Include aggregate reconstruction and current-access behavior so a row cannot turn into a late runtime exception.
 - Regenerate, never hand-edit, the affected PostgreSQL, SQLite, SQL Server and shared MySQL/MariaDB migration/snapshot artifacts. Decide whether an unapplied development migration can be regenerated or an already-applied history needs a generated corrective migration; validate real provider SQL and pending-model checks.
 - Run focused domain/persistence tests, the selected five-provider behavior gate and the owning Release build. Keep original migrated data safe; do not disguise malformed legacy rows by relaxing the domain rule.

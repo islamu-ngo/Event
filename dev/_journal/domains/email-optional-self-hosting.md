@@ -97,7 +97,7 @@ Navigation: [journal index](../journal.md), [domain index](../README.md), [findi
 
 **Root Cause**: HTTP response replay and the business transaction are not one atomic store. An idempotency key alone also does not bind a cached capability to the same protected challenge envelope.
 
-**Resolution**: A Data Protection envelope binds canonical request/key/scope to stable server-issued order and capability material. Validation precedes cached disclosure. Recovery looks up exact committed allocation and preserves its IDs, deadline, and capability. Fresh allocation expires after 120 seconds; the additional 24-hour historical-validation window permits recovery only. C08 is `da88aa6113807ece4c78ba0d134a11b05d3a82d9`; independent-host/shared-store tests recorded response-update faults and live-owner barriers, not a multiprocess deployment proof.
+**Resolution**: A Data Protection envelope binds normalized input/key/scope to stable server-issued order and capability material. Validation precedes cached disclosure. Recovery looks up exact committed allocation and preserves its IDs, deadline, and capability. Fresh allocation expires after 120 seconds; the additional 24-hour historical-validation window permits recovery only. C08 is `da88aa6113807ece4c78ba0d134a11b05d3a82d9`; independent-host/shared-store tests recorded response-update faults and live-owner barriers, not a multiprocess deployment proof.
 
 **Why This Matters for Future Work**: Reconcile from durable business identity after an acknowledgement loss; never infer that a missing response means no business commit occurred.
 

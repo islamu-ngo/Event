@@ -137,7 +137,7 @@ All ISLAMU Event container images (`Explore.API`, `Explore.Blazor`, `Event.Migra
 ```
 
 ### 1. Single-Tag Registry Distribution
-Adopters reference a single, canonical image tag (e.g. `:latest`, `:develop`, or semantic release tags). The Docker daemon / container runtime inspects the host CPU architecture and transparently pulls only the matching architecture slice without operator intervention or architecture-specific tag suffixes.
+Adopters reference a single, authoritative image tag (e.g. `:latest`, `:develop`, or semantic release tags). The Docker daemon / container runtime inspects the host CPU architecture and transparently pulls only the matching architecture slice without operator intervention or architecture-specific tag suffixes.
 
 ### 2. Native Cross-Compilation Build Pipeline
 To avoid the significant 5×–10× performance penalties of running the full .NET SDK under QEMU emulation on x64 CI runners, the build stage uses native cross-compilation:
@@ -161,7 +161,7 @@ Images distribute pure Intermediate Language (IL) assemblies rather than Ahead-O
 
 ## 5. Operational Deployment Runbooks (Public Source of Truth)
 
-For step-by-step container configuration, Docker Compose YAML manifests, environment variables, reverse proxies, and backup/restore procedures, **refer exclusively to the canonical public documentation**:
+For step-by-step container configuration, Docker Compose YAML manifests, environment variables, reverse proxies, and backup/restore procedures, **refer exclusively to the authoritative public documentation**:
 
 * 📖 **[Deployment Tiers & Hardware Sizing](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)**
 * 📖 **[Docker Standalone Runbook](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/docker-standalone)**

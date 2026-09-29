@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical I-VSD report for non-email communication and notification architecture in ISLAMU Event. -->
+<!-- ABOUTME: Authoritative I-VSD report for non-email communication and notification architecture in ISLAMU Event. -->
 <!-- ABOUTME: Evaluates sovereign, privacy-preserving event notification channels and establishes a 3-tier delivery hierarchy. -->
 
 # Zero-Email Communication & Notification Architecture — I-VSD Consultancy Report
@@ -36,7 +36,7 @@ This consultancy report examines how ISLAMU Event can deliver a first-class, rel
 
 - Core payment, ticketing tier pricing, and Stripe Connect payouts (governed by `islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md`).
 - Low-level ATProto cryptographic PDS repository handshakes (governed by the ATProto authentication workstream).
-- Canonical SMTP infrastructure and transactional outbox reliability mechanics (governed by `docs/internal/SELF_HOSTING.md` and `docs/internal/OPERATIONS.md`).
+- Authoritative SMTP infrastructure and transactional outbox reliability mechanics (governed by `docs/internal/SELF_HOSTING.md` and `docs/internal/OPERATIONS.md`).
 - Legal compliance opinions regarding local telecommunication marketing regulations (e.g., TCPA, CAN-SPAM, ePrivacy Directive).
 
 ### Settled User Decisions
@@ -286,4 +286,4 @@ If an attendee rejects all notification affordances, the system must not silentl
 
 | Date | Previous status | New status | Trigger | Evidence / replacement |
 |---|---|---|---|---|
-| 2026-09-15 | none | current | User brainstorm and explicit request for I-VSD consultation on zero-email alternatives | Authoring of canonical report based on settled 3-Tier Channel Hierarchy decision |
+| 2026-09-15 | none | current | User brainstorm and explicit request for I-VSD consultation on zero-email alternatives | Authoring of authoritative report based on settled 3-Tier Channel Hierarchy decision |

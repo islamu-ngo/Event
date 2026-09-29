@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://islamu.event/.agents/contract/schema.json",
   "title": "Contribution Contract Intents",
-  "description": "Canonical schema for intents.yaml. YAML syntax is checked by the lightweight eng/agent-workflow guard.",
+  "description": "Schema for intents.yaml. YAML syntax is checked by the lightweight eng/agent-workflow guard.",
   "type": "object",
   "required": ["version", "intents"],
   "additionalProperties": false,

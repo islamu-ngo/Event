@@ -404,6 +404,6 @@ If release notes do not explicitly state that a rollback is image-only safe, ass
 ## Related
 
 - [SELF_HOSTING.md](SELF_HOSTING.md) — runtime topology and environment keys.
-- [CONFIGURATION.md](CONFIGURATION.md) — canonical configuration sections.
+- [CONFIGURATION.md](CONFIGURATION.md) — authoritative configuration sections.
 - [SECRETS.md](SECRETS.md) — secret-provider behavior.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — release documentation contract.

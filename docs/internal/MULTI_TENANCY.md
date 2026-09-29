@@ -5,7 +5,7 @@ ABOUTME: Prioritizes runtime rules from TenantContext, query filters, and govern
 
 ## Tenant Directory-Operator Identity
 
-Every tenant has a canonical typed directory-operator identity document,
+ Every tenant has an authoritative typed directory-operator identity document,
 `tenant.directory-operator-identity`. Tenant creation writes the tenant,
 branding document, and directory identity document in the caller-owned
 transaction. Active creation requires explicit complete identity input before
@@ -199,7 +199,7 @@ Cache behavior:
 
 ### Reporting Provider Delegation
 
-Moderation reporting uses the same hierarchy but keeps the instance baseline authoritative. Local canonical report and case creation always happens first. Static `Reporting:*`, `Reporting:Osprey:*`, and `Reporting:Coop:*` configuration defines the instance provider baseline; tenant settings may only add tenant-owned Osprey or Coop targets.
+Moderation reporting uses the same hierarchy but keeps the instance baseline authoritative. Local authoritative report and case creation always happens first. Static `Reporting:*`, `Reporting:Osprey:*`, and `Reporting:Coop:*` configuration defines the instance provider baseline; tenant settings may only add tenant-owned Osprey or Coop targets.
 
 Instance administrators control delegation with three instance-scope locks that default closed: `governance.lock_tenant_reporting_providers`, `governance.lock_tenant_osprey_provider`, and `governance.lock_tenant_coop_provider`. When unlocked, a tenant may configure `reporting.enable_tenant_osprey_provider` or `reporting.enable_tenant_coop_provider` plus the matching endpoint and secret settings. `reporting.tenant_external_sync_enabled=false` disables only tenant-added external targets; it does not disable local reporting or any enabled instance baseline provider.
 
@@ -298,7 +298,7 @@ The service invalidates the typed tenant-document cache after a successful
 insert or winner read; recovery publishes no candidate to the cache. Missing
 tenants still fail the foreign-key constraint. Tenant creation, onboarding,
 managed provisioning, and governance updates retain their existing transaction
-owners. Canonical SQLite HTTP tests cover two successful concurrent initial
+owners. Authoritative SQLite HTTP tests cover two successful concurrent initial
 reads; PostgreSQL tests cover distinct proposed names, cache convergence,
 savepoint recovery, owner commit/rollback, snapshot retry, cancellation, and
 unrelated constraints. Deterministic SQLite transaction interceptors cover

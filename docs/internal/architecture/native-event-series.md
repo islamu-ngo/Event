@@ -31,6 +31,6 @@ The original five-case Red HTTP probe demonstrated anonymous draft/private detai
 
 The focused corpus covers six-port/controller closure, public and private reads, foreign/deleted graphs, stale identity-map children, live admin membership, draft/private editing, published transition, image eligibility, immutable patches, tenant-scoped cache behavior, provider typed facts/denial/outage, and deterministic two-writer and ownership-during-policy barriers. Exact temporal boundaries use an injected clock. Provider transport failure tests substitute only the external authorization boundary; Local authority uses persisted membership and the real Local provider. Pure mapping/patch invariants run in Application tests, and the existing repository pricing graph now seeds eligible active participation instead of bypassing tenant filters.
 
-Verification is single canonical SQLite, not a full database or authorization-provider matrix. No schema, migration, policy grant, generated reader, or unrelated mapper change is required.
+Verification is single authoritative SQLite, not a full database or authorization-provider matrix. No schema, migration, policy grant, generated reader, or unrelated mapper change is required.
 
 Operator guide: [Event Series management](../../public/features/event-series-management.md).

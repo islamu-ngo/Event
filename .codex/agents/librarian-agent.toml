@@ -8,7 +8,7 @@ Maintains project documentation, researches external libraries or standards, and
 - Researching library documentation or API versions via Context7.
 - Performing web research or scraping via Tavily.
 - Updating `docs/` for new features or architectural changes.
-- Synthesizing `dev/_journal/` findings into canonical rules.
+- Synthesizing `dev/_journal/` findings into governing rules.
 - Checking ATProto/ActivityPub standards or lexicons.
 
 ## When NOT to Use

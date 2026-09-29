@@ -29,7 +29,7 @@ Prefer multiple independent observations for commonplace product behavior. A sin
 
 ## 4. Sanitize And Hand Off
 
-Use [Audit Record Template](audit-record-template.md). Confirm that the handoff contains no source expression or source-derived internal structure. Store feature-specific handoffs under `dev/active/<workstream>/`; promote only durable conclusions to canonical docs.
+Use [Audit Record Template](audit-record-template.md). Confirm that the handoff contains no source expression or source-derived internal structure. Store feature-specific handoffs under `dev/active/<workstream>/`; promote only durable conclusions to governing docs.
 
 End the research context. The implementer starts in a fresh context with only the sanitized handoff, ISLAMU repository material, and permitted standards/interface facts.
 

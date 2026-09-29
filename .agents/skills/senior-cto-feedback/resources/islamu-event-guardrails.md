@@ -206,7 +206,7 @@ Plans touching API contracts must address:
 Preferred direction for pre-v1:
 
 - remove duplicate URL-segment aliases from client-facing OpenAPI,
-- keep one canonical contract,
+- keep one authoritative contract,
 - delete obsolete compatibility tests,
 - regenerate clients only after contract stabilization.
 

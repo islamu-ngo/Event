@@ -22,7 +22,7 @@
 - **Cerbos Authorization Attributes Use Organization ID, Not Actor ID**: Cerbos `org_admin` derived roles check `resource.attr.organizationId` against the user's organization membership. Because `Actor.Id` and `Organization.Id` are distinct GUIDs, controllers/handlers must resolve `recipientActorId → Actor.OrganizationId` server-side before evaluating authorization.
 - **`ISecureRequest.ResourceAttributes` Resolution Precedes Handler Execution**: `AuthorizationBehavior<TRequest, TResponse>` pulls `ResourceAttributes` synchronously before MediatR handler invocation. Any contextual lookup required for authorization must be resolved before `_mediator.Send`.
 - **Event-Child Fallback Authorization Must Validate Resource Tenant**: Optimized batch fallback authorization must resolve event context from resource attributes and verify `resourceTenantId == profile.TenantId` before allowing access, failing closed on tenant mismatch.
-- **Event-Scoped Operational Roles**: `EventRoleAssignment` serves as the persisted event-instance grant using canonical effective predicate `Status == Active && StartsAtUtc <= now && (ExpiresAtUtc IS NULL OR ExpiresAtUtc > now)`.
+- **Event-Scoped Operational Roles**: `EventRoleAssignment` serves as the persisted event-instance grant using authoritative effective predicate `Status == Active && StartsAtUtc <= now && (ExpiresAtUtc IS NULL OR ExpiresAtUtc > now)`.
 
 ---
 

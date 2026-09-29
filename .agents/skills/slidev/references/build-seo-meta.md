@@ -31,7 +31,7 @@ seoMeta:
 - `ogTitle` - Title
 - `ogDescription` - Description
 - `ogImage` - Preview image URL
-- `ogUrl` - Canonical URL
+- `ogUrl` - Primary URL
 
 **Twitter Card:**
 - `twitterCard` - Card type (summary, summary_large_image)

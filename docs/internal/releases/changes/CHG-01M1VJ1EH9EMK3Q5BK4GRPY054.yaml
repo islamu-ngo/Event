@@ -17,7 +17,7 @@ Impacts:
     Detail: >-
       The development-only tenant-shaped contract, routes, HAL relations,
       generated client methods, environment keys, schema path, and service
-      identities are removed without aliases. Callers must use the canonical
+      identities are removed without aliases. Callers must use the authoritative
       whole-instance contract and control-plane export route.
   Security:
     Reference: docs/SECURITY-MODEL.md
@@ -32,7 +32,7 @@ Impacts:
     Reference: docs/OPERATIONS.md
     Disposition: documented
     Detail: >-
-      Regenerated provider migrations persist canonical bootstrap operation,
+      Regenerated provider migrations persist authoritative bootstrap operation,
       tenant-result, digest, audit, and durable-effect state. Development
       environments carrying the removed unapplied model must reset or recreate
       their database before rehearsal.
@@ -50,12 +50,12 @@ Impacts:
       Instance administrators export Overrides or Portable views through
       GET /api/control-plane/configuration-manifest/export. The exact media
       type, bounded file response, HAL relations, inventory, and NSwag client
-      are regenerated from the canonical contract.
+      are regenerated from the governing contract.
   Operator:
     Reference: docs/SELF_HOSTING.md
     Disposition: documented
     Detail: >-
-      Remove obsolete keys and mounts, install the canonical schema and file,
+      Remove obsolete keys and mounts, install the authoritative schema and file,
       run MigrationService before the owning host, rehearse ValidateOnly before
       Bootstrap, verify the digest/audit result, and remove or disable the
       bootstrap file after first success. Bootstrap is not reconciliation and

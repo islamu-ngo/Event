@@ -1,4 +1,4 @@
-<!-- ABOUTME: Defines the canonical 3-Ring Progressive Verification Model and the Yak-Shaving Quarantine Rule. -->
+<!-- ABOUTME: Defines the authoritative 3-Ring Progressive Verification Model and the Yak-Shaving Quarantine Rule. -->
 <!-- ABOUTME: Protects engineering velocity by eliminating premature multi-container test loops and test-rot absorption. -->
 
 # ADR-028: Progressive 3-Ring Verification Model and Yak-Shaving Quarantine Rule

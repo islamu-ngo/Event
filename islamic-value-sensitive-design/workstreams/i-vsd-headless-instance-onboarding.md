@@ -242,8 +242,8 @@ authority transfer becomes automatic.
 |---|---|---|
 | E-001 | `src/Explore.Application/Features/InstanceOnboarding/Handlers/Commands/CompleteInstanceOnboardingCommandHandler.cs` | Owning implementation read |
 | E-002 | `src/Explore.API/Controllers/InstanceOnboardingController.cs` | Owning HTTP adapter read |
-| E-003 | `src/Explore.Application/Authentication/PlatformIdentityPrincipalExtensions.cs` | Canonical claims authority read |
-| E-004 | `src/Explore.Application/Authentication/CurrentUserResolutionExtensions.cs` | Canonical local-user resolver read |
+| E-003 | `src/Explore.Application/Authentication/PlatformIdentityPrincipalExtensions.cs` | Authoritative claims authority read |
+| E-004 | `src/Explore.Application/Authentication/CurrentUserResolutionExtensions.cs` | Authoritative local-user resolver read |
 | E-005 | `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs` | Existing synchronization flow read |
 | E-006 | `src/Explore.Application/Features/Authentication/Atproto/Handlers/Commands/BootstrapAtprotoSessionCommandHandler.cs` | Verified-DID boundary read |
 | E-007 | `src/Explore.Blazor/Services/BffAdminClaimsTransformation.cs` and `src/Explore.Blazor/Extensions/BffAuthEndpoints.cs` | BFF sign-in/gating flow read |
@@ -326,6 +326,6 @@ authority transfer becomes automatic.
 | 2026-09-01 | none | draft / ready-for-planning | Integrated implementation-plan intake | Evidence revision `sha256:5c67de2a4b210f6d57239a6eb7f4c7ae38cf6bf4a0b9321e32c77410065a9ca9` |
 | 2026-09-01 | draft / ready-for-planning | current / plan-aligned | Completed triad mapping revalidation | Triad revision `sha256:e62b30f20c3bf6c0a4db9939d8daf7207593ed0845cf48abf0b6d548cd8d26fb` |
 | 2026-09-01 | implementation active | current / plan-aligned | Phase 1 path-contract rebaseline | Added only `DotenvComposer.cs` after confirmed Red proved catalogue metadata could not execute value/matrix validation; triad revision `sha256:8de6ca33af025e1ea4d71cd16c258ba10ce6b5588a6d46d9916b089662ce2484` |
-| 2026-09-01 | implementation active | current / plan-aligned | Phase 1 generated-output rebaseline | Added `docs/CONFIGURATION.md` because the canonical generator owns its environment-catalogue block atomically with machine JSON; triad revision `sha256:b6072d7df9b14522f2a236f23f97d559f63b4f7be24d239faef0a0e0d2d432ff` |
+| 2026-09-01 | implementation active | current / plan-aligned | Phase 1 generated-output rebaseline | Added `docs/CONFIGURATION.md` because the authoritative generator owns its environment-catalogue block atomically with machine JSON; triad revision `sha256:b6072d7df9b14522f2a236f23f97d559f63b4f7be24d239faef0a0e0d2d432ff` |
 | 2026-09-01 | implementation active | current / plan-aligned | Phase 1 completed | Offline contract committed at `5896449f3ae7f78f302cc8f4d85e29574f74a2a5`; Phase 2 invariant Red active; triad revision `sha256:393c1c4d695310150976c858fcb7da69ee906058ab7a94e535e53c3a0cea93b0` |
 | 2026-09-01 | implementation active | current / plan-aligned | Phase 2 architecture rebaseline | Moved typed schema/migration and active-caller cutover into Phase 2, retained Phase 3 for locking/convergence, and replaced reflective Red with strong typing; triad revision `sha256:bddece5056ffa97ae877d3ddf86055c3036d27a06e99d5bf32e9def07d91a2bd` |

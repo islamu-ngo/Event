@@ -95,7 +95,7 @@ notifications do not replace them.
 AutoMapper, MediatR and MediatR.Contracts are absent from the supported dependency
 graph. There is no edition-dependent C# define, commercial version group or
 vendor license binding. CI and both API/Blazor Dockerfiles require locked restore.
-The canonical Setup catalogue owns supported environment metadata; its generator
+The authoritative Setup catalogue owns supported environment metadata; its generator
 owns both the JSON catalogue and the public reference's generated section.
 
 ```bash

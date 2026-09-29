@@ -91,7 +91,7 @@ The handoff includes file/line, behavior at risk, concrete trigger, expected/act
 
 ## Done Criteria
 
-1. All changed files and affected high-risk flows are reviewed against the correct intents and canonical rules.
+1. All changed files and affected high-risk flows are reviewed against the correct intents and governing rules.
 2. Every finding is actionable, reachable, non-duplicative, and severity-ranked.
 3. Test coverage and operational evidence are checked for the actual risks introduced.
 4. Security, tenancy, privacy, data, API/HAL, migration, and generated-artifact impacts are explicitly classified when relevant.

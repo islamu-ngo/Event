@@ -36,7 +36,7 @@ Keep headings simple: `#`, `##`, `###`.
 
 ## Metadata
 
-New canonical docs and operator-critical docs must include the metadata block defined in [DOCUMENTATION_ARCHITECTURE.md](DOCUMENTATION_ARCHITECTURE.md). Use it to make audience, status, ownership, verification date, and source anchors visible without adding process-heavy frontmatter.
+New primary documentation and operator-critical docs must include the metadata block defined in [DOCUMENTATION_ARCHITECTURE.md](DOCUMENTATION_ARCHITECTURE.md). Use it to make audience, status, ownership, verification date, and source anchors visible without adding process-heavy frontmatter.
 
 Do not add metadata mechanically. Add it when the page has verified source anchors and a clear owner category.
 
@@ -54,7 +54,7 @@ Do not add metadata mechanically. Add it when the page has verified source ancho
 - Mark assumptions explicitly when unavoidable.
 - Do not duplicate large sections across multiple docs.
 - Update docs in the same change when behavior changes.
-- Trace drift-prone claims to source anchors: code, infrastructure files, tests, workflows, or existing canonical docs.
+- Trace drift-prone claims to source anchors: code, infrastructure files, tests, workflows, or existing primary documentation.
 - Label planned or draft behavior at the section where it appears; page-level `Status: Mixed` is not enough.
 - Record docs impact for non-trivial changes as `Updated`, `Not needed`, or `Deferred` with a reason.
 - Keep release-sensitive docs current when migrations, configuration keys, secrets, auth, storage, or operator commands change.

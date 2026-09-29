@@ -1,5 +1,5 @@
 # ABOUTME: Records the ATProto session endpoint rate-policy binding correction.
-# ABOUTME: Reuses canonical registered policies without changing limits or authentication.
+# ABOUTME: Reuses authoritative registered policies without changing limits or authentication.
 Change-Id: CHG-01M1VGM7XPXAE6C9A067V2SWK3
 Title: bind ATProto endpoints to registered rate policies
 Type: fix

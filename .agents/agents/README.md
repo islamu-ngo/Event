@@ -4,7 +4,7 @@ description: Selection and coordination registry for repository subagent operati
 disabled: true
 ---
 
-<!-- ABOUTME: Canonical registry and routing guide for repository role subagents. -->
+<!-- ABOUTME: Repository registry and routing guide for role subagents. -->
 <!-- ABOUTME: Defines role selection, coordination, provenance, and the boundary between agents and skills. -->
 
 # Repository Subagent Registry

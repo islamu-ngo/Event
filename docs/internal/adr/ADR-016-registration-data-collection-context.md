@@ -1,5 +1,5 @@
 <!-- ABOUTME: Architectural decision record for registration data collection ownership and provider channels. -->
-<!-- ABOUTME: Defines canonical form, answer, capability, callback, and finalization boundaries. -->
+<!-- ABOUTME: Defines standard form, answer, capability, callback, and finalization boundaries. -->
 
 # ADR-016: Registration Data Collection Context And Provider Channels
 
@@ -27,8 +27,8 @@ The governing invariant is:
 
 1. A dedicated Registration Data Collection bounded context owns `Registration*` workflows, immutable form versions, attempts, submissions, normalized answers, issues, requirement fulfillment, and finalization effects.
 2. The bounded context may share domain validation value objects and mirror the custom-property subsystem's typed-column, `Ordinal`, `Namespace + Key`, constraint, and governance vocabulary. It does not reuse custom-property entities, tables, or projections.
-3. Canonical answers use one row per atomic typed value. Exactly one value column is populated, the populated column agrees with the field type, and multivalue answers use separate rows ordered by `Ordinal`.
-4. Sensitive values are stored separately as key-versioned ciphertext. Optional blind indexes require an explicit governed use case. Raw provider payloads may exist only in the bounded, short-retention incoming-message evidence store; they are never canonical answers.
+3. Authoritative answers use one row per atomic typed value. Exactly one value column is populated, the populated column agrees with the field type, and multivalue answers use separate rows ordered by `Ordinal`.
+4. Sensitive values are stored separately as key-versioned ciphertext. Optional blind indexes require an explicit governed use case. Raw provider payloads may exist only in the bounded, short-retention incoming-message evidence store; they are never authoritative answers.
 5. Relational form rows remain authoritative. Publishing a form version deterministically generates immutable, content-hashed JSON Schema 2020-12 data, UI, logic, and provider-mapping artifacts.
 
 ### Workflow and channel model
@@ -37,12 +37,12 @@ The governing invariant is:
 2. A `RegistrationChannel` binds one requirement to one provider binding. It records independent schema authority, presentation mode, collection mode, completion mode, trust level, and answer synchronization mode. There is no single provider enum and no composite-provider class.
 3. Provider adapters implement only the capability-specific Application contracts they support: descriptor, presentation, schema reading, provisioning, response writing or reading, callback verification, subscription management, reconciliation, or submission sink.
 4. Effective capability is the intersection of a proven profile, connection configuration, tenant governance, mapping compatibility, and authorization. Profiles bind to the exact provider code, deployment kind, API version, adapter-policy version, and conformance-evidence revision. Unknown tuples fail closed for automatic finalization.
-5. `IRegistrationSubmissionSink` remains separate from collection capabilities so approved canonical fields can be mirrored after commit without making the destination a registration authority.
+5. `IRegistrationSubmissionSink` remains separate from collection capabilities so approved authoritative fields can be mirrored after commit without making the destination a registration authority.
 
 ### Evidence, synchronization, and finalization
 
 1. Trust levels are explicit lookup data: `FirstParty`, `SignedProvider`, `AuthenticatedProviderFetch`, `DelegatedAutomation`, `UserReturnOnly`, and `ManualImport`. Event or tenant policy defines the minimum automatic-finalization trust level; lower-trust evidence enters `NeedsReconciliation`.
-2. Answer synchronization modes are explicit lookup data: `NONE`, `COMPLETION_ONLY`, `SELECTED_FIELDS`, `FULL_CANONICAL`, and `MIRROR_ONLY`. `NONE` stores no provider answers and cannot fulfill a required data requirement. `COMPLETION_ONLY` stores completion evidence but no canonical answers.
+2. Answer synchronization modes are explicit lookup data: `NONE`, `COMPLETION_ONLY`, `SELECTED_FIELDS`, `FULL_SYNC`, and `MIRROR_ONLY`. `NONE` stores no provider answers and cannot fulfill a required data requirement. `COMPLETION_ONLY` stores completion evidence but no authoritative answers.
 3. Formbricks and delegated Microsoft callbacks, plus Google Pub/Sub pushes, extend the existing `IncomingWebhookMessage` and `IncomingWebhookEffectOutbox` mechanism. Intake retains exact bounded bytes, verifies provider proof, deduplicates, persists one durable effect, and acknowledges promptly.
 4. A fenced worker re-verifies evidence, fetches provider data when supported, normalizes against the pinned form and mapping revisions, validates, records fulfillment, and invokes Application finalization. Callback controllers never mutate registration aggregates.
 5. External completion is evidence only. ISLAMU confirms registration only after its own transactional identity, deduplication, workflow, approval, and capacity checks succeed.
@@ -60,8 +60,8 @@ The following consultation anti-patterns are forbidden:
 
 1. Treating one `ExternalRegistrationUrl` as the integration model.
 2. Storing attendee answers in Event custom-property values.
-3. Storing all canonical response data only as JSONB.
-4. Using provider question IDs as canonical field IDs.
+3. Storing all authoritative response data only as JSONB.
+4. Using provider question IDs as authoritative field IDs.
 5. Letting webhook controllers insert registrations directly.
 6. Treating an external success page as completion proof.
 7. Treating iframe navigation as completion proof.
@@ -75,7 +75,7 @@ The following consultation anti-patterns are forbidden:
 15. Placing raw answers in ordinary outgoing registration webhooks.
 16. Representing consent only as a Boolean answer.
 17. Attaching an anonymous external response directly to a User without verified correlation.
-18. Making a provider-specific field mandatory across alternative channels without a canonical equivalent.
+ 18. Making a provider-specific field mandatory across alternative channels without an authoritative equivalent.
 
 ## Consequences
 

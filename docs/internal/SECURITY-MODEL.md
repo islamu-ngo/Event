@@ -8,7 +8,7 @@
 Guest allocation requires a native protected challenge and proof of work in
 addition to the existing intended `Idempotency-Key`. Challenge issuance accepts
 the same business request as guest start and allocates no seat, order or hold.
-The shared API canonicalizer binds the intended start method, resolved route,
+The shared API normalizer binds the intended start method, resolved route,
 tenant/event, principal/capability scope, content type and complete request digest;
 it does not hash the issuance route or a proof wrapper as the business request.
 
@@ -93,7 +93,7 @@ intentionally remain available during stop-sale.
 
 Authenticated personal and group/organization purchases share the acting account as their hard-ceiling key while retaining the independently authorized actor as pinned context. This blocks context switching without collapsing unrelated members of the same group. Verified-contact mode requires the order's persisted `IsEmailVerified` fact and hashes its normalized email immediately. Name-only mode is bound to one order and intentionally has no hard cross-order identity claim.
 
-The persistence boundary stores immutable policy lineage, cumulative authority usage, and a tenant-qualified operation key/fingerprint. Canonically ordered PostgreSQL advisory locks are acquired before the serializable snapshot so a waiter observes the winner. A replay with the exact fingerprint is safe; changed scope returns a stable conflict. No provider API, email, webhook, or other external I/O runs in that transaction, and failure output contains only generic codes plus the non-sentinel order identity.
+The persistence boundary stores immutable policy lineage, cumulative authority usage, and a tenant-qualified operation key/fingerprint. Deterministically ordered PostgreSQL advisory locks are acquired before the serializable snapshot so a waiter observes the winner. A replay with the exact fingerprint is safe; changed scope returns a stable conflict. No provider API, email, webhook, or other external I/O runs in that transaction, and failure output contains only generic codes plus the non-sentinel order identity.
 
 ## Security Model
 
@@ -236,13 +236,13 @@ The documented onboarding/setup exceptions remain narrow: they use their existin
 
 Standalone reduces deployment and operational isolation: UI and API availability, deployment cadence, process resources, and scaling are coupled. It also removes the YARP network-hop/proxy diagnostic surface. Use Split when independently scaled hosts, separate deployment failure domains, or a network boundary between BFF and API is required. Do not treat one process as an authorization shortcut: token secrecy, privileged-header sanitation, API authorization, tenant isolation, and antiforgery remain mandatory.
 
-Across the three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`), AppHost defaults to Split and explicit Standalone uses `WithHttpEndpoint(name: "http")` for a dynamic/non-guaranteed internal HTTP endpoint plus explicit HTTPS `https://localhost:7180`; direct `Event.Standalone` launch profiles reserve `http://localhost:5180`. Returning to Split changes topology only, not data. Standalone does not select SQLite or provide `docker-compose.yml`. The canonical protected surface is `/api/...` with non-URL API versioning, never `/api/v1/...` (see [the support matrix](ARCHITECTURE.md#hosting-topology)).
+Across the three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`), AppHost defaults to Split and explicit Standalone uses `WithHttpEndpoint(name: "http")` for a dynamic/non-guaranteed internal HTTP endpoint plus explicit HTTPS `https://localhost:7180`; direct `Event.Standalone` launch profiles reserve `http://localhost:5180`. Returning to Split changes topology only, not data. Standalone does not select SQLite or provide `docker-compose.yml`. The authoritative protected surface is `/api/...` with non-URL API versioning, never `/api/v1/...` (see [the support matrix](ARCHITECTURE.md#hosting-topology)).
 
 Topology rollback is process-level only: `Hosting:Topology` controls how local AppHost composes processes and does not reverse migrations or data commits. For schema/data rollback after topologies are switched, use the migration backup/restore workflow.
 
 ## Participant Admission Readiness Boundary
 
-`ParticipantAdmissionEligibility` is the non-PII authority projection for one tenant-qualified ticket assignment and participant. It records subject linkage, completion time, a canonical consent-record reference, approval, and terminal revocation. Typed answers and consent text remain in the existing registration evidence aggregates.
+`ParticipantAdmissionEligibility` is the non-PII authority projection for one tenant-qualified ticket assignment and participant. It records subject linkage, completion time, an authoritative consent-record reference, approval, and terminal revocation. Typed answers and consent text remain in the existing registration evidence aggregates.
 
 `ParticipantAdmissionReadinessRules` is the sole Domain decision surface. It evaluates confirmed-order authority, payment, subject ownership, mandatory completion, consent, approval, and revocation. `AdmissionIssuanceRepository` and `AdmissionCheckInRepository` receive the same `IParticipantAdmissionReadinessAuthority` and evaluate it inside their existing transaction after acquiring the assignment fence.
 
@@ -258,7 +258,7 @@ The same-origin BFF forwards reads through the generated client and carries a gu
 
 `TicketTransferPolicy` is catalog-versioned configuration for one tenant and ticket type. `AdmissionTicketTransfer` is the append-only offer/acceptance record; it stores source and recipient subject references, bounded status/timestamps, the offered credential generation, and only a claim-capability digest. The active `AdmissionTicket` remains the holder and credential authority.
 
-Transfer persistence uses the shared admission fence in canonical assignment → eligibility → ticket → transfer order. Under that fence, acceptance validates the current capability, expiry, hop, generation, check-in state, and recipient ownership before atomically changing holder, moving readiness to the recipient, rotating the keyed credential digest, invalidating active recovery capabilities, consuming the claim, and staging pointer-only outbox notification evidence. Cancellation, correction, reissue, revocation, recovery, and check-in use compatible ordering, so a concurrent loser returns a bounded outcome rather than overwriting the winner.
+Transfer persistence uses the shared admission fence in authoritative assignment → eligibility → ticket → transfer order. Under that fence, acceptance validates the current capability, expiry, hop, generation, check-in state, and recipient ownership before atomically changing holder, moving readiness to the recipient, rotating the keyed credential digest, invalidating active recovery capabilities, consuming the claim, and staging pointer-only outbox notification evidence. Cancellation, correction, reissue, revocation, recovery, and check-in use compatible ordering, so a concurrent loser returns a bounded outcome rather than overwriting the winner.
 
 Commerce does not move with the holder. Registration order, purchaser account, order line, amount, currency, payment/refund allocation, and append-only check-in history remain unchanged. The transfer response exposes only transfer/ticket identifiers, a closed status code, a closed support code, hop, expiry, credential generation, and server-computed HAL relations. It contains no tenant, account, participant, purchaser, payment, contact, or capability identity.
 
@@ -368,16 +368,16 @@ The `MultiAuth` policy selector preserves the Keycloak and API-key branches and 
 - `AtprotoBootstrap` is valid only for `POST /api/auth/atproto/session`. The BFF signs a one-minute ES256 assertion with the OAuth-client key ring and binds issuer, audience, tenant, exact DID, explicit Person/Organization/Group classification, method, path, `iat`, expiry, and single-use `jti`. The assertion carries no user authority. Browser-supplied bootstrap headers are stripped, and the BFF injects a server-created assertion only for the private bridge request.
 - The API atomically consumes the bootstrap `jti` in the durable idempotency table before dispatch. PostgreSQL `INSERT ... ON CONFLICT DO NOTHING` makes concurrent replay have exactly one winner across API instances.
 - The private bridge is excluded from API discovery and generated browser clients, rate-limited as a write, request-size bounded, and returned with `no-store`. It accepts opaque CarpaNet session material only over the server-to-server BFF boundary.
-- Infrastructure restores the OAuth session through CarpaNet, permits token refresh through the constrained ATProto transport, calls the user's PDS `com.atproto.server.getSession`, and requires the authenticated DID, returned DID, expected canonical HTTPS PDS, and linked tenant identity to agree before any write.
+- Infrastructure restores the OAuth session through CarpaNet, permits token refresh through the constrained ATProto transport, calls the user's PDS `com.atproto.server.getSession`, and requires the authenticated DID, returned DID, expected authoritative HTTPS PDS, and linked tenant identity to agree before any write.
 - API claim/body boundaries parse live identifiers into `AtprotoDid` before Application dispatch. Verification, current-session, prepared-session, and token-issuer contracts keep that typed value through Domain behavior; only JWT, provider, repository, and response egress unwrap the exact scalar value.
-- Exact DID verification proves only the external source Actor. Promotion to a new Organization or Group preserves that Actor in place. Consolidation into an existing canonical Actor additionally requires a signed target ID and concurrency stamp plus active current-tenant OrgAdmin or GroupAdmin authority over an approved participation; missing, stale, cross-kind, suspended, deleted, or unauthorized targets fail before reference movement.
+- Exact DID verification proves only the external source Actor. Promotion to a new Organization or Group preserves that Actor in place. Consolidation into an existing authoritative Actor additionally requires a signed target ID and concurrency stamp plus active current-tenant OrgAdmin or GroupAdmin authority over an approved participation; missing, stale, cross-kind, suspended, deleted, or unauthorized targets fail before reference movement.
 - OAuth-session encryption is prepared once before retryable work. One serializable transaction applies onboarding or consolidation and persists the prepared session on every database retry; cache invalidation and first-party JWT issuance occur only after commit. Merge evidence stores the identity ID and a bounded SHA-256 DID digest rather than the raw DID.
 - `AtprotoSession` accepts only ES256 first-party tokens from the separate session-JWT key ring, with exact issuer/audience, known `kid`, valid lifetime, tenant claim, `auth_provider=atproto`, DID claim, and a platform user `Guid` in `sub`. Configured lifetime is constrained to one through sixty minutes.
 - Current-session read, refresh, and revoke require both that `AtprotoSession` bearer token and a separate one-minute BFF session-bridge assertion bound to tenant, user, DID, method, path, and single-use `jti`. Refresh is serialized with a PostgreSQL advisory lock. Revoke attempts the remote provider operation but always removes the exact local encrypted session in `finally`; remote failure cannot preserve local authority.
 - The browser cookie stores the first-party platform JWT, never a PDS access token, refresh token, or DPoP private key. Protected OAuth state and cross-host handoffs use the primary relational store through the private machine-authenticated API, with candidate-bound single-winner consumption.
 - `ApiBackedAtprotoTransientStore` checks exact candidate equality and expiry again after the complete consume response arrives. A candidate expiring during delivery is rejected even if browser proof and session remain live; its committed deletion is never retried or recreated, and no authenticated cookie is issued from that result.
-- A separate `__Host-event-atproto-proof` cookie is Secure, HttpOnly, SameSite=Lax, host-only and fixed at fifteen minutes. Each flow stores only its independent identifier, HMAC binding and proof expiry. Same-origin callbacks and destination handoffs validate possession before consuming; a canonical callback for another origin issues no authenticated cookie. Sign-in rechecks proof after provider exchange. Wrong-browser rejection preserves the destination handoff; proof-cookie completion never slides or rewrites the shared proof.
-- The `atproto-authentication` health check validates canonical BFF identity, the OAuth signing ring, and state/session adapter registration, then performs a signed synthetic database create/read/consume probe. Its transport deadline is two seconds, without retries/hedging; completed results are cached for ten seconds. It does not certify a user PDS, discovery endpoints, or session-encryption/session-JWT key rings. Disabled ATProto is Healthy; unavailable ATProto primary is Unhealthy, while unavailable optional ATProto with explicit Local Identity/Keycloak primary is Degraded. Liveness does not probe the store.
+- A separate `__Host-event-atproto-proof` cookie is Secure, HttpOnly, SameSite=Lax, host-only and fixed at fifteen minutes. Each flow stores only its independent identifier, HMAC binding and proof expiry. Same-origin callbacks and destination handoffs validate possession before consuming; an authoritative callback for another origin issues no authenticated cookie. Sign-in rechecks proof after provider exchange. Wrong-browser rejection preserves the destination handoff; proof-cookie completion never slides or rewrites the shared proof.
+- The `atproto-authentication` health check validates authoritative BFF identity, the OAuth signing ring, and state/session adapter registration, then performs a signed synthetic database create/read/consume probe. Its transport deadline is two seconds, without retries/hedging; completed results are cached for ten seconds. It does not certify a user PDS, discovery endpoints, or session-encryption/session-JWT key rings. Disabled ATProto is Healthy; unavailable ATProto primary is Unhealthy, while unavailable optional ATProto with explicit Local Identity/Keycloak primary is Degraded. Liveness does not probe the store.
 
 OAuth session JSON, access/refresh tokens, DPoP material, JWTs, and JWK private values must never appear in logs, traces, metrics, URLs, OpenAPI, WASM authentication state, or generated clients. Verification failures use bounded reason codes; provider exceptions and response bodies are not reflected to callers.
 
@@ -990,9 +990,9 @@ These admin and internal-user claims are intentionally not serialized as browser
 
 Post-onboarding provider management safety:
 
-- `GET /api/instance/settings/auth-provider` and canonical `PATCH /api/instance/settings/auth-provider` accept either active setup-secret authority or authenticated instance-admin authority.
+- `GET /api/instance/settings/auth-provider` and authoritative `PATCH /api/instance/settings/auth-provider` accept either active setup-secret authority or authenticated instance-admin authority.
 - Authentication update flow denies requests that would disable all providers linked to the current admin account (self-lockout prevention).
-- `GET /api/instance/settings/authz-provider` and canonical `PATCH /api/instance/settings/authz-provider` accept either active setup-secret authority or authenticated instance-admin authority. The PATCH route stores the selected runtime authorization provider.
+- `GET /api/instance/settings/authz-provider` and authoritative `PATCH /api/instance/settings/authz-provider` accept either active setup-secret authority or authenticated instance-admin authority. The PATCH route stores the selected runtime authorization provider.
 - Setup-secret GET requests use an IP-and-normalized-route fixed window, which defaults to 5 requests per 60 seconds, so repeated status or journey reads cannot exhaust another authoritative setup read. Setup mutations retain the shared IP-keyed `setup:{ip}` window. Authenticated endpoints that require both normal authorization and `SetupSecretRequired` (`PATCH /api/instanceonboarding/profile` and `POST /api/instanceonboarding/complete`) use the separate IP-keyed `setup-authenticated:{ip}` window with the same configured limit, so anonymous setup traffic cannot exhaust the instance-claim budget. Provider operations declare typed `429 ProblemDetails`. The named `SetupSecret` policy and the setup-secret branch of `Write` use `NoLimiter`, so they don't create duplicate quota state. Bearer-authenticated GET requests without a setup-secret header do not enter either setup bucket, while bearer PATCH requests without setup-secret authority remain separate under the per-user `Write` policy. Setup-secret authority fails closed when setup mode is inactive.
 - Authorization update flow permits exactly one active provider: local RBAC or Cerbos. Cerbos endpoint changes are verified before the setting is applied.
 - If Cerbos is selected and unavailable, authorized requests fail closed. Recovery is an explicit operator action: switch the authorization provider setting back to local RBAC; the runtime does not silently fail over.
@@ -1083,7 +1083,7 @@ The HATEOAS link generation system is authorization-aware:
 
 1. **`HateoasAuthorizationEvaluator`** performs batch permission checks for all links in a response.
 2. Static checks (authentication, role requirements, condition lambdas) run first.
-3. Remaining links with `PermissionResourceKind` are batched into a single `IsAllowedBatchAsync()` call. Link identity includes resource kind, resource id, action, optional scope, and canonicalized attributes.
+3. Remaining links with `PermissionResourceKind` are batched into a single `IsAllowedBatchAsync()` call. Link identity includes resource kind, resource id, action, optional scope, and normalized attributes.
 4. On batch authorization failure, all permission-bound links are **denied** (fail-closed).
 5. Admin/sync controllers that manually build HAL responses run definitions through the same evaluator before materializing links.
 6. Clients never see links they cannot execute and must not recreate action gates from local roles or claims.
@@ -1195,7 +1195,7 @@ sections. A tenant entry cannot select another instance or write instance,
 provider, topology, secret, PII, or sovereign-payment state.
 
 `ValidateOnly` performs no writes. `Bootstrap` performs preflight before opening
-one serializable transaction, acquires canonical instance and tenant mutation
+one serializable transaction, acquires authoritative instance and tenant mutation
 locks, writes configuration plus value-free outcome evidence, and commits
 durable post-commit effects atomically. Existing tenant bootstrap results are
 wholesale skips; the feature is intentionally not a continuous desired-state
@@ -1220,7 +1220,7 @@ Domain policy, and proves it cannot broaden the instance ceiling before any
 write.
 
 CQRS and manifest mutations share `PaidEventPolicyMutationBoundary`.
-Authenticated commands enter a serializable transaction and acquire canonical
+Authenticated commands enter a serializable transaction and acquire authoritative
 instance/tenant named locks. Manifest bootstrap acquires those same keys in its
 outer transaction and calls the in-transaction path. A stale instance revision
 or tenant-policy collision fails as a concurrency conflict; tenant, settings,

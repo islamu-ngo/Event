@@ -62,7 +62,7 @@ No application loop may load all venue points and calculate distances after mate
 PostGIS mode is ready only when all of the following are true:
 
 1. the deployed PostgreSQL image/service supports PostGIS;
-2. the extension and canonical migration are applied;
+2. the extension and authoritative migration are applied;
 3. the governed point table and required GiST/tenant indexes exist;
 4. a bounded spatial smoke query succeeds;
 5. the configured mode is consistent across API instances.
@@ -78,7 +78,7 @@ Self-hosting documentation and deployment manifests must name the PostGIS-capabl
 3. Exact proximity becomes tenant-safe, occurrence-aware, geodesic, and index-backed when implemented.
 4. PostGIS becomes an operational dependency only for deployments that explicitly select `postgis` mode.
 5. Nearby responses cannot use shared caching; area-level home responses retain their existing tenant/area/mode cache posture.
-6. Phase 6 requires a canonical migration, real PostGIS tests, privacy tests, readiness, and self-hosting updates before product copy changes.
+ 6. Phase 6 requires an authoritative migration, real PostGIS tests, privacy tests, readiness, and self-hosting updates before product copy changes.
 
 ## Alternatives Considered
 

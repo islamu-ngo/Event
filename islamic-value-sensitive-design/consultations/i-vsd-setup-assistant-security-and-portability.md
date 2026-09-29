@@ -212,7 +212,7 @@ boundary.
     provenance-complete evidence plus fresh I-VSD, CTO, user, dependency,
     security, and accessibility approval before activation.
 23. The expanded plan keeps YAML/directory inputs as bounded source adapters
-    that converge on canonical v1alpha2 JSON; they do not become wire formats.
+    that converge on authoritative v1alpha2 JSON; they do not become wire formats.
 24. Live target, tenant, HAL, provider, import, transfer, and transaction
     authority remains server-side. Setup receives short-lived scoped authority
     and value-free state only.
@@ -268,12 +268,12 @@ boundary.
     result/failure contracts, and an exact directory snapshot/commit barrier.
     Its fourteen matrices, numeric ceilings, deterministic barriers, and Phase
     8 Worst Break are now executable requirements rather than broad topics.
-37. C1 Green is Core-only syntax-tree and canonical-parity closure. It excludes
+37. C1 Green is Core-only syntax-tree and authoritative-parity closure. It excludes
     presentation/source pickers and C2 scale; Linux directory semantics require
     real-filesystem evidence, while Windows directory input remains disabled
     unless a Windows runner proves equivalent handle-safe behavior.
 38. C2 begins only after C1 Green, measures named profiles, and keeps the
-    canonical SA-810 defaults unchanged. Every slice owns exact paths,
+    authoritative SA-810 defaults unchanged. Every slice owns exact paths,
     verification/failure disposition, explicit-path staging, unrelated-state
     preservation, material-override recording, and post-commit file/hash checks;
     this report authorizes no commit execution.
@@ -292,8 +292,8 @@ boundary.
     scale tests passed 4/4, Setup Core architecture passed 10/10, full Setup
     Core passed 65/65, and the Release build completed with zero errors.
 42. The measured `small`, `medium`, `large`, and exact 4,096-entry `ceiling`
-    profiles remain bound to canonical defaults, target Wire acceptance,
-    cancellation, host/runtime/process limits, canonical size/SHA-256, and
+    profiles remain bound to standard default, target Wire acceptance,
+    cancellation, host/runtime/process limits, authoritative size/SHA-256, and
     evidence-digest admission. `expanded` is known-disabled.
 43. Configuration import already supplies a repository-native security pattern
     for successor D: one-time capability issuance, digest-only persistence,
@@ -326,7 +326,7 @@ boundary.
     uses an Application-owned value-free issuance claim, current bearer/actor
     authorization on every action, exact generation-bound fingerprints, and
     transactional plus dispatch revocation fences.
-49. Capability shape is now exact: 32 cryptographic bytes, canonical unpadded
+49. Capability shape is now exact: 32 cryptographic bytes, authoritative unpadded
     43-character Base64url, SHA-256-only persistence, bounded parsing, and
     fixed-time comparison. Every invalid branch is byte-identical RFC 7807.
 50. Independent review also confirmed a relevant current defect:
@@ -367,11 +367,11 @@ boundary.
     explicit-approval and Wire-first boundary.
 59. The user explicitly approved the reviewed D2 sequence. D2-1 alone is now
     Green: package-free Wire metadata, immutable strict data, closed enums,
-    canonical redacted capability syntax, and source-generated JSON passed
+    authoritative redacted capability syntax, and source-generated JSON passed
     Wire/Core/Architecture Red then Green without creating live authority.
 60. Initial D2-1 review found default capability serialization and permissive
     generated JSON. Corrected D2-1 makes capability release method-only,
-    challenge/scope parsing canonical, every enum string-only, metadata closed,
+    challenge/scope parsing authoritative, every enum string-only, metadata closed,
     and tests execute the shipped source-generated context.
 61. Corrected D2-1 review approved at 100/100. D2-2 now has a seven-test
     attributable Domain Red for absent enrollment, issuance-claim, and
@@ -435,7 +435,7 @@ D2-0d governance evidence is:
   `sha256:9028de169d44fc54a8e2e096db6fca87d383ce66cbae5a29b20ba93e0708a3f1`,
   and evidence
   `sha256:8e63503c7f5f749f80495d83837cc334865e91d98f371cfec9b72c871fd9d089`.
-- **E099:** D2-0c Changes-required review plus corrected canonical ledgers:
+- **E099:** D2-0c Changes-required review plus corrected evidence ledger:
   review
   `sha256:e9f446c24b4ba9412e0ad7c133c3ad67855c2b17932819435e1ea293f9ef0282`,
   tasks
@@ -461,7 +461,7 @@ D2-0e governance evidence is:
   `sha256:d19b17b242ba5532f6fb61ea49823a8fcbbeb5819296e86df232e35b1ee83c4a`,
   and evidence
   `sha256:308f4d25dcbff9057cf16e549d88b77b4edf5b6fbb71be18e178c2c60a0401c7`.
-- **E102:** D2-0d Changes-required review plus corrected canonical ledgers:
+- **E102:** D2-0d Changes-required review plus corrected evidence ledger:
   review
   `sha256:36c00e1ed7db2aa5acfd0f185545ae84f8487d5fdd03ec92b67417a98da59b88`,
   tasks
@@ -487,7 +487,7 @@ D2-0f governance evidence is:
   `sha256:0ae75140cb02dd96da229e526d3bbb5fbf6cc837ca2b77e7c827dcef0505926e`,
   and evidence
   `sha256:e7d416f403feb432de8b7314031f1258a11b00c284f2f4bd9137e64d67563297`.
-- **E105:** D2-0e Changes-required review plus corrected canonical ledgers:
+- **E105:** D2-0e Changes-required review plus corrected evidence ledger:
   review
   `sha256:2d563b00938b614323a49c5d7cc2786e1f0651d2e05617198badca9ddeae5028`,
   tasks
@@ -511,7 +511,7 @@ D2-1 implementation evidence is:
   `sha256:a5d01cb1d91a071c7885316edb3ec27f244d8f36e44687ebe6d4344dbeb6b97e`
   and evidence
   `sha256:cc73a3a6d36099f4593f08d6a90855e93174d69c0125ea13369a24a15f60e106`.
-- **E108:** canonical ledgers:
+- **E108:** evidence ledger:
   tasks
   `sha256:c5c44977a61e1b32821cdbe711382f5e05ddb5dbbfc9eb993c76d8792a4f8054`,
   context
@@ -520,7 +520,7 @@ D2-1 implementation evidence is:
   `sha256:cbe493c4540ad230c6ee02665305724f8e28dcd5fe009b8984c981e78e158403`.
 
 D2-1 adds only BCL/package-free transport syntax and immutable public data.
-The capability value is canonical/redacted and absent from JSON response
+The capability value is authoritative/redacted and absent from JSON response
 contracts. Public outputs exclude authority, provider-coordinate, value, and
 P9-008 registration-provider surfaces. No server/provider behavior exists.
 This strengthens IVSD-F038/M038, F039/M039, and F040/M040 without adding a
@@ -536,7 +536,7 @@ Corrected D2-1 evidence is:
   `sha256:61976036324b4f436ec3fd6271c18ae88de4ae2b14dbb1e5da6129f1873014ba`
   and evidence
   `sha256:fb4334dec215ac0fb03b23e6d6117772148dae2b642ff22c4ccde7ca2b439936`.
-- **E111:** corrected canonical ledgers:
+- **E111:** corrected evidence ledger:
   tasks
   `sha256:0f1be477a9a9eb84e792c1f632443a5d2695f39c30aec859db1d77afd5f91fd0`,
   context
@@ -560,7 +560,7 @@ D2-2 Red evidence is:
   `sha256:cd9b41d98111914e4aba5a392ebe0fe9d981c52f4d2d376a75eae74ca68ca72c`
   and evidence
   `sha256:44270c031d914201a48243cb68a945dfb77af27a8fda42bc6e13e0ad33cf2a12`.
-- **E114:** D2-2 Red and canonical ledgers:
+- **E114:** D2-2 Red and evidence ledger:
   test
   `sha256:3c08bb1b93816f6ac5b2f1010c6c6215de71d063753e95508d2632f23d0d81b0`,
   tasks
@@ -586,7 +586,7 @@ Corrected D2-2 Red evidence is:
   `sha256:9176183c69a1b595182acbfdb58a603d4a478be6b3622dfaa06476223a010c05`
   and evidence
   `sha256:e3f10d42bceed7d92fe9bffb12b4a1739b6a8be7ebcfd1d80d64f7bb395d912f`.
-- **E117:** corrected Red and canonical ledgers:
+- **E117:** corrected Red and evidence ledger:
   test
   `sha256:c37c566a4262763c96b609e1f43b806d1dfca706c39cf58a2f8602720f13a63d`,
   tasks
@@ -613,7 +613,7 @@ Final D2-2 Red evidence is:
   `sha256:225120ba60178747284f57d2d837736bf381df8b4f77c7590920a0475b4fc114`
   and evidence
   `sha256:dff83e5860c548a0428413a56dc7399b4e59d0326c46deb3211a25620e8654d0`.
-- **E120:** final Red and canonical ledgers:
+- **E120:** final Red and evidence ledger:
   test
   `sha256:6e2146f7520c2466a93a8285fdc55b6d24d94871ce26094e3051a887c7a8eaea`,
   tasks
@@ -671,7 +671,7 @@ D2-3 Application Red evidence is:
   `sha256:bf46d5c7fe2e3a8c56d8e0ffb0dc72375e38b0bb2b4eb38d1508adcf97479db2`
   and evidence
   `sha256:b4be470d195860a3359868c11feff96dd4e0d579f633349b20a01a23119d6e1f`.
-- **E126:** D2-3 Red and canonical ledgers:
+- **E126:** D2-3 Red and evidence ledger:
   test
   `sha256:c9f5b901896d35ef29bac9e9df70e48e9519d1c301bf1627f206fce3f30d7ccc`,
   tasks
@@ -698,7 +698,7 @@ Corrected D2-3 Application Red evidence is:
   `sha256:eb4fdef0afae5633fdf0451327895df516f2f894f3f0c0473171543a641ee9b9`
   and evidence
   `sha256:16bb842e3e298058733682e50c294c3bb2f367058b315c6e208aa22a691d55ed`.
-- **E129:** corrected Red and canonical ledgers:
+- **E129:** corrected Red and evidence ledger:
   test
   `sha256:801d964556d3e3cc0ca11500823d091b9c389a539baf47350b0ffb37c7637dcc`,
   tasks
@@ -725,7 +725,7 @@ Final D2-3 Application Red evidence is:
   `sha256:8fd588fa609f9884eabc1feff9197ad3e55c5476234dfcc9056bf2d792406550`
   and evidence
   `sha256:d855661aa02e6721865bf49ef696a0f52c1eb70faaff0937c1ec7e37d61fdff7`.
-- **E132:** final Red and canonical ledgers:
+- **E132:** final Red and evidence ledger:
   test
   `sha256:2cada8a0adeb210f1fa8cd626321c946d3e3ebe8b080c0e7597897736d057463`,
   tasks
@@ -751,7 +751,7 @@ Complete D2-3 Application Red evidence is:
   `sha256:b2175ea8442cbc0af882bfacc1948f75aa5055e5052528bb3d9d8a0c9d326d99`
   and evidence
   `sha256:732bb6cf66a8f95505104518731801166d0ed84edb6e7b0659f4916fd1e33432`.
-- **E135:** complete Red and canonical ledgers:
+- **E135:** complete Red and evidence ledger:
   test
   `sha256:25a4086f985a6228c5f2fc6d0d801ac2f1c3bad256b78fc35f4982755dc068d2`,
   tasks
@@ -777,7 +777,7 @@ Exhaustive D2-3 Application Red evidence is:
   `sha256:d5eadd2c34368a30c8343b16209803cb208c650b45408bebfb3589185e3de3d4`
   and evidence
   `sha256:8fdfb632915f51e5219a70e6f899db89caaacea897f66316e2379c7090bac074`.
-- **E138:** exhaustive Red and canonical ledgers:
+- **E138:** exhaustive Red and evidence ledger:
   test
   `sha256:627567d68e080f45bc4f698dd48382062821160c86b14bf1d452010e1234a971`,
   tasks
@@ -803,7 +803,7 @@ Closed D2-3 Application Red evidence is:
   `sha256:fea22d226d869581063ea8afb18ce3669c89e7c8fe93ee4c4de0953544b46cd4`
   and evidence
   `sha256:a3bb1997a2faab3bfef611f2fe7ac4813075cb005654c320e906009fc7032149`.
-- **E141:** closed Red and canonical ledgers:
+- **E141:** closed Red and evidence ledger:
   test
   `sha256:ad6ecc9a6c8bd78cd1a066241fdcfdcf05c9563a158126d764039d46b8b041bf`,
   tasks
@@ -829,7 +829,7 @@ Approval-ready D2-3 Application Red evidence is:
   `sha256:042f62d5bcd4ac92749e314640304202e6527a94221fdd390bb4dfb9723f6e80`
   and evidence
   `sha256:944f36e4bcca75458103f36838b8add977b43565e6f1b326e84f241eb3431c28`.
-- **E144:** approval-ready Red and canonical ledgers:
+- **E144:** approval-ready Red and evidence ledger:
   test
   `sha256:fac62f11818682ead979b5c19f53f23e521a622262d6efe599fe83eecae1be01`,
   tasks
@@ -855,7 +855,7 @@ Final approvable D2-3 Application Red evidence is:
   `sha256:eb968040e608dce3408aeb379829894a2f0e377531f64f47ef16532fec4efb92`
   and evidence
   `sha256:c443616f85d308542aac18f767ecbe16a97c4b9caba4661437d50fd08ba4c33c`.
-- **E147:** final approvable Red and canonical ledgers:
+- **E147:** final approvable Red and evidence ledger:
   test
   `sha256:71e4dbceee9fb438f7f25d511a696b5bccc9b8e5b36c8c96db9e457094153791`,
   tasks
@@ -947,7 +947,7 @@ F040/M040 remain sufficient.
 | IVSD-F034 | accepted | High | Human-approval requirement | Autonomy, Justice; Design/Governance | Agent-generated configuration can silently broaden policy or publish legal text without informed review | E007, E032-E033; design validation | IVSD-M034 | Agent Governance + Product |
 | IVSD-F035 | accepted | High | Terminal accessibility limitation | Justice, Truthfulness; Design/Evaluation | Selecting Terminal.Gui as the sole human terminal target does not prove screen-reader, RTL, keyboard, color, Unicode, resize, signal, scrollback, or small-terminal behavior | E022, E031-E037, E041, E048-E055; requirements, exact B1 planning, and architecture evidence only | IVSD-M035 | Accessibility + CLI |
 | IVSD-F036 | accepted | Critical | Skill-lifecycle requirement | Promise-Keeping, Truthfulness; Governance | Publishing a skill before versioned commands exist teaches fictional or stale behavior | E032-E033; skill-contract evidence | IVSD-M036 | Skill owner + CLI owner |
-| IVSD-F037 | accepted | High | Composition-integrity requirement | Amanah, Truthfulness; Technical | YAML/directory ambiguity, path metadata, unsafe parser authority, platform overclaim, mixed ownership, or unmeasured scale can change canonical meaning or conceal prohibited content | E034-E037, E067-E074; final Phase 8 governance, unchanged technical contract/product preimages, independent reviews, and plan/task traceability | IVSD-M037 | Setup Core; C1 Red/Green and C2 |
+| IVSD-F037 | accepted | High | Composition-integrity requirement | Amanah, Truthfulness; Technical | YAML/directory ambiguity, path metadata, unsafe parser authority, platform overclaim, mixed ownership, or unmeasured scale can change authoritative meaning or conceal prohibited content | E034-E037, E067-E074; final Phase 8 governance, unchanged technical contract/product preimages, independent reviews, and plan/task traceability | IVSD-M037 | Setup Core; C1 Red/Green and C2 |
 | IVSD-F038 | accepted | Blocker | Tenant-isolation boundary | Justice, Rights of People; Technical/Governance | Source identifiers, mappings, profiles, or capabilities can cross target or tenant authority during live and data migration | E034-E036, E038, E075-E147; current repository, predecessor, intake, binding, debate, Red, correction, approval, strict D2-1, D2-2 Domain Green, and final approvable D2-3 Application Red traceability | IVSD-M038 | Server authorization; SA-910, SA-1110–SA-1130 |
 | IVSD-F039 | accepted | Blocker | Authorization/replay boundary | Amanah, Non-Harm; Technical | Stale HAL, bearer replay, duplicate transfer, or local authority synthesis can mutate the wrong target or repeat effects | E034-E036, E075-E147; current repository, predecessor, intake, binding, debate, Red, correction, approval, strict D2-1, D2-2 Domain Green, and final approvable D2-3 Application Red traceability | IVSD-M039 | Security; SA-910–SA-1030 |
 | IVSD-F040 | accepted | Blocker | Secret-provider boundary | Privacy, Avoiding Spying; Technical/Operational | Secret readback or provider-coordinate disclosure would turn Setup into a privileged extraction and reconnaissance client | E004-E006, E034-E036, E075-E147; current repository, predecessor, intake, binding, debate, Red, correction, approval, strict D2-1, D2-2 Domain Green, and final approvable D2-3 Application Red traceability | IVSD-M040 | Secrets + Security; SA-910–SA-930 |
@@ -1085,10 +1085,10 @@ An empty secret placeholder is not a valid deployment. The final review must
 state `Incomplete: secret values still required` and name the keys without
 inventing values.
 
-### IVSD-F008 — Environment Metadata Needs One Canonical Catalogue
+### IVSD-F008 — Environment Metadata Needs One Authoritative Catalogue
 
 The Setup Assistant must not parse human prose in `.env.example` as product
-logic. Introduce a pure canonical catalogue with metadata such as:
+logic. Introduce a pure authoritative catalogue with metadata such as:
 
 - key;
 - category and description resource key;
@@ -1670,11 +1670,11 @@ keys, ambiguous scalar coercion, conflicting fragments, links/reparse points,
 traversal, changed entries, cycles, unknown files, source ordering, and
 unmeasured expansion must fail deterministically before partial output. Source
 paths, source-only metadata, secret values/references, provider identifiers,
-and application data must not enter the normalized model, canonical output,
+and application data must not enter the normalized model, deterministic output,
 diagnostics, measurement records, or hashes.
 
 Every accepted representation compiles through one normalized model and the
-existing serializer/validator to the same canonical v1alpha2 JSON bytes,
+existing serializer/validator to the same authoritative v1alpha2 JSON bytes,
 digest, section coverage, legal limits, and diagnostics. JSON remains the only
 wire identity. Composition stays self-hostable and offline: no network,
 telemetry, provider, remote-reference, resolver, or application-service role is
@@ -1685,7 +1685,7 @@ one frozen patch/assembly/closure approval ratchet, a 21-component final SBOM,
 and a CI source rebuild with semantic package comparison. The Terminal control
 stores bullets rather than the secret, disables clipboard/context/undo paths,
 and retains the real input only in a locked mutable target buffer until the
-canonical Core handoff. Protected Unix output is flushed in an owner-only
+authoritative Core handoff. Protected Unix output is flushed in an owner-only
 temporary and atomically installed without overwrite; cancellation before that
 commit removes the temporary. English/Arabic resources cover visible outcomes,
 while the UI and operator docs continue to disclose unverified screen-reader,
@@ -1702,11 +1702,11 @@ C1 Red disposition and exact graph/content revalidation.
 C1 Red pins fourteen independent matrices: key shape; alias/anchor/tag;
 scalar parity; document shape; parser ceilings; directory escape; links/cycles;
 deterministic TOCTOU; conflict/order; cancellation/partial output; smuggling;
-canonical convergence; zero-value failure; and unknown profiles. The exact
+authoritative convergence; zero-value failure; and unknown profiles. The exact
 future public seam is `SetupCompositionCompiler`, `SetupCompositionLimits`,
 typed source/result/failure contracts, and a directory snapshot/commit barrier;
 tests must not implement a mirror parser, merger, filesystem policy, serializer,
-or canonicalizer.
+or normalizer.
 
 Its positive defaults are exact: 4,194,304 aggregate source bytes; one YAML
 document; 131,072 parser events; 65,536 normalized or aggregate directory
@@ -1724,7 +1724,7 @@ metric value, partial file, or retained handle. No sleep, polling, path-only
 precheck, or mocked filesystem identity counts as evidence.
 
 C1 Green is Core-only and must close all matrices through one normalized model
-and existing canonical authorities. Linux claims require real-filesystem
+and existing authoritative authorities. Linux claims require real-filesystem
 evidence; Windows directory composition remains disabled absent equivalent
 Windows-runner handle/reparse evidence. C2 is scale-only after C1 Green: it
 measures small/medium/large/ceiling profiles while preserving the C1 defaults
@@ -1761,7 +1761,7 @@ description paragraphs, and
 fragment. C2 uses
 `perf(self-hosting): record setup composition scale profiles`, its two bound
 description paragraphs, `Changelog: skip`, and
-`Changelog-Reason: measurement-only governance with unchanged canonical composition defaults`.
+`Changelog-Reason: measurement-only governance with unchanged authoritative composition defaults`.
 All three bind `Message override: Not overridden`.
 
 Index and full diff inspection precede edits or staging. Any path with another
@@ -1807,7 +1807,7 @@ inside configuration artifacts. Before a category moves, the operator sees its
 purpose, source and target custodians, data classes, compatibility blockers,
 retention and source-retention behavior, privacy/erasure authority, and
 failure consequences. Protected staging is purpose-limited and bounded. The
-existing authority-first erasure fact, anti-resurrection fence, canonical PII
+existing authority-first erasure fact, anti-resurrection fence, authoritative PII
 paths, and payload-free evidence remain authoritative across source, staging,
 and target; migration cannot restore erased data or bypass a pending erasure.
 
@@ -1847,7 +1847,7 @@ selectable plans. They never delete or disable source state as an implicit
 success step. Source retention continues until independently governed expiry,
 erasure, or operator action after target integrity and recovery evidence are
 available. Offline export/import remains usable where technically applicable,
-and revoking enrollment does not make an operator's canonical source artifact
+and revoking enrollment does not make an operator's authoritative source artifact
 unusable.
 
 ### IVSD-F045 — Recovery Evidence Must Match Authoritative State
@@ -2218,7 +2218,7 @@ The output algorithm is:
 7. In secret mode, render entered or locally generated values.
 8. Include optional keys only when the user selected the associated feature or
    explicitly chose advanced inclusion.
-9. Sort deterministically by deployment phase, category, and canonical key.
+9. Sort deterministically by deployment phase, category, and stable key.
 10. Render a redacted coverage/readiness report separately.
 
 The generated header must communicate this meaning:
@@ -2228,7 +2228,7 @@ The generated header must communicate this meaning:
 # This file intentionally contains only variables relevant to the selected
 # deployment and features. Supported variables not shown here use documented
 # defaults or belong to features you did not select.
-# See the canonical configuration documentation for the complete catalogue.
+# See the authoritative configuration documentation for the complete catalogue.
 ```
 
 The prose may evolve and must not be pinned by tests. Tests should assert
@@ -2296,7 +2296,7 @@ Recommended lifecycle:
 Draft -> ReviewRequired -> Approved -> Scheduled -> Published -> Retired
 ```
 
-The manifest/package expresses desired legal configuration. Canonical Domain
+The manifest/package expresses desired legal configuration. Authoritative Domain
 mutation creates immutable target versions and acceptance requirements.
 Published/retired history remains persisted evidence outside portable
 configuration.
@@ -2707,7 +2707,7 @@ source migration remain outside this revision.
 | IVSD-M005 | Load first, then enforce and test zero requests after secret-mode entry with strict CSP and no reporters | F005 |
 | IVSD-M006 | Forbid browser persistence and minimize DOM/memory/clipboard exposure; disclose extension/device limits | F006 |
 | IVSD-M007 | Render empty placeholders only for relevant selected secrets and mark readiness incomplete | F007 |
-| IVSD-M008 | Introduce one non-secret canonical environment catalogue that generates/validates every consumer | F008 |
+| IVSD-M008 | Introduce one non-secret authoritative environment catalogue that generates/validates every consumer | F008 |
 | IVSD-M009 | Keep manifests/packages and `.env` separate in data model, UX, files, and sensitivity labels | F009 |
 | IVSD-M010 | Use native picker, link refusal, restrictive permissions, atomic write, verification, and no plaintext backup | F010 |
 | IVSD-M011 | Minimize secret copies and lifetime; never promise deterministic memory erasure | F011 |
@@ -2736,7 +2736,7 @@ source migration remain outside this revision.
 | IVSD-M034 | Require human approval for writes, legal publication, live apply, and authority broadening | F034 |
 | IVSD-M035 | Publish Terminal.Gui-specific keyboard, screen-reader, RTL, Unicode, resize, signal, scrollback, and small-terminal evidence and state unsupported environments truthfully | F035 |
 | IVSD-M036 | Publish the operational skill only after the implemented CLI/version contract is verified | F036 |
-| IVSD-M037 | Compile bounded JSON/YAML/directory sources offline through one normalized model and the existing canonical serializer; reject ambiguity, path/sensitivity smuggling, parser authority, partial output, and evidence-free scale | F037 |
+| IVSD-M037 | Compile bounded JSON/YAML/directory sources offline through one normalized model and the existing deterministic serialization; reject ambiguity, path/sensitivity smuggling, parser authority, partial output, and evidence-free scale | F037 |
 | IVSD-M038 | Reauthorize exact target, tenant, category, and actor server-side; keep mappings tenant-qualified and fail closed on lineage conflict | F038 |
 | IVSD-M039 | Use short-lived target-qualified HAL capabilities, protected revocable handles, request binding, expiry, and replay fencing for every live effect | F039 |
 | IVSD-M040 | Permit only server-authorized write/readiness operations; prohibit raw readback, provider-coordinate disclosure, portable bindings, and provider SDK access from Setup | F040 |
@@ -2760,7 +2760,7 @@ source migration remain outside this revision.
 5. **Generate every known environment variable.** Rejected because it creates
    noise, unsafe accidental activation, and an unmaintainable file.
 6. **Write documented defaults explicitly.** Rejected by default because
-   omitted values should continue to receive canonical runtime defaults; an
+   omitted values should continue to receive authoritative runtime defaults; an
    advanced explicit-default export may be separately labeled.
 7. **Combine manifest and `.env`.** Rejected because a shareable artifact would
    become secret-bearing.
@@ -2888,7 +2888,7 @@ secret-bearing dotenv generation.
 - embedded AI adds provider keys, telemetry, or nondeterministic behavior;
 - GPL/AGPL dependency is linked into a target expected to remain
   alternatively licensable without explicit approval;
-- YAML merge order, aliases, paths, or directory enumeration change canonical
+- YAML merge order, aliases, paths, or directory enumeration change authoritative
   meaning;
 - a source tenant/object identifier is trusted as target authority;
 - an expired capability or retried chunk repeats a live effect;
@@ -3193,7 +3193,7 @@ traceability only. It does not establish stakeholder or operational validation.
 |---|---|---|
 | E001 | `.env.example` | Current environment template and user-facing variable surface |
 | E002 | `docker-compose.yml` | Compose interpolation and deployment profiles |
-| E003 | `docs/CONFIGURATION.md` | Canonical configuration behavior and sources |
+| E003 | `docs/CONFIGURATION.md` | Authoritative configuration behavior and sources |
 | E004 | `docs/SECRETS.md` | Secret-provider and `.env` boundaries |
 | E005 | `docs/SECURITY-MODEL.md` | BFF, token, logging, and secret trust patterns |
 | E006 | `src/Explore.Domain/Secrets/SecretDefinitionRegistry.cs` | Secret keys, scopes, source types, and environment names |
@@ -3244,7 +3244,7 @@ traceability only. It does not establish stakeholder or operational validation.
 | E068 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-yaml-probe-evidence.md` | Isolated YamlDotNet 18.1.0 one-node graph, content and artifact hashes, signature/audit/license observations, syntax-tree-only execution, and product non-drift without activation authority |
 | E069 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-corrected-review-bindings.md` | Exact corrected C1 Red/C1 Green/C2 split, all bound hashes, unchanged product preimages, owned-path/commit closures, and drift/authority boundary |
 | E070 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-dependency-review.md` | Independent dependency/IP approval for exact YamlDotNet 18.1.0 one-node graph and bounded syntax-tree role only, with product activation withheld |
-| E071 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-security-review.md` | Fourteen adversarial matrices, parser/filesystem/canonical/zero-value boundaries, platform evidence requirements, and conditional Green/scale gates |
+| E071 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-security-review.md` | Fourteen adversarial matrices, parser/filesystem/authoritative/zero-value boundaries, platform evidence requirements, and conditional Green/scale gates |
 | E072 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-cto-review.md` | Pre-correction `Split before approval` verdict that required the now-bound split, ceilings, public seam, Worst Break, owned paths, verification, and commit governance; not CTO approval of E069 |
 | E073 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-corrected-cto-review.md` | Corrected-revision `Approve with required changes` verdict accepting the technical contract while requiring literal commit copy, change-fragment/Change-Id governance, and mixed-author blockers before execution |
 | E074 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-final-review-bindings.md` | Final governance-only binding with exact two-file Red, exact Green/C2 new paths, central-pin read-only rule, literal messages/footers/override state, mixed-author blockers, unchanged technical scope, and all hashes |
@@ -3365,7 +3365,7 @@ transitives, a valid NuGet.org repository signature, no vulnerability or
 deprecation finding, MIT metadata, and successful restore/build/execution. Its
 role is limited to bounded in-memory syntax-tree parsing; no deserializer,
 serializer/emitter, dynamic type, naming policy, remote resolver, file,
-directory, network, telemetry, provider, Setup schema, canonical serializer,
+directory, network, telemetry, provider, Setup schema, deterministic serialization,
 validator, or wire authority was exercised. The product and test preimages did
 not drift.
 
@@ -3374,7 +3374,7 @@ conditional Phase 8 progression under IVSD-F037/M037. It is not dependency/IP,
 security, CTO, package-reference, implementation, support, release, or shipping
 approval. All Phase 8 restore/build/test commands must use the binding's four
 safe CLI variables and isolated package cache. Material drift in a bound file,
-parser identity/version/graph/role, source grammar, limits, canonical authority,
+parser identity/version/graph/role, source grammar, limits, authoritative authority,
 smuggling boundary, measurement profile, CLI environment, or review verdict
 makes this report stale.
 
@@ -3406,8 +3406,8 @@ The corrected split is provider-responsibility aligned. C1 Red now makes every
 material composition failure independently attributable and binds exact public
 seams, ceilings, deterministic barriers, claimed-platform evidence, the Phase
 8 Worst Break, and no-partial/value-free outcomes. C1 Green isolates Core parser
-and canonical parity from presentation and scale pressure. C2 cannot change the
-canonical default and cannot enable an unevidenced profile. Exact owned paths,
+and authoritative parity from presentation and scale pressure. C2 cannot change the
+standard default and cannot enable an unevidenced profile. Exact owned paths,
 phase-attributable failure ownership, explicit-path staging, unrelated-state
 preservation, material-override recording, and post-commit file/hash checks
 make each slice auditable without granting commit authority.
@@ -3454,7 +3454,7 @@ Every title, description paragraph, changelog outcome, trailer, and `Message
 override: Not overridden` value is literal. Mixed-author paths block rather than
 leak unrelated hunks into a slice. These corrections strengthen truthful,
 auditable ownership under IVSD-F037/M037 without changing a matrix, ceiling,
-public seam, parser role, platform claim, canonical authority, Worst Break,
+public seam, parser role, platform claim, authoritative authority, Worst Break,
 default, provider decision, stakeholder impact, or product preimage. No new
 finding or mitigation is needed.
 
@@ -3620,7 +3620,7 @@ provider-responsibility finding.
 
 Fresh D2-0 review accepted isolation, ownership, and claim scope but returned
 `Changes required` because the barrier did not match event ID/name and the
-canonical ledgers omitted the bound D2 stages/providers. Final D2-0b is bound
+evidence ledger omitted the bound D2 stages/providers. Final D2-0b is bound
 by:
 
 - **E091:** D2-0b review binding
@@ -3656,7 +3656,7 @@ migration providers. No migration, provider, product, client, protected
 profile, adapter, or capability behavior exists. This remains aligned with
 IVSD-F038/M038, F039/M039, and F040/M040 without a new finding.
 
-D2-0b technical review then returned `Changes required` only because canonical
+D2-0b technical review then returned `Changes required` only because authoritative
 tasks/context still advertised obsolete resume state. Status-only D2-0c is
 bound by:
 
@@ -3862,7 +3862,7 @@ mitigation into:
     exact-graph and authority gates;
 28. a schema-compliant skill created only after CLI implementation;
 29. architecture tests proving no embedded AI/provider dependency;
-30. canonical JSON/YAML/directory composition and bounded scale;
+30. normalized JSON/YAML/directory composition and bounded scale;
 31. live target/tenant enrollment, revocation, and replay fencing;
 32. write-only target-local secret binding without provider-coordinate exposure;
 33. HAL-authoritative live apply, transfer, cancellation, receipt, and recovery;
@@ -3947,7 +3947,7 @@ introduced.
   already governs source ambiguity and evidence-bound scale.
   IVSD-F038/M038, F039/M039, and F040/M040 now govern exact D1 tenant,
   capability/replay/HAL, protected-profile, provider-coordinate, write-only
-  secret, and readback boundaries; F002/F009/F020/F022 preserve canonical Core,
+  secret, and readback boundaries; F002/F009/F020/F022 preserve authoritative Core,
   secret separation, no provider extraction, and evidence limits.
 - **Required plan mappings for preserved scope:** Plan Section 9 maps
   `IVSD-F001/M001` through `IVSD-F036/M036` to Scenarios 3.1–3.12 and 3.16 and
@@ -4076,7 +4076,7 @@ introduced.
 | 2026-09-01 | current / plan-aligned | current / plan-aligned | Exact user approval authorized one API test; final D1 compiled and discovered 10/10 tests, all ten failed only for the absent exact owner/literal routes with no pass/skip or premature deeper assertion | Post-Red binding `setup-assistant-security-and-portability-phase9-post-red-20260901`, `sha256:494db8d6a5c0be3bb5f66b12f50ce70fe2995626355ae0545fc6021778133dd3`; D2 remains conditional on fresh post-Red review and exact approval |
 | 2026-09-01 | current / plan-aligned | stale / changes-required | Post-Red review accepted the absence Red but found shared database/time/authorization/telemetry state, request double-disposal, arbitrary activity barriers, and unsupported writer/resolver-call claims | Review `sha256:fa6d9ad2f13624e3e8b0af6a5abb2477fb7eea7d553c6b1ce672028561d00994` |
 | 2026-09-01 | stale / changes-required | current / plan-aligned | D2-0 isolated every test, fixed single HTTP ownership, replaced arbitrary activity barriers with exact value-free structured log milestones, narrowed claims to observed evidence, and retained 10/10 attributable absence failures | D2-0 binding `setup-assistant-security-and-portability-phase9-d2-0-final-20260901`, `sha256:b159e98a4202efff1cb5b175343d6befa093035160d3d6c9a90ded29ffa66a43`; product D2 still requires fresh review and exact approval |
-| 2026-09-01 | current / plan-aligned | stale / changes-required | D2-0 review accepted isolation/ownership/claim scope but found milestone matching omitted exact event ID/name and canonical ledgers omitted D2-1 through D2-11 plus all migration providers | Review `sha256:c6a4bc75f9a887802eb5fa518b055902980869f60e7786f9ecaafd6ea4741cc2` |
+| 2026-09-01 | current / plan-aligned | stale / changes-required | D2-0 review accepted isolation/ownership/claim scope but found milestone matching omitted exact event ID/name and evidence ledger omitted D2-1 through D2-11 plus all migration providers | Review `sha256:c6a4bc75f9a887802eb5fa518b055902980869f60e7786f9ecaafd6ea4741cc2` |
 | 2026-09-01 | stale / changes-required | current / plan-aligned | D2-0b matches event ID/name/operation/milestone, narrows mismatch evidence to HTTP shape/value exclusion, records D2-1 through D2-11 in plan/tasks/context, names all five generated migration providers, and retains 10/10 attributable Red | D2-0b binding `setup-assistant-security-and-portability-phase9-d2-0b-final-20260901`, `sha256:6fac4deb374ad98f1d9baad71e129d150ca8a841311f5633191d52d3993b92ea`; product D2 still requires fresh review and explicit approval |
 | 2026-09-01 | current / plan-aligned | stale / changes-required | D2-0b review accepted technical Red/staging but found tasks/context resume metadata still pointed at obsolete B1/Phase-8 work and omitted D2-1 as the next gated slice | Review `sha256:4e2b243aeed3872606652481858d233034bc3c8d59de801b4b93e7be8c13bb2c` |
 | 2026-09-01 | stale / changes-required | current / plan-aligned | Status-only D2-0c makes tasks/context identify final review plus explicit `approve` as next, D2-1 Wire Red as the sole first product slice, later layers/providers/generators gated, and capability flags false | D2-0c binding `setup-assistant-security-and-portability-phase9-d2-0c-final-20260901`, `sha256:83bdf2889ed66f5c4aab6e407d025d15e6b8d6e53fe03ea25afee37c39f70c34`; product D2 still requires fresh review and explicit approval |
@@ -4089,7 +4089,7 @@ introduced.
 | 2026-09-01 | current / plan-aligned | current / plan-aligned | Final D2-0f review approved the complete staged packet at 100/100 and the user explicitly approved it; D2-1 Wire Red became the sole authorized first product action | Review `sha256:fba631d7436e08ab397c72df4de04dacbcebfa150be258fd4bd03897bf5510e8`; approval `sha256:a5d01cb1d91a071c7885316edb3ec27f244d8f36e44687ebe6d4344dbeb6b97e` |
 | 2026-09-01 | current / plan-aligned | current / plan-aligned | D2-1 observed attributable Wire/Core/Architecture Red, then added only package-free immutable transport vocabulary and passed focused/full Wire, Core, Architecture, product-build, LSP, package-graph, and whitespace gates | D2-1 binding `setup-assistant-security-and-portability-phase9-d2-1-green-20260901`, `sha256:cb2292e484bf137c5b6f4d963733fa282cc54100dc50ec06f226ca2b7261c3e9`; D2-2 requires fresh focused review |
 | 2026-09-01 | current / plan-aligned | stale / changes-required | Initial D2-1 review reproduced clear capability default serialization plus null/invalid challenge, null/duplicate/numeric scope, numeric enum, and incomplete shipped-context test failures | Review `sha256:61976036324b4f436ec3fd6271c18ae88de4ae2b14dbb1e5da6129f1873014ba` |
-| 2026-09-01 | stale / changes-required | current / plan-aligned | Corrected D2-1 removes public capability data, adds canonical typed challenge and strict scope/enum converters, exercises the shipped context/default serializer, closes metadata aliases, and passes 8/8 focused plus 35/35 full Wire and architecture gates | Corrected binding `setup-assistant-security-and-portability-phase9-d2-1-corrected-green-20260901`, `sha256:1fa56ed5cf964151826cfd68a712657cb963ff29f5c1f4d10291ccaaccd6c2f7`; D2-2 requires fresh focused review |
+| 2026-09-01 | stale / changes-required | current / plan-aligned | Corrected D2-1 removes public capability data, adds authoritative typed challenge and strict scope/enum converters, exercises the shipped context/default serializer, closes metadata aliases, and passes 8/8 focused plus 35/35 full Wire and architecture gates | Corrected binding `setup-assistant-security-and-portability-phase9-d2-1-corrected-green-20260901`, `sha256:1fa56ed5cf964151826cfd68a712657cb963ff29f5c1f4d10291ccaaccd6c2f7`; D2-2 requires fresh focused review |
 | 2026-09-01 | current / plan-aligned | current / plan-aligned | Corrected D2-1 review closed every serializer/capability/metadata finding at 100/100 and authorized D2-2 Domain Red only | Review `sha256:cd9b41d98111914e4aba5a392ebe0fe9d981c52f4d2d376a75eae74ca68ca72c` |
 | 2026-09-01 | current / plan-aligned | current / plan-aligned | D2-2 added one reflection-driven public-behavior Domain test file; seven tests compile and fail only for absent enrollment, issuance-claim, and secret-operation owners, with no Domain product path | D2-2 Red binding `setup-assistant-security-and-portability-phase9-d2-2-red-20260901`, `sha256:08cd9144a496522f27da007dd611177eae8a87798f662ea30302d53b6a03556a`; Green requires focused Red review |
 | 2026-09-01 | current / plan-aligned | current / changes-required | Initial D2-2 review found incomplete cross-bound dispatch, replay/commitment, mutation atomicity, temporal/overflow, public-surface, audit, and concurrency contracts | Review `sha256:9176183c69a1b595182acbfdb58a603d4a478be6b3622dfaa06476223a010c05`; no Green authority |
@@ -4139,7 +4139,7 @@ Refresh this report when:
 - Phase 8 split, fourteen matrices, exact ceilings, public seam, deterministic
   barriers, Worst Break, owned paths, verification/commit governance, source
   grammar, parser identity/version/graph/role, platform claims, directory safety,
-  canonical bytes/diagnostics, source-path or sensitivity exclusion, defaults,
+  normalized bytes/diagnostics, source-path or sensitivity exclusion, defaults,
   measurement profiles, target-server compatibility, safe CLI environment, or
   review verdict changes; or
 - implementation evidence, stakeholder feedback, incidents, approval revision,

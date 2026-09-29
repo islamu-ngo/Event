@@ -104,7 +104,7 @@ Reviewer: unexposed independent handoff reviewer; date as above. Each implemente
 
 Dependency decision: no new dependency, package version, generated asset, or licensing mode is introduced. Use the already present ASP.NET Core Data Protection facilities; this is not a new or blanket approval of third-party licensing terms. Existing repository dependency gates remain applicable to the implementation phase.
 
-This documentation-only task uses diff/format and local-link checks; it does not run product builds, architecture suites, or dependency scans. The broader intent registry's implementation gates remain pending with the feature; AGENTS.md section 8 scopes this artifact's verification to documentation. No intent registry, skill schema, canonical governance document, or twin rule changes are required for this handoff.
+This documentation-only task uses diff/format and local-link checks; it does not run product builds, architecture suites, or dependency scans. The broader intent registry's implementation gates remain pending with the feature; AGENTS.md section 8 scopes this artifact's verification to documentation. No intent registry, skill schema, authoritative governance document, or twin rule changes are required for this handoff.
 
 Evidence location: this task-owned handoff. Commit, PR, durable journal entry, implementation attestations, final AFC/SSO disposition, and feature runtime results must be linked when available; none is claimed by this document. The coordinator owns those follow-ups outside this reviewer's file ownership.
 

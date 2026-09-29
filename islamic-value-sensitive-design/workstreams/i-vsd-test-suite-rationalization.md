@@ -124,7 +124,7 @@ No scholarly escalation is required. Technical escalation is required before del
 
 ## Evidence Reviewed
 - Evidence packet digest: `sha256:72b7d1f34068ec891d112ee7a29302c993e55833d8ae33dbd4d33ea449410373`
-- Canonical governance: `AGENTS.md`, `.agents/CONTEXT_ENGINEERING.md`, `.agents/rules/tests.md`, `docs/QUICK_REFERENCE.md`, `docs/GOVERNANCE.md`, `docs/OPERATIONS.md`, `docs/TESTING.md`
+- Authoritative governance: `AGENTS.md`, `.agents/CONTEXT_ENGINEERING.md`, `.agents/rules/tests.md`, `docs/QUICK_REFERENCE.md`, `docs/GOVERNANCE.md`, `docs/OPERATIONS.md`, `docs/TESTING.md`
 - Topology: `Explore.slnx`, `.github/workflows/_build-test.yml`, `.github/workflows/test.yml`
 - Representative pathology and invariant files named in the implementation plan evidence log
 - Repository inventory/search outputs captured in the planning session

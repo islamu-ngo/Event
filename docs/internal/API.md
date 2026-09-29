@@ -92,9 +92,9 @@ check. No client timestamp or new concurrency authority is introduced.
 
 For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Generated OpenAPI output remains the endpoint and DTO reference; Scalar is a development/testing UI over that contract.
 
-### Canonical Instance Onboarding Journey
+### Authoritative Instance Onboarding Journey
 
-The profile's internal `canonicalUrl` preserves scheme, port and path base. The
+The profile's internal `publicUrl` preserves scheme, port and path base. The
 InteractiveServer setup component supplies it from the effective BFF request, with
 no URL form field. Persistence still requires authorized setup. `PUBLIC_BASE_URL`
 overrides automatic resolution and participates in the journey generation. There
@@ -144,7 +144,7 @@ Local operation does not change the journey generation or repository readiness.
 The duplicate `GET /api/system/onboarding-preflight` and its generated method are
 removed with no alias. Clients refresh the journey, and save profile through the
 existing setup-only PATCH operation before refreshing readiness. Persisted profile
-projection includes the stored canonical host; it does not invent a URL scheme or
+projection includes the stored authoritative host; it does not invent a URL scheme or
 persist the non-persisted purpose/time-zone fields.
 
 ### Keycloak Operator Operations
@@ -193,11 +193,11 @@ The OpenAPI document defines wire shape; repository generation policy defines th
 
 This is a source-level breaking change for consumers of the generated C# client: use object initializers or `with` copies instead of post-construction mutation. It is not a wire-format compatibility layer, and the pre-v1 repository carries no legacy generated-client variant.
 
-Build `Explore.API` in Release to export the schema, then build `Explore.Blazor.Client` to regenerate the client. Generation alone uses `dotnet msbuild src/Explore.Blazor.Client/Explore.Blazor.Client.csproj -t:GenerateApiClient -p:Configuration=Release`, not a direct NSwag invocation: the target includes repository repairs, validation, and publication. API export and client preparation write private intermediates; publication replaces each canonical file through a closed temporary sibling and same-filesystem rename. Failed preparation leaves the published file unchanged, and identical bytes do not change its timestamp.
+Build `Explore.API` in Release to export the schema, then build `Explore.Blazor.Client` to regenerate the client. Generation alone uses `dotnet msbuild src/Explore.Blazor.Client/Explore.Blazor.Client.csproj -t:GenerateApiClient -p:Configuration=Release`, not a direct NSwag invocation: the target includes repository repairs, validation, and publication. API export and client preparation write private intermediates; publication replaces each primary file through a closed temporary sibling and same-filesystem rename. Failed preparation leaves the published file unchanged, and identical bytes do not change its timestamp.
 
-Within a solution build, client builds wait for the API's normal build/export target before preparing or compiling the client. The standalone architecture-project entry point establishes the same order before resolving its references. These dependencies preserve ordinary global-property identities; verification does not request another API/client variant or propagate a schema-path override. Standalone client builds remain canonical-schema-driven, and the generation-only command above operates on the selected schema without compiling either application. Incremental preparation compares selected schema bytes with the captured schema, so switching to an older-timestamp input cannot reuse another contract's completion stamp.
+Within a solution build, client builds wait for the API's normal build/export target before preparing or compiling the client. The standalone architecture-project entry point establishes the same order before resolving its references. These dependencies preserve ordinary global-property identities; verification does not request another API/client variant or propagate a schema-path override. Standalone client builds remain authoritative-schema-driven, and the generation-only command above operates on the selected schema without compiling either application. Incremental preparation compares selected schema bytes with the captured schema, so switching to an older-timestamp input cannot reuse another contract's completion stamp.
 
-The client compiles its captured intermediate source. Architecture builds embed that completed schema, client source, and mutable policy into the test assembly. Generated-contract checks read those embedded inputs, including during `--no-build` runs, rather than live source-tree artifacts. Missing captures fail collection instead of falling back to canonical files; normal generation restores missing outputs. When selected, the existing OpenAPI CI workflow regenerates and compares canonical schema/client artifacts. Its pre-existing path filter does not cover changes limited to `nswag.pertag.json` or `EventApiTagClients.g.cs`, so contributors must also run the generation command and inspect the generated diff locally. Concurrent external builds sharing the same project `bin`/`obj` are not supported; ordinary consumers within one solution build share their producer identity. Test serialization is not the publication mechanism.
+The client compiles its captured intermediate source. Architecture builds embed that completed schema, client source, and mutable policy into the test assembly. Generated-contract checks read those embedded inputs, including during `--no-build` runs, rather than live source-tree artifacts. Missing captures fail collection instead of falling back to primary file; normal generation restores missing outputs. When selected, the existing OpenAPI CI workflow regenerates and compares authoritative schema/client artifacts. Its pre-existing path filter does not cover changes limited to `nswag.pertag.json` or `EventApiTagClients.g.cs`, so contributors must also run the generation command and inspect the generated diff locally. Concurrent external builds sharing the same project `bin`/`obj` are not supported; ordinary consumers within one solution build share their producer identity. Test serialization is not the publication mechanism.
 
 See [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) for exact eligibility, privacy-safe diagnostics, generation steps, and focused tests.
 
@@ -279,7 +279,7 @@ Three-reader non-URL versioning — clients may use any of the following; all th
 3. **Custom-header strategy**: `X-Api-Version: 0.1` request header.
 4. Default API version is `0.1` when unspecified (`AssumeDefaultVersionWhenUnspecified = true`).
 5. Version is reported in response headers via `Asp.Versioning` middleware (`ReportApiVersions = true`).
-6. **URL-segment versioning is intentionally NOT supported** — every endpoint has exactly one canonical path (`/api/controller`). This invariant is enforced by the `NoUrlSegmentVersioning` contract test so that `operationId`, `RouteNames`, and HAL link generation stay stable across versions.
+6. **URL-segment versioning is intentionally NOT supported** — every endpoint has exactly one primary path (`/api/controller`). This invariant is enforced by the `NoUrlSegmentVersioning` contract test so that `operationId`, `RouteNames`, and HAL link generation stay stable across versions.
 
 ## Controller Conventions
 
@@ -393,7 +393,7 @@ context without adding grants. A reparenting update separately checks the
 persisted destination's `Event:update` authority before attachment or mutation;
 submitted destination authority never replaces source authority.
 
-Public list/detail retain canonical eligibility and policy-filtered location
+Public list/detail retain authoritative eligibility and policy-filtered location
 disclosure; managed list/detail retain `Event:ViewManagement`, parent binding
 and private/no-store HTTP responses. Managed detail alone retains exact location
 IDs. MCP management descriptors omit physical location information. Nullable
@@ -419,7 +419,7 @@ its handler exposes Task-based `QueryAsync`. `EventAgendaItemController` injects
 that exact closed port alongside its seven native agenda-item ports, removing
 its last mediator dependency. Automatic native registration retains authorization
 -> performance -> handler composition. This is a public query, not a management
-grant: the handler checks canonical persisted public eligibility before reading
+grant: the handler checks authoritative persisted public eligibility before reading
 published days, public sessions and public agenda items. It has no nested sender.
 
 The existing merge omits sessions missing required schedule projections, groups
@@ -466,7 +466,7 @@ claimed or introduced by this repair.
 
 `CreateEventSessionLanguageCommand` retains session authorization and manual input validation. The repository insert remains arbitrated by the existing unique `(TenantId, EventSessionId, LanguageId)` index, including concurrent requests; there is no check-then-insert substitute for that constraint. `EventSessionLanguageRepository` translates only that exact model-derived index violation through the existing provider-aware constraint classifier into `EventSessionLanguageAlreadyAssignedException`, detaching the rejected assignment. The command maps that exception to its established validation result, and the controller returns HTTP 400 ValidationProblemDetails (`validation_failed`, `errors.program`). Unrelated primary-key, foreign-key and other database failures are not classified as duplicate assignments.
 
-This replaces provider-dependent duplicate-create 500 responses without changing routes, successful 201 payloads, OpenAPI/client shapes or the unique index. No migration or configuration change is required. The inherited repository create signature remains tokenless; this repair does not claim database-write cancellation support. `NativeEventSessionLanguageHttpTests` covers sequential duplicates, two real inserts synchronized before persistence, durable uniqueness, and unrelated constraint failures on canonical SQLite; other provider execution remains part of the workstream matrix.
+This replaces provider-dependent duplicate-create 500 responses without changing routes, successful 201 payloads, OpenAPI/client shapes or the unique index. No migration or configuration change is required. The inherited repository create signature remains tokenless; this repair does not claim database-write cancellation support. `NativeEventSessionLanguageHttpTests` covers sequential duplicates, two real inserts synchronized before persistence, durable uniqueness, and unrelated constraint failures on authoritative SQLite; other provider execution remains part of the workstream matrix.
 
 ### Registration Provider Management Capabilities
 
@@ -748,7 +748,7 @@ Account-owned and capability-scoped guest orders expose idempotent payment start
 
 Payment state is one of `Created`, `Processing`, `RequiresAction`, `Unknown`, `Failed`, `Cancelled`, `Succeeded`, or `NeedsReconciliation`. Start only claims or reuses the durable attempt/dispatch effect and never calls the provider synchronously. Retry is available for a parked pre-handoff dispatch with no provider session or an authoritative terminal `Failed`/`Cancelled` attempt; ambiguous, processing, succeeded, and reconciliation-required states never advertise it. Idempotency identity binds the tenant key to the resolved path/route values and a SHA-256 capability scope; raw capability values are never persisted or logged. Successful replay restores protected `Cache-Control: private, no-store` metadata. `checkout-redirect` is an antiforgery-protected, rate-limited, PathBase-aware same-origin BFF `POST` executed by browser fetch in every Blazor render mode. Anonymous rate partitions use only trusted effective remote IP plus resolved tenant; authenticated partitions use stable user ID, never checkout or antiforgery cookies. Issue prepares the compact cookie, rechecks `RequestAborted`, commits the bounded server-side target, rechecks again, and only then writes cookies; cancellation triggers compare-and-delete rollback. The constant GET requires `Sec-Fetch-Site: same-origin` exactly before validating origin, PathBase, tenant/order, expiry, dedicated-session digest, and current allowlist, then peeks and atomically consumes the target. Split requires healthy Redis and Combined standalone uses bounded expiry scavenging. URL paths and traces contain no bearer ticket, capability, PII, provider account, API token, or provider URL.
 
-Checkout creation runs asynchronously from the Quartz `payment-reconciliation-drain` job. It uses the canonical public HTTPS origin for success/cancel navigation, the persisted connected account and idempotency key, and the configured Checkout-host allowlist. Signed Connect callbacks only persist a normalized inbox envelope and make reconciliation due. Authoritative connected-account Checkout and PaymentIntent retrieval, exact amount/currency/application-fee matching, and fenced monotonic settlement determine payment truth; browser return navigation never does.
+Checkout creation runs asynchronously from the Quartz `payment-reconciliation-drain` job. It uses the authoritative public HTTPS origin for success/cancel navigation, the persisted connected account and idempotency key, and the configured Checkout-host allowlist. Signed Connect callbacks only persist a normalized inbox envelope and make reconciliation due. Authoritative connected-account Checkout and PaymentIntent retrieval, exact amount/currency/application-fee matching, and fenced monotonic settlement determine payment truth; browser return navigation never does.
 
 Terminal `Failed` or `Cancelled` retry persists release of the old active slot before creating one replacement. Capability-aware replay recognizes only safe `Created + Pending` or `DispatchPending + Failed` replacement states and returns the same attempt/effect; `Unknown` and `Succeeded` remain forbidden, and expired guest capability remains `404`. A normalized `PublicBaseUrl` subpath is preserved in Checkout success/cancel URLs.
 
@@ -806,7 +806,7 @@ Authenticated registration-form authoring is rooted at `/api/events/{eventId:gui
 
 The surface provides event-purpose workflow read/create/update; requirement create/update/delete; form create/read; version create-or-clone/read; draft section, field, option, and bounded-rule mutations; publication preflight; and publication. Reads are authenticated and `private, no-store`. Writes use the `WritePolicy`, require a strong quoted `If-Match` containing the observed parent/root concurrency stamp, and return `409 Conflict` for stale observations. Preflight rejects empty forms, incomplete choice options, unresolved or forward condition references, and explicit-consent fields without both a purpose code and text version. Publication always invokes the Application publication facade and atomically pins the exact generated data, UI, logic, and mapping artifacts plus their lowercase SHA-256 hash; callers never supply schema JSON or hashes.
 
-The canonical preflight operation is `POST /api/events/{eventId:guid}/registration-forms/{formId:guid}/versions/{versionId:guid}/preflight` (`GetRegistrationFormPublishPreflight`); the former `publish:preflight` spelling is not part of the contract. The generated OpenAPI document, NSwag client, and `API_CONTRACT_INVENTORY.md` are regenerated from this route and checked for byte-level determinism.
+The authoritative preflight operation is `POST /api/events/{eventId:guid}/registration-forms/{formId:guid}/versions/{versionId:guid}/preflight` (`GetRegistrationFormPublishPreflight`); the former `publish:preflight` spelling is not part of the contract. The generated OpenAPI document, NSwag client, and `API_CONTRACT_INVENTORY.md` are regenerated from this route and checked for byte-level determinism.
 
 Draft authoring resources expose only state-valid, permission-checked HAL relations such as `edit`, `add-section`, `add-field`, `add-option`, `add-rule`, `preflight`, and `publish`. Published versions expose read, preflight, and new-version navigation only; child mutation relations are omitted. DTOs expose normalized lookup IDs/codes/names, lifecycle status, provenance, schema hash, and concurrency stamps, with no provider question IDs, claims, roles, or local capability booleans.
 
@@ -1101,7 +1101,7 @@ Outgoing product webhooks are managed under `/api/webhooks`. These routes config
 
 | Verb | Route | Route Name | Purpose | Response |
 |---|---|---|---|---|
-| `GET` | `/api/webhooks/event-types` | `GetWebhookEventTypes` | Public canonical event catalog with schema/example metadata. | `IReadOnlyList<WebhookEventTypeDto>` |
+| `GET` | `/api/webhooks/event-types` | `GetWebhookEventTypes` | Public primary event catalog with schema/example metadata. | `IReadOnlyList<WebhookEventTypeDto>` |
 | `GET` | `/api/webhooks/consumers` | `GetWebhookConsumers` | Tenant-scoped webhook consumers/integration owners visible to the caller. | HAL collection of `WebhookConsumerDto` |
 | `GET` | `/api/webhooks/consumers/{consumerId}` | `GetWebhookConsumerById` | One tenant-scoped webhook consumer. | HAL resource of `WebhookConsumerDto` |
 | `POST` | `/api/webhooks/consumers` | `CreateWebhookConsumer` | Create a tenant-scoped consumer for Local/Svix/Composite/DryRun/Disabled mode. | `BaseCommandResponse<Guid>` |
@@ -1112,7 +1112,7 @@ Outgoing product webhooks are managed under `/api/webhooks`. These routes config
 | `DELETE` | `/api/webhooks/endpoints/{endpointId}` | `DeleteWebhookEndpoint` | Archive a tenant-scoped webhook endpoint while preserving delivery history. | `204 No Content` |
 | `POST` | `/api/webhooks/endpoints/{endpointId}/rotate-secret` | `RotateWebhookEndpointSecret` | Rotate the endpoint signing secret reference while preserving a bounded previous-secret overlap window. | `BaseCommandResponse<Guid>` |
 | `POST` | `/api/webhooks/endpoints/{endpointId}/test` | `TestWebhookEndpoint` | Schedule a signed LocalProvider test delivery for one active tenant-scoped endpoint. | `BaseCommandResponse<Guid>` |
-| `GET` | `/api/webhooks/messages` | `GetWebhookMessages` | Tenant-scoped canonical webhook messages and provider handoff state. | HAL collection of `WebhookMessageDto` |
+| `GET` | `/api/webhooks/messages` | `GetWebhookMessages` | Tenant-scoped authoritative webhook messages and provider handoff state. | HAL collection of `WebhookMessageDto` |
 | `GET` | `/api/webhooks/messages/{messageId}` | `GetWebhookMessageById` | One tenant-scoped webhook message without raw payload material. | HAL resource of `WebhookMessageDto` |
 | `GET` | `/api/webhooks/messages/{messageId}/payload` | `GetWebhookMessagePayload` | Separately authorized exact payload bytes while the tenant-scoped retention window remains open. | `WebhookMessagePayloadDto` |
 | `GET` | `/api/webhooks/delivery-attempts` | `GetWebhookDeliveryAttempts` | Tenant-scoped LocalProvider delivery attempts, optionally filtered by message or endpoint. | HAL collection of `WebhookDeliveryAttemptDto` |
@@ -1133,16 +1133,16 @@ Contract rules:
 - Endpoint DTOs expose normalized status fields, provider endpoint ids, bounded timeout/retry/rate-limit settings, last success/failure timestamps, and enabled subscription event types. They never expose `secretRef` or secret material.
 - Endpoint create derives `tenantId` from `ITenantContext`, requires an active tenant-local consumer, validates an absolute HTTP(S) URL, stores only the supplied secret reference, rejects duplicate tenant/consumer URLs, and fails closed when requested event type IDs are missing, duplicated, disabled, or unknown.
 - Endpoint update replaces URL, delivery controls, and the enabled event-type subscription set after validating all requested event types. It does not rotate signing secrets; secret rotation remains a separate route.
-- Endpoint delete is a soft archive operation. Archived endpoints leave active lists and lose mutation HAL affordances while preserving canonical delivery history.
+- Endpoint delete is a soft archive operation. Archived endpoints leave active lists and lose mutation HAL affordances while preserving authoritative delivery history.
 - Endpoint secret rotation accepts `newSecretRef` and optional `previousSecretValidForSeconds` only. It never accepts or returns raw signing secret material, rejects unchanged secret references, increments `secretVersion`, stores the old reference as `previousSecretRef`, and sets a bounded `previousSecretValidUntil` transition window. Repeated calls without an `Idempotency-Key` create distinct rotations.
-- Endpoint test scheduling creates a canonical `webhook.test` message plus one LocalProvider delivery attempt for the target endpoint. It requires an active Local or Composite consumer endpoint; Svix-managed endpoint tests belong in the Svix App Portal because Svix owns provider-side endpoint delivery/replay semantics.
+ - Endpoint test scheduling creates an authoritative `webhook.test` message plus one LocalProvider delivery attempt for the target endpoint. It requires an active Local or Composite consumer endpoint; Svix-managed endpoint tests belong in the Svix App Portal because Svix owns provider-side endpoint delivery/replay semantics.
 - Message DTOs expose tenant, event type, event id, aggregate reference, consumer/provider state, payload hash, and retention timestamps. They intentionally do not expose `payloadJson` or raw sensitive event data.
-- Payload reads require the distinct `webhook:view-payload` action. The dedicated response base64-encodes the canonical bytes and includes only content type/encoding, hash, byte length, retention cutoff, and retrieval time. The action writes a mandatory `PAYLOAD_VIEWED` audit before returning data and fails closed if audit persistence fails.
+- Payload reads require the distinct `webhook:view-payload` action. The dedicated response base64-encodes the normalized bytes and includes only content type/encoding, hash, byte length, retention cutoff, and retrieval time. The action writes a mandatory `PAYLOAD_VIEWED` audit before returning data and fails closed if audit persistence fails.
 - Payload responses set `Cache-Control: no-store,no-cache` and `Pragma: no-cache`. A missing or cross-tenant message returns the same generic `404`; a known tenant-local message whose bytes are expired or cleared returns `410`. HAL emits `payload` only while the bytes are retained and the caller passes the separate permission check.
 - Delivery attempt DTOs expose endpoint/message references, attempt number, status, bounded HTTP status/failure/duration metadata, next retry time, and a safe response-body preview only. They do not expose endpoint secrets, request payloads, authorization headers, or full endpoint responses.
 - Manual retry is attempt-based. Only failed or abandoned attempt detail resources may expose `retry`, and the command delegates scheduling to the LocalProvider delivery drain service.
 - Bulk replay requires `webhook:bulk-replay`. Preview and execution use the message `MaterializedAt` half-open interval `[fromUtc,toUtc)`, with optional exact consumer, endpoint, and event-type filters. Only terminal Local targets (`DEAD_LETTERED` or `ABANDONED`) can become eligible. Active holds, expired/cleared payloads, inactive endpoints, nonterminal/succeeded Local work, and every provider publication are excluded and counted; provider conflict, unknown, and manual-reconciliation states have distinct exclusion counts and are never guessed or blindly republished.
-- Scheduling requires an operator reason and stable `operationKey`. Reusing the key with identical canonical filters returns the existing operation; changing any parameter returns `409`. Configured operation and per-tenant reserved-item ceilings are checked under a tenant advisory lock. The worker rechecks eligibility in its transaction and only changes eligible Local targets to `RETRY_DUE`; ordinary Local claim workers continue to enforce tenant/endpoint fairness, in-flight limits, rate limits, signing, and retry policy. Cancellation is available only in `QUEUED` and requires `expectedConcurrencyVersion`; worker start and cancellation therefore resolve without an ABA race.
+- Scheduling requires an operator reason and stable `operationKey`. Reusing the key with identical authoritative filters returns the existing operation; changing any parameter returns `409`. Configured operation and per-tenant reserved-item ceilings are checked under a tenant advisory lock. The worker rechecks eligibility in its transaction and only changes eligible Local targets to `RETRY_DUE`; ordinary Local claim workers continue to enforce tenant/endpoint fairness, in-flight limits, rate limits, signing, and retry policy. Cancellation is available only in `QUEUED` and requires `expectedConcurrencyVersion`; worker start and cancellation therefore resolve without an ABA race.
 - HAL collection resources may expose `create`; active endpoint detail resources may expose `update`, `rotate-secret`, `test`, and `delete`; archived endpoint detail resources expose no mutation affordances. Message resources may expose `delivery-attempts`, `provider-publications`, and the separately authorized retained `payload` relation; retryable attempt detail resources may expose `retry`; Svix or Composite consumer detail resources may expose `open-provider-portal`. Clients must render webhook actions from `_links`, not client-side role checks.
 - The Svix App Portal route returns only short-lived URL/token data. The Svix API token is resolved server-side through the configured secret provider and is never sent to Blazor.
 
@@ -1263,7 +1263,7 @@ HAL omits same-target ordinary fixed lifecycle actions because they do not chang
 
 **The API's `_links` payload is the single source of truth for action affordances in the Blazor UI.** The server already evaluated every authorization check and only emitted the links the caller is allowed to follow — the client must trust that contract and render UI affordances directly from it.
 
-#### Canonical pattern
+#### Authoritative pattern
 Blazor components gate mutation buttons (Edit, Delete, Create, etc.) with extension helpers defined in `Explore.Blazor.Client/Helpers/HalResourceExtensions.cs`:
 
 ```csharp
@@ -1490,7 +1490,7 @@ Gates onboarding endpoints behind the setup secret:
 | `GET /api/event` | Anonymous HAL collection of `EventDiscoveryItemDto`. Each item is either the existing local `EventListDto` projection or a bounded `FederatedEventDto`; the federated projection does not return raw provider payloads, credentials, DIDs, record keys, or external source URLs. |
 | `GET /api/event/federated/{atprotoRecordId}/source` | Anonymous, globally rate-limited `302` to the current tenant-visible normalized HTTPS source. Disabled capability, missing/tombstoned/cross-tenant records, and unsafe targets all return `404`. |
 | `GET /api/settings/instance/atproto-federation`; keyed `/api/settings/instance/atproto-federation/{key}` and `/api/settings/instance/atproto-federation/{key}/lock` mutations | Instance-admin HAL surface for the exact capability and validation-profile keys. Update and lock affordances are server-produced. |
-| `GET /api/actor`, `GET /api/actor/{id}`, `GET /api/actor/by-did/{did}` | Anonymous canonical global Actor reads. Responses omit tenant participation IDs, private User ownership, and tenant storage-object identifiers. |
+| `GET /api/actor`, `GET /api/actor/{id}`, `GET /api/actor/by-did/{did}` | Anonymous authoritative global Actor reads. Responses omit tenant participation IDs, private User ownership, and tenant storage-object identifiers. |
 | `GET /api/actor/by-tenant/{tenantId}` | Anonymous tenant-contextual Actor collection containing only locally discoverable Actors, with safe approved participation overrides and tenant-local subscription affordances. |
 | `GET /api/actor/by-tenant/{tenantId}/{id}` | Anonymous exact tenant-contextual Actor detail. Hidden or cross-tenant targets return `404`; safe approved participation overrides and tenant-local HAL affordances are composed server-side. |
 | `POST /api/actor/{actorId}/moderation/suspend` | Suspend the global Actor. The body contains only `reasonCode`; the route selects `Suspend`. |
@@ -1508,7 +1508,7 @@ The four moderation POST routes are authenticated instance operations. Their com
 
 Event publication is database-first: the committed local lifecycle mutation and immutable `PdsSyncOutbox` intent share one transaction, and CarpaNet PDS I/O occurs later under a fenced worker claim. Every eligible public event/session/aspect/resolved-lookup/EAV value must be mapped natively or rendered into the one community event `description`; coverage, privacy, JSON/DAG-CBOR size, or validation failure prevents enqueue, with no truncation or silent omission. RSVP egress represents only a committed active registration as `community.lexicon.calendar.rsvp#going`, ignores organizer approval state, and remains blocked until the event's settled URI/CID can form the exact `strongRef`.
 
-Ingress uses one globally leased Jetstream consumer for exactly `community.lexicon.calendar.event` and `community.lexicon.calendar.rsvp`. Canonical DID/collection/record-key state, current source version, typed event projection, tenant presentation, quarantine/tombstone effects, and cursor advancement are persisted atomically. Public clients must treat HAL links as action authority: federated items have no write affordances, and `source` exists only when the server can safely resolve the internal redirect route.
+Ingress uses one globally leased Jetstream consumer for exactly `community.lexicon.calendar.event` and `community.lexicon.calendar.rsvp`. Authoritative DID/collection/record-key state, current source version, typed event projection, tenant presentation, quarantine/tombstone effects, and cursor advancement are persisted atomically. Public clients must treat HAL links as action authority: federated items have no write affordances, and `source` exists only when the server can safely resolve the internal redirect route.
 
 Public Event reads require a published, public, non-deleted Event and active Actor. Local User Events additionally require an active `TenantUser`; local Organization and Group Events require approved, visible, unsuspended participation, without rechecking organizer eligibility. Inbound federated Events instead require the current visible tenant presentation, non-tombstoned record, and exact active DID identity owned by the Actor. Anonymous child reads inherit the same parent gate. Authorized management detail remains available through `view-management` when public eligibility fails, and HAL omits public affordances from that management representation.
 
@@ -1600,7 +1600,7 @@ Authorization decisions are also traced via `ActivitySource` named `Explore.Auth
 - Claims rows with owner, token, monotonic fence, and expiring lease so crashed workers are reclaimable and stale workers cannot settle or fail a successor claim.
 - Rechecks effective capability, the owner's current self-consent, exact linked DID/session, source version, public-location privacy, and immutable payload immediately before CarpaNet PDS I/O.
 - Retries the same stable record key with bounded exponential backoff; permanent or exhausted failures are dead-lettered with a stable failure code, never a provider response body.
-- Settles URI/CID, canonical record ownership/presentation, outbox completion, and the local Event's `AtprotoRecordId` transactionally. RSVP claims remain blocked until the event URI/CID strong reference exists.
+- Settles URI/CID, primary record ownership/presentation, outbox completion, and the local Event's `AtprotoRecordId` transactionally. RSVP claims remain blocked until the event URI/CID strong reference exists.
 
 ---
 
@@ -1695,13 +1695,13 @@ is the only supported repeat-operation record.
     - `POST /api/a/t` — anonymous-safe analytics relay for relay transport mode
 6. Federation:
    - `GET /api/event` — anonymous typed local/federated event discovery; federated items appear only for an effectively enabled tenant and are de-duplicated against local ATProto ownership.
-   - Accepted inbound community events are imported internally through `ImportAtprotoFederatedEventCommand` into tenant-local `Event` and `EventSession` rows. There is no public ATProto-import endpoint; the normal event/session read APIs expose the mapped aggregates, while the canonical record retains the complete accepted source JSON.
+   - Accepted inbound community events are imported internally through `ImportAtprotoFederatedEventCommand` into tenant-local `Event` and `EventSession` rows. There is no public ATProto-import endpoint; the normal event/session read APIs expose the mapped aggregates, while the primary record retains the complete accepted source JSON.
    - `GET /api/event/federated/{atprotoRecordId}/source` — anonymous, rate-limited redirect to the currently tenant-visible bounded HTTPS source. Clients render this action only from the item-level `source` HAL relation.
    - `GET /api/event/my` — authenticated local event list with optional `atprotoDeliveryStatus` and stable `atprotoDeliveryFailureCode`; no provider body is returned.
    - `GET|PUT|DELETE /api/settings/instance/atproto-federation...` — instance administrator read/update/reset and lock/unlock operations for the two administrator ATProto federation settings, with HAL as action authority.
    - `/api/indexeddid/*` — DID indexing metadata under existing authorization.
    - `/api/auth/atproto/*` — server-private bootstrap/current/refresh/revoke bridge, excluded from public OpenAPI and generated browser clients.
-   - No `/api/atprotorecord` CRUD/read contract exists. Lifecycle-owned outbox delivery and canonical Jetstream ingestion are the only `AtprotoRecord` write authorities.
+   - No `/api/atprotorecord` CRUD/read contract exists. Lifecycle-owned outbox delivery and authoritative Jetstream ingestion are the only `AtprotoRecord` write authorities.
 7. Notifications (all `[Authorize]`):
        - `GET /api/notification` — paginated list with `?isRead=` and `?notificationTypeId=` filters
       - `GET /api/notification/{id}` — detail

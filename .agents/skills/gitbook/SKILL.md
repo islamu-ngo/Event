@@ -10,7 +10,7 @@ priority: high
 
 # GitBook Platform & Documentation
 
-A unified skill for building, configuring, authoring, reviewing, and extending GitBook documentation and integrations. For our canonical hosted public portal, see `docs/public/` and `docs/public/gitbook-docs.yaml`.
+A unified skill for building, configuring, authoring, reviewing, and extending GitBook documentation and integrations. For our hosted public portal, see `docs/public/` and `docs/public/gitbook-docs.yaml`.
 
 ## Resources
 

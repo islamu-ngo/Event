@@ -92,7 +92,7 @@ Acknowledge the webhook (return 2xx) within a few seconds. If the actual process
 
 <summary>Don't trust the event payload more than necessary</summary>
 
-For destructive operations, refetch the canonical object from the API after receiving the event. Webhook payloads are point-in-time — by the time you process the event, the object may have changed.
+For destructive operations, refetch the current object from the API after receiving the event. Webhook payloads are point-in-time — by the time you process the event, the object may have changed.
 
 </details>
 

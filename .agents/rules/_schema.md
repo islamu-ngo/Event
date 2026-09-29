@@ -34,7 +34,7 @@ Path-scoped rules are concise supplements to the intent contract. Claude Code au
 
 - Use columns: `#`, `Rule`, `Correct`, `Wrong`.
 - Keep 5-10 rows.
-- Source rows from canonical docs and skills.
+- Source rows from governing docs and skills.
 - Cross-reference `docs/internal/QUICK_REFERENCE.md`; do not paste large invariant blocks into rule files.
 
 ## Authoring Limits

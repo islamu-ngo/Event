@@ -83,7 +83,7 @@ Parent/child rule:
 
 - `Event` stays the program/container aggregate
 - `EventSession` stays the scheduled child aggregate
-- merged event-with-sessions views are read models, not canonical write models
+- merged event-with-sessions views are read models, not authoritative write models
 
 ## Projection Lifecycle
 

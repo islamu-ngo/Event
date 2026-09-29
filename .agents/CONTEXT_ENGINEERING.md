@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical context-budget and retrieval policy for repository agents and subagents. -->
+<!-- ABOUTME: Repository context-budget and retrieval policy for repository agents and subagents. -->
 <!-- ABOUTME: Prevents duplicate reads, preserves the main agent's working set, and routes broad discovery to economical scouts. -->
 
 # Context Engineering Contract
@@ -104,7 +104,7 @@ To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck
 | Ring | Scope & Cadence | Target Execution Time | Permitted Suites & Infrastructure | Purpose |
 |---|---|---|---|---|
 | **Ring 1: Inner Loop** | Subtask level (every code edit) | **< 2 seconds** | Sliced in-memory TUnit (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 Docker containers, 0 network I/O, 0 database lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
-| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15 seconds** | Single Release build (`dotnet build -c Release -v q`) + at most **one** selected test project against **one canonical provider** (e.g. SQLite in-memory or single PostgreSQL container). | Verify project compilability and single-layer integration without matrix delays. |
+| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15 seconds** | Single Release build (`dotnet build -c Release -v q`) + at most **one** selected test project against **one selected provider** (e.g. SQLite in-memory or single PostgreSQL container). | Verify project compilability and single-layer integration without matrix delays. |
 | **Ring 3: Plan Exit Gate** | Workstream boundary (before PR creation) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
 
 ### 2. The Yak-Shaving Quarantine Rule
@@ -273,7 +273,7 @@ Hashline is an OmO-specific feature. Agents running through Claude Code, Cursor,
 ## Dual-Documentation Parity Protocol (Internal vs Public Website)
 
 The repository maintains two strictly separated documentation tracks:
-1. `docs/internal/`: Canonical engineering brain for Developers & AI Agents.
+1. `docs/internal/`: Authoritative engineering reference for Developers & AI Agents.
 2. `docs/public/`: Curated public guides for Adopters, Operators & Integrators (synced with GitBook).
 
 ### The Parity Rule

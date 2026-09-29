@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical I-VSD strategy review for ISLAMU Event licensing, enterprise compliance, and partner monetization. -->
+<!-- ABOUTME: Authoritative I-VSD strategy review for ISLAMU Event licensing, enterprise compliance, and partner monetization. -->
 <!-- ABOUTME: Defines the three-pillar ecosystem: AGPLv3 FOSS, CLA-backed Anti-SaaS Enterprise licensing, and Official Partners. -->
 
 # I-VSD Strategy Review — Open-Source Licensing, Anti-SaaS Governance, and Commercial Model

@@ -83,20 +83,20 @@ There are three application composition roots: `Explore.API` owns the Split API 
 | Standalone / Combined | one `Event.Standalone` process at `https://localhost:7180`; AppHost also publishes a dynamic internal HTTP endpoint | AppHost waits for migration completion and selected infrastructure; the combined root then starts API initialization before Blazor initialization and owns API workers, health, and shutdown exactly once. The Combined BFF profile does not register YARP or remote-API readiness. |
 
 AppHost exposes the optional Standalone HTTP endpoint through
-`WithHttpEndpoint(name: "http")` (dynamic/non-guaranteed internal HTTP), with HTTPS canonical on
+`WithHttpEndpoint(name: "http")` (dynamic/non-guaranteed internal HTTP), with HTTPS authoritative on
 `https://localhost:7180`. Direct `Event.Standalone` launch profiles reserve
 `http://localhost:5180` (and `https://localhost:7180` for the HTTPS profile).
 
 In the Combined topology, browser `/api/*` requests stay in one process. The BFF classifies its cookie session only to enforce antiforgery, obtains the server-held access token, strips untrusted privileged headers, and dispatches through the in-process API transport. API `MultiAuth` revalidates the bearer token and remains the sole controller principal; no loopback or YARP self-proxy is used. Requests without a valid BFF session keep the existing external bearer/API-key API flow.
 
-To roll back an AppHost topology change, relaunch with `Hosting:Topology=Split` (or omit it); this does not roll back data or migrations. The AppHost topology selector does not itself change the database provider. The separately packaged Standalone image defaults to SQLite; `docker-compose.yml` remains the Split descriptor. Canonical controller paths remain `/api/...`; version negotiation uses media type, `?api-version=`, or `X-Api-Version`, never `/api/v1/...`.
+To roll back an AppHost topology change, relaunch with `Hosting:Topology=Split` (or omit it); this does not roll back data or migrations. The AppHost topology selector does not itself change the database provider. The separately packaged Standalone image defaults to SQLite; `docker-compose.yml` remains the Split descriptor. Authoritative controller paths remain `/api/...`; version negotiation uses media type, `?api-version=`, or `X-Api-Version`, never `/api/v1/...`.
 
-Split/Standalone is a process-composition choice only: it changes where BFF and API execute, not API contracts, authorization policy, token semantics, or versioning. The API keeps canonical `/api/*` versioning through non-URL headers and query values (`Accept: application/json;v=...`, `api-version`, `X-Api-Version`), and Standalone never adds route-based version segments.
+Split/Standalone is a process-composition choice only: it changes where BFF and API execute, not API contracts, authorization policy, token semantics, or versioning. The API keeps authoritative `/api/*` versioning through non-URL headers and query values (`Accept: application/json;v=...`, `api-version`, `X-Api-Version`), and Standalone never adds route-based version segments.
 
 | API versioning input | Support | Notes |
 |---|---|---|
 | `/api/...` plus `Accept` media-type parameter, `?api-version=`, or `X-Api-Version` | Supported | The same API pipeline parses these in Split and Standalone. |
-| `/api/v1/...`, `/api/v0.1/...`, or any topology-specific versioned route | Unsupported | URL version segments are never added; routes and HAL links remain canonical. |
+| `/api/v1/...`, `/api/v0.1/...`, or any topology-specific versioned route | Unsupported | URL version segments are never added; routes and HAL links remain authoritative. |
 
 Container packaging is explicit. The repository `docker-compose.yml` describes the Split deployment; Standalone is the single `Event.Standalone` image run directly with an env file and defaults to SQLite. AppHost remains the local topology selector. Selecting Standalone through AppHost does not automatically change the database provider; database selection always remains an explicit structured provider contract.
 
@@ -216,7 +216,7 @@ transaction and the order-before-event-before-assignment/ticket/target/pool
 fence protocol. Cancellation keeps Tenant filtering on all evidence reads;
 only historical assignment and hold reads use `IncludeDeleted()`. Cross-scope
 visitor-policy safety reads use the two dedicated `TenantFilterBypassReasons`
-entries, preserving their canonical-key and affected-event predicates.
+entries, preserving their authoritative-key and affected-event predicates.
 
 Application and Data Protection migrations have independent generated
 histories for all five providers. Retained privacy-erasure authority has its
@@ -267,7 +267,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 ## Authorization Architecture
 1. Endpoint-level auth is handled via ASP.NET attributes/policies. `[AuthorizeResource]` attribute pairs a resource kind with a domain action constant from `AuthorizationActions`.
 2. `RequestAuthorization<TRequest>` owns resource-level evaluation for native authorization decorators. Checks route to `IAuthorizationProvider`, which resolves to Cerbos PDP or local fallback.
-3. `AuthorizationActions` (string constants) and `ResourceKinds` (string constants) form the canonical action/resource catalogs shared by commands, link policies, and Cerbos policies.
+3. `AuthorizationActions` (string constants) and `ResourceKinds` (string constants) form the authoritative action/resource catalogs shared by commands, link policies, and Cerbos policies.
 4. `IAuthorizableResourceDescriptor<T>` + `ResourceDescriptors` extract resource metadata (kind, id, attributes, scope) from DTOs — eliminating manual attribute dictionaries in HATEOAS link policies.
 5. HATEOAS capability planning uses a 4-phase pipeline: candidate links → normalized `AuthorizationCheck` with dedup key → batch evaluate unique checks → map decisions back to links. Fail-closed on batch failure.
 6. Runtime authorization provider routes checks by configuration: tenant BYO Cerbos first, otherwise the instance provider setting. Instance and BYO Cerbos failures deny rather than falling through to local RBAC; local fallback is used only when local mode is selected.
@@ -279,7 +279,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 2. `Prefer: return=minimal` can reduce link payload where clients do not need hypermedia.
 3. OpenAPI is exposed in development for inspection and generated at build time for client generation.
 4. API-local OpenAPI transformers and Swashbuckle transition filters adjust schemas to reflect HAL structure.
-5. API versioning is read from three non-URL sources combined (`ApiVersionReader.Combine`): media-type parameter (`Accept: application/json;v=0.1`), query string (`?api-version=0.1`), and custom header (`X-Api-Version: 0.1`). URL-segment versioning (e.g. `/api/v0.1/controller`) is intentionally unsupported — every endpoint has exactly one canonical path so that `operationId`, `RouteNames`, and HAL link generation stay stable across versions.
+5. API versioning is read from three non-URL sources combined (`ApiVersionReader.Combine`): media-type parameter (`Accept: application/json;v=0.1`), query string (`?api-version=0.1`), and custom header (`X-Api-Version: 0.1`). URL-segment versioning (e.g. `/api/v0.1/controller`) is intentionally unsupported — every endpoint has exactly one primary path so that `operationId`, `RouteNames`, and HAL link generation stay stable across versions.
 
 ## MCP Adapter Boundary
 1. The initial Model Context Protocol adapter is an optional `Explore.API` presentation adapter, not a new authority for AI tools.
@@ -420,7 +420,7 @@ coordinate extraction or the existing location disclosure service.
 
 ## Contract Value Semantics
 
-Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.
+Handwritten immutable contracts follow the [primary record-selection policy](GOVERNANCE.md#primary-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.
 
 NSwag remains the sole OpenAPI-to-C# source generator. `Explore.Blazor.Client` applies the repository-owned SDK-Roslyn transformer before final byte normalization; it adds no package dependency or copied template and produces byte-identical output for identical input. `GeneratedClientRecordArchitectureTests` ratchets the compiled record/init surface and exact mutable-class manifest alongside the cross-layer `PublishedCollectionContractArchitectureTests`.
 
@@ -433,9 +433,9 @@ Write operations support `Idempotency-Key` header for safe retries. `Idempotency
 Implemented today:
 - AT Protocol confidential-client OAuth for already-linked platform accounts, with a server-private trust bridge and encrypted DID-keyed sessions.
 - Database-first event/RSVP publication through immutable `PdsSyncOutbox` intent, fenced leases, stable record keys, retry/reconciliation, and URI/CID settlement.
-- One globally leased, exact-collection Jetstream consumer with optional DID curation for canonical community event/RSVP records, tombstones, quarantine evidence, and durable cursor state.
-- Internal CQRS import of each visible community event into one tenant-local `Event` and one `EventSession`. The fenced persistence transaction also owns canonical state, tenant presentation, cursor/snapshot settlement, and optional `StorageObject` linkage for a CID-verified thumbnail.
-- Lossless accepted-record preservation in `AtprotoRecord.RecordJson`; only semantically compatible lexicon values are promoted into local aggregate fields, while producer-specific and future extensions remain canonical JSON.
+- One globally leased, exact-collection Jetstream consumer with optional DID curation for authoritative community event/RSVP records, tombstones, quarantine evidence, and durable cursor state.
+- Internal CQRS import of each visible community event into one tenant-local `Event` and one `EventSession`. The fenced persistence transaction also owns authoritative state, tenant presentation, cursor/snapshot settlement, and optional `StorageObject` linkage for a CID-verified thumbnail.
+- Lossless accepted-record preservation in `AtprotoRecord.RecordJson`; only semantically compatible lexicon values are promoted into local aggregate fields, while producer-specific and future extensions remain normalized JSON.
 - Tenant-governed typed event discovery, safe source HAL, administrator controls, user consent, and delivery-status client surfaces.
 
 Not fully implemented today:
@@ -480,12 +480,12 @@ pass the existing validation before any write.
 
 ## AT Protocol Ownership
 
-1. `Explore.Blazor` owns CarpaNet confidential-client OAuth, protected single-use state, canonical callback/handoff, and the server cookie. PDS credentials and private key material never enter the browser.
+1. `Explore.Blazor` owns CarpaNet confidential-client OAuth, protected single-use state, authoritative callback/handoff, and the server cookie. PDS credentials and private key material never enter the browser.
 2. `Explore.API` owns the server-private bootstrap/session trust boundary, first-party JWT validation, ATProto HTTP/HAL contracts, and hosted-worker registration.
 3. `Explore.Application` owns effective capability and self-consent resolution, exhaustive public event/RSVP snapshots, deterministic untruncated description rendering, durable publication planning, and the fenced delivery processor. For inbound events it also owns `ImportAtprotoFederatedEventCommand`, manual FluentValidation, semantic import-plan mapping, and optional thumbnail staging orchestration.
-4. `Explore.Persistence` owns encrypted-session metadata persistence, immutable `PdsSyncOutbox` intent, fenced lease/settlement state, globally canonical Jetstream record/quarantine/presentation/cursor state, and atomic synchronization of tenant-local `Event`, implicit `EventSession`, and optional `StorageObject` rows.
+4. `Explore.Persistence` owns encrypted-session metadata persistence, immutable `PdsSyncOutbox` intent, fenced lease/settlement state, globally authoritative Jetstream record/quarantine/presentation/cursor state, and atomic synchronization of tenant-local `Event`, implicit `EventSession`, and optional `StorageObject` rows.
 5. `Explore.Infrastructure` owns the hardened CarpaNet OAuth/PDS adapters, encrypted session envelope protection, generated-record mapping/validation, the fixed-endpoint two-collection Jetstream client, and CID/MIME/size-verified `com.atproto.sync.getBlob` acquisition through registered storage.
-6. Quartz `pds-sync-drain` invokes the Infrastructure one-pass drain for committed outbound intent; the API-hosted Infrastructure `AtprotoJetstreamSubscriber` holds one global fenced lease for canonical inbound materialization.
+6. Quartz `pds-sync-drain` invokes the Infrastructure one-pass drain for committed outbound intent; the API-hosted Infrastructure `AtprotoJetstreamSubscriber` holds one global fenced lease for authoritative inbound materialization.
 7. `Explore.Blazor.Client` consumes generated safe DTOs. HAL link presence gates Edit/Delete, federated source/RSVP/retry/sync, and instance-governance actions. Generic tenant-setting controls instead use server-derived `EffectiveSettingDto.CanEdit` and `Reason` metadata for writability and explanation. Neither mechanism inspects local roles or claims, and resource actions are never inferred from source type.
 
 Outbound delivery remains database-first: capability, self-consent, linked session, source version, and `EventLocationDisclosurePurpose.Public` are rechecked immediately before remote I/O. Remote failure changes only delivery state; it never rolls back or deletes the committed local event.
@@ -586,7 +586,7 @@ classDiagram
    - Two events sharing the same physical venue disclose independently; tightening one event's privacy never affects the other.
 
 3. **`EventSession` & `EventAgendaItem` (Mediation Invariant):**
-   - Sessions and agenda items reference **`EventLocationId`** as their canonical location anchor, with an optional sub-room reference (`RoomId`).
+   - Sessions and agenda items reference **`EventLocationId`** as their authoritative location anchor, with an optional sub-room reference (`RoomId`).
    - Database check constraints (`ck_event_session_physical_location_requires_event_location`, `ck_event_agenda_item_physical_location_requires_event_location`) strictly enforce that `location_id IS NULL OR event_location_id IS NOT NULL`. No write path can bypass the event's disclosure authority to attach an unmediated venue.
    - When public or attendee agendas are queried, session locations are dynamically evaluated through the event's `EventLocation` policy before serialization, preventing undisclosed physical addresses or coordinates from leaking to unauthenticated clients.
 
@@ -638,7 +638,7 @@ See [OUTBOX_PATTERN.md](OUTBOX_PATTERN.md) for full entity model, configuration,
 |---|---|---|
 | `OutboxProcessor` | General outbox message dispatch with retry/dead-letter | Configurable (default 5s) |
 | Quartz `pds-sync-drain` | Fenced, bounded-parallel AT Protocol event/RSVP delivery from committed `PdsSyncOutbox` rows, including retry/reconciliation and URI/CID settlement | Configurable interval, default 5s |
-| `AtprotoJetstreamSubscriber` | One globally leased, allowlisted consumer for canonical community event/RSVP materialization, tombstones, quarantine, and cursor advancement | Capability-aware reconnect loop with bounded backoff |
+| `AtprotoJetstreamSubscriber` | One globally leased, allowlisted consumer for authoritative community event/RSVP materialization, tombstones, quarantine, and cursor advancement | Capability-aware reconnect loop with bounded backoff |
 | Quartz `email-dispatch-drain` | Default Basic Dispatch Mode trigger for draining `EmailDispatchOutbox` through the shared drain service | Cron `*/10 * * * * ?`, every 10s |
 | `EmailDispatchProcessor` | Hosted-service fallback trigger over the same EmailDispatch drain service | Configurable fallback |
 | `CompositeOutboxMessageDispatcher` | Dispatch component used by `OutboxProcessor` to route internal notification fanout, moderation fanout, and report provider sync messages | Invoked per outbox message |

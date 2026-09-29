@@ -11,7 +11,7 @@ Impacts:
   Security:
     Reference: docs/internal/BLAZOR.md
     Disposition: documented
-    Detail: "Completed Interactive and ConfiguredAdministrator statuses accept only canonical provider identities; setup revocation, credential replacement and ordinary authentication remain unchanged."
+    Detail: "Completed Interactive and ConfiguredAdministrator statuses accept only designated provider identities; setup revocation, credential replacement and ordinary authentication remain unchanged."
   Migration:
     Reference: docs/internal/BLAZOR.md
     Disposition: not-applicable

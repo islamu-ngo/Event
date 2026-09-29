@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical architecture for Local Identity, Keycloak, AT Protocol, BFF sessions, and switching. -->
+<!-- ABOUTME: Authoritative architecture for Local Identity, Keycloak, AT Protocol, BFF sessions, and switching. -->
 <!-- ABOUTME: Defines JIT identity convergence, token isolation, persistence ownership, and recovery boundaries. -->
 
 # Authentication
@@ -168,7 +168,7 @@ through user synchronization, nor silently acquire a newer verification fact.
 
 The isolated Local JWT handler requires HS256 and ordinary `JWT` type. After native
 signature/issuer/audience/lifetime validation, `OnTokenValidated` parses authority
-from one authenticated Local identity with unique canonical claims and invokes the
+from one authenticated Local identity with unique authoritative claims and invokes the
 fresh check before claims enrichment. Typed `Invalid` and `Unavailable` outcomes
 both fail authentication with bounded HTTP 401; cancellation propagates. No legacy
 stamp-less token is accepted. These are admission-time reads, not a distributed
@@ -185,7 +185,7 @@ The native cookie validation callback invokes the host's existing session handle
 before missing-token and unexpired-token early returns. `BffAdminClaimsTransformation`
 validates Local provider metadata and the original server-held token, then uses the
 private `AdminAuthority` client to call `GET /api/user`. The returned user ID must
-match the trusted canonical Local subject. The API remains the cryptographic and
+match the trusted authoritative Local subject. The API remains the cryptographic and
 current-credential authority; an external token for the same user is not a substitute.
 This check precedes synchronization and cached administrator enrichment. Failure
 rejects the cookie; request cancellation is checked before destructive cleanup.
@@ -438,7 +438,7 @@ chosen password. Consumed or superseded authority cannot replace it again.
 `POST /api/auth/local/credential-replacement` accepts the challenge as a Bearer
 token and only `newPassword` in its JSON body. Its dedicated native JWT bearer
 handler validates the signing key, issuer, audience, algorithm and token type,
-then rejects duplicate or extra envelope fields, noncanonical identifiers and
+then rejects duplicate or extra envelope fields, non-authoritative identifiers and
 invalid timing. The authority adapter reads exactly one authenticated identity
 of the replacement scheme; it never combines claims across identities or exposes
 replacement authority as ambient platform identity. Ordinary access tokens cannot
@@ -455,13 +455,13 @@ repeated key cannot replay a prior password-change success. No session or cookie
 is issued by replacement.
 
 Ordinary Local provider reconstruction uses the exact Local issuer and a nonempty
-canonical GUID subject as its Local account key. It does not interpret the Local
+authoritative GUID subject as its Local account key. It does not interpret the Local
 issuer as an OIDC URL or accept another issuer claiming the Local provider name.
 External OIDC and AT Protocol key construction remain separate.
 The shared platform-ID reader applies the same Local validation before any GUID
 fallback. Rejected Local authority cannot become a providerless identity through
 `sub`, name identifier, session ID or `internal_user_id`; valid Local authority
-resolves only its canonical subject. Administrator resolution and claims
+resolves only its authoritative subject. Administrator resolution and claims
 transformation therefore cannot recover an attacker-selected account ID after
 provider reconstruction rejects it.
 
@@ -509,7 +509,7 @@ browser cookie/live-circuit revocation and generated provider migrations still n
 Focused BFF tests substitute downstream HTTP; real browser and Combined-to-native
 API end-to-end verification remain separate acceptance gates.
 
-`SyncUserCommandHandler` also requires a pre-established canonical Local subject,
+`SyncUserCommandHandler` also requires a pre-established authoritative Local subject,
 matching User and active personal Actor. Local sign-in cannot create that graph
 or adopt another account by email or a supplied User ID. For unlinked external
 identities, a sole Local-owned email candidate is excluded; multiple candidates

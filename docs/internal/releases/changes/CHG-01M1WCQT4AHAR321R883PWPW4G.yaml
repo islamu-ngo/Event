@@ -32,4 +32,4 @@ Impacts:
   Operator:
     Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
     Disposition: documented
-    Detail: Use the canonical runbook's generated migration identifiers and coordinated backup/reset procedure. Globalization upgrades require stopped-traffic compatibility evaluation and current-key rebuild or disposable reset; provider-local sorting is not a universal ordering guarantee. An uncertain committed login consume requires a fresh login, not destructive retry.
+    Detail: Use the authoritative runbook's generated migration identifiers and coordinated backup/reset procedure. Globalization upgrades require stopped-traffic compatibility evaluation and current-key rebuild or disposable reset; provider-local sorting is not a universal ordering guarantee. An uncertain committed login consume requires a fresh login, not destructive retry.

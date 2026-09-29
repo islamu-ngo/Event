@@ -1,4 +1,4 @@
-ABOUTME: Canonical entry point for authentication, authorization, and trust-boundary documentation.
+ABOUTME: Primary entrypoint for authentication, authorization, and trust-boundary documentation.
 ABOUTME: Points readers to the maintained security model while preserving documentation index links.
 
 # Security

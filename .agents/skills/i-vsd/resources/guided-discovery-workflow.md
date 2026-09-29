@@ -15,7 +15,7 @@ Do not produce a generic product strategy. I-VSD is contextual: the same Islamic
 2. Follow [Grill-Me](../../grill-me/SKILL.md): resolve available facts directly, recommend an answer when a real choice exists, ask exactly one material question per response, and use the answer to choose the next dependent branch.
 3. Reflect back the emerging mission, stakeholders, constraints, and moral risks before making recommendations.
 4. Ask targeted follow-ups where the recommended model depends on unresolved facts.
-5. Continue until mission/decision, provider/deployment model, affected stakeholders, relevant data-money-content-AI surfaces, and operational constraints are captured or explicitly unavailable. Then resolve the canonical subject path from [report-contract.md](report-contract.md) and update or create the report.
+5. Continue until mission/decision, provider/deployment model, affected stakeholders, relevant data-money-content-AI surfaces, and operational constraints are captured or explicitly unavailable. Then resolve the subject path from [report-contract.md](report-contract.md) and update or create the report.
 6. Mark unanswered areas as assumptions, validation gaps, or questions for scholarly, legal, operational, or stakeholder review.
 
 ## Interview Areas

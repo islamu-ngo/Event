@@ -1,8 +1,8 @@
 Change-Id: CHG-01M2ZZ356XGJP0PP97PEPMXF6T
-Title: "publish canonical operator form choices"
+Title: "publish authoritative operator form choices"
 Type: feat
 Scope: onboarding
-Summary: "Expose canonical operator kinds, runtime country choices and shared identity field constraints without saved identity values."
+Summary: "Expose authoritative operator kinds, runtime country choices and shared identity field constraints without saved identity values."
 Supersedes: []
 Impacts:
   Breaking:
@@ -25,4 +25,4 @@ Impacts:
   Operator:
     Reference: docs/public/api-reference/readme/hal-rest.md
     Disposition: documented
-    Detail: "Forms can reuse canonical choices, field limits and label/help keys while retaining identity-document save authority. Registration identifiers remain optional."
+    Detail: "Forms can reuse authoritative choices, field limits and label/help keys while retaining identity-document save authority. Registration identifiers remain optional."

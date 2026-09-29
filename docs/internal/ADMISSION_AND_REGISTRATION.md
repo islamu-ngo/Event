@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical architectural documentation for the Registration and Admission subsystems. -->
+<!-- ABOUTME: Authoritative architectural documentation for the Registration and Admission subsystems. -->
 <!-- ABOUTME: Explains the distinction between registration orders, entitlement materialization, and zero-knowledge admission credentials. -->
 
 # Registration And Admission Architecture
@@ -103,7 +103,7 @@ Registration and Admission are kept in separate aggregates for five critical arc
 
 ### 3. QR Wire Codec & Payload Standard
 * **[`AdmissionQrPayloadCodec`](../../src/Event.Wire.Contracts/Admissions/AdmissionQrPayloadCodec.cs)**:
-  * Formats admission QR codes with the canonical prefix:
+  * Formats admission QR codes with the authoritative prefix:
     $$\text{islamu-admission:v1:}\langle\text{43-character Base64url bearer}\rangle$$
   * Total payload length is exactly 63 characters.
   * Strictly redacts plaintext credentials from debugging strings, logs, and OpenTelemetry spans.
@@ -174,7 +174,7 @@ prohibited authentication keys portable.
 Both sides acquire the full `VisitorAccessCapabilityResolver.AuthoritySettingKeys`
 group through `ISettingMutationLock.ExecuteOrderedGroupsAsync` before opening
 their transaction or reading its authority snapshot. Existing SMTP/reporting
-groups join that one outer acquisition in the canonical order. `ExecuteManyAsync`
+groups join that one outer acquisition in the authoritative order. `ExecuteManyAsync`
 is not an outer lease: it may open a transaction itself. Rejected mutations leave
 policy, event and allocation state unchanged; notifications follow commit.
 
@@ -260,7 +260,7 @@ their prior transaction and authority contracts.
 The bodyless capability-header POST is private/no-store/no-referrer and suppresses
 generic response replay; each invocation rechecks current authority and the
 aggregate owns idempotence. The browser confirms a captured event/order/capability
-and route generation, allows one pending operation, and refreshes canonical
+and route generation, allows one pending operation, and refreshes authoritative
 status after success or conflict. The BFF retains antiforgery and private failure
 headers. No capability is added to URLs or request bodies.
 
@@ -385,7 +385,7 @@ See [Operations](OPERATIONS.md#admission-check-in-operations-phase-21) for incid
 Participation validation failures retain the API's machine-consumed `code`
 extension through the generated client and `EventService`. A visitor-policy
 rejection reaches `ParticipationConfigurationEditor` unchanged, allowing its
-existing reload callback to fetch current canonical capabilities. The editor
+existing reload callback to fetch current authoritative capabilities. The editor
 then disables unavailable AccountRequired choices rather than inferring
 permission from its stale draft. Generic validation failures without a string
 code retain the existing fallback.

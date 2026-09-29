@@ -1,4 +1,4 @@
-<!-- ABOUTME: Rules for promoting journal findings into canonical docs, skills, rules, or ADRs. -->
+<!-- ABOUTME: Rules for promoting journal findings into primary documentation, skills, rules, or ADRs. -->
 <!-- ABOUTME: Prevents the journal from becoming a graveyard of unread wisdom. -->
 
 # Journal Promotion Rules
@@ -19,7 +19,7 @@ Promote an entry when **any** of the following is true:
 2. **Referenced by ≥ 1 PR review comment** citing it as a correctness rule.
 3. **Cited in an intent's `must_read_docs` or `load_rules`** — the entry is being used operationally, not just historically.
 4. **Generalizes beyond the specific feature** where it was first observed.
-5. **Contradicts or sharpens an existing canonical doc** — the doc must be corrected.
+5. **Contradicts or sharpens an existing primary documentation** — the doc must be corrected.
 
 ---
 
@@ -47,7 +47,7 @@ Promote an entry when **any** of the following is true:
 3. **Update cross-references** in any agent/skill/rule that referenced the journal entry.
 4. **Run `Event.Architecture.Tests.AgentContextLinkTests`** to verify no dead links remain.
 
-The journal entry itself is **never deleted**. It is durable evidence of when and why the canonical rule came to exist.
+The journal entry itself is **never deleted**. It is durable evidence of when and why the authoritative rule came to exist.
 
 ---
 
@@ -56,17 +56,17 @@ The journal entry itself is **never deleted**. It is durable evidence of when an
 - The finding is a **debugging war story** that does not apply to new code.
 - The fix is a **one-shot workaround** for an external bug (document it, stay local).
 - The pattern is **still under review** — wait for the second occurrence.
-- Promoting would **duplicate** an existing canonical rule — instead, add a cross-reference to the existing rule in the journal entry.
+- Promoting would **duplicate** an existing authoritative rule — instead, add a cross-reference to the existing rule in the journal entry.
 
 ---
 
 ## 5. Anti-Patterns
 
-- **Promoting too early** → canonical docs bloat with conjecture.
+- **Promoting too early** → primary documentation bloat with conjecture.
 - **Promoting too late** → contributors rediscover the same lesson.
 - **Promoting without annotation** → the journal loses traceability.
 - **Deleting journal entries after promotion** → loss of historical context.
-- **Two canonical locations for the same rule** → when promoted, pick ONE home (see table above) and cross-reference from others.
+- **Two authoritative locations for the same rule** → when promoted, pick ONE home (see table above) and cross-reference from others.
 
 ---
 

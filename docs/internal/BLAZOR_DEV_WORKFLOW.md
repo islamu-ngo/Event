@@ -41,7 +41,7 @@ persona initialization passwords. Never print their values.
 | Name | Role |
 |---|---|
 | `AGENT_BROWSER_SEED_ENABLED` | Non-secret opt-in; the profile sets it to `true`. |
-| `AGENT_BROWSER_PERSONA_PASSWORD` | Final persona password; canonical secret key `authentication.local.agent_browser_persona_password`. |
+| `AGENT_BROWSER_PERSONA_PASSWORD` | Final persona password; authoritative secret key `authentication.local.agent_browser_persona_password`. |
 | `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | Initial configured-administrator credential only. |
 | `AUTHENTICATION_LOCAL_JWT_KEY` | Local signing authority; required on every launch. |
 | `POSTGRESQL_USERNAME` | Username for the isolated PostgreSQL resource. |

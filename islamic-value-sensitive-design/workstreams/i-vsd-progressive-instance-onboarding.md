@@ -12,7 +12,7 @@ Last Updated: 2026-09-21 Europe/Brussels
 - Disposition: implementation-aligned with recorded validation gaps
 - Evidence cutoff: 2026-09-21
 - Reviewed input: progressive-instance-onboarding triad revision `R2`, grounded in `origin/develop` `7f78e938f`; final implementation `f5ccd58f468f374ff259a8d5c557c3c1cfeb62b1`
-- Supersedes: R1 review and the R2 planning review at this same canonical report path
+- Supersedes: R1 review and the R2 planning review at this same authoritative report path
 
 ## Scope
 
@@ -55,7 +55,7 @@ non-payment deployments have no disclosure obligations.
   snapshot. Show explicit ready, action-required, restart-required, unavailable,
   failed, stale, uncertain-completion, and completed states. Reproduce the
   browser failure before assigning or fixing its cause.
-- IVSD-M004: Use human-labeled canonical choices, visible essential guidance,
+- IVSD-M004: Use human-labeled authoritative choices, visible essential guidance,
   one primary action, categorized post-install work, keyboard/touch-accessible
   help, and verified responsive, zoom, contrast, screen-reader, and RTL behavior.
 - IVSD-M005: Preserve permanent setup lockout, exact-tenant server authorization,

@@ -1,7 +1,7 @@
 # Islamic Value-Sensitive Design (I-VSD)
 
 > **Provider-Responsibility and Ethical Architecture Archive**  
-> Canonical Guidance & Working Repository for ISLAMU Event
+> Authoritative Guidance & Working Repository for ISLAMU Event
 
 ---
 

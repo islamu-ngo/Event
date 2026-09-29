@@ -1,4 +1,4 @@
-ABOUTME: Canonical contributor guide for record contracts, value semantics, and generated client records.
+ABOUTME: Authoritative contributor guide for record contracts, value semantics, and generated client records.
 ABOUTME: Explains ownership, class exclusions, persistence boundaries, privacy, generation, and verification.
 
 # Record Contracts And Value Semantics
@@ -9,7 +9,7 @@ ABOUTME: Explains ownership, class exclusions, persistence boundaries, privacy, 
 > **Last Verified:** 2026-08-26
 > **Source Anchors:** `src/Explore.Application/Responses/BaseCommandResponse.cs`, `src/Explore.Domain/ValueObjects/`, `src/Explore.Persistence/`, `eng/tools/Explore.GeneratedContracts/`, `tests/Explore.GeneratedContracts.Tests/`, `tests/Event.Architecture.Tests/GeneratedClientRecordArchitectureTests.cs`
 
-This page is the canonical implementation guide for choosing records or
+This page is the authoritative implementation guide for choosing records or
 classes, preserving shallow immutability, and evolving generated C# contracts.
 The shorter rules in [GOVERNANCE.md](GOVERNANCE.md) remain normative.
 

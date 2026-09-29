@@ -11,7 +11,7 @@ Impacts:
   Breaking:
     Reference: docs/internal/API_CHANGELOG.md
     Disposition: documented
-    Detail: Interactive setup no longer accepts a user-confirmed public URL or blocks launch on a canonical host; deployment overrides and authorized request origins now establish the address.
+    Detail: Interactive setup no longer accepts a user-confirmed public URL or blocks launch on an authoritative host; deployment overrides and authorized request origins now establish the address.
   Security:
     Reference: docs/internal/SECURITY-MODEL.md
     Disposition: documented

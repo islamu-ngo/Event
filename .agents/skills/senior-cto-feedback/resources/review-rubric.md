@@ -144,13 +144,13 @@ Check:
 
 | Score | Meaning |
 |---|---|
-| 5 | Contracts are canonical, named, generated, tested, and documented |
+| 5 | Contracts are authoritative, named, generated, tested, and documented |
 | 3 | API works but naming/versioning/client regeneration is incomplete |
 | 1 | Contracts are improvised or duplicate paths/semantics |
 
 Check:
 
-- Single canonical route shape.
+- Single route shape.
 - Stable route names and operation IDs.
 - Clear request/response DTOs.
 - HAL/HATEOAS behavior considered where relevant.

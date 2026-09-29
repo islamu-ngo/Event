@@ -1,5 +1,5 @@
 <!-- ABOUTME: Architectural decision record for AT Protocol event federation ownership and ordering. -->
-<!-- ABOUTME: Defines canonical ingress, tenant presentation, fenced processing, and DB-first egress. -->
+<!-- ABOUTME: Defines authoritative ingress, tenant presentation, fenced processing, and DB-first egress. -->
 
 # ADR-015: AT Protocol Event Federation Ownership
 
@@ -21,13 +21,13 @@ The platform must also operate safely on multiple nodes. A consumer or outbox wo
 
 ### Inbound ownership and presentation
 
-1. Inbound event and RSVP records are global canonical observations identified by DID, collection, and record key. Each row carries the current monotonic source version/cursor; a tenant does not own or duplicate the canonical protocol record.
-2. Tenant visibility is represented through tenant presentation joins. For every visible inbound event presentation, the platform additionally materializes one tenant-local, provenance-linked `Event` and exactly one `EventSession`. These are application aggregates for normal event/session querying, not competing canonical protocol records or new Jetstream consumers.
+1. Inbound event and RSVP records are global authoritative observations identified by DID, collection, and record key. Each row carries the current monotonic source version/cursor; a tenant does not own or duplicate the authoritative protocol record.
+2. Tenant visibility is represented through tenant presentation joins. For every visible inbound event presentation, the platform additionally materializes one tenant-local, provenance-linked `Event` and exactly one `EventSession`. These are application aggregates for normal event/session querying, not competing authoritative protocol records or new Jetstream consumers.
 3. `Atproto:Jetstream:AllowedDids` is an optional bounded ingress filter. Empty subscribes to all publishers of the two exact community collections; a non-empty list restricts ingestion to those curated DIDs. Tenant governance controls presentation and whether any stream demand exists; it is not a second DID filter.
 4. Exactly one logical Jetstream consumer owns the global stream. Multi-node hosts coordinate through a renewable lease carrying owner, generation/fence, and expiry. A stale generation cannot advance the cursor or settle materialization.
-5. Accepted record materialization, tenant-local Event/EventSession import or synchronization, dependent RSVP changes, tombstone effects, quarantine state, and cursor advancement commit atomically. A rejected or malformed envelope can be quarantined with bounded metadata in that same transaction; no path advances the cursor while losing its required canonical or application aggregate effect.
+5. Accepted record materialization, tenant-local Event/EventSession import or synchronization, dependent RSVP changes, tombstone effects, quarantine state, and cursor advancement commit atomically. A rejected or malformed envelope can be quarantined with bounded metadata in that same transaction; no path advances the cursor while losing its required authoritative or application aggregate effect.
 6. A dedicated internal CQRS import command validates the community lexicon minimum (`name`, `createdAt`) and every optional supplied value. It maps the first policy-approved event URI to `Event.EventUrl`, maps starts/ends to the single session, maps mode/status/RSVP expectation deterministically, preserves DID/AT URI provenance, and never invokes outbound publication planning.
-7. Duplicate source versions preserve Event/EventSession identities. Newer versions update source-owned fields. Tombstones suppress the canonical presentation and soft-delete the imported Event and session without producing outbound work. Locally owned URI/CID matches still reconcile as echoes instead of producing duplicate imported events.
+7. Duplicate source versions preserve Event/EventSession identities. Newer versions update source-owned fields. Tombstones suppress the authoritative presentation and soft-delete the imported Event and session without producing outbound work. Locally owned URI/CID matches still reconcile as echoes instead of producing duplicate imported events.
 
 ### Outbound ownership and ordering
 
@@ -48,7 +48,7 @@ Disabling capability or revoking consent stops pending and future eligible remot
 
 ## Transaction boundaries
 
-- Inbound: canonical record or tombstone, quarantine outcome when applicable, tenant-presentation effects, tenant-local Event/EventSession synchronization, and cursor advance or complete-snapshot settlement are one database transaction under the current consumer fence.
+- Inbound: primary record or tombstone, quarantine outcome when applicable, tenant-presentation effects, tenant-local Event/EventSession synchronization, and cursor advance or complete-snapshot settlement are one database transaction under the current consumer fence.
 - Outbound enqueue: local lifecycle mutation and immutable outbox insertion are one database transaction.
 - Outbound settlement: URI/CID reconciliation, `AtprotoRecord` linkage, outbox terminal state, and dependent RSVP release are one database transaction under the current worker fence.
 - External CarpaNet/PDS calls occur outside database transactions and only after a committed, current claim passes all delivery gates.
@@ -62,7 +62,7 @@ Disabling capability or revoking consent stops pending and future eligible remot
 
 ## Alternatives considered
 
-1. Per-tenant Jetstream consumers and canonical record copies — rejected because they duplicate global protocol state, multiply sockets, and create inconsistent tombstone/cursor ownership. Tenant-local Event/EventSession aggregates are retained because application queries and lifecycle data require the normal domain model, while `AtprotoRecord` remains canonical.
+1. Per-tenant Jetstream consumers and primary record copies — rejected because they duplicate global protocol state, multiply sockets, and create inconsistent tombstone/cursor ownership. Tenant-local Event/EventSession aggregates are retained because application queries and lifecycle data require the normal domain model, while `AtprotoRecord` remains authoritative.
 2. Public `AtprotoRecord` CRUD — rejected because it bypasses lifecycle, consent, tenant, privacy, version, and idempotency authorities.
 3. Remote-first event creation or PDS calls inside the local transaction — rejected because either permits a PDS-only event or holds database transactions across an external dependency.
 4. Best-effort cursor advancement and later materialization — rejected because a crash can permanently lose accepted commits.

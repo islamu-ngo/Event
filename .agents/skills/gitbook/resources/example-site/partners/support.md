@@ -78,7 +78,7 @@ When one of your referred customers has a production issue that needs urgent att
 
 1. **First**: have the customer open a support ticket via the standard [<code class="expression">space.vars.dashboard_live</code>/support](https://gitbook.com) flow.
 2. If the issue is critical (production-impacting, security, etc.), Slack-DM your PSM with the ticket number — they'll route to the right team and get a real-time update for you.
-3. For incidents affecting multiple customers, [<code class="expression">space.vars.status_page</code>](https://gitbook.com) is the canonical source.
+3. For incidents affecting multiple customers, [<code class="expression">space.vars.status_page</code>](https://gitbook.com) is the primary source.
 
 Don't message your PSM with non-urgent customer questions — those should flow through the standard support channel so they're tracked.
 

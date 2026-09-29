@@ -9,7 +9,7 @@ Define one consistent error contract for all API failures.
 
 Use RFC 7807 `ProblemDetails` as the base envelope:
 
-- `type`: canonical error category URI
+- `type`: stable error category URI
 - `title`: short summary
 - `status`: HTTP status code
 - `detail`: human-readable explanation

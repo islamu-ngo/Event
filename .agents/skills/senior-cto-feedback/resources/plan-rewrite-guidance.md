@@ -42,7 +42,7 @@ When improving a workstream:
 
 Eliminating separate `*-cto-review.md` files must **never** result in lost review intelligence. Chat output is ephemeral, whereas the triad (`plan.md`, `context.md`, `tasks.md`) is durable and persistent across sessions.
 
-Every piece of architectural analysis, risk profiling, adversarial stress-testing, and scoring must be permanently recorded into its canonical location across the triad:
+Every piece of architectural analysis, risk profiling, adversarial stress-testing, and scoring must be permanently recorded into its designated location across the triad:
 
 | Review Dimension / Element | Destination in the Triad | How & Why It Is Preserved |
 |---|---|---|
@@ -318,4 +318,4 @@ Replace these phrases:
 | “Make tenant-aware” | “Resolve tenant from X, enforce through Y, test wrong-tenant Z.” |
 | “Add config” | “Add env var, default, validation, docs, and failure behavior.” |
 | “Add background worker” | “Add idempotent worker with retry, dead-letter, metrics, and recovery.” |
-| “Update UI” | “Update UI after canonical API contract and generated client are stable.” |
+| “Update UI” | “Update UI after the API contract and generated client are stable.” |

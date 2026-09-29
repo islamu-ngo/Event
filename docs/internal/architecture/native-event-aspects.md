@@ -1,6 +1,6 @@
 # Native EventAspects operation boundary
 
-> **Status:** Implemented, canonical SQLite verification.
+> **Status:** Implemented, authoritative SQLite verification.
 > **Source anchors:** `src/Explore.Application/Features/EventAspects/`, `src/Explore.API/Controllers/EventAspectController.cs`.
 
 ## Ownership and composition

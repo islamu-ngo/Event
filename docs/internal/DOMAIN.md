@@ -84,7 +84,7 @@ state and are never parsed or accepted as live DIDs.
 Legal identity is split by responsibility:
 
 - `TenantDirectoryOperatorIdentity` is the normalized tenant-owned directory
-  authority stored in the canonical typed settings document;
+  authority stored in the authoritative typed settings document;
 - `InstanceOperatorIdentity` is the normalized general platform operator identity
   assessed from the persisted `instance.operator_identity` document;
 - organizer merchant identity comes from the event organizer actor and current
@@ -209,7 +209,7 @@ The platform isolates **physical venue master records** from **per-event disclos
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │          EventSession / EventAgendaItem                │
-│  - References: EventLocationId (Canonical)             │
+│  - References: EventLocationId (Authoritative)             │
 │  - Optionally specifies a specific RoomId              │
 │  - Inherits disclosure rules & timed reveal            │
 └────────────────────────────────────────────────────────┘
@@ -250,7 +250,7 @@ collisions become validation errors rather than partial writes.
 - Rather than pointing directly to an unmediated `LocationId`, sessions and agenda items reference `EventLocationId`.
 - This ensures session schedules cannot accidentally leak physical addresses, violate parent event privacy policies, or reference a physical venue in a different city from the event.
 - Enforced at the database level by check constraints (`ck_event_session_physical_location_requires_event_location`).
-- Deleting a session, session group, or agenda item clears its canonical event-location reference and the physical location/room keys and navigations together. EF persists deletion as an audited soft-delete UPDATE, so retaining a physical key after detachment would violate the same mediation constraint. The reusable venue and other carriers remain intact.
+- Deleting a session, session group, or agenda item clears its primary event-location reference and the physical location/room keys and navigations together. EF persists deletion as an audited soft-delete UPDATE, so retaining a physical key after detachment would violate the same mediation constraint. The reusable venue and other carriers remain intact.
 
 ### Location Address Source, Visibility, And Promotion
 
@@ -285,7 +285,7 @@ also rejects unsupported revisions. Explicit authorized promotion repairs stale 
 before publishing, while erased rows cannot regain PII. Grouped PATCH prevalidates every
 effective name/address before changing tracked fields, including protected provider selections.
 
-Search is a literal substring of normalized text. Canonical `é`/`e` plus combining acute match;
+Search is a literal substring of normalized text. Authoritative `é`/`e` plus combining acute match;
 accent removal, transliteration, full Unicode case folding, and Turkish linguistic casing are
 not promised (`Straße` need not match `STRASSE`, and `İstanbul` does not match `ISTANBUL`).
 Tenant, current membership, privacy, and governance filtering happen in SQL before projection
@@ -340,7 +340,7 @@ Ordinary Event transitions are:
 
 Create Event supports only `Draft` and `Published` requested states. Input `0` is treated as the default Draft request; malformed, undefined, Cancelled, Completed, Archived, or Moderated creation states are rejected before actor resolution or persistence. New `Event` and `EventSession` instances default to Draft through Domain property initialization. For requested Published creation, the handler constructs the Event with the controlled explicit Published constructor before dynamic readiness evaluation so readiness sees the intended target state; after readiness succeeds, it constructs the sessions with controlled explicit Published constructors inside the transaction. It does not treat `Event.Publish(...)` or `EventSession.Publish(...)` as the creation mechanism. Those semantic methods remain the normal transition path for existing aggregates. Import remains Draft/default and emits no lifecycle side effects.
 
-Development seed repair does not force every known seed row to Published. `SeedData` uses controlled Published constructors for the canonical published graph; `DatabaseSeeder` only promotes an existing seed session when `EventSessionLifecycleRules.CanPublish(...)` accepts its current status, the Published parent state, and its schedule. Terminal or otherwise non-publishable states, including Moderated, are left unchanged.
+Development seed repair does not force every known seed row to Published. `SeedData` uses controlled Published constructors for the authoritative published graph; `DatabaseSeeder` only promotes an existing seed session when `EventSessionLifecycleRules.CanPublish(...)` accepts its current status, the Published parent state, and its schedule. Terminal or otherwise non-publishable states, including Moderated, are left unchanged.
 
 Event sessions also remain normal `EventSession` rows. Draft/internal sessions are represented by `EventSessionStatusId = Draft`, can be unscheduled, and are hidden from anonymous/public program surfaces until they are scheduled and published. This allows a published event to own an internal draft session without leaking it through public session list/detail, program summary, calendar export, agenda projection, or event-list schedule facets. Session publication is subordinate to event publication: an `EventSession` cannot move to `Published` unless its parent `Event` is already `Published`.
 
@@ -400,7 +400,7 @@ The four Task 7.1 lookup families are normalized rows with stable integer IDs an
 |---|---|---|
 | `RegistrationRequirementCriticality` | `REQUIRED`, `OPTIONAL`, `INFORMATIONAL`, `POST_REGISTRATION` | Blocking and lifecycle criticality. |
 | `RegistrationRequirementCompletionEffect` | `BLOCKS_REGISTRATION`, `ENRICHES_REGISTRATION`, `NO_REGISTRATION_EFFECT` | Effect of completion on registration. |
-| `RegistrationAnswerSyncMode` | `NONE`, `COMPLETION_ONLY`, `SELECTED_FIELDS`, `FULL_CANONICAL`, `MIRROR_ONLY` | What completion may synchronize. |
+| `RegistrationAnswerSyncMode` | `NONE`, `COMPLETION_ONLY`, `SELECTED_FIELDS`, `FULL_SYNC`, `MIRROR_ONLY` | What completion may synchronize. |
 | `RegistrationRequirementSubjectType` | `ALL_ORDERS`, `SPECIFIC_TICKET_TYPE`, `EVERY_PARTICIPANT`, `LEAD_BOOKER_ONLY`, `CHILD_PARTICIPANTS`, `SPECIFIC_SESSION_SELECTION` | Typed applicability target. |
 
 Evaluation is pure. The workflow applies **ALL** semantics across applicable requirements; a requirement applies **ANY** semantics across its channel completions (subject to its sync mode). Required incomplete requirements block registration. Optional, informational, and post-registration requirements are nonblocking. A permitted registrant skip returns `SkippedByRegistrant`; required or non-skippable requirements reject the skip. This result is not durable registrant state: Task 8.5 owns subject-scoped `RegistrationRequirementFulfillment` and durable skip/finalization persistence.
@@ -411,7 +411,7 @@ All three entities are tenant-scoped, audited, soft-deletable, and concurrency-a
 
 The form authoring aggregate is exactly five persisted entities: `RegistrationForm`, `RegistrationFormVersion`, `RegistrationFormSection`, `RegistrationFormField`, and `RegistrationFormFieldOption`. `FormVersionRules` is a pure domain rules service; `RegistrationFormRule` adds the bounded-condition rules described below. A form owns versioned authoring graphs, and a version is either draft, published, or explicitly retired. Published versions reject graph mutation; edits deep-clone into fresh version/section/field/option IDs while retaining source-template provenance and stable field identity.
 
-Fields have dual identity: immutable graph IDs identify a specific versioned row, while normalized `Namespace/Key` is the stable machine identity for the field across versions. Provider question IDs and provider labels are mapping metadata only and cannot become canonical identity. `Namespace/Key` is unique across all active fields in a version, including fields in different sections; the aggregate rejects duplicates and persistence retains a version-wide active-row unique index as defense in depth. Sections, fields, and options use explicit positive owner-scoped ordinals.
+Fields have dual identity: immutable graph IDs identify a specific versioned row, while normalized `Namespace/Key` is the stable machine identity for the field across versions. Provider question IDs and provider labels are mapping metadata only and cannot become stable identity. `Namespace/Key` is unique across all active fields in a version, including fields in different sections; the aggregate rejects duplicates and persistence retains a version-wide active-row unique index as defense in depth. Sections, fields, and options use explicit positive owner-scoped ordinals.
 
 Field governance is explicit and provider-neutral: organizer visibility, explicit-consent requirement, provider-transfer allowance, and positive retention-policy identity are validated by the domain. The model stores no provider-owned question entity and does not reuse custom-property tables. Every form version requires a normalized BCP-47 `LanguageTag`; translation tables and `MULTILINGUAL` content support are intentionally absent until the localization decision in Task 7.8. Form content localization must not be inferred from UI/TMS localization.
 
@@ -423,7 +423,7 @@ Conditions reference only normalized fields earlier in the same form version. Sc
 
 #### Deterministic Schema Artifacts And Publication Authority
 
-Each immutable form version pins exactly four deterministic artifacts: the JSON Schema 2020-12 data schema, UI layout, closed condition/rule logic, and the empty provider-mapping shape reserved for Task 9.3. `FormSchemaArtifactGenerator` owns canonical non-indented `System.Text.Json` serialization to UTF-8 bytes and computes lowercase SHA-256 over the complete bundle, including normalized consent purpose code and text version whenever a field requires explicit consent. `FormSchemaArtifactPublicationService` is the Application-owned generate-and-publish facade: it generates from the live relational aggregate and passes the result to the Domain's internal atomic pinning seam. Callers cannot supply artifact JSON or a hash.
+Each immutable form version pins exactly four deterministic artifacts: the JSON Schema 2020-12 data schema, UI layout, closed condition/rule logic, and the empty provider-mapping shape reserved for Task 9.3. `FormSchemaArtifactGenerator` owns authoritative non-indented `System.Text.Json` serialization to UTF-8 bytes and computes lowercase SHA-256 over the complete bundle, including normalized consent purpose code and text version whenever a field requires explicit consent. `FormSchemaArtifactPublicationService` is the Application-owned generate-and-publish facade: it generates from the live relational aggregate and passes the result to the Domain's internal atomic pinning seam. Callers cannot supply artifact JSON or a hash.
 
 Persistence stores all four artifact values and the 64-character hash together. Draft versions require all artifact columns to be null; published and retired versions require all of them to be non-null. The generated `20260801192258_init` migration and model snapshot carry this constraint; generated migration artifacts are not hand-edited. The initial adversarial review found the former caller-authored `Publish(string ...)` authority defect; the repair moved authority to the Application facade/internal Domain seam and was independently confirmed at 0.99.
 
@@ -435,7 +435,7 @@ Phase 9 adds provider-neutral integration metadata only; no Formbricks, Google F
 
 Bindings pin one form/version and the provider tuple evidence used by capabilities: `(ProviderCode, DeploymentKind, ApiVersion, AdapterPolicyVersion, ConformanceEvidenceRevision)`. The ten D3 capability interfaces are `IRegistrationProviderDescriptor`, `IRegistrationProviderPresentation`, `IRegistrationProviderSchemaReader`, `IRegistrationProviderFormProvisioner`, `IRegistrationProviderSubmissionWriter`, `IRegistrationProviderSubmissionReader`, `IRegistrationProviderCallbackVerifier`, `IRegistrationProviderSubscriptionManager`, `IRegistrationProviderReconciliationProvider`, and `IRegistrationProviderSubmissionSink`. Runtime capability is the intersection of proven tuple support, configured capability rows, governance, mapping compatibility, and authorization; unknown tuples fail closed for automatic finalization.
 
-Drift is one of eight lookup classes: `NoDrift`, `AdditiveOptionalChange`, `LabelOnlyChange`, `MappingRequired`, `RequiredFieldRemoved`, `TypeChanged`, `OptionSetChanged`, or `UnsupportedChange`. `MappingRequired` and worse block publication. Draft mappings can be replaced before publication; published or pinned mappings are immutable and require a new binding revision. Requirement answer sync modes are `NONE`, `COMPLETION_ONLY`, `SELECTED_FIELDS`, `FULL_CANONICAL`, and `MIRROR_ONLY`; trust gates require at least `CompletionOnly`, `SelectedFields`, or `FullCanonical` respectively, while mirror-only requires a sink capability and otherwise parks for reconciliation.
+Drift is one of eight lookup classes: `NoDrift`, `AdditiveOptionalChange`, `LabelOnlyChange`, `MappingRequired`, `RequiredFieldRemoved`, `TypeChanged`, `OptionSetChanged`, or `UnsupportedChange`. `MappingRequired` and worse block publication. Draft mappings can be replaced before publication; published or pinned mappings are immutable and require a new binding revision. Requirement answer sync modes are `NONE`, `COMPLETION_ONLY`, `SELECTED_FIELDS`, `FULL_SYNC`, and `MIRROR_ONLY`; trust gates require at least `CompletionOnly`, `SelectedFields`, or `FullSync` respectively, while mirror-only requires a sink capability and otherwise parks for reconciliation.
 
 ### Ticketing And Instance Monetization
 
@@ -456,7 +456,7 @@ Drift is one of eight lookup classes: `NoDrift`, `AdditiveOptionalChange`, `Labe
 - **Included Quantity (`IncludedQuantity`)**: The number of admission units or entries granted per entitlement.
 
 Entitlements feed directly into capacity pool enforcement (`EventCapacityPool`), attendee check-in lists, and location privacy disclosure gating (`EventLocation` reveal policy).
-`ScopeId` is the canonical entitlement identity: session ID, then day ID, then target event ID.
+`ScopeId` is the authoritative entitlement identity: session ID, then day ID, then target event ID.
 PostgreSQL, SQLite, and SQL Server persist it as a stored computed column; MariaDB and MySQL
 populate the same value in the save pipeline and generated migration backfill, so the unique
 tenant/ticket-type/event/scope index has identical semantics on every provider.
@@ -501,7 +501,7 @@ Moderation review is CQRS-driven. Triage, assignment, decision capture, and deci
 
 Decision completion and recipient materialization share one application-owned serializable transaction. That transaction alone applies the report/case lifecycle outcome after the exact receipt is present. `NoViolation` and `Duplicate` record a no-action receipt; `LightModerate` and `HeavyRedact` require their exact moderation-record receipt; `WarnOrganizer` requires a generic warning for every effective active `EventOwner`; `Escalate` and `NeedsMoreInfo` remain nonterminal and produce no final reporter outcome. `NeedsMoreInfo` additionally moves the case to `WaitingReporter` and materializes one decision-scoped `report.needs-more-information` intent: required linkless in-app delivery plus optional email governed by the separate follow-up-contact consent. A persisted non-deleted reporter and active tenant membership are revalidated before graph preparation and again inside completion; absent authority aborts before the business transition and leaves the receipted execution resumable in `CompletionPending`. Email address, verification, trust-safety preference, and follow-up consent are narrower optional-channel checks: their failure records a typed skipped email while preserving required in-app delivery. Dispatch revalidates consent again before provider handoff, and exact execution replay creates no second intent. Organizer authority is re-queried at a fresh time inside every completion attempt and must match the prepared cohort before any recipient row is materialized. Final reporter outcomes use required linkless in-app delivery plus optional verified, preference- and case-update-consent-gated email. Reporter copy exposes only the allowed lifecycle meaning, never evidence, event-private data, moderator/provider identity, reason codes, notes, or invented response links. A completion retry resumes from `CompletionPending` and does not repeat enforcement.
 
-Provider integrations remain metadata-only. Osprey signals and Coop review-queue/callback state are stored as bounded codes and external IDs with idempotency indexes. Signed, authenticated Coop callbacks are retained with one unique `IncomingWebhookEffectOutbox` pointer. The pointer's fenced worker loads and revalidates the retained callback, invokes canonical decision execution outside intake, and commits the applied-effect receipt with pointer completion only after command success. Retryable failures reschedule; poison callbacks dead-letter for authenticated, generation-checked operator redrive. Osprey remains signal-only.
+Provider integrations remain metadata-only. Osprey signals and Coop review-queue/callback state are stored as bounded codes and external IDs with idempotency indexes. Signed, authenticated Coop callbacks are retained with one unique `IncomingWebhookEffectOutbox` pointer. The pointer's fenced worker loads and revalidates the retained callback, invokes authoritative decision execution outside intake, and commits the applied-effect receipt with pointer completion only after command success. Retryable failures reschedule; poison callbacks dead-letter for authenticated, generation-checked operator redrive. Osprey remains signal-only.
 
 Registration provider callbacks reuse the same incoming-webhook ledger. `RegistrationProviderCallbackController` only reads bounded exact bytes, adds provider/binding route metadata, and acknowledges with `202 Accepted`; malformed, duplicate, stale, out-of-order, unknown-tuple, or unverifiable evidence is acknowledged and either deduped or parked as `NeedsReconciliation`. The worker validates the Data Protection receipt purpose `Explore.RegistrationProviderCallbackReceipt` / `v1` against tenant, connection, binding, provider, tuple key, payload hash, submission id, and timestamp before any Phase 8 submission persistence. Completion is never inferred from redirect return, iframe navigation, or external clicks.
 
@@ -578,9 +578,9 @@ Revocation is explicit (`RevokedAt`, `RevokedBy`, `RevocationReason`) so histori
 
 An unknown exact DID materializes one global `AtprotoIdentity`, one `Actor` with `ActorTypeId = ExternalUnclassified`, and one `ExternalActorSubject`. Verified Organization or Group classification can promote that Actor in place, preserving the Actor, identity, profile, and Event identifiers while retiring the external owner evidence.
 
-Consolidation into an existing same-kind Actor is stricter. The signed bootstrap request must name the canonical Actor and its expected concurrency stamp, and the authenticated User must already hold active OrgAdmin or GroupAdmin authority over an approved, non-suspended participation in the current tenant. Exact DID proves the external source only; names, handles, URLs, profile similarity, and classification intent do not prove authority over the canonical target.
+Consolidation into an existing same-kind Actor is stricter. The signed bootstrap request must name the authoritative Actor and its expected concurrency stamp, and the authenticated User must already hold active OrgAdmin or GroupAdmin authority over an approved, non-suspended participation in the current tenant. Exact DID proves the external source only; names, handles, URLs, profile similarity, and classification intent do not prove authority over the authoritative target.
 
-The serializable onboarding transaction moves active operational references for the identity, Events, EventSeries, session speakers, and tenant-local subscriptions. It records one immutable `ActorMerge` with the identity ID and a bounded SHA-256 DID digest, then retires the source Actor. Consent, reports, organizer claims, notifications, moderation records, exports, canonical records, and other historical evidence remain attached to the source. Prepared encrypted OAuth-session persistence commits in the same retry attempt; JWT issuance occurs only after commit.
+The serializable onboarding transaction moves active operational references for the identity, Events, EventSeries, session speakers, and tenant-local subscriptions. It records one immutable `ActorMerge` with the identity ID and a bounded SHA-256 DID digest, then retires the source Actor. Consent, reports, organizer claims, notifications, moderation records, exports, primary record, and other historical evidence remain attached to the source. Prepared encrypted OAuth-session persistence commits in the same retry attempt; JWT issuance occurs only after commit.
 
 ### 12) Four-Level Actor And Event Moderation
 
@@ -601,7 +601,7 @@ Event creation eligibility and public visibility are separate rules. Creation re
 
 ### 13) Actor Subscriptions And Notification Fanout
 
-`ActorSubscription` is the canonical durable relationship for user subscriptions to subscribable actors. V1 supports organization and group target actors only. The subscription stores the active tenant-local subscriber (`SubscriberTenantUserId`), denormalized global `SubscriberUserId` for notification delivery, target actor, target actor type, subscription status, notification level, audit fields, soft-delete fields, and a concurrency stamp.
+`ActorSubscription` is the authoritative durable relationship for user subscriptions to subscribable actors. V1 supports organization and group target actors only. The subscription stores the active tenant-local subscriber (`SubscriberTenantUserId`), denormalized global `SubscriberUserId` for notification delivery, target actor, target actor type, subscription status, notification level, audit fields, soft-delete fields, and a concurrency stamp.
 
 Unsubscribe is modeled as a status transition to `UNSUBSCRIBED`, not as deletion. Resubscribe reactivates the same durable row and resets the notification level to the v1 default. Command handlers and fanout scans require an active, non-deleted `TenantUser` so suspended, banned, removed, or deleted tenant-local users do not receive subscription fanout.
 
@@ -615,7 +615,7 @@ Delivery services call the effective notification preference resolver before cre
 
 ## Fair Return And Waitlist
 
-`FairReturnSupplyPolicy`, `FairReturnSupplyUnit`, `EventWaitlistEntry`, `EventWaitlistOffer`, and `FairReturnSourceBinding` form one tenant-qualified lifecycle. Open-slot nullable keys enforce one open supply, queue entry, offer, and binding without reusing closed-row sentinels. Allocation locks canonical entity fences and rolls losers back atomically. Withdrawal may substitute only a commercially equivalent source before payment handoff; expiry and finalization share the same offer, entry, supply, and binding fence.
+`FairReturnSupplyPolicy`, `FairReturnSupplyUnit`, `EventWaitlistEntry`, `EventWaitlistOffer`, and `FairReturnSourceBinding` form one tenant-qualified lifecycle. Open-slot nullable keys enforce one open supply, queue entry, offer, and binding without reusing closed-row sentinels. Allocation locks authoritative entity fences and rolls losers back atomically. Withdrawal may substitute only a commercially equivalent source before payment handoff; expiry and finalization share the same offer, entry, supply, and binding fence.
 
 Public queue position is calculated from literal domain order but capped at 999, with zero meaning unavailable. API and UI contracts expose only bounded status/reason state. Participant, account, seller, payment instrument, provider payload, commerce amount, and queue priority remain server-side. HAL link presence is the sole browser action authority and durable paid-sale controls suppress new allocation and withdrawal links.
 

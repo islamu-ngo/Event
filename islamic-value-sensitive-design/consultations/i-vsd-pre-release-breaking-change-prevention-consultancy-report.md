@@ -27,7 +27,7 @@ This report identifies decisions that become expensive once users, organizations
 Two future products are explicit inputs:
 
 1. **ISLAMU Asset:** an optional self-hosted API with advanced file/asset modeling and access APIs, including presigned URLs. When selected, it is intended to handle all Event-managed files instead of Event directly using S3 or a filesystem. Asset can itself use those backends.
-2. **ISLAMU Identity:** an optional self-hosted canonical identity graph and profile/consent/provisioning control plane. Keycloak, local credential services and ATProto account authorities retain their respective credential, token and recovery responsibilities. Event must still operate without this additional infrastructure.
+2. **ISLAMU Identity:** an optional self-hosted stable identity graph and profile/consent/provisioning control plane. Keycloak, local credential services and ATProto account authorities retain their respective credential, token and recovery responsibilities. Event must still operate without this additional infrastructure.
 
 The supplied Identity assessment is treated as product intent, not independently verified market or standards research. Its opaque citation markers cannot serve as sources for this report. No competing implementation was examined or copied.
 
@@ -44,7 +44,7 @@ The most valuable pre-release work is therefore **not building Asset or Identity
 ### The five decisions with the highest leverage
 
 1. **What remains the identity of a person, actor and file when its provider changes?** Choose durable application identities and explicit external bindings, not email addresses, hostnames or storage URLs.
-2. **Who is allowed to write each fact?** Separate credential authority, canonical profile authority, Event permissions, scoped consent and immutable historical evidence.
+2. **Who is allowed to write each fact?** Separate credential authority, authoritative profile authority, Event permissions, scoped consent and immutable historical evidence.
 3. **What exactly is a stored file reference?** Separate an Event-facing object identity from its physical target/version and from any temporary delivery URL.
 4. **What does deletion or revocation mean across products?** Unlinking an account, withdrawing Event access, deleting one attachment and erasing a person everywhere are different operations.
 5. **What does optionality promise?** Asset and Identity must each be independently absent, enabled, unavailable and deliberately removed without silently changing authority or losing business data.
@@ -56,7 +56,7 @@ Priority ranks the cost of getting the decision wrong, not the amount of impleme
 | Rank | Decision | Current evidence | Pre-release action | Finding |
 | --- | --- | --- | --- | --- |
 | 1 | Stable identity and authority-qualified linking | Local User/Actor IDs and issuer-qualified OIDC/DID keys already exist; selected verified-email auto-matching also exists. | Preserve the separation; explicitly choose linking/merge rules and external Identity namespace. | IVSD-F001 |
-| 2 | Canonical profile writer and Event-owned permissions | Login synchronization and profile commands both write local profile fields. | Decide field ownership and precedence; correct conflicting write semantics before they become promises. | IVSD-F002 |
+| 2 | Authoritative profile writer and Event-owned permissions | Login synchronization and profile commands both write local profile fields. | Decide field ownership and precedence; correct conflicting write semantics before they become promises. | IVSD-F002 |
 | 3 | Provider-neutral file identity, target and version | Stable storage IDs exist, but `Uri` has mixed meanings and binding discipline differs by file path. | Normalize reference semantics and extend durable target ownership to all managed file producers. | IVSD-F003 |
 | 4 | File access, metadata and shared ownership | Event-resource files have stronger authority/lifecycle rules than generic files. | Define the Asset/Event ownership split and preserve policy-sensitive delivery. | IVSD-F004 |
 | 5 | Consent, deletion and retained evidence | Scoped consent snapshots and authority-first erasure already exist. | Define cross-product scopes and prohibit automatic global propagation of local deletion. | IVSD-F005 |
@@ -83,7 +83,7 @@ Breaking changes remain appropriate when they produce the better design. The goa
 | Add an optional Identity authority while retaining Event subject IDs, membership semantics and credential-provider ownership | Potentially additive; authority handover is still a substantive integration. |
 | Add a database table/column or an external binding with a lossless upgrade | Not inherently a public breaking change. A schema migration is normal evolution. |
 | Replace every Event `UserId` with an Identity ID, or every file ID with a remote URL | Changes durable identity and references; likely disruptive even if HTTP routes look unchanged. |
-| Preserve JSON fields but make a profile update overwrite canonical Identity data or broaden file access | A behavioral/authority break. Matching schemas are not sufficient. |
+| Preserve JSON fields but make a profile update overwrite stable identity data or broaden file access | A behavioral/authority break. Matching schemas are not sufficient. |
 | Make a formerly standalone workflow require a new daemon or online control plane | A deployment/operational break. |
 | Return a new provider/status value to clients promised a closed vocabulary | Potentially breaking for exhaustive consumers; define extension behavior rather than assuming additions are harmless. |
 | Rename an internal class without changing persisted/public meaning | Usually an internal refactor, not a reason to create compatibility layers. |
@@ -105,7 +105,7 @@ The expensive commitments are semantic identity, ownership, history, access and 
 - **Owner / acceptance:** Identity/security owner with project steward; demonstrate same subject under different issuers remains distinct, an email change does not create a new person, and linking never changes unrelated Event ownership or consent.
 - **Escalation:** Cross-product person correlation and disputed account ownership need explicit product/privacy policy. This review does not claim an exploitable account-takeover path was demonstrated.
 
-### IVSD-F002: Choose one writer for canonical profile facts, without exporting Event authorization
+### IVSD-F002: Choose one writer for authoritative profile facts, without exporting Event authorization
 
 - **Lifecycle:** open.
 - **Severity / claim type:** Very high; confirmed current write coupling and future authority decision.
@@ -113,9 +113,9 @@ The expensive commitments are semantic identity, ownership, history, access and 
 - **Stakeholders / controlled decision:** Account holders, organizers and administrators; field mastering, profile edits, participation and revocation.
 - **Evidence / validation:** `User` exposes local `UserPii` through property wrappers. `UpdateUserCommandHandler` changes names; `SyncUserCommandHandler` also rewrites names, email/verification and Actor display name from incoming account data. `TenantUserProfile` has separate override/preferences fields. `AdminContext` resolves authority from Event repositories; a selected test exercises committed grant changes across independent hosts. [E02-E05]
 - **Why costly later:** If an Identity profile update is overwritten at the next login, the system has two masters. Moving Event roles into a generic person profile can also weaken tenant/organization boundaries and revocation freshness.
-- **Mitigation:** **IVSD-M002** - Write a field/operation ownership matrix now. When embedded mode is selected, Event's profile authority owns designated fields. When external Identity is selected, that authority owns those same canonical fields and Event uses an explicitly bounded local projection. Credential verification remains with the credential authority; an arbitrary profile edit cannot make an address verified. Tenant display overrides and Event participation/permissions retain their own scopes. Preserve Event's ability to deny an operation using current Event authority, regardless of a remote profile or stale claim.
+- **Mitigation:** **IVSD-M002** - Write a field/operation ownership matrix now. When embedded mode is selected, Event's profile authority owns designated fields. When external Identity is selected, that authority owns those same authoritative fields and Event uses an explicitly bounded local projection. Credential verification remains with the credential authority; an arbitrary profile edit cannot make an address verified. Tenant display overrides and Event participation/permissions retain their own scopes. Preserve Event's ability to deny an operation using current Event authority, regardless of a remote profile or stale claim.
 - **Decide now / later:** Correct unconditional profile-overwrite semantics and identify the application-owned write/read boundary now. Later add the remote implementation and synchronization. Do not require a network call for every rendering of a user's display name, and do not use eventually synchronized display/profile facts to authorize protected actions.
-- **Owner / acceptance:** Application/identity owner; a chosen canonical profile edit survives login, a removed organizer cannot act using an old profile/session projection, and identity administration does not confer Event instance-admin authority.
+- **Owner / acceptance:** Application/identity owner; a chosen authoritative profile edit survives login, a removed organizer cannot act using an old profile/session projection, and identity administration does not confer Event instance-admin authority.
 - **Escalation:** If Identity will also become an authorization-policy authority, that is a separate explicit contract—not an automatic consequence of owning the user graph.
 
 ### IVSD-F003: Storage has stable IDs, but references and target binding need one coherent meaning
@@ -189,7 +189,7 @@ The expensive commitments are semantic identity, ownership, history, access and 
 - **Severity / claim type:** High; model-confirmation decision, not a finding that the whole event domain is wrong.
 - **Principles / domains:** Sidq, Adl, Promise-Keeping; design, technical and evaluation.
 - **Stakeholders / controlled decision:** Organizers, attendees and discovery consumers; what an Event represents, schedule changes, provenance and contextual authority.
-- **Evidence / validation:** Accepted ADRs distinguish publishing, organizer and participant authority and retain one object through lifecycle transitions. `EventSession` has nullable start/end and explicit fixed/open-ended/prayer-relative end types; local times are derived by a timezone-aware projection. A separate current consultancy discusses canonical Event/session/series identity and discovery. [E15, E16]
+- **Evidence / validation:** Accepted ADRs distinguish publishing, organizer and participant authority and retain one object through lifecycle transitions. `EventSession` has nullable start/end and explicit fixed/open-ended/prayer-relative end types; local times are derived by a timezone-aware projection. A separate current consultancy discusses primary event/session/series identity and discovery. [E15, E16]
 - **Why costly later:** Splitting or merging an Event after orders, URLs, sessions, resources and federation records exist has broader consequences than adding a storage adapter. Changing whether a repeated session is a new event, or whether a time is fixed versus rule-derived, changes attendee expectations.
 - **Mitigation:** **IVSD-M008** - Confirm Event/session/day/series meaning using a multi-day conference, repeated course, multi-city program and annual edition. Distinguish reporter, publisher, organizer and payment recipient. Keep structural identity separate from configurable publication completeness. Decide whether each schedule value is an instant, a local civil-time intention or a symbolic rule; define timezone, ambiguity, missing end and rescheduling outcomes without inventing fake dates. Preserve immutable published/transactional versions where needed.
 - **Decide now / later:** Resolve meanings that affect current persistence and public contracts now. A future recurrence/prayer calculation engine can wait; an enum value alone is not proof that every symbolic scheduling behavior exists. Reference the dedicated discovery consultation rather than creating a competing model here.
@@ -251,7 +251,7 @@ Keep these independently selectable:
 
 ```text
 Credential/authentication authority: Local | Keycloak | ATProto account authority
-Canonical profile/control-plane authority: Embedded Event | ISLAMU Identity
+Authoritative profile/control-plane authority: Embedded Event | ISLAMU Identity
 File provider: Local | S3-compatible | ISLAMU Asset
 ```
 
@@ -262,7 +262,7 @@ These are conceptual axes, not proposed configuration keys or a requirement to e
 | Concern | Recommended owner |
 | --- | --- |
 | Passwords, MFA, login tokens, provider verification and reset/security email | The selected credential/account authority |
-| Canonical person graph, externally linked authorities and designated global profile fields | Embedded profile authority or Identity, with one selected writer |
+| Authoritative person graph, externally linked authorities and designated global profile fields | Embedded profile authority or Identity, with one selected writer |
 | Local Event subject/Actor IDs and Event references | Event |
 | Event tenant/organization/group participation, organizer authority, bans and grants | Event by default; remote provisioning requests do not bypass local authorization |
 | Tenant-specific display/contact overrides | Their explicit tenant authority, with defined precedence and verification semantics |
@@ -270,7 +270,7 @@ These are conceptual axes, not proposed configuration keys or a requirement to e
 | Notification preferences and consent | Explicitly scoped records; centralized administration must preserve product, purpose, recipient and subject boundaries |
 | Historical purchase/consent/audit snapshots | Their originating domain and retention policy, not the current editable profile |
 
-Identity can provision membership information without making every global identity-group membership an Event permission. Likewise, a person's canonical profile can exist without granting visibility of that person's participation across unrelated mosques or applications.
+Identity can provision membership information without making every global identity-group membership an Event permission. Likewise, a person's authoritative profile can exist without granting visibility of that person's participation across unrelated mosques or applications.
 
 ### How far should the standalone model align?
 
@@ -284,9 +284,9 @@ Do not move all current fields merely because they contain "user." A ticket part
 
 ### A non-breaking future adoption scenario
 
-An Event installation has `User U`, personal `Actor P`, memberships and historical registrations. Identity authority `I` introduces canonical person `C`. Event records an authenticated, reviewed mapping `(I, C) -> U`; existing event-domain foreign keys retain `U` and `P`.
+An Event installation has `User U`, personal `Actor P`, memberships and historical registrations. Identity authority `I` introduces authoritative person `C`. Event records an authenticated, reviewed mapping `(I, C) -> U`; existing event-domain foreign keys retain `U` and `P`.
 
-The profile authority then hands over deliberately. Login still resolves the validated external credential account to the correct local Event subject. New canonical profile writes go to the selected owner; Event projections carry provenance/version and never become a competing writer. Existing scoped consent and transaction snapshots do not change.
+The profile authority then hands over deliberately. Login still resolves the validated external credential account to the correct local Event subject. New authoritative profile writes go to the selected owner; Event projections carry provenance/version and never become a competing writer. Existing scoped consent and transaction snapshots do not change.
 
 Disabling Identity requires an export/handover of the fields Event needs, preserved mappings/history and an explicitly supported login path. It is not safe to drop the mapping and hope email correlation reconstructs the account. A remote outage must not trigger that handover automatically.
 
@@ -297,7 +297,7 @@ Disabling Identity requires an export/handover of the fields Event needs, preser
 Record the answers as domain/architecture decisions and adjust the existing implementation where it contradicts them:
 
 1. **Identity/reference contract:** Which IDs remain Event-local, how external authorities are namespaced, which links are permitted, and what merging may change.
-2. **Authority matrix:** One writer for each canonical profile field; separate credentials, Event access, scoped consent, historical facts and file ownership.
+2. **Authority matrix:** One writer for each authoritative profile field; separate credentials, Event access, scoped consent, historical facts and file ownership.
 3. **File contract:** Stable reference versus location/version/delivery URL; complete producer inventory; access and deletion semantics across shared use.
 4. **Lifecycle/optionality contract:** Activation, interruption, revocation, erasure, restore and deliberate exit for each optional service.
 5. **Public meaning contract:** Event/session/time/provenance, stable API/lookup/webhook/configuration values and immutable transactional snapshots.
@@ -308,7 +308,7 @@ These are decision deliverables, not five new platforms. A short explicit owners
 
 - Eliminate the mixed meaning of `StorageObject.Uri` across finalization, generated CSVs and consumers; choose a consistent ID-based delivery contract.
 - Extend or deliberately unify target/version binding and disposal obligations across generic files and resource files. Preserve different access policies rather than flattening sensitive resources into generic downloads.
-- Decide profile-write precedence before adding more profile fields: incoming login claims must not silently compete with the chosen canonical writer.
+- Decide profile-write precedence before adding more profile fields: incoming login claims must not silently compete with the chosen authoritative writer.
 - Decide whether the current verified-email auto-match policy is acceptable; prefer explicit proof-backed linking for the intended multi-authority future.
 - Review configuration and public DTO semantics that currently expose provider details; do not build an Asset/Identity connector merely to prove the boundary exists.
 
@@ -328,7 +328,7 @@ SCIM or another protocol may be a useful later integration transport; selecting 
 
 - **Preserve today's code because it might become public:** directly contradicts the greenfield objective.
 - **Build the entire Asset/Identity roadmap before v0.1:** delays learning and duplicates future product design unnecessarily.
-- **Use one canonical remote ID as every product's primary key:** couples migration, restores and account merges to every consumer's historical records.
+- **Use one authoritative remote ID as every product's primary key:** couples migration, restores and account merges to every consumer's historical records.
 - **Share the full EF model/database between products:** couples releases and lets one application's write bypass another's domain invariants.
 - **Treat Identity as another auth-provider enum member:** confuses the stated control-plane role with token authority.
 - **Trust presigned URLs everywhere:** weakens current sensitive-resource revocation and disclosure semantics.
@@ -343,7 +343,7 @@ These are recommended proofs for follow-up implementation, **not tests run in th
 | Scenario | Required outcome | Finding |
 | --- | --- | --- |
 | Two credential authorities issue the same subject/email | No accidental account merge or transfer of existing rights. | IVSD-F001 |
-| A canonical profile edit is followed by login from another linked provider | Selected ownership/precedence is preserved; verification provenance is not fabricated. | IVSD-F002 |
+| A authoritative profile edit is followed by login from another linked provider | Selected ownership/precedence is preserved; verification provenance is not fabricated. | IVSD-F002 |
 | An organizer is revoked while a remote profile projection is stale | Event denies new protected actions according to its current authority contract. | IVSD-F002 |
 | Default storage target changes, including two targets with the same key spelling | Old objects and pending deletions keep their exact original target until explicit migration. | IVSD-F003 |
 | Image, PDF/resource, avatar and generated CSV move to Asset | Event references and allowed delivery behavior remain coherent for every class. | IVSD-F003 |
@@ -377,7 +377,7 @@ For v0.1, prove the applicable local invariants and correct current couplings. R
 | Sidq / strategic and design | State what optionality, completed migration, privacy and deletion actually mean. |
 | Non-Harm / technical and operational | Prevent cross-account exposure, stale authority, wrong-target deletion and orphaned private files. |
 | Adl / design and evaluation | Do not force guest attendees into a global identity account or make small self-hosters fund unnecessary infrastructure. |
-| Avoiding Spying / governance | A canonical user graph is not permission to correlate participation across all communities/products. |
+| Avoiding Spying / governance | A authoritative user graph is not permission to correlate participation across all communities/products. |
 | Promise-Keeping / strategic and operational | Preserve the supported standalone path and a credible exit from optional services. |
 | Ihsan / evaluation | Test the difficult counterexamples before users bear the cost, without constructing speculative frameworks. |
 
@@ -434,7 +434,7 @@ Locators refer to the inspected revision/working-tree snapshot. Documentation is
 | E13 | [Architecture](../../docs/internal/ARCHITECTURE.md):74-147; [Outbox](../../docs/internal/OUTBOX_PATTERN.md):8-64 | Independent host composition, durable key ownership and documented at-least-once delivery. |
 | E14 | [API versioning implementation](../../src/Explore.API/Extensions/ApiVersioningExtensions.cs):18-44; [API contract](../../docs/internal/API.md), Concurrency Request Headers and API Versioning; [Generated-client contract](../../docs/internal/RECORD_CONTRACTS.md):116-158; [Webhook envelopes](../../docs/internal/WEBHOOKS.md):109-127 | Existing public protocol and generated-client stability surfaces. |
 | E15 | [Participation ADR](../../docs/internal/adr/ADR-017-event-participation-authority-model.md), Decision; [Lifecycle ADR](../../docs/internal/adr/ADR-026-domain-owned-lifecycle-and-contextual-completeness.md):58-148; [EventSession](../../src/Explore.Domain/EventSession.cs):24-46; [Schedule projection](../../src/Explore.Domain/Services/Scheduling/EventScheduleProjectionCalculator.cs); [Timezone resolver](../../src/Explore.Domain/Services/Scheduling/ScheduleTimeZoneResolver.cs); [End-time types](../../src/Explore.Domain/Enums/SessionEndTimeType.cs) | Ownership, lifecycle and time semantics worth confirming; not evidence that all future recurrence/prayer behavior is implemented. |
-| E16 | [Canonical discovery consultation](i-vsd-event-publication-and-canonical-discovery-consultation.md):143-179 | Related working-tree proposal on Event/session/series identity and discovery; contextual recommendation, not implemented proof. |
+| E16 | [Identity discovery consultation](i-vsd-event-publication-and-identity-discovery-consultation.md):143-179 | Related working-tree proposal on Event/session/series identity and discovery; contextual recommendation, not implemented proof. |
 | E17 | [Registration ADR](../../docs/internal/adr/ADR-018-registration-order-ticketing-aggregate.md):24-60; [Order line](../../src/Explore.Domain/RegistrationOrderLine.cs):17-86; [Admission ADR](../../docs/internal/adr/ADR-023-admission-credential-check-in-transfer-recovery.md):22-55 | Immutable commercial snapshots, participant distinctions and credential/display-ID separation. |
 | E18 | Founder's request of 2026-09-25; [I-VSD architecture heuristics](../../.agents/skills/i-vsd/resources/architecture-heuristics.md); [Report contract](../../.agents/skills/i-vsd/resources/report-contract.md) | Greenfield objective, future product roles, provider-responsibility criteria and evidence limits. |
 
@@ -454,7 +454,7 @@ Key source SHA-256 snapshots:
 ## Missing Evidence
 
 - Agreed Asset and Identity external contracts and ownership matrices.
-- Accepted account-link/merge policy and exact scope of canonical versus tenant/product profile data.
+- Accepted account-link/merge policy and exact scope of authoritative versus tenant/product profile data.
 - Complete persistent-file producer, derivative, attachment/reference and deletion inventory.
 - The intended scope of cross-product consent administration and Identity-wide erasure.
 - Tested activation/exit/data-portability workflows for the future services.
@@ -467,7 +467,7 @@ These are the decisions/evidence to obtain, not a requirement to implement both 
 - Current repository architecture/domain/API/operator docs, application/domain/infrastructure code and selected existing test source.
 - Two independent read-only evidence tracks for storage and identity; parent verification of decisive source seams and related domain contracts.
 - Knowledge-graph discovery found no available tool. C# workspace-symbol lookup timed out while processing unrelated workspace projects; bounded native search/read supplied the relevant source evidence instead.
-- Earlier launch consultancy remains operational context; the canonical-discovery consultation remains a separate domain-design source.
+- Earlier launch consultancy remains operational context; the authoritative-discovery consultation remains a separate domain-design source.
 - No external product/source research, provider calls, dependency additions or implementation edits. The supplied Identity product narrative was not reproduced as verified research.
 - The shared working tree contained other work. Only this new report and one catalogue entry are authored by this task.
 
@@ -477,4 +477,4 @@ These are the decisions/evidence to obtain, not a requirement to implement both 
 | --- | --- | --- | --- | --- |
 | 2026-09-25 | none | current | New pre-release decision consultancy for optional Asset/Identity and other durable contracts | Reviewed HEAD, bounded working-tree sources and E01-E18; advisory, not implementation or release approval |
 
-Refresh affected findings when canonical IDs, profile mastering, file binding/delivery, consent/erasure ownership, optional-service semantics or proposed remote contracts change. Preserve the finding/mitigation IDs during that review. Future breaking changes remain valid when justified by the better design.
+Refresh affected findings when authoritative IDs, profile mastering, file binding/delivery, consent/erasure ownership, optional-service semantics or proposed remote contracts change. Preserve the finding/mitigation IDs during that review. Future breaking changes remain valid when justified by the better design.

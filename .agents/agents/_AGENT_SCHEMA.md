@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical schema every repository subagent profile must satisfy. -->
+<!-- ABOUTME: Schema every repository subagent profile must satisfy. -->
 <!-- ABOUTME: Defines narrow ownership, skill routing, tool limits, handoffs, and evidence-based completion. -->
 
 # Agent Schema (Authoritative)
@@ -48,7 +48,7 @@ Explicit negatives and the correct alternate agent or built-in role.
 
 ### `## Mandatory Reads`
 
-Link `AGENTS.md`, `docs/QUICK_REFERENCE.md`, `.agents/contract/intents.yaml`, and the smallest role-specific canonical docs. These links are retrieval locations, not instructions to reread whole files: use injected `AGENTS.md`, resolve one intent entry, and retrieve only relevant headings once.
+Link `AGENTS.md`, `docs/QUICK_REFERENCE.md`, `.agents/contract/intents.yaml`, and the smallest role-specific governing docs. These links are retrieval locations, not instructions to reread whole files: use injected `AGENTS.md`, resolve one intent entry, and retrieve only relevant headings once.
 
 ### `## Skill Routing`
 
@@ -91,7 +91,7 @@ Link at least one sibling agent and describe the handoff boundary.
 - Target 80–140 lines; hard maximum 180 lines.
 - No stack overview, generic persona prose, ASCII diagrams, or copied rule catalogs.
 - Do not hard-code the full test-project list; derive checks from the matched intent and `docs/OPERATIONS.md`.
-- If guidance already exists in `AGENTS.md`, canonical docs, rules, or a skill, link it.
+- If guidance already exists in `AGENTS.md`, governing docs, rules, or a skill, link it.
 - Fifteen substantially identical consecutive lines across agent files is a duplication failure.
 - Read-only scout outputs use the cap in [Context Engineering](../CONTEXT_ENGINEERING.md) and contain findings plus locations, never raw source or logs.
 - Every profile follows [Context Engineering](../CONTEXT_ENGINEERING.md); repeated unchanged context is a schema failure even when the prose differs.

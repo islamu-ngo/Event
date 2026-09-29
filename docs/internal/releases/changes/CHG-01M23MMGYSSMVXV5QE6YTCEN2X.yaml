@@ -23,4 +23,4 @@ Impacts:
   Operator:
     Reference: docs/public/documentation/readme/events-and-ticketing/modular-event-aspects.md
     Disposition: documented
-    Detail: A stale Studio participation save rejected by current visitor policy refreshes canonical capability and disables unavailable account-required choices.
+    Detail: A stale Studio participation save rejected by current visitor policy refreshes authoritative capability and disables unavailable account-required choices.

@@ -30,7 +30,7 @@ Impacts:
     Reference: docs/CONFIGURATION.md
     Disposition: documented
     Detail: >-
-      Paid Checkout requires a canonical public HTTPS origin, Stripe mode and exact
+      Paid Checkout requires an authoritative public HTTPS origin, Stripe mode and exact
       Checkout hosts, organizer platform identity, server-only secrets, and Split Redis.
   OpenAPI:
     Reference: docs/API_CHANGELOG.md

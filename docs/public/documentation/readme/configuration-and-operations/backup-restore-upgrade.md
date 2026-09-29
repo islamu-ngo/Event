@@ -306,7 +306,7 @@ never remove a shared database volume as a reset shortcut. Run the migration ser
 twice and require successful completion both times before starting the application.
 
 Search retains complete accepted names and addresses (up to 500 UTF-16 code units).
-Canonically equivalent accents match, while accents, Arabic marks, joiners, and emoji
+Normalization-equivalent accents match, while accents, Arabic marks, joiners, and emoji
 details remain significant. Search treats percent signs, underscores, backslashes,
 and brackets literally. It does not promise transliteration, accent-free search,
 German full case folding, Turkish linguistic casing, or identical sorting between

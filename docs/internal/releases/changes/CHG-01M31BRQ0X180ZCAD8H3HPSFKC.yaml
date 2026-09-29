@@ -14,7 +14,7 @@ Impacts:
   Security:
     Reference: docs/internal/AUTHENTICATION.md
     Disposition: documented
-    Detail: "Preserve validated issuer, canonical subject and provider-owned verification under trusted OIDC scheme identities. Cookie, circuit and outbound token bytes remain unchanged; subjectless or forged API credentials remain denied."
+    Detail: "Preserve validated issuer, authoritative subject and provider-owned verification under trusted OIDC scheme identities. Cookie, circuit and outbound token bytes remain unchanged; subjectless or forged API credentials remain denied."
   Migration:
     Reference: docs/internal/RELEASE_RUNBOOK.md
     Disposition: not-applicable

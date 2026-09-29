@@ -471,7 +471,7 @@ scenarios:
     acceptance_criteria:
       - "The request classifies as `registration-data-collection`, not a collection of unrelated endpoint or migration intents."
       - "External completion remains evidence; ISLAMU alone confirms after pinned-version validation, capacity, approval, and deduplication."
-      - "Canonical answers are typed atomic rows; published form and ticket catalog versions are immutable."
+      - "Answer records are typed atomic rows; published form and ticket catalog versions are immutable."
       - "Guest mutations use dedicated rate limiting, antiforgery treatment, idempotency, and hashed scoped capabilities."
       - "Repositories return entities, handlers map DTOs, validators are manually instantiated, and tenant filters remain active."
       - "Provider calls happen outside database transactions and are coordinated through the existing durable inbox/outbox pattern."
@@ -707,7 +707,7 @@ scenarios:
     acceptance_criteria:
       - "Every removed reflection or source-assurance cohort has an explicit invariant disposition and passing replacement before deletion."
       - "Live AT Protocol DIDs parse once at ingress, preserve case-sensitive value, and emit exact scalars without storage or wire drift."
-      - "Ambient platform-user identity resolves through one canonical Application authority with purpose-separated BFF, provider, and session helpers."
+      - "Ambient platform-user identity resolves through one Application authority with purpose-separated BFF, provider, and session helpers."
       - "API Admin endpoints use one API-local policy with unchanged authorization cohorts, and client mutation controls render only from HAL relations."
       - "Database query, ordering, tenant, and concurrency behavior is proven on real providers without source scraping or fixed sleeps."
       - "Generated OpenAPI schemas, client classes, and EF model snapshots show expected zero drift."

@@ -33,7 +33,7 @@ Repository-level sitemap coverage verifies that the event set is tenant-filtered
 | Production | Allows crawling and advertises `/sitemap.xml`. |
 | Non-production | Returns `Disallow: /`. |
 
-Robots output uses forwarded host/proto context for the sitemap URL. Integration coverage verifies that non-production hosts disallow crawlers and production robots output uses forwarded proto/host for the canonical sitemap URL. Do not document non-production environments as indexable.
+Robots output uses forwarded host/proto context for the sitemap URL. Integration coverage verifies that non-production hosts disallow crawlers and production robots output uses forwarded proto/host for the authoritative sitemap URL. Do not document non-production environments as indexable.
 
 ## Render Policy And Public Routes
 
@@ -46,7 +46,7 @@ Important boundaries:
 - Defaults fall back safely when tenant settings are missing.
 - `Explore.Blazor.Client/Routes.razor` registers `/home`; keep route documentation tied to that router mapping and the runtime classifier instead of inventing separate page-level SEO behavior.
 
-See [RENDER_POLICIES.md](RENDER_POLICIES.md) for the canonical render-policy model.
+See [RENDER_POLICIES.md](RENDER_POLICIES.md) for the authoritative render-policy model.
 
 ## Public Experience And Tenant Controls
 
@@ -63,12 +63,12 @@ Tenant resolution and public URL generation are domain-aware. See [MULTI_TENANCY
 
 ## Event Detail Metadata
 
-Public event detail pages emit crawler and preview metadata from the same canonical event URL helper used by the share and calendar flows.
+Public event detail pages emit crawler and preview metadata from the same primary event URL helper used by the share and calendar flows.
 
 | Metadata | Behavior |
 |---|---|
-| Canonical URL | Built from the public event slug/code through `CanonicalUrlHelper`. |
-| Open Graph and Twitter | Uses event title, normalized description, canonical URL, and featured image/public storage image URL. |
+| Preferred URL | Built from the public event slug/code through `AbsoluteUrlBuilder`. |
+| Open Graph and Twitter | Uses event title, normalized description, preferred URL, and featured image/public storage image URL. |
 | Structured data | Emits schema.org `Event` JSON-LD for crawlable public events only. JSON is generated through `System.Text.Json`; no raw HTML rendering helper is used. |
 | Noindex | Emits `robots noindex, nofollow` for non-public visibility or non-crawlable event statuses such as draft, cancelled, or moderated states. |
 
@@ -85,7 +85,7 @@ Implemented:
 - Public sitemap endpoint.
 - Public robots endpoint with environment-sensitive indexing behavior.
 - Public route render-policy classification.
-- Event detail page metadata/canonical behavior in the Blazor client.
+- Event detail page metadata/authoritative behavior in the Blazor client.
 - Event detail schema.org `Event` JSON-LD for crawlable public event pages.
 - Event detail noindex metadata for non-public or non-crawlable event states.
 - Minimal public web app manifest and app-shell manifest link.
@@ -96,7 +96,7 @@ Not proven by inspected source:
 
 - Site-wide dynamic metadata on every route.
 - Structured data / JSON-LD automation outside public event detail pages.
-- Canonical URL management for every possible page.
+- Preferred URL management for every possible page.
 - SEO score auditing, keyword tools, or search-console integrations.
 - A standalone SEO admin page.
 

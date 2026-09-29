@@ -15,7 +15,7 @@ This document is the contributor-facing guide for `Explore.Blazor` and `Explore.
 
 Use the specialized docs for deep detail:
 
-| Area | Canonical doc |
+| Area | Primary documentation |
 |---|---|
 | API contract, HAL, idempotency | [API.md](API.md) |
 | Task-first API usage | [API_COOKBOOK.md](API_COOKBOOK.md) |
@@ -70,7 +70,7 @@ The browser never owns access tokens. Interactive UI calls go through the BFF or
 
 ## Generated Client Record Ownership
 
-`schemas/openapi_islamu-event.json` and `src/Explore.Blazor.Client/nswag.json` remain the canonical generated-client inputs. The `GenerateApiClient` MSBuild target runs pinned NSwag 14.6.3, fixes the known `void` response artifact, applies `eng/tools/Explore.GeneratedContracts`, and performs final byte normalization.
+`schemas/openapi_islamu-event.json` and `src/Explore.Blazor.Client/nswag.json` remain the authoritative generated-client inputs. The `GenerateApiClient` MSBuild target runs pinned NSwag 14.6.3, fixes the known `void` response artifact, applies `eng/tools/Explore.GeneratedContracts`, and performs final byte normalization.
 
 Use [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) when changing record eligibility, mutable exclusions, AOT extension data, or generated-client construction.
 
@@ -179,7 +179,7 @@ fixed same-origin BFF route. Immediately before forwarding, both the client
 adapter and BFF reload the control-plane overview and require the exact
 `export-configuration-overrides` or `export-configuration-portable` HAL
 relation. The BFF never follows a browser-provided URL or HAL href, calls only
-the generated canonical API operation, buffers at most 4 MiB, and accepts only
+the generated authoritative API operation, buffers at most 4 MiB, and accepts only
 the exact manifest media type and per-view filename. Responses are `no-store`;
 downstream failures preserve safe status codes without forwarding provider
 bodies. Access tokens and raw API authority remain server-side.
@@ -225,9 +225,9 @@ Setup-secret handling is intentionally BFF-owned:
 3. The setup cookie is protected with time-limited ASP.NET Core Data Protection, `HttpOnly`, invalidated by the BFF setup-secret endpoints, and `Secure` outside local development. The cookie and server-side entry use a 30-minute rolling inactivity timeout refreshed by successful status and synchronization calls.
 4. `SameSite=Lax` is intentional because onboarding may cross top-level OIDC redirects before the first administrator completes setup.
 5. Setup-secret validation is rate-limited at the BFF edge and again at the API edge.
-6. Completed Interactive and ConfiguredAdministrator states retain their canonical Local, Keycloak, or Atproto provider. The BFF admits fresh sign-in for those completed states without reopening setup authority; unknown providers and inconsistent status remain closed.
+6. Completed Interactive and ConfiguredAdministrator states retain their authoritative Local, Keycloak, or Atproto provider. The BFF admits fresh sign-in for those completed states without reopening setup authority; unknown providers and inconsistent status remain closed.
 7. A fresh Local sign-in with server-verified instance-administrator authority and completed setup defaults to `/settings/instance?section=getting-started` instead of loading the public shell. Explicit safe return URLs and non-administrator destinations remain unchanged.
-8. Browser-proxied exact `GET /api/instanceonboarding/status` and `GET /api/instanceonboarding/journey` retain the BFF-owned bearer identity when present. Authenticated status omits the setup credential; journey may carry an independently resolved setup credential alongside the bearer. The BFF has no authoritative completion snapshot in this forwarding path and must not infer one from sign-in or roles. On journey, API bearer validation takes precedence and active setup or persisted administrator authority is checked independently ([API contract](API.md#canonical-instance-onboarding-journey)). After completion a retained setup credential grants nothing: the administrator can still read, but another authenticated account cannot. Browser-supplied authority headers remain stripped.
+8. Browser-proxied exact `GET /api/instanceonboarding/status` and `GET /api/instanceonboarding/journey` retain the BFF-owned bearer identity when present. Authenticated status omits the setup credential; journey may carry an independently resolved setup credential alongside the bearer. The BFF has no authoritative completion snapshot in this forwarding path and must not infer one from sign-in or roles. On journey, API bearer validation takes precedence and active setup or persisted administrator authority is checked independently ([API contract](API.md#authoritative-instance-onboarding-journey)). After completion a retained setup credential grants nothing: the administrator can still read, but another authenticated account cannot. Browser-supplied authority headers remain stripped.
 6. The BFF limiter partitions requests by authenticated user when available, then antiforgery/session cookie state, then IP as the final fallback.
 
 When debugging onboarding, check both BFF setup-secret endpoints and API setup-secret validation rather than adding client-side storage shortcuts.
@@ -283,11 +283,11 @@ Dynamic authentication scheme management allows the server BFF host (`Explore.Bl
 
 AT Protocol authentication uses a custom authentication handler (`AtprotoAuthenticationHandler`) rather than standard OIDC:
 
-1. **Client Metadata Publication**: `GET /oauth/client-metadata.json` publishes canonical client metadata (including client ID, HTTPS callback redirect URIs, scope `atproto transition:generic`, grant types `authorization_code` and `refresh_token`, and token auth method `private_key_jwt`).
+1. **Client Metadata Publication**: `GET /oauth/client-metadata.json` publishes authoritative client metadata (including client ID, HTTPS callback redirect URIs, scope `atproto transition:generic`, grant types `authorization_code` and `refresh_token`, and token auth method `private_key_jwt`).
 2. **Public Key Set (JWKS)**: `GET /oauth/jwks.json` serves public keys from `AtprotoClientKeyProvider` for rotation-aware ES256 client assertion signing.
 3. **PKCE & DPoP Tokens**: The flow enforces mandatory PKCE (`S256`) and DPoP (Demonstrating Proof-of-Possession) bound access tokens.
 4. **Session Persistence & Identity Resolution**: `ApiBackedOAuthStateStore` and `AtprotoTenantSessionHandoffStore` share the private `ApiBackedAtprotoTransientStore`; the BFF has no database reference or alternate transient cache. `ApiBackedOAuthSessionStore` retains durable OAuth-session ownership, and `AtprotoIdentityCache` remains discovery-only.
-5. **Browser Correlation**: `AtprotoBrowserProof` protects one fixed-expiry, host-only HTTPS cookie and derives an independent HMAC binding per flow. State/handoff adapters validate recovered origin, tenant and browser binding before candidate-bound consumption. Cross-origin canonical callbacks issue only opaque handoffs; the destination issues the first-party session cookie after proof validation. Proof is checked again immediately before cookie sign-in.
+5. **Browser Correlation**: `AtprotoBrowserProof` protects one fixed-expiry, host-only HTTPS cookie and derives an independent HMAC binding per flow. State/handoff adapters validate recovered origin, tenant and browser binding before candidate-bound consumption. Cross-origin authoritative callbacks issue only opaque handoffs; the destination issues the first-party session cookie after proof validation. Proof is checked again immediately before cookie sign-in.
 
 ## Analytics Diagnostic Boundary
 
@@ -528,7 +528,7 @@ Interface injection remains the default for application services. The approved c
 
 ### Actor profiles and organization evidence
 
-- `/actors/{actorId}` is the only Actor profile page and renders the canonical
+- `/actors/{actorId}` is the only Actor profile page and renders the authoritative
   global Actor detail. There is no separate tenant-contextual browser route;
   tenant-aware consumers use the exact
   `GET /api/actor/by-tenant/{tenantId}/{id}` API lookup when they need approved public local overrides.
@@ -538,7 +538,7 @@ Interface injection remains the default for application services. The approved c
 
 ### Workspace shell contract
 
-`WorkspaceRegistry` is the compile-time source of canonical rail order: Events, Studio, AI, then Settings. `AppWorkspaceRail` filters that ordered list using authentication and server-returned `WorkspaceAvailabilityDto`; it does not alphabetize destinations or infer capabilities from claims. The same semantic navigation is CSS-projected to the Xs bottom rail, while `WorkspaceNavigationHost` swaps contextual providers without re-registering the shell dock.
+`WorkspaceRegistry` is the compile-time source of authoritative rail order: Events, Studio, AI, then Settings. `AppWorkspaceRail` filters that ordered list using authentication and server-returned `WorkspaceAvailabilityDto`; it does not alphabetize destinations or infer capabilities from claims. The same semantic navigation is CSS-projected to the Xs bottom rail, while `WorkspaceNavigationHost` swaps contextual providers without re-registering the shell dock.
 
 `UiShellState` owns route-derived active workspace, session-only Personal Settings origin, last routes, and revocation fallback. `ShellPreferencesService` restores only server-authorized workspace, actor, and Settings-scope values; authenticated dock state uses server-backed user settings, anonymous state uses tenant-discriminated local storage, and viewport/content-floor projection never persists.
 

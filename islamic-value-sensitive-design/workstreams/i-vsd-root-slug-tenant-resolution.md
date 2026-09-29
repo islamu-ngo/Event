@@ -62,7 +62,7 @@ This is a provider-responsibility design review, not a fatwa or Sharia certifica
 ## Mitigations
 
 ### IVSD-M001: Reserved Slug Catalog
-Maintain a canonical `ReservedTenantSlugs` set in `Explore.Domain.Constants`. Enforce in `CreateTenantDtoValidator` and `UpdateTenantSlugDtoValidator`. Include all Blazor route root segments, framework paths, API prefixes, auth paths, and brand-safety terms. Minimum slug length of 3 characters prevents single/double-letter collisions.
+Maintain an authoritative `ReservedTenantSlugs` set in `Explore.Domain.Constants`. Enforce in `CreateTenantDtoValidator` and `UpdateTenantSlugDtoValidator`. Include all Blazor route root segments, framework paths, API prefixes, auth paths, and brand-safety terms. Minimum slug length of 3 characters prevents single/double-letter collisions.
 
 ### IVSD-M002: Anti-Squatting Governance (Deferred)
 This is an instance-operator governance concern. The platform provides the reserved catalog as baseline protection. Broader anti-squatting policies (e.g., proof of community affiliation) are deferred to the instance operator's admin settings and are not in scope for this workstream.

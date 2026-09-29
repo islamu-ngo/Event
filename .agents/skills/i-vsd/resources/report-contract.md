@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical identity, schema, evidence, and lifecycle contract for I-VSD reports. -->
+<!-- ABOUTME: Report identity, schema, evidence, and lifecycle contract for I-VSD reports. -->
 <!-- ABOUTME: Gives standalone and integrated workflows one durable report format without pinning prose. -->
 
 # I-VSD Report Contract

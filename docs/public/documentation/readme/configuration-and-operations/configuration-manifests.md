@@ -24,7 +24,7 @@ JSON arrays of strings, not JSON encoded inside a string:
 | `event_resources.enabled_delivery_types` | `StoredFile`, `ExternalLink` |
 | `event_resources.enabled_audiences` | `Public`, `AuthenticatedTenantMember`, `SessionRegistrant`, `TicketHolder`, `CheckedInParticipant`, `AnyEventSessionSpeaker`, `SessionSpeaker`, `EventStaff`, `Organizer` |
 | `event_resources.permitted_file_types` | `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.presentationml.presentation` |
-| `event_resources.external_origins` | Canonical HTTPS origins such as `https://resources.example.org`; no path, trailing slash, credentials, query, or fragment |
+| `event_resources.external_origins` | Authoritative HTTPS origins such as `https://resources.example.org`; no path, trailing slash, credentials, query, or fragment |
 
 For example, `"event_resources.enabled_delivery_types": ["StoredFile"]` permits
 only stored-file delivery. Names and MIME types are case-sensitive; whitespace,

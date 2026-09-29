@@ -788,7 +788,7 @@ Recommended lifecycle:
 Draft -> ReviewRequired -> Approved -> Scheduled -> Published -> Retired
 ```
 
-The artifact expresses desired configuration. Canonical Domain mutation creates
+The artifact expresses desired configuration. Authoritative Domain mutation creates
 immutable target versions, publication facts, and acceptance requirements.
 
 Candidate instance-owned kinds:

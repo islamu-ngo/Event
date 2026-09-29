@@ -21,7 +21,7 @@ moderation workflow is not part of this cohort.
 ## Authority and state
 
 Both public queries retain the published/public parent checks, participation
-configuration, and canonical `IsPubliclyEligibleAsync` check (including publisher
+configuration, and authoritative `IsPubliclyEligibleAsync` check (including publisher
 eligibility). Only Active actions allowed by the parent's participation mode
 are exposed. Detail requires the persisted action's EventId to match the route.
 Redirect resolves this same detail before recording any engagement and uses only

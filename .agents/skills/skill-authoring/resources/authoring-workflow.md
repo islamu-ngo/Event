@@ -10,7 +10,7 @@ Use this workflow when a task asks for a new `.agents/skills/<name>/SKILL.md` or
 ## Sequence
 
 1. Classify the task as `create-agent-context-skill` when the work changes `.agents/skills/**`, skill resources, skill schema tests, or skill-related intent routing.
-2. Reuse injected `AGENTS.md`, resolve one intent, read `_SKILL_SCHEMA.md` once, then retrieve only the relevant headings from canonical docs and the task-owned current context. Do not preload plan/context/tasks together.
+2. Reuse injected `AGENTS.md`, resolve one intent, read `_SKILL_SCHEMA.md` once, then retrieve only the relevant headings from governing docs and the task-owned current context. Do not preload plan/context/tasks together.
 3. Confirm whether an existing skill folder exists before creating files; do not overwrite unrelated work without reading it.
 4. Write the `description` first: concrete positive triggers plus a compact exclusion when a neighboring skill could match.
 5. Draft the loaded body from non-inferable rules, ordered workflow steps, just-in-time resources, and realistic verification; delete activation prose and generic advice.

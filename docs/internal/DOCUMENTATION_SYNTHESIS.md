@@ -17,7 +17,7 @@ Strengths:
 - Security and multi-tenancy behavior are now documented with implementation-level details.
 - Reference docs are increasingly aligned with source code.
 - Repository Markdown is the current source of truth; hosted public docs remain deferred.
-- Canonical documentation metadata, source anchors, and stale-command checks now run through architecture tests.
+- Primary documentation metadata, source anchors, and stale-command checks now run through architecture tests.
 
 Weaknesses:
 
@@ -36,7 +36,7 @@ Weaknesses:
 6. Keep architecture docs focused on implemented patterns only.
 7. Treat release documentation as part of the release contract.
 
-## Canonical Reference Set
+## Authoritative Reference Set
 
 These docs should remain the highest-priority source of truth:
 
@@ -54,7 +54,7 @@ These docs should remain the highest-priority source of truth:
 
 ## Maintenance Policy
 
-- Any behavior change should update at least one canonical reference in the same PR.
+- Any behavior change should update at least one authoritative reference in the same PR.
 - Every PR should state docs impact: `Updated`, `Not needed`, or `Deferred` with a reason.
 - Prefer links over duplicated explanations.
 - Remove stale roadmap text from reference docs.
@@ -65,5 +65,5 @@ These docs should remain the highest-priority source of truth:
 1. Finish splitting `OPERATIONS.md` into reference content plus links to dedicated runbooks.
 2. Keep `TROUBLESHOOTING.md` focused on repeat symptoms and exact runbook links.
 3. Add admin and API cookbook docs after operator-critical docs stay green.
-4. Keep `README.md` concise and aligned with canonical docs.
+4. Keep `README.md` concise and aligned with primary documentation.
 5. Keep `API_CHANGELOG.md` behavior-focused and short.

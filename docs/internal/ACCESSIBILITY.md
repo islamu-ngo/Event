@@ -12,7 +12,7 @@ ABOUTME: Defines the page shell contract, service contracts, component authoring
 ## Guided Onboarding Surfaces
 
 Getting-started uses the administration page's single H1, then H2/H3/H4 section
-headings. Refresh marks the section busy and updates one polite status. Canonical
+headings. Refresh marks the section busy and updates one polite status. Authoritative
 operator kind/country selectors use native labels and connected help/error IDs;
 metadata translation keys do not become visible IDs or edit permissions. Optional
 wizard details use a native `details`/`summary` disclosure. Sidebar labels use the

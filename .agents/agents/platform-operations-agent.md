@@ -112,4 +112,4 @@ Handoffs include topology, resource names, config keys/defaults/validation, secr
 - [Architect](architect-agent.md) — decides topology and major operational boundaries.
 - [Security & Privacy](security-privacy-agent.md) — owns credentials and trust policy.
 - [Quality Verifier](quality-verifier-agent.md) — independently exercises runtime evidence.
-- [Librarian](librarian-agent.md) — keeps operator documentation canonical and navigable.
+- [Librarian](librarian-agent.md) — keeps operator documentation authoritative and navigable.

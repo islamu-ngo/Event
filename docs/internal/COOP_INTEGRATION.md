@@ -56,7 +56,7 @@ Model B: Isolated/Self-Hosted Coop
 
 ## 3. Data Scoping & Routing Policy
 
-Local canonical reports and cases are always created in the ISLAMU Event PostgreSQL database **first**. Data synchronization to Coop occurs asynchronously via the transactional outbox pattern.
+Local authoritative reports and cases are always created in the ISLAMU Event PostgreSQL database **first**. Data synchronization to Coop occurs asynchronously via the transactional outbox pattern.
 
 ### The Routing Resolver
 The system evaluates the effective targets at runtime using the `ReportingRoutingPolicyResolver`. This resolver merges two scopes of targets:
@@ -113,7 +113,7 @@ When a reviewer makes a decision in Coop (e.g., dismissing a case, warning an or
 [ ProcessCoopDecisionCallbackCommand ]
          │
          ▼
-[ ExecuteReportDecisionCommand ] (canonical enforcement/completion seam)
+[ ExecuteReportDecisionCommand ] (authoritative enforcement/completion seam)
          │
          ▼
 [ Complete decision + materialize reporter notification atomically ]
@@ -186,7 +186,7 @@ sequenceDiagram
 
 * **Composite Provider:** `src/Explore.Infrastructure/Services/Moderation/CompositeEventReportProvider.cs`
 * **Callback Command Handler:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/ProcessCoopDecisionCallbackCommandHandler.cs`
-* **Canonical Decision Executor:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/ExecuteReportDecisionCommandHandler.cs`
+* **Authoritative Decision Executor:** `src/Explore.Application/Features/EventReporting/Handlers/Commands/ExecuteReportDecisionCommandHandler.cs`
 * **Effect Processing:** `src/Explore.Application/Services/Webhooks/IncomingWebhookEffectProcessingService.cs`
 * **Effect Drain:** `src/Explore.Infrastructure/Webhooks/IncomingWebhookEffectDrainService.cs`
 * **Operator API:** `src/Explore.API/Controllers/IncomingWebhookEffectsAdminController.cs`

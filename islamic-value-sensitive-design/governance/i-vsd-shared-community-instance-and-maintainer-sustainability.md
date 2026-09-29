@@ -1,4 +1,4 @@
-<!-- ABOUTME: Canonical I-VSD governance report on the shared multi-tenant community instance model. -->
+<!-- ABOUTME: Authoritative I-VSD governance report on the shared multi-tenant community instance model. -->
 <!-- ABOUTME: Defines ethical guardrails for maintainer labor protection, resource rationing, spam mitigation, and community sponsorship. -->
 
 # I-VSD Strategy Review — Shared Community Instance Governance, Maintainer Labor Protection, and Resource Rationing

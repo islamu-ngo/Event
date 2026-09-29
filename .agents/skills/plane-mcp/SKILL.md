@@ -6,7 +6,7 @@ enforcement: suggest
 priority: high
 ---
 <!-- ABOUTME: Safe Plane MCP workflow for ISLAMU Event work-item operations. -->
-<!-- ABOUTME: Keeps canonical IDs in one resource and prevents duplicates or unverified mutations. -->
+<!-- ABOUTME: Keeps stable IDs in one resource and prevents duplicates or unverified mutations. -->
 
 # Plane MCP
 

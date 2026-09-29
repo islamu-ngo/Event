@@ -42,7 +42,7 @@ Claims describe the repository at Git revision `06e4e6878dd575d50e9c4116be7e1b7b
 
 ## Recommendations
 
-- `IVSD-M001`: Adopt the **3-Ring Progressive Verification Model**: Ring 1 (< 2s, `--treenode-filter`, in-memory C#), Ring 2 (< 15s, single canonical DB engine at phase exit), Ring 3 (multi-database matrix strictly at Plan Exit Gate or CI).
+- `IVSD-M001`: Adopt the **3-Ring Progressive Verification Model**: Ring 1 (< 2s, `--treenode-filter`, in-memory C#), Ring 2 (< 15s, single authoritative DB engine at phase exit), Ring 3 (multi-database matrix strictly at Plan Exit Gate or CI).
 - `IVSD-M002`: Enforce the **Yak-Shaving Quarantine Rule**: when an unrelated pre-existing test fails during a feature workstream, the agent must isolate it, record it under `context.md` as external debt, prove its own slice is green, and quarantine the defect for separate remediation.
 - `IVSD-M003`: Implement **Schema-Per-Run Isolation** in database integration test fixtures (`search_path = test_<run_id>` / isolated memory DBs), guaranteeing zero cross-test interference and zero port deadlocks.
 - `IVSD-M004`: Re-balance the test pyramid by mandating that pure algorithmic, normalization, arithmetic, and state-machine invariants reside in `Event.Domain.UnitTests` as zero-I/O tests, reserving persistence integration tests strictly for EF Core mapping and SQL provider syntax.

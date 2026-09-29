@@ -37,7 +37,7 @@ Impacts:
   OpenAPI:
     Reference: docs/API_CHANGELOG.md
     Disposition: documented
-    Detail: "Canonical private API and generated-client contracts are recorded."
+    Detail: "Authoritative private API and generated-client contracts are recorded."
   Operator:
     Reference: docs/TROUBLESHOOTING.md
     Disposition: documented

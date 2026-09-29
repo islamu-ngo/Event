@@ -12,7 +12,7 @@ Impacts:
   Security:
     Reference: docs/internal/API.md
     Disposition: documented
-    Detail: "Both completion routes require all canonical blocking checks to pass before credential or administrator creation, even for an exact current generation."
+    Detail: "Both completion routes require all authoritative blocking checks to pass before credential or administrator creation, even for an exact current generation."
   Migration:
     Reference: docs/internal/RELEASE_RUNBOOK.md
     Disposition: not-applicable

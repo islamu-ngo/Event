@@ -14,7 +14,7 @@ Impacts:
     Disposition: documented
     Public-Disclosure: documented
     Detail: >-
-      Preserve canonical public eligibility, tenant and deletion boundaries,
+      Preserve authoritative public eligibility, tenant and deletion boundaries,
       approved venue disclosure and privacy-review suppression. The query remains
       public and introduces no management grant or authorization policy change.
   Migration:

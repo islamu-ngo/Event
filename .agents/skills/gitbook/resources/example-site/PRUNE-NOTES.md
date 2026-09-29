@@ -5,7 +5,7 @@ This `example-site/` is a curated subset of the full Evolve Demo repo, trimmed t
 The full original tree is faithfully captured in two files alongside this one — read them when you need the un-pruned picture:
 
 - **`structure.json`** — the response from `GET /v1/orgs/{orgId}/sites/{siteId}/structure` for the original site. Lists every section, section-group, and site-space (including all auto-translated language variants). The English site-spaces it lists are what the original Git repo had as folders; everything pruned below is still represented here.
-- **`SUMMARY.md`** files within each remaining space — these still describe the original page tree, including any pages whose individual `.md` files were removed in the prune. Treat the SUMMARY as canonical for the original IA.
+- **`SUMMARY.md`** files within each remaining space — these still describe the original page tree, including any pages whose individual `.md` files were removed in the prune. Treat the SUMMARY as authoritative for the original IA.
 
 ## What was removed
 
@@ -76,7 +76,7 @@ Everything else is intact, including:
 - The `home/` space with its `.gitbook/includes/` content blocks
 - All `guides/` subspaces (help-center, integrations, tutorials)
 - `partners/` and `changelog/` in full
-- `developers/v2/` (the canonical example) and `developers/openapi/` (all three versions)
+- `developers/v2/` (the reference example) and `developers/openapi/` (all three versions)
 - All `.gitbook/vars.yaml` files
 - All `SUMMARY.md` files
 - Top-level `customization.json` and `structure.json`

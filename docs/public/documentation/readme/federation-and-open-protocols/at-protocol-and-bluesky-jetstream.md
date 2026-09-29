@@ -22,7 +22,7 @@ OAuth login state and one-time cross-domain handoffs use the primary database, n
 
 Use HTTPS for the public instance and every configured tenant login origin, including local development. Keep the same browser throughout login. A protected host-only proof cookie lasts fifteen minutes and supports parallel login attempts without being rewritten. State lasts at most ten minutes (or the shorter configured SDK lifetime), reserving two minutes for handoff. A handoff lasts at most two minutes and never outlives browser proof. Near proof expiry, wait for the returned `Retry-After` before starting another attempt; do not clear cookies underneath other pending logins.
 
-For a custom-domain login, the canonical callback redirects an opaque code back to the initiating domain without signing the browser in on the canonical host. Opening that code in another browser cannot sign it in or consume the legitimate destination handoff.
+For a custom-domain login, the authoritative callback redirects an opaque code back to the initiating domain without signing the browser in on the authoritative host. Opening that code in another browser cannot sign it in or consume the legitimate destination handoff.
 
 If login state or a handoff expires while the API response is in transit, sign-in is rejected even if the browser proof is still valid. Start a fresh login; a successfully consumed code cannot be recovered or retried.
 

@@ -11,7 +11,7 @@ ABOUTME: Summarizes authentication, tenant context, HAL, errors, pagination, ide
 
 ## Scope
 
-This cookbook explains how to call the API safely without duplicating every endpoint. Use [API.md](API.md) for canonical conventions and the generated OpenAPI/Scalar reference for exact request and response DTOs.
+This cookbook explains how to call the API safely without duplicating every endpoint. Use [API.md](API.md) for authoritative conventions and the generated OpenAPI/Scalar reference for exact request and response DTOs.
 
 ## Find The Generated Reference
 
@@ -121,7 +121,7 @@ Public browse endpoints are often anonymous, but the generated reference remains
 
 ## Related Documentation
 
-- [API.md](API.md) — canonical API architecture and conventions.
+- [API.md](API.md) — authoritative API architecture and conventions.
 - [API_CHANGELOG.md](API_CHANGELOG.md) — API-specific changes.
 - [SECURITY_OVERVIEW.md](SECURITY_OVERVIEW.md) — authentication, authorization, and trust boundaries.
 - [ADMIN_GUIDE.md](ADMIN_GUIDE.md) — API-key administration surfaces.

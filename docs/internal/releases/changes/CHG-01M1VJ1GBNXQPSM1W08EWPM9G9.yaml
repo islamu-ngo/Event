@@ -43,7 +43,7 @@ Impacts:
     Reference: docs/API.md
     Disposition: documented
     Detail: >-
-      The canonical OpenAPI document, contract inventory, and generated Blazor
+      The authoritative OpenAPI document, contract inventory, and generated Blazor
       client include purchase-governance, readiness, transfer, and fair-return
       waitlist operations.
   Operator:

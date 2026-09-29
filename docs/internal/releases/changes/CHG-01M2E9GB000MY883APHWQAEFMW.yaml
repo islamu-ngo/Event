@@ -14,7 +14,7 @@ Impacts:
     Disposition: documented
     Public-Disclosure: documented
     Detail: >-
-      Preserve public eligibility, managed event authorization and canonical
+      Preserve public eligibility, managed event authorization and authoritative
       location disclosure through exact protected native query ports.
       Restore stored-UTC timestamp Kind when reading EventLocation creation
       and optional reveal values; writes, ticks, nulls and strict disclosure

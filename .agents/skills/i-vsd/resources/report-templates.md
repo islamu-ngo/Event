@@ -3,7 +3,7 @@
 
 # Report Templates
 
-Use [report-contract.md](report-contract.md) for every report's canonical path, metadata, stable IDs, required headings, evidence fields, and lifecycle. Use [action-routing.md](action-routing.md) to select the standalone report kind and [context-discovery.md](context-discovery.md) before artifact-based findings.
+Use [report-contract.md](report-contract.md) for every report's subject path, metadata, stable IDs, required headings, evidence fields, and lifecycle. Use [action-routing.md](action-routing.md) to select the standalone report kind and [context-discovery.md](context-discovery.md) before artifact-based findings.
 
 ## Persistence Boundary
 
@@ -11,7 +11,7 @@ Persist substantive findings, recommendations, advisories, audits, and consultat
 
 ## Required Headings For Generated Reports
 
-The canonical headings and ordering live only in [report-contract.md](report-contract.md#required-report-headings). Templates below add action-specific content without replacing them. Preserve stable finding/mitigation IDs and lifecycle history when updating an existing matching report.
+The required headings and ordering live only in [report-contract.md](report-contract.md#required-report-headings). Templates below add action-specific content without replacing them. Preserve stable finding/mitigation IDs and lifecycle history when updating an existing matching report.
 
 When a report reviews a concrete feature request, add `## Common Overlooked Failures And Outcomes` after `## Recommendations` or as an action-specific subsection under `## Findings`. Use [feature-risk-patterns.md](feature-risk-patterns.md) to name feature-specific mistakes, possible bad outcomes, provider questions, and positive outcomes from responsible implementation.
 

@@ -1,5 +1,5 @@
 ABOUTME: First contribution guide with short docs-only and small-bug paths.
-ABOUTME: Links to canonical contributing and testing docs without duplicating governance rules.
+ABOUTME: Links to authoritative contributing and testing docs without duplicating governance rules.
 
 # First Contribution
 
@@ -17,7 +17,7 @@ Use this path for typo fixes, stale doc corrections, missing links, or source-gr
 
 1. Pick a small documentation issue or open a Documentation issue in GitHub using the documentation issue form.
 2. Edit only the relevant docs and keep claims tied to source anchors.
-3. If you add a new canonical doc, include the metadata block from [DOCUMENTATION_ARCHITECTURE.md](DOCUMENTATION_ARCHITECTURE.md).
+3. If you add a new primary documentation, include the metadata block from [DOCUMENTATION_ARCHITECTURE.md](DOCUMENTATION_ARCHITECTURE.md).
 4. In the pull request template, set documentation impact to `Updated` and summarize the reviewed links and source anchors.
 
 ## Path 2: Small Bug PR

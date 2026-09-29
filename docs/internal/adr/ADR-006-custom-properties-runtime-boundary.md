@@ -17,7 +17,7 @@ That capability creates a product boundary risk: EAV can be stretched from “cu
 
 Keep EAV custom properties bounded to custom fields on existing first-class resources.
 
-Layer 3 may extend existing aggregates with tenant-local fields, but it must not define new canonical product entities or replace typed domain schema.
+Layer 3 may extend existing aggregates with tenant-local fields, but it must not define new authoritative product entities or replace typed domain schema.
 
 ### Allowed Layer 3 Use
 
@@ -31,7 +31,7 @@ Layer 3 may extend existing aggregates with tenant-local fields, but it must not
 
 - User-defined entity types.
 - Arbitrary relationships between custom objects.
-- Reference fields that become canonical domain relationships.
+- Reference fields that become authoritative domain relationships.
 - Cross-field rules, formulas, computed fields, or workflow/policy logic.
 - Custom uniqueness constraints beyond the local `Namespace + Key` identity rules.
 - Tenant-authored schema migrations.
@@ -57,4 +57,4 @@ If the product needs user-defined entities, relationships, formulas, or schema m
 
 - [CUSTOM_PROPERTIES.md](../CUSTOM_PROPERTIES.md) — Layer 3 governance and lifecycle rules.
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — Layer 1 / Layer 2 / Layer 3 architecture.
-- [LEXICONS.md](../LEXICONS.md) — canonical and extension publication contracts.
+- [LEXICONS.md](../LEXICONS.md) — authoritative and extension publication contracts.

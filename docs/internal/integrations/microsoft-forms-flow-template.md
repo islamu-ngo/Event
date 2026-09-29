@@ -35,7 +35,7 @@ In Studio, open the event's Integrations section and use only the HAL-exposed co
    - **Callback secret binding ID** to the tenant secret binding containing the callback key.
    - completion mode to callback and trust level to completion-only.
 3. Add a required field mapping from `system.registration_attempt_token` to a required short-answer question in the Form.
-4. Map every required canonical field to its Microsoft Forms response-detail field.
+4. Map every required authoritative field to its Microsoft Forms response-detail field.
 
 The launch URL prefills the correlation question with `attemptId|attemptToken`. The value is correlation-only, can be visible to the respondent, and is not identity proof. If it is removed or changed, processing parks the response for reconciliation.
 

@@ -15,7 +15,7 @@ A guide for creating and maintaining entire GitBook documentation sites end-to-e
 
 GitBook programmatic APIs (REST and MCP) can create sites, sections, spaces, and apply branding, but **authorizing the Git provider (GitHub/GitLab), picking the repo/branch, and configuring initial sync direction are UI-only operations**.
 
-The canonical end-to-end flow:
+The standard end-to-end flow:
 1. **Scaffold Git Repo Locally**: Monorepo layout (one directory per space), with root `gitbook-docs.yaml` pre-mapping spaces, then push to remote.
 2. **Create Resources Programmatically**: Create site, sections, and empty spaces via MCP or REST API.
 3. **User Completes 1 UI Step**: Connect site-level Git Sync in the GitBook UI and confirm space mapping. See [git-sync-handoff.md](git-sync-handoff.md).
@@ -90,7 +90,7 @@ After space creation, resolve `XSPACE_<KEY>` to real space IDs via sed or script
 ## Multi-Language & Auto-Translated Spaces
 
 - GitBook supports auto-translated site-spaces attached to the same section.
-- **Do not scaffold per-language folders in Git.** Keep one canonical English tree in the repository.
+- **Do not scaffold per-language folders in Git.** Keep one primary English tree in the repository.
 - Translations are managed in GitBook UI under **Section Settings → Translations**.
 - Customization payloads carry `localizedTitle` maps. Preserve existing language entries.
 

@@ -208,7 +208,7 @@ After an interrupted attempt, refresh setup status so the wizard can recover
 the original operation reference rather than start a competing operation.
 
 For headless setup, select `ConfiguredAdministrator`, set the bootstrap provider
-to `local`, use a canonical UUIDv7 subject as the username, and supply
+to `local`, use a UUIDv7 subject as the username, and supply
 `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` through the selected secret authority.
 The active authentication provider must also be Local. The password has no
 source default and does not become a reset mechanism after setup completes.

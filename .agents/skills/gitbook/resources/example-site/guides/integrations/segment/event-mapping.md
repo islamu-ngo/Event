@@ -65,7 +65,7 @@ Useful for marketing tools that want to gate or personalize based on verificatio
 | `account.restricted` | `Seller Restricted` | `account_id`, `restriction_reason` |
 | `application_fee.created` | `Platform Revenue` | `amount`, `currency`, `seller_id`, `charge_id` |
 
-The `Platform Revenue` event is the canonical "platform revenue per transaction" event — most marketplaces wire this directly to a daily revenue chart in their data warehouse.
+The `Platform Revenue` event is the primary "platform revenue per transaction" event — most marketplaces wire this directly to a daily revenue chart in their data warehouse.
 
 ## Custom metadata
 

@@ -41,7 +41,7 @@ category/channel restrictions or mute behavior.
 Event publication, ticket confirmations, and moderation alerts utilize the **Transactional Outbox Pattern** (see [Architecture & Request Flows](../getting-started/architecture-and-request-flows.md#2-write-command-flow)):
 * Business transactions commit the domain state change and the notification outbox entry in a single atomic database transaction.
 * Background workers process fanout with deterministic deduplication keys, ensuring idempotent processing even during network interruptions.
-* **Server-Sent Events (SSE)** and **Browser Web Push** deliver non-authoritative wake-up signals; the client always fetches the canonical message from the API.
+* **Server-Sent Events (SSE)** and **Browser Web Push** deliver non-authoritative wake-up signals; the client always fetches the authoritative message from the API.
 
 When a push service reports a retired endpoint (`404` or `410`), the dispatch
 failure and subscription deactivation are stored together. A database failure

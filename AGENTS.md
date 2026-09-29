@@ -1,9 +1,9 @@
-<!-- ABOUTME: Canonical AI-agent contract for the ISLAMU Event platform. -->
+<!-- ABOUTME: Repository AI-agent contract for the ISLAMU Event platform. -->
 <!-- ABOUTME: Defines the Contribution Contract, critical rules, and routing logic. -->
 
-# AGENTS.md — Canonical Agent Contract
+# AGENTS.md — Agent Contribution Contract
 
-> **This is the canonical entrypoint for every AI tool contributing to this repository.**
+> **This is the required entrypoint for every AI tool contributing to this repository.**
 > Last Updated: 2026-08-12
 
 ---
@@ -25,9 +25,9 @@ Every change must answer these eight questions **before editing any file**:
 
 ---
 
-## 2. Canonical Artifacts (Single Source of Truth)
+## 2. Authoritative Artifacts (Single Source of Truth)
 
-| Concern | Canonical File | Purpose |
+| Concern | Authoritative File | Purpose |
 |---|---|---|
 | AI agent contract | `AGENTS.md` (this) | Every agent starts here |
 | Invariant reference | `docs/internal/QUICK_REFERENCE.md` | Global hard constraints |
@@ -84,7 +84,7 @@ Every change must answer these eight questions **before editing any file**:
 14. **Self-Contained Interaction & Zero Plan-Opening Overhead**: Prompts, questions, feedback requests, and status reports to the developer MUST be completely self-contained and immediately actionable without requiring the developer to open `dev/active/<task>/...` or grep internal plan files. Agents must NEVER reference bare phase/task IDs (`P04/P06`, `T02.1`, `P03 gates`) in isolation. Every approval request, decision prompt, or milestone update MUST provide a self-contained Decision Brief inline: descriptive human names of features/components, current context, the exact choice with rationale, and clear recommended options with trade-offs. The implementation plan is internal working memory; the chat response is the developer console.
 15. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
     - **Ring 1 (Inner Loop / Sliced)**: Subtask changes MUST be verified via fast in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting Domain or Application unit tests in **< 2 seconds**. Zero Docker containers or network I/O in the inner loop. 90%+ of algorithmic/normalization/business invariants belong in `Event.Domain.UnitTests`.
-    - **Ring 2 (Phase Exit Gate)**: Verify the single touched project against ONE canonical provider (e.g., SQLite in-memory or single PostgreSQL container) in **< 15 seconds**.
+    - **Ring 2 (Phase Exit Gate)**: Verify the single touched project against ONE selected provider (e.g., SQLite in-memory or single PostgreSQL container) in **< 15 seconds**.
     - **Ring 3 (Plan Exit / Workstream Gate)**: The full multi-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), migration checks, and full suites are run ONCE at the end of the entire implementation plan before PR creation.
     - **Yak-Shaving Quarantine**: Agents are strictly FORBIDDEN from absorbing or repairing pre-existing unrelated test suite rot encountered during feature work. If an existing test fails outside the task's path, verify if it reproduces on an untouched base worktree, log it under `*-context.md` (or `dev/backlog/`), and quarantine it. Never derail feature implementation to fix unrelated persistence suite failures.
 
@@ -133,7 +133,7 @@ Before the first product edit, ensure local tracking is fresh against upstream (
    - Strictly in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`).
    - Zero Docker containers, zero network I/O, zero database setup lag.
 2. **Ring 2 (Phase Exit Gate — Phase Level, < 15s)**:
-   - Run a single Release build and at most ONE selected project test against a single canonical provider.
+   - Run a single Release build and at most ONE selected project test against a single selected provider.
    - Forbid running the multi-database provider matrix during intermediate phase exits.
 3. **Ring 3 (Plan Exit Gate — Workstream Level)**:
    - Full multi-database matrix, migration round-trips, and architecture guardrails run ONCE at the end of the workstream before PR creation.
@@ -192,7 +192,7 @@ Whenever an agent prompts for approval, requests architectural direction, report
 | GitHub Copilot | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | `.github/instructions/` |
 | Gemini / Antigravity | [`AGENTS.md`](AGENTS.md) | Session rules injection |
 
-> **Twin Rules Policy**: Path-scoped rules are maintained as identical copies in both `.agents/rules/*.md` (for the canonical ISLAMU contract system) and `.omo/rules/*.md` (for OmO's native `rules-injector` hook). When editing a rule, update both twin files — each twin's `ABOUTME:` header documents its counterpart path. This dual presence ensures that agents running through **any** harness receive automatic path-scoped rule injection without manual loading.
+> **Twin Rules Policy**: Path-scoped rules are maintained as identical copies in both `.agents/rules/*.md` (for the repository contribution contract system) and `.omo/rules/*.md` (for OmO's native `rules-injector` hook). When editing a rule, update both twin files — each twin's `ABOUTME:` header documents its counterpart path. This dual presence ensures that agents running through **any** harness receive automatic path-scoped rule injection without manual loading.
 
 ---
 

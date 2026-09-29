@@ -19,9 +19,9 @@ who cannot make it themselves:
 2. **Who bears the timing decision** for disclosing an embargoed security fix, given that
    self-hosters cannot act until they are told, and telling everyone tells attackers too.
 3. **The deliberate trade of contributor recognition against contributor privacy**, because
-   canonical release artifacts strip author and committer identities by construction.
+   governed release artifacts strip author and committer identities by construction.
 
-Out of scope: SemVer arithmetic, canonicalization byte rules, tag-object attestation, provider
+Out of scope: SemVer arithmetic, normalization byte rules, tag-object attestation, provider
 transport mechanics, and the ref-namespace model. Those are correctness concerns governed by
 [RELEASE_POLICY.md](../docs/RELEASE_POLICY.md) and
 [ADR-025](../docs/adr/ADR-025-provider-neutral-release-governance.md); they carry no value
@@ -43,7 +43,7 @@ and moral-rights requirements vary by jurisdiction and require qualified legal a
 Approve the release-governance model with the following boundaries:
 
 1. Never let a published forge page present itself as the authoritative release record. Each page
-   must carry the canonical `release-notes.md` hash and its tag reference so any reader can check
+   must carry the authoritative `release-notes.md` hash and its tag reference so any reader can check
    the page against the repository.
 2. Report publication drift; do not silently repair it, and do not let drift invalidate a release.
    A silent auto-repair would hide the fact that the public record was altered — which is the harm
@@ -52,9 +52,9 @@ Approve the release-governance model with the following boundaries:
    make premature leakage impossible and must not make the timing choice itself.
 4. Treat "self-hosters can patch before attackers can exploit" as the disclosure objective, and
    record whose judgement set each embargo window.
-5. State plainly, in contributor-facing documentation, that canonical release notes carry no
+5. State plainly, in contributor-facing documentation, that governed release notes carry no
    author identities, and provide a separate recognition surface that contributors opt into.
-6. Do not reintroduce identities into canonical artifacts as a recognition mechanism; recognition
+6. Do not reintroduce identities into release artifact as a recognition mechanism; recognition
    must not become a permanent, unremovable, machine-readable identity record.
 
 ## Findings By Severity
@@ -62,13 +62,13 @@ Approve the release-governance model with the following boundaries:
 ### High — A mutable public page must never be dressed as an invariant
 
 A forge release body can be edited after publication by any maintainer, by a compromised token,
-or by the forge operator. Any acceptance criterion of the form "published bodies match canonical
+or by the forge operator. Any acceptance criterion of the form "published bodies match authoritative
 notes" is unenforceable by construction. Asserting it would make the weakest surface in the whole
 system look like the strongest, which is a truthfulness failure rather than a technical one:
 readers would rely on a guarantee that does not exist.
 
 **Provider duty:** publish, but publish as an explicitly derived view. Every page states the
-canonical notes hash and the tag it projects. Divergence is reported, attributed to the page, and
+authoritative notes hash and the tag it projects. Divergence is reported, attributed to the page, and
 never treated as invalidating the signed release.
 
 **Implemented by:** Task 8.3 (publication projection and `report-publication-drift`), and
@@ -96,7 +96,7 @@ security input procedure.
 
 ### Moderate — Identity stripping is a real cost, chosen deliberately
 
-Canonical release artifacts omit author and committer identities, emails, raw commit bodies, and
+Governed release artifacts omit author and committer identities, emails, raw commit bodies, and
 provider handles. This is deliberate and defensible: release notes become a permanent, mirrored,
 machine-readable, non-deletable record, and a contributor who later needs distance from this
 project — for safety, for employment, for any private reason — cannot retract a signed tag. The
@@ -108,11 +108,11 @@ are exactly the contributors a community project depends on.
 
 **Provider duty:** be honest that this trade was made and why, rather than presenting privacy as
 free. Recognition, if offered, belongs in a separate opt-in surface whose removal is possible,
-not in the immutable canonical record.
+not in the immutable primary record.
 
-**Implemented by:** Task 3.2 (canonicalization and untrusted-text hardening) and the canonical
+**Implemented by:** Task 3.2 (normalization and untrusted-text hardening) and the authoritative
 artifact privacy clause in [RELEASE_POLICY.md](../docs/RELEASE_POLICY.md). Optional forge
-enrichment (contributor acknowledgements) remains explicitly deferred and must not alter canonical
+enrichment (contributor acknowledgements) remains explicitly deferred and must not alter authoritative
 checksums.
 
 ### Moderate — Verifiability is itself a stakeholder protection, not only a correctness property
@@ -135,9 +135,9 @@ guarantee subject to review, not as an internal implementation preference.
 |---|---|---|
 | Self-hosting operators | Knowing what changed, and being able to patch in time | Deterministic three-layer notes; embargo window owned by a named human; offline tag verification |
 | Attendees of self-hosted events | Not being exposed by an unpatched deployment they never chose | Disclosure timing judged against operator patching capability, not release convenience |
-| Contributors | Fair recognition without a permanent identity record | Identity-free canonical artifacts; recognition only through a separate opt-in surface |
+| Contributors | Fair recognition without a permanent identity record | Identity-free release artifact; recognition only through a separate opt-in surface |
 | Contributors needing distance from the project | Not being permanently, irrevocably indexed | No identities in signed, mirrored, non-deletable artifacts |
-| Readers of the public release record | Not being misled by an altered page | Canonical hash and tag reference on every published page; drift reported |
+| Readers of the public release record | Not being misled by an altered page | Content hash and tag reference on every published page; drift reported |
 | Security reporters | Predictable, non-arbitrary handling | Restricted lane outside the public checkout; fail-closed rather than guess |
 | Release operators | Clear authority boundaries and no hidden defaults | Tool verifies and emits evidence; it never approves, tags, pushes, publishes, or deploys |
 
@@ -166,7 +166,7 @@ guarantee subject to review, not as an internal implementation preference.
 
 ## Rejected Alternatives
 
-1. **Treating published forge bodies as canonical** — rejected: unsigned mutable state cannot be
+1. **Treating published forge bodies as authoritative** — rejected: unsigned mutable state cannot be
    release truth, and claiming otherwise misleads readers.
 2. **Refusing all publication** — rejected: real ergonomic loss for self-hosters who rely on
    release pages to learn what to patch.
@@ -176,19 +176,19 @@ guarantee subject to review, not as an internal implementation preference.
    accountable human without removing the moral weight of the decision.
 5. **Publishing security detail immediately to "be transparent"** — rejected: transparency that
    reaches attackers before operators can patch harms the people it claims to serve.
-6. **Reintroducing author identities into canonical notes for recognition** — rejected: it makes
+6. **Reintroducing author identities into authoritative notes for recognition** — rejected: it makes
    recognition permanent and unremovable, converting a courtesy into a lasting exposure.
 
 ## Validation And Evaluation Plan
 
 Implementation evidence must demonstrate:
 
-- every published page carries the canonical notes hash and its tag reference;
+- every published page carries the authoritative notes hash and its tag reference;
 - drift is detected and reported without auto-repair and without invalidating the release;
 - a provider outage or a missing release API degrades to a recorded no-op, not a failed release;
 - restricted security input cannot reach public artifacts, context, notes, or evidence;
 - absence of disclosure authorization stops the flow rather than defaulting to publish;
-- canonical artifacts contain no identities, emails, raw bodies, handles, or tokens;
+- release artifact contain no identities, emails, raw bodies, handles, or tokens;
 - a release verifies offline from its tag with no forge API and no branch present.
 
 ## Validation Gaps
@@ -216,14 +216,14 @@ Implementation evidence must demonstrate:
 
 ### Repository Evidence
 
-- `docs/RELEASE_POLICY.md` — canonical release contract, ref namespace, disclosure and operation.
+- `docs/RELEASE_POLICY.md` — governed release contract, ref namespace, disclosure and operation.
 - `docs/RELEASE_RUNBOOK.md` — restricted security input, maintenance lines, operator commands.
 - `docs/adr/ADR-025-provider-neutral-release-governance.md` — architecture and superseded model.
 - `.ci/release/adapter-contract.md` — provider transport boundary and reserved ref namespace.
 - `dev/active/git-cliff-release-engineering/git-cliff-release-engineering-plan.md` — Decisions 12,
   13, and 14; Tasks 3.2, 3.3, and 8.3.
-- `eng/release/src/ISLAMU.ReleaseEngineering/CanonicalArtifactPolicy.cs` — identity, provider, and
-  secret-shape rejection in canonical artifacts.
+- `eng/release/src/ISLAMU.ReleaseEngineering/ReleaseArtifactPolicy.cs` — identity, provider, and
+  secret-shape rejection in release artifact.
 
 ### External Functional References
 

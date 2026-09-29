@@ -98,7 +98,7 @@ internal implementation details.
 ### Operator form choices (2026-09-21)
 
 Authenticated clients can read `GET /api/operator-identity-metadata` through the
-generated `GetOperatorIdentityFormOptionsAsync` operation. It supplies canonical
+generated `GetOperatorIdentityFormOptionsAsync` operation. It supplies authoritative
 operator-kind codes, runtime country display choices, shared field limits and
 label/help identifiers without returning saved identity values. An unavailable
 country catalogue is explicit; do not replace it with invented choices.
@@ -131,7 +131,7 @@ Cerbos intent is explicit and fail closed. HAL action generation follows current
 
 Record removals, renames, authentication/authorization changes, request/response/problem changes, pagination/cursor changes, and generated-client changes. Each entry should name affected routes/schema/methods, old and new behavior, consumers, migration guidance or compatibility window, target release, and verification evidence.
 
-## Canonical sources
+## Authoritative sources
 
 The repository's `docs/API_CHANGELOG.md` is the detailed date-indexed contract log. The governed OpenAPI artifact is `schemas/openapi-islamu-event.json`. Regenerate all governed client artifacts after server contract changes; do not edit generated files manually.
 

@@ -4,7 +4,7 @@
 # Setup Composition Scale Profiles
 
 Setup composition scale profiles are measured workload manifests over the
-existing canonical parser limits. They do not define another grammar, tree,
+existing authoritative parser limits. They do not define another grammar, tree,
 wire identity, filesystem policy, serializer, or fallback. The default
 `SetupCompositionCompiler` behavior and every value in
 `SetupCompositionLimits.Default` remain unchanged.
@@ -24,13 +24,13 @@ The repository-owned generator measures four synthetic, non-secret workloads:
 source shape, host/runtime/process limits, source/Core/Wire/target revisions,
 warmups and measured iterations, median and p95 elapsed time, allocation and
 GC counts, peak working set, cancellation, stack-overflow disposition, and
-canonical artifact size/hash. The generated machine record is
+release artifact size/hash. The generated machine record is
 `eng/setup-assistant/generated/composition-scale-profiles.json`; the human
 measurement record is
 `.omo/evidence/20260831-setup-assistant-security-and-portability/phase8-scale-results.md`.
 
 Timing and allocation measurements are evidence, not flaky test thresholds.
-Verification recompiles each deterministic workload and checks canonical
+Verification recompiles each deterministic workload and checks authoritative
 artifact bytes and hashes without asserting wall-clock speed.
 
 ## Admission
@@ -40,15 +40,15 @@ artifact bytes and hashes without asserting wall-clock speed.
 1. an exact known profile name;
 2. the exact generated `ArtifactDigest` for that measurement;
 3. an enabled profile; and
-4. a target maximum artifact size at least as large as the measured canonical
+4. a target maximum artifact size at least as large as the measured authoritative
    artifact.
 
 Admission returns the exact immutable profile or one closed failure:
 `UnknownProfile`, `ProfileDisabled`, `EvidenceMismatch`, or
 `TargetIncompatible`. Rejection returns no profile and never clamps, selects a
-smaller profile, falls back to the canonical default, or changes compiler
+smaller profile, falls back to the standard default, or changes compiler
 behavior. `expanded` is deliberately known-disabled because no measured and
-target-accepted evidence authorizes limits above the canonical ceiling.
+target-accepted evidence authorizes limits above the authoritative ceiling.
 
 Every admitted profile exposes `SetupCompositionLimits.Default` as its
 effective limit set. A future larger profile requires a new controlled
@@ -57,7 +57,7 @@ review; it cannot be activated by editing runtime configuration.
 
 ## Target Compatibility
 
-Each measured canonical result is reparsed through the frozen v1alpha2 Wire
+Each measured authoritative result is reparsed through the frozen v1alpha2 Wire
 codec used by the target contract and must remain below
 `ConfigurationPortabilityContentLimits.MaximumArtifactUtf8Bytes`. This checks
 the target-consumed contract rather than trusting source size or local parser
@@ -98,4 +98,4 @@ dotnet run eng/setup-assistant/GenerateSetupCompositionScaleProfiles.cs -- \
 
 The check validates exact revisions and evidence digests, recompiles all four
 workloads through Setup Core and the target Wire contract, and compares
-canonical byte sizes and SHA-256 hashes.
+normalized bytes sizes and SHA-256 hashes.

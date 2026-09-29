@@ -1,10 +1,10 @@
 # ABOUTME: Public change fragment for bounded Setup composition source formats.
-# ABOUTME: Records canonical parity and fail-closed parser/filesystem policy.
+# ABOUTME: Records authoritative parity and fail-closed parser/filesystem policy.
 Change-Id: CHG-01M1C8MP8S1T10N8D3D5A7B9CX
 Title: "Bounded Setup composition sources"
 Type: feat
 Scope: self-hosting
-Summary: "Setup Core compiles bounded JSON, YAML, and directory sources to byte-identical canonical v1alpha2 JSON without adding wire identity."
+Summary: "Setup Core compiles bounded JSON, YAML, and directory sources to byte-identical authoritative v1alpha2 JSON without adding wire identity."
 Group: setup-composition
 Supersedes: []
 Impacts:
@@ -21,7 +21,7 @@ Impacts:
     Public-Disclosure: documented
     Detail: >-
       Syntax-tree-only parsing, deterministic directory revalidation,
-      canonical parity, value-free failures, and no partial output protect
+      authoritative parity, value-free failures, and no partial output protect
       self-hosted composition.
   Migration:
     Reference: docs/RELEASE_RUNBOOK.md
@@ -32,7 +32,7 @@ Impacts:
     Reference: docs/SETUP_COMPOSITION.md
     Disposition: documented
     Detail: >-
-      Canonical defaults bound source bytes, parser structure, paths,
+      Standard default bound source bytes, parser structure, paths,
       files, directories, scalar sizes, and normalized nodes.
   OpenAPI:
     Reference: docs/API_CHANGELOG.md
@@ -44,6 +44,6 @@ Impacts:
     Reference: docs/OPERATIONS.md
     Disposition: documented
     Detail: >-
-      Operators select one bounded source form and receive canonical output
+      Operators select one bounded source form and receive deterministic output
       only after complete validation; unsupported filesystem semantics
       disable directory input.

@@ -16,7 +16,7 @@ culture detector.
 
 Before adding localized URL segments, choose one deterministic owner and ordering
 for culture and tenant resolution. Update route generation, inbound matching,
-base-path rewriting, circuit navigation, redirects/canonical URLs, and the
+base-path rewriting, circuit navigation, redirects/preferred URL, and the
 reserved-slug catalog as one contract. Preserve configurable nonempty tenant path
 prefixes and custom-domain behavior explicitly.
 
@@ -28,7 +28,7 @@ prefixes and custom-domain behavior explicitly.
 - Existing system routes and language identifiers have machine-checked reserved
   coverage.
 - Generated links, bookmarks, refreshes, and supported RTL/localized navigation
-  use one canonical shape.
+  use one authoritative shape.
 - Tests cover root-default, configured-prefix, and custom-domain deployments
   without sleeps or browser-header shortcuts.
 

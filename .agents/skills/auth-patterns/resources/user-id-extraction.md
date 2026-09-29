@@ -69,7 +69,7 @@ Three subtly different chains once coexisted here: `UserContext` used four claim
 two, and a base controller preferred `internal_user_id` first. They disagreed about who the caller was.
 Compiled controller dependency checks reject request-container service
 location, while principal-extension and controller behavior tests exercise the
-single canonical claim chain. Purpose-bound authentication schemes remain
+single authority claim chain. Purpose-bound authentication schemes remain
 separate by protocol behavior rather than a source-file allowlist.
 
 **Related**: `auth-patterns` skill; `docs/internal/CODEBASE_INSIGHTS.md` §15.

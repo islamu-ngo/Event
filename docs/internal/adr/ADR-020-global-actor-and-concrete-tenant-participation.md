@@ -23,7 +23,7 @@ Tenant authority is concrete:
 
 Events keep a simple global `ActorId`; tenant write authority is resolved from the concrete participation and current user. `ActorSubscription` remains tenant-local and targets a global Actor. Create/read/fanout require local discoverability; unsubscribe may retain durable-row access after the target becomes hidden.
 
-Canonical `/actors/{actorId}` is the only Actor profile page and contains only
+Authoritative `/actors/{actorId}` is the only Actor profile page and contains only
 safe global data. Tenant-aware API consumers may request
 `GET /api/actor/by-tenant/{tenantId}/{id}` to compose approved public local
 overrides under the endpoint's fail-closed discoverability rules; this does not

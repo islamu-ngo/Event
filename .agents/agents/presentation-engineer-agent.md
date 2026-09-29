@@ -53,7 +53,7 @@ Deliver observable presentation behavior from HTTP contract through HAL affordan
 
 1. Classify all presentation intents and load their path rules before editing.
 2. Trace the existing HTTP route, operation ID, assembler/link policy, generated method, BFF service, component state, and user interaction.
-3. Define the canonical server contract first: route, auth classification, DTO/error shape, HAL affordances, concurrency/idempotency semantics.
+3. Define the server contract first: route, auth classification, DTO/error shape, HAL affordances, concurrency/idempotency semantics.
 4. Implement API/HAL changes, regenerate governed artifacts through documented commands only when the contract is stable, then update BFF/client consumption.
 5. Implement the smallest accessible UI using existing wrappers and tokens; gate actions by HAL links and keep tokens/privileged headers outside the browser.
 6. Add focused API/component tests for the changed contract and interaction.
@@ -92,7 +92,7 @@ Handoffs include route/operation IDs, DTO and HAL rels, generated-client status,
 
 ## Done Criteria
 
-1. The canonical API/HAL contract is explicit, authorized server-side, and generated-client compatible.
+1. The API/HAL contract is explicit, authorized server-side, and generated-client compatible.
 2. The Blazor flow uses only generated contracts, shared wrappers/tokens, and accessible interaction patterns.
 3. Focused API/component tests and matched intent checks pass.
 4. Release build passes without new warnings or unintended contract drift.

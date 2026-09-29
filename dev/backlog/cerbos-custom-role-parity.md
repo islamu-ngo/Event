@@ -42,4 +42,4 @@ Before implementation establish a new active triad, exact atomic commit contract
 
 ## Verification
 
-Use in-memory rule/principal Red/Green slices and the real Cerbos policy test lane for decision parity. Per phase run one Release build and at most one selected owning project/canonical provider; at exit run affected application/infrastructure/API authorization integration, architecture and anonymized security/operations MAD. Test runtime outcomes, not prose, source calls or timing. Quarantine unrelated baseline failures. This backlog graduation runs no runtime test and claims no parity implementation.
+Use in-memory rule/principal Red/Green slices and the real Cerbos policy test lane for decision parity. Per phase run one Release build and at most one selected owning project/designated provider; at exit run affected application/infrastructure/API authorization integration, architecture and anonymized security/operations MAD. Test runtime outcomes, not prose, source calls or timing. Quarantine unrelated baseline failures. This backlog graduation runs no runtime test and claims no parity implementation.

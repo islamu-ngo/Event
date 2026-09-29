@@ -10,7 +10,7 @@ or administrator authority. `source_unavailable`, `source_contradiction`, and
 `snapshot_changed` mean the snapshot cannot safely offer mutations; follow its
 `refresh` relation after repairing the selected source. Do not infer readiness
 from deployment ownership or select a different provider to hide failure.
-Save the profile through its HAL action before refreshing canonical-host checks.
+Save the profile through its HAL action before refreshing authoritative-host checks.
 The old System preflight route is removed, not redirected.
 
 A failed browser environment is not evidence of a render/circuit defect. Capture
@@ -57,7 +57,7 @@ Use this page when you have a symptom. For planned work, installation, backup, r
 | Startup stops with a bootstrap matrix reason code | Mode missing/unknown, a configured key set under `Interactive`, a required key missing under `ConfiguredAdministrator`, or only one of the two profile names | Fix the environment or secret authority to satisfy one closed matrix exactly, then restart |
 | Provider rejected at startup | Configured provider is outside `local`, `keycloak`, `atproto`, or conflicts with the selected authentication matrix | Set the exact supported provider and matching inputs; Local requires its temporary password from the selected secret authority |
 | Generation rejected at startup | Value isn't a positive integer | Set a positive integer |
-| Sign-in succeeds but no privilege is granted | The presented claim isn't the exact configured selector: wrong issuer for `keycloak`, wrong subject, or a non-canonical DID for `atproto` | Compare the configured subject with the provider's issued subject/DID and correct the configuration, not the database |
+| Sign-in succeeds but no privilege is granted | The presented claim isn't the exact configured selector: wrong issuer for `keycloak`, wrong subject, or a non-authoritative DID for `atproto` | Compare the configured subject with the provider's issued subject/DID and correct the configuration, not the database |
 | External-provider onboarding sits pending with a healthy instance | Expected until the configured administrator signs in | Sign in as that administrator; provider-owned verification still applies even with Event email disabled |
 | Local bootstrap cannot reach ordinary sign-in | Initial/reset credential is restricted until private replacement | Complete password replacement and sign in afresh; do not enable SMTP or invent a public registration route |
 | Bootstrap reports drift and refuses to proceed | Stored generation is same or lower than a changed selector, meaning the configuration moved without a new generation | Restore the previous configuration or raise `INSTANCE_BOOTSTRAP_BINDING_GENERATION` above the stored one |
@@ -112,7 +112,7 @@ Checks:
 
 AppHost assigns the optional Standalone HTTP endpoint dynamically through `WithHttpEndpoint(name: "http")`; it remains internal/non-guaranteed, while HTTPS is `https://localhost:7180`. If running `Event.Standalone` directly, use its launch profile's reserved `http://localhost:5180` HTTP endpoint (or its `https://localhost:7180` HTTPS profile).
 
-These checks cover the three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`): AppHost selects the Split default or explicit Standalone, while the latter keeps browser `/api/*` traffic in-process after cookie antiforgery and trusted-header reconstruction. Keep canonical API paths as `/api/...` with non-URL API versioning (`Accept`, `?api-version=`, or `X-Api-Version`), never `/api/v1/...` (see [the support matrix](ARCHITECTURE.md#hosting-topology)).
+These checks cover the three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`): AppHost selects the Split default or explicit Standalone, while the latter keeps browser `/api/*` traffic in-process after cookie antiforgery and trusted-header reconstruction. Keep authoritative API paths as `/api/...` with non-URL API versioning (`Accept`, `?api-version=`, or `X-Api-Version`), never `/api/v1/...` (see [the support matrix](ARCHITECTURE.md#hosting-topology)).
 
 The in-process Combined bridge remains the BFF/API trust boundary; a topology
 switch never bypasses API authentication, authorization, or tenant isolation.
@@ -245,10 +245,10 @@ Symptoms:
 Checks:
 
 1. Confirm `Atproto:PublicUrl` is the exact browser-facing HTTPS origin and `Atproto:CallbackPath` matches the published client metadata. Remove credentials, non-root paths, queries, fragments, trailing-dot or Unicode host aliases, and ambiguous callback segments. Do not change the callback for an in-flight flow.
-2. Confirm the instance secret provider can resolve `/atproto/ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS`. Do not print the value. Validate only that the ring has bounded canonical P-256/ES256 keys, unique `kid` values, one active key, and any still-needed older keys marked retired. Session persistence and first-party token issuance separately require `/atproto/ATPROTO_SESSION_ENCRYPTION_KEYRING` and `/atproto/ATPROTO_SESSION_JWT_PRIVATE_JWKS`.
+2. Confirm the instance secret provider can resolve `/atproto/ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS`. Do not print the value. Validate only that the ring has bounded authoritative P-256/ES256 keys, unique `kid` values, one active key, and any still-needed older keys marked retired. Session persistence and first-party token issuance separately require `/atproto/ATPROTO_SESSION_ENCRYPTION_KEYRING` and `/atproto/ATPROTO_SESSION_JWT_PRIVATE_JWKS`.
 3. `state_store_unavailable` means the state adapter is missing or the signed private create/read/consume probe failed; `session_store_unavailable` identifies a missing session adapter. `BffProviderReadinessService` checks local prerequisites before consulting its ten-second probe-result cache. The private transport has a two-second deadline and no retry/hedge policy. Restore registration, API/database connectivity, migrations, and the shared OAuth signing authority as appropriate, then wait beyond the cache window and verify a fresh login. This probe does not certify durable session operations or a user's PDS. Never enable an in-memory fallback. Caller cancellation remains cancellation, not a provider failure.
 4. Verify public DNS for the PDS and authorization server from the BFF and Infrastructure network namespaces. Every answer must be public; a mixed public/private response is rejected. Production rejects loopback, RFC1918, link-local, unspecified, multicast, documentation, and benchmark ranges. Development loopback requires both Development environment and the explicit option.
-5. Verify authorization-server metadata is HTTP 200 JSON, bounded, has the exact canonical issuer, and advertises PAR, `private_key_jwt`, ES256 assertion and DPoP algorithms, S256 PKCE, code and refresh grants, code response, issuer response parameter, URL client metadata, and `atproto` scope. Authorization, PAR, token, and optional revocation endpoints may retain their declared query, but redirects and unsafe endpoint hosts are rejected.
+5. Verify authorization-server metadata is HTTP 200 JSON, bounded, has the exact authoritative issuer, and advertises PAR, `private_key_jwt`, ES256 assertion and DPoP algorithms, S256 PKCE, code and refresh grants, code response, issuer response parameter, URL client metadata, and `atproto` scope. Authorization, PAR, token, and optional revocation endpoints may retain their declared query, but redirects and unsafe endpoint hosts are rejected.
 6. If a previously working flow fails after about five minutes, start a new discovery/login flow. Endpoint trust is deliberately short-lived. An expired mapping rejects OAuth-shaped POSTs instead of sending them without confidential authentication.
 7. For `client_id_mismatch`, callback mismatch, ambiguous-form, invalid-DPoP, or missing-nonce failures, verify the remote server is preserving the published client ID/callback and AT Protocol DPoP contract. Do not relax form, assertion, proof, or nonce validation.
 8. During key rotation, keep the previous key as retired until all sessions pinned to its `kid` are expired or revoked. An unknown pinned key must not be silently replaced with the new active key.
@@ -264,7 +264,7 @@ Transient-store and PDS recovery:
 - A PDS outage can prevent login, refresh, `getSession`, and best-effort remote revocation. Local sign-out must still clear the BFF cookie. Restore public DNS/TLS/PDS availability, then start a new login if refresh reports the durable session invalid, corrupt, revoked, expired, or bound to an unavailable retired key.
 - To invalidate a compromised local session, revoke/delete it through the authorized session lifecycle and clear the BFF cookie. Do not edit encrypted session bytes or reuse another user's DID/PDS binding. If remote revocation is unavailable, local removal remains authoritative and the bounded outage result is retained for operators.
 
-Recovery is configuration- and dependency-first: restore the secret resolver or durable stores, correct canonical public URLs/DNS/metadata, retain required retired keys, and start a new flow. Do not bypass endpoint discovery, private-client assertions, DPoP, response limits, or SSRF checks.
+Recovery is configuration- and dependency-first: restore the secret resolver or durable stores, correct authoritative public URLs/DNS/metadata, retain required retired keys, and start a new flow. Do not bypass endpoint discovery, private-client assertions, DPoP, response limits, or SSRF checks.
 
 ### AT Protocol events are missing, pending, retrying, or failed
 
@@ -285,7 +285,7 @@ Checks:
 6. `session_unavailable`, `session_binding_mismatch`, or `reauth_required` requires the user to reconnect the same AT Protocol account, then update the local event to request publication again.
 7. `record_conflict` or `remote_record_missing` means the PDS copy changed or disappeared. Update the local event to request safe reconciliation; do not issue an unfenced direct record write.
 8. Provider rate-limit, timeout, or availability failures retry automatically within the row's configured bound. Dead-lettered rows retain only stable codes; raw provider bodies, tokens, DPoP material, and session envelopes must not enter logs, support artifacts, API responses, or the UI.
-9. After successful delivery, verify the outbox URI/CID, canonical ownership/presentation, and local Event `AtprotoRecordId` were settled together. A crash after remote success should reconcile the same record key, never create a duplicate.
+9. After successful delivery, verify the outbox URI/CID, authoritative ownership/presentation, and local Event `AtprotoRecordId` were settled together. A crash after remote success should reconcile the same record key, never create a duplicate.
 
 Local data remains authoritative during every PDS outage or permanent federation failure. Do not delete or roll back a valid local event merely because delivery failed.
 
@@ -753,7 +753,7 @@ Checks:
 3. For Infisical, verify the deployment-owned `INFISICAL_*` bootstrap inputs. Do not paste their values into logs, tickets, commands, or application configuration.
 4. Check health endpoint: `/health` includes the `secret_provider` check — `Degraded` after 1-2 failures, `Unhealthy` after 3+.
 5. If refresh is enabled, check `secrets_refresh_failures_total` Prometheus metric for recurring failures.
-6. Key mapping: Infisical/domain secret names use canonical `SCREAMING_SNAKE_CASE` names such as `STORAGE_S3_ACCESS_KEY_ID`; private credentials do not use .NET double-underscore aliases. Primary and external-authority database credentials are discrete structured role values such as `DATABASE_RUNTIME_USERNAME` / `DATABASE_RUNTIME_PASSWORD`, not URL-form connection strings; see [SECRETS.md](SECRETS.md).
+6. Key mapping: Infisical/domain secret names use authoritative `SCREAMING_SNAKE_CASE` names such as `STORAGE_S3_ACCESS_KEY_ID`; private credentials do not use .NET double-underscore aliases. Primary and external-authority database credentials are discrete structured role values such as `DATABASE_RUNTIME_USERNAME` / `DATABASE_RUNTIME_PASSWORD`, not URL-form connection strings; see [SECRETS.md](SECRETS.md).
 7. `secret_authority_unauthorized`, `secret_authority_invalid`, and
    `secret_authority_unavailable` are intentionally value-free. Repair the selected
    provider and restart; never switch authority or add an environment value as an

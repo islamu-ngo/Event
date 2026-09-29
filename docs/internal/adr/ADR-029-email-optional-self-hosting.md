@@ -66,7 +66,7 @@ Sources: [disable handler](../../../src/Explore.Application/Features/EmailDispat
 
 ### Anonymous recovery reuses the committed order
 
-Anonymous intake uses existing guest orders, relational capacity authority, rate/concurrency limits, and durable tenant/event issuance quotas. It does not introduce another RSVP aggregate or CAPTCHA service. ASP.NET Data Protection binds the tenant, event, operation, canonical request digest, idempotency key, stable server-generated order ID, and random capability material. Browser Web Crypto performs bounded SHA-256 work; the default is 18 bits within 16-22, not a measured mobile-performance guarantee.
+Anonymous intake uses existing guest orders, relational capacity authority, rate/concurrency limits, and durable tenant/event issuance quotas. It does not introduce another RSVP aggregate or CAPTCHA service. ASP.NET Data Protection binds the tenant, event, operation, normalized input digest, idempotency key, stable server-generated order ID, and random capability material. Browser Web Crypto performs bounded SHA-256 work; the default is 18 bits within 16-22, not a measured mobile-performance guarantee.
 
 Fresh allocation authority lasts 120 seconds. Historical proof validation until original expiry plus 24 hours permits only exact committed-order recovery, not a late new allocation. Validation precedes idempotency response disclosure. A response-store failure after business commit must return the same order, holds, and capability without allocating or scheduling again; changed scope, body, key, or envelope cannot disclose another result.
 

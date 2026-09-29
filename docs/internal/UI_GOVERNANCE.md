@@ -16,9 +16,9 @@ The Blazor frontend distinguishes between *Primitive Proxy Wrappers* and *Semant
   - **Reasoning:** These components standardize UX patterns, enforce structural accessibility boundaries, and encapsulate business logic.
   - **Rule:** Semantic components MUST preserve `AdditionalAttributes` (and pass them to their root element) to ensure testing hooks and ARIA attributes can be applied.
 
-## 3. Canonical Form Architecture
+## 3. Standard form Architecture
 
-All forms in the platform must adhere to the **Canonical Form Architecture Standard** to guarantee consistent UX, robust validation, and accessibility.
+All forms in the platform must adhere to the **Standard form Architecture Standard** to guarantee consistent UX, robust validation, and accessibility.
 
 - **Foundation:** Forms must use `EditForm` with `EditContext` and `FluentValidation` rather than MudBlazor's legacy `MudForm`.
 - **Validation Pipeline:**
@@ -114,4 +114,4 @@ MudBlazor v9 removed `MudGlobal` theming defaults (such as `ButtonVariant`, `Inp
 - **Zero** `<MudForm>` tags exist in the Blazor client codebase.
 - **Zero** `private bool _isSaving` declarations exist in the Blazor client codebase.
 - All forms use `EditForm` + `FluentValidation` or have no form submission logic.
-- All async submission flows use `FormSubmitState` from the canonical form infrastructure.
+- All async submission flows use `FormSubmitState` from the standard form infrastructure.

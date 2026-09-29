@@ -1,4 +1,4 @@
-# ABOUTME: Canonical intent catalog for the Contribution Contract.
+# ABOUTME: Authoritative intent catalog for the Contribution Contract.
 # ABOUTME: Each entry is a machine-readable answer to the 8 contract questions for one category of change.
 
 version: 1
@@ -643,7 +643,7 @@ intents:
       - "Required checks are always-present or explicitly documented as path-conditional"
       - "Deployment changes retain protected environment approval and release evidence"
       - "Release-engine work is limited to governed release lines; develop receives no generated Unreleased changelog writes."
-      - "Canonical release notes and evidence are provider-neutral; forge metadata may only enrich a noncanonical publication view."
+      - "Signed release notes and evidence are provider-neutral; forge metadata may only enrich a non-authoritative publication view."
       - "ISLAMU-owned policy validates inclusion, impacts, versions, ranges, and trust; git-cliff renders normalized context only."
       - "The release branch head, final preparation commit B, candidate attestation, signed annotated tag target, and stable-main target are the same full Git object."
       - "release.yaml and summary.md are the only human-owned release inputs; release-notes.md is fully generated."
@@ -1118,7 +1118,7 @@ intents:
       - "The guard never executes Git and owns no workflow state, digests, claims, locks, approvals, or context packets"
     pr_checklist:
       - "Run the focused `ISLAMU.AgentWorkflow.Tests` project"
-      - "Exercise the guard against the canonical intents YAML and a representative literal-file commit command"
+      - "Exercise the guard against the authoritative intents YAML and a representative literal-file commit command"
       - "Keep the implementation dependency-light and free of Git mutation"
     forbidden_without_approval:
       - "Changing product runtime, API, domain, persistence, migrations, generated artifacts, deployment behavior, or secret authority"
@@ -1362,7 +1362,7 @@ intents:
       - schemas/islamu-event.md
     unique_acceptance:
       - "Cosmetic branding, tenant directory operator, instance operator, and organizer merchant remain independent authoritative roles"
-      - "Every tenant creation path atomically creates both canonical typed documents and cannot bypass identity readiness when requesting Active"
+      - "Every tenant creation path atomically creates both typed documents and cannot bypass identity readiness when requesting Active"
       - "Activation, public disclosure, paid publication, checkout, and acceptance fail closed with stable payload-free reason codes"
       - "Paid acceptance snapshots exact structured tenant, instance, organizer, provider, policy, and money facts without rewriting history"
       - "HAL, authorization, OpenAPI, generated client, and Blazor affordances converge without local role inference"
@@ -1372,7 +1372,7 @@ intents:
       - "Repositories return entities or typed documents, handlers map DTOs, validators are manually instantiated, and tenant filters remain active"
       - "No branding value, literal product name, instance identity, organizer identity, or compatibility alias substitutes for missing tenant identity"
       - "Logs, metrics, traces, health, and ProblemDetails contain only bounded codes and approved identifiers, never legal names, registration identifiers, emails, or URLs"
-      - "OpenAPI, contract inventory, generated client, five provider migrations, canonical docs, I-VSD evidence, and release fragment match the shipped contract"
+      - "OpenAPI, contract inventory, generated client, five provider migrations, authoritative docs, I-VSD evidence, and release fragment match the shipped contract"
     forbidden_without_approval:
       - "Creating or reactivating an Active tenant outside the shared identity and capacity readiness boundary"
       - "Inferring legal identity from branding, tenant name, instance configuration, organizer data, or payment recipient data"
@@ -1704,7 +1704,7 @@ intents:
     unique_acceptance:
       - "ISLAMU remains authoritative for workflow, normalized answers, capacity, approval, and confirmation; external completion is evidence only"
       - "Every attempt pins the exact form, provider binding, mapping, participation, workflow, and ticket catalog versions it uses"
-      - "Canonical answers are typed atomic rows with database-enforced value and subject shape; JSON and provider payloads are not answer truth"
+      - "Answer records are typed atomic rows with database-enforced value and subject shape; JSON and provider payloads are not answer truth"
       - "Guest writes use PublicTransactional controls: dedicated rate limit, antiforgery decision, idempotency, hashed scoped capability, and PII-free telemetry"
       - "All participant and organizer UI affordances and Studio sections are authorized by server-authored HAL links, never local roles or capability booleans"
       - "Provider calls execute outside business transactions; durable inbox, outbox, fencing, retry, and reconciliation coordinate every external effect"
@@ -1725,7 +1725,7 @@ intents:
       - "Product, security, authorization, provider, self-hosting, schema, and active development docs match the shipped behavior"
     forbidden_without_approval:
       - "Adding backward-compatibility aliases, dual writes, deprecated registration contracts, or data-migration shims"
-      - "Reusing Event custom-property rows for registration answers or storing canonical answers only as JSON"
+      - "Reusing Event custom-property rows for registration answers or storing answer records only as JSON"
       - "Treating provider completion, redirect return, iframe navigation, or an external click as registration confirmation"
       - "Using provider names as capability authority, silently switching active attempts, or silently accepting external schema drift"
       - "Performing provider I/O inside a database transaction or letting callback controllers mutate registration aggregates"
@@ -2471,7 +2471,7 @@ intents:
     unique_acceptance:
       - "Every removed reflection or source-assurance cohort has an explicit invariant disposition and passing replacement before deletion"
       - "Live AT Protocol DIDs parse once at ingress, preserve case-sensitive value, and emit exact scalars without storage or wire drift"
-      - "Ambient platform-user identity resolves through one canonical Application authority with purpose-separated BFF, provider, and session helpers"
+      - "Ambient platform-user identity resolves through one Application authority with purpose-separated BFF, provider, and session helpers"
       - "API Admin endpoints use one API-local policy with unchanged authorization cohorts, and client mutation controls render only from HAL relations"
       - "Database query, ordering, tenant, and concurrency behavior is proven on real providers without source scraping or fixed sleeps"
       - "Generated OpenAPI schemas, client classes, and EF model snapshots show expected zero drift"

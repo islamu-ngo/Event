@@ -148,6 +148,103 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
             () => service.SaveAsync(ValidCandidate(), firstRevision));
     }
 
+    [Test]
+    public async Task ConcurrentSerializableIdentityWritesCommitOnceAndReturnTypedConflict()
+    {
+        await fixture.ResetAsync();
+        bool created;
+        string? originalValue;
+        SettingValueType? originalValueType;
+        await using (ExploreDbContext seed = fixture.CreateDbContext())
+        {
+            SystemSetting? identity = await seed.SystemSettings.SingleOrDefaultAsync(setting =>
+                setting.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity);
+            created = identity is null;
+            originalValue = identity?.Value;
+            originalValueType = identity?.ValueType;
+            if (identity is null)
+            {
+                identity = new SystemSetting
+                {
+                    SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
+                    Value = "{}",
+                    CreatedAt = DateTime.UtcNow
+                };
+                seed.SystemSettings.Add(identity);
+            }
+            identity.Value = "{}";
+            identity.ValueType = SettingValueType.Json;
+            await seed.SaveChangesAsync();
+        }
+
+        try
+        {
+            await using ExploreDbContext firstContext = fixture.CreateDbContext();
+            await using ExploreDbContext secondContext = fixture.CreateDbContext();
+            var firstRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var secondRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            async Task<Exception?> WriteAsync(
+                ExploreDbContext context,
+                string value,
+                TaskCompletionSource ownRead,
+                Task otherRead)
+            {
+                try
+                {
+                    await new EfCoreUnitOfWork(context).ExecuteSerializableAsync(
+                        async token =>
+                        {
+                            SystemSetting setting = await context.SystemSettings.SingleAsync(
+                                item => item.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity,
+                                token);
+                            ownRead.SetResult();
+                            await otherRead.WaitAsync(TimeSpan.FromSeconds(10), token);
+                            setting.Value = value;
+                            await context.SaveChangesAsync(token);
+                            return true;
+                        });
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
+
+            Exception?[] results = await Task.WhenAll(
+                WriteAsync(firstContext, "first", firstRead, secondRead.Task),
+                WriteAsync(secondContext, "second", secondRead, firstRead.Task))
+                .WaitAsync(TimeSpan.FromSeconds(30));
+            await Assert.That(results.Count(result => result is null)).IsEqualTo(1);
+            await Assert.That(results.Count(result => result is ConcurrencyConflictException))
+                .IsEqualTo(1);
+
+            await using ExploreDbContext verification = fixture.CreateDbContext();
+            string? committed = await verification.SystemSettings
+                .Where(setting => setting.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity)
+                .Select(setting => setting.Value)
+                .SingleAsync();
+            await Assert.That(committed is "first" or "second").IsTrue();
+        }
+        finally
+        {
+            await using ExploreDbContext cleanup = fixture.CreateDbContext();
+            SystemSetting identity = await cleanup.SystemSettings.SingleAsync(setting =>
+                setting.SettingKey == InstanceOperatorIdentitySettingKeys.OperatorIdentity);
+            if (created)
+            {
+                cleanup.SystemSettings.Remove(identity);
+            }
+            else
+            {
+                identity.Value = originalValue!;
+                identity.ValueType = originalValueType!.Value;
+            }
+            await cleanup.SaveChangesAsync();
+        }
+    }
+
     public enum SystemMutation
     {
         Upsert,

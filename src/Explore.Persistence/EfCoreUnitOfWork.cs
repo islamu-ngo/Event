@@ -79,7 +79,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             }
             catch (Exception exception) when (
                 attempt < BootstrapConvergenceAttemptLimit
-                && IsBootstrapConvergenceConflict(exception))
+                && IsProviderWriteConflict(exception))
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(25 * attempt), ct);
             }
@@ -127,6 +127,16 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
                 var translatedException = TranslateConcurrencyException(ex);
                 await RollbackAndClearTrackingAsync(transaction);
                 throw translatedException;
+            }
+            catch (Exception ex) when (
+                isolationLevel == IsolationLevel.Serializable
+                && IsProviderWriteConflict(ex))
+            {
+                await RollbackAndClearTrackingAsync(transaction);
+                throw new ConcurrencyConflictException(
+                    ConcurrencyConflictException.ConcurrentUpdate,
+                    "A concurrent writer changed the serializable transaction.",
+                    innerException: ex);
             }
             catch
             {
@@ -186,7 +196,7 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
             ex);
     }
 
-    private static bool IsBootstrapConvergenceConflict(Exception exception)
+    private static bool IsProviderWriteConflict(Exception exception)
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)
         {

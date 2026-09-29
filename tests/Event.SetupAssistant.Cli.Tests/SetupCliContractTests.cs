@@ -23,7 +23,7 @@ public sealed class SetupCliContractTests
         await Assert.That(schema["properties"]?["exitCode"]?["enum"]!.AsArray().Select(item => item!.GetValue<int>()))
             .IsEquivalentTo(SetupCliContractSpecification.ExitCodes.Values);
         await Assert.That(schema["_metadata"]?["commandOptions"]!.AsArray().Select(item => item!.GetValue<string>()))
-            .IsEquivalentTo(["--help", "--machine", "--text", "--dry-run", "--input", "--baseline", "--output", "--key", "--topology", "--capability", "--provider"]);
+            .IsEquivalentTo(["--help", "--machine", "--text", "--dry-run", "--input", "--baseline", "--output", "--key", "--topology", "--capability", "--provider", "--format", "--expected-revision"]);
     }
 
     [Test]

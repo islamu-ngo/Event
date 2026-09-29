@@ -7,12 +7,13 @@ internal static class SetupCliParser
         ["catalogue"] = ["list", "show", "describe"],
         ["manifest"] = ["create", "open", "validate", "format", "diff", "coverage", "export"],
         ["tenant-package"] = ["create", "open", "validate", "format", "diff", "coverage", "export"],
+        ["portability"] = ["export-operator-identity", "import-operator-identity"],
         ["env"] = ["render", "validate"],
         ["legal"] = ["validate", "preview"],
         ["doctor"] = ["doctor"]
     };
-    private static readonly HashSet<string> InputOperations = new(["open", "validate", "format", "diff", "coverage", "export", "preview"], StringComparer.Ordinal);
-    private static readonly HashSet<string> OutputOperations = new(["create", "format", "export", "render", "list", "show", "describe"], StringComparer.Ordinal);
+    private static readonly HashSet<string> InputOperations = new(["open", "validate", "format", "diff", "coverage", "export", "preview", "export-operator-identity", "import-operator-identity"], StringComparer.Ordinal);
+    private static readonly HashSet<string> OutputOperations = new(["create", "format", "export", "render", "list", "show", "describe", "export-operator-identity", "import-operator-identity"], StringComparer.Ordinal);
     private static readonly string[] Forbidden = ["secret", "password", "token", "credential", "private-key", "api-key", "connection-string"];
 
     internal static SetupCliCommand Parse(SetupCliInvocation invocation)
@@ -30,6 +31,7 @@ internal static class SetupCliParser
         int index = self ? 1 : 2;
         bool text = false, dryRun = false, help = false;
         string? input = null, baseline = null, output = null, key = null, topology = null, error = null;
+        string? format = null, expectedRevision = null;
         var capabilities = new List<string>();
         var providers = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -52,6 +54,8 @@ internal static class SetupCliParser
                 case "--topology": topology = Value("identifier"); break;
                 case "--capability": Add(capabilities, Value("identifier")); break;
                 case "--provider": Add(providers, Value("identifier")); break;
+                case "--format": format = Value("format"); break;
+                case "--expected-revision": expectedRevision = Value("revision"); break;
                 default: error = option.Length > 0 && option[0] == '-' ? "option-unknown" : "argument-tail"; break;
             }
         }
@@ -67,9 +71,22 @@ internal static class SetupCliParser
         if (output is not null && !OutputOperations.Contains(operation)) error = "output-not-supported";
         if (dryRun && !OutputOperations.Contains(operation)) error = "dry-run-not-supported";
         if (machine && output == "-") error = "machine-artifact-stdout";
+        if (format is not null && (operation != "export-operator-identity" || format is not ("json" or "yaml")))
+            error = "format-not-supported";
+        if (expectedRevision is not null && operation != "import-operator-identity")
+            error = "revision-not-supported";
+        if (operation == "import-operator-identity"
+            && (expectedRevision is null || expectedRevision != "absent"
+                && (expectedRevision.Length != 64
+                    || expectedRevision.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))))
+            error = "revision-required";
         return new(family, operation, machine, dryRun, help, input, baseline, output, key, topology,
             capabilities.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(),
-            providers.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), error);
+            providers.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), error)
+        {
+            Format = format ?? "json",
+            ExpectedRevision = expectedRevision
+        };
 
         string? Value(string kind)
         {

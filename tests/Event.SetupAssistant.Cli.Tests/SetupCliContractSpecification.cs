@@ -17,6 +17,7 @@ internal static class SetupCliContractSpecification
                 ["catalogue"] = Set("list", "show", "describe"),
                 ["manifest"] = Set("create", "open", "validate", "format", "diff", "coverage", "export"),
                 ["tenant-package"] = Set("create", "open", "validate", "format", "diff", "coverage", "export"),
+                ["portability"] = Set("export-operator-identity", "import-operator-identity"),
                 ["env"] = Set("render", "validate"),
                 ["legal"] = Set("validate", "preview"),
                 ["doctor"] = Set("doctor")

@@ -79,9 +79,31 @@ internal static class SetupCliProgram
                 standardOutput.Flush();
                 return;
             }
-            using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            file.Write(bytes.Span);
-            file.Flush(flushToDisk: true);
+            string destination = Path.GetFullPath(path);
+            string temporary = Path.Combine(Path.GetDirectoryName(destination)!, $".event-setup-{Guid.NewGuid():N}.tmp");
+            var options = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None
+            };
+            if (!OperatingSystem.IsWindows())
+                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            bool created = false;
+            try
+            {
+                using (var file = new FileStream(temporary, options))
+                {
+                    created = true;
+                    file.Write(bytes.Span);
+                    file.Flush(flushToDisk: true);
+                }
+                File.Move(temporary, destination, overwrite: false);
+            }
+            finally
+            {
+                if (created) File.Delete(temporary);
+            }
         }
     }
 }

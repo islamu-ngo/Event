@@ -6,7 +6,11 @@ namespace ISLAMU.Event.SetupAssistant.Cli;
 internal sealed record SetupCliCommand(
     string Family, string Operation, bool Machine, bool DryRun, bool Help,
     string? Input, string? Baseline, string? Output, string? Key, string? Topology,
-    IReadOnlyList<string> Capabilities, IReadOnlyList<string> Providers, string? Error);
+    IReadOnlyList<string> Capabilities, IReadOnlyList<string> Providers, string? Error)
+{
+    internal string Format { get; init; } = "json";
+    internal string? ExpectedRevision { get; init; }
+}
 
 internal sealed record SetupCliCommandResult(
     SetupCliExitCode Exit, IReadOnlyList<SetupCliMachineDiagnostic> Diagnostics,

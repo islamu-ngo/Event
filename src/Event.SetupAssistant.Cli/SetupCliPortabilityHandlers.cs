@@ -1,11 +1,64 @@
 using ISLAMU.Event.Setup.Core;
 using ISLAMU.Event.Setup.Core.Environment;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
+using System.Text.Json;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;
 
 internal static class SetupCliPortabilityHandlers
 {
+    internal static SetupCliCommandResult OperatorIdentity(SetupCliCommand command, SetupCliInvocation invocation)
+    {
+        byte[] input = SetupCliIoOperations.Read(invocation, command.Input!);
+        if (input.Length > OperatorIdentityManifestJson.MaximumBytes)
+            return SetupCliResults.Failure(SetupCliExitCode.Data, "operator-identity-manifest-invalid", "$.input");
+        try
+        {
+            byte[] output;
+            string kind;
+            string mediaType = "application/json";
+            if (command.Operation == "export-operator-identity")
+            {
+                using JsonDocument document = JsonDocument.Parse(input, new JsonDocumentOptions { MaxDepth = 4 });
+                OperatorIdentityManifest manifest = document.RootElement.ValueKind == JsonValueKind.Object
+                    && document.RootElement.TryGetProperty("kind", out _)
+                    ? OperatorIdentityManifestJson.Parse(input)
+                    : OperatorIdentityManifestJson.Create(document.RootElement);
+                OperatorIdentityManifestFormat format = command.Format == "yaml"
+                    ? OperatorIdentityManifestFormat.Yaml : OperatorIdentityManifestFormat.Json;
+                output = OperatorIdentityManifestCodec.Write(manifest, format);
+                kind = "operator-identity-manifest";
+                if (format == OperatorIdentityManifestFormat.Yaml) mediaType = "application/yaml";
+            }
+            else
+            {
+                OperatorIdentityManifest manifest = OperatorIdentityManifestCodec.Read(input);
+                using var buffer = new MemoryStream();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("manifest");
+                    writer.WriteRawValue(OperatorIdentityManifestJson.Serialize(manifest));
+                    writer.WriteString("expectedRevisionHash", command.ExpectedRevision == "absent"
+                        ? OperatorIdentityManifestJson.RevisionHash(null) : command.ExpectedRevision);
+                    writer.WriteEndObject();
+                }
+                output = buffer.ToArray();
+                kind = "operator-identity-import-request";
+            }
+            SetupCliIoOperations.Write(invocation, command, output);
+            // Offline integrity is not server readiness or permission to mutate a target.
+            var readiness = new SetupCliMachineReadiness("incomplete", ["server-validation-required"], []);
+            return SetupCliResults.Success([SetupCliResults.Artifact(kind, mediaType, output, "sensitive",
+                SetupCliResults.PathIntent(command.Output), command.DryRun ? "planned" : "written",
+                readiness: readiness)], readiness: readiness);
+        }
+        catch (Exception exception) when (exception is OperatorIdentityManifestException or JsonException)
+        {
+            return SetupCliResults.Failure(SetupCliExitCode.Data, "operator-identity-manifest-invalid", "$.input");
+        }
+    }
+
     internal static SetupCliCommandResult Portability(SetupCliCommand command, SetupCliInvocation invocation, bool tenant)
     {
         (SetupProfile profile, SetupSelection selection) = Context(tenant);

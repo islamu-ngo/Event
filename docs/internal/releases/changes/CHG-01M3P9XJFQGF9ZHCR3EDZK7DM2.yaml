@@ -1,0 +1,27 @@
+Change-Id: CHG-01M3P9XJFQGF9ZHCR3EDZK7DM2
+Title: Standalone Setup Assistant portability commands
+Type: feat
+Scope: self-hosting
+Summary: Operators can prepare identity manifests offline with a self-contained Setup Assistant CLI on four supported runtimes.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Offline artifacts use atomic owner-only output on Unix.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented

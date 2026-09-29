@@ -1,0 +1,90 @@
+---
+name: setup-assistant-cli
+description: "Load when invoking the standalone `event-setup` machine CLI to inspect the environment catalogue, validate or render dotenv input, process configuration manifests or tenant packages, export/import operator-identity portability artifacts, validate legal drafts, or run setup diagnostics; do not use for the interactive terminal UI, browser setup, or API endpoint design."
+type: workflow
+enforcement: suggest
+priority: high
+---
+
+# Setup Assistant CLI
+
+## Rules
+
+1. Invoke the packaged executable as `event-setup`; command families are bare
+   first arguments. Never prefix them with `setup`.
+2. Use `--machine` for automation. Read the single
+   `event-setup-command/v1` JSON object and branch on `exitCode`, `diagnostics`,
+   `coverage`, and `readiness`; do not scrape text output.
+3. Pass artifacts through `--input` and `--output`. Use `-` only where the
+   command accepts standard input or text-mode standard output.
+4. Never place passwords, tokens, credentials, private keys, API keys, or
+   connection strings in arguments, input paths, environment names, logs, or
+   retained command output. The CLI rejects secret-bearing surfaces.
+5. Treat `--dry-run` as planning only. An artifact reports `writeStatus` as
+   `planned` until a non-dry-run command writes it.
+6. Do not invent command aliases. The checked machine schema at
+   `schemas/event-setup-command-v1.schema.json` is the command metadata source.
+7. Operator-identity export and import are offline integrity operations. Their
+   output is sensitive, and successful CLI validation is not target readiness
+   or permission to mutate a server.
+
+## Workflow
+
+1. Confirm the binary and machine contract:
+
+   ```bash
+   event-setup doctor --machine
+   ```
+
+2. Inspect the public configuration catalogue without writing an artifact:
+
+   ```bash
+   event-setup catalogue list --machine --dry-run
+   ```
+
+3. Validate an existing dotenv file:
+
+   ```bash
+   event-setup env validate --input deployment.env --machine
+   ```
+
+4. Render a topology-specific dotenv artifact only after selecting explicit
+   non-secret capabilities and providers:
+
+   ```bash
+   event-setup env render --topology standalone --provider sqlite --output deployment.env --machine
+   ```
+
+5. Validate configuration portability artifacts before promotion:
+
+   ```bash
+   event-setup manifest validate --input instance-manifest.json --machine
+   event-setup tenant-package validate --input tenant-package.json --machine
+   ```
+
+6. Export an operator-identity portability artifact, then prepare a server
+   import request against the exact current revision:
+
+   ```bash
+   event-setup portability export-operator-identity --input operator-identity.json --output operator-identity.yaml --format yaml --machine
+   event-setup portability import-operator-identity --input operator-identity.yaml --output operator-identity-import.json --expected-revision "$EXPECTED_REVISION_SHA256" --machine
+   ```
+
+   Use `--expected-revision absent` only when the target has no current
+   operator-identity document. The import result remains incomplete until
+   server validation and authorization succeed.
+
+7. Validate a legal draft before it enters an operator review:
+
+   ```bash
+   event-setup legal validate --input legal-draft.json --machine
+   ```
+
+## Verification
+
+- `event-setup doctor --machine` exits `0` and emits one newline-terminated JSON
+  object with `schemaVersion` equal to `event-setup-command/v1`.
+- Reject any instruction using a `setup` prefix or a command family absent from
+  the checked schema.
+- Treat exit codes `2`, `3`, `4`, `64`, `65`, `70`, and `74` as failure states;
+  do not infer success from an empty diagnostic list alone.

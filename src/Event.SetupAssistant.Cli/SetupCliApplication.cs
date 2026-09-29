@@ -50,6 +50,7 @@ public sealed class SetupCliApplication
             "catalogue" => SetupCliCatalogueEnvironmentHandlers.Catalogue(command, invocation),
             "manifest" => SetupCliPortabilityHandlers.Portability(command, invocation, tenant: false),
             "tenant-package" => SetupCliPortabilityHandlers.Portability(command, invocation, tenant: true),
+            "portability" => SetupCliPortabilityHandlers.OperatorIdentity(command, invocation),
             "env" => SetupCliCatalogueEnvironmentHandlers.Environment(command, invocation),
             "legal" => SetupCliPortabilityHandlers.Legal(command, invocation),
             "doctor" => SetupCliPortabilityHandlers.Doctor(),
@@ -58,7 +59,9 @@ public sealed class SetupCliApplication
     }
 
     private static bool RequiresInput(SetupCliCommand command) => command.Operation is
-        "open" or "validate" or "format" or "diff" or "coverage" or "export" or "preview";
+        "open" or "validate" or "format" or "diff" or "coverage" or "export" or "preview"
+        or "export-operator-identity" or "import-operator-identity";
     private static bool RequiresOutput(SetupCliCommand command) => command.Operation is
-        "create" or "format" or "export" or "render" or "list" or "show" or "describe";
+        "create" or "format" or "export" or "render" or "list" or "show" or "describe"
+        or "export-operator-identity" or "import-operator-identity";
 }

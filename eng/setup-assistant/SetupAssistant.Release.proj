@@ -1,0 +1,99 @@
+<Project DefaultTargets="ValidateSetupAssistantRelease">
+  <PropertyGroup>
+    <Configuration>Release</Configuration>
+    <SetupAssistantProject>$(MSBuildThisFileDirectory)../../src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj</SetupAssistantProject>
+    <SetupAssistantOutputRoot Condition="'$(SetupAssistantOutputRoot)' == ''">$(MSBuildThisFileDirectory)../../artifacts/setup-assistant</SetupAssistantOutputRoot>
+    <SetupAssistantExecutableName>event-setup</SetupAssistantExecutableName>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <UseAppHost>true</UseAppHost>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SetupAssistantRuntimeIdentifier Include="linux-x64" />
+    <SetupAssistantRuntimeIdentifier Include="linux-arm64" />
+    <SetupAssistantRuntimeIdentifier Include="osx-arm64" />
+    <SetupAssistantRuntimeIdentifier Include="win-x64" />
+  </ItemGroup>
+
+  <Target Name="ValidateSetupAssistantRelease">
+    <Error
+      Condition="'$(SetupAssistantRid)' != '' and '$(SetupAssistantRid)' != 'linux-x64' and '$(SetupAssistantRid)' != 'linux-arm64' and '$(SetupAssistantRid)' != 'osx-arm64' and '$(SetupAssistantRid)' != 'win-x64'"
+      Text="Unsupported Setup Assistant runtime identifier '$(SetupAssistantRid)'." />
+    <Error
+      Condition="'$(SelfContained)' != 'true' or '$(PublishSingleFile)' != 'true' or '$(UseAppHost)' != 'true'"
+      Text="Setup Assistant releases must be standalone single-file executables." />
+    <Error
+      Condition="'$(PublishTrimmed)' != 'false'"
+      Text="Setup Assistant trimming is disabled until the command surface has a dedicated trimming contract." />
+    <Error
+      Condition="'$(SetupAssistantExecutableName)' != 'event-setup'"
+      Text="The Setup Assistant release executable name is part of the operator contract." />
+  </Target>
+
+  <Target
+    Name="ValidateSetupAssistantReleaseMatrix"
+    DependsOnTargets="ValidateSetupAssistantRelease">
+    <MSBuild
+      Projects="$(SetupAssistantProject)"
+      Targets="GetTargetPath"
+      BuildInParallel="false"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=%(SetupAssistantRuntimeIdentifier.Identity);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);UseAppHost=$(UseAppHost)" />
+  </Target>
+
+  <Target
+    Name="WriteSetupAssistantReleaseContract"
+    DependsOnTargets="ValidateSetupAssistantRelease">
+    <Error
+      Condition="'$(SetupAssistantContractOutput)' == ''"
+      Text="SetupAssistantContractOutput is required." />
+    <PropertyGroup>
+      <_SetupAssistantRuntimeIdentifiersJson>@(SetupAssistantRuntimeIdentifier->'&quot;%(Identity)&quot;', ',')</_SetupAssistantRuntimeIdentifiersJson>
+      <_SetupAssistantReleaseContractJson>{&quot;runtimeIdentifiers&quot;:[$(_SetupAssistantRuntimeIdentifiersJson)],&quot;selfContained&quot;:$(SelfContained),&quot;publishSingleFile&quot;:$(PublishSingleFile),&quot;publishTrimmed&quot;:$(PublishTrimmed),&quot;enableCompressionInSingleFile&quot;:$(EnableCompressionInSingleFile),&quot;includeNativeLibrariesForSelfExtract&quot;:$(IncludeNativeLibrariesForSelfExtract),&quot;useAppHost&quot;:$(UseAppHost),&quot;debugSymbols&quot;:$(DebugSymbols),&quot;executableName&quot;:&quot;$(SetupAssistantExecutableName)&quot;}</_SetupAssistantReleaseContractJson>
+    </PropertyGroup>
+    <MakeDir
+      Directories="$([System.IO.Path]::GetDirectoryName('$(SetupAssistantContractOutput)'))" />
+    <WriteLinesToFile
+      File="$(SetupAssistantContractOutput)"
+      Overwrite="true"
+      Encoding="ASCII"
+      Lines="$(_SetupAssistantReleaseContractJson)" />
+  </Target>
+
+  <Target
+    Name="PublishSetupAssistant"
+    DependsOnTargets="ValidateSetupAssistantRelease"
+    Condition="'$(SetupAssistantRid)' != ''">
+    <MSBuild
+      Projects="$(SetupAssistantProject)"
+      Targets="Restore"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);RestorePackagesWithLockFile=true;RestoreLockedMode=false;NuGetLockFilePath=obj/setup-assistant-release/$(SetupAssistantRid)/packages.lock.json" />
+    <MSBuild
+      Projects="$(SetupAssistantProject)"
+      Targets="Publish"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);EnableCompressionInSingleFile=$(EnableCompressionInSingleFile);IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract);UseAppHost=$(UseAppHost);DebugSymbols=$(DebugSymbols);DebugType=$(DebugType);PublishDir=$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/;NoRestore=true" />
+    <PropertyGroup>
+      <_SetupAssistantExecutableExtension Condition="'$(SetupAssistantRid)' == 'win-x64'">.exe</_SetupAssistantExecutableExtension>
+      <_SetupAssistantPublishedExecutable>$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/Event.SetupAssistant.Cli$(_SetupAssistantExecutableExtension)</_SetupAssistantPublishedExecutable>
+      <_SetupAssistantReleaseExecutable>$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/$(SetupAssistantExecutableName)$(_SetupAssistantExecutableExtension)</_SetupAssistantReleaseExecutable>
+    </PropertyGroup>
+    <Move
+      SourceFiles="$(_SetupAssistantPublishedExecutable)"
+      DestinationFiles="$(_SetupAssistantReleaseExecutable)" />
+  </Target>
+
+  <Target
+    Name="PublishAllSetupAssistantRids"
+    DependsOnTargets="ValidateSetupAssistantRelease">
+    <MSBuild
+      Projects="$(MSBuildProjectFullPath)"
+      Targets="PublishSetupAssistant"
+      BuildInParallel="false"
+      Properties="SetupAssistantRid=%(SetupAssistantRuntimeIdentifier.Identity);SetupAssistantOutputRoot=$(SetupAssistantOutputRoot)" />
+  </Target>
+</Project>

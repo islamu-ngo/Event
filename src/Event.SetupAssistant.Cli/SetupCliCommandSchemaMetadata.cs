@@ -8,11 +8,11 @@ public static class SetupCliCommandSchemaMetadata
 {
     public const string RelativePath = "schemas/event-setup-command-v1.schema.json";
     public static IReadOnlyList<string> Families { get; } = System.Array.AsReadOnly(new[]
-        { "catalogue", "manifest", "tenant-package", "env", "legal", "doctor" });
+        { "catalogue", "manifest", "tenant-package", "env", "legal", "doctor", "portability" });
     public static IReadOnlyList<string> Operations { get; } = System.Array.AsReadOnly(new[]
-        { "list", "show", "describe", "create", "open", "validate", "format", "diff", "coverage", "export", "render", "preview", "doctor" });
+        { "list", "show", "describe", "create", "open", "validate", "format", "diff", "coverage", "export", "render", "preview", "doctor", "export-operator-identity", "import-operator-identity" });
     public static IReadOnlyList<string> Options { get; } = System.Array.AsReadOnly(new[]
-        { "--help", "--machine", "--text", "--dry-run", "--input", "--baseline", "--output", "--key", "--topology", "--capability", "--provider" });
+        { "--help", "--machine", "--text", "--dry-run", "--input", "--baseline", "--output", "--key", "--topology", "--capability", "--provider", "--format", "--expected-revision" });
 
     public static byte[] GenerateSchema()
     {
@@ -32,7 +32,7 @@ public static class SetupCliCommandSchemaMetadata
             }),
             ["artifact"] = ObjectSchema(["kind", "mediaType", "digest", "sensitivity", "coverage", "readiness", "pathIntent", "writeStatus"], new()
             {
-                ["kind"] = Enum(["catalogue", "configuration-manifest", "tenant-configuration-package", "dotenv-template", "legal-draft", "doctor-report"]),
+                ["kind"] = Enum(["catalogue", "configuration-manifest", "tenant-configuration-package", "dotenv-template", "legal-draft", "doctor-report", "operator-identity-manifest", "operator-identity-import-request"]),
                 ["mediaType"] = String(1, 128, "^[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*(?:;v=[a-z0-9.-]+)?$"),
                 ["digest"] = String(null, null, "^[0-9a-f]{64}$"),
                 ["sensitivity"] = Enum(["public", "sensitive"]),

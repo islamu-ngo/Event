@@ -159,6 +159,53 @@ type. Legacy operator identity keys under Checkout governance are unsupported.
 Cosmetic branding remains independently configurable and is never a legal
 identity fallback.
 
+### Operator identity manifest portability
+
+The dedicated instance-admin routes are `GET /api/instance-operator-identity/manifest`
+and `POST /api/instance-operator-identity/manifest/import`. They do not inherit the
+ordinary draft editor's setup-secret authority. GET returns a complete JSON
+`InstanceOperatorIdentity` manifest; POST accepts `{manifest, expectedRevisionHash}`.
+Authentication, instance management routing, private/no-store responses, bounded
+input, and RFC 7807 failures are API responsibilities. `ConcurrencyConflictException`
+uses the existing HTTP 409 mapper.
+
+`Event.Wire.Contracts/ConfigurationPortability/OperatorIdentityManifest.cs` owns
+the closed JSON contract and canonical SHA-256 computation. `contentDigest` covers
+all 14 document members, including the source operator ID and revision, in ordinal
+member order with compact JSON and canonical UUID spelling. `revisionHash` hashes
+the UTF-8 lowercase `D`-format revision without a newline; the absent-document
+precondition hashes the literal `absent`. These hashes detect corruption and
+stale writes; they are not signatures or authority attestations.
+
+`OperatorIdentityManifestCodec` in Setup Core reuses the bounded syntax-only
+composition YAML parser. Documents are limited to 64 KiB; aliases, anchors, tags,
+duplicate/unknown members, extra documents, invalid types, and inconsistent hashes
+fail closed. The CLI `portability export-operator-identity` operation accepts raw
+persisted document JSON or a JSON API export and emits JSON or YAML.
+`portability import-operator-identity` verifies an artifact and writes the POST
+request JSON. Neither CLI operation connects to a server or claims server readiness.
+
+The native export/import handlers check `IAdminContext` and call
+`InstanceOperatorIdentityService`. The service preserves target operator identity,
+assigns a fresh revision, and compares the target revision hash inside its
+serializable transaction. Imports require paid-commerce readiness, a registration
+identifier for `registered_organization`, and a country recognized by .NET
+`RegionInfo`; draft editor completeness rules remain independent. Persisted
+readiness is re-evaluated through `IInstanceOperatorIdentityReadinessEvaluator`
+before commit. Imported official claims and replacement of an already official
+target are rejected: there is no trusted registry-attestation verifier.
+
+`OperatorIdentityImportAudit` records actor ID, source content digest, expected
+target revision hash, and committed revision in the native `OutboxMessage` table
+within that same transaction. An outbox insert failure rolls back the identity
+write. `CompositeOutboxMessageDispatcher` logs only event type, outbox message ID,
+and delivery status after commit. Legal-identity digests and actor/revision
+identifiers remain in the protected durable payload, not application logs;
+normal outbox retries and dead-letter reconciliation apply without replaying the
+identity mutation. Legal names, contact details, and complete documents are not
+audit payloads. No schema migration or generic scalar-setting allowlist expansion
+is required. See the [operator procedure](../public/self-hosting/operator-identity-portability.md).
+
 > **Audience:** Operators | Contributors | AI agents
 > **Status:** Implemented
 > **Owner:** Platform/Ops

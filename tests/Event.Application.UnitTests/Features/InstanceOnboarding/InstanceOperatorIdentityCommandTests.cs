@@ -266,7 +266,7 @@ public sealed class InstanceOperatorIdentityCommandTests
                 .Returns(callInfo => callInfo.Arg<Func<CancellationToken, Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocument>>>>()(
                     CancellationToken.None));
 
-            Service = new InstanceOperatorIdentityService(SystemSettings, UnitOfWork);
+            Service = new InstanceOperatorIdentityService(SystemSettings, UnitOfWork, Substitute.For<IOutboxRepository>());
         }
 
         public ISystemSettingRepository SystemSettings { get; } = Substitute.For<ISystemSettingRepository>();

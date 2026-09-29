@@ -131,6 +131,37 @@ public sealed class SetupLiveGeneratedContractTests
     }
 
     [Test]
+    public async Task LiveImportPublishesBoundedBinaryUploadAndTypedPreviewCoverage()
+    {
+        await using Stream schema = GeneratedContractInputs.OpenSchema();
+        using JsonDocument document = await JsonDocument.ParseAsync(schema);
+        const string path =
+            "/api/tenants/{tenantId}/setup/enrollments/{enrollmentId}/configuration-import/sessions";
+        JsonElement upload = document.RootElement.GetProperty("paths")
+            .GetProperty(path).GetProperty("post");
+        await Assert.That(upload.GetProperty("operationId").GetString())
+            .IsEqualTo("CreateSetupConfigurationImportSession");
+        JsonElement binary = upload.GetProperty("requestBody").GetProperty("content")
+            .GetProperty("application/vnd.islamu.tenant-configuration-package.v1alpha2+json")
+            .GetProperty("schema");
+        await Assert.That(binary.GetProperty("format").GetString()).IsEqualTo("binary");
+        await AssertRequiredStringParameters("CreateSetupConfigurationImportSessionAsync",
+            "x_Setup_Enrollment_Capability");
+        await AssertRequiredStringParameters("PreviewSetupConfigurationImportSessionAsync",
+            "x_Setup_Enrollment_Capability", "x_Configuration_Import_Token");
+        await AssertRequiredStringParameters("ApplySetupConfigurationImportSessionAsync",
+            "x_Setup_Enrollment_Capability", "x_Configuration_Import_Token");
+        await AssertPropertyType<HalResourceOfConfigurationImportPreviewResult>(
+            "Items", typeof(ICollection<ConfigurationImportPreviewItem>));
+        await AssertPropertyType<ConfigurationImportPreviewItem>(
+            "Category", typeof(ConfigurationImportPreviewCategory));
+        JsonElement apply = document.RootElement.GetProperty("paths")
+            .GetProperty(path + "/{sessionId}/apply").GetProperty("post");
+        await Assert.That(apply.GetProperty("responses").GetProperty("409")
+            .GetProperty("content").TryGetProperty("application/problem+json", out _)).IsTrue();
+    }
+
+    [Test]
     public async Task GeneratedCreateUsesNormalizedJsonAndExposesOnlyIssuedCapability()
     {
         string challenge = Base64Url(RandomNumberGenerator.GetBytes(32));
@@ -289,7 +320,8 @@ public sealed class SetupLiveGeneratedContractTests
         }
 
         AssertEnum(schemas, "SetupEnrollmentScope",
-            "target.read", "secret_binding.readiness", "secret_binding.write");
+            "target.read", "secret_binding.readiness", "secret_binding.write",
+            "configuration.import");
         AssertEnum(schemas, "SetupEnrollmentState", "active", "revoked", "expired");
         AssertEnum(schemas, "SetupEnrollmentIssuance", "issued", "already_issued");
         AssertEnum(schemas, "SetupSecretBindingReadinessState",
@@ -307,7 +339,7 @@ public sealed class SetupLiveGeneratedContractTests
         AssertReference(requestedScopes.GetProperty("items"), "SetupEnrollmentScope");
         if (!requestedScopes.GetProperty("uniqueItems").GetBoolean()
             || requestedScopes.GetProperty("minItems").GetInt32() != 1
-            || requestedScopes.GetProperty("maxItems").GetInt32() != 3)
+            || requestedScopes.GetProperty("maxItems").GetInt32() != 4)
         {
             throw new InvalidOperationException("setup-scope-set-schema-invalid");
         }

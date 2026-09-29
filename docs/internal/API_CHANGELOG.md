@@ -3,6 +3,28 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-29
+
+- **SetupLive configuration imports.** Enrollment-bound tenant administrators
+  can create a bounded configuration-import session and request a preview under
+  `/api/tenants/{tenantId}/setup/enrollments/{enrollmentId}/configuration-import/sessions`.
+  The server advertises apply only for a current, reviewable preview. Each step
+  checks the ephemeral enrollment capability, explicit `configuration.import`
+  scope and current tenant-setting authority. Session origin is bound to the
+  enrollment generation and actor; ordinary tenant import routes cannot consume
+  an enrollment-bound session after revocation or rotation. Conflicting or
+  replayed applies return RFC 7807 errors instead of reapplying mutations.
+- **Instance operator identity portability.** Instance administrators can
+  export `GET /api/instance-operator-identity/manifest` and import
+  `POST /api/instance-operator-identity/manifest/import`. The closed
+  JSON manifest contains a canonical document, SHA-256 content digest and
+  revision hash. The import requires a matching target revision, rechecks
+  administrator authority on every request (including idempotency-key
+  replays), rejects unofficial-to-official escalation, and atomically writes
+  value-free outbox audit evidence. Stale revisions and concurrent writes
+  return 409; malformed manifests fail closed. The published OpenAPI component
+  describes the required closed envelope and document fields.
+
 ## 2026-09-23
 
 - **Event-resource operator settings.** Instance administrators can read

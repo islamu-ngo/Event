@@ -349,6 +349,7 @@ public sealed class SetupLiveApplicationContractTests
             .ToArray();
         await Assert.That(featureOwners).IsEquivalentTo(
             [
+                "Explore.Application.Features.SetupLive.SetupConfigurationImportApplicationService",
                 "Explore.Application.Features.SetupLive.SetupLiveApplicationService",
                 "Explore.Application.Features.SetupLive.SetupLiveApplicationStatus",
                 "Explore.Application.Features.SetupLive.SetupLiveEnrollmentResult",

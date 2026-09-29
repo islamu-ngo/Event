@@ -12,7 +12,10 @@ public enum SetupEnrollmentScope
     SecretBindingReadiness,
 
     [JsonStringEnumMemberName("secret_binding.write")]
-    SecretBindingWrite
+    SecretBindingWrite,
+
+    [JsonStringEnumMemberName("configuration.import")]
+    ConfigurationImport
 }
 
 [JsonConverter(typeof(SetupEnrollmentStateJsonConverter))]
@@ -178,7 +181,7 @@ internal static class SetupLiveSnapshot
     {
         ArgumentNullException.ThrowIfNull(source);
         SetupEnrollmentScope[] snapshot = source.ToArray();
-        if (snapshot.Length is < 1 or > 3
+        if (snapshot.Length is < 1 or > 4
             || snapshot.Distinct().Count() != snapshot.Length
             || snapshot.Any(scope => !Enum.IsDefined(scope)))
         {

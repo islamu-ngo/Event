@@ -76,9 +76,11 @@ public sealed class SetupTargetEnrollmentsController(
         IActionResult response = result.Status switch
         {
             SetupLiveApplicationStatus.Created =>
-                Enrollment(result.Data!, StatusCodes.Status201Created, result.CanMutate),
+                await Enrollment(result.Data!, StatusCodes.Status201Created, result.CanMutate,
+                    tenantId, userId.Value, cancellationToken),
             SetupLiveApplicationStatus.Duplicate =>
-                Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate),
+                await Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate,
+                    tenantId, userId.Value, cancellationToken),
             SetupLiveApplicationStatus.Conflict => IdempotencyConflict(),
             SetupLiveApplicationStatus.Forbidden => Forbidden(),
             SetupLiveApplicationStatus.Invalid => InvalidRequest(),
@@ -108,7 +110,8 @@ public sealed class SetupTargetEnrollmentsController(
             capability,
             cancellationToken);
         IActionResult response = result.Status == SetupLiveApplicationStatus.Success
-            ? Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate)
+            ? await Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate,
+                tenantId, userId.Value, cancellationToken)
             : Unavailable();
         telemetryOperation.Complete(Outcome(result.Status));
         return response;
@@ -143,7 +146,8 @@ public sealed class SetupTargetEnrollmentsController(
         IActionResult response = result.Status switch
         {
             SetupLiveApplicationStatus.Success =>
-                Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate),
+                await Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate,
+                    tenantId, userId.Value, cancellationToken),
             SetupLiveApplicationStatus.Conflict => IdempotencyConflict(),
             _ => Unavailable()
         };
@@ -190,7 +194,8 @@ public sealed class SetupTargetEnrollmentsController(
         {
             SetupLiveApplicationStatus.Success or
                 SetupLiveApplicationStatus.Duplicate =>
-                Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate),
+                await Enrollment(result.Data!, StatusCodes.Status200OK, result.CanMutate,
+                    tenantId, userId.Value, cancellationToken),
             SetupLiveApplicationStatus.Conflict => IdempotencyConflict(),
             _ => Unavailable()
         };
@@ -364,16 +369,30 @@ public sealed class SetupTargetEnrollmentsController(
         return response;
     }
 
-    private IActionResult Enrollment(
+    private async Task<IActionResult> Enrollment(
         SetupTargetEnrollmentData data,
         int statusCode,
-        bool canMutate)
+        bool canMutate,
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken)
     {
         string enrollmentPath = EnrollmentPath(data.EnrollmentId);
         var resource = new HalResource<SetupTargetEnrollmentData>(data)
             .WithLink(SetupLiveHalRelations.Self, HalLink.Create(enrollmentPath));
         if (data.State == ISLAMU.Wire.Contracts.SetupLive.SetupEnrollmentState.Active)
         {
+            if (canMutate
+                && data.Scopes.Contains(SetupEnrollmentScope.ConfigurationImport)
+                && await setupLive.CanImportConfigurationAsync(
+                    tenantId, userId, cancellationToken))
+            {
+                resource.WithLink(
+                    SetupLiveHalRelations.CreateConfigurationImportSession,
+                    HalLink.CreateAction(
+                        $"{enrollmentPath}/configuration-import/sessions",
+                        HttpMethods.Post));
+            }
             if (canMutate
                 && data.Scopes.Contains(SetupEnrollmentScope.TargetRead))
             {

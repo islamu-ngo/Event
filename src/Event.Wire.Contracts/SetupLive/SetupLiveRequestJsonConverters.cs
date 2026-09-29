@@ -48,7 +48,7 @@ internal sealed class SetupEnrollmentScopeListJsonConverter
         if (reader.TokenType != JsonTokenType.StartArray)
             throw new JsonException("Setup enrollment scopes must be an array.");
 
-        var scopes = new List<SetupEnrollmentScope>(3);
+        var scopes = new List<SetupEnrollmentScope>(4);
         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
         {
             if (reader.TokenType != JsonTokenType.String
@@ -62,7 +62,7 @@ internal sealed class SetupEnrollmentScopeListJsonConverter
             }
 
             scopes.Add(scope);
-            if (scopes.Count > 3)
+            if (scopes.Count > 4)
                 throw new JsonException("Too many Setup enrollment scopes.");
         }
 

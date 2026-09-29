@@ -49,6 +49,9 @@ public static class RouteNames
     public const string GetLocalCredentialOperation = nameof(GetLocalCredentialOperation);
     public const string ReconcileLocalCredentialOperation = nameof(ReconcileLocalCredentialOperation);
     public const string CreateSetupTargetEnrollment = nameof(CreateSetupTargetEnrollment);
+    public const string CreateSetupConfigurationImportSession = nameof(CreateSetupConfigurationImportSession);
+    public const string PreviewSetupConfigurationImportSession = nameof(PreviewSetupConfigurationImportSession);
+    public const string ApplySetupConfigurationImportSession = nameof(ApplySetupConfigurationImportSession);
     public const string GetSetupTargetEnrollment = nameof(GetSetupTargetEnrollment);
     public const string RevokeSetupTargetEnrollment = nameof(RevokeSetupTargetEnrollment);
     public const string RotateSetupTargetEnrollmentCapability =
@@ -1238,6 +1241,8 @@ public static class RouteNames
     public const string GetOperatorIdentityFormOptions = nameof(GetOperatorIdentityFormOptions);
     public const string GetInstanceOperatorIdentity = nameof(GetInstanceOperatorIdentity);
     public const string SaveInstanceOperatorIdentity = nameof(SaveInstanceOperatorIdentity);
+    public const string ExportInstanceOperatorIdentity = nameof(ExportInstanceOperatorIdentity);
+    public const string ImportInstanceOperatorIdentity = nameof(ImportInstanceOperatorIdentity);
 
     #endregion
 

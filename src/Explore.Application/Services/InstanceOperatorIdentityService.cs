@@ -9,6 +9,9 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Domain.ValueObjects;
+using ISLAMU.Wire.Contracts.ConfigurationPortability;
+using System.Globalization;
+using Explore.Application.Features.ConfigurationManifest.Application;
 
 namespace Explore.Application.Services;
 
@@ -39,7 +42,8 @@ public sealed record InstanceOperatorIdentitySavedDocument(
 /// </summary>
 public sealed class InstanceOperatorIdentityService(
     ISystemSettingRepository systemSettingRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IOutboxRepository outbox)
     : IInstanceOperatorIdentityReadinessEvaluator
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -95,7 +99,38 @@ public sealed class InstanceOperatorIdentityService(
         InstanceOperatorIdentitySettings candidate,
         Guid? expectedRevision,
         CancellationToken cancellationToken = default)
-        => unitOfWork.ExecuteSerializableAsync(
+        => SaveCoreAsync(candidate, expectedRevision, null, null, null, cancellationToken);
+
+    /// <summary>
+    /// Imports a complete legal identity under the target's revision precondition.
+    /// Official registry authority is never portable; no manifest is an attestation.
+    /// </summary>
+    public Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocument>> ImportAsync(
+        InstanceOperatorIdentitySettings candidate,
+        string expectedRevisionHash,
+        string contentDigest,
+        Guid actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedRevisionHash);
+        ArgumentOutOfRangeException.ThrowIfEqual(actorUserId, Guid.Empty);
+        return SaveCoreAsync(candidate, null, expectedRevisionHash, contentDigest, actorUserId, cancellationToken);
+    }
+
+    private Task<BaseCommandResponse<InstanceOperatorIdentitySavedDocument>> SaveCoreAsync(
+        InstanceOperatorIdentitySettings candidate,
+        Guid? expectedRevision,
+        string? importRevisionHash,
+        string? contentDigest,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        Guid newOperatorId = Guid.CreateVersion7();
+        Guid newRevision = Guid.CreateVersion7();
+        Guid newSettingId = Guid.CreateVersion7();
+        Guid auditId = Guid.CreateVersion7();
+        DateTime occurredAt = DateTime.UtcNow;
+        return unitOfWork.ExecuteSerializableAsync(
             async ct =>
             {
                 SystemSetting? setting = await systemSettingRepository.GetByKey(
@@ -109,13 +144,23 @@ public sealed class InstanceOperatorIdentityService(
                         "The stored instance operator identity document could not be parsed; it must be repaired before it can be replaced.");
                 }
 
-                if (stored?.Revision != expectedRevision)
+                if (importRevisionHash is not null
+                    ? !string.Equals(OperatorIdentityManifestJson.RevisionHash(stored?.Revision),
+                        importRevisionHash, StringComparison.Ordinal)
+                    : stored?.Revision != expectedRevision)
                 {
                     throw new ConcurrencyConflictException(
                         ConcurrencyConflictException.ConcurrentUpdate,
                         "The instance operator identity changed since it was loaded.",
                         nameof(SystemSetting),
                         InstanceOperatorIdentitySettingKeys.OperatorIdentity);
+                }
+
+                if (importRevisionHash is not null && (candidate.IsOfficialInstance || stored?.IsOfficialInstance == true))
+                {
+                    return BaseCommandResponse.Failure<InstanceOperatorIdentitySavedDocument>(
+                        "operator_identity_official_authority_not_portable",
+                        "Official registry authority cannot be imported or replaced by a manifest.");
                 }
 
                 InstanceOperatorIdentityDraftValidation draft =
@@ -129,30 +174,88 @@ public sealed class InstanceOperatorIdentityService(
 
                 InstanceOperatorIdentitySettings saved = draft.Normalized with
                 {
-                    OperatorId = stored?.OperatorId ?? Guid.CreateVersion7(),
+                    OperatorId = stored?.OperatorId ?? newOperatorId,
                     IsOfficialInstance = stored?.IsOfficialInstance ?? false,
-                    Revision = Guid.CreateVersion7()
+                    Revision = newRevision
                 };
+
+                if (importRevisionHash is not null)
+                {
+                    if (saved.OperatorKindCode == "registered_organization"
+                        && string.IsNullOrWhiteSpace(saved.RegistrationIdentifier))
+                        return BaseCommandResponse.Failure<InstanceOperatorIdentitySavedDocument>(
+                            InstanceOperatorIdentityReasonCodes.IncompleteFailureCode,
+                            "A registered organization import requires its registration identifier.",
+                            ["instance_operator_identity_registration_identifier_missing"]);
+
+                    try
+                    {
+                        if (saved.JurisdictionCountryCode is null
+                            || new RegionInfo(saved.JurisdictionCountryCode).TwoLetterISORegionName
+                                != saved.JurisdictionCountryCode)
+                            throw new ArgumentException("Invalid jurisdiction.");
+                    }
+                    catch (ArgumentException)
+                    {
+                        return BaseCommandResponse.Failure<InstanceOperatorIdentitySavedDocument>(
+                            InstanceOperatorIdentityReasonCodes.IncompleteFailureCode,
+                            "The imported identity requires a recognized country jurisdiction.",
+                            ["instance_operator_identity_jurisdiction_country_invalid"]);
+                    }
+
+                    InstanceOperatorIdentityReadinessAssessment readiness =
+                        Assess(saved, InstanceOperatorIdentityCapability.PaidCommerce);
+                    if (!readiness.IsReady)
+                    {
+                        return BaseCommandResponse.Failure<InstanceOperatorIdentitySavedDocument>(
+                            readiness.FailureCode!, "The imported operator identity is incomplete.", readiness.ReasonCodes);
+                    }
+                }
 
                 if (setting is null)
                 {
                     setting = new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(),
+                        Id = newSettingId,
                         SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
                         Value = JsonSerializer.Serialize(saved, SerializerOptions),
                         ValueType = SettingValueType.Json,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = occurredAt,
+                        CreatedBy = actorUserId
                     };
                 }
                 else
                 {
                     setting.Value = JsonSerializer.Serialize(saved, SerializerOptions);
                     setting.ValueType = SettingValueType.Json;
-                    setting.UpdatedAt = DateTime.UtcNow;
+                    setting.UpdatedAt = occurredAt;
+                    setting.UpdatedBy = actorUserId;
                 }
 
                 await systemSettingRepository.UpsertInCurrentTransactionAsync(setting, ct);
+
+                if (importRevisionHash is not null)
+                {
+                    InstanceOperatorIdentityReadinessAssessment persisted =
+                        await ((IInstanceOperatorIdentityReadinessEvaluator)this).EvaluateAsync(
+                            InstanceOperatorIdentityCapability.PaidCommerce, ct);
+                    if (!persisted.IsReady || persisted.DocumentRevision != newRevision)
+                    {
+                        throw new InvalidOperationException("The imported identity did not retain its readiness and revision.");
+                    }
+                    await outbox.CreateRange([new OutboxMessage
+                    {
+                        Id = auditId,
+                        AggregateType = OperatorIdentityImportAudit.AggregateType,
+                        AggregateId = saved.OperatorId.Value,
+                        EventType = OperatorIdentityImportAudit.EventType,
+                        Payload = JsonSerializer.Serialize(new OperatorIdentityImportAudit(
+                            actorUserId!.Value, contentDigest!, importRevisionHash, newRevision)),
+                        Status = OutboxMessageStatus.Pending,
+                        CreatedAt = occurredAt,
+                        MaxRetries = 5
+                    }], ct);
+                }
 
                 return BaseCommandResponse.Success(
                     new InstanceOperatorIdentitySavedDocument(
@@ -163,6 +266,7 @@ public sealed class InstanceOperatorIdentityService(
                     "Instance operator identity saved.");
             },
             cancellationToken);
+    }
 
     private static InstanceOperatorIdentityReadinessAssessment Missing() => new(
         false,

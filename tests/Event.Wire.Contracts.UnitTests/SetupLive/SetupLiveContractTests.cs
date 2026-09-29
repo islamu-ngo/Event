@@ -58,7 +58,8 @@ public sealed class SetupLiveContractTests
             "SetupEnrollmentScope",
             ("TargetRead", "target.read"),
             ("SecretBindingReadiness", "secret_binding.readiness"),
-            ("SecretBindingWrite", "secret_binding.write"));
+            ("SecretBindingWrite", "secret_binding.write"),
+            ("ConfigurationImport", "configuration.import"));
         await AssertEnumValues(
             "SetupEnrollmentState",
             ("Active", "active"),
@@ -140,13 +141,14 @@ public sealed class SetupLiveContractTests
             "rotate-capability",
             "secret-binding-readiness",
             "write-secret-binding",
-            "secret-binding-operation"
+            "secret-binding-operation",
+            "create-configuration-import-session"
         ]);
         await AssertConstantNames(
             relations,
             "CreateSetupEnrollment", "Self", "Revoke", "RotateCapability",
             "SecretBindingReadiness", "WriteSecretBinding",
-            "SecretBindingOperation");
+            "SecretBindingOperation", "CreateConfigurationImportSession");
 
         await Assert.That(ReadStringConstant(problems, "UnavailableType"))
             .IsEqualTo("/problems/setup-enrollment-unavailable");
@@ -185,6 +187,24 @@ public sealed class SetupLiveContractTests
             "UnavailableCode", "UnavailableDetail", "IdempotencyConflictStatus",
             "IdempotencyConflictType", "IdempotencyConflictTitle",
             "IdempotencyConflictCode", "IdempotencyConflictDetail");
+    }
+
+    [Test]
+    public async Task ConfigurationImportScopeRoundTripsWithAllExistingScopes()
+    {
+        string challenge = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        string json =
+            $$"""{"clientChallenge":"{{challenge}}","requestedScopes":["target.read","secret_binding.readiness","secret_binding.write","configuration.import"]}""";
+        var type = SetupLiveJsonContext.Default.CreateSetupTargetEnrollmentRequest;
+        var request = JsonSerializer.Deserialize(json, type);
+        await Assert.That(JsonSerializer.Serialize(request, type)).IsEqualTo(json);
+        await Assert.That(() => JsonSerializer.Deserialize(
+                json.Replace("\"configuration.import\"]",
+                    "\"configuration.import\",\"configuration.import\"]",
+                    StringComparison.Ordinal),
+                type))
+            .Throws<JsonException>();
     }
 
     [Test]

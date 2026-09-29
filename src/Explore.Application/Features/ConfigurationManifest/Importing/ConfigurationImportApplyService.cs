@@ -104,6 +104,14 @@ public sealed class ConfigurationImportApplyService(
             managedScheduleId,
             cancellationToken);
 
+    internal Task<ConfigurationImportOperationResult> ApplySetupLiveTenantAsync(
+        ConfigurationImportTarget target,
+        Guid sessionId,
+        string accessToken,
+        ConfigurationImportPreviewRequest request,
+        CancellationToken cancellationToken) =>
+        ApplyAsync(sessionId, target, accessToken, request, null, null, cancellationToken);
+
     public async Task<ConfigurationImportRollbackSessionCreatedResult>
         CreateRollbackSessionAsync(
         Guid operationId,

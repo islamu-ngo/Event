@@ -96,11 +96,20 @@ public sealed class ConfigurationImportSessionApplicationService(
         Guid tenantId,
         ReadOnlyMemory<byte> artifact,
         CancellationToken cancellationToken)
+        => await CreateSetupLiveTenantAsync(
+            ConfigurationImportTarget.ForTenant(tenantId),
+            artifact,
+            cancellationToken);
+
+    internal async Task<ConfigurationImportSessionCreatedResult> CreateSetupLiveTenantAsync(
+        ConfigurationImportTarget target,
+        ReadOnlyMemory<byte> artifact,
+        CancellationToken cancellationToken)
     {
         ConfigurationImportParsedTenantPackage parsed =
             parser.ParseTenantPackage(artifact);
         return await CreateAsync(
-            ConfigurationImportTarget.ForTenant(tenantId),
+            target,
             artifact,
             ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(
                 parsed.Package),
@@ -131,6 +140,14 @@ public sealed class ConfigurationImportSessionApplicationService(
             accessToken,
             request,
             cancellationToken);
+
+    internal Task<ConfigurationImportPreviewResult> PreviewSetupLiveTenantAsync(
+        ConfigurationImportTarget target,
+        Guid sessionId,
+        string accessToken,
+        ConfigurationImportPreviewRequest request,
+        CancellationToken cancellationToken) =>
+        PreviewAsync(sessionId, target, accessToken, request, cancellationToken);
 
     public Task CancelInstanceAsync(
         Guid sessionId,

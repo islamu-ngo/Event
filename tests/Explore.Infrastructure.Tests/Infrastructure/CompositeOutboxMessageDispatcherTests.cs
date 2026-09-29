@@ -29,12 +29,57 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
 public sealed class CompositeOutboxMessageDispatcherTests
 {
+    [Test]
+    public async Task DispatchAsync_OperatorIdentityAuditDoesNotLogPayloadOrFingerprintValues()
+    {
+        var logger = new TestListLogger<CompositeOutboxMessageDispatcher>();
+        CompositeOutboxMessageDispatcher dispatcher = CreateDispatcher(
+            Substitute.For<IEventPublishedNotificationFanoutService>(),
+            Substitute.For<IEventModerationNotificationFanoutService>(),
+            logger: logger);
+        var audit = new OperatorIdentityImportAudit(
+            Guid.CreateVersion7(), new string('a', 64), new string('b', 64), Guid.CreateVersion7());
+        var message = new OutboxMessage
+        {
+            Id = Guid.CreateVersion7(),
+            AggregateType = OperatorIdentityImportAudit.AggregateType,
+            AggregateId = Guid.CreateVersion7(),
+            EventType = OperatorIdentityImportAudit.EventType,
+            Payload = JsonSerializer.Serialize(new
+            {
+                audit.ActorUserId, audit.ContentDigest, audit.ExpectedRevisionHash, audit.CommittedRevision,
+                LegalName = "private-legal-name", Contact = "private-contact@example.test"
+            }),
+            Status = OutboxMessageStatus.Pending,
+            CreatedAt = DateTime.UtcNow,
+            MaxRetries = 5
+        };
+
+        await dispatcher.DispatchAsync(message);
+        await dispatcher.ReconcileDeadLetterAsync(message);
+
+        await Assert.That(logger.Entries).IsNotEmpty();
+        foreach (TestLogEntry entry in logger.Entries)
+        {
+            string projection = entry.Message + JsonSerializer.Serialize(entry.Arguments);
+            foreach (string sensitive in new[]
+            {
+                audit.ContentDigest, audit.ExpectedRevisionHash, audit.CommittedRevision.ToString(),
+                audit.ActorUserId.ToString(), "private-legal-name", "private-contact@example.test"
+            })
+                await Assert.That(projection.Contains(sensitive, StringComparison.Ordinal)).IsFalse();
+            await Assert.That(entry.State.Where(property => property.Key != "{OriginalFormat}")
+                .Select(property => property.Key)).IsEquivalentTo(["EventType", "MessageId", "Status"]);
+        }
+    }
+
     [Test]
     public async Task DispatchAsync_WithFanoutOccurrencePointer_RoutesToDurableHandoff()
     {
@@ -673,7 +718,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
         IRefundAttemptRepository? refundRepository = null,
         IRefundCreator? refundCreator = null,
         IConfigurationManifestEffectDispatcher? manifestEffectDispatcher = null,
-        IConfigurationImportEffectDelivery? importEffectDelivery = null)
+        IConfigurationImportEffectDelivery? importEffectDelivery = null,
+        ILogger<CompositeOutboxMessageDispatcher>? logger = null)
     {
         HybridCache selectedCache = cache ?? new RecordingHybridCache();
         var correctionPlanner = Substitute.For<IAtprotoLocationPrivacyCorrectionPlanner>();
@@ -718,7 +764,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
             TimeProvider.System,
             processHandler ?? Substitute.For<ICommandHandler<ProcessManagedTenantProvisioningOperationCommand, bool>>(),
             reconcileHandler ?? Substitute.For<ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>>(),
-            NullLogger<CompositeOutboxMessageDispatcher>.Instance,
+            logger ?? NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             manifestEffectDispatcher
                 ?? Substitute.For<IConfigurationManifestEffectDispatcher>(),
             importEffectDelivery

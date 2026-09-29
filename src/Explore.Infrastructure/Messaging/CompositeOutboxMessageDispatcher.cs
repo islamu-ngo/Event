@@ -93,6 +93,15 @@ public sealed class CompositeOutboxMessageDispatcher(
                     ct);
                 return;
 
+            case OperatorIdentityImportAudit.EventType:
+                _ = JsonSerializer.Deserialize<OperatorIdentityImportAudit>(
+                    message.Payload ?? throw new InvalidOperationException("Operator import audit is missing."))
+                    ?? throw new InvalidOperationException("Operator import audit is invalid.");
+                logger.LogInformation(
+                    "Operator identity audit delivered: EventType={EventType} MessageId={MessageId} Status={Status}",
+                    OperatorIdentityImportAudit.EventType, message.Id, "recorded");
+                return;
+
             case RegistrationOrderOutboxMessageFactory.RejectedEventType:
             case RegistrationOrderOutboxMessageFactory.ConfirmedEventType:
                 logger.LogInformation("Recorded registration-order lifecycle outbox message {MessageId} after commit.", message.Id);
@@ -270,6 +279,10 @@ public sealed class CompositeOutboxMessageDispatcher(
     {
         switch (message.EventType)
         {
+            case OperatorIdentityImportAudit.EventType:
+                await DispatchAsync(message, ct);
+                return;
+
             case ConfigurationManifestEffectOutbox.EventType:
                 await configurationManifestEffectDispatcher.DispatchAsync(
                     message.AggregateId,

@@ -20,7 +20,7 @@ public sealed class GeneratedClientRecordArchitectureTests
         using FileStream symbols = File.OpenRead(Path.ChangeExtension(typeof(ActorDto).Assembly.Location, ".pdb"));
         using MetadataReaderProvider provider = MetadataReaderProvider.FromPortablePdbStream(symbols);
         MetadataReader metadata = provider.GetMetadataReader();
-        Document document = metadata.Documents.Select(metadata.GetDocument).Single(candidate =>
+        System.Reflection.Metadata.Document document = metadata.Documents.Select(metadata.GetDocument).Single(candidate =>
             metadata.GetString(candidate.Name).Replace('\\', '/')
                 .EndsWith("/generated-contracts/EventApiTagClients.g.cs", StringComparison.Ordinal));
         await Assert.That(metadata.GetGuid(document.HashAlgorithm))

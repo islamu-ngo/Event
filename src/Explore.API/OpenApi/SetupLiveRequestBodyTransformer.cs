@@ -16,7 +16,10 @@ public sealed class SetupLiveRequestBodyTransformer
         RouteNames.RotateSetupTargetEnrollmentCapability,
         RouteNames.GetSetupSecretBindingReadiness,
         RouteNames.WriteSetupSecretBinding,
-        RouteNames.GetSetupSecretBindingOperation
+        RouteNames.GetSetupSecretBindingOperation,
+        RouteNames.CreateSetupConfigurationImportSession,
+        RouteNames.PreviewSetupConfigurationImportSession,
+        RouteNames.ApplySetupConfigurationImportSession
     ];
 
     public Task TransformAsync(
@@ -32,6 +35,26 @@ public sealed class SetupLiveRequestBodyTransformer
         NormalizeCreateRequestBody(operation);
         MarkRequiredHeaders(operation);
         AddCapabilityHeader(operation);
+
+        if (operation.OperationId == RouteNames.CreateSetupConfigurationImportSession)
+        {
+            operation.RequestBody = new OpenApiRequestBody
+            {
+                Required = true,
+                Content = new Dictionary<string, OpenApiMediaType>
+                {
+                    [ISLAMU.Wire.Contracts.ConfigurationPortability
+                        .TenantConfigurationPackageContractMetadata.MediaType] = new()
+                    {
+                        Schema = new OpenApiSchema
+                        {
+                            Type = JsonSchemaType.String,
+                            Format = "binary"
+                        }
+                    }
+                }
+            };
+        }
 
         if (string.Equals(
                 operation.OperationId,
@@ -104,6 +127,10 @@ public sealed class SetupLiveRequestBodyTransformer
             "state", nameof(SetupSecretBindingReadinessState));
         SetOperationReferences(document, nameof(SetupSecretBindingOperationData));
         SetOperationReferences(document, "HalResourceOfSetupSecretBindingOperationData");
+        SetArrayReference(document, "HalResourceOfConfigurationImportPreviewResult",
+            "items", "ConfigurationImportPreviewItem");
+        SetReference(document, "ConfigurationImportPreviewItem",
+            "category", "ConfigurationImportPreviewCategory");
 
         return Task.CompletedTask;
     }
@@ -273,7 +300,7 @@ public sealed class SetupLiveRequestBodyTransformer
             if (boundedSet)
             {
                 array.MinItems = 1;
-                array.MaxItems = 3;
+                array.MaxItems = 4;
             }
         }
     }

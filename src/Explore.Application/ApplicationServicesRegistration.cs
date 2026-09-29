@@ -346,6 +346,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<TenantPlanStorageQuotaCeilingPolicy>();
         services.AddScoped<IManagedProviderClientProvisioner, EnsureManagedProviderClientProvisionedCommandHandler>();
         services.AddScoped<Features.SetupLive.SetupLiveApplicationService>();
+        services.AddScoped<Features.SetupLive.SetupConfigurationImportApplicationService>();
         services.AddSingleton<Telemetry.SetupLiveTelemetry>();
 
         // Analytics consent / runtime profile resolution

@@ -24,7 +24,7 @@ public sealed class ConfigurationImportSessionRepository(
     {
         ArgumentOutOfRangeException.ThrowIfEqual(sessionId, Guid.Empty);
         ArgumentNullException.ThrowIfNull(target);
-        string authorityKey = target.AuthorityKey;
+        string authorityKey = target.GetSessionStorageKey();
         return dbContext.Set<ConfigurationImportSession>()
             .SingleOrDefaultAsync(
                 session => session.SessionId == sessionId

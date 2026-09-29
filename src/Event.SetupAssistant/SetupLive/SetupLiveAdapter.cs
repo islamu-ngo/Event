@@ -75,7 +75,7 @@ public sealed class SetupLiveAccessToken
 public delegate ValueTask<SetupLiveAccessToken?> SetupLiveAccessTokenProvider(
     CancellationToken cancellationToken);
 
-public sealed class SetupLiveAdapter : IDisposable
+public sealed partial class SetupLiveAdapter : IDisposable
 {
     private readonly SetupLiveAccessTokenProvider _accessTokenProvider;
     private readonly Generated.ISetup_LiveClient _client;
@@ -83,7 +83,7 @@ public sealed class SetupLiveAdapter : IDisposable
     private readonly HttpClient _httpClient;
     private readonly HttpClient? _ownedHttpClient;
     private readonly TimeProvider _timeProvider;
-    private readonly Dictionary<string, string?> _enrollmentAffordances =
+    private readonly Dictionary<string, (string Href, string? Method)> _enrollmentAffordances =
         new(StringComparer.Ordinal);
     private readonly HashSet<Guid> _readableOperations = [];
     private readonly HashSet<string> _writableBindings =
@@ -636,6 +636,7 @@ public sealed class SetupLiveAdapter : IDisposable
         Wire.SetupEnrollmentCapability capability,
         IDictionary<string, Generated.HalLink>? links)
     {
+        ClearConfigurationImport();
         _capability = capability;
         _enrollmentId = snapshot.EnrollmentId;
         _generation = snapshot.Generation;
@@ -659,7 +660,7 @@ public sealed class SetupLiveAdapter : IDisposable
         foreach ((string relation, Generated.HalLink link) in links)
         {
             if (link is not null && !string.IsNullOrWhiteSpace(link.Href))
-                _enrollmentAffordances[relation] = link.Method;
+                _enrollmentAffordances[relation] = (link.Href, link.Method);
         }
     }
 
@@ -704,8 +705,8 @@ public sealed class SetupLiveAdapter : IDisposable
         string relation,
         HttpMethod expectedMethod)
     {
-        if (!_enrollmentAffordances.TryGetValue(relation, out string? method)
-            || !MethodMatches(method, expectedMethod))
+        if (!_enrollmentAffordances.TryGetValue(relation, out var link)
+            || !MethodMatches(link.Method, expectedMethod))
         {
             throw new SetupLiveAffordanceUnavailableException(relation);
         }
@@ -719,6 +720,7 @@ public sealed class SetupLiveAdapter : IDisposable
 
     private void ClearState()
     {
+        ClearConfigurationImport();
         _capability = null;
         _enrollmentId = Guid.Empty;
         _generation = 0;
@@ -808,7 +810,7 @@ public sealed class SetupLiveAdapter : IDisposable
     {
         ArgumentNullException.ThrowIfNull(scopes);
         Wire.SetupEnrollmentScope[] snapshot = scopes.ToArray();
-        if (snapshot.Length is < 1 or > 3
+        if (snapshot.Length is < 1 or > 4
             || snapshot.Distinct().Count() != snapshot.Length
             || snapshot.Any(scope => !Enum.IsDefined(scope)))
         {
@@ -828,6 +830,8 @@ public sealed class SetupLiveAdapter : IDisposable
                 Generated.SetupEnrollmentScope.Secret_binding_readiness,
             Wire.SetupEnrollmentScope.SecretBindingWrite =>
                 Generated.SetupEnrollmentScope.Secret_binding_write,
+            Wire.SetupEnrollmentScope.ConfigurationImport =>
+                Generated.SetupEnrollmentScope.Configuration_import,
             _ => throw new ArgumentOutOfRangeException(nameof(scope))
         };
 
@@ -840,6 +844,8 @@ public sealed class SetupLiveAdapter : IDisposable
                 Wire.SetupEnrollmentScope.SecretBindingReadiness,
             Generated.SetupEnrollmentScope.Secret_binding_write =>
                 Wire.SetupEnrollmentScope.SecretBindingWrite,
+            Generated.SetupEnrollmentScope.Configuration_import =>
+                Wire.SetupEnrollmentScope.ConfigurationImport,
             _ => throw ContractViolation()
         };
 

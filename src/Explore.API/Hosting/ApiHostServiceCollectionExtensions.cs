@@ -336,6 +336,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddDocumentTransformer<HalDtoSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
             options.AddDocumentTransformer<OpenApiStringEnumDocumentTransformer>();
+            options.AddDocumentTransformer<OperatorIdentityManifestSchemaTransformer>();
             options.AddDocumentTransformer<SetupLiveRequestBodyTransformer>();
             options.AddDocumentTransformer<OperationIdInvariantTransformer>();
             options.AddOperationTransformer<EndpointClassificationTransformer>();

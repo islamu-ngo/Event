@@ -18,7 +18,7 @@ using Explore.Application.Authentication;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel]
-public class InstanceOperatorIdentityControllerTests
+public partial class InstanceOperatorIdentityControllerTests
 {
     private const string BaseUrl = "/api/instance-operator-identity";
     private static string SetupSecret => OnboardingWebApplicationFactory.SetupSecret;

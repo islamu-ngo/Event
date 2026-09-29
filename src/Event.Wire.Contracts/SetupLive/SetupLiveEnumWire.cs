@@ -14,11 +14,13 @@ internal static class SetupLiveEnumWire
             "secret_binding.readiness" =>
                 SetupEnrollmentScope.SecretBindingReadiness,
             "secret_binding.write" => SetupEnrollmentScope.SecretBindingWrite,
+            "configuration.import" => SetupEnrollmentScope.ConfigurationImport,
             _ => default
         };
         return value is "target.read"
             or "secret_binding.readiness"
-            or "secret_binding.write";
+            or "secret_binding.write"
+            or "configuration.import";
     }
 
     internal static bool TryParse(
@@ -114,6 +116,7 @@ internal static class SetupLiveEnumWire
         SetupEnrollmentScope.SecretBindingReadiness =>
             "secret_binding.readiness",
         SetupEnrollmentScope.SecretBindingWrite => "secret_binding.write",
+        SetupEnrollmentScope.ConfigurationImport => "configuration.import",
         _ => throw new JsonException("Unknown Setup enrollment scope.")
     };
 

@@ -45,7 +45,7 @@ public sealed record SetupLiveSecretBindingResult(
     SetupLiveApplicationStatus Status,
     SetupSecretBindingOperationData? Data = null);
 
-public sealed class SetupLiveApplicationService(
+public sealed partial class SetupLiveApplicationService(
     ISetupLiveRepository setupLiveRepository,
     ISecretBindingRepository secretBindingRepository,
     IUnitOfWork unitOfWork,
@@ -1109,6 +1109,7 @@ public sealed class SetupLiveApplicationService(
         SetupEnrollmentScope.TargetRead => "target.read",
         SetupEnrollmentScope.SecretBindingReadiness => "secret_binding.readiness",
         SetupEnrollmentScope.SecretBindingWrite => "secret_binding.write",
+        SetupEnrollmentScope.ConfigurationImport => "configuration.import",
         _ => throw new ArgumentOutOfRangeException(nameof(scope))
     };
 

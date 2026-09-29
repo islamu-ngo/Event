@@ -1,6 +1,7 @@
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Security.Cryptography;
+using System.Text;
 using Explore.Application.Contracts.Persistence;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
@@ -38,14 +39,17 @@ public sealed record ConfigurationImportTarget
 {
     private ConfigurationImportTarget(
         ConfigurationImportScope scope,
-        Guid? tenantId)
+        Guid? tenantId,
+        string? sessionAuthorityKey = null)
     {
         Scope = scope;
         TenantId = tenantId;
+        SessionAuthorityKey = sessionAuthorityKey;
     }
 
     public ConfigurationImportScope Scope { get; }
     public Guid? TenantId { get; }
+    private string? SessionAuthorityKey { get; }
 
     public static ConfigurationImportTarget ForInstance() =>
         new(ConfigurationImportScope.Instance, tenantId: null);
@@ -55,6 +59,39 @@ public sealed record ConfigurationImportTarget
         ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
         return new(ConfigurationImportScope.Tenant, tenantId);
     }
+
+    public static ConfigurationImportTarget ForSetupLiveTenant(
+        Guid tenantId,
+        Guid enrollmentId,
+        long generation,
+        Guid actorId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
+        ArgumentOutOfRangeException.ThrowIfEqual(enrollmentId, Guid.Empty);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);
+        ArgumentOutOfRangeException.ThrowIfEqual(actorId, Guid.Empty);
+        string source = $"setup-import:{tenantId:N}:{enrollmentId:N}:{generation}:{actorId:N}";
+        return new(
+            ConfigurationImportScope.Tenant,
+            tenantId,
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))));
+    }
+
+    internal static ConfigurationImportTarget FromPersisted(
+        ConfigurationImportScope scope,
+        Guid? tenantId,
+        string sessionAuthorityKey) =>
+        scope switch
+        {
+            ConfigurationImportScope.Instance => ForInstance(),
+            ConfigurationImportScope.Tenant when tenantId is { } id =>
+                sessionAuthorityKey == ForTenant(id).AuthorityKey
+                    ? ForTenant(id)
+                    : new(ConfigurationImportScope.Tenant, id, sessionAuthorityKey),
+            _ => throw new InvalidOperationException("Configuration import target is inconsistent.")
+        };
+
+    public string GetSessionStorageKey() => SessionAuthorityKey ?? AuthorityKey;
 
     public string AuthorityKey => Scope switch
     {
@@ -183,12 +220,10 @@ public sealed class ConfigurationImportSession
     public long Revision { get; private set; }
 
     public ConfigurationImportTarget Target =>
-        TargetScope == ConfigurationImportScope.Instance
-            ? ConfigurationImportTarget.ForInstance()
-            : ConfigurationImportTarget.ForTenant(
-                TargetTenantId
-                ?? throw new InvalidOperationException(
-                    "Tenant import session has no tenant."));
+        ConfigurationImportTarget.FromPersisted(
+            TargetScope,
+            TargetTenantId,
+            TargetAuthorityKey);
 
     public ConfigurationImportArtifactReference Artifact =>
         new(
@@ -256,7 +291,7 @@ public sealed class ConfigurationImportSession
             SessionId = sessionId,
             TargetScope = target.Scope,
             TargetTenantId = target.TenantId,
-            TargetAuthorityKey = target.AuthorityKey,
+            TargetAuthorityKey = target.GetSessionStorageKey(),
             ArtifactHandleId = artifact.Handle.Id,
             ArtifactDigest = artifact.Sha256Digest,
             ArtifactByteLength = artifact.ByteLength,
@@ -275,7 +310,7 @@ public sealed class ConfigurationImportSession
         ArgumentNullException.ThrowIfNull(target);
         return string.Equals(
             TargetAuthorityKey,
-            target.AuthorityKey,
+            target.GetSessionStorageKey(),
             StringComparison.Ordinal);
     }
 

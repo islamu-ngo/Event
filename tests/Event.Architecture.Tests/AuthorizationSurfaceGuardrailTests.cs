@@ -428,7 +428,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
             .ToArray();
 
         await Assert.That(unclassified).IsEmpty()
-            .Because("every mutating IRequest<T> must either carry [AuthorizeResource] or have an exact Phase 0 disposition with evidence");
+            .Because($"every mutating IRequest<T> must carry [AuthorizeResource] or have an exact Phase 0 disposition: {string.Join(", ", unclassified)}");
     }
 
     [Test]
@@ -492,7 +492,8 @@ public sealed class AuthorizationSurfaceGuardrailTests
                 .Where(item => !NamedAnonymousMutationExceptions.Concat(NamedAnonymousMutationViolations).Any(entry => entry.Id == item.Id))
                 .ToArray());
 
-        await Assert.That(report.UnclassifiedMutatingRequests).IsEmpty();
+        await Assert.That(report.UnclassifiedMutatingRequests).IsEmpty()
+            .Because($"unclassified requests: {string.Join(", ", report.UnclassifiedMutatingRequests.Select(item => item.Id))}");
         await Assert.That(report.UnclassifiedAnonymousMutationSurfaces).IsEmpty();
         await Assert.That(report.Violations).IsEmpty();
     }

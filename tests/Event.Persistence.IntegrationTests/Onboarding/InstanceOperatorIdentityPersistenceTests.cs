@@ -110,7 +110,8 @@ public sealed class InstanceOperatorIdentityPersistenceTests(PostgreSqlContainer
         var unitOfWork = new EfCoreUnitOfWork(context);
         var service = new InstanceOperatorIdentityService(
             new SystemSettingRepository(context, new RelationalSettingMutationLock(context, unitOfWork)),
-            unitOfWork);
+            unitOfWork,
+            new OutboxRepository(context));
 
         BaseCommandResponse<InstanceOperatorIdentitySavedDocument> first =
             await service.SaveAsync(ValidCandidate(), expectedRevision: null);

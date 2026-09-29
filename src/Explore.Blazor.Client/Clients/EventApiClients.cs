@@ -136,6 +136,7 @@ public static class EventApiJsonSerializerSettings
                 "target.read" => SetupEnrollmentScope.Target_read,
                 "secret_binding.readiness" => SetupEnrollmentScope.Secret_binding_readiness,
                 "secret_binding.write" => SetupEnrollmentScope.Secret_binding_write,
+                "configuration.import" => SetupEnrollmentScope.Configuration_import,
                 _ => throw new JsonException("Invalid Setup enrollment scope.")
             };
 
@@ -147,6 +148,7 @@ public static class EventApiJsonSerializerSettings
                 SetupEnrollmentScope.Target_read => "target.read",
                 SetupEnrollmentScope.Secret_binding_readiness => "secret_binding.readiness",
                 SetupEnrollmentScope.Secret_binding_write => "secret_binding.write",
+                SetupEnrollmentScope.Configuration_import => "configuration.import",
                 _ => throw new JsonException("Invalid Setup enrollment scope.")
             });
     }

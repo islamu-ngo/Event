@@ -1,0 +1,27 @@
+Change-Id: CHG-01M3P9XHCY8QYCSM4BB1JZMBC7
+Title: Enrollment-bound imports and operator identity portability
+Type: feat
+Scope: self-hosting
+Summary: Operators can apply reviewed tenant configuration through SetupLive and port instance legal identity with revision protection.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: mitigated
+    Detail: Enrollment origin and current administrator authority are checked before imports.
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+  Operator:
+    Reference: docs/public/self-hosting/operator-identity-portability.md
+    Disposition: documented

@@ -66032,6 +66032,240 @@
         "x-rate-limit-policy": "Write"
       }
     },
+    "/api/instance-operator-identity/manifest": {
+      "get": {
+        "tags": [
+          "InstanceOperatorIdentityPortability"
+        ],
+        "operationId": "ExportInstanceOperatorIdentity",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorIdentityManifest"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin"
+      }
+    },
+    "/api/instance-operator-identity/manifest/import": {
+      "post": {
+        "tags": [
+          "InstanceOperatorIdentityPortability"
+        ],
+        "operationId": "ImportInstanceOperatorIdentity",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInstanceOperatorIdentityCommand"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportInstanceOperatorIdentityCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfInstanceOperatorIdentitySavedDocument"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfInstanceOperatorIdentitySavedDocument"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfInstanceOperatorIdentitySavedDocument"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "Write"
+      }
+    },
     "/api/instance/settings/branding": {
       "get": {
         "tags": [
@@ -93711,6 +93945,533 @@
         "x-rate-limit-policy": "Write"
       }
     },
+    "/api/tenants/{tenantId}/setup/enrollments/{enrollmentId}/configuration-import/sessions": {
+      "post": {
+        "tags": [
+          "Setup Live"
+        ],
+        "operationId": "CreateSetupConfigurationImportSession",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "enrollmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Setup-Enrollment-Capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/vnd.islamu.tenant-configuration-package.v1alpha2+json": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfConfigurationImportSessionCreatedResult"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "ConfigurationImportUpload"
+      }
+    },
+    "/api/tenants/{tenantId}/setup/enrollments/{enrollmentId}/configuration-import/sessions/{sessionId}/preview": {
+      "post": {
+        "tags": [
+          "Setup Live"
+        ],
+        "operationId": "PreviewSetupConfigurationImportSession",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "enrollmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Setup-Enrollment-Capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Configuration-Import-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationImportPreviewRequest"
+              }
+            },
+            "text/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationImportPreviewRequest"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationImportPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfConfigurationImportPreviewResult"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/tenants/{tenantId}/setup/enrollments/{enrollmentId}/configuration-import/sessions/{sessionId}/apply": {
+      "post": {
+        "tags": [
+          "Setup Live"
+        ],
+        "operationId": "ApplySetupConfigurationImportSession",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "enrollmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Setup-Enrollment-Capability",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Configuration-Import-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationImportPreviewRequest"
+              }
+            },
+            "text/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationImportPreviewRequest"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationImportPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfConfigurationImportOperationResult"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
     "/api/tenants/{tenantId}/setup/enrollments": {
       "post": {
         "tags": [
@@ -114235,6 +114996,56 @@
           }
         }
       },
+      "BaseCommandResponseOfInstanceOperatorIdentitySavedDocument": {
+        "required": [
+          "id",
+          "success",
+          "message",
+          "errors",
+          "failureCode",
+          "quotaExceeded"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentitySavedDocument"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quotaExceeded": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuotaExceededDetails"
+              }
+            ]
+          }
+        }
+      },
       "BaseCommandResponseOfInstanceOperatorIdentitySavedDocumentDto": {
         "required": [
           "id",
@@ -119817,7 +120628,7 @@
             "$ref": "#/components/schemas/SetupClientChallenge"
           },
           "requestedScopes": {
-            "maxItems": 3,
+            "maxItems": 4,
             "minItems": 1,
             "uniqueItems": true,
             "type": "array",
@@ -137455,39 +138266,10 @@
             "type": "boolean"
           },
           "items": {
+            "uniqueItems": false,
             "type": "array",
             "items": {
-              "required": [
-                "sectionKey",
-                "category",
-                "reasonCode",
-                "sourceMappingIdentity",
-                "targetMappingIdentity"
-              ],
-              "type": "object",
-              "properties": {
-                "sectionKey": {
-                  "type": "string"
-                },
-                "category": {
-                  "type": "integer"
-                },
-                "reasonCode": {
-                  "type": "string"
-                },
-                "sourceMappingIdentity": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "targetMappingIdentity": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                }
-              }
+              "$ref": "#/components/schemas/ConfigurationImportPreviewItem"
             }
           },
           "_links": {
@@ -153815,7 +154597,7 @@
             "format": "date-time"
           },
           "scopes": {
-            "maxItems": 3,
+            "maxItems": 4,
             "minItems": 1,
             "uniqueItems": true,
             "type": "array",
@@ -157142,6 +157924,23 @@
           }
         }
       },
+      "ImportInstanceOperatorIdentityCommand": {
+        "required": [
+          "manifest",
+          "expectedRevisionHash"
+        ],
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "$ref": "#/components/schemas/OperatorIdentityManifest"
+          },
+          "expectedRevisionHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ImportLocalizationBundleDto": {
         "type": "object",
         "properties": {
@@ -157347,6 +158146,84 @@
           }
         }
       },
+      "InstanceOperatorIdentity": {
+        "type": "object",
+        "properties": {
+          "operatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publicName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "legalName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isOfficialInstance": {
+            "type": "boolean"
+          },
+          "officialOrigin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operatorKindCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jurisdictionCountryCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registrationIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publicContactEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "websiteUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "legalNoticeUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "termsUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "privacyUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "InstanceOperatorIdentityCapabilityReadinessDto": {
         "required": [
           "isReady",
@@ -157511,6 +158388,75 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "InstanceOperatorIdentityReadinessAssessment": {
+        "required": [
+          "isReady",
+          "failureCode",
+          "reasonCodes",
+          "identity",
+          "documentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "isReady": {
+            "type": "boolean"
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "identity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstanceOperatorIdentity"
+              }
+            ]
+          },
+          "documentRevision": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "InstanceOperatorIdentitySavedDocument": {
+        "required": [
+          "revision",
+          "operatorId",
+          "publicDisclosure",
+          "paidCommerce"
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "publicDisclosure": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentityReadinessAssessment"
+          },
+          "paidCommerce": {
+            "$ref": "#/components/schemas/InstanceOperatorIdentityReadinessAssessment"
           }
         }
       },
@@ -164501,6 +165447,156 @@
             "type": "string"
           }
         }
+      },
+      "OperatorIdentityManifest": {
+        "required": [
+          "apiVersion",
+          "kind",
+          "settingKey",
+          "contentDigest",
+          "revisionHash",
+          "document"
+        ],
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "enum": [
+              "islamu.org/operator-identity/v1"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "InstanceOperatorIdentity"
+            ],
+            "type": "string"
+          },
+          "settingKey": {
+            "enum": [
+              "instance.operator_identity"
+            ],
+            "type": "string"
+          },
+          "contentDigest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "revisionHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "document": {
+            "required": [
+              "jurisdictionCountryCode",
+              "legalName",
+              "legalNoticeUrl",
+              "officialOrigin",
+              "operatorKindCode",
+              "privacyUrl",
+              "publicContactEmail",
+              "publicName",
+              "registrationIdentifier",
+              "termsUrl",
+              "websiteUrl",
+              "isOfficialInstance",
+              "operatorId",
+              "revision"
+            ],
+            "type": "object",
+            "properties": {
+              "jurisdictionCountryCode": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "legalName": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "legalNoticeUrl": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "officialOrigin": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "operatorKindCode": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "privacyUrl": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "publicContactEmail": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "publicName": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "registrationIdentifier": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "termsUrl": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "websiteUrl": {
+                "maxLength": 2048,
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "isOfficialInstance": {
+                "type": "boolean"
+              },
+              "operatorId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "revision": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
       },
       "OptionalQuestionnaireDto": {
         "required": [
@@ -175513,7 +176609,8 @@
         "enum": [
           "target.read",
           "secret_binding.readiness",
-          "secret_binding.write"
+          "secret_binding.write",
+          "configuration.import"
         ],
         "type": "string"
       },
@@ -175660,7 +176757,7 @@
             "format": "date-time"
           },
           "scopes": {
-            "maxItems": 3,
+            "maxItems": 4,
             "minItems": 1,
             "uniqueItems": true,
             "type": "array",
@@ -185398,6 +186495,9 @@
     },
     {
       "name": "InstanceOperatorIdentity"
+    },
+    {
+      "name": "InstanceOperatorIdentityPortability"
     },
     {
       "name": "InstancePresentationSettings"

@@ -29,6 +29,7 @@ public static class SetupLiveHalRelations
     public const string SecretBindingReadiness = "secret-binding-readiness";
     public const string WriteSecretBinding = "write-secret-binding";
     public const string SecretBindingOperation = "secret-binding-operation";
+    public const string CreateConfigurationImportSession = "create-configuration-import-session";
 }
 
 public static class SetupLiveProblemContracts

@@ -18,10 +18,14 @@ internal sealed class SignedPublicationInventoryAuthority(
     private const string Principal = "publication-approver";
     private const string Namespace = "islamu-publication";
 
-    public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries)
+    public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default)
     {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        cancellationToken = deadline.Token;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string signaturePath = inventoryPath + ".sig";
             if (!IsRegularFile(inventoryPath) || !IsRegularFile(signaturePath) ||
                 !IsRegularFile(trustedAllowedSignersPath) ||
@@ -31,7 +35,7 @@ internal sealed class SignedPublicationInventoryAuthority(
                 return false;
             }
 
-            byte[] original = File.ReadAllBytes(inventoryPath);
+            byte[] original = File.ReadAllBytesAsync(inventoryPath, cancellationToken).GetAwaiter().GetResult();
             if (Convert.ToHexStringLower(SHA256.HashData(original)) != inventorySha256)
             {
                 return false;
@@ -39,6 +43,7 @@ internal sealed class SignedPublicationInventoryAuthority(
 
             foreach (AuthorizedInventoryEntry entry in entries)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (entry is null || !entry.DisclosureAuthorized ||
                     !IsSafeVersion(entry.Version) || string.IsNullOrEmpty(entry.EvidencePath) ||
                     Path.IsPathRooted(entry.EvidencePath) || entry.EvidencePath.Contains('\\', StringComparison.Ordinal) ||
@@ -55,7 +60,7 @@ internal sealed class SignedPublicationInventoryAuthority(
                     return false;
                 }
 
-                byte[] approval = File.ReadAllBytes(approvalPath);
+                byte[] approval = File.ReadAllBytesAsync(approvalPath, cancellationToken).GetAwaiter().GetResult();
                 if (Convert.ToHexStringLower(SHA256.HashData(approval)) != entry.AuthorizationEvidenceSha256)
                 {
                     return false;
@@ -74,7 +79,7 @@ internal sealed class SignedPublicationInventoryAuthority(
 
                 if (!TagCommand.IsSignedFinalRelease(
                     repositoryRoot, trustedBundleRoot, Path.Combine(retainedEvidenceRoot, entry.EvidencePath),
-                    entry.TagObjectId, entry.Version, entry.TargetOid))
+                    entry.TagObjectId, entry.Version, entry.TargetOid, cancellationToken))
                 {
                     return false;
                 }
@@ -97,27 +102,62 @@ internal sealed class SignedPublicationInventoryAuthority(
                 process.StartInfo.ArgumentList.Add(argument);
             }
 
-            process.Start();
-            process.StandardInput.BaseStream.Write(original);
-            process.StandardInput.Close();
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            Task<string> stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            Task<string> stderr = process.StandardError.ReadToEndAsync(timeout.Token);
-            try
-            {
-                Task.WhenAll(process.WaitForExitAsync(timeout.Token), stdout, stderr).GetAwaiter().GetResult();
-                return process.ExitCode == 0 &&
-                    stdout.Result.Length < 4_096 && stderr.Result.Length < 4_096;
-            }
-            finally
-            {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
-            }
+            return VerifySignature(process, original, cancellationToken);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
             ArgumentException or JsonException or InvalidOperationException or System.ComponentModel.Win32Exception or OperationCanceledException)
         {
             return false;
+        }
+    }
+
+    internal static bool VerifySignature(Process process, byte[] original, CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellationToken = deadline.Token;
+        cancellationToken.ThrowIfCancellationRequested();
+        process.Start();
+        Task stdout = Drain(process.StandardOutput);
+        Task stderr = Drain(process.StandardError);
+        Task stdin = WriteInput();
+        try
+        {
+            Task.WhenAll(process.WaitForExitAsync(cancellationToken), stdin, stdout, stderr).GetAwaiter().GetResult();
+            cancellationToken.ThrowIfCancellationRequested();
+            return process.ExitCode == 0;
+        }
+        finally
+        {
+            deadline.Cancel();
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(); }
+            try { Task.WhenAll(stdin, stdout, stderr).GetAwaiter().GetResult(); }
+            catch (Exception exception) when (exception is IOException or OperationCanceledException) { }
+        }
+
+        async Task WriteInput()
+        {
+            try
+            {
+                await process.StandardInput.BaseStream.WriteAsync(original, cancellationToken);
+                process.StandardInput.Close();
+            }
+            catch { deadline.Cancel(); throw; }
+        }
+
+        async Task Drain(StreamReader reader)
+        {
+            try
+            {
+                var buffer = new char[4_096];
+                int count = 0;
+                int read;
+                while ((read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken)) != 0)
+                {
+                    count += read;
+                    if (count >= buffer.Length) throw new IOException("publication_signature_output_too_large");
+                }
+            }
+            catch { deadline.Cancel(); throw; }
         }
     }
 

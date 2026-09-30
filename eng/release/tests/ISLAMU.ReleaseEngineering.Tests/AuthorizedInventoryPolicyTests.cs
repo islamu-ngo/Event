@@ -9,6 +9,32 @@ public sealed class AuthorizedInventoryPolicyTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     [Test]
+    public async Task DeadlineIncludesAuthorityAndRejectsItsLateSuccess()
+    {
+        using var fixture = new InventoryFixture();
+        AuthorizedInventoryEntry entry = fixture.AddRelease("1.2.0", "v1.2");
+        string json = JsonSerializer.Serialize(new { schemaVersion = "authorized-inventory.v1", producer = "final-lane", completeSet = true, entries = new[] { entry } }, JsonOptions);
+        var authority = new DeadlineAuthority();
+        AuthorizedInventoryResult result = AuthorizedInventoryPolicy.Verify(
+            fixture.Repository, json, fixture.EvidenceRoot, authority, [], TimeSpan.FromMilliseconds(100));
+        await Assert.That(authority.DeadlineObserved).IsTrue();
+        await Assert.That(result.IsValid).IsFalse();
+        await Assert.That(result.Releases.Count).IsEqualTo(0);
+    }
+
+    private sealed class DeadlineAuthority : IFinalLaneInventoryAuthority
+    {
+        public bool DeadlineObserved { get; private set; }
+
+        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default)
+        {
+            if (!cancellationToken.CanBeCanceled) return true;
+            DeadlineObserved = cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(5));
+            return true;
+        }
+    }
+
+    [Test]
     public async Task EmptyInventoryFailsClosed()
     {
         using var fixture = new InventoryFixture();
@@ -197,7 +223,7 @@ public sealed class AuthorizedInventoryPolicyTests
 
     private sealed class PinnedTestAuthority(string digest) : IFinalLaneInventoryAuthority
     {
-        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries) => inventorySha256 == digest;
+        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default) => inventorySha256 == digest;
     }
 
     private static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -268,7 +294,7 @@ public sealed class AuthorizedInventoryPolicyTests
 
         // A test-only retained authority pins the whole byte sequence, including every disclosure
         // record. Production must authenticate this digest outside the publisher.
-        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries) => inventorySha256 == authorizedDigest;
+        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default) => inventorySha256 == authorizedDigest;
 
         public string Git(params string[] args)
         {

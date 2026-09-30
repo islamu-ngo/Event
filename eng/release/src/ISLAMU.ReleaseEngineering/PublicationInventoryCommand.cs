@@ -303,7 +303,7 @@ public static class PublicationInventoryCommand
     private sealed class ProposalValidation(string verifiedDigest, AuthorizedInventoryEntry[] verifiedEntries)
         : IFinalLaneInventoryAuthority
     {
-        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries) =>
+        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default) =>
             inventorySha256 == verifiedDigest &&
             Canonical(entries).AsSpan().SequenceEqual(Canonical(verifiedEntries));
     }

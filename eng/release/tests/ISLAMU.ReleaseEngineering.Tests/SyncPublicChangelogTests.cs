@@ -314,7 +314,7 @@ public sealed class SyncPublicChangelogTests
 
     private sealed class PinnedInventoryAuthority(string acceptedDigest) : IFinalLaneInventoryAuthority
     {
-        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries) =>
+        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default) =>
             inventorySha256 == acceptedDigest;
     }
 }

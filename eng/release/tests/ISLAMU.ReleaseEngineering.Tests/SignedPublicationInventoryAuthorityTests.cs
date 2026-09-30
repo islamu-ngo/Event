@@ -8,6 +8,85 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class SignedPublicationInventoryAuthorityTests
 {
     [Test]
+    public async Task CancelledAuthorityAndFinalTagFailClosedBeforeReadingInputs()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var authority = new SignedPublicationInventoryAuthority("", "", "", "", "");
+        await Assert.That(authority.VerifyCompleteInventory("", [], cancellation.Token)).IsFalse();
+        await Assert.That(TagCommand.IsSignedFinalRelease("", "", "", "", "", "", cancellation.Token)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ProcessCancellationOrOutputFaultReapsTheStartedProcess(bool outputFault)
+        => await VerifyProcessCleanup(outputFault, signatureInput: false);
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task SignatureBlockedInputCancellationOrOutputFaultReapsProcess(bool outputFault)
+        => await VerifyProcessCleanup(outputFault, signatureInput: true);
+
+    private static async Task VerifyProcessCleanup(bool outputFault, bool signatureInput)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        Task<System.Net.Sockets.TcpClient> started = listener.AcceptTcpClientAsync();
+        Task<Exception?> run = Task.Run(() =>
+        {
+            try
+            {
+                string command = $"printf '%s' \"$$\" > /dev/tcp/127.0.0.1/{port}; exec " +
+                    (outputFault ? "yes" : "tail -f /dev/null");
+                if (signatureInput)
+                {
+                    using var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo("/bin/bash")
+                        {
+                            UseShellExecute = false,
+                            RedirectStandardInput = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                        },
+                    };
+                    process.StartInfo.ArgumentList.Add("-c");
+                    process.StartInfo.ArgumentList.Add(command);
+                    SignedPublicationInventoryAuthority.VerifySignature(process, new byte[1_048_576], cancellation.Token);
+                }
+                else
+                {
+                    TagCommand.RunProcess("/bin/bash", null, cancellation.Token, "-c", command);
+                }
+                return null;
+            }
+            catch (Exception exception) { return exception; }
+        });
+        try
+        {
+            using System.Net.Sockets.TcpClient client = await started.WaitAsync(TimeSpan.FromSeconds(10));
+            using var reader = new StreamReader(client.GetStream());
+            int pid = int.Parse(await reader.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(10)), System.Globalization.CultureInfo.InvariantCulture);
+            if (!outputFault) cancellation.Cancel();
+            Exception? failure = await run.WaitAsync(TimeSpan.FromSeconds(10));
+            await Assert.That(outputFault ? failure is IOException : failure is OperationCanceledException).IsTrue();
+            bool exited;
+            try { using Process process = Process.GetProcessById(pid); exited = process.HasExited; }
+            catch (ArgumentException) { exited = true; }
+            await Assert.That(exited).IsTrue();
+        }
+        finally
+        {
+            cancellation.Cancel();
+            await run.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Test]
     [NotInParallel("RuntimePromotionTrustRoot")]
     public async Task OperatorSignatureBindsCompleteInventoryAndDisclosureReceipt()
     {

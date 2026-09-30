@@ -3,63 +3,521 @@ name: Release Publish Projection
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Governed release version, for example 1.1.0
+      mode:
+        description: Propose, validate an exact proposal head, or reconcile accepted publication
         required: true
+        default: propose
+        type: choice
+        options:
+          - propose
+          - validate
+          - reconcile
+      proposal_pr:
+        description: Publication proposal number (required for validate and reconcile)
+        required: false
+        type: string
+      proposal_head:
+        description: Full reviewed proposal HEAD (required for validate and reconcile)
+        required: false
         type: string
 
 permissions:
   contents: read
 
+# Final-lane inventory writers must join this same non-cancelling queue. GitHub cannot
+# atomically compare the inventory ref while updating a different mirror ref.
 concurrency:
-  group: release-publish-${{ github.ref }}
+  group: release-public-changelog
   cancel-in-progress: false
 
 jobs:
   release-publish:
     name: release-publish
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    # Dedicated, ephemeral, protected runner group: never used for PR/candidate execution.
+    runs-on:
+      group: release-publication
+      labels: [self-hosted, linux, x64]
     timeout-minutes: 15
     environment: production
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+      checks: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      MODE: ${{ inputs.mode }}
+      PUBLICATION_ENABLED: ${{ vars.RELEASE_PUBLICATION_ENABLED }}
+      TRUSTED_LAUNCHER: ${{ vars.RELEASE_TRUSTED_LAUNCHER }}
+      PUBLICATION_BASE: ${{ vars.RELEASE_PUBLICATION_BASE }}
+      GITBOOK_APP_ID: ${{ vars.RELEASE_GITBOOK_APP_ID }}
+      GITBOOK_CHECK_NAME: ${{ vars.RELEASE_GITBOOK_CHECK_NAME }}
+      PROPOSAL_PR: ${{ inputs.proposal_pr }}
+      PROPOSAL_HEAD: ${{ inputs.proposal_head }}
+      STATE: ${{ github.workspace }}/.publication-state
+      PAGE: docs/public/changelog/README.md
+      MANIFEST: docs/public/changelog/publication-manifest.v1.json
+      RECEIPT_BRANCH: docs/publication-receipts
+      ISLAMU_RELEASE_TRUSTED_BUNDLE: ${{ vars.RELEASE_TRUSTED_BUNDLE }}
+      ISLAMU_RELEASE_PROMOTION_RECEIPT: ${{ vars.RELEASE_PROMOTION_RECEIPT }}
+      ISLAMU_RELEASE_PROMOTION_SIGNATURE: ${{ vars.RELEASE_PROMOTION_SIGNATURE }}
+      ISLAMU_RELEASE_PROMOTION_PRINCIPAL: ${{ vars.RELEASE_PROMOTION_PRINCIPAL }}
+      ISLAMU_RELEASE_BUNDLE_ID: ${{ vars.RELEASE_BUNDLE_ID }}
+      ISLAMU_RELEASE_BUNDLE_VERSION: ${{ vars.RELEASE_BUNDLE_VERSION }}
+      ISLAMU_RELEASE_POLICY_VERSION: ${{ vars.RELEASE_POLICY_VERSION }}
+      ISLAMU_RELEASE_CONFIG_VERSION: ${{ vars.RELEASE_CONFIG_VERSION }}
+      ISLAMU_RELEASE_TRUST_VERSION: ${{ vars.RELEASE_TRUST_VERSION }}
+      ISLAMU_RELEASE_MANIFEST_SHA256: ${{ vars.RELEASE_MANIFEST_SHA256 }}
     steps:
       - name: Checkout trusted default branch only
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+          fetch-depth: 0
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-
-      # A forge release body is mutable, unsigned, and editable by any maintainer or by the forge
-      # itself. It can therefore never be release truth. Every page states the release notes hash
-      # and the tag it projects so a reader can check the page against the repository.
-      - name: Declare the publication projection contract
+      - name: Require independently provisioned runtime and protected branches
+        id: guard
         run: |
-          printf '%s\n' 'release-publish: non-authoritative projection of the signed tag'
-          printf '%s\n' 'page-header: release-notes-sha256 and tag-reference are required on every published body'
-          printf '%s\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'
-          printf '%s\n' 'release-truth: refs/tags/v<version> plus release-notes.md committed at B'
+          set -Eeuo pipefail
+          mkdir -p "$STATE"
+          # This prevents repeated denied mutations within one attempt, not future approved runs.
+          rm -f "$STATE/permanent-transport-failure"
+          printf '%s\n' '{"schemaVersion":"publication-receipt.v1","state":"pending","reason":"activation-or-transport","autoRepair":false,"releaseInvalidated":false}' > "$STATE/receipt.json"
+          [[ "$PUBLICATION_ENABLED" == true ]]
+          [[ "$MODE" == propose || "$MODE" == validate || "$MODE" == reconcile ]]
+          [[ -n "$PUBLICATION_BASE" && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          if [[ "$MODE" != propose ]]; then
+            [[ "$PROPOSAL_PR" =~ ^[1-9][0-9]*$ && "$PROPOSAL_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          fi
+          # Provisioning, not checkout code or a checksum alongside it, authenticates this
+          # immutable launcher and its fixed promoter root. It verifies promotion and executes
+          # the promoted engine from its protected runtime, outside BOTH checkout and bundle.
+          # Provision .NET/Git/OpenSSH/gh/jq with it; this lane never builds or installs tools.
+          workspace=$(realpath -e "$GITHUB_WORKSPACE")
+          bundle=$(realpath -e "$ISLAMU_RELEASE_TRUSTED_BUNDLE")
+          launcher=$(realpath -e "$TRUSTED_LAUNCHER")
+          [[ "$TRUSTED_LAUNCHER" == "$launcher" && -x "$launcher" && ! -L "$launcher" ]]
+          runtime=$(dirname "$launcher")
+          [[ "$runtime" != "$workspace" && "$runtime" != "$workspace/"* && "$workspace" != "$runtime/"* ]]
+          [[ "$bundle" != "$workspace" && "$bundle" != "$workspace/"* && "$workspace" != "$bundle/"* ]]
+          [[ "$runtime" != "$bundle" && "$runtime" != "$bundle/"* && "$bundle" != "$runtime/"* ]]
+          [[ -f "$runtime/ISLAMU.ReleaseEngineering.promotion-allowed-signers" ]]
+          for name in ISLAMU_RELEASE_PROMOTION_RECEIPT ISLAMU_RELEASE_PROMOTION_SIGNATURE \
+            ISLAMU_RELEASE_PROMOTION_PRINCIPAL ISLAMU_RELEASE_BUNDLE_ID ISLAMU_RELEASE_BUNDLE_VERSION \
+            ISLAMU_RELEASE_POLICY_VERSION ISLAMU_RELEASE_CONFIG_VERSION ISLAMU_RELEASE_TRUST_VERSION \
+            ISLAMU_RELEASE_MANIFEST_SHA256; do
+            [[ -n "${!name}" ]]
+          done
+          [[ "$DEFAULT_BRANCH" != docs/publication && "$DEFAULT_BRANCH" != docs/gitbook-sync &&
+             "$DEFAULT_BRANCH" != "$RECEIPT_BRANCH" ]]
+          # Acceptance requires independent reviews and exact-head validation, with no bypass.
+          # Receipt protection permits ordinary authenticated appends but forbids deletion,
+          # history rewrites and publisher bypass. If rules deny an append, publication fails pending.
 
-      - name: Report publication drift without repairing it
-        env:
-          RestorePackagesWithLockFile: "false"
-          RELEASE_VERSION: ${{ inputs.version }}
+      - name: Initialize publication transport
+        id: transport
         run: |
-          case "$RELEASE_VERSION" in
-            *[!0-9.a-z-]* | "" )
-              printf '%s\n' 'release-publish: rejected, version input is not a governed version'
+          set -euo pipefail
+          cat > "$STATE/transport.sh" <<'TRANSPORT'
+          set -Eeuo pipefail
+          transport_delay() {
+            sleep "$1"
+          }
+          gh_api() {
+            local trial code status delay line retry_after rate_remaining rate_reset body response error elapsed=0
+            [[ ! -f "$STATE/permanent-transport-failure" ]] || return 77
+            response=$(mktemp "$STATE/response.XXXXXXXX")
+            error=$(mktemp "$STATE/error.XXXXXXXX")
+            for trial in 1 2 3; do
+              code=0
+              gh api --include "$@" > "$response" 2> "$error" || code=$?
+              status= retry_after= rate_remaining= rate_reset= body=
+              if IFS= read -r line < "$response" && [[ "$line" == HTTP/* ]]; then
+                status=$(cut -d' ' -f2 <<< "$line")
+                while IFS= read -r line; do
+                  line=${line%$'\r'}
+                  [[ -n "$line" ]] || break
+                  if [[ "${line,,}" == retry-after:* ]]; then retry_after=${line#*:}; fi
+                  if [[ "${line,,}" == x-ratelimit-remaining:* ]]; then rate_remaining=${line#*:}; fi
+                  if [[ "${line,,}" == x-ratelimit-reset:* ]]; then rate_reset=${line#*:}; fi
+                done < "$response"
+                body=$(awk 'body { print } /^\r?$/ { body=1 }' "$response")
+              else
+                body=$(<"$response")
+              fi
+              if [[ "$code" == 0 ]] && ! jq -e '.errors | length > 0' <<< "$body" >/dev/null 2>&1; then
+                printf '%s\n' "$body"
+                rm -f "$response" "$error"
+                return 0
+              fi
+              rate_remaining=${rate_remaining//[[:space:]]/}
+              rate_reset=${rate_reset//[[:space:]]/}
+              if [[ "$status" == 401 || ( "$status" == 403 && -z "$retry_after" && "$rate_remaining" != 0 ) ]] ||
+                jq -e '[.errors[]?.type] | any(. == "FORBIDDEN" or . == "UNAUTHORIZED")' <<< "$body" >/dev/null 2>&1; then
+                touch "$STATE/permanent-transport-failure"
+                rm -f "$response" "$error"
+                return 77
+              fi
+              if [[ "$status" == 409 ]] ||
+                grep -Eqi 'expectedHeadOid|expected head|is at .* but expected' "$error" ||
+                grep -Eqi 'expectedHeadOid|expected head' <<< "$body"; then
+                rm -f "$response" "$error"
+                return 75
+              fi
+              if [[ "$status" != 429 && ! "$status" =~ ^5[0-9][0-9]$ &&
+                    ! ( "$status" == 403 && ( -n "$retry_after" || "$rate_remaining" == 0 ) ) ]] &&
+                ! grep -Eqi 'connection reset|connection refused|timed out|temporary failure|TLS handshake timeout' "$error"; then
+                touch "$STATE/permanent-transport-failure"
+                rm -f "$response" "$error"
+                return 77
+              fi
+              [[ "$trial" -lt 3 ]] || break
+              delay=$((1 << (trial - 1)))
+              retry_after="${retry_after#"${retry_after%%[![:space:]]*}"}"
+              if [[ "$retry_after" =~ ^[0-9]+$ ]]; then
+                delay=$((10#$retry_after))
+              elif [[ -n "$retry_after" ]]; then
+                delay=$(($(date -d "$retry_after" +%s) - $(date +%s))) || break
+                (( delay >= 0 )) || delay=0
+              elif [[ "$rate_remaining" == 0 && "$rate_reset" =~ ^[0-9]+$ ]]; then
+                delay=$((rate_reset - $(date +%s)))
+                (( delay >= 0 )) || delay=0
+              fi
+              (( elapsed + delay <= 120 )) || break
+              transport_delay "$delay"
+              elapsed=$((elapsed + delay))
+            done
+            rm -f "$response" "$error"
+            return 76
+          }
+          git_remote() {
+            local trial code error
+            [[ ! -f "$STATE/permanent-transport-failure" ]] || return 77
+            error=$(mktemp "$STATE/git-error.XXXXXXXX")
+            for trial in 1 2 3; do
+              code=0
+              git -c credential.helper= -c 'credential.helper=!gh auth git-credential' "$@" 2>"$error" || code=$?
+              if [[ "$code" == 0 ]]; then rm -f "$error"; return 0; fi
+              # ls-remote exit 2 is absence, not a failed authentication.
+              if [[ "$code" == 2 && " $* " == *" ls-remote "* ]]; then rm -f "$error"; return 2; fi
+              if grep -Eqi 'non-fast-forward|fetch first|stale info|cannot lock ref' "$error"; then
+                rm -f "$error"; return 75
+              fi
+              if ! grep -Eqi 'connection reset|connection refused|timed out|temporary failure|HTTP (429|5[0-9][0-9])' "$error"; then
+                touch "$STATE/permanent-transport-failure"
+                rm -f "$error"; return 77
+              fi
+              [[ "$trial" -lt 3 ]] || break
+              transport_delay "$((1 << (trial - 1)))"
+            done
+            rm -f "$error"
+            return 76
+          }
+          remote_oid() {
+            git_remote ls-remote --exit-code origin "refs/heads/$1" | cut -f1
+          }
+          fetch_branch() {
+            git_remote fetch --no-tags origin "refs/heads/$1" >/dev/null || return $?
+            git rev-parse FETCH_HEAD
+          }
+          create_commit() {
+            jq -n --arg repo "$GH_REPO" --arg branch "$1" --arg old "$2" --arg message "$3" \
+              --slurpfile files "$4" \
+              '{query:"mutation($input:CreateCommitOnBranchInput!){createCommitOnBranch(input:$input){commit{oid}}}",
+                variables:{input:{branch:{repositoryNameWithOwner:$repo,branchName:$branch},
+                  expectedHeadOid:$old,message:{headline:$message},fileChanges:{additions:$files[0]}}}}' \
+              > "$STATE/commit-request.json"
+            gh_api graphql --input "$STATE/commit-request.json" > "$STATE/commit-result.json" &&
+              jq -er '.data.createCommitOnBranch.commit.oid | select(test("^[0-9a-f]{40}$"))' "$STATE/commit-result.json"
+          }
+          persist_receipt() {
+            local digest path old observed new retry encoded code
+            encoded=$(jq -rn --arg value "$RECEIPT_BRANCH" '$value | @uri')
+            gh_api "repos/$GH_REPO/branches/$encoded" | jq -e '.protected == true' >/dev/null || return 1
+            digest=$(sha256sum "$STATE/receipt.json" | cut -d' ' -f1)
+            path="receipts/$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/$MODE-$digest.json"
+            jq -n --arg path "$path" --rawfile receipt "$STATE/receipt.json" \
+              '[{path:$path,contents:($receipt|@base64)}]' > "$STATE/receipt-files.json"
+            for retry in 1 2 3; do
+              old=$(fetch_branch "$RECEIPT_BRANCH") || return 1
+              if git cat-file -e "$old:$path" 2>/dev/null; then
+                [[ "$(git rev-parse "$old:$path")" == "$(git hash-object "$STATE/receipt.json")" ]] || return 1
+                return 0
+              fi
+              new=$(create_commit "$RECEIPT_BRANCH" "$old" 'docs(release): retain publication receipt' "$STATE/receipt-files.json") ||
+                { code=$?; [[ "$code" == 75 ]] && continue; return "$code"; }
+              observed=$(fetch_branch "$RECEIPT_BRANCH") || return 1
+              git merge-base --is-ancestor "$new" "$observed" || continue
+              [[ "$(git rev-parse "$observed:$path")" == "$(git hash-object "$STATE/receipt.json")" ]] && return 0
+            done
+            return 1
+          }
+          source= accepted= proposal= commit= mirror= pr="${PROPOSAL_PR:-}" attempt=0 check='{}'
+          receipt() {
+            local manifest='null'
+            if [[ -f "$STATE/generated-manifest.json" ]]; then
+              manifest=$(jq -c . "$STATE/generated-manifest.json")
+            fi
+            jq -n --arg state "$1" --arg reason "$2" --arg mode "$MODE" --arg source "$source" \
+              --arg accepted "$accepted" --arg mirror "$mirror" --arg proposal "$proposal" \
+              --arg commit "$commit" --arg expected "$PROPOSAL_HEAD" --arg pr "$pr" \
+              --arg run "$GITHUB_RUN_ID" --arg runAttempt "$GITHUB_RUN_ATTEMPT" --argjson attempt "$attempt" \
+              --arg bundle "$ISLAMU_RELEASE_MANIFEST_SHA256" --argjson manifest "$manifest" --argjson check "$check" \
+              '{schemaVersion:"publication-receipt.v1",state:$state,reason:$reason,mode:$mode,
+                sourceCommit:$source,acceptedCommit:$accepted,mirrorCommit:$mirror,
+                proposalBranch:$proposal,proposalCommit:$commit,expectedProposalCommit:$expected,proposalPr:$pr,
+                runId:$run,runAttempt:$runAttempt,attempt:$attempt,bundleManifestSha256:$bundle,
+                inputSetSha256:$manifest.inputSetSha256,projectionSha256:$manifest.projectionSha256,
+                releases:$manifest.releases,manifest:$manifest,gitbookCheck:$check,
+                autoRepair:false,releaseInvalidated:false}' > "$STATE/receipt.json"
+            if ! persist_receipt; then
+              jq '.state="pending" | .reason="durable-receipt-unavailable"' "$STATE/receipt.json" > "$STATE/receipt.tmp"
+              mv "$STATE/receipt.tmp" "$STATE/receipt.json"
+              return 1
+            fi
+          }
+          fail_pending() {
+            trap - ERR
+            if [[ -f "$STATE/permanent-transport-failure" ]]; then
+              printf '%s\n' '{"schemaVersion":"publication-receipt.v1","state":"pending","reason":"transport-authorization-denied"}' > "$STATE/receipt.json"
               exit 1
-              ;;
-          esac
-          if [ ! -f "publication-projection.v1.json" ]; then
-            printf '%s\n' 'release-publish: recorded-no-op, no publication projection supplied'
+            fi
+            receipt pending "$1"
+            exit 1
+          }
+          trap 'fail_pending transport-or-verification-failed' ERR
+          seed() {
+            mkdir -p "$(dirname "$PAGE")"
+            for path in "$PAGE" "$MANIFEST"; do
+              if git cat-file -e "$1:$path" 2>/dev/null; then
+                [[ "$(git ls-tree "$1" -- "$path" | cut -d' ' -f1)" == 100644 ]]
+                git show "$1:$path" > "$path"
+              else
+                rm -f -- "$path"
+              fi
+            done
+          }
+          project() {
+            # Only DATA is extracted from the default branch, never an executable or trust root.
+            stage=$(mktemp -d "$RUNNER_TEMP/publication.XXXXXXXX")
+            git archive "$source" eng/release/publication/retained | tar -x -C "$stage"
+            inputs="$stage/eng/release/publication/retained"
+            seed "$1"
+            "$TRUSTED_LAUNCHER" run-promoted sync-public-changelog \
+              --inventory "$inputs/authorized-inventory.v1.json" --retained-evidence "$inputs/evidence" \
+              --publication-base "$PUBLICATION_BASE"
+            "$TRUSTED_LAUNCHER" run-promoted sync-public-changelog \
+              --inventory "$inputs/authorized-inventory.v1.json" --retained-evidence "$inputs/evidence" \
+              --publication-base "$PUBLICATION_BASE" --check
+            cp "$MANIFEST" "$STATE/generated-manifest.json"
+            page_blob=$(git hash-object "$PAGE")
+            manifest_blob=$(git hash-object "$MANIFEST")
+          }
+          matches_projection() {
+            [[ "$(git ls-tree "$1" -- "$PAGE" | cut -d' ' -f1)" == 100644 &&
+               "$(git ls-tree "$1" -- "$MANIFEST" | cut -d' ' -f1)" == 100644 &&
+               "$(git rev-parse "$1:$PAGE")" == "$page_blob" &&
+               "$(git rev-parse "$1:$MANIFEST")" == "$manifest_blob" ]]
+          }
+          fresh() {
+            [[ "$(remote_oid "$DEFAULT_BRANCH")" == "$source" &&
+               "$(remote_oid docs/publication)" == "$accepted" ]]
+          }
+          read_proposal() {
+            gh_api "repos/$GH_REPO/pulls/$PROPOSAL_PR" > "$STATE/proposal.json"
+            jq -e --arg repo "$GH_REPO" --arg head "$PROPOSAL_HEAD" \
+              '.base.ref == "docs/publication" and .base.repo.full_name == $repo and
+                .head.repo.full_name == $repo and .head.sha == $head and
+                (.head.ref | startswith("release-publication/"))' "$STATE/proposal.json" >/dev/null
+            proposal=$(jq -er '.head.ref' "$STATE/proposal.json")
+            if jq -e '.merged == true' "$STATE/proposal.json" >/dev/null; then
+              git_remote fetch --no-tags origin "refs/pull/$PROPOSAL_PR/head" >/dev/null
+              commit=$(git rev-parse FETCH_HEAD)
+            else
+              commit=$(fetch_branch "$proposal")
+            fi
+            [[ "$commit" == "$PROPOSAL_HEAD" ]]
+            base=$(git rev-parse "$commit^")
+            [[ "$(git rev-list --parents -n 1 "$commit" | wc -w)" == 2 ]]
+            [[ -z "$(git diff --name-only "$base" "$commit" -- . ":(exclude)$PAGE" ":(exclude)$MANIFEST")" ]]
+          }
+          status() {
+            gh_api --silent --method POST "repos/$GH_REPO/statuses/$1" \
+              -f state="$2" -f context="$3" -f description="$4" 2>/dev/null
+          }
+          check_protection() {
+            local branch encoded
+            for branch in "$DEFAULT_BRANCH" docs/publication "$RECEIPT_BRANCH"; do
+              encoded=$(jq -rn --arg value "$branch" '$value | @uri')
+              gh_api "repos/$GH_REPO/branches/$encoded" | jq -e '.protected == true' >/dev/null || return $?
+            done
+          }
+          TRANSPORT
+
+      - name: Regenerate all authorized releases and propose protected acceptance
+        id: propose
+        if: ${{ inputs.mode == 'propose' }}
+        run: |
+          source "$STATE/transport.sh"
+          check_protection
+          for attempt in 1 2 3; do
+            source=$(fetch_branch "$DEFAULT_BRANCH")
+            accepted=$(fetch_branch docs/publication)
+            git_remote fetch --tags origin >/dev/null
+            project "$accepted"
+            fresh || continue
+            receipt pending proposal-prepared
+            if matches_projection "$accepted" 2>/dev/null; then
+              commit=$accepted
+              receipt pending awaiting-explicit-reconcile
+              exit 0
+            fi
+            key=$(sha256sum "$MANIFEST" | cut -d' ' -f1)
+            proposal="release-publication/${accepted:0:12}-$key"
+            commit=$(remote_oid "$proposal" || true)
+            if [[ -z "$commit" ]]; then
+              gh_api --silent --method POST "repos/$GH_REPO/git/refs" \
+                -f ref="refs/heads/$proposal" -f sha="$accepted" ||
+                { code=$?; [[ "$code" == 75 ]] && continue; fail_pending proposal-write-failed; }
+              commit=$accepted
+            fi
+            if [[ "$commit" == "$accepted" ]]; then
+              jq -n --rawfile page "$PAGE" --rawfile manifest "$MANIFEST" --arg pagePath "$PAGE" --arg manifestPath "$MANIFEST" \
+                '[{path:$pagePath,contents:($page|@base64)},{path:$manifestPath,contents:($manifest|@base64)}]' > "$STATE/proposal-files.json"
+              commit=$(create_commit "$proposal" "$commit" 'docs(changelog): propose authorized release projection' "$STATE/proposal-files.json") ||
+                { code=$?; [[ "$code" == 75 ]] && continue; fail_pending proposal-write-failed; }
+            fi
+            [[ "$(fetch_branch "$proposal")" == "$commit" && "$(git rev-parse "$commit^")" == "$accepted" ]]
+            matches_projection "$commit"
+            [[ -z "$(git diff --name-only "$accepted" "$commit" -- . ":(exclude)$PAGE" ":(exclude)$MANIFEST")" ]]
+            fresh || continue
+            gh_api --method GET "repos/$GH_REPO/pulls" -f state=all \
+              -f head="${GH_REPO%%/*}:$proposal" -f base=docs/publication > "$STATE/pulls.json" 2>/dev/null
+            [[ "$(jq 'length' "$STATE/pulls.json")" -le 1 ]]
+            pr=$(jq -r '.[0].number // empty' "$STATE/pulls.json")
+            if [[ -z "$pr" ]]; then
+              pr=$(gh_api --method POST "repos/$GH_REPO/pulls" -f head="$proposal" -f base=docs/publication \
+                -f title='docs(changelog): accept authorized release projection' \
+                -f body="Publication pending. Independently review this projection. Dispatch validate with proposal_pr and exact proposal_head=$commit to run release-publication/validation. After protected merge, dispatch reconcile with the same inputs. No automatic merge or bypass." \
+                --jq .number 2>/dev/null)
+            fi
+            receipt pending review-and-required-checks
+            status "$commit" pending release-publication/delivery 'Awaiting exact-head validation and protected acceptance'
+            exit 0
+          done
+          receipt pending cas-retry-exhausted
+          exit 1
+
+      - name: Validate exact proposal against current complete inventory and acceptance
+        id: validate
+        if: ${{ inputs.mode == 'validate' }}
+        run: |
+          source "$STATE/transport.sh"
+          check_protection
+          read_proposal
+          jq -e '.state == "open" and .merged == false' "$STATE/proposal.json" >/dev/null
+          receipt pending validation-started
+          status "$commit" pending release-publication/validation 'Rechecking exact proposal against current complete inventory'
+          source=$(fetch_branch "$DEFAULT_BRANCH")
+          accepted=$(fetch_branch docs/publication)
+          [[ "$base" == "$accepted" ]] || fail_pending acceptance-base-changed
+          git_remote fetch --tags origin >/dev/null
+          project "$accepted"
+          matches_projection "$commit" || fail_pending stale-proposal-projection
+          fresh && [[ "$(remote_oid "$proposal")" == "$commit" ]] || fail_pending validation-snapshot-changed
+          receipt verified exact-proposal-current-inventory
+          # Receipt storage is part of validation, not a best-effort afterthought.
+          fresh && [[ "$(remote_oid "$proposal")" == "$commit" ]] || fail_pending validation-snapshot-changed
+          status "$commit" success release-publication/validation 'Exact proposal matches current complete inventory and acceptance base'
+
+      - name: Reconcile observed acceptance and mirror without repairing drift
+        id: reconcile
+        if: ${{ inputs.mode == 'reconcile' }}
+        run: |
+          source "$STATE/transport.sh"
+          check_protection
+          [[ "$GITBOOK_APP_ID" =~ ^[1-9][0-9]*$ && -n "$GITBOOK_CHECK_NAME" ]]
+          read_proposal
+          if ! jq -e '.merged == true' "$STATE/proposal.json" >/dev/null; then
+            receipt pending acceptance-not-observed
             exit 0
           fi
-          dotnet run --file .ci/scripts/report-publication-drift.cs -- \
-            --release-directory "docs/releases/$RELEASE_VERSION" \
-            --projections publication-projection.v1.json \
-            --output publication-drift
+          merged=$(jq -er '.merge_commit_sha' "$STATE/proposal.json")
+          for attempt in 1 2 3; do
+            source=$(fetch_branch "$DEFAULT_BRANCH")
+            accepted=$(fetch_branch docs/publication)
+            mirror=$(fetch_branch docs/gitbook-sync)
+            [[ "$accepted" == "$merged" && "$(git rev-parse "$accepted^")" == "$base" ]] || fail_pending acceptance-changed
+            [[ -z "$(git diff --name-only "$base" "$accepted" -- . ":(exclude)$PAGE" ":(exclude)$MANIFEST")" ]] || fail_pending acceptance-scope-changed
+            git_remote fetch --tags origin >/dev/null
+            project "$base"
+            matches_projection "$commit" && matches_projection "$accepted" || fail_pending stale-accepted-projection
+            if ! git merge-base --is-ancestor "$mirror" "$accepted"; then
+              receipt drift mirror-diverged-from-acceptance
+              exit 1
+            fi
+            fresh || continue
+            if [[ "$mirror" != "$accepted" ]]; then
+              # Retain a rich recovery checkpoint BEFORE the mirror mutation.
+              receipt pending mirror-prepared
+              fresh || continue
+              git_remote push origin "$accepted:refs/heads/docs/gitbook-sync" >/dev/null ||
+                { code=$?; [[ "$code" == 75 ]] && continue; fail_pending mirror-write-failed; }
+            fi
+            mirror=$(remote_oid docs/gitbook-sync)
+            [[ "$mirror" == "$accepted" ]] && fresh || continue
+            receipt pending gitbook-sync-not-observed
+            status "$accepted" pending release-publication/delivery 'Accepted and mirrored; awaiting observed GitBook synchronization'
+            # Request pages separately: gh --include --paginate --slurp interleaves
+            # HTTP headers inside the slurped JSON array and cannot be parsed as JSON.
+            printf '[]\n' > "$STATE/gitbook-checks.json"
+            for page in {1..100}; do
+              gh_api --method GET "repos/$GH_REPO/commits/$mirror/check-runs" \
+                -f check_name="$GITBOOK_CHECK_NAME" -f filter=latest -f per_page=100 -f page="$page" \
+                > "$STATE/gitbook-page.json"
+              jq -s '.[0] + .[1].check_runs' "$STATE/gitbook-checks.json" "$STATE/gitbook-page.json" \
+                > "$STATE/gitbook-checks.tmp"
+              mv "$STATE/gitbook-checks.tmp" "$STATE/gitbook-checks.json"
+              [[ "$(jq '.check_runs | length' "$STATE/gitbook-page.json")" == 100 ]] || break
+              [[ "$page" -lt 100 ]] || fail_pending gitbook-check-page-limit
+            done
+            check=$(jq -c --arg name "$GITBOOK_CHECK_NAME" --argjson app "$GITBOOK_APP_ID" --arg sha "$mirror" \
+              '[.[] | select(.name == $name and .app.id == $app and .head_sha == $sha)] |
+                sort_by(.id) | last // {}' "$STATE/gitbook-checks.json")
+            if [[ "$(jq -r '.status' <<< "$check")" == completed &&
+                  "$(jq -r '.conclusion' <<< "$check")" == success ]]; then
+              suite=$(jq -er '.check_suite.id' <<< "$check")
+              gh_api "repos/$GH_REPO/check-suites/$suite" > "$STATE/gitbook-suite.json"
+              if jq -e --arg sha "$mirror" --argjson app "$GITBOOK_APP_ID" \
+                '.head_branch == "docs/gitbook-sync" and .head_sha == $sha and .app.id == $app' "$STATE/gitbook-suite.json" >/dev/null; then
+                [[ "$(remote_oid docs/gitbook-sync)" == "$mirror" ]] && fresh || continue
+                receipt delivered gitbook-sync-observed
+                [[ "$(remote_oid docs/gitbook-sync)" == "$mirror" ]] && fresh || continue
+                status "$accepted" success release-publication/delivery 'Protected acceptance mirrored and GitBook synchronization observed'
+              fi
+            fi
+            exit 0
+          done
+          receipt pending mirror-retry-exhausted
+          exit 1
+
+      - name: Retain diagnostic receipt artifact
+        id: retain
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: publication-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ github.workspace }}/.publication-state/receipt.json
+            ${{ github.workspace }}/.publication-state/generated-manifest.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 90
+          # Diagnostic copy only. The protected append-only receipt branch is the durable ledger.

@@ -1,4 +1,5 @@
 #:property RestorePackagesWithLockFile=false
+#:package YamlDotNet
 #pragma warning disable CA1050
 
 using System.Security.Cryptography;
@@ -8,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
+using YamlDotNet.RepresentationModel;
 
 var options = ParseArgs(args);
 if (options is null) return Fail("adapter_usage_invalid");
@@ -253,48 +255,150 @@ static void ValidateProvider(ProviderDefinition provider, string operation, Exte
     ValidatePublicationWorkflows(provider);
 }
 
-// A published release page is a non-authoritative projection of the signed tag. It is mutable and
-// unsigned, so the contract it must satisfy is stated here and machine-checked: trusted final lane
-// only, release notes hash and tag reference on the page, self-verifying assets attached, and a
-// recorded operator no-op for any provider that has no release API at all.
+// GitHub consumes the signed all-line inventory and retains the projection manifest.
+// Other providers still declare the release-page transport contract or an evidenced no-op.
 static void ValidatePublicationWorkflows(ProviderDefinition provider)
 {
     foreach (string workflow in provider.PublicationWorkflows)
     {
         string path = ResolveDiscoveryWorkflowPath(provider, workflow);
         if (!File.Exists(path) || IsAlias(path)) throw new AdapterException("adapter_publication_workflow_missing");
-        string text = File.ReadAllText(path);
-        if (!text.Contains("release-publish", StringComparison.Ordinal)) throw new AdapterException("adapter_publication_workflow_mismatch");
-        if (WorkflowHasEvent(text, "pull_request") || WorkflowHasEvent(text, "pull_request_target") || WorkflowHasEvent(text, "push"))
+        YamlMappingNode document;
+        try
+        {
+            var stream = new YamlStream();
+            stream.Load(new StringReader(File.ReadAllText(path)));
+            if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode mapping)
+                throw new AdapterException("adapter_publication_workflow_invalid");
+            document = mapping;
+        }
+        catch (YamlDotNet.Core.YamlException)
+        {
+            throw new AdapterException("adapter_publication_workflow_invalid");
+        }
+        YamlNode? events = PublicationNode(document, "on");
+        string[] eventNames = events switch
+        {
+            YamlMappingNode eventMap => eventMap.Children.Keys.OfType<YamlScalarNode>().Select(node => node.Value ?? "").ToArray(),
+            YamlSequenceNode eventList => eventList.Children.OfType<YamlScalarNode>().Select(node => node.Value ?? "").ToArray(),
+            YamlScalarNode scalar => [scalar.Value ?? ""],
+            _ => [],
+        };
+        if (eventNames.Length == 0 || eventNames.Any(name => name is not ("workflow_dispatch" or "manual")))
         {
             throw new AdapterException("adapter_publication_untrusted_origin");
         }
-
-        if (!text.Contains("release-notes-sha256", StringComparison.Ordinal) || !text.Contains("tag-reference", StringComparison.Ordinal))
+        YamlMappingNode jobs = PublicationMapping(document, "jobs");
+        YamlMappingNode job = PublicationMapping(jobs, "release-publish");
+        if (PublicationNode(job, "steps") is not YamlSequenceNode steps || steps.Children.Any(node => node is not YamlMappingNode))
+            throw new AdapterException("adapter_publication_workflow_invalid");
+        string runs = string.Join('\n', steps.Children.Cast<YamlMappingNode>().Select(step => PublicationScalar(step, "run")));
+        if (provider.ProviderId == "github")
         {
-            throw new AdapterException("adapter_publication_release_notes_reference_missing");
+            ValidateChangelogPublication(job, steps);
         }
-
-        foreach (string asset in RequiredPublicationAssets())
+        else
         {
-            if (!text.Contains(asset, StringComparison.Ordinal)) throw new AdapterException("adapter_publication_asset_missing");
+            if (!runs.Contains("release-notes-sha256", StringComparison.Ordinal) || !runs.Contains("tag-reference", StringComparison.Ordinal))
+                throw new AdapterException("adapter_publication_release_notes_reference_missing");
+            foreach (string asset in RequiredPublicationAssets())
+            {
+                if (!runs.Contains(asset, StringComparison.Ordinal)) throw new AdapterException("adapter_publication_asset_missing");
+            }
         }
-
-        foreach (string action in ExtractUsedActions(text))
+        foreach (YamlNode action in PublicationActions(jobs))
         {
-            if (!ActionPinPattern().IsMatch(action)) throw new AdapterException("adapter_action_pin_mutable");
+            if (action is not YamlScalarNode scalar || !ActionPinPattern().IsMatch(scalar.Value ?? ""))
+                throw new AdapterException("adapter_action_pin_mutable");
         }
 
         if (provider.Capabilities.ReleasePublication)
         {
-            if (provider.FinalLane.EnvironmentApproval && !text.Contains("environment:", StringComparison.Ordinal)) throw new AdapterException("adapter_final_environment_required");
+            if (provider.FinalLane.EnvironmentApproval && string.IsNullOrWhiteSpace(PublicationScalar(job, "environment")))
+                throw new AdapterException("adapter_final_environment_required");
         }
         else
         {
             if (!provider.Capabilities.OperatorEvidenceRequired) throw new AdapterException("adapter_publication_noop_evidence_required");
-            if (!text.Contains("recorded-no-op", StringComparison.Ordinal)) throw new AdapterException("adapter_publication_noop_evidence_required");
+            if (!runs.Contains("recorded-no-op", StringComparison.Ordinal)) throw new AdapterException("adapter_publication_noop_evidence_required");
         }
     }
+}
+
+static YamlNode? PublicationNode(YamlMappingNode node, string key) =>
+    node.Children.TryGetValue(new YamlScalarNode(key), out YamlNode? value) ? value : null;
+
+static string PublicationScalar(YamlMappingNode node, string key) =>
+    (PublicationNode(node, key) as YamlScalarNode)?.Value ?? "";
+
+static YamlMappingNode PublicationMapping(YamlMappingNode node, string key) =>
+    PublicationNode(node, key) as YamlMappingNode ?? throw new AdapterException("adapter_publication_workflow_invalid");
+
+static IEnumerable<YamlNode> PublicationActions(YamlNode node)
+{
+    if (node is YamlMappingNode mapping)
+    {
+        foreach (var child in mapping.Children)
+        {
+            if (child.Key is YamlScalarNode { Value: "uses" }) yield return child.Value;
+            else foreach (YamlNode action in PublicationActions(child.Value)) yield return action;
+        }
+    }
+    else if (node is YamlSequenceNode sequence)
+    {
+        foreach (YamlNode child in sequence.Children)
+            foreach (YamlNode action in PublicationActions(child)) yield return action;
+    }
+}
+
+static void ValidateChangelogPublication(YamlMappingNode job, YamlSequenceNode steps)
+{
+    if (PublicationScalar(job, "if") != "${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}")
+        throw new AdapterException("adapter_publication_untrusted_origin");
+    YamlMappingNode runner = PublicationMapping(job, "runs-on");
+    if (PublicationScalar(runner, "group") != "release-publication" ||
+        PublicationNode(runner, "labels") is not YamlSequenceNode labels ||
+        !labels.Children.OfType<YamlScalarNode>().Any(label => label.Value == "self-hosted"))
+        throw new AdapterException("adapter_self_hosted_runner_required");
+    YamlMappingNode environment = PublicationMapping(job, "env");
+    if (PublicationScalar(environment, "TRUSTED_LAUNCHER") != "${{ vars.RELEASE_TRUSTED_LAUNCHER }}")
+        throw new AdapterException("adapter_final_candidate_code_forbidden");
+    if (PublicationScalar(environment, "PAGE") != "docs/public/changelog/README.md" ||
+        PublicationScalar(environment, "MANIFEST") != "docs/public/changelog/publication-manifest.v1.json")
+        throw new AdapterException("adapter_publication_projection_paths_invalid");
+
+    var proposalSteps = steps.Children.Cast<YamlMappingNode>()
+        .Where(step => PublicationScalar(step, "id") == "propose").ToArray();
+    if (proposalSteps.Length != 1 || PublicationScalar(proposalSteps[0], "if") != "${{ inputs.mode == 'propose' }}")
+        throw new AdapterException("adapter_publication_inventory_contract_missing");
+    var transportSteps = steps.Children.Cast<YamlMappingNode>()
+        .Where(step => PublicationScalar(step, "id") == "transport").ToArray();
+    if (transportSteps.Length != 1 || PublicationNode(transportSteps[0], "if") is not null)
+        throw new AdapterException("adapter_publication_inventory_contract_missing");
+    string program = PublicationScalar(transportSteps[0], "run");
+    string[] commands = Regex.Replace(program, @"\\\r?\n\s*", " ").Split('\n')
+        .Select(line => line.Trim()).Where(line =>
+            line.StartsWith("\"$TRUSTED_LAUNCHER\" run-promoted sync-public-changelog ", StringComparison.Ordinal)).ToArray();
+    if (commands.Length != 2 || commands.Any(command =>
+            !command.Contains("--inventory \"$inputs/authorized-inventory.v1.json\"", StringComparison.Ordinal) ||
+            !command.Contains("--retained-evidence \"$inputs/evidence\"", StringComparison.Ordinal) ||
+            !command.Contains("--publication-base \"$PUBLICATION_BASE\"", StringComparison.Ordinal)) ||
+        commands.Count(command => Regex.IsMatch(command, @"(?:^|\s)--check(?:\s|$)")) != 1)
+        throw new AdapterException("adapter_publication_inventory_contract_missing");
+
+    var retentionSteps = steps.Children.Cast<YamlMappingNode>()
+        .Where(step => PublicationScalar(step, "id") == "retain").ToArray();
+    if (retentionSteps.Length != 1 ||
+        PublicationScalar(retentionSteps[0], "if") != "${{ always() }}" ||
+        !PublicationScalar(retentionSteps[0], "uses").StartsWith("actions/upload-artifact@", StringComparison.Ordinal))
+        throw new AdapterException("adapter_publication_manifest_retention_missing");
+    YamlMappingNode retention = PublicationMapping(retentionSteps[0], "with");
+    string[] retainedPaths = PublicationScalar(retention, "path").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (!retainedPaths.Contains("${{ github.workspace }}/.publication-state/receipt.json", StringComparer.Ordinal) ||
+        !retainedPaths.Contains("${{ github.workspace }}/.publication-state/generated-manifest.json", StringComparer.Ordinal) ||
+        PublicationScalar(retention, "if-no-files-found") != "error" ||
+        PublicationScalar(retention, "include-hidden-files") != "true")
+        throw new AdapterException("adapter_publication_manifest_retention_missing");
 }
 
 static IReadOnlyList<string> RequiredPublicationAssets() =>

@@ -2,12 +2,24 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using YamlDotNet.RepresentationModel;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
 [NotInParallel]
 public sealed class ReleaseProviderAdapterScriptTests
 {
+    [Test]
+    public async Task ProviderAdapterScriptAcceptsTheCheckedInPublicationWorkflow()
+    {
+        using var fixture = ProviderFixture.CreateSingle("github");
+
+        ScriptResult result = fixture.Run();
+
+        await Assert.That(result.ExitCode).IsEqualTo(0).Because(result.Output);
+        await Assert.That(result.Output).Contains("adapter_validation_passed: providers=1");
+    }
+
     [Test]
     public async Task ProviderAdapterScriptEnforcesThePublicationProjectionContract()
     {
@@ -16,11 +28,11 @@ public sealed class ReleaseProviderAdapterScriptTests
         using var untrustedOrigin = ProviderFixture.CreateSingle("github");
         untrustedOrigin.MutatePublicationWorkflow("github", yaml => yaml.Replace("on:\n  workflow_dispatch:", "on:\n  pull_request:", StringComparison.Ordinal));
 
-        using var missingReference = ProviderFixture.CreateSingle("github");
-        missingReference.MutatePublicationWorkflow("github", yaml => yaml.Replace("release-notes-sha256", "release-title", StringComparison.Ordinal));
+        using var missingReference = ProviderFixture.CreateSingle("forgejo-codeberg");
+        missingReference.MutatePublicationWorkflow("forgejo-codeberg", yaml => yaml.Replace("release-notes-sha256", "release-title", StringComparison.Ordinal));
 
-        using var missingAsset = ProviderFixture.CreateSingle("github");
-        missingAsset.MutatePublicationWorkflow("github", yaml => yaml.Replace("sbom", "changelog", StringComparison.Ordinal));
+        using var missingAsset = ProviderFixture.CreateSingle("forgejo-codeberg");
+        missingAsset.MutatePublicationWorkflow("forgejo-codeberg", yaml => yaml.Replace("sbom", "changelog", StringComparison.Ordinal));
 
         using var mutableAction = ProviderFixture.CreateSingle("github");
         mutableAction.MutatePublicationWorkflow("github", yaml => yaml + "      - uses: actions/checkout@v4\n");
@@ -40,6 +52,113 @@ public sealed class ReleaseProviderAdapterScriptTests
         await Assert.That(assetResult.Output).Contains("adapter_publication_asset_missing");
         await Assert.That(actionResult.Output).Contains("adapter_action_pin_mutable");
         await Assert.That(noopResult.Output).Contains("adapter_publication_noop_evidence_required");
+    }
+
+    [Test]
+    public async Task ProviderAdapterScriptRejectsPublicationInventoryAndProjectionDrift()
+    {
+        using var inventory = ProviderFixture.CreateSingle("github");
+        inventory.MutatePublicationWorkflow("github", yaml => yaml.Replace(
+            "--inventory \"$inputs/authorized-inventory.v1.json\"", "--inventory \"$inputs/current-release.json\"", StringComparison.Ordinal));
+        using var evidence = ProviderFixture.CreateSingle("github");
+        evidence.MutatePublicationWorkflow("github", yaml => yaml.Replace("--retained-evidence", "--unverified-evidence", StringComparison.Ordinal));
+        using var check = ProviderFixture.CreateSingle("github");
+        check.MutatePublicationWorkflow("github", yaml => yaml.Replace(" --check", "", StringComparison.Ordinal));
+        using var projection = ProviderFixture.CreateSingle("github");
+        projection.MutatePublicationWorkflow("github", yaml => yaml.Replace(
+            "PAGE: docs/public/changelog/README.md", "PAGE: docs/public/README.md", StringComparison.Ordinal));
+        using var manifest = ProviderFixture.CreateSingle("github");
+        manifest.MutatePublicationWorkflow("github", yaml => yaml.Replace(
+            "MANIFEST: docs/public/changelog/publication-manifest.v1.json", "MANIFEST: docs/public/changelog/unbound.json", StringComparison.Ordinal));
+
+        foreach (ProviderFixture fixture in new[] { inventory, evidence, check })
+        {
+            ScriptResult result = fixture.Run();
+            await Assert.That(result.ExitCode).IsNotEqualTo(0);
+            await Assert.That(result.Output).Contains("adapter_publication_inventory_contract_missing");
+        }
+        foreach (ProviderFixture fixture in new[] { projection, manifest })
+        {
+            ScriptResult result = fixture.Run();
+            await Assert.That(result.ExitCode).IsNotEqualTo(0);
+            await Assert.That(result.Output).Contains("adapter_publication_projection_paths_invalid");
+        }
+    }
+
+    [Test]
+    public async Task ProviderAdapterScriptRequiresActualPublicationCommandsAndManifestRetention()
+    {
+        using var commentedCommands = ProviderFixture.CreateSingle("github");
+        commentedCommands.MutatePublicationJob(job =>
+        {
+            var steps = (YamlSequenceNode)job.Children[new YamlScalarNode("steps")];
+            var transport = steps.Children.Cast<YamlMappingNode>().Single(step =>
+                step.Children.TryGetValue(new YamlScalarNode("id"), out YamlNode? id) && ((YamlScalarNode)id).Value == "transport");
+            string program = ((YamlScalarNode)transport.Children[new YamlScalarNode("run")]).Value!;
+            transport.Children[new YamlScalarNode("run")] = new YamlScalarNode(
+                string.Join('\n', program.Split('\n').Select(line => "# " + line)));
+        });
+        using var missingManifest = ProviderFixture.CreateSingle("github");
+        missingManifest.MutatePublicationWorkflow("github", yaml => yaml.Replace(
+            "${{ github.workspace }}/.publication-state/generated-manifest.json",
+            "${{ github.workspace }}/.publication-state/unrelated.json", StringComparison.Ordinal));
+        using var optionalRetention = ProviderFixture.CreateSingle("github");
+        optionalRetention.MutatePublicationWorkflow("github", yaml => yaml.Replace("if-no-files-found: error", "if-no-files-found: ignore", StringComparison.Ordinal));
+        using var proseOnlyEnvironment = ProviderFixture.CreateSingle("github");
+        proseOnlyEnvironment.MutatePublicationJob(job =>
+        {
+            job.Children.Remove(new YamlScalarNode("environment"));
+            job.Children[new YamlScalarNode("name")] = new YamlScalarNode("environment: production");
+        });
+
+        ScriptResult commandsResult = commentedCommands.Run();
+        await Assert.That(commandsResult.ExitCode).IsNotEqualTo(0);
+        await Assert.That(commandsResult.Output).Contains("adapter_publication_inventory_contract_missing");
+        foreach (ProviderFixture fixture in new[] { missingManifest, optionalRetention })
+        {
+            ScriptResult result = fixture.Run();
+            await Assert.That(result.ExitCode).IsNotEqualTo(0);
+            await Assert.That(result.Output).Contains("adapter_publication_manifest_retention_missing");
+        }
+        ScriptResult environmentResult = proseOnlyEnvironment.Run();
+        await Assert.That(environmentResult.ExitCode).IsNotEqualTo(0);
+        await Assert.That(environmentResult.Output).Contains("adapter_final_environment_required");
+    }
+
+    [Test]
+    public async Task ProviderAdapterScriptRejectsParsedPublicationTrustViolations()
+    {
+        using var inlineEvent = ProviderFixture.CreateSingle("github");
+        inlineEvent.MutatePublicationJob(_ => { }, workflow =>
+            workflow.Children[new YamlScalarNode("on")] = new YamlSequenceNode(new YamlScalarNode("workflow_dispatch"), new YamlScalarNode("pull_request_target")));
+        using var candidateRef = ProviderFixture.CreateSingle("github");
+        candidateRef.MutatePublicationJob(job => job.Children[new YamlScalarNode("if")] =
+            new YamlScalarNode("${{ github.event_name == 'workflow_dispatch' }}"));
+        using var sharedRunner = ProviderFixture.CreateSingle("github");
+        sharedRunner.MutatePublicationJob(job =>
+        {
+            var runner = (YamlMappingNode)job.Children[new YamlScalarNode("runs-on")];
+            runner.Children[new YamlScalarNode("group")] = new YamlScalarNode("candidate-builds");
+        });
+        using var candidateLauncher = ProviderFixture.CreateSingle("github");
+        candidateLauncher.MutatePublicationJob(job =>
+        {
+            var environment = (YamlMappingNode)job.Children[new YamlScalarNode("env")];
+            environment.Children[new YamlScalarNode("TRUSTED_LAUNCHER")] = new YamlScalarNode("${{ inputs.launcher }}");
+        });
+
+        foreach (ProviderFixture fixture in new[] { inlineEvent, candidateRef })
+        {
+            ScriptResult result = fixture.Run();
+            await Assert.That(result.ExitCode).IsNotEqualTo(0);
+            await Assert.That(result.Output).Contains("adapter_publication_untrusted_origin");
+        }
+        ScriptResult runnerResult = sharedRunner.Run();
+        await Assert.That(runnerResult.ExitCode).IsNotEqualTo(0);
+        await Assert.That(runnerResult.Output).Contains("adapter_self_hosted_runner_required");
+        ScriptResult launcherResult = candidateLauncher.Run();
+        await Assert.That(launcherResult.ExitCode).IsNotEqualTo(0);
+        await Assert.That(launcherResult.Output).Contains("adapter_final_candidate_code_forbidden");
     }
 
     [Test]
@@ -416,8 +535,25 @@ public sealed class ReleaseProviderAdapterScriptTests
         public void MutatePublicationWorkflow(string provider, Func<string, string> mutate)
         {
             string path = Path.Combine(ProvidersRoot, provider, "release-publish.yml");
-            File.WriteAllText(path, mutate(File.ReadAllText(path)));
+            string original = File.ReadAllText(path);
+            string mutated = mutate(original);
+            if (mutated == original) throw new InvalidOperationException("publication workflow mutation did not change its input");
+            File.WriteAllText(path, mutated);
         }
+
+        public void MutatePublicationJob(Action<YamlMappingNode> mutate, Action<YamlMappingNode>? mutateWorkflow = null) =>
+            MutatePublicationWorkflow("github", yaml =>
+            {
+                var stream = new YamlStream();
+                stream.Load(new StringReader(yaml));
+                var workflow = (YamlMappingNode)stream.Documents[0].RootNode;
+                var jobs = (YamlMappingNode)workflow.Children[new YamlScalarNode("jobs")];
+                mutate((YamlMappingNode)jobs.Children[new YamlScalarNode("release-publish")]);
+                mutateWorkflow?.Invoke(workflow);
+                using var writer = new StringWriter();
+                stream.Save(writer, assignAnchors: false);
+                return writer.ToString();
+            });
 
         public void MutateFinalEvent(string provider, string finalEvent) => MutateProvider(provider, json => json
             .Replace("\"event\": \"workflow_dispatch\",\n    \"trustedRef\": \"default-branch\"", $"\"event\": \"{finalEvent}\",\n    \"trustedRef\": \"default-branch\"", StringComparison.Ordinal)
@@ -536,15 +672,21 @@ public sealed class ReleaseProviderAdapterScriptTests
 
         private void WritePublicationWorkflow(string provider, bool unsupportedPublication)
         {
+            if (provider == "github")
+            {
+                File.Copy(Path.Combine(FindRepositoryRoot(), ".github", "workflows", "release-publish.yml"),
+                    Path.Combine(ProvidersRoot, provider, "release-publish.yml"));
+                return;
+            }
             string environment = provider == "tangled" ? string.Empty : "    environment: production\n";
             string noop = unsupportedPublication
-                ? "      - run: printf '%s\\n' 'release-publish: recorded-no-op, provider has no documented release publication API'\n"
+                ? "      - run: |\n          printf '%s\\n' 'release-publish: recorded-no-op, provider has no documented release publication API'\n"
                 : string.Empty;
             File.WriteAllText(
                 Path.Combine(ProvidersRoot, provider, "release-publish.yml"),
                 "name: publish\non:\n  workflow_dispatch:\njobs:\n  release-publish:\n" + environment + "    steps:\n" + noop +
-                "      - run: printf '%s\\n' 'page-header: release-notes-sha256 and tag-reference'\n" +
-                "      - run: printf '%s\\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'\n");
+                "      - run: |\n          printf '%s\\n' 'page-header: release-notes-sha256 and tag-reference'\n" +
+                "      - run: |\n          printf '%s\\n' 'assets: release-evidence.v1.json artifacts.sha256 container-image-digests sbom'\n");
         }
 
         private void WriteDiscoveryWorkflows(string provider, string finalEvent)

@@ -38,6 +38,11 @@ public static class Program
             return WriteUsage(output);
         }
 
+        if (string.Equals(args[0], "run-promoted", StringComparison.Ordinal))
+        {
+            return PromotedReleaseCommand.Run(args, output, Environment.CurrentDirectory);
+        }
+
         if (string.Equals(args[0], "prepare-publication-inventory", StringComparison.Ordinal))
         {
             return PublicationInventoryCommand.Run(args, output, Environment.CurrentDirectory);
@@ -298,6 +303,7 @@ public static class Program
 
     private static int WriteUsage(TextWriter output)
     {
+        output.WriteLine("trusted launcher: run-promoted <sync-public-changelog|prepare-publication-inventory> <command-arguments>");
         output.WriteLine("publication preparation: prepare-publication-inventory --inventory <existing-inventory> --retained-evidence <directory> --release-evidence <relative-path> --release-directory <repository-relative-path> --disclosure-approved <version> --output-directory <new-directory>");
         output.WriteLine("usage: release-engine allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | rename-change --commit <oid> --from <id> [--to <id>] --reason <reason> | install-change-hooks [--target <ref>] | verify-tools | prepare <release-directory> | verify-candidate <release-directory> <candidate-oid> | tag-message <release-directory> | verify-tag <release-directory> <tag-name> | verify-main <release-directory> <expected-old-origin-main-oid> <tag-object-oid> | verify-baseline <baseline-ref> <target-oid> <tag-object-oid> | open-maintenance-line <release-directory> <tag-object-oid> | sync-public-changelog --inventory <signed-inventory> --retained-evidence <directory> --publication-base <https-url> [--check] | activate-trust --release-principal <name> --release-key <public-key> --promotion-principal <name> --promotion-key <public-key> --valid-from <yyyy-MM-dd> --valid-until <yyyy-MM-dd> --output <trust-directory> [--replace]");
         return UsageError;

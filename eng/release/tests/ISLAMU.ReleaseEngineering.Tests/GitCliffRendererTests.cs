@@ -150,6 +150,65 @@ public sealed class GitCliffRendererTests
     }
 
     [Test]
+    public async Task RendererRejectsReversedNestedAndUnbalancedPresentationLoops()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var fixture = new RendererFixture();
+        fixture.WriteExecutable("if [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'git-cliff 2.13.1'; exit 0; fi\nprintf '# Release 1.1.0\\n'");
+        string original = File.ReadAllText(Path.Combine(RepositoryRoot.Find(), "eng", "release", "cliff.toml"));
+        string begin = "{% for commit in commits %}";
+        string end = "{% endfor %}";
+        string[] invalid =
+        [
+            original.Replace(begin, "__LOOP_START__", StringComparison.Ordinal)
+                .Replace(end, begin, StringComparison.Ordinal)
+                .Replace("__LOOP_START__", end, StringComparison.Ordinal),
+            original.Replace(begin, begin + begin, StringComparison.Ordinal),
+            original.Replace(begin, begin + begin + end, StringComparison.Ordinal),
+            original.Replace(begin, end, StringComparison.Ordinal),
+            original.Replace(end, end + end, StringComparison.Ordinal),
+        ];
+
+        foreach (string config in invalid)
+        {
+            await Assert.That(fixture.RenderWithConfig(config).Diagnostic).IsEqualTo("renderer_config_not_presentation_only");
+        }
+    }
+
+    [Test]
+    public async Task RendererEscapesPunctuationBeforePassingCommitTitlesToTheFormatter()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        using var fixture = new RendererFixture();
+        string captured = Path.Combine(fixture.Root, "captured-context.json");
+        fixture.WriteExecutable(
+            $"if [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'git-cliff 2.13.1'; exit 0; fi\ncp \"$4\" \"{captured}\"\nprintf '# Release 1.1.0\\n'");
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            WriteIndented = true,
+        };
+        ReleaseContext context = JsonSerializer.Deserialize<ReleaseContext>(fixture.Context(), options)!;
+        string title = "show *bold* _italic_ `code` [link](path)";
+        byte[] input = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
+            context with { Changes = [context.Changes[0] with { Title = title }] }, options) + "\n");
+
+        GitCliffRenderResult result = fixture.Render(context: input);
+        using JsonDocument rendered = JsonDocument.Parse(File.ReadAllBytes(captured));
+        JsonElement commit = rendered.RootElement[0].GetProperty("commits")[0];
+        string escaped = ReleaseArtifactPolicy.EscapeUntrustedMarkdown(title).Text!;
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "formatter input");
+        await Assert.That(commit.GetProperty("message").GetString()).IsEqualTo(escaped);
+        await Assert.That(commit.GetProperty("raw_message").GetString()).IsEqualTo(escaped);
+        await Assert.That(escaped).IsNotEqualTo(title);
+    }
+
+    [Test]
     public async Task RendererRejectsTrustedConfigSymlinkAndHardlinkAliasesAtUseTime()
     {
         if (OperatingSystem.IsWindows()) return;
@@ -333,7 +392,7 @@ public sealed class GitCliffRendererTests
             "### \u26a1 Performance\n\n" +
             "- search: reduce allocation (eeeeeeeeeeee)\n\n" +
             "### \U0001f527 Other Improvements\n\n" +
-            "- guides: keep punctuation: (safe), caf\u00e9 (999999999999)\n" +
+            "- guides: keep punctuation: \\(safe\\), caf\u00e9 (999999999999)\n" +
             "- release: refresh contributor tooling (888888888888)\n";
         (ReleaseContextChange[] Changes, string Markdown)[] cases =
         [

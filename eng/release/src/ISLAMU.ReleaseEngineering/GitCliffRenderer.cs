@@ -38,15 +38,15 @@ internal static class PresentationConfigGrammar
         if (index >= lines.Length || lines[index] != "body = \"\"\"") return false;
         index++;
 
-        bool sawLoopStart = false;
-        bool sawLoopEnd = false;
+        int loopDepth = 0;
+        int loopCount = 0;
         while (index < lines.Length && lines[index] != "\"\"\"")
         {
-            if (!IsAllowedTemplateLine(lines[index], ref sawLoopStart, ref sawLoopEnd)) return false;
+            if (!IsAllowedTemplateLine(lines[index], ref loopDepth, ref loopCount)) return false;
             index++;
         }
 
-        if (index >= lines.Length || !sawLoopStart || !sawLoopEnd) return false;
+        if (index >= lines.Length || loopDepth != 0 || loopCount != 1) return false;
         index = SkipTrivia(lines, index + 1);
         if (index >= lines.Length || lines[index] != "trim = true") return false;
         index = SkipTrivia(lines, index + 1);
@@ -65,7 +65,7 @@ internal static class PresentationConfigGrammar
         return index;
     }
 
-    private static bool IsAllowedTemplateLine(string line, ref bool sawLoopStart, ref bool sawLoopEnd)
+    private static bool IsAllowedTemplateLine(string line, ref int loopDepth, ref int loopCount)
     {
         if (line.Contains("http://", StringComparison.OrdinalIgnoreCase) ||
             line.Contains("https://", StringComparison.OrdinalIgnoreCase) ||
@@ -91,11 +91,14 @@ internal static class PresentationConfigGrammar
             string block = match.Groups[1].Value.Trim();
             if (block == "for commit in commits")
             {
-                sawLoopStart = true;
+                loopDepth++;
+                loopCount++;
+                if (loopDepth > 1 || loopCount > 1) return false;
             }
             else if (block == "endfor")
             {
-                sawLoopEnd = true;
+                loopDepth--;
+                if (loopDepth < 0) return false;
             }
             else
             {
@@ -403,7 +406,7 @@ public static class GitCliffRenderer
             .OrderBy(group => group.Key.Order)
             .SelectMany(group => group.Select((change, index) => new RendererCommit(
                 change.DisplayId,
-                change.Title,
+                ReleaseArtifactPolicy.EscapeUntrustedMarkdown(change.Title).Text!,
                 null,
                 [],
                 index == 0 ? $"\n### {group.Key.Heading}\n\n" : string.Empty,
@@ -422,7 +425,7 @@ public static class GitCliffRenderer
                 ProviderCommit.Empty,
                 ProviderCommit.Empty,
                 ProviderCommit.Empty,
-                change.Title))).ToArray();
+                ReleaseArtifactPolicy.EscapeUntrustedMarkdown(change.Title).Text!))).ToArray();
         string commitId = context.Changes.Count == 0 ? context.Evidence.PreviousPublishedOid : context.Changes[^1].Oid;
         var release = new RendererRelease(
             context.Release.Version,

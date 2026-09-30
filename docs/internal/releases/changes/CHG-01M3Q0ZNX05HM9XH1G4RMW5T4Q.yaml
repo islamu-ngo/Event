@@ -1,0 +1,29 @@
+Change-Id: CHG-01M3Q0ZNX05HM9XH1G4RMW5T4Q
+Title: Standalone public setup browser
+Type: feat
+Scope: self-hosting
+Summary: A static Blazor workspace previews public configuration definitions and validates closed public templates locally without an instance API or private artifact retention.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: documented
+    Detail: Unknown and private fields fail closed; completed reads release selected files and stale completions cannot restore exports.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Host the static bundle on one origin with WebAssembly MIME types and application-route fallback; no instance configuration is added.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: First load requires the static host; no offline relaunch, secret entry, identity export, or live application is offered.

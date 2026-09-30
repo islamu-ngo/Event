@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
@@ -178,7 +177,7 @@ public sealed class SetupCliContractTests
     }
 
     [Test]
-    public async Task CliAssemblyIsExecutableAndPackageFreeWithOnlyCoreProjectDependency()
+    public async Task CliAssemblyIsExecutableWithSpectreCoreAndProtectedArtifacts()
     {
         System.Reflection.Assembly assembly = System.Reflection.Assembly.Load("Event.SetupAssistant.Cli");
         XDocument project = XDocument.Load(RepositoryPath("src", "Event.SetupAssistant.Cli", "Event.SetupAssistant.Cli.csproj"));
@@ -191,14 +190,53 @@ public sealed class SetupCliContractTests
             .Select(reference => reference.Name ?? string.Empty)
             .Where(name => name.StartsWith("Microsoft.Extensions.DependencyInjection", StringComparison.Ordinal) ||
                            name.StartsWith("System.CommandLine", StringComparison.Ordinal) ||
+                           name.Contains("SetupLive", StringComparison.Ordinal) ||
+                           name == "Explore.Blazor.Client" ||
                            name.Contains("Provider", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         await Assert.That(assembly.EntryPoint).IsNotNull();
         await Assert.That(project.Root?.Element("PropertyGroup")?.Element("OutputType")?.Value).IsEqualTo("Exe");
-        await Assert.That(packageReferences).IsEmpty();
-        await Assert.That(projectReferences).IsEquivalentTo(["Event.Setup.Core"]);
+        await Assert.That(packageReferences).IsEquivalentTo(["Spectre.Console", "Spectre.Console.Cli"]);
+        await Assert.That(projectReferences).IsEquivalentTo(["Event.Setup.Core", "Event.Setup.Artifacts"]);
         await Assert.That(forbiddenReferences).IsEmpty();
+    }
+
+    [Test]
+    public async Task SpectreOwnsTheRegisteredGrammarWithoutLegacyParser()
+    {
+        System.Reflection.Assembly assembly = System.Reflection.Assembly.Load("Event.SetupAssistant.Cli");
+        string[] references = assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
+            .ToArray();
+        Type? commandSettings = Type.GetType("Spectre.Console.Cli.CommandSettings, Spectre.Console.Cli");
+        Type[] settings = commandSettings is null
+            ? []
+            : assembly.GetTypes().Where(type => !type.IsAbstract && commandSettings.IsAssignableFrom(type)).ToArray();
+
+        await Assert.That(references).Contains("Spectre.Console");
+        await Assert.That(references).Contains("Spectre.Console.Cli");
+        await Assert.That(assembly.GetType("ISLAMU.Event.SetupAssistant.Cli.SetupCliParser", throwOnError: false)).IsNull();
+        await Assert.That(commandSettings).IsNotNull();
+        await Assert.That(settings.Length).IsGreaterThanOrEqualTo(7);
+    }
+
+    [Test]
+    public async Task GeneratedSchemaCarriesTheSingleRegisteredCommandGrammar()
+    {
+        byte[] bytes = await File.ReadAllBytesAsync(RepositoryPath("schemas", "event-setup-command-v1.schema.json"));
+        JsonObject schema = SetupCliMachineContractVerifier.ParseSchema(bytes);
+        JsonArray? commands = schema["_metadata"]?["commands"] as JsonArray;
+
+        await Assert.That(commands).IsNotNull();
+        JsonArray commandMetadata = commands!;
+        await Assert.That(commandMetadata.Select(node => node!["name"]!.GetValue<string>()))
+            .IsEquivalentTo(["catalogue", "manifest", "tenant-package", "portability", "env", "legal", "doctor"]);
+        await Assert.That(commandMetadata.All(node =>
+            node is JsonObject command
+            && command["operations"] is JsonArray operations
+            && operations.Count > 0
+            && command["options"] is JsonArray)).IsTrue();
     }
 
     [Test]

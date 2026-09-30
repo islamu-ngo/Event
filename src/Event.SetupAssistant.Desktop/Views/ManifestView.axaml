@@ -1,0 +1,37 @@
+<UserControl
+    x:Class="ISLAMU.Event.SetupAssistant.Desktop.Views.ManifestView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:ISLAMU.Event.SetupAssistant.Desktop.ViewModels"
+    x:DataType="vm:SetupDesktopShellViewModel"
+    AutomationProperties.Name="Configuration manifest workflow">
+  <StackPanel Spacing="12" Margin="16">
+    <TextBlock FontSize="22" FontWeight="SemiBold" Text="Configuration manifest" />
+    <TextBlock TextWrapping="Wrap"
+               Text="Create and validate an offline instance manifest through Event.Setup.Core before saving it locally." />
+    <TextBlock Text="Source name" />
+    <TextBox Text="{Binding ManifestSourceName}"
+             MaxLength="128"
+             AutomationProperties.Name="Manifest source name" />
+    <TextBlock Text="Output file name" />
+    <TextBox Text="{Binding ManifestFileName}"
+             MaxLength="128"
+             AutomationProperties.Name="Manifest output file name" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="_Prepare manifest"
+              AutomationProperties.Name="Prepare configuration manifest"
+              Click="PrepareClicked" />
+      <Button Content="_Save protected"
+              AutomationProperties.Name="Save manifest with protected permissions"
+              IsEnabled="{Binding CanSaveManifest}"
+              Click="SaveClicked" />
+    </StackPanel>
+    <TextBlock Text="{Binding ManifestStatus}"
+               TextWrapping="Wrap"
+               AutomationProperties.Name="Manifest workflow status"
+               AutomationProperties.LiveSetting="Polite" />
+    <TextBlock IsVisible="{Binding !ProtectedSaveAvailable}"
+               TextWrapping="Wrap"
+               Text="Protected save is unavailable on this operating system. Linux is the only host currently proven safe." />
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,154 @@
+@page "/manifest"
+@implements IDisposable
+<PageTitle>Validate a public setup manifest</PageTitle>
+
+<section class="hero" aria-labelledby="manifest-heading">
+    <p class="eyebrow">Closed public format</p>
+    <h1 id="manifest-heading">Validate a public setup manifest</h1>
+    <p class="lede">
+        Choose a JSON public template. Validation and preview happen in memory in this browser;
+        nothing is sent to an application API or retained after the page closes.
+    </p>
+</section>
+
+<section class="workspace" aria-labelledby="choose-heading">
+    <div>
+        <h2 id="choose-heading">Choose a public manifest</h2>
+        <p id="manifest-help">
+            Unknown fields, secret-bearing content, identity data, and unknown kinds are rejected.
+            Use the offline CLI, terminal, or desktop assistant for restricted artifacts.
+        </p>
+        <label class="file-label" for="manifest-file">Public manifest JSON</label>
+        <InputFile @key="_inputKey"
+                   @ref="_fileInput"
+                   id="manifest-file"
+                   accept="application/json,.json"
+                   aria-describedby="manifest-help"
+                   OnChange="LoadFileAsync" />
+    </div>
+    @if (_result.IsAccepted)
+    {
+        <p class="notice notice--success" role="status">@_result.Status</p>
+    }
+    else if (_hasResult)
+    {
+        <p class="notice notice--error" role="alert">@_result.Status</p>
+    }
+    else
+    {
+        <p class="notice" role="status">@_result.Status</p>
+    }
+    @if (_result.Preview is not null)
+    {
+        <h2>Validated public preview</h2>
+        <pre dir="ltr" tabindex="0">@_result.Preview</pre>
+    }
+    @if (_result.DownloadHref is not null)
+    {
+        <a class="button"
+           download="event-setup-public-manifest.json"
+           href="@_result.DownloadHref">Download public manifest</a>
+    }
+</section>
+
+@code {
+    private BrowserManifestResult _result = new(false, "Choose a public manifest to validate.", null, null);
+    private bool _hasResult;
+    private long _readGeneration;
+    private long _inputKey;
+    private InputFile? _fileInput;
+    private bool _restoreInputFocus;
+    private bool _disposed;
+
+    public async Task LoadAsync(Stream input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        if (_disposed)
+            return;
+        long generation = ++_readGeneration;
+        _result = BrowserManifestResult.Rejected;
+        _hasResult = false;
+        await InvokeAsync(StateHasChanged);
+        byte[] buffer = new byte[BrowserPublicManifest.MaximumBytes + 1];
+        int length = 0;
+        try
+        {
+            while (length < buffer.Length)
+            {
+                int read = await input.ReadAsync(buffer.AsMemory(length, buffer.Length - length));
+                if (read == 0)
+                    break;
+                length += read;
+            }
+
+            if (generation != _readGeneration)
+                return;
+            _result = length > BrowserPublicManifest.MaximumBytes
+                ? BrowserManifestResult.Rejected
+                : BrowserPublicManifest.ValidateAndPreview(buffer.AsMemory(0, length));
+            _hasResult = true;
+        }
+        catch (IOException)
+        {
+            if (generation != _readGeneration)
+                return;
+            _result = BrowserManifestResult.Rejected;
+            _hasResult = true;
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(buffer);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadFileAsync(InputFileChangeEventArgs args)
+    {
+        long generation = _readGeneration + 1;
+        try
+        {
+            if (args.File.Size > BrowserPublicManifest.MaximumBytes)
+            {
+                RejectCurrentRead();
+                return;
+            }
+            await using Stream input = args.File.OpenReadStream(BrowserPublicManifest.MaximumBytes);
+            await LoadAsync(input);
+        }
+        catch (IOException)
+        {
+            RejectCurrentRead();
+        }
+        finally
+        {
+            if (!_disposed && generation == _readGeneration)
+            {
+                ++_inputKey;
+                _restoreInputFocus = true;
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_restoreInputFocus && _fileInput?.Element is { } element)
+        {
+            _restoreInputFocus = false;
+            await element.FocusAsync(preventScroll: true);
+        }
+    }
+
+    private void RejectCurrentRead()
+    {
+        ++_readGeneration;
+        _result = BrowserManifestResult.Rejected;
+        _hasResult = true;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        RejectCurrentRead();
+    }
+}

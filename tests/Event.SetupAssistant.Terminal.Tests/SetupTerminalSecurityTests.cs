@@ -1,6 +1,8 @@
 namespace ISLAMU.SetupAssistant.Terminal.Tests;
 
 using System.Security.Cryptography;
+using ISLAMU.Event.Setup.Artifacts;
+using ISLAMU.Event.Setup.Core;
 using ISLAMU.Event.SetupAssistant.Terminal;
 using global::Terminal.Gui.Input;
 
@@ -9,7 +11,7 @@ public sealed class SetupTerminalSecurityTests
     [Test]
     public async Task ProcessArgumentsCannotTransportSecretValues()
     {
-        int exit = SetupTerminalProgram.Run(["--secret", "rejected"]);
+        int exit = SetupTerminalProgram.Run(["--secret", Convert.ToHexString(RandomNumberGenerator.GetBytes(32))]);
 
         await Assert.That(exit).IsEqualTo(64);
     }
@@ -17,7 +19,7 @@ public sealed class SetupTerminalSecurityTests
     [Test]
     public async Task ManualSecretIsClearedAndWrittenOnlyOnceWithOwnerMode()
     {
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-test-" + Guid.CreateVersion7());
@@ -27,8 +29,8 @@ public sealed class SetupTerminalSecurityTests
         try
         {
             using var secret = new SetupTerminalSecretBuffer();
-            var writer = new SetupTerminalProtectedWriter(directory);
-            var operation = new SetupTerminalArtifactOperation(() => "safe.env", secret, writer);
+            var writer = new ProtectedArtifactWriter();
+            var operation = new SetupTerminalArtifactOperation(() => "safe.env", secret, writer, directory);
 
             await Assert.That(secret.TryReplace(secretValue)).IsTrue();
             await Assert.That(operation.PrepareManual()).IsTrue();
@@ -40,11 +42,9 @@ public sealed class SetupTerminalSecurityTests
             await Assert.That(result.ToString()).DoesNotContain(secretValue, StringComparison.Ordinal);
             await Assert.That(File.ReadAllText(path)).Contains("SETUP_SECRET=" + secretValue, StringComparison.Ordinal);
             await Assert.That(File.GetUnixFileMode(path)).IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            await Assert.That(await writer.WriteCreateNewAsync(
-                "safe.env",
-                "second"u8.ToArray(),
-                64,
-                CancellationToken.None)).IsFalse();
+            using var repeat = await writer.PrepareAsync(
+                SetupArtifactKind.Environment, path, RandomNumberGenerator.GetBytes(32));
+            await Assert.That(await repeat.CommitAsync()).IsEqualTo(ProtectedArtifactStatus.TargetExists);
         }
         finally
         {
@@ -59,7 +59,7 @@ public sealed class SetupTerminalSecurityTests
     {
         using var secret = new SetupTerminalSecretBuffer();
 
-        await Assert.That(secret.TryReplace("line\nbreak")).IsFalse();
+        await Assert.That(secret.TryReplace(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)) + "\n")).IsFalse();
         await Assert.That(secret.Count).IsEqualTo(0);
         await Assert.That(secret.ToString()).Contains("Redacted", StringComparison.Ordinal);
     }
@@ -71,9 +71,10 @@ public sealed class SetupTerminalSecurityTests
         var operation = new SetupTerminalArtifactOperation(
             () => "safe.env",
             secret,
-            new SetupTerminalProtectedWriter(Path.GetTempPath()));
+            new ProtectedArtifactWriter(),
+            Path.GetTempPath());
         using var cancellation = new CancellationTokenSource();
-        await Assert.That(secret.TryReplace("transient-value")).IsTrue();
+        await Assert.That(secret.TryReplace(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))).IsTrue();
         await Assert.That(operation.PrepareManual()).IsTrue();
         cancellation.Cancel();
 
@@ -116,21 +117,21 @@ public sealed class SetupTerminalSecurityTests
     [Test]
     public async Task CancelledProtectedWriteLeavesNoFinalOrTemporaryArtifact()
     {
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-cancel-" + Guid.CreateVersion7());
         Directory.CreateDirectory(directory);
         try
         {
-            var writer = new SetupTerminalProtectedWriter(directory);
+            var writer = new ProtectedArtifactWriter();
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
 
-            await Assert.That(async () => await writer.WriteCreateNewAsync(
-                "cancelled.env",
-                "secret"u8.ToArray(),
-                64,
+            await Assert.That(async () => await writer.PrepareAsync(
+                SetupArtifactKind.Environment,
+                Path.Combine(directory, "cancelled.env"),
+                RandomNumberGenerator.GetBytes(32),
                 cancellation.Token)).Throws<OperationCanceledException>();
             await Assert.That(Directory.EnumerateFiles(directory)).IsEmpty();
         }
@@ -143,7 +144,7 @@ public sealed class SetupTerminalSecurityTests
     [Test]
     public async Task SignalDuringPreparedWriteCancelsBeforeAtomicCommitAndClearsState()
     {
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-signal-" + Guid.CreateVersion7());
@@ -154,15 +155,15 @@ public sealed class SetupTerminalSecurityTests
         {
             using var cancellation = new CancellationTokenSource();
             using var secret = new SetupTerminalSecretBuffer();
-            var writer = new SetupTerminalProtectedWriter(
-                directory,
+            var writer = new ProtectedArtifactWriter();
+            var resumeCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var operation = new SetupTerminalArtifactOperation(() => "signal.env", secret, writer, directory,
                 async token =>
                 {
                     reachedCommitBoundary.TrySetResult();
-                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    await resumeCommit.Task.WaitAsync(token);
                 });
-            var operation = new SetupTerminalArtifactOperation(() => "signal.env", secret, writer);
-            await Assert.That(secret.TryReplace("transient-value")).IsTrue();
+            await Assert.That(secret.TryReplace(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))).IsTrue();
             await Assert.That(operation.PrepareManual()).IsTrue();
             Task execution = operation.ExecuteAsync(cancellation.Token);
             await reachedCommitBoundary.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -181,38 +182,29 @@ public sealed class SetupTerminalSecurityTests
     }
 
     [Test]
-    public async Task StagingPathReplacementCannotBePublished()
+    public async Task SharedWriterKeepsTerminalStagingAnonymous()
     {
-        if (OperatingSystem.IsWindows())
-            return;
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-swap-" + Guid.CreateVersion7());
         Directory.CreateDirectory(directory);
         try
         {
-            var writer = new SetupTerminalProtectedWriter(
-                directory,
+            using var secret = new SetupTerminalSecretBuffer();
+            var writer = new ProtectedArtifactWriter();
+            var operation = new SetupTerminalArtifactOperation(() => "safe.env", secret, writer, directory,
                 _ =>
                 {
-                    string staged = Directory.EnumerateFiles(directory).Single();
-                    File.Delete(staged);
-                    File.WriteAllText(staged, "attackerr");
-#pragma warning disable CA1416
-                    File.SetUnixFileMode(staged, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-#pragma warning restore CA1416
+                    if (Directory.EnumerateFiles(directory).Any())
+                        throw new InvalidOperationException("replaceable-staging-entry");
                     return Task.CompletedTask;
                 });
-
-            bool written = await writer.WriteCreateNewAsync(
-                "safe.env",
-                "protected"u8.ToArray(),
-                64,
-                CancellationToken.None);
-
-            await Assert.That(written).IsFalse();
-            await Assert.That(Directory.EnumerateFiles(directory)).IsEmpty();
+            await Assert.That(secret.TryReplace(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))).IsTrue();
+            await Assert.That(operation.PrepareManual()).IsTrue();
+            var outcome = await operation.ExecuteAsync(CancellationToken.None);
+            await Assert.That(((SetupTerminalArtifactResult)outcome.CoreResult).Written).IsTrue();
+            File.Delete(Path.Combine(directory, "safe.env"));
         }
         finally
         {

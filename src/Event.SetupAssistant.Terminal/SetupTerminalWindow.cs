@@ -4,15 +4,28 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Input;
 using ISLAMU.Event.Setup.Core.Environment;
+using ISLAMU.Event.Setup.Artifacts;
 using ISLAMU.Event.SetupAssistant.Presentation;
+using ISLAMU.Event.SetupAssistant.Terminal.Views;
 using global::Terminal.Gui.App;
 using global::Terminal.Gui.ViewBase;
 using global::Terminal.Gui.Views;
 
+internal enum SetupTerminalWorkspaceKind
+{
+    Environment,
+    Catalogue,
+    Manifest,
+    TenantPackage,
+    LegalDraft,
+    IdentityDraft
+}
+
 internal sealed class SetupTerminalWindow : Window
 {
     internal const int MinimumTerminalHeight = 17;
-    internal const int MinimumTerminalWidth = 40;
+    internal const int MinimumTerminalWidth = 80;
+    private const int ContentStart = 23;
 
     private readonly IApplication _application;
     private readonly Button _closeButton;
@@ -24,8 +37,17 @@ internal sealed class SetupTerminalWindow : Window
     private readonly SetupTerminalArtifactOperation _operation;
     private readonly Label _status;
     private readonly Label _smallTerminalNotice;
+    private readonly View _navigation;
+    private readonly List<Button> _navigationButtons = [];
     private readonly View[] _standardViews;
+    private readonly View[] _environmentViews;
+    private readonly Dictionary<SetupTerminalWorkspaceKind, View> _offlineViews;
+    private readonly IdentityDraftView _identityDraftView;
+    private readonly LegalDraftView _legalDraftView;
+    private readonly ManifestView _manifestView;
+    private readonly ManifestView _tenantPackageView;
     private readonly SetupPresentationWorkspace _workspace;
+    private SetupTerminalWorkspaceKind _activeWorkspace = SetupTerminalWorkspaceKind.Environment;
     private bool _disposed;
 
     internal SetupTerminalWindow(
@@ -46,42 +68,43 @@ internal sealed class SetupTerminalWindow : Window
 
         var introduction = new Label
         {
-            X = 1,
+            X = ContentStart,
             Y = 1,
             Width = Dim.Fill(2),
+            Height = 2,
             Text = SetupTerminalText.Get("Introduction")
         };
-        var outputLabel = new Label { X = 1, Y = 3, Text = SetupTerminalText.Get("OutputFile") };
+        var outputLabel = new Label { X = ContentStart, Y = 3, Text = SetupTerminalText.Get("OutputFile") };
         _outputFileName = new TextField
         {
-            X = 18,
+            X = ContentStart + 17,
             Y = 3,
             Width = Dim.Fill(2),
             Text = ".env.setup"
         };
-        var secretLabel = new Label { X = 1, Y = 5, Text = SetupTerminalText.Get("SetupSecret") };
+        var secretLabel = new Label { X = ContentStart, Y = 5, Text = SetupTerminalText.Get("SetupSecret") };
         _secretField = new SetupSecretTextField(_secret)
         {
-            X = 18,
+            X = ContentStart + 17,
             Y = 5,
             Width = Dim.Fill(2)
         };
-        _saveManualButton = new Button { X = 1, Y = 7, Text = SetupTerminalText.Get("SaveManual") };
+        _saveManualButton = new Button { X = ContentStart, Y = 7, Text = SetupTerminalText.Get("SaveManual") };
         _generateButton = new Button
         {
-            X = 1,
+            X = ContentStart,
             Y = 8,
             Text = SetupTerminalText.Get("Generate")
         };
         _closeButton = new Button
         {
-            X = 1,
+            X = ContentStart,
             Y = 9,
             Text = SetupTerminalText.Get("Close")
         };
         _status = new Label
         {
-            X = 1,
+            X = ContentStart,
             Y = 11,
             Width = Dim.Fill(2),
             Height = 2,
@@ -91,7 +114,7 @@ internal sealed class SetupTerminalWindow : Window
         };
         var limitations = new Label
         {
-            X = 1,
+            X = ContentStart,
             Y = 14,
             Width = Dim.Fill(2),
             Height = 2,
@@ -108,6 +131,77 @@ internal sealed class SetupTerminalWindow : Window
             Visible = false
         };
 
+        var protectedWriter = new ProtectedArtifactWriter();
+        string baseDirectory = Directory.GetCurrentDirectory();
+        var catalogueView = new CatalogueView
+        {
+            X = ContentStart,
+            Y = 1,
+            Width = Dim.Fill(2),
+            Height = Dim.Fill(1),
+            Visible = false
+        };
+        _manifestView = new ManifestView(
+            ManifestWorkspaceKind.Manifest,
+            protectedWriter,
+            baseDirectory)
+        {
+            X = ContentStart,
+            Y = 1,
+            Width = Dim.Fill(2),
+            Height = Dim.Fill(1),
+            Visible = false
+        };
+        _tenantPackageView = new ManifestView(
+            ManifestWorkspaceKind.TenantPackage,
+            protectedWriter,
+            baseDirectory)
+        {
+            X = ContentStart,
+            Y = 1,
+            Width = Dim.Fill(2),
+            Height = Dim.Fill(1),
+            Visible = false
+        };
+        _legalDraftView = new LegalDraftView
+        {
+            X = ContentStart,
+            Y = 1,
+            Width = Dim.Fill(2),
+            Height = Dim.Fill(1),
+            Visible = false
+        };
+        _identityDraftView = new IdentityDraftView(protectedWriter, baseDirectory)
+        {
+            X = ContentStart,
+            Y = 1,
+            Width = Dim.Fill(2),
+            Height = Dim.Fill(1),
+            Visible = false
+        };
+        _offlineViews = new Dictionary<SetupTerminalWorkspaceKind, View>
+        {
+            [SetupTerminalWorkspaceKind.Catalogue] = catalogueView,
+            [SetupTerminalWorkspaceKind.Manifest] = _manifestView,
+            [SetupTerminalWorkspaceKind.TenantPackage] = _tenantPackageView,
+            [SetupTerminalWorkspaceKind.LegalDraft] = _legalDraftView,
+            [SetupTerminalWorkspaceKind.IdentityDraft] = _identityDraftView
+        };
+
+        _navigation = new View
+        {
+            X = 1,
+            Y = 1,
+            Width = ContentStart - 2,
+            Height = Dim.Fill(1)
+        };
+        AddNavigationButton(SetupTerminalWorkspaceKind.Environment, "NavigationEnvironment", 0);
+        AddNavigationButton(SetupTerminalWorkspaceKind.Catalogue, "NavigationCatalogue", 2);
+        AddNavigationButton(SetupTerminalWorkspaceKind.Manifest, "NavigationManifest", 4);
+        AddNavigationButton(SetupTerminalWorkspaceKind.TenantPackage, "NavigationTenantPackage", 6);
+        AddNavigationButton(SetupTerminalWorkspaceKind.LegalDraft, "NavigationLegalDraft", 8);
+        AddNavigationButton(SetupTerminalWorkspaceKind.IdentityDraft, "NavigationIdentityDraft", 10);
+
         Add(
             introduction,
             outputLabel,
@@ -119,8 +213,14 @@ internal sealed class SetupTerminalWindow : Window
             _closeButton,
             _status,
             limitations,
+            _navigation,
+            catalogueView,
+            _manifestView,
+            _tenantPackageView,
+            _legalDraftView,
+            _identityDraftView,
             _smallTerminalNotice);
-        _standardViews =
+        _environmentViews =
         [
             introduction,
             outputLabel,
@@ -132,6 +232,12 @@ internal sealed class SetupTerminalWindow : Window
             _closeButton,
             _status,
             limitations
+        ];
+        _standardViews =
+        [
+            .. _environmentViews,
+            _navigation,
+            .. _offlineViews.Values
         ];
 
         _outputFileName.TextChanging += ValidateOutputName;
@@ -150,6 +256,7 @@ internal sealed class SetupTerminalWindow : Window
     }
 
     internal int ExitCode { get; private set; } = 4;
+    internal SetupTerminalWorkspaceKind ActiveWorkspace => _activeWorkspace;
 
     internal void RequestStopFromSignal()
     {
@@ -182,7 +289,20 @@ internal sealed class SetupTerminalWindow : Window
         bool tooSmall = size.Width < MinimumTerminalWidth
             || size.Height < MinimumTerminalHeight;
         foreach (View view in _standardViews)
-            view.Visible = !tooSmall;
+            view.Visible = false;
+        _navigation.Visible = !tooSmall;
+        if (!tooSmall)
+        {
+            if (_activeWorkspace == SetupTerminalWorkspaceKind.Environment)
+            {
+                foreach (View view in _environmentViews)
+                    view.Visible = true;
+            }
+            else
+            {
+                _offlineViews[_activeWorkspace].Visible = true;
+            }
+        }
         _smallTerminalNotice.Visible = tooSmall;
         if (tooSmall)
         {
@@ -193,6 +313,65 @@ internal sealed class SetupTerminalWindow : Window
         {
             RefreshCommandState();
         }
+    }
+
+    internal void SelectWorkspace(SetupTerminalWorkspaceKind workspace)
+    {
+        if (_activeWorkspace == workspace)
+            return;
+        ClearWorkspaceState(_activeWorkspace);
+        _activeWorkspace = workspace;
+        if (workspace == SetupTerminalWorkspaceKind.Environment)
+            _workspace.Activate();
+        ApplyViewportPolicy(Viewport.Size);
+        if (workspace == SetupTerminalWorkspaceKind.Environment)
+            _outputFileName.SetFocus();
+        else
+            _offlineViews[workspace].SetFocus();
+    }
+
+    private void ClearWorkspaceState(SetupTerminalWorkspaceKind workspace)
+    {
+        switch (workspace)
+        {
+            case SetupTerminalWorkspaceKind.Environment:
+                _workspace.Deactivate();
+                ClearSecretField();
+                break;
+            case SetupTerminalWorkspaceKind.Manifest:
+                _manifestView.ClearPreview();
+                break;
+            case SetupTerminalWorkspaceKind.TenantPackage:
+                _tenantPackageView.ClearPreview();
+                break;
+            case SetupTerminalWorkspaceKind.LegalDraft:
+                _legalDraftView.ClearPrivateState();
+                break;
+            case SetupTerminalWorkspaceKind.IdentityDraft:
+                _identityDraftView.ClearPrivateState();
+                break;
+        }
+    }
+
+    private void AddNavigationButton(
+        SetupTerminalWorkspaceKind workspace,
+        string textKey,
+        int row)
+    {
+        var button = new Button
+        {
+            X = 0,
+            Y = row,
+            Width = ContentStart - 3,
+            Text = SetupTerminalText.Get(textKey)
+        };
+        button.Accepting += (_, args) =>
+        {
+            args.Handled = true;
+            SelectWorkspace(workspace);
+        };
+        _navigationButtons.Add(button);
+        _navigation.Add(button);
     }
 
     private void SecretFieldValueChanged(object? sender, ValueChangedEventArgs<string?> args) =>
@@ -328,6 +507,9 @@ internal sealed class SetupTerminalWindow : Window
             _saveManualButton.Accepting -= SaveManual;
             _generateButton.Accepting -= Generate;
             _closeButton.Accepting -= CloseOrCancel;
+            foreach (Button button in _navigationButtons)
+                button.Dispose();
+            _navigationButtons.Clear();
             ClearSecretField();
         }
 

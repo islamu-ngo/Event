@@ -8,7 +8,7 @@
   },
   "schemaVersion": 1,
   "target": "browser",
-  "targetEnabled": false,
+  "targetEnabled": true,
   "capabilities": {
     "secretEntry": false
   }

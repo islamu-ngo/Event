@@ -6,23 +6,360 @@
     ],
     "generatedBy": "ISLAMU.Event.SetupAssistant.Cli.CommandSchemaGenerator",
     "commandOptions": [
-      "--help",
-      "--machine",
-      "--text",
-      "--dry-run",
-      "--input",
       "--baseline",
-      "--output",
-      "--key",
-      "--topology",
       "--capability",
-      "--provider",
+      "--dry-run",
+      "--expected-revision",
       "--format",
-      "--expected-revision"
+      "--help",
+      "--input",
+      "--key",
+      "--machine",
+      "--output",
+      "--provider",
+      "--text",
+      "--topology"
     ],
     "repeatableOptions": [
       "--capability",
       "--provider"
+    ],
+    "commands": [
+      {
+        "name": "catalogue",
+        "operations": [
+          {
+            "name": "list",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "show",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--key",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "describe",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--key",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--dry-run",
+          "--help",
+          "--key",
+          "--machine",
+          "--output",
+          "--text"
+        ]
+      },
+      {
+        "name": "manifest",
+        "operations": [
+          {
+            "name": "create",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "open",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "validate",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "format",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--input",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "diff",
+            "options": [
+              "--baseline",
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "coverage",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "export",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--input",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--baseline",
+          "--dry-run",
+          "--help",
+          "--input",
+          "--machine",
+          "--output",
+          "--text"
+        ]
+      },
+      {
+        "name": "tenant-package",
+        "operations": [
+          {
+            "name": "create",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "open",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "validate",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "format",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--input",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "diff",
+            "options": [
+              "--baseline",
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "coverage",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "export",
+            "options": [
+              "--dry-run",
+              "--help",
+              "--input",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--baseline",
+          "--dry-run",
+          "--help",
+          "--input",
+          "--machine",
+          "--output",
+          "--text"
+        ]
+      },
+      {
+        "name": "portability",
+        "operations": [
+          {
+            "name": "export-operator-identity",
+            "options": [
+              "--dry-run",
+              "--format",
+              "--help",
+              "--input",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          },
+          {
+            "name": "import-operator-identity",
+            "options": [
+              "--dry-run",
+              "--expected-revision",
+              "--help",
+              "--input",
+              "--machine",
+              "--output",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--dry-run",
+          "--expected-revision",
+          "--format",
+          "--help",
+          "--input",
+          "--machine",
+          "--output",
+          "--text"
+        ]
+      },
+      {
+        "name": "env",
+        "operations": [
+          {
+            "name": "render",
+            "options": [
+              "--capability",
+              "--dry-run",
+              "--help",
+              "--machine",
+              "--output",
+              "--provider",
+              "--text",
+              "--topology"
+            ]
+          },
+          {
+            "name": "validate",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--capability",
+          "--dry-run",
+          "--help",
+          "--input",
+          "--machine",
+          "--output",
+          "--provider",
+          "--text",
+          "--topology"
+        ]
+      },
+      {
+        "name": "legal",
+        "operations": [
+          {
+            "name": "validate",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          },
+          {
+            "name": "preview",
+            "options": [
+              "--help",
+              "--input",
+              "--machine",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--help",
+          "--input",
+          "--machine",
+          "--text"
+        ]
+      },
+      {
+        "name": "doctor",
+        "operations": [
+          {
+            "name": "doctor",
+            "options": [
+              "--help",
+              "--machine",
+              "--text"
+            ]
+          }
+        ],
+        "options": [
+          "--help",
+          "--machine",
+          "--text"
+        ]
+      }
     ]
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -123,29 +460,29 @@
             "catalogue",
             "manifest",
             "tenant-package",
+            "portability",
             "env",
             "legal",
-            "doctor",
-            "portability"
+            "doctor"
           ]
         },
         "operation": {
           "enum": [
-            "list",
-            "show",
-            "describe",
-            "create",
-            "open",
-            "validate",
-            "format",
-            "diff",
             "coverage",
-            "export",
-            "render",
-            "preview",
+            "create",
+            "describe",
+            "diff",
             "doctor",
+            "export",
             "export-operator-identity",
-            "import-operator-identity"
+            "format",
+            "import-operator-identity",
+            "list",
+            "open",
+            "preview",
+            "render",
+            "show",
+            "validate"
           ]
         },
         "mode": {

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M3Q0ZQ00F9012DFCCE2AA983
+Title: Value-safe setup parser failures
+Type: fix
+Scope: self-hosting
+Summary: Malformed setup command arguments cannot expose paths through framework diagnostics or replace machine JSON with prose.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: documented
+    Detail: Spectre parsing uses the owned console and a typed value-safe exception boundary.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Parser failures return usage exit 64 and preserve the machine response contract.

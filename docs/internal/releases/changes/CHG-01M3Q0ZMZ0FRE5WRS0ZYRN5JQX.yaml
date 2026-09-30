@@ -1,0 +1,28 @@
+Change-Id: CHG-01M3Q0ZMZ0FRE5WRS0ZYRN5JQX
+Title: Offline setup terminal workspaces
+Type: feat
+Scope: self-hosting
+Summary: A separate terminal executable guides local environment, catalogue, manifest, tenant-package, legal and identity-draft work without connecting to an instance.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: documented
+    Detail: Masked identity input blocks clipboard and history; focus follows navigation, which invalidates pending writes and clears private state.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Publish the terminal separately and use a real interactive terminal; exported drafts require separate authorized platform administration.

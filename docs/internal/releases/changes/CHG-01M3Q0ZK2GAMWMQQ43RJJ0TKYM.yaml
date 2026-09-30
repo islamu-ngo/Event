@@ -1,0 +1,28 @@
+Change-Id: CHG-01M3Q0ZK2GAMWMQQ43RJJ0TKYM
+Title: Spectre presentation for offline setup commands
+Type: feat
+Scope: self-hosting
+Summary: Offline setup commands use one Spectre grammar and readable human output while preserving confidential diagnostics and deterministic machine JSON.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: documented
+    Detail: Owned-console framework errors become value-safe diagnostics; malformed commands preserve one machine envelope without exposing input paths.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Human help and result rendering change; automation retains the value-safe event-setup-command/v1 response.

@@ -342,8 +342,8 @@ Dockerfiles must copy the root restore inputs (`global.json`, `Directory.Build.p
 
 ### Setup Assistant Foundation CI Boundary
 
-The `Build & Test` change detector treats the six Setup source trees (including
-the nested `Event.SetupAssistant.SetupLive` project), all six focused test
+The `Build & Test` change detector treats the Setup source trees (including
+`Event.Setup.Artifacts` and the nested `Event.SetupAssistant.SetupLive` project), all focused test
 trees, the exact cross-layer SetupLive owners, `eng/setup-assistant/**`, the
 audited Terminal.Gui package inputs, every
 nested Setup `packages.lock.json`, and all three generated ratchet JSON files as
@@ -355,28 +355,42 @@ dedicated-workflow changes.
 
 `Event.Setup.Core` points inward to `Event.Wire.Contracts` and uses the approved
 YamlDotNet graph. The shared Assistant points inward through Core and uses the
-approved CommunityToolkit graph; the disabled Browser/Desktop shells point
-through Assistant; the CLI points only to Core. The separate SetupLive outer
+approved CommunityToolkit graph. The public Browser points directly to Core;
+native targets use the protected Artifacts adapter. The separate SetupLive outer
 adapter points to Core and the generated Blazor client while keeping network and
 ephemeral capability custody outside the shared presentation assembly. The Setup
-lane restores in locked mode, builds all six focused test projects in Release,
+lane restores in locked mode, builds the focused test projects in Release,
 then executes every project with a nonzero TUnit test-count safeguard. It also
 executes the isolated 35-test `SetupLiveAuthoritySecurityTests` Tier 1 class and
 retains its TRX report. The main Assistant suite currently executes 52 tests.
 The Terminal suite independently guards authoritative Core output, localization,
-and the secret boundary. Live release capabilities and browser runtime remain
-disabled.
+and the secret boundary. SetupLive release capabilities remain disabled.
+The public Browser is enabled independently, with secret entry disabled.
 
-All fourteen Setup lock files are tracked and discovered automatically by the
+The read-only `Publish public Setup Assistant browser` step runs only when
+both `run-fast-tests` and `run-setup-tests` are true. It invokes the static
+release target, checks `index.html` and `_framework/` in the temporary bundle,
+and verifies generator-owned capabilities with `--check`. This is local
+artifact validation, not deployment or external publication.
+
+All Setup lock files are tracked and discovered automatically by the
 recursive NuGet license-policy scan. Official `Terminal.Gui`, `TextMateSharp`,
-Avalonia, Sharprompt, and unapproved replacement GUI/TUI packages remain
+Sharprompt, and unapproved replacement GUI/TUI packages remain
 blocked. `ISLAMU.Terminal.Gui` `2.4.17-islamu.1` is the separately approved,
 MIT-preserving package built from the pinned official revision. CI verifies its
 recorded patch, package identity, final closure, SBOM, notices, and absence of
 the grammar/editor graph. The exact
 YamlDotNet and CommunityToolkit graphs are pinned by architecture and lock-file
-ratchets; Browser/Desktop activation still requires independent dependency,
-I-VSD, CTO, user, and target approval.
+ratchets. Every additional target requires its own dependency, behavior,
+publish and supported-host evidence.
+
+The audited Avalonia graph is admitted only in the desktop project and its
+focused tests. Headless test dependencies must remain absent from native
+published dependency manifests. The release-contract suite publishes each
+native target independently and checks project/package separation; desktop
+publication is restricted to the verified Linux x64 host. See
+[the dependency record](legal/dependencies/setup-assistant-ui.md) for the
+version-specific ANGLE file-license classification.
 
 `eng/setup-assistant/GenerateSetupAssistantRatchets.cs` owns the tracked browser
 capability, SetupLive capability, and frozen-contract JSON ratchets. CI runs only its non-mutating
@@ -389,7 +403,7 @@ ignored.
 
 This lane inherits top-level `permissions: contents: read`, disables checkout
 credential persistence, receives no PR secrets, and has no write, OIDC, signing,
-publish, deployment, or release authority.
+external publication, deployment, or release authority.
 
 ### NuGet Vulnerability Audit Policy
 

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M3Q0ZM2DZ19XWPZ0TJCXPAYF
+Title: Classified protected Setup Assistant artifacts
+Type: fix
+Scope: self-hosting
+Summary: Restricted setup output cannot reach stdout and Linux native exports share an atomic owner-only writer; unproved Windows and macOS file export stays disabled.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Configuration and dotenv stdout export and native overwrite are refused; Windows and macOS file export is disabled.
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: documented
+    Detail: Closed classification, anonymous private staging, descriptor-relative create-only publication and fail-closed host gates.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented

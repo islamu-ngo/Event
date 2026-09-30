@@ -1,0 +1,51 @@
+<UserControl
+    x:Class="ISLAMU.Event.SetupAssistant.Desktop.Views.IdentityDraftView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:portability="using:ISLAMU.Wire.Contracts.ConfigurationPortability"
+    xmlns:vm="using:ISLAMU.Event.SetupAssistant.Desktop.ViewModels"
+    x:DataType="vm:SetupDesktopShellViewModel"
+    AutomationProperties.Name="Operator identity draft workflow">
+  <Grid RowDefinitions="Auto,160,Auto,Auto,Auto" Margin="16">
+    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,12">
+      <TextBlock FontSize="22" FontWeight="SemiBold" Text="Operator identity draft" />
+      <TextBlock TextWrapping="Wrap"
+                 Text="Paste a local operator identity JSON document. Identity content remains in this control and private prepared memory; only a digest and status are exposed by the shared view model." />
+    </StackPanel>
+    <TextBox x:Name="IdentityDocument"
+             Grid.Row="1"
+             AcceptsReturn="True"
+             MaxLength="{x:Static portability:OperatorIdentityManifestJson.MaximumBytes}"
+             TextWrapping="Wrap"
+             PlaceholderText="Operator identity JSON"
+             AutomationProperties.Name="Operator identity JSON"
+             TextChanged="IdentityChanged" />
+    <StackPanel Grid.Row="2" Spacing="6" Margin="0,12,0,0">
+      <TextBlock Text="Output file name" />
+      <TextBox Text="{Binding IdentityFileName}"
+               MaxLength="128"
+               AutomationProperties.Name="Identity output file name" />
+    </StackPanel>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+      <Button x:Name="PrepareIdentity" Content="_Validate draft"
+              AutomationProperties.Name="Validate operator identity draft"
+              Click="PrepareClicked" />
+      <Button x:Name="SaveIdentity" Content="_Save protected"
+              AutomationProperties.Name="Save operator identity with protected permissions"
+              IsEnabled="{Binding CanSaveIdentity}"
+              Click="SaveClicked" />
+      <Button Content="_Clear private input"
+              AutomationProperties.Name="Clear operator identity input"
+              Click="ClearClicked" />
+    </StackPanel>
+    <StackPanel Grid.Row="4" Spacing="6" Margin="0,12,0,0">
+      <TextBlock Text="{Binding IdentityStatus}"
+                 TextWrapping="Wrap"
+                 AutomationProperties.Name="Identity workflow status"
+                 AutomationProperties.LiveSetting="Polite" />
+      <TextBlock IsVisible="{Binding !ProtectedSaveAvailable}"
+                 TextWrapping="Wrap"
+                 Text="Protected save is unavailable on this operating system. Linux is the only host currently proven safe." />
+    </StackPanel>
+  </Grid>
+</UserControl>

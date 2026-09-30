@@ -1,6 +1,7 @@
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using ISLAMU.Event.SetupAssistant.Presentation;
+using ISLAMU.Event.Setup.Artifacts;
 using global::Terminal.Gui.App;
 
 internal sealed class SetupTerminalApplication(SetupPresentationSession session)
@@ -13,7 +14,7 @@ internal sealed class SetupTerminalApplication(SetupPresentationSession session)
             throw new InvalidOperationException("terminal-workspace-id-invalid");
 
         using var secret = new SetupTerminalSecretBuffer();
-        var protectedWriter = new SetupTerminalProtectedWriter(Directory.GetCurrentDirectory());
+        var protectedWriter = new ProtectedArtifactWriter();
         SetupPresentationWorkspace? workspace = null;
         IApplication? app = null;
         SetupTerminalWindow? window = null;
@@ -21,7 +22,8 @@ internal sealed class SetupTerminalApplication(SetupPresentationSession session)
         var operation = new SetupTerminalArtifactOperation(
             () => workspace?.PublicInput ?? string.Empty,
             secret,
-            protectedWriter);
+            protectedWriter,
+            Directory.GetCurrentDirectory());
         try
         {
             workspace = _session.CreateWorkspace(workspaceId, operation);

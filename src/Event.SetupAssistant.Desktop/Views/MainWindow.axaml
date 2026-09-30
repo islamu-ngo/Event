@@ -1,0 +1,38 @@
+<Window
+    x:Class="ISLAMU.Event.SetupAssistant.Desktop.Views.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:ISLAMU.Event.SetupAssistant.Desktop.Views"
+    Title="ISLAMU Event Setup Assistant"
+    Width="920"
+    Height="680"
+    MinWidth="720"
+    MinHeight="540"
+    AutomationProperties.Name="ISLAMU Event offline setup assistant">
+  <Grid RowDefinitions="Auto,*" Margin="24">
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+      <StackPanel Grid.Column="0" Spacing="6">
+        <TextBlock FontSize="28" FontWeight="SemiBold" Text="Offline setup assistant" />
+        <TextBlock TextWrapping="Wrap"
+                   Text="Prepare local environment, configuration manifest, and operator identity artifacts. This application never connects to an Event instance." />
+      </StackPanel>
+      <CheckBox Grid.Column="1"
+                VerticalAlignment="Top"
+                Content="_Right-to-left layout"
+                AutomationProperties.Name="Use right-to-left layout"
+                Click="DirectionClicked" />
+    </Grid>
+
+    <TabControl Grid.Row="1" AutomationProperties.Name="Offline setup workflows">
+      <TabItem Header="_Environment">
+        <views:EnvironmentView />
+      </TabItem>
+      <TabItem Header="_Manifest">
+        <views:ManifestView />
+      </TabItem>
+      <TabItem Header="_Identity draft">
+        <views:IdentityDraftView />
+      </TabItem>
+    </TabControl>
+  </Grid>
+</Window>

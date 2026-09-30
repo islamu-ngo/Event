@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;
@@ -12,11 +11,7 @@ internal static class SetupCliMachineOutput
             invocation.Io.Output.Write("-", Serialize(command, result, invocation.Io.MaximumCharacters), invocation.Io.MaximumCharacters);
             return;
         }
-        string line = result.Exit == SetupCliExitCode.Success ? "success\n" : $"{SetupCliResults.Lower(result.Exit)}-error $.arguments\n";
-        byte[] text = Encoding.UTF8.GetBytes(line);
-        ISetupCliWriter writer = command.Output == "-" && result.Exit == SetupCliExitCode.Success
-            ? invocation.Io.Error : invocation.Io.Output;
-        writer.Write("-", text, invocation.Io.MaximumCharacters);
+        throw new InvalidOperationException("machine-output-required");
     }
 
     internal static byte[] Fallback(SetupCliExitCode exit, string code, int maximumCharacters = 65_536) =>
@@ -25,9 +20,12 @@ internal static class SetupCliMachineOutput
 
     private static byte[] Serialize(SetupCliCommand command, SetupCliCommandResult result, int maximumCharacters)
     {
-        string family = SetupCliParser.Operations.ContainsKey(command.Family) ? command.Family : "doctor";
-        string operation = SetupCliParser.Operations.TryGetValue(family, out string[]? operations)
-            && operations.Contains(command.Operation, StringComparer.Ordinal) ? command.Operation : family;
+        string family = SetupCliCommandRegistry.Families.Any(item => item.Name == command.Family)
+            ? command.Family
+            : "doctor";
+        string operation = SetupCliCommandRegistry.TryResolve(family, command.Operation, out _)
+            ? command.Operation
+            : SetupCliCommandRegistry.Families.First(item => item.Name == family).Operations[0].Name;
         string category = SetupCliResults.Lower(result.Exit);
         var envelope = new SetupCliMachineEnvelope("event-setup-command/v1",
             new SetupCliMachineInvocation(family, operation, "machine"), category, category, (int)result.Exit,

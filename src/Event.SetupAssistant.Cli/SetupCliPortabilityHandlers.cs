@@ -7,6 +7,8 @@ namespace ISLAMU.Event.SetupAssistant.Cli;
 
 internal static class SetupCliPortabilityHandlers
 {
+    private const string SensitiveArtifact = "sensitive";
+
     internal static SetupCliCommandResult OperatorIdentity(SetupCliCommand command, SetupCliInvocation invocation)
     {
         byte[] input = SetupCliIoOperations.Read(invocation, command.Input!);
@@ -49,7 +51,7 @@ internal static class SetupCliPortabilityHandlers
             SetupCliIoOperations.Write(invocation, command, output);
             // Offline integrity is not server readiness or permission to mutate a target.
             var readiness = new SetupCliMachineReadiness("incomplete", ["server-validation-required"], []);
-            return SetupCliResults.Success([SetupCliResults.Artifact(kind, mediaType, output, "sensitive",
+            return SetupCliResults.Success([SetupCliResults.Artifact(kind, mediaType, output, SensitiveArtifact,
                 SetupCliResults.PathIntent(command.Output), command.DryRun ? "planned" : "written",
                 readiness: readiness)], readiness: readiness);
         }
@@ -85,7 +87,7 @@ internal static class SetupCliPortabilityHandlers
             : OfflinePortabilityWorkflow.Format(document).Output;
         if (output is null) return SetupCliResults.Failure(SetupCliExitCode.Validation, "artifact-not-ready");
         SetupCliIoOperations.Write(invocation, command, output.Bytes);
-        return SetupCliResults.Success([SetupCliResults.Artifact(Kind(tenant), output.MediaType, output.Bytes.Span, "public",
+        return SetupCliResults.Success([SetupCliResults.Artifact(Kind(tenant), output.MediaType, output.Bytes.Span, SensitiveArtifact,
             SetupCliResults.PathIntent(command.Output), command.DryRun ? "planned" : "written", coverage)], coverage, SetupCliResults.Ready());
     }
 
@@ -99,7 +101,7 @@ internal static class SetupCliPortabilityHandlers
         if (!opened.Succeeded) return SetupCliResults.CoreFailure(opened.Diagnostics, SetupCliExitCode.Data);
         return command.Operation == "preview"
             ? SetupCliResults.Failure(SetupCliExitCode.Incomplete, "legal-identity-required")
-            : SetupCliResults.Success([SetupCliResults.Artifact("legal-draft", "application/json", input, "public", "input", "none")]);
+            : SetupCliResults.Success([SetupCliResults.Artifact("legal-draft", "application/json", input, SensitiveArtifact, "input", "none")]);
     }
 
     internal static SetupCliCommandResult Doctor()
@@ -133,7 +135,7 @@ internal static class SetupCliPortabilityHandlers
         SetupCliIoOperations.Write(invocation, command, formatted.Output!.Bytes);
         SetupCliMachineCoverage coverage = SetupCliResults.Coverage(OfflinePortabilityWorkflow.Coverage(validated.Document!));
         return SetupCliResults.Success([SetupCliResults.Artifact(Kind(tenant), formatted.Output.MediaType,
-            formatted.Output.Bytes.Span, "public", SetupCliResults.PathIntent(command.Output),
+            formatted.Output.Bytes.Span, SensitiveArtifact, SetupCliResults.PathIntent(command.Output),
             command.DryRun ? "planned" : "written", coverage)], coverage, SetupCliResults.Ready());
     }
 
@@ -151,7 +153,7 @@ internal static class SetupCliPortabilityHandlers
     }
 
     private static SetupCliMachineArtifact InputArtifact(bool tenant, byte[] input, SetupCliMachineCoverage coverage) =>
-        SetupCliResults.Artifact(Kind(tenant), "application/json;v=v1alpha2", input, "public", "input", "none", coverage);
+        SetupCliResults.Artifact(Kind(tenant), "application/json;v=v1alpha2", input, SensitiveArtifact, "input", "none", coverage);
     private static string Kind(bool tenant) => tenant ? "tenant-configuration-package" : "configuration-manifest";
 }
 
@@ -166,6 +168,8 @@ internal static class SetupCliIoOperations
 
     internal static void Write(SetupCliInvocation invocation, SetupCliCommand command, ReadOnlyMemory<byte> bytes)
     {
-        if (!command.DryRun) invocation.Io.Output.Write(command.Output!, bytes, invocation.Io.MaximumBytes);
+        if (!command.DryRun) invocation.Io.Output.WriteArtifact(command.Output!,
+            command.Family == "portability" ? SetupArtifactKind.OperatorIdentity : SetupArtifactKind.Configuration,
+            bytes, invocation.Io.MaximumBytes);
     }
 }

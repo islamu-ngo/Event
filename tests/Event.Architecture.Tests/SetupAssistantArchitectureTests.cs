@@ -27,6 +27,7 @@ public sealed class SetupAssistantArchitectureTests
     private const string TenantPackageSchemaId =
         "https://schemas.islamu.org/event/tenant-configuration-package/v1alpha2/schema.json";
     private const string ApiVersion = "configuration.islamu.org/v1alpha2";
+    private const string PackageReferenceElementName = "PackageReference";
 
     private static readonly string[] RegistryKeys =
     [
@@ -51,14 +52,16 @@ public sealed class SetupAssistantArchitectureTests
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Event.Setup.Core"] = ["Event.Wire.Contracts"],
+            ["Event.Setup.Artifacts"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant.SetupLive"] = ["Event.Setup.Core", "Explore.Blazor.Client"],
-            ["Event.SetupAssistant.Browser"] = ["Event.SetupAssistant"],
-            ["Event.SetupAssistant.Desktop"] = ["Event.SetupAssistant"],
-            ["Event.SetupAssistant.Terminal"] = ["Event.SetupAssistant", "Event.Setup.Core"],
-            ["Event.SetupAssistant.Cli"] = ["Event.Setup.Core"],
+            ["Event.SetupAssistant.Browser"] = ["Event.Setup.Core"],
+            ["Event.SetupAssistant.Desktop"] = ["Event.SetupAssistant", "Event.Setup.Artifacts"],
+            ["Event.SetupAssistant.Terminal"] = ["Event.SetupAssistant", "Event.Setup.Core", "Event.Setup.Artifacts"],
+            ["Event.SetupAssistant.Cli"] = ["Event.Setup.Core", "Event.Setup.Artifacts"],
             ["SetupCliCommandSchemaGenerator"] = ["Event.SetupAssistant.Cli"],
             ["Event.Setup.Core.Tests"] = ["Event.Setup.Core"],
+            ["Event.Setup.Artifacts.Tests"] = ["Event.Setup.Artifacts"],
             ["Event.SetupAssistant.Tests"] = ["Event.SetupAssistant", "Event.SetupAssistant.SetupLive"],
             ["Event.SetupAssistant.Browser.Tests"] = ["Event.SetupAssistant.Browser"],
             ["Event.SetupAssistant.Desktop.Tests"] = ["Event.SetupAssistant.Desktop"],
@@ -70,6 +73,7 @@ public sealed class SetupAssistantArchitectureTests
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Event.Setup.Core"] = "src/Event.Setup.Core/Event.Setup.Core.csproj",
+            ["Event.Setup.Artifacts"] = "src/Event.Setup.Artifacts/Event.Setup.Artifacts.csproj",
             ["Event.SetupAssistant"] = "src/Event.SetupAssistant/Event.SetupAssistant.csproj",
             ["Event.SetupAssistant.SetupLive"] = "src/Event.SetupAssistant/SetupLive/Event.SetupAssistant.SetupLive.csproj",
             ["Event.SetupAssistant.Browser"] = "src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj",
@@ -78,6 +82,7 @@ public sealed class SetupAssistantArchitectureTests
             ["Event.SetupAssistant.Cli"] = "src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj",
             ["SetupCliCommandSchemaGenerator"] = "eng/setup-assistant/SetupCliCommandSchemaGenerator/SetupCliCommandSchemaGenerator.csproj",
             ["Event.Setup.Core.Tests"] = "tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj",
+            ["Event.Setup.Artifacts.Tests"] = "tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj",
             ["Event.SetupAssistant.Tests"] = "tests/Event.SetupAssistant.Tests/Event.SetupAssistant.Tests.csproj",
             ["Event.SetupAssistant.Browser.Tests"] = "tests/Event.SetupAssistant.Browser.Tests/Event.SetupAssistant.Browser.Tests.csproj",
             ["Event.SetupAssistant.Desktop.Tests"] = "tests/Event.SetupAssistant.Desktop.Tests/Event.SetupAssistant.Desktop.Tests.csproj",
@@ -90,6 +95,23 @@ public sealed class SetupAssistantArchitectureTests
 
     private static readonly string[] BlockedPackageTerms =
         ["TextMateSharp", "Avalonia", "Sharprompt"];
+    private static readonly HashSet<string> DesktopAvaloniaPackages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Avalonia", "Avalonia.Angle.Windows.Natives", "Avalonia.BuildServices",
+        "Avalonia.Desktop", "Avalonia.FreeDesktop", "Avalonia.FreeDesktop.AtSpi",
+        "Avalonia.FreeDesktop.DBus", "Avalonia.FreeDesktop.X11", "Avalonia.HarfBuzz",
+        "Avalonia.Native", "Avalonia.Remote.Protocol", "Avalonia.Skia",
+        "Avalonia.Themes.Fluent", "Avalonia.Win32", "Avalonia.X11"
+    };
+
+    private static bool IsApprovedDesktopPackage(string projectName, string packageName)
+    {
+        if (projectName is not ("Event.SetupAssistant.Desktop" or "Event.SetupAssistant.Desktop.Tests"))
+            return false;
+        return DesktopAvaloniaPackages.Contains(packageName)
+            || (projectName == "Event.SetupAssistant.Desktop.Tests"
+                && packageName is "Avalonia.Headless" or "Avalonia.Fonts.Inter");
+    }
 
     private static readonly string[] ForbiddenPresentationClosureTerms =
     [
@@ -167,10 +189,17 @@ public sealed class SetupAssistantArchitectureTests
             }
 
             string lockContent = await File.ReadAllTextAsync(lockPath);
-            violations.AddRange(BlockedPackageTerms
-                .Where(term => lockContent.Contains(term, StringComparison.OrdinalIgnoreCase))
-                .Select(term => $"blocked package term {term} in {relativeLockPath}"));
             using JsonDocument lockDocument = JsonDocument.Parse(lockContent);
+            string projectName = relativeLockPath.Split('/')[1];
+            foreach (JsonProperty framework in lockDocument.RootElement.GetProperty("dependencies").EnumerateObject())
+            {
+                foreach (JsonProperty package in framework.Value.EnumerateObject().Where(package =>
+                    BlockedPackageTerms.Any(term => package.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    && !IsApprovedDesktopPackage(projectName, package.Name)))
+                {
+                    violations.Add($"blocked package {package.Name} in {relativeLockPath}");
+                }
+            }
             if (FindJsonPropertyNames(lockDocument.RootElement).Contains(
                     "Terminal.Gui", StringComparer.OrdinalIgnoreCase))
                 violations.Add($"official Terminal.Gui package in {relativeLockPath}");
@@ -182,69 +211,22 @@ public sealed class SetupAssistantArchitectureTests
     }
 
     [Test]
-    public async Task DisabledPresentationTargetsMustRemainMachineDisabledAndGraphAbsent()
+    public async Task DesktopTargetMustUseItsAuditedNativeBoundary()
     {
-        string[] disabledShells =
-        [
-            "src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj",
-            "src/Event.SetupAssistant.Desktop/Event.SetupAssistant.Desktop.csproj"
-        ];
-        var violations = new List<string>();
-        foreach (string relativePath in disabledShells)
-        {
-            string path = ContextSystemHelpers.RepoPath(
-                relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries));
-            XDocument project = XDocument.Load(path);
-            string? declared = project.Descendants()
-                .SingleOrDefault(element => element.Name.LocalName == "SetupTargetEnabled")?.Value;
-            if (!string.Equals(declared, "false", StringComparison.OrdinalIgnoreCase))
-                violations.Add($"SetupTargetEnabled is not false: {relativePath}");
-
-            ProcessResult evaluated = RunProcess(
-                "dotnet",
-                ["msbuild", path, "-getProperty:SetupTargetEnabled", "-nologo"],
-                ContextSystemHelpers.RepoPath());
-            if (evaluated.ExitCode != 0
-                || !string.Equals(evaluated.Output.Trim(), "false", StringComparison.OrdinalIgnoreCase))
-                violations.Add($"evaluated SetupTargetEnabled is not false: {relativePath}");
-        }
-
-        string sourceRoot = ContextSystemHelpers.RepoPath("src");
-        string[] targetProjectCanaries = ["Event.SetupAssistant.Avalonia"];
-        foreach (string target in targetProjectCanaries)
-        {
-            if (Directory.Exists(Path.Combine(sourceRoot, target)))
-                violations.Add($"disabled target project exists: {target}");
-        }
-
-        foreach (string projectPath in Directory.GetFiles(
-            sourceRoot,
-            "*.csproj",
-            SearchOption.AllDirectories).Where(path =>
-                Path.GetFileNameWithoutExtension(path).StartsWith(
-                    "Event.SetupAssistant",
-                    StringComparison.Ordinal)))
-        {
-            XDocument project = XDocument.Load(projectPath);
-            IEnumerable<string> graphIdentities = project.Descendants()
-                .Where(element => element.Name.LocalName is "PackageReference" or "ProjectReference")
-                .Select(element => element.Attribute("Include")?.Value ?? string.Empty);
-            violations.AddRange(graphIdentities
-                .Where(identity => BlockedPackageTerms.Skip(1).Any(term =>
-                    identity.Contains(term, StringComparison.OrdinalIgnoreCase)))
-                .Select(identity => $"disabled target reference exists: {identity}"));
-
-            string lockPath = Path.Combine(Path.GetDirectoryName(projectPath)!, "packages.lock.json");
-            using JsonDocument lockDocument = JsonDocument.Parse(File.ReadAllBytes(lockPath));
-            violations.AddRange(FindJsonPropertyNames(lockDocument.RootElement)
-                .Where(identity => BlockedPackageTerms.Skip(1).Any(term =>
-                    identity.Contains(term, StringComparison.OrdinalIgnoreCase)))
-                .Select(identity => $"disabled target lock node exists: {identity}"));
-        }
-
-        await Assert.That(violations).IsEmpty()
-            .Because("SA518-DISABLED-TARGET-BOUNDARY: Avalonia shared/browser/desktop targets must remain disabled, absent, and non-resolvable: "
-                + string.Join("; ", violations));
+        string path = ContextSystemHelpers.RepoPath(
+            "src", "Event.SetupAssistant.Desktop", "Event.SetupAssistant.Desktop.csproj");
+        XDocument project = XDocument.Load(path);
+        await Assert.That(project.Descendants("SetupTargetEnabled").Single().Value).IsEqualTo("true");
+        await Assert.That(project.Descendants("OutputType").Single().Value).IsEqualTo("WinExe");
+        await Assert.That(project.Descendants("SetupTargetRole").Single().Value).IsEqualTo("OfflineDesktop");
+        await Assert.That(project.Descendants(PackageReferenceElementName)
+            .Select(element => element.Attribute("Include")!.Value)).IsEquivalentTo(
+            ["Avalonia", "Avalonia.Desktop", "Avalonia.Themes.Fluent"]);
+        ProcessResult evaluated = RunProcess(
+            "dotnet", ["msbuild", path, "-getProperty:SetupTargetEnabled", "-nologo"],
+            ContextSystemHelpers.RepoPath());
+        await Assert.That(evaluated.ExitCode).IsEqualTo(0);
+        await Assert.That(evaluated.Output.Trim()).IsEqualTo("true");
     }
 
     [Test]
@@ -505,7 +487,7 @@ public sealed class SetupAssistantArchitectureTests
             "_metadata":{"about":["ABOUTME: Generated Setup Assistant architecture ratchet; do not edit by hand.","ABOUTME: Owned by eng/setup-assistant/GenerateSetupAssistantRatchets.cs."],"generatedBy":"eng/setup-assistant/GenerateSetupAssistantRatchets.cs"}
             """;
         using JsonDocument safeCapability = JsonDocument.Parse(
-            "{" + metadata + ""","schemaVersion":1,"target":"browser","targetEnabled":false,"capabilities":{"secretEntry":false}}""");
+            "{" + metadata + ""","schemaVersion":1,"target":"browser","targetEnabled":true,"capabilities":{"secretEntry":false}}""");
         using JsonDocument unsafeCapability = JsonDocument.Parse(
             """{"schemaVersion":1,"target":"browser","targetEnabled":true,"capabilities":{"secretEntry":true}}""");
         using JsonDocument safeLiveCapability = JsonDocument.Parse(
@@ -653,7 +635,7 @@ public sealed class SetupAssistantArchitectureTests
         XDocument cli = XDocument.Load(ContextSystemHelpers.RepoPath(
             "src", "Event.SetupAssistant.Cli", "Event.SetupAssistant.Cli.csproj"));
         string[] cliPackages = cli.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
+            .Where(element => element.Name.LocalName == PackageReferenceElementName)
             .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
             .ToArray();
         if (cliPackages.Any(package => package.Contains("Terminal", StringComparison.OrdinalIgnoreCase)))
@@ -690,7 +672,7 @@ public sealed class SetupAssistantArchitectureTests
         XDocument terminal = XDocument.Load(ContextSystemHelpers.RepoPath(
             "src", "Event.SetupAssistant.Terminal", "Event.SetupAssistant.Terminal.csproj"));
         string[] terminalPackages = terminal.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
+            .Where(element => element.Name.LocalName == PackageReferenceElementName)
             .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
             .ToArray();
         if (terminalPackages.Count(package => string.Equals(
@@ -714,12 +696,12 @@ public sealed class SetupAssistantArchitectureTests
                 "true",
                 StringComparison.OrdinalIgnoreCase);
         }).ToArray();
-        if (enabledTargets.Length != 1
-            || !string.Equals(
-                Path.GetFileNameWithoutExtension(enabledTargets.SingleOrDefault()),
-                "Event.SetupAssistant.Terminal",
-                StringComparison.Ordinal))
-            violations.Add("exactly one human Setup target must be enabled: Event.SetupAssistant.Terminal");
+        if (!enabledTargets.Select(Path.GetFileNameWithoutExtension)
+                .Order(StringComparer.Ordinal)
+                .SequenceEqual(
+                    new[] { "Event.SetupAssistant.Browser", "Event.SetupAssistant.Desktop", "Event.SetupAssistant.Terminal" },
+                    StringComparer.Ordinal))
+            violations.Add("enabled human targets must be the public browser and independent native terminal and desktop");
         string? role = terminal.Descendants().SingleOrDefault(element =>
             element.Name.LocalName == "SetupTargetRole")?.Value;
         if (!string.Equals(role, "Terminal", StringComparison.Ordinal))
@@ -769,12 +751,13 @@ public sealed class SetupAssistantArchitectureTests
                 .Select(reference => $"missing ProjectReference {projectName} -> {reference}"));
 
             string[] packages = project.Descendants()
-                .Where(element => element.Name.LocalName == "PackageReference")
+                .Where(element => element.Name.LocalName == PackageReferenceElementName)
                 .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
                 .ToArray();
             violations.AddRange(packages
                 .Where(package => BlockedPackageTerms.Any(term =>
-                    package.Contains(term, StringComparison.OrdinalIgnoreCase)))
+                    package.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    && !IsApprovedDesktopPackage(projectName, package))
                 .Select(package => $"blocked PackageReference {projectName}: {package}"));
             violations.AddRange(packages
                 .Where(package => string.Equals(
@@ -783,7 +766,8 @@ public sealed class SetupAssistantArchitectureTests
             if (projectName.EndsWith(".Tests", StringComparison.Ordinal))
             {
                 violations.AddRange(packages
-                    .Where(package => !ApprovedTestPackages.Contains(package, StringComparer.Ordinal))
+                    .Where(package => !ApprovedTestPackages.Contains(package, StringComparer.Ordinal)
+                        && !IsApprovedDesktopPackage(projectName, package))
                     .Select(package =>
                         $"unapproved test PackageReference {projectName}: {package}"));
             }
@@ -815,7 +799,7 @@ public sealed class SetupAssistantArchitectureTests
 
         XDocument live = projects["Event.SetupAssistant.SetupLive"];
         if (live.Descendants().Any(element =>
-            element.Name.LocalName == "PackageReference"))
+            element.Name.LocalName == PackageReferenceElementName))
         {
             violations.Add("Event.SetupAssistant.SetupLive must not declare packages");
         }
@@ -837,7 +821,7 @@ public sealed class SetupAssistantArchitectureTests
             violations.Add("ProjectReferences must be exactly Event.Setup.Core");
 
         string[] packages = project.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
+            .Where(element => element.Name.LocalName == PackageReferenceElementName)
             .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
             .ToArray();
         if (!packages.SequenceEqual(["CommunityToolkit.Mvvm"], StringComparer.Ordinal))
@@ -964,18 +948,20 @@ public sealed class SetupAssistantArchitectureTests
     }
 
     private static string[] ValidateBrowserCapability(JsonElement root) =>
-        ValidateDisabledCapability(root, "browser", ["secretEntry"]);
+        ValidateCapability(root, "browser", ["secretEntry"], enabled: true);
 
     private static string[] ValidateSetupLiveCapability(JsonElement root) =>
-        ValidateDisabledCapability(
+        ValidateCapability(
             root,
             "setup-live",
-            ["targetEnrollment", "secretBindingReadiness", "secretBindingWrite", "savedProfiles"]);
+            ["targetEnrollment", "secretBindingReadiness", "secretBindingWrite", "savedProfiles"],
+            enabled: false);
 
-    private static string[] ValidateDisabledCapability(
+    private static string[] ValidateCapability(
         JsonElement root,
         string expectedTarget,
-        string[] expectedCapabilities)
+        string[] expectedCapabilities,
+        bool enabled)
     {
         var violations = new List<string>();
         string[] actualRootProperties = root.EnumerateObject()
@@ -987,48 +973,70 @@ public sealed class SetupAssistantArchitectureTests
         if (!actualRootProperties.SequenceEqual(
                 expectedRootProperties.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             violations.Add("root properties must match the exact generated set");
+
+        ValidateCapabilityMetadata(root, violations);
+        ValidateCapabilityProperties(root, expectedTarget, enabled, violations);
+        ValidateCapabilityItems(root, expectedCapabilities, violations);
+
+        return [.. violations];
+    }
+
+    private static void ValidateCapabilityMetadata(JsonElement root, List<string> violations)
+    {
         if (!root.TryGetProperty("_metadata", out JsonElement metadata)
             || metadata.ValueKind != JsonValueKind.Object)
         {
             violations.Add("_metadata must be an object");
+            return;
         }
-        else
-        {
-            string[] actualMetadataProperties = metadata.EnumerateObject()
-                .Select(property => property.Name)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-            if (!actualMetadataProperties.SequenceEqual(
-                    new[] { "about", "generatedBy" }, StringComparer.Ordinal))
-                violations.Add("_metadata properties must match the exact generated set");
-            if (!TryGetString(metadata, "generatedBy", out string? generatedBy)
-                || generatedBy != "eng/setup-assistant/GenerateSetupAssistantRatchets.cs")
-                violations.Add("_metadata.generatedBy must name the authoritative generator");
-            if (!metadata.TryGetProperty("about", out JsonElement about)
-                || about.ValueKind != JsonValueKind.Array
-                || !about.EnumerateArray().Select(item => item.GetString()).SequenceEqual(
-                    new[]
-                    {
-                        "ABOUTME: Generated Setup Assistant architecture ratchet; do not edit by hand.",
-                        "ABOUTME: Owned by eng/setup-assistant/GenerateSetupAssistantRatchets.cs."
-                    }, StringComparer.Ordinal))
-                violations.Add("_metadata.about must match the exact generated ownership summary");
-        }
+
+        string[] actualMetadataProperties = metadata.EnumerateObject()
+            .Select(property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!actualMetadataProperties.SequenceEqual(
+                new[] { "about", "generatedBy" }, StringComparer.Ordinal))
+            violations.Add("_metadata properties must match the exact generated set");
+        if (!TryGetString(metadata, "generatedBy", out string? generatedBy)
+            || generatedBy != "eng/setup-assistant/GenerateSetupAssistantRatchets.cs")
+            violations.Add("_metadata.generatedBy must name the authoritative generator");
+        if (!metadata.TryGetProperty("about", out JsonElement about)
+            || about.ValueKind != JsonValueKind.Array
+            || !about.EnumerateArray().Select(item => item.GetString()).SequenceEqual(
+                new[]
+                {
+                    "ABOUTME: Generated Setup Assistant architecture ratchet; do not edit by hand.",
+                    "ABOUTME: Owned by eng/setup-assistant/GenerateSetupAssistantRatchets.cs."
+                }, StringComparer.Ordinal))
+            violations.Add("_metadata.about must match the exact generated ownership summary");
+    }
+
+    private static void ValidateCapabilityProperties(
+        JsonElement root,
+        string expectedTarget,
+        bool enabled,
+        List<string> violations)
+    {
         if (!TryGetInt32(root, "schemaVersion", out int version) || version != 1)
             violations.Add("schemaVersion must be 1");
         if (!TryGetString(root, "target", out string? target)
             || !string.Equals(target, expectedTarget, StringComparison.Ordinal))
-        {
             violations.Add($"target must be {expectedTarget}");
-        }
         if (!root.TryGetProperty("targetEnabled", out JsonElement targetEnabled)
-            || targetEnabled.ValueKind != JsonValueKind.False)
-            violations.Add("targetEnabled must be false");
+            || targetEnabled.ValueKind != (enabled ? JsonValueKind.True : JsonValueKind.False))
+            violations.Add($"targetEnabled must be {enabled.ToString().ToLowerInvariant()}");
+    }
+
+    private static void ValidateCapabilityItems(
+        JsonElement root,
+        string[] expectedCapabilities,
+        List<string> violations)
+    {
         if (!root.TryGetProperty("capabilities", out JsonElement capabilities)
             || capabilities.ValueKind != JsonValueKind.Object)
         {
             violations.Add("capabilities must be an object");
-            return [.. violations];
+            return;
         }
         string[] actualCapabilities = capabilities.EnumerateObject()
             .Select(property => property.Name)
@@ -1043,7 +1051,6 @@ public sealed class SetupAssistantArchitectureTests
                 || value.ValueKind != JsonValueKind.False)
                 violations.Add($"capabilities.{capability} must be false");
         }
-        return [.. violations];
     }
 
     private static string[] ValidateFrozenContractBaseline(JsonElement root)

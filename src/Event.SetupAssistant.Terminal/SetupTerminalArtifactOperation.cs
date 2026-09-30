@@ -1,6 +1,7 @@
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.Security.Cryptography;
+using ISLAMU.Event.Setup.Artifacts;
 using ISLAMU.Event.Setup.Core;
 using ISLAMU.Event.Setup.Core.Environment;
 using ISLAMU.Event.SetupAssistant.Presentation;
@@ -27,7 +28,9 @@ internal sealed record SetupTerminalArtifactResult(
 internal sealed class SetupTerminalArtifactOperation(
     Func<string> outputFileName,
     SetupTerminalSecretBuffer secret,
-    SetupTerminalProtectedWriter protectedWriter) : ISetupPresentationOperation
+    ProtectedArtifactWriter protectedWriter,
+    string baseDirectory,
+    Func<CancellationToken, Task>? beforeCommit = null) : ISetupPresentationOperation
 {
     private static ReadOnlySpan<byte> Placeholder => "ISLAMU_SETUP_SECRET_PLACEHOLDER"u8;
     private readonly object _gate = new();
@@ -180,11 +183,11 @@ internal sealed class SetupTerminalArtifactOperation(
                 finalBytes.AsSpan(placeholderIndex + transient.Length));
             cancellationToken.ThrowIfCancellationRequested();
             string digest = ArtifactDigest.Compute(finalBytes).Value;
-            bool written = await protectedWriter.WriteCreateNewAsync(
-                fileName,
-                finalBytes,
-                DotenvCodec.MaximumFileUtf8Bytes,
-                cancellationToken);
+            using ProtectedArtifactPreparation preparation = await protectedWriter.PrepareAsync(
+                SetupArtifactKind.Environment, Path.Combine(baseDirectory, fileName), finalBytes, cancellationToken);
+            if (beforeCommit is not null)
+                await beforeCommit(cancellationToken);
+            bool written = await preparation.CommitAsync(cancellationToken) == ProtectedArtifactStatus.Written;
             return FromComposition(
                 written,
                 written ? "terminal-complete" : "protected-output-unavailable",
@@ -230,4 +233,20 @@ internal sealed class SetupTerminalArtifactOperation(
         DotenvReadinessState.Blocked,
         0,
         1);
+}
+
+internal static class SetupTerminalFileName
+{
+    internal const int MaximumLength = 64;
+
+    internal static bool IsPartialSafe(string value) => value.Length <= MaximumLength && value.All(IsAllowed);
+
+    internal static bool IsSafe(string value) => value.Length is > 0 and <= MaximumLength
+        && value.All(IsAllowed)
+        && value is not "-" and not "." and not "..";
+
+    private static bool IsAllowed(char value) => value is >= 'a' and <= 'z'
+        or >= 'A' and <= 'Z'
+        or >= '0' and <= '9'
+        or '.' or '_' or '-';
 }

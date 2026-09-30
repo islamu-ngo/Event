@@ -24,6 +24,52 @@ rendered keyboard, reflow, themes, direction and assistive-technology evidence,
 and explicitly retain any unavailable or uncompleted checks in the workstream
 report.
 
+## Offline Setup Terminal
+
+The separate Terminal.Gui executable uses native focusable controls and a
+minimum viewport of 80 columns by 17 rows. Below that bound, a localized
+resize notice replaces actions instead of allowing overlapping controls.
+English and Arabic resources provide navigation labels and distinct access
+keys. Catalogue and manifest output use scrollable, non-editing list views.
+Changing input invalidates prepared artifacts; workspace navigation clears
+secret and identity state.
+
+Linux native rendering and Catalogue keyboard activation were exercised
+through an isolated X11 terminal. Those checks do not certify screen-reader,
+braille, RTL shaping, terminal scrollback erasure or managed-heap erasure.
+Keep those limits explicit until verified on the actual target terminal and
+assistive technology. The protected-output host gate is separate from
+accessibility evidence.
+
+## Public Setup Browser
+
+The independent static app supplies its own landmarks, skip link, route H1
+focus, labelled upload and status/alert regions; it does not inherit the
+platform's authenticated shell. Completed uploads replace the file input to
+release the selected file and restore focus without scrolling. Public JSON
+previews explicitly use `dir="ltr"` within either page direction.
+
+Both routes were rendered at desktop and mobile widths. Accepted/rejected
+uploads, file release, focus continuity and mobile RTL preview were exercised
+through the actual WebAssembly app. These checks do not certify every browser
+or assistive technology; retain the ordinary manual accessibility checklist.
+
+## Offline Setup Desktop
+
+The Avalonia shell uses named native controls, keyboard button access keys,
+polite status regions and a runtime RTL layout toggle. Its minimum window is
+720 by 520 device-independent units; scrollable content preserves access to
+larger forms. Private identity data stays in its input control and preparation
+buffer rather than public viewmodel properties.
+
+The packaged Linux x64 window, environment/manifest/identity tabs, protected
+Save, private-input clearing and minimum-size RTL layout were exercised on
+X11. A headless real-control test independently guards identity preparation
+and invalidation; its UI session is disposed off the UI thread to avoid
+joining that thread from itself. Headless assertions are not screen-reader
+certification. Arabic translation, braille and other native OS claims remain
+unverified and must not be inferred from the RTL toggle.
+
 ## Platform Rules
 
 ### PR-1: Page Shell Contract

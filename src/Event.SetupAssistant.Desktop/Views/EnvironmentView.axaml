@@ -1,0 +1,33 @@
+<UserControl
+    x:Class="ISLAMU.Event.SetupAssistant.Desktop.Views.EnvironmentView"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:ISLAMU.Event.SetupAssistant.Desktop.ViewModels"
+    x:DataType="vm:SetupDesktopShellViewModel"
+    AutomationProperties.Name="Local environment workflow">
+  <StackPanel Spacing="12" Margin="16">
+    <TextBlock FontSize="22" FontWeight="SemiBold" Text="Local environment" />
+    <TextBlock TextWrapping="Wrap"
+               Text="Compose a standalone SQLite environment file with Core defaults and protected placeholders. Secret values are never shown in this window." />
+    <TextBlock Text="Output file name" />
+    <TextBox Text="{Binding EnvironmentFileName}"
+             MaxLength="128"
+             AutomationProperties.Name="Environment output file name" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="_Prepare environment"
+              AutomationProperties.Name="Prepare environment artifact"
+              Click="PrepareClicked" />
+      <Button Content="_Save protected"
+              AutomationProperties.Name="Save environment artifact with protected permissions"
+              IsEnabled="{Binding CanSaveEnvironment}"
+              Click="SaveClicked" />
+    </StackPanel>
+    <TextBlock Text="{Binding EnvironmentStatus}"
+               TextWrapping="Wrap"
+               AutomationProperties.Name="Environment workflow status"
+               AutomationProperties.LiveSetting="Polite" />
+    <TextBlock IsVisible="{Binding !ProtectedSaveAvailable}"
+               TextWrapping="Wrap"
+               Text="Protected save is unavailable on this operating system. Linux is the only host currently proven safe." />
+  </StackPanel>
+</UserControl>

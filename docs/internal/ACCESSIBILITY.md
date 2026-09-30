@@ -24,6 +24,23 @@ rendered keyboard, reflow, themes, direction and assistive-technology evidence,
 and explicitly retain any unavailable or uncompleted checks in the workstream
 report.
 
+## Offline Setup Terminal
+
+The separate Terminal.Gui executable uses native focusable controls and a
+minimum viewport of 80 columns by 17 rows. Below that bound, a localized
+resize notice replaces actions instead of allowing overlapping controls.
+English and Arabic resources provide navigation labels and distinct access
+keys. Catalogue and manifest output use scrollable, non-editing list views.
+Changing input invalidates prepared artifacts; workspace navigation clears
+secret and identity state.
+
+Linux native rendering and Catalogue keyboard activation were exercised
+through an isolated X11 terminal. Those checks do not certify screen-reader,
+braille, RTL shaping, terminal scrollback erasure or managed-heap erasure.
+Keep those limits explicit until verified on the actual target terminal and
+assistive technology. The protected-output host gate is separate from
+accessibility evidence.
+
 ## Platform Rules
 
 ### PR-1: Page Shell Contract

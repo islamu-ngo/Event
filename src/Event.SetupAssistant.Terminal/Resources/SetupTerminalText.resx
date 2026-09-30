@@ -9,12 +9,12 @@
   <data name="SetupSecret" xml:space="preserve"><value>Setup secret:</value></data>
   <data name="SaveManual" xml:space="preserve"><value>_Save entered secret</value></data>
   <data name="Generate" xml:space="preserve"><value>_Generate and save</value></data>
-  <data name="Close" xml:space="preserve"><value>_Close</value></data>
+  <data name="Close" xml:space="preserve"><value>Cl_ose</value></data>
   <data name="Cancel" xml:space="preserve"><value>_Cancel</value></data>
   <data name="Ready" xml:space="preserve"><value>Ready. Existing files are never overwritten.</value></data>
   <data name="ProtectedUnavailable" xml:space="preserve"><value>Protected secret output is unavailable on this operating system.</value></data>
   <data name="Limitations" xml:space="preserve"><value>Keyboard/non-color mode. Screen-reader, braille, RTL shaping, scrollback, and managed-heap erasure after Core handoff are unverified.</value></data>
-  <data name="TerminalTooSmall" xml:space="preserve"><value>Terminal is too small. Resize to at least 40 columns by 17 rows.</value></data>
+  <data name="TerminalTooSmall" xml:space="preserve"><value>Terminal is too small. Resize to at least 80 columns by 17 rows.</value></data>
   <data name="InvalidOutputPartial" xml:space="preserve"><value>Output filename accepts only letters, digits, dot, underscore, and hyphen.</value></data>
   <data name="InvalidSecret" xml:space="preserve"><value>Secret input is invalid or exceeds the supported bound.</value></data>
   <data name="SecretCommandsDisabled" xml:space="preserve"><value>Clipboard, context-menu, and undo commands are disabled for secret input.</value></data>
@@ -30,4 +30,46 @@
   <data name="OutcomeComplete" xml:space="preserve"><value>Protected file created; readiness is {0}.{1}</value></data>
   <data name="OutcomeIncomplete" xml:space="preserve"><value>Protected file created with incomplete readiness ({0}).{1}</value></data>
   <data name="OutcomeFailed" xml:space="preserve"><value>Operation failed ({2}); readiness is {0}.</value></data>
+  <data name="NavigationEnvironment" xml:space="preserve"><value>_Environment</value></data>
+  <data name="NavigationCatalogue" xml:space="preserve"><value>_Catalogue</value></data>
+  <data name="NavigationManifest" xml:space="preserve"><value>_Manifest</value></data>
+  <data name="NavigationTenantPackage" xml:space="preserve"><value>_Tenant package</value></data>
+  <data name="NavigationLegalDraft" xml:space="preserve"><value>_Legal draft</value></data>
+  <data name="NavigationIdentityDraft" xml:space="preserve"><value>_Identity draft</value></data>
+  <data name="CatalogueHeading" xml:space="preserve"><value>Browse the local environment catalogue. No values or network requests are used.</value></data>
+  <data name="CatalogueKey" xml:space="preserve"><value>Variable key:</value></data>
+  <data name="CatalogueList" xml:space="preserve"><value>_List all</value></data>
+  <data name="CatalogueLookup" xml:space="preserve"><value>_Look up</value></data>
+  <data name="CatalogueNotFound" xml:space="preserve"><value>No catalogue entry matches that key.</value></data>
+  <data name="ManifestHeading" xml:space="preserve"><value>Create, validate, preview, and protect a local configuration manifest.</value></data>
+  <data name="TenantPackageHeading" xml:space="preserve"><value>Create, validate, preview, and protect a local tenant package.</value></data>
+  <data name="SourceName" xml:space="preserve"><value>Source name:</value></data>
+  <data name="TenantName" xml:space="preserve"><value>Tenant name:</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>Display name:</value></data>
+  <data name="PreparePreview" xml:space="preserve"><value>_Prepare preview</value></data>
+  <data name="SaveProtected" xml:space="preserve"><value>_Save protected</value></data>
+  <data name="LocalDraftReady" xml:space="preserve"><value>Local draft only. Nothing is applied to an instance.</value></data>
+  <data name="PreviewReady" xml:space="preserve"><value>Core validation passed; the local preview is ready.</value></data>
+  <data name="DraftInvalid" xml:space="preserve"><value>The local draft is invalid.</value></data>
+  <data name="ProtectedDraftSaved" xml:space="preserve"><value>The protected local draft was created.</value></data>
+  <data name="ProtectedDraftFailed" xml:space="preserve"><value>The protected local draft could not be created.</value></data>
+  <data name="LegalHeading" xml:space="preserve"><value>Prepare and preview an offline legal draft with explicit identity substitution.</value></data>
+  <data name="LegalTitle" xml:space="preserve"><value>Title:</value></data>
+  <data name="LegalSummary" xml:space="preserve"><value>Summary:</value></data>
+  <data name="AccountableIdentity" xml:space="preserve"><value>Accountable identity:</value></data>
+  <data name="LegalMarkdown" xml:space="preserve"><value>Markdown:</value></data>
+  <data name="LegalPreviewReady" xml:space="preserve"><value>The local legal preview is ready.</value></data>
+  <data name="LegalPreviewIncomplete" xml:space="preserve"><value>The legal preview still has unresolved identity placeholders.</value></data>
+  <data name="LegalPreviewInvalid" xml:space="preserve"><value>The legal draft is invalid.</value></data>
+  <data name="IdentityHeading" xml:space="preserve"><value>Validate a private operator-identity draft and save only through protected local output.</value></data>
+  <data name="IdentityDocument" xml:space="preserve"><value>Identity JSON:</value></data>
+  <data name="ValidateDraft" xml:space="preserve"><value>_Validate draft</value></data>
+  <data name="IdentityPrivateNotice" xml:space="preserve"><value>Private identity values are not repeated in status or logs.</value></data>
+  <data name="IdentityValid" xml:space="preserve"><value>The identity draft is valid. Content digest:</value></data>
+  <data name="IdentityInvalid" xml:space="preserve"><value>The identity draft is invalid.</value></data>
+  <data name="InputFile" xml:space="preserve"><value>Input file:</value></data>
+  <data name="BaselineFile" xml:space="preserve"><value>Baseline file:</value></data>
+  <data name="OpenValidate" xml:space="preserve"><value>Open / _validate</value></data>
+  <data name="CompareFiles" xml:space="preserve"><value>Compare _files</value></data>
+  <data name="DifferenceCount" xml:space="preserve"><value>Changed sections</value></data>
 </root>

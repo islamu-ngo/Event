@@ -14,7 +14,7 @@
   <data name="Ready" xml:space="preserve"><value>جاهز. لا تُستبدل الملفات الموجودة.</value></data>
   <data name="ProtectedUnavailable" xml:space="preserve"><value>الإخراج السري المحمي غير متاح على نظام التشغيل هذا.</value></data>
   <data name="Limitations" xml:space="preserve"><value>وضع لوحة المفاتيح دون اعتماد على اللون. قارئ الشاشة وبرايل وتشكيل RTL ومسح سجل الشاشة ومسح ذاكرة .NET بعد تسليم Core غير متحقق منها.</value></data>
-  <data name="TerminalTooSmall" xml:space="preserve"><value>الطرفية صغيرة جدًا. غيّر الحجم إلى 40 عمودًا و17 صفًا على الأقل.</value></data>
+  <data name="TerminalTooSmall" xml:space="preserve"><value>الطرفية صغيرة جدًا. غيّر الحجم إلى 80 عمودًا و17 صفًا على الأقل.</value></data>
   <data name="InvalidOutputPartial" xml:space="preserve"><value>اسم ملف الإخراج يقبل الحروف اللاتينية والأرقام والنقطة والشرطة السفلية والشرطة فقط.</value></data>
   <data name="InvalidSecret" xml:space="preserve"><value>إدخال السر غير صالح أو يتجاوز الحد المدعوم.</value></data>
   <data name="SecretCommandsDisabled" xml:space="preserve"><value>أوامر الحافظة وقائمة السياق والتراجع معطلة في حقل السر.</value></data>
@@ -30,4 +30,46 @@
   <data name="OutcomeComplete" xml:space="preserve"><value>تم إنشاء الملف المحمي؛ الجاهزية: {0}.{1}</value></data>
   <data name="OutcomeIncomplete" xml:space="preserve"><value>تم إنشاء الملف المحمي مع جاهزية غير مكتملة ({0}).{1}</value></data>
   <data name="OutcomeFailed" xml:space="preserve"><value>فشلت العملية ({2})؛ الجاهزية: {0}.</value></data>
+  <data name="NavigationEnvironment" xml:space="preserve"><value>الب_يئة</value></data>
+  <data name="NavigationCatalogue" xml:space="preserve"><value>ال_فهرس</value></data>
+  <data name="NavigationManifest" xml:space="preserve"><value>البيا_ن</value></data>
+  <data name="NavigationTenantPackage" xml:space="preserve"><value>ح_زمة المستأجر</value></data>
+  <data name="NavigationLegalDraft" xml:space="preserve"><value>مسودة _قانونية</value></data>
+  <data name="NavigationIdentityDraft" xml:space="preserve"><value>مسودة ال_هوية</value></data>
+  <data name="CatalogueHeading" xml:space="preserve"><value>تصفح فهرس البيئة المحلي دون قيم أو طلبات شبكة.</value></data>
+  <data name="CatalogueKey" xml:space="preserve"><value>مفتاح المتغير:</value></data>
+  <data name="CatalogueList" xml:space="preserve"><value>_عرض الكل</value></data>
+  <data name="CatalogueLookup" xml:space="preserve"><value>_بحث</value></data>
+  <data name="CatalogueNotFound" xml:space="preserve"><value>لا يوجد إدخال مطابق في الفهرس.</value></data>
+  <data name="ManifestHeading" xml:space="preserve"><value>أنشئ بيان إعداد محليا وتحقق منه واعرضه واحفظه بأمان.</value></data>
+  <data name="TenantPackageHeading" xml:space="preserve"><value>أنشئ حزمة مستأجر محليا وتحقق منها واعرضها واحفظها بأمان.</value></data>
+  <data name="SourceName" xml:space="preserve"><value>اسم المصدر:</value></data>
+  <data name="TenantName" xml:space="preserve"><value>اسم المستأجر:</value></data>
+  <data name="DisplayName" xml:space="preserve"><value>اسم العرض:</value></data>
+  <data name="PreparePreview" xml:space="preserve"><value>_إعداد المعاينة</value></data>
+  <data name="SaveProtected" xml:space="preserve"><value>_حفظ محمي</value></data>
+  <data name="LocalDraftReady" xml:space="preserve"><value>مسودة محلية فقط؛ لن يطبق شيء على أي مثيل.</value></data>
+  <data name="PreviewReady" xml:space="preserve"><value>نجح تحقق النواة وأصبحت المعاينة المحلية جاهزة.</value></data>
+  <data name="DraftInvalid" xml:space="preserve"><value>المسودة المحلية غير صالحة.</value></data>
+  <data name="ProtectedDraftSaved" xml:space="preserve"><value>تم إنشاء المسودة المحلية المحمية.</value></data>
+  <data name="ProtectedDraftFailed" xml:space="preserve"><value>تعذر إنشاء المسودة المحلية المحمية.</value></data>
+  <data name="LegalHeading" xml:space="preserve"><value>أعد مسودة قانونية غير متصلة وعاينها مع استبدال صريح للهوية.</value></data>
+  <data name="LegalTitle" xml:space="preserve"><value>العنوان:</value></data>
+  <data name="LegalSummary" xml:space="preserve"><value>الملخص:</value></data>
+  <data name="AccountableIdentity" xml:space="preserve"><value>الهوية المسؤولة:</value></data>
+  <data name="LegalMarkdown" xml:space="preserve"><value>ماركداون:</value></data>
+  <data name="LegalPreviewReady" xml:space="preserve"><value>المعاينة القانونية المحلية جاهزة.</value></data>
+  <data name="LegalPreviewIncomplete" xml:space="preserve"><value>ما زالت المعاينة القانونية تتضمن عناصر هوية غير محلولة.</value></data>
+  <data name="LegalPreviewInvalid" xml:space="preserve"><value>المسودة القانونية غير صالحة.</value></data>
+  <data name="IdentityHeading" xml:space="preserve"><value>تحقق من مسودة هوية مشغل خاصة واحفظها فقط عبر إخراج محلي محمي.</value></data>
+  <data name="IdentityDocument" xml:space="preserve"><value>هوية JSON:</value></data>
+  <data name="ValidateDraft" xml:space="preserve"><value>_تحقق من المسودة</value></data>
+  <data name="IdentityPrivateNotice" xml:space="preserve"><value>لا تكرر قيم الهوية الخاصة في الحالة أو السجلات.</value></data>
+  <data name="IdentityValid" xml:space="preserve"><value>مسودة الهوية صالحة. بصمة المحتوى:</value></data>
+  <data name="IdentityInvalid" xml:space="preserve"><value>مسودة الهوية غير صالحة.</value></data>
+  <data name="InputFile" xml:space="preserve"><value>ملف الإدخال:</value></data>
+  <data name="BaselineFile" xml:space="preserve"><value>ملف الأساس:</value></data>
+  <data name="OpenValidate" xml:space="preserve"><value>فتح و_تحقق</value></data>
+  <data name="CompareFiles" xml:space="preserve"><value>مقارنة المل_فات</value></data>
+  <data name="DifferenceCount" xml:space="preserve"><value>الأقسام المتغيرة</value></data>
 </root>

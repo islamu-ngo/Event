@@ -1,5 +1,5 @@
 ---
-description: "Publish and operate the standalone Setup Assistant CLI without exposing secrets or bypassing server-issued configuration-import affordances."
+description: "Prepare local configuration with the offline Setup Assistant and keep restricted artifacts on protected native hosts."
 ---
 
 # Setup Assistant
@@ -55,6 +55,27 @@ chmod 0755 artifacts/setup-assistant/linux-x64/event-setup
 install -m 0755 artifacts/setup-assistant/linux-x64/event-setup "$HOME/.local/bin/event-setup"
 event-setup doctor --machine
 ```
+
+## Interactive terminal
+
+Publish the Terminal.Gui application separately:
+
+```bash
+dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
+  -target:PublishSetupAssistant \
+  -property:SetupAssistantSurface=terminal \
+  -property:SetupAssistantRid=linux-x64 \
+  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
+artifacts/setup-assistant/terminal/linux-x64/event-setup-terminal
+```
+
+Run it in a real terminal at least 80 columns by 17 rows. Redirected input
+or output is rejected. Navigation separates environment editing, the
+catalogue, configuration manifests, tenant packages, legal previews and
+operator-identity drafts. Changing a form invalidates its prepared output;
+changing workspace clears private inputs and previews. Native exports use
+the protected, create-only file rules above. Exported drafts do not attest
+identity or apply anything to an instance.
 
 ## Use the implemented command grammar
 

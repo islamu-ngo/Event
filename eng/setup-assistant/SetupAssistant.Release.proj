@@ -1,9 +1,15 @@
 <Project DefaultTargets="ValidateSetupAssistantRelease">
   <PropertyGroup>
     <Configuration>Release</Configuration>
-    <SetupAssistantProject>$(MSBuildThisFileDirectory)../../src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj</SetupAssistantProject>
+    <SetupAssistantSurface Condition="'$(SetupAssistantSurface)' == ''">cli</SetupAssistantSurface>
+    <SetupAssistantAssemblyName Condition="'$(SetupAssistantSurface)' == 'cli'">Event.SetupAssistant.Cli</SetupAssistantAssemblyName>
+    <SetupAssistantAssemblyName Condition="'$(SetupAssistantSurface)' == 'terminal'">Event.SetupAssistant.Terminal</SetupAssistantAssemblyName>
+    <SetupAssistantProject>$(MSBuildThisFileDirectory)../../src/$(SetupAssistantAssemblyName)/$(SetupAssistantAssemblyName).csproj</SetupAssistantProject>
     <SetupAssistantOutputRoot Condition="'$(SetupAssistantOutputRoot)' == ''">$(MSBuildThisFileDirectory)../../artifacts/setup-assistant</SetupAssistantOutputRoot>
-    <SetupAssistantExecutableName>event-setup</SetupAssistantExecutableName>
+    <SetupAssistantExecutableName Condition="'$(SetupAssistantSurface)' == 'cli'">event-setup</SetupAssistantExecutableName>
+    <SetupAssistantExecutableName Condition="'$(SetupAssistantSurface)' == 'terminal'">event-setup-terminal</SetupAssistantExecutableName>
+    <SetupAssistantPublishDirectory Condition="'$(SetupAssistantSurface)' == 'cli'">$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/</SetupAssistantPublishDirectory>
+    <SetupAssistantPublishDirectory Condition="'$(SetupAssistantSurface)' == 'terminal'">$(SetupAssistantOutputRoot)/terminal/$(SetupAssistantRid)/</SetupAssistantPublishDirectory>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
@@ -23,6 +29,9 @@
 
   <Target Name="ValidateSetupAssistantRelease">
     <Error
+      Condition="'$(SetupAssistantSurface)' != 'cli' and '$(SetupAssistantSurface)' != 'terminal'"
+      Text="Unsupported Setup Assistant surface '$(SetupAssistantSurface)'." />
+    <Error
       Condition="'$(SetupAssistantRid)' != '' and '$(SetupAssistantRid)' != 'linux-x64' and '$(SetupAssistantRid)' != 'linux-arm64' and '$(SetupAssistantRid)' != 'osx-arm64' and '$(SetupAssistantRid)' != 'win-x64'"
       Text="Unsupported Setup Assistant runtime identifier '$(SetupAssistantRid)'." />
     <Error
@@ -32,7 +41,7 @@
       Condition="'$(PublishTrimmed)' != 'false'"
       Text="Setup Assistant trimming is disabled until the command surface has a dedicated trimming contract." />
     <Error
-      Condition="'$(SetupAssistantExecutableName)' != 'event-setup'"
+      Condition="('$(SetupAssistantSurface)' == 'cli' and '$(SetupAssistantExecutableName)' != 'event-setup') or ('$(SetupAssistantSurface)' == 'terminal' and '$(SetupAssistantExecutableName)' != 'event-setup-terminal')"
       Text="The Setup Assistant release executable name is part of the operator contract." />
   </Target>
 
@@ -76,11 +85,11 @@
     <MSBuild
       Projects="$(SetupAssistantProject)"
       Targets="Publish"
-      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);MSBuildProjectExtensionsPath=obj/setup-assistant-release/$(SetupAssistantRid)/;PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);EnableCompressionInSingleFile=$(EnableCompressionInSingleFile);IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract);UseAppHost=$(UseAppHost);DebugSymbols=$(DebugSymbols);DebugType=$(DebugType);PublishDir=$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/;NoRestore=true" />
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);MSBuildProjectExtensionsPath=obj/setup-assistant-release/$(SetupAssistantRid)/;PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);EnableCompressionInSingleFile=$(EnableCompressionInSingleFile);IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract);UseAppHost=$(UseAppHost);DebugSymbols=$(DebugSymbols);DebugType=$(DebugType);PublishDir=$(SetupAssistantPublishDirectory);NoRestore=true" />
     <PropertyGroup>
       <_SetupAssistantExecutableExtension Condition="'$(SetupAssistantRid)' == 'win-x64'">.exe</_SetupAssistantExecutableExtension>
-      <_SetupAssistantPublishedExecutable>$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/Event.SetupAssistant.Cli$(_SetupAssistantExecutableExtension)</_SetupAssistantPublishedExecutable>
-      <_SetupAssistantReleaseExecutable>$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/$(SetupAssistantExecutableName)$(_SetupAssistantExecutableExtension)</_SetupAssistantReleaseExecutable>
+      <_SetupAssistantPublishedExecutable>$(SetupAssistantPublishDirectory)$(SetupAssistantAssemblyName)$(_SetupAssistantExecutableExtension)</_SetupAssistantPublishedExecutable>
+      <_SetupAssistantReleaseExecutable>$(SetupAssistantPublishDirectory)$(SetupAssistantExecutableName)$(_SetupAssistantExecutableExtension)</_SetupAssistantReleaseExecutable>
     </PropertyGroup>
     <Move
       SourceFiles="$(_SetupAssistantPublishedExecutable)"

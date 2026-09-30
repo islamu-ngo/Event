@@ -11,10 +11,13 @@ public sealed class SetupAssistantReleaseTests
 
     private static readonly string[] ForbiddenReleaseTerms =
         ["Avalonia", "Terminal.Gui", "CommunityToolkit.Mvvm", "OpenTelemetry",
-            "ApplicationInsights", "Sentry", "NewRelic", "Datadog", "Telemetry"];
+            "ApplicationInsights", "Sentry", "NewRelic", "Datadog", "Telemetry",
+            "SetupLive", "Explore.Blazor", "Explore.API", "Refit", "RestSharp"];
 
     [Test]
-    public async Task ReleaseProject_EvaluatesExactStandaloneRuntimeMatrix()
+    [Arguments("cli", "event-setup")]
+    [Arguments("terminal", "event-setup-terminal")]
+    public async Task ReleaseProject_EvaluatesExactStandaloneRuntimeMatrix(string surface, string executable)
     {
         string contractPath = Path.Combine(
             Path.GetTempPath(),
@@ -29,6 +32,7 @@ public sealed class SetupAssistantReleaseTests
                     "msbuild",
                     ReleaseProjectPath(),
                     "-target:WriteSetupAssistantReleaseContract",
+                    $"-property:SetupAssistantSurface={surface}",
                     $"-property:SetupAssistantContractOutput={contractPath}",
                     "-nologo",
                     "-verbosity:minimal"
@@ -54,7 +58,7 @@ public sealed class SetupAssistantReleaseTests
             await Assert.That(root.GetProperty("useAppHost").GetBoolean()).IsTrue();
             await Assert.That(root.GetProperty("debugSymbols").GetBoolean()).IsFalse();
             await Assert.That(root.GetProperty("executableName").GetString())
-                .IsEqualTo("event-setup");
+                .IsEqualTo(executable);
         }
         finally
         {
@@ -68,7 +72,9 @@ public sealed class SetupAssistantReleaseTests
 
     [Test]
     [NotInParallel]
-    public async Task HostPublish_ProducesStandaloneCliWithoutUiOrTelemetryAssemblies()
+    [Arguments("cli", "event-setup")]
+    [Arguments("terminal", "event-setup-terminal")]
+    public async Task HostPublish_ProducesIndependentOfflineNativeTarget(string surface, string executable)
     {
         string hostRuntimeIdentifier = RuntimeInformation.RuntimeIdentifier;
         await Assert.That(ExpectedRuntimeIdentifiers).Contains(hostRuntimeIdentifier)
@@ -86,6 +92,7 @@ public sealed class SetupAssistantReleaseTests
                     "msbuild",
                     ReleaseProjectPath(),
                     "-target:PublishSetupAssistant",
+                    $"-property:SetupAssistantSurface={surface}",
                     $"-property:SetupAssistantRid={hostRuntimeIdentifier}",
                     $"-property:SetupAssistantOutputRoot={outputRoot}",
                     "-nologo",
@@ -94,10 +101,10 @@ public sealed class SetupAssistantReleaseTests
             await Assert.That(result.ExitCode).IsEqualTo(0)
                 .Because(result.Output);
 
-            string publishDirectory = Path.Combine(outputRoot, hostRuntimeIdentifier);
-            string executableName = OperatingSystem.IsWindows()
-                ? "event-setup.exe"
-                : "event-setup";
+            string publishDirectory = surface == "cli"
+                ? Path.Combine(outputRoot, hostRuntimeIdentifier)
+                : Path.Combine(outputRoot, surface, hostRuntimeIdentifier);
+            string executableName = executable + (OperatingSystem.IsWindows() ? ".exe" : string.Empty);
             string executablePath = Path.Combine(publishDirectory, executableName);
             await Assert.That(File.Exists(executablePath)).IsTrue();
 
@@ -106,7 +113,9 @@ public sealed class SetupAssistantReleaseTests
                 .Where(name => name is not null)
                 .Cast<string>()
                 .ToArray();
-            string[] forbidden = files.Where(file => ForbiddenReleaseTerms.Any(term =>
+            IEnumerable<string> forbiddenTerms = surface == "cli" ? ForbiddenReleaseTerms
+                : ForbiddenReleaseTerms.Where(term => term is not "Terminal.Gui" and not "CommunityToolkit.Mvvm");
+            string[] forbidden = files.Where(file => forbiddenTerms.Any(term =>
                     file.Contains(term, StringComparison.OrdinalIgnoreCase)))
                 .ToArray();
             await Assert.That(forbidden).IsEmpty();
@@ -114,21 +123,27 @@ public sealed class SetupAssistantReleaseTests
                 ".dll", StringComparison.OrdinalIgnoreCase))).IsEmpty()
                 .Because("single-file publishing must not leave a managed assembly sidecar");
 
+            string project = surface == "cli" ? "Event.SetupAssistant.Cli" : "Event.SetupAssistant.Terminal";
             using JsonDocument dependencies = JsonDocument.Parse(await File.ReadAllBytesAsync(
-                ContextSystemHelpers.RepoPath("src", "Event.SetupAssistant.Cli", "bin", "Release",
-                    "net10.0", hostRuntimeIdentifier, "Event.SetupAssistant.Cli.deps.json")));
+                ContextSystemHelpers.RepoPath("src", project, "bin", "Release",
+                    "net10.0", hostRuntimeIdentifier, project + ".deps.json")));
             JsonProperty[] libraries = dependencies.RootElement.GetProperty("libraries")
                 .EnumerateObject().ToArray();
-            await Assert.That(libraries
-                .Where(library => library.Value.GetProperty("type").GetString() == "package")
-                .Select(library => library.Name)).IsEquivalentTo(
-                ["Spectre.Console/0.57.2", "Spectre.Console.Ansi/0.57.2",
-                 "Spectre.Console.Cli/0.56.1", "YamlDotNet/18.1.0"]);
+            await Assert.That(libraries.Where(library => forbiddenTerms.Any(term =>
+                library.Name.Contains(term, StringComparison.OrdinalIgnoreCase)))).IsEmpty();
+            if (surface == "cli")
+                await Assert.That(libraries
+                    .Where(library => library.Value.GetProperty("type").GetString() == "package")
+                    .Select(library => library.Name)).IsEquivalentTo(
+                    ["Spectre.Console/0.57.2", "Spectre.Console.Ansi/0.57.2",
+                     "Spectre.Console.Cli/0.56.1", "YamlDotNet/18.1.0"]);
+            string[] expectedProjects = surface == "cli"
+                ? ["Event.SetupAssistant.Cli", "Event.Setup.Core", "Event.Setup.Artifacts", "Event.Wire.Contracts"]
+                : ["Event.SetupAssistant.Terminal", "Event.SetupAssistant", "Event.Setup.Core",
+                   "Event.Setup.Artifacts", "Event.Wire.Contracts"];
             await Assert.That(libraries
                 .Where(library => library.Value.GetProperty("type").GetString() == "project")
-                .Select(library => library.Name.Split('/')[0])).IsEquivalentTo(
-                ["Event.SetupAssistant.Cli", "Event.Setup.Core",
-                 "Event.Setup.Artifacts", "Event.Wire.Contracts"]);
+                .Select(library => library.Name.Split('/')[0])).IsEquivalentTo(expectedProjects);
         }
         finally
         {

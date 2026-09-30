@@ -6,9 +6,10 @@
 > **Last Verified:** 2026-09-30
 > **Source Anchors:** `src/Event.SetupAssistant.Cli/`, `src/Event.Setup.Core/`, `src/Event.SetupAssistant.Terminal/`, `src/Event.SetupAssistant/SetupLive/`, `src/Explore.Application/Features/ConfigurationManifest/Importing/`, `eng/setup-assistant/SetupAssistant.Release.proj`, `.agents/skills/setup-assistant-cli/SKILL.md`, `tests/Event.Architecture.Tests/SetupAssistantReleaseTests.cs`
 
-The Setup Assistant separates deterministic offline configuration work,
-interactive operator presentation, and authenticated live-instance operations.
-The release artifact in this phase is the non-interactive CLI only.
+The Setup Assistant targets perform local configuration work only. Core
+validation, presentation and protected native output are separate boundaries.
+The existing SetupLive adapter and platform import services remain separate
+backend capabilities; none is referenced by the offline product targets.
 
 ## Component boundaries
 
@@ -80,6 +81,16 @@ No third-party implementation, snippet, package or source-derived structure
 was incorporated. The anonymous-inode/create-only design was selected over
 pathname snapshot-and-replace because a path comparison cannot make the
 subsequent overwrite atomic against a competing writer.
+
+## Offline presentation boundaries
+
+Terminal navigation owns separate environment, catalogue, manifest, tenant
+package, legal and identity draft views. Core remains the authority for
+composition, portability and legal substitution. Input changes invalidate
+prepared bytes; navigation clears restricted inputs and outputs. Status
+labels carry outcomes and approved metadata, not identity content.
+`SetupAssistantSurface=terminal` selects its independent apphost and
+`terminal/<rid>/` publish directory. It never falls back to the CLI.
 
 ## Executable command contract
 

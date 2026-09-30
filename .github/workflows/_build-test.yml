@@ -231,6 +231,18 @@ jobs:
             --minimum-expected-tests 35 --maximum-parallel-tests 1 --no-progress \
             --report-trx --report-trx-filename SetupLiveAuthoritySecurityTests.trx
 
+      - name: Publish public Setup Assistant browser
+        if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
+            -target:PublishSetupAssistantBrowser \
+            -property:SetupAssistantOutputRoot="$RUNNER_TEMP/setup-assistant"
+          test -f "$RUNNER_TEMP/setup-assistant/browser/wwwroot/index.html"
+          test -d "$RUNNER_TEMP/setup-assistant/browser/wwwroot/_framework"
+          dotnet run eng/setup-assistant/GenerateSetupAssistantRatchets.cs -- --check
+
       - name: Unit Tests — Application
         if: ${{ inputs.run-fast-tests && inputs.run-app-tests }}
         id: test_application

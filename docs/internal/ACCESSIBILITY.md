@@ -41,6 +41,19 @@ Keep those limits explicit until verified on the actual target terminal and
 assistive technology. The protected-output host gate is separate from
 accessibility evidence.
 
+## Public Setup Browser
+
+The independent static app supplies its own landmarks, skip link, route H1
+focus, labelled upload and status/alert regions; it does not inherit the
+platform's authenticated shell. Completed uploads replace the file input to
+release the selected file and restore focus without scrolling. Public JSON
+previews explicitly use `dir="ltr"` within either page direction.
+
+Both routes were rendered at desktop and mobile widths. Accepted/rejected
+uploads, file release, focus continuity and mobile RTL preview were exercised
+through the actual WebAssembly app. These checks do not certify every browser
+or assistive technology; retain the ordinary manual accessibility checklist.
+
 ## Platform Rules
 
 ### PR-1: Page Shell Contract

@@ -94,14 +94,15 @@ Console.WriteLine("Generated Setup Assistant ratchets (3/3).");
 return 0;
 
 static byte[] GenerateBrowserCapability() =>
-    GenerateDisabledCapability("browser", ["secretEntry"]);
+    GenerateCapability("browser", ["secretEntry"], enabled: true);
 
 static byte[] GenerateSetupLiveCapability() =>
-    GenerateDisabledCapability(
+    GenerateCapability(
         "setup-live",
-        ["targetEnrollment", "secretBindingReadiness", "secretBindingWrite", "savedProfiles"]);
+        ["targetEnrollment", "secretBindingReadiness", "secretBindingWrite", "savedProfiles"],
+        enabled: false);
 
-static byte[] GenerateDisabledCapability(string target, IEnumerable<string> capabilities)
+static byte[] GenerateCapability(string target, IEnumerable<string> capabilities, bool enabled)
 {
     using var stream = new MemoryStream();
     using (var writer = CreateWriter(stream))
@@ -110,7 +111,7 @@ static byte[] GenerateDisabledCapability(string target, IEnumerable<string> capa
         WriteMetadata(writer);
         writer.WriteNumber("schemaVersion", 1);
         writer.WriteString("target", target);
-        writer.WriteBoolean("targetEnabled", false);
+        writer.WriteBoolean("targetEnabled", enabled);
         writer.WriteStartObject("capabilities");
         foreach (string capability in capabilities)
             writer.WriteBoolean(capability, false);

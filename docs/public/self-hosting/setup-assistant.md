@@ -30,7 +30,8 @@ not need a separately installed .NET runtime.
 Windows and macOS packages can inspect public catalogue data and validate
 local input, but cannot save files. The Terminal's protected Save is
 unavailable on those hosts. Neither package currently promises protected
-dotenv or identity export. Browser and Desktop remain disabled shells.
+dotenv or identity export. The browser provides a smaller public-only
+workspace; the Desktop release is not yet enabled.
 
 ## Publish from source
 
@@ -76,6 +77,35 @@ operator-identity drafts. Changing a form invalidates its prepared output;
 changing workspace clears private inputs and previews. Native exports use
 the protected, create-only file rules above. Exported drafts do not attest
 identity or apply anything to an instance.
+
+## Public browser workspace
+
+Publish the independent static Blazor application:
+
+```bash
+dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
+  -target:PublishSetupAssistantBrowser \
+  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
+```
+
+Serve `artifacts/setup-assistant/browser/wwwroot/` from one static origin.
+Serve WebAssembly files with `application/wasm`, preserve the `_framework/`
+directory, and route application paths such as `/manifest` to `index.html`.
+The initial load requires the static host. There is no service worker and
+no promise of relaunching without network access.
+
+The catalogue contains public Core definitions only. The manifest page
+accepts the bounded `event-setup-public-manifest/v1` template format:
+`schema`, `kind`, `name`, `topology`, `capabilities` and `providers`.
+It is not the native configuration-portability or identity format.
+Unknown fields and kinds, identity fields, malformed input and files above
+64 KiB are rejected without a preview or download. A new selection clears
+the previous result; a failed or superseded read cannot restore it.
+
+Processing stays in browser memory after static boot. There is no application
+API, login, instance address, secret input, persistent storage or telemetry.
+Use a native target for restricted files. Browser validation never applies
+configuration or establishes platform authorization.
 
 ## Use the implemented command grammar
 

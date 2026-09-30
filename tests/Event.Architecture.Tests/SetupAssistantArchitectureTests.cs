@@ -54,7 +54,7 @@ public sealed class SetupAssistantArchitectureTests
             ["Event.Setup.Artifacts"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant.SetupLive"] = ["Event.Setup.Core", "Explore.Blazor.Client"],
-            ["Event.SetupAssistant.Browser"] = ["Event.SetupAssistant"],
+            ["Event.SetupAssistant.Browser"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant.Desktop"] = ["Event.SetupAssistant", "Event.Setup.Artifacts"],
             ["Event.SetupAssistant.Terminal"] = ["Event.SetupAssistant", "Event.Setup.Core", "Event.Setup.Artifacts"],
             ["Event.SetupAssistant.Cli"] = ["Event.Setup.Core", "Event.Setup.Artifacts"],
@@ -186,11 +186,10 @@ public sealed class SetupAssistantArchitectureTests
     }
 
     [Test]
-    public async Task DisabledPresentationTargetsMustRemainMachineDisabledAndGraphAbsent()
+    public async Task UnreleasedDesktopMustRemainDisabledAndGraphAbsent()
     {
         string[] disabledShells =
         [
-            "src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj",
             "src/Event.SetupAssistant.Desktop/Event.SetupAssistant.Desktop.csproj"
         ];
         var violations = new List<string>();
@@ -509,7 +508,7 @@ public sealed class SetupAssistantArchitectureTests
             "_metadata":{"about":["ABOUTME: Generated Setup Assistant architecture ratchet; do not edit by hand.","ABOUTME: Owned by eng/setup-assistant/GenerateSetupAssistantRatchets.cs."],"generatedBy":"eng/setup-assistant/GenerateSetupAssistantRatchets.cs"}
             """;
         using JsonDocument safeCapability = JsonDocument.Parse(
-            "{" + metadata + ""","schemaVersion":1,"target":"browser","targetEnabled":false,"capabilities":{"secretEntry":false}}""");
+            "{" + metadata + ""","schemaVersion":1,"target":"browser","targetEnabled":true,"capabilities":{"secretEntry":false}}""");
         using JsonDocument unsafeCapability = JsonDocument.Parse(
             """{"schemaVersion":1,"target":"browser","targetEnabled":true,"capabilities":{"secretEntry":true}}""");
         using JsonDocument safeLiveCapability = JsonDocument.Parse(
@@ -718,12 +717,12 @@ public sealed class SetupAssistantArchitectureTests
                 "true",
                 StringComparison.OrdinalIgnoreCase);
         }).ToArray();
-        if (enabledTargets.Length != 1
-            || !string.Equals(
-                Path.GetFileNameWithoutExtension(enabledTargets.SingleOrDefault()),
-                "Event.SetupAssistant.Terminal",
-                StringComparison.Ordinal))
-            violations.Add("exactly one human Setup target must be enabled: Event.SetupAssistant.Terminal");
+        if (!enabledTargets.Select(Path.GetFileNameWithoutExtension)
+                .Order(StringComparer.Ordinal)
+                .SequenceEqual(
+                    new[] { "Event.SetupAssistant.Browser", "Event.SetupAssistant.Terminal" },
+                    StringComparer.Ordinal))
+            violations.Add("enabled human targets must be the public browser and offline terminal");
         string? role = terminal.Descendants().SingleOrDefault(element =>
             element.Name.LocalName == "SetupTargetRole")?.Value;
         if (!string.Equals(role, "Terminal", StringComparison.Ordinal))
@@ -968,18 +967,20 @@ public sealed class SetupAssistantArchitectureTests
     }
 
     private static string[] ValidateBrowserCapability(JsonElement root) =>
-        ValidateDisabledCapability(root, "browser", ["secretEntry"]);
+        ValidateCapability(root, "browser", ["secretEntry"], enabled: true);
 
     private static string[] ValidateSetupLiveCapability(JsonElement root) =>
-        ValidateDisabledCapability(
+        ValidateCapability(
             root,
             "setup-live",
-            ["targetEnrollment", "secretBindingReadiness", "secretBindingWrite", "savedProfiles"]);
+            ["targetEnrollment", "secretBindingReadiness", "secretBindingWrite", "savedProfiles"],
+            enabled: false);
 
-    private static string[] ValidateDisabledCapability(
+    private static string[] ValidateCapability(
         JsonElement root,
         string expectedTarget,
-        string[] expectedCapabilities)
+        string[] expectedCapabilities,
+        bool enabled)
     {
         var violations = new List<string>();
         string[] actualRootProperties = root.EnumerateObject()
@@ -1026,8 +1027,8 @@ public sealed class SetupAssistantArchitectureTests
             violations.Add($"target must be {expectedTarget}");
         }
         if (!root.TryGetProperty("targetEnabled", out JsonElement targetEnabled)
-            || targetEnabled.ValueKind != JsonValueKind.False)
-            violations.Add("targetEnabled must be false");
+            || targetEnabled.ValueKind != (enabled ? JsonValueKind.True : JsonValueKind.False))
+            violations.Add($"targetEnabled must be {enabled.ToString().ToLowerInvariant()}");
         if (!root.TryGetProperty("capabilities", out JsonElement capabilities)
             || capabilities.ValueKind != JsonValueKind.Object)
         {

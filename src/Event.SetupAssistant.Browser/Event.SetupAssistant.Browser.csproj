@@ -1,14 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ISLAMU.Event.SetupAssistant.Browser</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <SetupTargetEnabled>false</SetupTargetEnabled>
-    <SetupTargetRole>ContractShell</SetupTargetRole>
+    <SetupTargetEnabled>true</SetupTargetEnabled>
+    <SetupTargetRole>StandalonePublicBrowser</SetupTargetRole>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Event.SetupAssistant\Event.SetupAssistant.csproj" />
+    <ProjectReference Include="..\Event.Setup.Core\Event.Setup.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
   </ItemGroup>
 </Project>

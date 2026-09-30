@@ -1,72 +1,128 @@
 namespace Event.SetupAssistant.Browser.Tests;
 
-using System.Text.Json;
-using System.Xml.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using Bunit;
+using ISLAMU.Event.Setup.Core.Environment;
+using ISLAMU.Event.SetupAssistant.Browser;
+using ISLAMU.Event.SetupAssistant.Browser.Pages;
 
 public sealed class BrowserSecretBoundaryTests
 {
-    private static readonly string[] ForbiddenGraphTerms =
-    [
-        "Avalonia", "BlazorWebAssembly", "WebAssembly", "Remote.Protocol",
-        "ServiceWorker", "Telemetry", "ApplicationInsights"
-    ];
-
     [Test]
-    public async Task GeneratedPublicCapabilityRemainsDisabled()
+    public async Task RestrictedFieldsAreRejectedWithoutPreviewOrDownload()
     {
-        using JsonDocument document = await BrowserSecretBoundaryContract.ReadCapabilitiesAsync();
-        JsonElement root = document.RootElement;
+        string confidentialValue = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        byte[] manifest = Encoding.UTF8.GetBytes(
+            $$"""
+            {
+              "schema": "event-setup-public-manifest/v1",
+              "kind": "public-template",
+              "name": "community-host",
+              "topology": "single",
+              "capabilities": [],
+              "providers": [],
+              "operatorIdentity": "{{confidentialValue}}"
+            }
+            """);
 
-        await Assert.That(root.GetProperty("target").GetString()).IsEqualTo("browser");
-        await Assert.That(root.GetProperty("targetEnabled").GetBoolean()).IsFalse();
-        await Assert.That(root.GetProperty("capabilities")
-            .GetProperty("secretEntry").GetBoolean()).IsFalse();
+        BrowserManifestResult result = BrowserPublicManifest.ValidateAndPreview(manifest);
+
+        await Assert.That(result.IsAccepted).IsFalse();
+        await Assert.That(result.Preview).IsNull();
+        await Assert.That(result.DownloadHref).IsNull();
+        await Assert.That(result.Status).DoesNotContain(confidentialValue);
     }
 
     [Test]
-    public async Task ApprovedDisabledBrowserExportsNoRuntimeOwner()
+    public async Task UnknownKindsAreRejectedWithoutRetainingGeneratedContent()
     {
-        var contract = new BrowserSecretBoundaryContract();
+        string confidentialValue = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        byte[] manifest = Encoding.UTF8.GetBytes(
+            $$"""
+            {
+              "schema": "event-setup-public-manifest/v1",
+              "kind": "future-unknown-kind",
+              "name": "{{confidentialValue}}",
+              "topology": "single",
+              "capabilities": [],
+              "providers": []
+            }
+            """);
 
-        await Assert.That(contract.ExportedBrowserTypes()).IsEmpty();
-        await Assert.That(contract.ReferencedAssemblies().Any(reference =>
-            ForbiddenGraphTerms.Any(term =>
-                reference.Contains(term, StringComparison.OrdinalIgnoreCase)))).IsFalse();
+        BrowserManifestResult result = BrowserPublicManifest.ValidateAndPreview(manifest);
+
+        await Assert.That(result.IsAccepted).IsFalse();
+        await Assert.That(result.Preview).IsNull();
+        await Assert.That(result.DownloadHref).IsNull();
+        await Assert.That(result.Status).DoesNotContain(confidentialValue);
     }
 
     [Test]
-    public async Task ApprovedDisabledBrowserHasNoRuntimeGraphOrStaticAssets()
+    public async Task RenderedRejectionDoesNotExposeConfidentialInput()
     {
-        string root = BrowserSecretBoundaryContract.RepositoryRoot();
-        string projectPath = Path.Combine(
-            root,
-            "src",
-            "Event.SetupAssistant.Browser",
-            "Event.SetupAssistant.Browser.csproj");
-        string lockPath = Path.Combine(
-            root,
-            "src",
-            "Event.SetupAssistant.Browser",
-            "packages.lock.json");
-        XDocument project = XDocument.Load(projectPath);
-        using JsonDocument lockDocument = JsonDocument.Parse(
-            await File.ReadAllBytesAsync(lockPath));
-        string? enabled = project.Descendants()
-            .Single(element => element.Name.LocalName == "SetupTargetEnabled")
-            .Value;
-        string graph = lockDocument.RootElement.GetRawText();
-        string sourceRoot = Path.GetDirectoryName(projectPath)!;
+        string confidentialValue = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        byte[] manifest = Encoding.UTF8.GetBytes(
+            $$"""
+            {
+              "schema": "event-setup-public-manifest/v1",
+              "kind": "public-template",
+              "name": "community-host",
+              "topology": "single",
+              "capabilities": [],
+              "providers": [],
+              "secret": "{{confidentialValue}}"
+            }
+            """);
+        using var context = new BunitContext();
+        var component = context.Render<ManifestPreview>();
 
-        await Assert.That(enabled).IsEqualTo("false");
-        await Assert.That(ForbiddenGraphTerms.Any(term =>
-            graph.Contains(term, StringComparison.OrdinalIgnoreCase))).IsFalse();
-        await Assert.That(Directory.Exists(Path.Combine(sourceRoot, "wwwroot"))).IsFalse();
-        await Assert.That(Directory.GetFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.Contains(
-                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
-                StringComparison.Ordinal)
-                && !path.Contains(
-                    $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
-                    StringComparison.Ordinal))).IsEmpty();
+        await component.InvokeAsync(() => component.Instance.LoadAsync(new MemoryStream(manifest)));
+
+        await Assert.That(component.Markup).DoesNotContain(confidentialValue);
+        await Assert.That(component.FindAll("a[download]")).IsEmpty();
+        await Assert.That(component.FindAll("[role=alert]").Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task RejectedUploadClearsEarlierPublicPreviewAndDownload()
+    {
+        string topology = PlatformEnvironmentCatalogue.Catalogue.Topologies[0];
+        byte[] publicManifest = Encoding.UTF8.GetBytes(
+            $$"""
+            {
+              "schema": "event-setup-public-manifest/v1",
+              "kind": "public-template",
+              "name": "community-host",
+              "topology": "{{topology}}",
+              "capabilities": [],
+              "providers": []
+            }
+            """);
+        string confidentialValue = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        byte[] restrictedManifest = Encoding.UTF8.GetBytes(
+            $$"""
+            {
+              "schema": "event-setup-public-manifest/v1",
+              "kind": "public-template",
+              "name": "community-host",
+              "topology": "{{topology}}",
+              "capabilities": [],
+              "providers": [],
+              "identity": "{{confidentialValue}}"
+            }
+            """);
+        using var context = new BunitContext();
+        var component = context.Render<ManifestPreview>();
+        await component.InvokeAsync(() =>
+            component.Instance.LoadAsync(new MemoryStream(publicManifest)));
+
+        await component.InvokeAsync(() =>
+            component.Instance.LoadAsync(new MemoryStream(restrictedManifest)));
+
+        await Assert.That(component.FindAll("a[download]")).IsEmpty();
+        await Assert.That(component.FindAll("pre")).IsEmpty();
+        await Assert.That(component.Markup).DoesNotContain(confidentialValue);
+        await Assert.That(component.FindAll("[role=alert]").Count).IsEqualTo(1);
     }
 }

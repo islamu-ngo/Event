@@ -1,0 +1,56 @@
+@page "/"
+
+<PageTitle>Public setup catalogue</PageTitle>
+
+<section class="hero" aria-labelledby="catalogue-heading">
+    <p class="eyebrow">Standalone public workspace</p>
+    <h1 id="catalogue-heading">Public setup catalogue</h1>
+    <p class="lede">
+        Review non-secret configuration definitions without connecting to an ISLAMU Event instance.
+        The first load needs this static site; disconnected relaunch is not promised.
+    </p>
+    <div class="actions">
+        <a class="button" href="@_catalogue.DownloadHref" download="event-setup-public-catalogue.json">
+            Download public catalogue
+        </a>
+        <NavLink class="button button--secondary" href="manifest">Validate a public manifest</NavLink>
+    </div>
+</section>
+
+<section aria-labelledby="definitions-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Local reference</p>
+            <h2 id="definitions-heading">Public environment definitions</h2>
+        </div>
+        <p><strong>@_catalogue.Entries.Count</strong> public definitions</p>
+    </div>
+    <div class="table-scroll" tabindex="0" aria-label="Scrollable public configuration catalogue">
+        <table>
+            <caption>Only definitions classified public by Event.Setup.Core are shown.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Requirement</th>
+                    <th scope="col">Safe default</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (BrowserCatalogueEntry entry in _catalogue.Entries)
+                {
+                    <tr>
+                        <th scope="row"><code>@entry.Key</code></th>
+                        <td>@entry.Category</td>
+                        <td>@entry.Requirement</td>
+                        <td>@(entry.SafeDefault ?? "None")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private readonly BrowserCatalogue _catalogue = BrowserPublicCatalogue.Create();
+}

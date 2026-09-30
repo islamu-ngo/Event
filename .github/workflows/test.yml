@@ -185,7 +185,7 @@ jobs:
                   run_blazor="true"
                   run_arch="true"
                   ;;
-                NuGet.Config|.env.example|docker-compose.yml|docs/CONFIGURATION.md|src/Event.Setup.Core/*|src/Event.SetupAssistant/*|src/Event.SetupAssistant.Browser/*|src/Event.SetupAssistant.Desktop/*|src/Event.SetupAssistant.Terminal/*|src/Event.SetupAssistant.Cli/*|tests/Event.Setup*.Tests/*|eng/setup-assistant/generated/browser-release-capabilities.json|eng/setup-assistant/generated/setup-live-release-capabilities.json|eng/setup-assistant/generated/frozen-contract-baseline.json|eng/setup-assistant/generated/environment-catalogue.json|eng/setup-assistant/*|eng/release/dependencies/terminal-gui/*)
+                NuGet.Config|.env.example|docker-compose.yml|docs/CONFIGURATION.md|src/Event.Setup.Core/*|src/Event.Setup.Artifacts/*|src/Event.SetupAssistant/*|src/Event.SetupAssistant.Browser/*|src/Event.SetupAssistant.Desktop/*|src/Event.SetupAssistant.Terminal/*|src/Event.SetupAssistant.Cli/*|tests/Event.Setup*.Tests/*|eng/setup-assistant/generated/browser-release-capabilities.json|eng/setup-assistant/generated/setup-live-release-capabilities.json|eng/setup-assistant/generated/frozen-contract-baseline.json|eng/setup-assistant/generated/environment-catalogue.json|eng/setup-assistant/*|eng/release/dependencies/terminal-gui/*)
                   run_arch="true"
                   run_setup="true"
                   ;;

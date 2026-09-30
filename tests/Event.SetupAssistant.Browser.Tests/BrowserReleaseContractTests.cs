@@ -1,37 +1,46 @@
 namespace Event.SetupAssistant.Browser.Tests;
 
-using System.Text.Json;
+using System.Reflection;
+using ISLAMU.Event.SetupAssistant.Browser;
 
 public sealed class BrowserReleaseContractTests
 {
     [Test]
-    public async Task ApprovedDisabledTargetHasNoPublishableBrowserSurface()
+    public async Task EnabledBrowserRuntimeExcludesConnectedAndTelemetryProducts()
     {
-        string root = BrowserSecretBoundaryContract.RepositoryRoot();
-        string sourceRoot = Path.Combine(root, "src", "Event.SetupAssistant.Browser");
-        using JsonDocument capabilities =
-            await BrowserSecretBoundaryContract.ReadCapabilitiesAsync();
-        string[] forbiddenFiles =
+        Assembly assembly = typeof(BrowserPublicManifest).Assembly;
+        string[] forbidden =
         [
-            "index.html", "service-worker.js", "manifest.webmanifest",
-            "appsettings.json", "web.config", "staticwebapp.config.json"
+            "Event.SetupAssistant.SetupLive",
+            "ApplicationInsights",
+            "OpenTelemetry",
+            "Yarp",
+            "Authentication"
         ];
-        string[] present = Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories)
-            .Where(path => !path.Contains(
-                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
-                StringComparison.Ordinal)
-                && !path.Contains(
-                    $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
-                    StringComparison.Ordinal))
-            .Where(path => forbiddenFiles.Contains(
-                Path.GetFileName(path),
-                StringComparer.OrdinalIgnoreCase))
+        string[] references = assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
             .ToArray();
 
-        await Assert.That(capabilities.RootElement.GetProperty("targetEnabled")
-            .GetBoolean()).IsFalse();
-        await Assert.That(capabilities.RootElement.GetProperty("capabilities")
-            .GetProperty("secretEntry").GetBoolean()).IsFalse();
-        await Assert.That(present).IsEmpty();
+        await Assert.That(references.Any(reference => forbidden.Any(term =>
+            reference.Contains(term, StringComparison.OrdinalIgnoreCase)))).IsFalse();
+    }
+
+    [Test]
+    public async Task BrowserPublicSurfaceExposesNoConnectionOrStorageContract()
+    {
+        string[] forbiddenTerms =
+        [
+            "HttpClient", "Token", "Login", "Identity", "Storage",
+            "Telemetry", "ServiceWorker", "InstanceUrl", "ApiKey"
+        ];
+        Type[] publicTypes = typeof(BrowserPublicManifest).Assembly.GetExportedTypes();
+        string[] publicMembers = publicTypes
+            .SelectMany(type => type.GetMembers(BindingFlags.Public
+                | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Select(member => $"{member.DeclaringType?.FullName}.{member.Name}")
+            .ToArray();
+
+        await Assert.That(publicMembers.Any(member => forbiddenTerms.Any(term =>
+            member.Contains(term, StringComparison.OrdinalIgnoreCase)))).IsFalse();
     }
 }

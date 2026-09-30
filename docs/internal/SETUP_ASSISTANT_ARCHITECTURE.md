@@ -19,6 +19,7 @@ backend capabilities; none is referenced by the offline product targets.
 | `Event.Setup.Artifacts` | Classified public output and native create-only protected files | Core and OS APIs; no UI or network client |
 | `Event.SetupAssistant.Cli` | Deterministic command parsing, explicit I/O, machine JSON, and exit codes | Core and Artifacts |
 | `Event.SetupAssistant.Terminal` | Interactive operator workflow and protected secret entry | Shared presentation, Core and Artifacts |
+| `Event.SetupAssistant.Browser` | Static public catalogue and closed public-template validation | Core and Blazor WebAssembly; no native writer |
 | `Event.SetupAssistant.Desktop` | Disabled contract shell; no separate writer implementation | Shared presentation and Artifacts |
 | `Event.SetupAssistant` | Framework-neutral presentation state | Core |
 | `Event.SetupAssistant.SetupLive` | Ephemeral transport adapter for server-issued live-control affordances | Generated client and Core contracts |
@@ -71,7 +72,8 @@ to the current user and justified OS principals, plus reparse, race and
 cleanup invariants. macOS requires its own native host evidence; Linux
 mode tests do not prove either platform. The host CI jobs currently test
 refusal and public output only; they are not permission-support evidence.
-Browser and Desktop activation remain separate work.
+The public browser does not reference this adapter. Desktop activation
+remains separate work.
 
 The shared adapter's implementation is repository-native. Its externally
 constrained elements are only the Linux `openat`, `open` (`O_TMPFILE`),
@@ -91,6 +93,22 @@ prepared bytes; navigation clears restricted inputs and outputs. Status
 labels carry outcomes and approved metadata, not identity content.
 `SetupAssistantSurface=terminal` selects its independent apphost and
 `terminal/<rid>/` publish directory. It never falls back to the CLI.
+
+The standalone browser directly references Core, not the shared native
+presentation or filesystem adapter. `BrowserPublicManifest` accepts a
+closed six-field public template and canonicalizes only enumerated Core
+topology, capability and provider selections. It never treats an arbitrary
+native portability manifest as public. Raw upload buffers are bounded and
+zeroed; the component clears earlier output before reading, fences
+completion by generation and invalidates on disposal or read failure.
+
+`PublishSetupAssistantBrowser` emits a static bundle independently of native
+RID publishing. Its generated capability enables the browser but retains
+`secretEntry=false`; SetupLive's generated capability remains disabled.
+Same-origin static boot acquisition is the only required network activity.
+There is no application HTTP client registration, API route, service worker,
+browser persistence or private identity export. First-load hosting and
+offline-relaunch limits belong to the public operator guide.
 
 ## Executable command contract
 

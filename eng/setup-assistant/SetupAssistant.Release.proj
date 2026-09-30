@@ -96,6 +96,14 @@
       DestinationFiles="$(_SetupAssistantReleaseExecutable)" />
   </Target>
 
+  <Target Name="PublishSetupAssistantBrowser">
+    <MSBuild
+      Projects="$(MSBuildThisFileDirectory)../../src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj"
+      Targets="Restore;Publish"
+      RemoveProperties="RuntimeIdentifier;SelfContained;PublishSingleFile;UseAppHost"
+      Properties="Configuration=$(Configuration);PublishDir=$(SetupAssistantOutputRoot)/browser/;RestoreLockedMode=true" />
+  </Target>
+
   <Target
     Name="PublishAllSetupAssistantRids"
     DependsOnTargets="ValidateSetupAssistantRelease">

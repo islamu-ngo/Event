@@ -8,6 +8,8 @@ using System.Text.Json;
 
 public sealed class SetupAssistantReleaseTests
 {
+    private const string DesktopSurface = "desktop";
+
     private static readonly string[] ExpectedRuntimeIdentifiers =
         ["linux-x64", "linux-arm64", "osx-arm64", "win-x64"];
 
@@ -20,7 +22,7 @@ public sealed class SetupAssistantReleaseTests
     [Test]
     [Arguments("cli", "event-setup")]
     [Arguments("terminal", "event-setup-terminal")]
-    [Arguments("desktop", "event-setup-desktop")]
+    [Arguments(DesktopSurface, "event-setup-desktop")]
     public async Task ReleaseProject_EvaluatesExactStandaloneRuntimeMatrix(string surface, string executable)
     {
         string contractPath = Path.Combine(
@@ -53,7 +55,7 @@ public sealed class SetupAssistantReleaseTests
                 .ToArray();
 
             await Assert.That(runtimeIdentifiers)
-                .IsEquivalentTo(surface == "desktop" ? ["linux-x64"] : ExpectedRuntimeIdentifiers);
+                .IsEquivalentTo(surface == DesktopSurface ? ["linux-x64"] : ExpectedRuntimeIdentifiers);
             await Assert.That(root.GetProperty("selfContained").GetBoolean()).IsTrue();
             await Assert.That(root.GetProperty("publishSingleFile").GetBoolean()).IsTrue();
             await Assert.That(root.GetProperty("publishTrimmed").GetBoolean()).IsFalse();
@@ -78,7 +80,7 @@ public sealed class SetupAssistantReleaseTests
     [NotInParallel]
     [Arguments("cli", "event-setup")]
     [Arguments("terminal", "event-setup-terminal")]
-    [Arguments("desktop", "event-setup-desktop")]
+    [Arguments(DesktopSurface, "event-setup-desktop")]
     public async Task HostPublish_ProducesIndependentOfflineNativeTarget(string surface, string executable)
     {
         string hostRuntimeIdentifier = RuntimeInformation.RuntimeIdentifier;
@@ -103,7 +105,7 @@ public sealed class SetupAssistantReleaseTests
                     "-nologo",
                     "-verbosity:minimal"
                 ]);
-            if (surface == "desktop" && hostRuntimeIdentifier != "linux-x64")
+            if (surface == DesktopSurface && hostRuntimeIdentifier != "linux-x64")
             {
                 await Assert.That(result.ExitCode).IsNotEqualTo(0)
                     .Because("desktop publication must refuse hosts without release evidence");
@@ -127,7 +129,7 @@ public sealed class SetupAssistantReleaseTests
             IEnumerable<string> forbiddenTerms = surface switch
             {
                 "terminal" => ForbiddenReleaseTerms.Where(term => term is not "Terminal.Gui" and not "CommunityToolkit.Mvvm"),
-                "desktop" => ForbiddenReleaseTerms.Where(term => term is not "Avalonia" and not "CommunityToolkit.Mvvm"),
+                DesktopSurface => ForbiddenReleaseTerms.Where(term => term is not "Avalonia" and not "CommunityToolkit.Mvvm"),
                 _ => ForbiddenReleaseTerms
             };
             string[] forbidden = files.Where(file => forbiddenTerms.Any(term =>
@@ -140,7 +142,7 @@ public sealed class SetupAssistantReleaseTests
 
             string project = surface switch
             {
-                "desktop" => "Event.SetupAssistant.Desktop",
+                DesktopSurface => "Event.SetupAssistant.Desktop",
                 "terminal" => "Event.SetupAssistant.Terminal",
                 _ => "Event.SetupAssistant.Cli"
             };
@@ -164,7 +166,7 @@ public sealed class SetupAssistantReleaseTests
             await Assert.That(libraries
                 .Where(library => library.Value.GetProperty("type").GetString() == "project")
                 .Select(library => library.Name.Split('/')[0])).IsEquivalentTo(expectedProjects);
-            if (surface == "desktop")
+            if (surface == DesktopSurface)
             {
                 using FileStream assembly = File.OpenRead(ContextSystemHelpers.RepoPath(
                     "src", project, "bin", "Release", "net10.0", hostRuntimeIdentifier, project + ".dll"));

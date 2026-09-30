@@ -72,7 +72,8 @@ public sealed class BrowserOfflineWorkflowTests
         using var context = new BunitContext();
         var component = context.Render<ManifestPreview>();
 
-        await component.InvokeAsync(() => component.Instance.LoadAsync(new MemoryStream(input)));
+        using MemoryStream stream = new(input);
+        await component.InvokeAsync(() => component.Instance.LoadAsync(stream));
 
         await Assert.That(component.FindAll("h1")).Count().IsEqualTo(1);
         await Assert.That(component.FindAll("[role=status]").Count).IsEqualTo(1);

@@ -86,13 +86,8 @@ public static class BrowserPublicManifest
     private static bool HasClosedPropertySet(JsonElement root)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (JsonProperty property in root.EnumerateObject())
-        {
-            if (!AllowedProperties.Contains(property.Name) || !seen.Add(property.Name))
-                return false;
-        }
-
-        return seen.SetEquals(AllowedProperties);
+        return root.EnumerateObject().All(property => AllowedProperties.Contains(property.Name) && seen.Add(property.Name))
+            && seen.SetEquals(AllowedProperties);
     }
 
     private static bool TryReadString(JsonElement root, string propertyName, out string value)

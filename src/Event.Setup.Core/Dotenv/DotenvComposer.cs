@@ -204,7 +204,7 @@ public static class DotenvComposer
         if (value.Length is < 3 or > 320 || value.Any(character =>
                 char.IsWhiteSpace(character) || char.IsControl(character)))
             return false;
-        int separator = value.IndexOf('@');
+        int separator = value.IndexOf('@', StringComparison.Ordinal);
         return separator > 0 && separator == value.LastIndexOf('@') && separator < value.Length - 1;
     }
 

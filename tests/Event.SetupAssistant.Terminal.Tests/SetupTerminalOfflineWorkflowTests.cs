@@ -49,7 +49,7 @@ public sealed class SetupTerminalOfflineWorkflowTests
             ManifestWorkspaceKind kind = tenant ? ManifestWorkspaceKind.TenantPackage : ManifestWorkspaceKind.Manifest;
             using var source = new ManifestView(kind, new ProtectedArtifactWriter(), directory);
             await Assert.That(source.PreparePreview()).IsTrue();
-            byte[] expected = source.PreviewBytes.ToArray();
+            byte[] expected = source.GetPreviewBytes().ToArray();
             await File.WriteAllBytesAsync(Path.Combine(directory, "input.json"), expected);
             using var candidate = new ManifestView(kind, new ProtectedArtifactWriter(), directory)
             {
@@ -57,14 +57,14 @@ public sealed class SetupTerminalOfflineWorkflowTests
                 BaselineFileName = "input.json"
             };
             await Assert.That(candidate.OpenLocalFile()).IsTrue();
-            await Assert.That(candidate.PreviewBytes.ToArray()).IsEquivalentTo(expected);
+            await Assert.That(candidate.GetPreviewBytes().ToArray()).IsEquivalentTo(expected);
             await Assert.That(candidate.CompareLocalFiles()).IsTrue();
             await Assert.That(candidate.DifferenceCount).IsEqualTo(0);
 
             await File.WriteAllTextAsync(Path.Combine(directory, "invalid.json"), "invalid");
             candidate.InputFileName = "invalid.json";
             await Assert.That(candidate.OpenLocalFile()).IsFalse();
-            await Assert.That(candidate.PreviewBytes).IsEmpty();
+            await Assert.That(candidate.GetPreviewBytes()).IsEmpty();
             await Assert.That(candidate.DifferenceCount).IsNull();
         }
         finally
@@ -184,9 +184,9 @@ public sealed class SetupTerminalOfflineWorkflowTests
                 "Terminal tenant",
                 null).Document!).Document!;
 
-        await Assert.That(manifestView.PreviewBytes.ToArray())
+        await Assert.That(manifestView.GetPreviewBytes().ToArray())
             .IsEquivalentTo(OfflinePortabilityWorkflow.Format(manifest).Output!.Bytes.ToArray());
-        await Assert.That(tenantView.PreviewBytes.ToArray())
+        await Assert.That(tenantView.GetPreviewBytes().ToArray())
             .IsEquivalentTo(OfflinePortabilityWorkflow.Format(tenantPackage).Output!.Bytes.ToArray());
     }
 
@@ -197,7 +197,7 @@ public sealed class SetupTerminalOfflineWorkflowTests
             ManifestWorkspaceKind.Manifest, new ProtectedArtifactWriter(), Path.GetTempPath());
         await Assert.That(manifest.PreparePreview()).IsTrue();
         manifest.SourceName = "changed-source";
-        await Assert.That(manifest.PreviewBytes).IsEmpty();
+        await Assert.That(manifest.GetPreviewBytes()).IsEmpty();
 
         using var identity = new IdentityDraftView(new ProtectedArtifactWriter(), Path.GetTempPath())
         {
@@ -205,7 +205,7 @@ public sealed class SetupTerminalOfflineWorkflowTests
         };
         await Assert.That(identity.ValidateDraft()).IsTrue();
         identity.Document = "{}";
-        await Assert.That(identity.ManifestBytes).IsEmpty();
+        await Assert.That(identity.GetManifestBytes()).IsEmpty();
 
         using var legal = new LegalDraftView
         {
@@ -257,7 +257,7 @@ public sealed class SetupTerminalOfflineWorkflowTests
             await Assert.That(view.ValidateDraft()).IsTrue();
             await Assert.That(view.Status).DoesNotContain(privateMarker, StringComparison.Ordinal);
             OperatorIdentityManifest manifest =
-                OperatorIdentityManifestCodec.Read(view.ManifestBytes);
+                OperatorIdentityManifestCodec.Read(view.GetManifestBytes());
             await Assert.That(manifest.Document.GetProperty("legalName").GetString())
                 .IsEqualTo(privateMarker);
 
@@ -265,8 +265,8 @@ public sealed class SetupTerminalOfflineWorkflowTests
             {
                 await Assert.That(await view.SaveProtectedAsync())
                     .IsEqualTo(ProtectedArtifactStatus.Written);
-                await Assert.That(File.ReadAllBytes(path))
-                    .IsEquivalentTo(view.ManifestBytes.ToArray());
+                await Assert.That(await File.ReadAllBytesAsync(path))
+                    .IsEquivalentTo(view.GetManifestBytes().ToArray());
                 await Assert.That(File.GetUnixFileMode(path))
                     .IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
@@ -319,7 +319,7 @@ public sealed class SetupTerminalOfflineWorkflowTests
         ManifestView manifest = Descendants(window).OfType<ManifestView>().First();
         await Assert.That(manifest.PreparePreview()).IsTrue();
         window.SelectWorkspace(SetupTerminalWorkspaceKind.LegalDraft);
-        await Assert.That(manifest.PreviewBytes).IsEmpty();
+        await Assert.That(manifest.GetPreviewBytes()).IsEmpty();
         LegalDraftView legal = Descendants(window).OfType<LegalDraftView>().Single();
         legal.AccountableIdentity = "Private legal identity";
         await Assert.That(legal.PreparePreview()).IsTrue();

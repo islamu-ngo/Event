@@ -246,7 +246,7 @@ public static class DotenvCodec
                 Add(diagnostics, "dotenv-utf16-invalid", path, entry.Key);
                 return;
             }
-            if (HasControl(value.AsSpan()) || value.Contains('\r') || value.Contains('\n')
+            if (HasControl(value.AsSpan()) || value.Contains('\r', StringComparison.Ordinal) || value.Contains('\n', StringComparison.Ordinal)
                 || ContainsForbiddenShell(value))
                 Add(diagnostics, "dotenv-value-forbidden", path, entry.Key);
         }

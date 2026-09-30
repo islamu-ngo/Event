@@ -77,7 +77,10 @@ public sealed class BrowserSecretBoundaryTests
         using var context = new BunitContext();
         var component = context.Render<ManifestPreview>();
 
-        await component.InvokeAsync(() => component.Instance.LoadAsync(new MemoryStream(manifest)));
+        using (MemoryStream stream = new(manifest))
+        {
+            await component.InvokeAsync(() => component.Instance.LoadAsync(stream));
+        }
 
         await Assert.That(component.Markup).DoesNotContain(confidentialValue);
         await Assert.That(component.FindAll("a[download]")).IsEmpty();
@@ -114,11 +117,17 @@ public sealed class BrowserSecretBoundaryTests
             """);
         using var context = new BunitContext();
         var component = context.Render<ManifestPreview>();
-        await component.InvokeAsync(() =>
-            component.Instance.LoadAsync(new MemoryStream(publicManifest)));
+        using (MemoryStream publicStream = new(publicManifest))
+        {
+            await component.InvokeAsync(() =>
+                component.Instance.LoadAsync(publicStream));
+        }
 
-        await component.InvokeAsync(() =>
-            component.Instance.LoadAsync(new MemoryStream(restrictedManifest)));
+        using (MemoryStream restrictedStream = new(restrictedManifest))
+        {
+            await component.InvokeAsync(() =>
+                component.Instance.LoadAsync(restrictedStream));
+        }
 
         await Assert.That(component.FindAll("a[download]")).IsEmpty();
         await Assert.That(component.FindAll("pre")).IsEmpty();

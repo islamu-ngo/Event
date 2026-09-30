@@ -53,7 +53,18 @@ public sealed class ProtectedArtifactPreparation : IDisposable
     }
 }
 
-public sealed class ProtectedArtifactWriter
+public interface IProtectedArtifactWriter
+{
+    bool IsAvailable { get; }
+
+    Task<ProtectedArtifactPreparation> PrepareAsync(
+        SetupArtifactKind kind,
+        string targetPath,
+        ReadOnlyMemory<byte> bytes,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class ProtectedArtifactWriter : IProtectedArtifactWriter
 {
     public const int MaximumBytes = 4 * 1024 * 1024;
 

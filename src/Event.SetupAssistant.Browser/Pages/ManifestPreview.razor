@@ -81,7 +81,7 @@
                 length += read;
             }
 
-            if (_disposed || generation != _readGeneration)
+            if (generation != _readGeneration)
                 return;
             _result = length > BrowserPublicManifest.MaximumBytes
                 ? BrowserManifestResult.Rejected
@@ -90,7 +90,7 @@
         }
         catch (IOException)
         {
-            if (_disposed || generation != _readGeneration)
+            if (generation != _readGeneration)
                 return;
             _result = BrowserManifestResult.Rejected;
             _hasResult = true;

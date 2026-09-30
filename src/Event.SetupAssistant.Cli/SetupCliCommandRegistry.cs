@@ -51,7 +51,7 @@ internal static class SetupCliCommandRegistry
                         operation.RegisterBranch(branch, family.Name, runtime);
                 });
             }
-            configuration.AddExample(["doctor", "--machine"]);
+            configuration.AddExample("doctor", "--machine");
         });
         return app;
     }

@@ -27,6 +27,7 @@ public sealed class SetupAssistantArchitectureTests
     private const string TenantPackageSchemaId =
         "https://schemas.islamu.org/event/tenant-configuration-package/v1alpha2/schema.json";
     private const string ApiVersion = "configuration.islamu.org/v1alpha2";
+    private const string PackageReferenceElementName = "PackageReference";
 
     private static readonly string[] RegistryKeys =
     [
@@ -191,11 +192,13 @@ public sealed class SetupAssistantArchitectureTests
             using JsonDocument lockDocument = JsonDocument.Parse(lockContent);
             string projectName = relativeLockPath.Split('/')[1];
             foreach (JsonProperty framework in lockDocument.RootElement.GetProperty("dependencies").EnumerateObject())
-            foreach (JsonProperty package in framework.Value.EnumerateObject())
             {
-                if (BlockedPackageTerms.Any(term => package.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
-                    && !IsApprovedDesktopPackage(projectName, package.Name))
+                foreach (JsonProperty package in framework.Value.EnumerateObject().Where(package =>
+                    BlockedPackageTerms.Any(term => package.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    && !IsApprovedDesktopPackage(projectName, package.Name)))
+                {
                     violations.Add($"blocked package {package.Name} in {relativeLockPath}");
+                }
             }
             if (FindJsonPropertyNames(lockDocument.RootElement).Contains(
                     "Terminal.Gui", StringComparer.OrdinalIgnoreCase))
@@ -216,7 +219,7 @@ public sealed class SetupAssistantArchitectureTests
         await Assert.That(project.Descendants("SetupTargetEnabled").Single().Value).IsEqualTo("true");
         await Assert.That(project.Descendants("OutputType").Single().Value).IsEqualTo("WinExe");
         await Assert.That(project.Descendants("SetupTargetRole").Single().Value).IsEqualTo("OfflineDesktop");
-        await Assert.That(project.Descendants("PackageReference")
+        await Assert.That(project.Descendants(PackageReferenceElementName)
             .Select(element => element.Attribute("Include")!.Value)).IsEquivalentTo(
             ["Avalonia", "Avalonia.Desktop", "Avalonia.Themes.Fluent"]);
         ProcessResult evaluated = RunProcess(
@@ -632,7 +635,7 @@ public sealed class SetupAssistantArchitectureTests
         XDocument cli = XDocument.Load(ContextSystemHelpers.RepoPath(
             "src", "Event.SetupAssistant.Cli", "Event.SetupAssistant.Cli.csproj"));
         string[] cliPackages = cli.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
+            .Where(element => element.Name.LocalName == PackageReferenceElementName)
             .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
             .ToArray();
         if (cliPackages.Any(package => package.Contains("Terminal", StringComparison.OrdinalIgnoreCase)))
@@ -669,7 +672,7 @@ public sealed class SetupAssistantArchitectureTests
         XDocument terminal = XDocument.Load(ContextSystemHelpers.RepoPath(
             "src", "Event.SetupAssistant.Terminal", "Event.SetupAssistant.Terminal.csproj"));
         string[] terminalPackages = terminal.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
+            .Where(element => element.Name.LocalName == PackageReferenceElementName)
             .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
             .ToArray();
         if (terminalPackages.Count(package => string.Equals(
@@ -748,7 +751,7 @@ public sealed class SetupAssistantArchitectureTests
                 .Select(reference => $"missing ProjectReference {projectName} -> {reference}"));
 
             string[] packages = project.Descendants()
-                .Where(element => element.Name.LocalName == "PackageReference")
+                .Where(element => element.Name.LocalName == PackageReferenceElementName)
                 .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
                 .ToArray();
             violations.AddRange(packages
@@ -796,7 +799,7 @@ public sealed class SetupAssistantArchitectureTests
 
         XDocument live = projects["Event.SetupAssistant.SetupLive"];
         if (live.Descendants().Any(element =>
-            element.Name.LocalName == "PackageReference"))
+            element.Name.LocalName == PackageReferenceElementName))
         {
             violations.Add("Event.SetupAssistant.SetupLive must not declare packages");
         }
@@ -818,7 +821,7 @@ public sealed class SetupAssistantArchitectureTests
             violations.Add("ProjectReferences must be exactly Event.Setup.Core");
 
         string[] packages = project.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
+            .Where(element => element.Name.LocalName == PackageReferenceElementName)
             .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
             .ToArray();
         if (!packages.SequenceEqual(["CommunityToolkit.Mvvm"], StringComparer.Ordinal))
@@ -970,48 +973,70 @@ public sealed class SetupAssistantArchitectureTests
         if (!actualRootProperties.SequenceEqual(
                 expectedRootProperties.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             violations.Add("root properties must match the exact generated set");
+
+        ValidateCapabilityMetadata(root, violations);
+        ValidateCapabilityProperties(root, expectedTarget, enabled, violations);
+        ValidateCapabilityItems(root, expectedCapabilities, violations);
+
+        return [.. violations];
+    }
+
+    private static void ValidateCapabilityMetadata(JsonElement root, List<string> violations)
+    {
         if (!root.TryGetProperty("_metadata", out JsonElement metadata)
             || metadata.ValueKind != JsonValueKind.Object)
         {
             violations.Add("_metadata must be an object");
+            return;
         }
-        else
-        {
-            string[] actualMetadataProperties = metadata.EnumerateObject()
-                .Select(property => property.Name)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-            if (!actualMetadataProperties.SequenceEqual(
-                    new[] { "about", "generatedBy" }, StringComparer.Ordinal))
-                violations.Add("_metadata properties must match the exact generated set");
-            if (!TryGetString(metadata, "generatedBy", out string? generatedBy)
-                || generatedBy != "eng/setup-assistant/GenerateSetupAssistantRatchets.cs")
-                violations.Add("_metadata.generatedBy must name the authoritative generator");
-            if (!metadata.TryGetProperty("about", out JsonElement about)
-                || about.ValueKind != JsonValueKind.Array
-                || !about.EnumerateArray().Select(item => item.GetString()).SequenceEqual(
-                    new[]
-                    {
-                        "ABOUTME: Generated Setup Assistant architecture ratchet; do not edit by hand.",
-                        "ABOUTME: Owned by eng/setup-assistant/GenerateSetupAssistantRatchets.cs."
-                    }, StringComparer.Ordinal))
-                violations.Add("_metadata.about must match the exact generated ownership summary");
-        }
+
+        string[] actualMetadataProperties = metadata.EnumerateObject()
+            .Select(property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!actualMetadataProperties.SequenceEqual(
+                new[] { "about", "generatedBy" }, StringComparer.Ordinal))
+            violations.Add("_metadata properties must match the exact generated set");
+        if (!TryGetString(metadata, "generatedBy", out string? generatedBy)
+            || generatedBy != "eng/setup-assistant/GenerateSetupAssistantRatchets.cs")
+            violations.Add("_metadata.generatedBy must name the authoritative generator");
+        if (!metadata.TryGetProperty("about", out JsonElement about)
+            || about.ValueKind != JsonValueKind.Array
+            || !about.EnumerateArray().Select(item => item.GetString()).SequenceEqual(
+                new[]
+                {
+                    "ABOUTME: Generated Setup Assistant architecture ratchet; do not edit by hand.",
+                    "ABOUTME: Owned by eng/setup-assistant/GenerateSetupAssistantRatchets.cs."
+                }, StringComparer.Ordinal))
+            violations.Add("_metadata.about must match the exact generated ownership summary");
+    }
+
+    private static void ValidateCapabilityProperties(
+        JsonElement root,
+        string expectedTarget,
+        bool enabled,
+        List<string> violations)
+    {
         if (!TryGetInt32(root, "schemaVersion", out int version) || version != 1)
             violations.Add("schemaVersion must be 1");
         if (!TryGetString(root, "target", out string? target)
             || !string.Equals(target, expectedTarget, StringComparison.Ordinal))
-        {
             violations.Add($"target must be {expectedTarget}");
-        }
         if (!root.TryGetProperty("targetEnabled", out JsonElement targetEnabled)
             || targetEnabled.ValueKind != (enabled ? JsonValueKind.True : JsonValueKind.False))
             violations.Add($"targetEnabled must be {enabled.ToString().ToLowerInvariant()}");
+    }
+
+    private static void ValidateCapabilityItems(
+        JsonElement root,
+        string[] expectedCapabilities,
+        List<string> violations)
+    {
         if (!root.TryGetProperty("capabilities", out JsonElement capabilities)
             || capabilities.ValueKind != JsonValueKind.Object)
         {
             violations.Add("capabilities must be an object");
-            return [.. violations];
+            return;
         }
         string[] actualCapabilities = capabilities.EnumerateObject()
             .Select(property => property.Name)
@@ -1026,7 +1051,6 @@ public sealed class SetupAssistantArchitectureTests
                 || value.ValueKind != JsonValueKind.False)
                 violations.Add($"capabilities.{capability} must be false");
         }
-        return [.. violations];
     }
 
     private static string[] ValidateFrozenContractBaseline(JsonElement root)

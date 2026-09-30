@@ -30,17 +30,51 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
     private long _manifestRevision;
     private bool _disposed;
 
-    [ObservableProperty]
+    private const string EnvironmentNotPreparedStatus = "environment-not-prepared";
+    private const string EnvironmentInvalidStatus = "environment-invalid";
+    private const string ManifestNotPreparedStatus = "manifest-not-prepared";
+    private const string IdentityInputRequiredStatus = "identity-input-required";
+    private const string IdentityInvalidStatus = "identity-invalid";
+
     private string _environmentFileName = ".env.setup";
+    public string EnvironmentFileName
+    {
+        get => _environmentFileName;
+        set
+        {
+            if (SetProperty(ref _environmentFileName, value))
+            {
+                OnEnvironmentFileNameChanged(value);
+            }
+        }
+    }
 
-    [ObservableProperty]
-    private string _environmentStatus = "environment-not-prepared";
+    private string _environmentStatus = EnvironmentNotPreparedStatus;
+    public string EnvironmentStatus
+    {
+        get => _environmentStatus;
+        set => SetProperty(ref _environmentStatus, value);
+    }
 
-    [ObservableProperty]
     private string _identityFileName = "operator-identity.json";
+    public string IdentityFileName
+    {
+        get => _identityFileName;
+        set
+        {
+            if (SetProperty(ref _identityFileName, value))
+            {
+                OnIdentityFileNameChanged(value);
+            }
+        }
+    }
 
-    [ObservableProperty]
-    private string _identityStatus = "identity-input-required";
+    private string _identityStatus = IdentityInputRequiredStatus;
+    public string IdentityStatus
+    {
+        get => _identityStatus;
+        set => SetProperty(ref _identityStatus, value);
+    }
 
     [ObservableProperty]
     private bool _isEnvironmentSaving;
@@ -58,7 +92,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
     private string _manifestSourceName = "event-setup";
 
     [ObservableProperty]
-    private string _manifestStatus = "manifest-not-prepared";
+    private string _manifestStatus = ManifestNotPreparedStatus;
 
     public SetupDesktopShellViewModel()
         : this(CreateNativeSave(), Directory.GetCurrentDirectory(),
@@ -99,7 +133,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
     public bool PrepareEnvironment()
     {
         ThrowIfDisposed();
-        InvalidateEnvironment("environment-not-prepared");
+        InvalidateEnvironment(EnvironmentNotPreparedStatus);
         try
         {
             var context = new EnvironmentActivationContext(
@@ -114,7 +148,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
             DotenvRenderResult rendered = DotenvCodec.Render(composition.Document, finalNewline: true);
             if (!rendered.Succeeded)
             {
-                EnvironmentStatus = "environment-invalid";
+                EnvironmentStatus = EnvironmentInvalidStatus;
                 return false;
             }
 
@@ -126,7 +160,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
         }
         catch (ArgumentException)
         {
-            EnvironmentStatus = "environment-invalid";
+            EnvironmentStatus = EnvironmentInvalidStatus;
             return false;
         }
     }
@@ -134,7 +168,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
     public bool PrepareManifest()
     {
         ThrowIfDisposed();
-        InvalidateManifest("manifest-not-prepared");
+        InvalidateManifest(ManifestNotPreparedStatus);
         OfflinePortabilityResult created = OfflinePortabilityWorkflow.CreateManifest(
             Profile(),
             Selection(),
@@ -175,7 +209,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
         InvalidateIdentityDraft();
         if (Encoding.UTF8.GetByteCount(document) > OperatorIdentityManifestJson.MaximumBytes)
         {
-            IdentityStatus = "identity-invalid";
+            IdentityStatus = IdentityInvalidStatus;
             return false;
         }
         byte[] source = Encoding.UTF8.GetBytes(document);
@@ -195,7 +229,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
         catch (Exception exception) when (exception is JsonException
             or OperatorIdentityManifestException)
         {
-            IdentityStatus = "identity-invalid";
+            IdentityStatus = IdentityInvalidStatus;
             return false;
         }
         finally
@@ -207,43 +241,46 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
     public Task<ProtectedArtifactStatus> SaveEnvironmentAsync(
         CancellationToken cancellationToken = default) =>
         SaveAsync(
-            SetupArtifactKind.Environment,
-            EnvironmentFileName,
-            _environmentWorkspace,
-            _environmentOperation,
-            GetEnvironmentPreparation,
-            revision => revision == _environmentRevision,
-            status => EnvironmentStatus = status,
-            value => IsEnvironmentSaving = value,
-            NotifyEnvironmentSaveChanged,
+            new DesktopSaveContext(
+                SetupArtifactKind.Environment,
+                EnvironmentFileName,
+                _environmentWorkspace,
+                _environmentOperation,
+                GetEnvironmentPreparation,
+                revision => revision == _environmentRevision,
+                status => EnvironmentStatus = status,
+                value => IsEnvironmentSaving = value,
+                NotifyEnvironmentSaveChanged),
             cancellationToken);
 
     public Task<ProtectedArtifactStatus> SaveManifestAsync(
         CancellationToken cancellationToken = default) =>
         SaveAsync(
-            SetupArtifactKind.Configuration,
-            ManifestFileName,
-            _manifestWorkspace,
-            _manifestOperation,
-            GetManifestPreparation,
-            revision => revision == _manifestRevision,
-            status => ManifestStatus = status,
-            value => IsManifestSaving = value,
-            NotifyManifestSaveChanged,
+            new DesktopSaveContext(
+                SetupArtifactKind.Configuration,
+                ManifestFileName,
+                _manifestWorkspace,
+                _manifestOperation,
+                GetManifestPreparation,
+                revision => revision == _manifestRevision,
+                status => ManifestStatus = status,
+                value => IsManifestSaving = value,
+                NotifyManifestSaveChanged),
             cancellationToken);
 
     public Task<ProtectedArtifactStatus> SaveIdentityAsync(
         CancellationToken cancellationToken = default) =>
         SaveAsync(
-            SetupArtifactKind.OperatorIdentity,
-            IdentityFileName,
-            _identityWorkspace,
-            _identityOperation,
-            GetIdentityPreparation,
-            revision => revision == _identityRevision,
-            status => IdentityStatus = status,
-            value => IsIdentitySaving = value,
-            NotifyIdentitySaveChanged,
+            new DesktopSaveContext(
+                SetupArtifactKind.OperatorIdentity,
+                IdentityFileName,
+                _identityWorkspace,
+                _identityOperation,
+                GetIdentityPreparation,
+                revision => revision == _identityRevision,
+                status => IdentityStatus = status,
+                value => IsIdentitySaving = value,
+                NotifyIdentitySaveChanged),
             cancellationToken);
 
     public void InvalidateIdentityDraft()
@@ -256,7 +293,7 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
             _identityRevision++;
             Zero(ref _identityBytes);
         }
-        IdentityStatus = "identity-input-required";
+        IdentityStatus = IdentityInputRequiredStatus;
         NotifyIdentitySaveChanged();
     }
 
@@ -283,17 +320,17 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
     public override string ToString() =>
         $"{nameof(SetupDesktopShellViewModel)}:ProtectedSaveAvailable={ProtectedSaveAvailable}";
 
-    partial void OnEnvironmentFileNameChanged(string value) =>
-        InvalidateEnvironment("environment-not-prepared");
+    private void OnEnvironmentFileNameChanged(string value) =>
+        InvalidateEnvironment(EnvironmentNotPreparedStatus);
 
-    partial void OnIdentityFileNameChanged(string value) =>
+    private void OnIdentityFileNameChanged(string value) =>
         InvalidateIdentityDraft();
 
     partial void OnManifestFileNameChanged(string value) =>
-        InvalidateManifest("manifest-not-prepared");
+        InvalidateManifest(ManifestNotPreparedStatus);
 
     partial void OnManifestSourceNameChanged(string value) =>
-        InvalidateManifest("manifest-not-prepared");
+        InvalidateManifest(ManifestNotPreparedStatus);
 
     private static Func<SetupArtifactKind, string, ReadOnlyMemory<byte>, CancellationToken,
         Task<ProtectedArtifactStatus>> CreateNativeSave()
@@ -318,66 +355,69 @@ public sealed partial class SetupDesktopShellViewModel : ObservableObject, IDisp
         return workspace;
     }
 
+    private sealed record DesktopSaveContext(
+        SetupArtifactKind Kind,
+        string FileName,
+        SetupPresentationWorkspace Workspace,
+        DesktopProtectedSaveOperation Operation,
+        Func<(byte[] Bytes, long Revision)> TakePreparation,
+        Func<long, bool> IsCurrent,
+        Action<string> SetStatus,
+        Action<bool> SetSaving,
+        Action NotifySaveChanged);
+
     private async Task<ProtectedArtifactStatus> SaveAsync(
-        SetupArtifactKind kind,
-        string fileName,
-        SetupPresentationWorkspace workspace,
-        DesktopProtectedSaveOperation operation,
-        Func<(byte[] Bytes, long Revision)> takePreparation,
-        Func<long, bool> isCurrent,
-        Action<string> setStatus,
-        Action<bool> setSaving,
-        Action notifySaveChanged,
+        DesktopSaveContext context,
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        (byte[] bytes, long revision) = takePreparation();
+        (byte[] bytes, long revision) = context.TakePreparation();
         if (bytes.Length == 0)
             return ProtectedArtifactStatus.InvalidRequest;
 
-        setSaving(true);
-        notifySaveChanged();
+        context.SetSaving(true);
+        context.NotifySaveChanged();
         try
         {
             if (!ProtectedSaveAvailable)
             {
-                if (isCurrent(revision))
-                    setStatus("save-failed:UnsupportedPlatform");
+                if (context.IsCurrent(revision))
+                    context.SetStatus("save-failed:UnsupportedPlatform");
                 return ProtectedArtifactStatus.UnsupportedPlatform;
             }
-            if (!IsSafeFileName(fileName))
+            if (!IsSafeFileName(context.FileName))
             {
-                if (isCurrent(revision))
-                    setStatus("save-failed:UnsafeTarget");
+                if (context.IsCurrent(revision))
+                    context.SetStatus("save-failed:UnsafeTarget");
                 return ProtectedArtifactStatus.UnsafeTarget;
             }
 
-            operation.Prepare(kind, Path.Combine(_outputDirectory, fileName), bytes);
-            await workspace.ExecuteAsync(Guid.CreateVersion7()).WaitAsync(cancellationToken);
-            if (!isCurrent(revision))
+            context.Operation.Prepare(context.Kind, Path.Combine(_outputDirectory, context.FileName), bytes);
+            await context.Workspace.ExecuteAsync(Guid.CreateVersion7()).WaitAsync(cancellationToken);
+            if (!context.IsCurrent(revision))
                 return ProtectedArtifactStatus.InvalidRequest;
 
-            ProtectedArtifactStatus result = workspace.Result is DesktopProtectedSaveResult settled
+            ProtectedArtifactStatus result = context.Workspace.Result is DesktopProtectedSaveResult settled
                 ? settled.Status
                 : ProtectedArtifactStatus.InvalidRequest;
-            setStatus(result == ProtectedArtifactStatus.Written
+            context.SetStatus(result == ProtectedArtifactStatus.Written
                 ? "save-complete"
                 : $"save-failed:{result}");
             return result;
         }
         catch (OperationCanceledException)
         {
-            workspace.Cancel();
-            if (isCurrent(revision))
-                setStatus("save-cancelled");
+            context.Workspace.Cancel();
+            if (context.IsCurrent(revision))
+                context.SetStatus("save-cancelled");
             return ProtectedArtifactStatus.InvalidRequest;
         }
         finally
         {
             CryptographicOperations.ZeroMemory(bytes);
-            operation.Clear();
-            setSaving(false);
-            notifySaveChanged();
+            context.Operation.Clear();
+            context.SetSaving(false);
+            context.NotifySaveChanged();
         }
     }
 

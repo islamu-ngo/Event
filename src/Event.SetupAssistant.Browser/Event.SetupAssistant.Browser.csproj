@@ -8,6 +8,9 @@
     <SetupTargetEnabled>true</SetupTargetEnabled>
     <SetupTargetRole>StandalonePublicBrowser</SetupTargetRole>
     <IsPackable>false</IsPackable>
+    <!-- Blazor WASM client runtime packages (Microsoft.NET.Sdk.WebAssembly.Pack) track host runtime patch versions,
+         making static lock files non-portable across dev and CI runners. -->
+    <RestoreLockedMode>false</RestoreLockedMode>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,8 +19,5 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
-    <!-- Keep the implicit SDK pack independent of installed workload/runtime patches. -->
-    <KnownWebAssemblySdkPack Update="Microsoft.NET.Sdk.WebAssembly.Pack"
-                            WebAssemblySdkPackVersion="10.0.9" />
   </ItemGroup>
 </Project>

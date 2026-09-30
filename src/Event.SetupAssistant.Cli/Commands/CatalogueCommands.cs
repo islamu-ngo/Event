@@ -4,7 +4,7 @@ internal static class CatalogueCommands
 {
     internal static SetupCliFamilyDescriptor Descriptor { get; } = SetupCliCommandRegistry.Family(
         "catalogue",
-        SetupCliCommandRegistry.Operation<CatalogueListSettings>("list"),
+        SetupCliCommandRegistry.Operation<OutputSettings>("list"),
         SetupCliCommandRegistry.Operation<CatalogueItemSettings>("show"),
         SetupCliCommandRegistry.Operation<CatalogueItemSettings>("describe"));
 }

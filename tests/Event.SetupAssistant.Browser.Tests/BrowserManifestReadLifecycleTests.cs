@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.Components.Forms;
 
 public sealed class BrowserManifestReadLifecycleTests
 {
+    private const string DownloadAnchor = "a[download]";
+    private const string PreElement = "pre";
+
     [Test]
     public async Task RejectedUploadReleasesTheSelectedFileControl()
     {
@@ -24,7 +27,7 @@ public sealed class BrowserManifestReadLifecycleTests
 
         await Assert.That(ReferenceEquals(
             selectedControl, component.FindComponent<InputFile>().Instance)).IsFalse();
-        await Assert.That(component.FindAll("a[download]")).IsEmpty();
+        await Assert.That(component.FindAll(DownloadAnchor)).IsEmpty();
     }
 
     [Test]
@@ -34,13 +37,13 @@ public sealed class BrowserManifestReadLifecycleTests
         var component = context.Render<ManifestPreview>();
         using var valid = new MemoryStream(PublicManifest());
         await component.InvokeAsync(() => component.Instance.LoadAsync(valid));
-        await Assert.That(component.FindAll("a[download]").Count).IsEqualTo(1);
+        await Assert.That(component.FindAll(DownloadAnchor).Count).IsEqualTo(1);
         using var failed = new FailedReadStream();
 
         await component.InvokeAsync(() => component.Instance.LoadAsync(failed));
 
-        await Assert.That(component.FindAll("a[download]")).IsEmpty();
-        await Assert.That(component.FindAll("pre")).IsEmpty();
+        await Assert.That(component.FindAll(DownloadAnchor)).IsEmpty();
+        await Assert.That(component.FindAll(PreElement)).IsEmpty();
         await Assert.That(component.FindAll("[role=alert]").Count).IsEqualTo(1);
     }
 
@@ -63,8 +66,8 @@ public sealed class BrowserManifestReadLifecycleTests
         }
         await pending.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await Assert.That(component.FindAll("a[download]")).IsEmpty();
-        await Assert.That(component.FindAll("pre")).IsEmpty();
+        await Assert.That(component.FindAll(DownloadAnchor)).IsEmpty();
+        await Assert.That(component.FindAll(PreElement)).IsEmpty();
     }
 
     private static byte[] PublicManifest() => Encoding.UTF8.GetBytes(

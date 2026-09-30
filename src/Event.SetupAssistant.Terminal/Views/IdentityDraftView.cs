@@ -11,6 +11,8 @@ using global::Terminal.Gui.Views;
 
 internal sealed class IdentityDraftView : View
 {
+    private const string IdentityPrivateNoticeKey = "IdentityPrivateNotice";
+
     private readonly string _baseDirectory;
     private readonly SetupTerminalSecretBuffer _identityInput =
         new(OperatorIdentityManifestJson.MaximumBytes, urlSafeOnly: false);
@@ -75,7 +77,7 @@ internal sealed class IdentityDraftView : View
             Y = 9,
             Width = Dim.Fill(),
             Height = 3,
-            Text = SetupTerminalText.Get("IdentityPrivateNotice")
+            Text = SetupTerminalText.Get(IdentityPrivateNoticeKey)
         };
 
         validate.Accepting += ValidateAccepted;
@@ -83,12 +85,12 @@ internal sealed class IdentityDraftView : View
         _document.ValueChanged += (_, _) =>
         {
             ClearPreparedBytes();
-            _status.Text = SetupTerminalText.Get("IdentityPrivateNotice");
+            _status.Text = SetupTerminalText.Get(IdentityPrivateNoticeKey);
             _status.SetNeedsDraw();
         };
         _document.SensitiveCommandBlocked += (_, _) =>
         {
-            _status.Text = SetupTerminalText.Get("IdentityPrivateNotice");
+            _status.Text = SetupTerminalText.Get(IdentityPrivateNoticeKey);
             _status.SetNeedsDraw();
         };
         _document.InputRejected += (_, _) =>
@@ -112,7 +114,7 @@ internal sealed class IdentityDraftView : View
         set => _fileName.Text = value;
     }
 
-    internal ReadOnlyMemory<byte> ManifestBytes => new((byte[])_manifestBytes.Clone());
+    internal ReadOnlyMemory<byte> GetManifestBytes() => new((byte[])_manifestBytes.Clone());
     internal string Status => _status.Text.ToString() ?? string.Empty;
 
     internal bool ValidateDraft()
@@ -182,7 +184,7 @@ internal sealed class IdentityDraftView : View
     {
         _document.ClearSensitiveState();
         ClearPreparedBytes();
-        _status.Text = SetupTerminalText.Get("IdentityPrivateNotice");
+        _status.Text = SetupTerminalText.Get(IdentityPrivateNoticeKey);
         _status.SetNeedsDraw();
     }
 

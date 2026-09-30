@@ -250,7 +250,7 @@ pre {
     background: #111a14;
     color: #e6f4e9;
     white-space: pre-wrap;
-    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 footer {

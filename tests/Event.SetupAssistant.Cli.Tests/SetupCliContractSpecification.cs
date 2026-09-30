@@ -32,6 +32,14 @@ internal static class SetupCliContractSpecification
             ["io"] = 74
         });
 
+    private const string MachineOption = "--machine";
+    private const string TextOption = "--text";
+    private const string DryRunOption = "--dry-run";
+    private const string InputOption = "--input";
+    private const string BaselineOption = "--baseline";
+    private const string OutputOption = "--output";
+    private const string KeyOption = "--key";
+
     private static readonly string[] ForbiddenNames = ["secret", "password", "token", "credential", "private-key", "api-key", "connection-string"];
 
     internal static IReadOnlyList<string> Validate(CliVector vector)
@@ -70,27 +78,31 @@ internal static class SetupCliContractSpecification
         bool hasKey = false;
         string? inputPath = null;
         string? outputPath = null;
-        for (int index = optionStart; index < args.Count; index++)
+        int index = optionStart;
+        while (index < args.Count)
         {
             string token = args[index];
             if (LooksForbidden(token))
             {
                 errors.Add("usage-secret-surface");
+                index++;
                 continue;
             }
 
             if (!supportedOptions.Contains(token))
             {
                 errors.Add(token.StartsWith('-') ? "usage-option-unknown" : "usage-argument-tail");
+                index++;
                 continue;
             }
 
-            machine |= token == "--machine";
-            text |= token == "--text";
-            dryRun |= token == "--dry-run";
-            if (token is "--input" or "--baseline" or "--output" or "--key" or "--topology" or "--capability" or "--provider")
+            machine |= token == MachineOption;
+            text |= token == TextOption;
+            dryRun |= token == DryRunOption;
+            if (token is InputOption or BaselineOption or OutputOption or KeyOption or "--topology" or "--capability" or "--provider")
             {
-                if (++index >= args.Count || args[index].StartsWith("--", StringComparison.Ordinal))
+                index++;
+                if (index >= args.Count || args[index].StartsWith("--", StringComparison.Ordinal))
                 {
                     errors.Add("usage-option-value-missing");
                     continue;
@@ -98,29 +110,30 @@ internal static class SetupCliContractSpecification
 
                 string value = args[index];
                 if (LooksForbidden(value)) errors.Add("usage-secret-surface");
-                if (token == "--input") { hasInput = true; inputPath = value; }
-                else if (token == "--baseline") hasBaseline = true;
-                else if (token == "--output") { hasOutput = true; outputPath = value; }
-                else if (token == "--key") hasKey = true;
+                if (token == InputOption) { hasInput = true; inputPath = value; }
+                else if (token == BaselineOption) hasBaseline = true;
+                else if (token == OutputOption) { hasOutput = true; outputPath = value; }
+                else if (token == KeyOption) hasKey = true;
             }
+            index++;
         }
 
         if (machine && text)
         {
             errors.Add("usage-mode-conflict");
         }
-        if (hasInput && !supportedOptions.Contains("--input")) errors.Add("usage-input-not-supported");
-        if (hasOutput && !supportedOptions.Contains("--output")) errors.Add("usage-output-not-supported");
-        if (dryRun && !supportedOptions.Contains("--dry-run")) errors.Add("usage-dry-run-not-supported");
+        if (hasInput && !supportedOptions.Contains(InputOption)) errors.Add("usage-input-not-supported");
+        if (hasOutput && !supportedOptions.Contains(OutputOption)) errors.Add("usage-output-not-supported");
+        if (dryRun && !supportedOptions.Contains(DryRunOption)) errors.Add("usage-dry-run-not-supported");
         if (hasBaseline != (operation == "diff")) errors.Add(hasBaseline ? "usage-baseline-not-supported" : "usage-baseline-required");
         if (hasKey != (operation is "show" or "describe")) errors.Add(hasKey ? "usage-key-not-supported" : "usage-key-required");
-        if (supportedOptions.Contains("--output") && !hasOutput && !dryRun)
+        if (supportedOptions.Contains(OutputOption) && !hasOutput && !dryRun)
             errors.Add("usage-output-required");
         if (machine && outputPath == "-")
         {
             errors.Add("usage-machine-artifact-stdout");
         }
-        if (vector.CapturedInput.Length > 0 && (inputPath != "-" || !supportedOptions.Contains("--input")))
+        if (vector.CapturedInput.Length > 0 && (inputPath != "-" || !supportedOptions.Contains(InputOption)))
         {
             errors.Add("usage-stdin-not-explicit");
         }

@@ -181,7 +181,7 @@ internal sealed class ManifestView : View
         set => _fileName.Text = value;
     }
 
-    internal ReadOnlyMemory<byte> PreviewBytes => new((byte[])_previewBytes.Clone());
+    internal ReadOnlyMemory<byte> GetPreviewBytes() => new((byte[])_previewBytes.Clone());
     internal string Status => _status.Text.ToString() ?? string.Empty;
     internal string InputFileName
     {

@@ -21,6 +21,7 @@ internal static partial class UnixProtectedArtifactWriter
     private const uint BasicStats = 0x7ff;
     private const uint OwnerOnly = 0x180;
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Staging stream ownership is transferred to the returned ProtectedArtifactPreparation which disposes it.")]
     internal static async Task<ProtectedArtifactPreparation> PrepareAsync(
         string targetPath, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
@@ -44,11 +45,13 @@ internal static partial class UnixProtectedArtifactWriter
             int descriptor = OpenAt(parent, ".", AnonymousReadWrite, OwnerOnly);
             if (descriptor < 0)
                 return ProtectedArtifactPreparation.Rejected(ProtectedArtifactStatus.IoFailure);
-            var handle = new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
+
+            SafeFileHandle? handle = new((IntPtr)descriptor, ownsHandle: true);
             try
             {
                 if (ChangeMode(handle, OwnerOnly) != 0 || !IsPrivateFile(Inspect(handle), 0))
                     return ProtectedArtifactPreparation.Rejected(ProtectedArtifactStatus.PermissionDenied);
+
                 staged = new FileStream(handle, FileAccess.ReadWrite);
                 handle = null;
             }
@@ -56,6 +59,7 @@ internal static partial class UnixProtectedArtifactWriter
             {
                 handle?.Dispose();
             }
+
             await staged.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             await staged.FlushAsync(cancellationToken).ConfigureAwait(false);
             staged.Flush(flushToDisk: true);
@@ -93,7 +97,8 @@ internal static partial class UnixProtectedArtifactWriter
         }
         finally
         {
-            staged?.Dispose();
+            if (staged is not null)
+                await staged.DisposeAsync().ConfigureAwait(false);
             parent?.Dispose();
         }
     }
@@ -117,10 +122,26 @@ internal static partial class UnixProtectedArtifactWriter
 
             // linkat follows only our procfs descriptor, not an operator pathname.
             // The kernel installs that inode iff the destination is still absent.
-            string descriptorPath = "/proc/self/fd/" + staged.SafeFileHandle.DangerousGetHandle()
-                .ToInt64().ToString(CultureInfo.InvariantCulture);
-            if (LinkAt(CurrentDirectory, descriptorPath, parent, name, FollowDescriptorLink) != 0)
-                return Marshal.GetLastPInvokeError() == 17
+            int linkResult;
+            int linkError = 0;
+            bool addedRef = false;
+            staged.SafeFileHandle.DangerousAddRef(ref addedRef);
+            try
+            {
+                string descriptorPath = "/proc/self/fd/" + staged.SafeFileHandle.DangerousGetHandle()
+                    .ToInt64().ToString(CultureInfo.InvariantCulture);
+                linkResult = LinkAt(CurrentDirectory, descriptorPath, parent, name, FollowDescriptorLink);
+                if (linkResult != 0)
+                    linkError = Marshal.GetLastPInvokeError();
+            }
+            finally
+            {
+                if (addedRef)
+                    staged.SafeFileHandle.DangerousRelease();
+            }
+
+            if (linkResult != 0)
+                return linkError == 17
                     ? ProtectedArtifactStatus.TargetChanged : ProtectedArtifactStatus.IoFailure;
 
             if (StatAt(parent, name, NoFollow, BasicStats, out FileIdentity installed) != 0
@@ -152,8 +173,9 @@ internal static partial class UnixProtectedArtifactWriter
                 int next = OpenAt(current, segments[index], DirectoryNoFollow, 0);
                 if (next < 0)
                     return null;
-                current.Dispose();
+                SafeFileHandle toDispose = current;
                 current = new SafeFileHandle((IntPtr)next, ownsHandle: true);
+                toDispose.Dispose();
                 if (!IsTrustedDirectory(Inspect(current), final: index == segments.Length - 1))
                     return null;
             }
@@ -167,14 +189,18 @@ internal static partial class UnixProtectedArtifactWriter
         }
     }
 
+    private static readonly uint CurrentEffectiveUserId = GetEffectiveUserId();
+
+    private static uint GetEffectiveUserId() => EffectiveUserId();
+
     private static bool IsTrustedDirectory(FileIdentity identity, bool final) =>
         (identity.Mode & 0xf000) == 0x4000
-        && (identity.UserId == 0 || identity.UserId == EffectiveUserId())
+        && (identity.UserId == 0 || identity.UserId == CurrentEffectiveUserId)
         && ((identity.Mode & 0x12) == 0
             || (!final && identity.UserId == 0 && (identity.Mode & 0x200) != 0));
 
     private static bool IsPrivateFile(FileIdentity identity, int length) =>
-        identity.UserId == EffectiveUserId()
+        identity.UserId == CurrentEffectiveUserId
         && identity.Mode == (0x8000 | OwnerOnly)
         && identity.Size == (ulong)length;
 

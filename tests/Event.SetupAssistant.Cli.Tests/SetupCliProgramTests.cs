@@ -224,7 +224,10 @@ public sealed class SetupCliProgramTests
             await Assert.That(result.StandardError).IsEmpty();
             await Assert.That(SetupCliMachineContractVerifier.Validate(result.StandardOutput)).IsEmpty();
         }
-        finally { File.Delete(path); }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     private static async Task<ProcessResult> ExecuteAsync(
@@ -240,10 +243,9 @@ public sealed class SetupCliProgramTests
         };
         string[] hostVariables = ["PATH", "SystemRoot", "DOTNET_ROOT", "DOTNET_ROOT_X64",
             "DOTNET_ROOT_ARM64", "TEMP", "TMP", "TMPDIR"];
-        foreach (string name in info.Environment.Keys.ToArray())
+        foreach (string name in info.Environment.Keys.Where(key => !hostVariables.Contains(key, StringComparer.OrdinalIgnoreCase)).ToArray())
         {
-            if (!hostVariables.Contains(name, StringComparer.OrdinalIgnoreCase))
-                info.Environment.Remove(name);
+            info.Environment.Remove(name);
         }
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
         if (environment is not null)

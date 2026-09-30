@@ -24,34 +24,28 @@ internal abstract class SetupCliCommandSettings : CommandSettings, ISetupCliComm
         string family,
         string operation,
         SetupCliMode invocationMode,
-        bool dryRun = false,
-        string? input = null,
-        string? baseline = null,
-        string? output = null,
-        string? key = null,
-        string? topology = null,
-        IReadOnlyList<string>? capabilities = null,
-        IReadOnlyList<string>? providers = null,
-        string format = "json",
-        string? expectedRevision = null) =>
-        new(
+        SetupCliCommandArgs? args = null)
+    {
+        args ??= new();
+        return new(
             family,
             operation,
             Machine || invocationMode == SetupCliMode.Machine,
-            dryRun,
+            args.DryRun,
             false,
-            input,
-            baseline,
-            output,
-            key,
-            topology,
-            Normalize(capabilities),
-            Normalize(providers),
+            args.Input,
+            args.Baseline,
+            args.Output,
+            args.Key,
+            args.Topology,
+            Normalize(args.Capabilities),
+            Normalize(args.Providers),
             null)
         {
-            Format = format,
-            ExpectedRevision = expectedRevision
+            Format = args.Format,
+            ExpectedRevision = args.ExpectedRevision
         };
+    }
 
     protected static string? Path(string? value) =>
         value == SetupCliArgumentPreflight.StandardIoSentinel ? "-" : value;
@@ -62,13 +56,25 @@ internal abstract class SetupCliCommandSettings : CommandSettings, ISetupCliComm
             : values.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
 }
 
+internal sealed record SetupCliCommandArgs(
+    bool DryRun = false,
+    string? Input = null,
+    string? Baseline = null,
+    string? Output = null,
+    string? Key = null,
+    string? Topology = null,
+    IReadOnlyList<string>? Capabilities = null,
+    IReadOnlyList<string>? Providers = null,
+    string Format = "json",
+    string? ExpectedRevision = null);
+
 internal sealed class InputSettings : SetupCliCommandSettings
 {
     [CommandOption("--input <PATH>")]
     public string? Input { get; set; }
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, input: Path(Input));
+        Create(family, operation, invocationMode, new(Input: Path(Input)));
 }
 
 internal class OutputSettings : SetupCliCommandSettings
@@ -80,7 +86,7 @@ internal class OutputSettings : SetupCliCommandSettings
     public bool DryRun { get; set; }
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, DryRun, output: Path(Output));
+        Create(family, operation, invocationMode, new(DryRun: DryRun, Output: Path(Output)));
 }
 
 internal class InputOutputSettings : SetupCliCommandSettings
@@ -95,7 +101,7 @@ internal class InputOutputSettings : SetupCliCommandSettings
     public bool DryRun { get; set; }
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, DryRun, Path(Input), output: Path(Output));
+        Create(family, operation, invocationMode, new(DryRun: DryRun, Input: Path(Input), Output: Path(Output)));
 }
 
 internal sealed class DiffSettings : SetupCliCommandSettings
@@ -107,10 +113,8 @@ internal sealed class DiffSettings : SetupCliCommandSettings
     public string? Baseline { get; set; }
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, input: Path(Input), baseline: Path(Baseline));
+        Create(family, operation, invocationMode, new(Input: Path(Input), Baseline: Path(Baseline)));
 }
-
-internal sealed class CatalogueListSettings : OutputSettings;
 
 internal sealed class CatalogueItemSettings : SetupCliCommandSettings
 {
@@ -124,7 +128,7 @@ internal sealed class CatalogueItemSettings : SetupCliCommandSettings
     public bool DryRun { get; set; }
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, DryRun, output: Path(Output), key: Key);
+        Create(family, operation, invocationMode, new(DryRun: DryRun, Output: Path(Output), Key: Key));
 }
 
 internal sealed class EnvironmentRenderSettings : OutputSettings
@@ -139,8 +143,12 @@ internal sealed class EnvironmentRenderSettings : OutputSettings
     public string[] Providers { get; set; } = [];
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, DryRun, output: Path(Output), topology: Topology,
-            capabilities: Capabilities, providers: Providers);
+        Create(family, operation, invocationMode, new(
+            DryRun: DryRun,
+            Output: Path(Output),
+            Topology: Topology,
+            Capabilities: Capabilities,
+            Providers: Providers));
 }
 
 internal sealed class OperatorIdentityExportSettings : InputOutputSettings
@@ -149,7 +157,11 @@ internal sealed class OperatorIdentityExportSettings : InputOutputSettings
     public string Format { get; set; } = "json";
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, DryRun, Path(Input), output: Path(Output), format: Format);
+        Create(family, operation, invocationMode, new(
+            DryRun: DryRun,
+            Input: Path(Input),
+            Output: Path(Output),
+            Format: Format));
 }
 
 internal sealed class OperatorIdentityImportSettings : InputOutputSettings
@@ -158,8 +170,11 @@ internal sealed class OperatorIdentityImportSettings : InputOutputSettings
     public string? ExpectedRevision { get; set; }
 
     public override SetupCliCommand Bind(string family, string operation, SetupCliMode invocationMode) =>
-        Create(family, operation, invocationMode, DryRun, Path(Input), output: Path(Output),
-            expectedRevision: ExpectedRevision);
+        Create(family, operation, invocationMode, new(
+            DryRun: DryRun,
+            Input: Path(Input),
+            Output: Path(Output),
+            ExpectedRevision: ExpectedRevision));
 }
 
 internal sealed class DoctorSettings : SetupCliCommandSettings

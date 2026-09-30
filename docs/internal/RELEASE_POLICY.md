@@ -132,3 +132,40 @@ steps.
   independent verification and operator-approval boundaries hold.
 - The historical report design has not shipped. Implementations MUST NOT add
   compatibility shims for its split-output, candidate-`A`, or renderer-policy model.
+
+## Prospective public changelog publication
+
+Publication MUST remain described as prospective/unverified until retained
+operator evidence proves protected acceptance controls and live GitBook
+synchronization. A local renderer, workflow definition or branch name MUST NOT
+be treated as activation evidence.
+
+- The public changelog MUST contain dated release entries only. General adopter
+  help MUST live separately; projection content MUST remain non-authoritative.
+- The final lane MUST retain a complete finally verified, human-authorized
+  inventory before dispatch, pinned to full annotated tag-object IDs and durable
+  final evidence. The publisher MUST NOT grant disclosure authorization.
+- Reconciliation MUST combine complete retained inventory with last accepted
+  identities across all lines, including absent/coalesced dispatches. Missing
+  inventory, missing evidence, omitted accepted history or moved/deleted tag
+  identities MUST fail closed.
+- Protected `docs/publication` acceptance MUST require independent review and
+  checks without GitBook/publisher bypass. Mutations MUST enforce expected-old
+  commit CAS; changed input unions/digests MUST receive fresh review.
+- GitBook MUST synchronize through separate mutable `docs/gitbook-sync` only.
+  Any app bypass MUST require operator approval restricted to that mirror;
+  write-back MUST NOT automatically merge into protected acceptance. Drift MUST
+  be preserved and repaired only after explicit review.
+- Manifests and receipts MUST retain pinned identities, input/projection digests,
+  accepted commits and bounded outcomes beyond expiring artifacts. Delivery
+  MUST require observed live content, not merely acceptance or a mirror push.
+- Required bot checks MUST actually execute; missing checks MUST leave
+  publication pending, never authorize a bypass. Preview lanes MUST remain
+  secret-free; docs-only writes MUST NOT deploy runtime artifacts.
+- Rotation, retry, publisher upgrade and disable/recovery MUST preserve signed
+  identity. Publication failure MUST NOT invalidate releases, retag, rebuild
+  binaries, move stable `main` or rewrite authoritative notes.
+
+The operator gates are in the
+[activation checklist](RELEASE_CHECKLIST.md#prospective-changelog-publication-activation)
+and [runbook](RELEASE_RUNBOOK.md#governed-changelog-publication-and-activation).

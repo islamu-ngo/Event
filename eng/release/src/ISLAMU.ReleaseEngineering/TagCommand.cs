@@ -17,6 +17,79 @@ public static class TagCommand
     private static readonly Regex GoodSignaturePattern = new("Good \\\"git\\\" signature for (?<principal>[^\\s]+)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
+    /// <summary>
+    /// Rechecks the release-role SSH signature and signer policy for a retained final manifest
+    /// without writing evidence or relying on any branch head. Inventory approval cannot stand in
+    /// for a verified release tag.
+    /// </summary>
+    public static bool IsSignedFinalRelease(
+        string repositoryRoot, string trustedBundleRoot, string evidencePath,
+        string tagObjectId, string version, string targetOid, CancellationToken cancellationToken = default)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        cancellationToken = deadline.Token;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            byte[] evidence = ReadFileBounded(evidencePath, cancellationToken);
+            using JsonDocument document = JsonDocument.Parse(evidence);
+            JsonElement root = document.RootElement;
+            if (root.GetProperty("schemaVersion").GetString() != "release-evidence.v1" ||
+                root.GetProperty("tagName").GetString() != $"v{version}" ||
+                root.GetProperty("tagObjectId").GetString() != tagObjectId ||
+                root.GetProperty("targetOid").GetString() != targetOid)
+            {
+                return false;
+            }
+
+            if (!FullOidPattern.IsMatch(tagObjectId) || !FullOidPattern.IsMatch(targetOid) ||
+                RunGit(repositoryRoot, cancellationToken, "cat-file", "-t", tagObjectId).Trim() != "tag" ||
+                RunGit(repositoryRoot, cancellationToken, "rev-parse", "--verify", $"refs/tags/v{version}").Trim() != tagObjectId)
+            {
+                return false;
+            }
+
+            TagObject tag = ParseTagObject(RunGit(repositoryRoot, cancellationToken, "cat-file", "-p", tagObjectId));
+            string expectedMessage =
+                $"ISLAMU release tag v1\nTag: v{version}\nVersion: {version}\n" +
+                $"Line: {root.GetProperty("line").GetString()}\nCandidate-Oid: {targetOid}\n" +
+                $"Candidate-SHA256: {root.GetProperty("candidateManifestSha256").GetString()}\n" +
+                $"Release-Notes-SHA256: {root.GetProperty("releaseNotesSha256").GetString()}\n";
+            if (tag.TargetOid != targetOid || tag.Name != $"v{version}" ||
+                NormalizeTagMessage(tag.Message) != NormalizeTagMessage(expectedMessage))
+            {
+                return false;
+            }
+
+            DateOnly releaseDate = DateOnly.ParseExact(root.GetProperty("releaseDate").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            string allowedSigners = Path.Combine(trustedBundleRoot, "trust", "allowed-signers");
+            ReleaseSigningPolicy policy = ReadSigningPolicy(Path.Combine(trustedBundleRoot, "trust", "release-signing-policy.yaml"), cancellationToken);
+            SshVerification signature = VerifyTagSignature(repositoryRoot, tagObjectId, allowedSigners, cancellationToken);
+            if (!signature.Verified || signature.Principal != root.GetProperty("signerPrincipal").GetString())
+            {
+                return false;
+            }
+
+            TrustedSshSigner signer = ReadTrustedSigner(allowedSigners, policy, signature.Principal, releaseDate, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return root.GetProperty("signerRole").GetString() == signer.Role &&
+                root.GetProperty("signerKeyFingerprint").GetString() == signer.KeyFingerprint &&
+                root.GetProperty("signerAlgorithm").GetString() == signer.Algorithm &&
+                SshSignerPolicy.Authorize([signer], new SshTagAuthorizationRequest(
+                    IsAnnotatedTag: true, CryptographicSignatureVerified: true,
+                    Principal: signature.Principal, RequiredRole: "release",
+                    KeyFingerprint: signer.KeyFingerprint, Algorithm: signer.Algorithm,
+                    VerificationDate: releaseDate, ExpectedTagObjectId: tagObjectId,
+                    ObservedTagObjectId: tagObjectId, PreviouslyRecordedTagObjectId: tagObjectId)).IsValid;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+            InvalidOperationException or JsonException or ArgumentException or FormatException or KeyNotFoundException or OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
     public static int Run(string[] args, TextWriter output, string repositoryRoot, string platform, TimeSpan timeout)
     {
         if (args.Length > 0 && string.Equals(args[0], "tag-message", StringComparison.Ordinal))
@@ -32,10 +105,10 @@ public static class TagCommand
                 CandidateManifest candidate = ReadCandidateManifest(ResolveReleaseDirectory(root, args[1]));
                 string tagName = $"v{candidate.Version}";
                 if (!string.Equals(args[2], tagName, StringComparison.Ordinal)) return Reject(output, "release_tag_name_mismatch");
-                string tagObjectId = RunGit(root, "rev-parse", "--verify", $"refs/tags/{tagName}^{{object}}").Trim();
+                string tagObjectId = RunGit(root, default, "rev-parse", "--verify", $"refs/tags/{tagName}^{{object}}").Trim();
                 return Run(["verify-tag", args[1], candidate.CandidateOid, tagObjectId], output, repositoryRoot, platform, timeout);
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException or JsonException or InvalidOperationException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException or JsonException or InvalidOperationException or OperationCanceledException)
             {
                 return Reject(output, "release_tag_input_invalid");
             }
@@ -108,26 +181,26 @@ public static class TagCommand
                 ExpectedTagObjectOids: expectedPriorTags),
                 timeout);
             if (!git.IsValid || git.Identity is null) return Reject(output, FirstDiagnostic(git.Diagnostics));
-            if (!string.Equals(RunGit(root, "rev-parse", "--verify", $"{candidate.PreviousPublishedRef}^{{commit}}").Trim(), candidate.PreviousPublishedOid, StringComparison.Ordinal))
+            if (!string.Equals(RunGit(root, default, "rev-parse", "--verify", $"{candidate.PreviousPublishedRef}^{{commit}}").Trim(), candidate.PreviousPublishedOid, StringComparison.Ordinal))
             {
                 return Reject(output, $"git_previous_tag_target_mismatch:{candidate.PreviousPublishedTag}");
             }
-            if (!string.Equals(RunGit(root, "rev-parse", "--verify", $"{candidate.BaseStableRef}^{{commit}}").Trim(), candidate.BaseStableOid, StringComparison.Ordinal))
+            if (!string.Equals(RunGit(root, default, "rev-parse", "--verify", $"{candidate.BaseStableRef}^{{commit}}").Trim(), candidate.BaseStableOid, StringComparison.Ordinal))
             {
                 return Reject(output, $"git_base_stable_tag_target_mismatch:{candidate.BaseStableTag}");
             }
 
-            string tagType = RunGit(root, "cat-file", "-t", expectedTagObjectId).Trim();
+            string tagType = RunGit(root, default, "cat-file", "-t", expectedTagObjectId).Trim();
             if (!string.Equals(tagType, "tag", StringComparison.Ordinal)) return Reject(output, "release_tag_not_annotated");
-            string observedTagObjectId = RunGit(root, "rev-parse", "--verify", $"{expectedTagObjectId}^{{object}}").Trim();
+            string observedTagObjectId = RunGit(root, default, "rev-parse", "--verify", $"{expectedTagObjectId}^{{object}}").Trim();
             if (!string.Equals(observedTagObjectId, expectedTagObjectId, StringComparison.Ordinal)) return Reject(output, "release_tag_object_replaced");
-            string targetOid = RunGit(root, "rev-parse", "--verify", $"{expectedTagObjectId}^{{commit}}").Trim();
+            string targetOid = RunGit(root, default, "rev-parse", "--verify", $"{expectedTagObjectId}^{{commit}}").Trim();
             if (!string.Equals(targetOid, candidateOid, StringComparison.Ordinal)) return Reject(output, "release_tag_wrong_target");
 
-            TagObject tag = ParseTagObject(RunGit(root, "cat-file", "-p", observedTagObjectId));
+            TagObject tag = ParseTagObject(RunGit(root, default, "cat-file", "-p", observedTagObjectId));
             if (!string.Equals(tag.Name, tagName, StringComparison.Ordinal)) return Reject(output, "release_tag_name_mismatch");
             string tagRef = $"refs/tags/{tagName}";
-            if (!string.Equals(RunGit(root, "rev-parse", "--verify", $"{tagRef}^{{object}}").Trim(), observedTagObjectId, StringComparison.Ordinal)) return Reject(output, "release_tag_object_replaced");
+            if (!string.Equals(RunGit(root, default, "rev-parse", "--verify", $"{tagRef}^{{object}}").Trim(), observedTagObjectId, StringComparison.Ordinal)) return Reject(output, "release_tag_object_replaced");
             if (!string.Equals(tag.TargetOid, candidateOid, StringComparison.Ordinal)) return Reject(output, "release_tag_wrong_target");
             string expectedMessage = BuildTagMessage(candidate, candidateDigest);
             if (!string.Equals(NormalizeTagMessage(tag.Message), NormalizeTagMessage(expectedMessage), StringComparison.Ordinal)) return Reject(output, "release_tag_message_mismatch");
@@ -150,7 +223,7 @@ public static class TagCommand
             if (!authorization.IsValid) return Reject(output, authorization.Diagnostic!);
 
             byte[] manifest = BuildManifest(candidate, git.Identity, trusted.Bundle, bundleDigests, candidateDigest, observedTagObjectId, targetOid, signer, summaryBytes, contextBytes, notesBytes);
-            if (!string.Equals(RunGit(root, "rev-parse", "--verify", $"{tagRef}^{{object}}").Trim(), observedTagObjectId, StringComparison.Ordinal)) return Reject(output, "release_tag_object_replaced");
+            if (!string.Equals(RunGit(root, default, "rev-parse", "--verify", $"{tagRef}^{{object}}").Trim(), observedTagObjectId, StringComparison.Ordinal)) return Reject(output, "release_tag_object_replaced");
             if (File.Exists(finalPath))
             {
                 if (!ReadFileBounded(finalPath).AsSpan().SequenceEqual(manifest)) return Reject(output, "release_evidence_manifest_stale");
@@ -167,7 +240,7 @@ public static class TagCommand
         {
             return Reject(output, exception.Message);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException or JsonException or InvalidOperationException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or DecoderFallbackException or JsonException or InvalidOperationException or OperationCanceledException)
         {
             return Reject(output, "release_tag_input_invalid");
         }
@@ -297,7 +370,7 @@ public static class TagCommand
         return new BundleDigests(policy, trust, gitCliff);
     }
 
-    private static ReleaseSigningPolicy ReadSigningPolicy(string path)
+    private static ReleaseSigningPolicy ReadSigningPolicy(string path, CancellationToken cancellationToken = default)
     {
         string releasePrincipal = string.Empty;
         string requiredAlgorithm = "ssh-ed25519";
@@ -305,7 +378,7 @@ public static class TagCommand
         DateOnly? validUntil = null;
         DateOnly? revokedOn = null;
         bool inRelease = false;
-        foreach (string line in ReadLinesBounded(path))
+        foreach (string line in ReadLinesBounded(path, cancellationToken))
         {
             string trimmed = line.Trim();
             if (trimmed == "release:") inRelease = true;
@@ -320,9 +393,9 @@ public static class TagCommand
         return new ReleaseSigningPolicy(releasePrincipal, requiredAlgorithm, validFrom, validUntil, revokedOn);
     }
 
-    private static TrustedSshSigner ReadTrustedSigner(string signerPolicyPath, ReleaseSigningPolicy policy, string observedPrincipal, DateOnly releaseDate)
+    private static TrustedSshSigner ReadTrustedSigner(string signerPolicyPath, ReleaseSigningPolicy policy, string observedPrincipal, DateOnly releaseDate, CancellationToken cancellationToken = default)
     {
-        foreach (string rawLine in ReadLinesBounded(signerPolicyPath))
+        foreach (string rawLine in ReadLinesBounded(signerPolicyPath, cancellationToken))
         {
             string line = rawLine.Trim();
             if (line.Length == 0 || line.StartsWith('#')) continue;
@@ -338,14 +411,14 @@ public static class TagCommand
                 if (policy.ValidUntil is null && option.StartsWith("valid-before=\"", StringComparison.Ordinal)) validUntil = ParseSshDate(option[14..^1]);
             }
             string role = string.Equals(observedPrincipal, policy.ReleasePrincipal, StringComparison.Ordinal) ? "release" : string.Empty;
-            return new TrustedSshSigner(observedPrincipal, role, PublicKeyFingerprint(parts[keyIndex], parts[keyIndex + 1]), policy.RequiredAlgorithm, validFrom, validUntil, policy.RevokedOn);
+            return new TrustedSshSigner(observedPrincipal, role, PublicKeyFingerprint(parts[keyIndex], parts[keyIndex + 1], cancellationToken), policy.RequiredAlgorithm, validFrom, validUntil, policy.RevokedOn);
         }
         throw new InvalidOperationException();
     }
 
-    private static SshVerification VerifyTagSignature(string root, string tagName, string signerPolicyPath)
+    private static SshVerification VerifyTagSignature(string root, string tagName, string signerPolicyPath, CancellationToken cancellationToken = default)
     {
-        string output = RunGitAllowError(root, "-c", "gpg.format=ssh", "-c", $"gpg.ssh.allowedSignersFile={signerPolicyPath}", "verify-tag", "-v", tagName);
+        string output = RunGitAllowError(root, cancellationToken, "-c", "gpg.format=ssh", "-c", $"gpg.ssh.allowedSignersFile={signerPolicyPath}", "verify-tag", "-v", tagName);
         Match match = GoodSignaturePattern.Match(output);
         return match.Success
             ? new SshVerification(true, match.Groups["principal"].Value)
@@ -380,13 +453,13 @@ public static class TagCommand
 
     private static DateOnly ParseSshDate(string value) => DateOnly.ParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture);
 
-    private static string PublicKeyFingerprint(string algorithm, string key)
+    private static string PublicKeyFingerprint(string algorithm, string key, CancellationToken cancellationToken = default)
     {
         string temporary = Path.Combine(Path.GetTempPath(), $"islamu-release-key-{Guid.NewGuid():N}.pub");
         try
         {
             File.WriteAllText(temporary, $"{algorithm} {key}\n");
-            string output = RunProcess("/usr/bin/ssh-keygen", null, "-lf", temporary).Trim();
+            string output = RunProcess("/usr/bin/ssh-keygen", null, cancellationToken, "-lf", temporary).Trim();
             string[] parts = output.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 2) throw new IOException();
             return parts[1];
@@ -400,8 +473,8 @@ public static class TagCommand
     private static bool IsExactCommittedFile(string repositoryRoot, string candidateOid, string path)
     {
         string relative = Path.GetRelativePath(repositoryRoot, path).Replace(Path.DirectorySeparatorChar, '/');
-        string committed = RunGit(repositoryRoot, "rev-parse", "--verify", $"{candidateOid}:{relative}").Trim();
-        string observed = RunGit(repositoryRoot, "hash-object", "--", relative).Trim();
+        string committed = RunGit(repositoryRoot, default, "rev-parse", "--verify", $"{candidateOid}:{relative}").Trim();
+        string observed = RunGit(repositoryRoot, default, "hash-object", "--", relative).Trim();
         return FullOidPattern.IsMatch(committed) && string.Equals(committed, observed, StringComparison.Ordinal);
     }
 
@@ -420,17 +493,21 @@ public static class TagCommand
         { ExpectedManifestDigest = Required("ISLAMU_RELEASE_MANIFEST_SHA256") });
     }
 
-    private static string RunGit(string repositoryRoot, params string[] arguments)
+    private static string RunGit(string repositoryRoot, CancellationToken cancellationToken, params string[] arguments)
     {
-        string output = RunGitAllowError(repositoryRoot, arguments);
+        string output = RunGitAllowError(repositoryRoot, cancellationToken, arguments);
         if (output.StartsWith("__git_failed__", StringComparison.Ordinal)) throw new IOException();
         return output;
     }
 
-    private static string RunGitAllowError(string repositoryRoot, params string[] arguments) => RunProcess("git", repositoryRoot, arguments);
+    private static string RunGitAllowError(string repositoryRoot, CancellationToken cancellationToken, params string[] arguments) => RunProcess("git", repositoryRoot, cancellationToken, arguments);
 
-    private static string RunProcess(string executable, string? workingDirectory, params string[] arguments)
+    internal static string RunProcess(string executable, string? workingDirectory, CancellationToken cancellationToken, params string[] arguments)
     {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(5));
+        cancellationToken = deadline.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         using var process = new Process { StartInfo = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory } };
         string nullDevice = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
         process.StartInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
@@ -444,38 +521,46 @@ public static class TagCommand
             process.StartInfo.ArgumentList.Add($"core.hooksPath={nullDevice}");
         }
         foreach (string argument in arguments) process.StartInfo.ArgumentList.Add(argument);
+        try { process.Start(); }
+        catch (System.ComponentModel.Win32Exception exception) { throw new IOException("release_process_start_failed", exception); }
+        Task<string> stdout = ReadOutput(process.StandardOutput);
+        Task<string> stderr = ReadOutput(process.StandardError);
         try
         {
-            process.Start();
-            Task<string> stdout = ReadBoundedAsync(process.StandardOutput);
-            Task<string> stderr = ReadBoundedAsync(process.StandardError);
-            if (!process.WaitForExit(TimeSpan.FromSeconds(5)))
-            {
-                process.Kill(entireProcessTree: true);
-                throw new IOException();
-            }
-            Task.WaitAll([stdout, stderr], TimeSpan.FromSeconds(1));
+            Task.WhenAll(process.WaitForExitAsync(cancellationToken), stdout, stderr).GetAwaiter().GetResult();
+            cancellationToken.ThrowIfCancellationRequested();
             string combined = stdout.Result + stderr.Result;
             return process.ExitCode == 0 ? combined : "__git_failed__" + combined;
         }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        finally
         {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            throw new IOException();
+            deadline.Cancel();
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(); }
+            try { Task.WhenAll(stdout, stderr).GetAwaiter().GetResult(); }
+            catch (Exception exception) when (exception is IOException or OperationCanceledException)
+            {
+                Trace.TraceWarning("release_tag_process_cleanup_interrupted:{0}", exception.GetType().Name);
+            }
+        }
+
+        async Task<string> ReadOutput(StreamReader reader)
+        {
+            try { return await ReadBoundedAsync(reader, cancellationToken); }
+            catch { deadline.Cancel(); throw; }
         }
     }
 
-    private static async Task<string> ReadBoundedAsync(StreamReader reader)
+    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
     {
         var buffer = new char[MaximumGitOutputCharacters];
         int count = 0;
         while (count < buffer.Length)
         {
-            int read = await reader.ReadAsync(buffer.AsMemory(count, buffer.Length - count));
+            int read = await reader.ReadAsync(buffer.AsMemory(count, buffer.Length - count), cancellationToken);
             if (read == 0) return new string(buffer, 0, count);
             count += read;
         }
-        if (await reader.ReadAsync(new char[1]) != 0) throw new OperationCanceledException();
+        if (await reader.ReadAsync(new char[1].AsMemory(), cancellationToken) != 0) throw new IOException("release_process_output_too_large");
         return new string(buffer);
     }
 
@@ -502,17 +587,18 @@ public static class TagCommand
         return text;
     }
 
-    private static byte[] ReadFileBounded(string path)
+    private static byte[] ReadFileBounded(string path, CancellationToken cancellationToken = default)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan);
         if (stream.Length > MaximumArtifactBytes) throw new IOException();
         var bytes = new byte[stream.Length];
-        stream.ReadExactly(bytes);
+        stream.ReadExactlyAsync(bytes, cancellationToken).AsTask().GetAwaiter().GetResult();
+        cancellationToken.ThrowIfCancellationRequested();
         return bytes;
     }
 
-    private static string[] ReadLinesBounded(string path) =>
-        StrictUtf8.GetString(ReadFileBounded(path)).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+    private static string[] ReadLinesBounded(string path, CancellationToken cancellationToken = default) =>
+        StrictUtf8.GetString(ReadFileBounded(path, cancellationToken)).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
 
     private static string ResolveReleaseDirectory(string root, string path)
     {

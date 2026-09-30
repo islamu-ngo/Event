@@ -9,4 +9,17 @@
     <ProjectReference Include="../../src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
+  <Target Name="CopyReleaseEngineAppHost" AfterTargets="Build">
+    <MSBuild Projects="../../src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework)">
+      <Output TaskParameter="TargetOutputs" ItemName="_ReleaseEngineTarget" />
+    </MSBuild>
+    <PropertyGroup>
+      <_ReleaseEngineAppHostSuffix Condition="'$(OS)' == 'Windows_NT'">.exe</_ReleaseEngineAppHostSuffix>
+    </PropertyGroup>
+    <Copy SourceFiles="@(_ReleaseEngineTarget->'%(RootDir)%(Directory)%(Filename)$(_ReleaseEngineAppHostSuffix)')"
+          DestinationFolder="$(TargetDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

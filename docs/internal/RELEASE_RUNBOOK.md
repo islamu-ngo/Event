@@ -405,17 +405,190 @@ candidate/tag/main verification from current local objects.
 - Restricted security inputs MUST remain in the embargo lane outside the public
   checkout. If disclosure is not authorized, stop before public generation or tag.
 
-### Public changelog publication prerequisite
+### Governed changelog publication and activation
 
-The required [publication follow-up](../../dev/backlog/governed-changelog-publication.md)
-is not delivered by categorized notes. It must retain the complete accepted
-publication inventory and reconcile all unacknowledged records after coalesced
-dispatches. A protected acceptance branch is the trust boundary; a separate
-mutable GitBook synchronization branch is only its repairable mirror. Before
-activation, prove mirror repair, stable space identity, and the credential/event
-strategy that actually triggers required checks on generated pull requests.
-Neither successful rendering nor a GitBook view is publication authorization.
-A publication failure cannot rewrite or invalidate a signed release.
+**Prospective / operator evidence required.** The approved
+[publication workstream](../../dev/backlog/governed-changelog-publication.md)
+adds an offline `sync-public-changelog` projection followed by protected
+transport. Neither checked-in workflow/configuration nor local tests attest live
+branch settings or GitBook delivery.
+
+The flow is final tag verification -> retained human authorization inventory ->
+offline all-line projection -> reviewed proposal -> protected acceptance ->
+mutable mirror -> observed GitBook delivery. The engine verifies/composes local
+inputs; the adapter owns network credentials, ref mutation and receipts. The
+publisher cannot grant disclosure authorization. Keep adopter help in the
+[public guide](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md),
+not in the entries-only `docs/public/changelog/README.md`.
+
+#### Retain and verify inputs before dispatch
+
+Retain the complete set of finally verified, human-authorized releases before
+dispatch, including releases not yet on the accepted page. Pin full annotated
+tag-object IDs and retain disclosure authorization, final
+`release-evidence.v1.json`, authoritative bundles and notes hashes beyond expiring
+CI artifacts. Do not discover authority from directories on one branch or from
+the triggering version. Historical final evidence may be in retained storage,
+not at preparation commit `B`.
+
+The retained `authorized-inventory.v1` document must be signed as exact UTF-8
+bytes with the SSH namespace `islamu-publication`, the
+`publication-approver` principal and a matching sibling `.sig` file. The
+promoted trusted bundle must contain the approved public signer list at
+`trust/publication-allowed-signers`; a publisher-supplied key is never trusted.
+Each authorized inventory entry binds a retained
+`publication-approvals/<version>.json` receipt (`publication-approval.v1`) by
+SHA-256. That receipt binds version, full tag-object ID, final evidence SHA-256
+and `disclosureAuthorized: true`. Signing the complete inventory attests
+completeness and those individual disclosure decisions.
+
+The final operator prepares a new unsigned proposal with
+`prepare-publication-inventory`. Supply `--inventory` for the complete retained
+inventory, `--retained-evidence` for its artifact root, `--release-evidence`
+for the new final evidence path relative to that root, `--release-directory`
+for the committed release directory, `--disclosure-approved` with the exact
+version being approved, and `--output-directory` for a new proposal directory.
+The command re-verifies signed releases, retains every existing entry and
+approval, and reports `publication_inventory_pending_signature`. It never
+signs or replaces an accepted inventory.
+
+Review the complete proposal and sign its `authorized-inventory.v1.json` with
+the authorized operator key using `ssh-keygen -Y sign -n islamu-publication`.
+Retain the proposal, detached signature, approval receipts and final evidence
+through the protected final-lane change process before dispatching publication.
+The signature is a human authorization step, not a publisher-generated key.
+Initialize the first empty inventory explicitly during the reviewed trust
+bootstrap; an empty inventory is not publishable.
+
+Verification permits up to 1,024 retained entries, with a ten-second per-entry
+ceiling inside a five-minute complete-inventory deadline. The independently
+launched command is capped at six minutes. The publication job allows
+45 minutes for up to three fresh-snapshot attempts, each generating and
+checking the complete projection, plus bounded transport retries. Cancellation
+still propagates through signature verification, Git processes and file reads;
+larger inventories do not receive unbounded execution time.
+
+Use the independently promoted bundle to verify every pinned tag and retained
+evidence. Rebuild from the complete inventory and last accepted manifest;
+previously accepted identities cannot disappear. Missing authorization/evidence,
+moved or deleted tags, or tag-object/hash mismatches fail closed without a
+partial page. Verify projection bytes read-only before proposing acceptance.
+Identical inputs must produce identical output and no duplicate proposal.
+
+Install the independently reviewed launcher and its fixed promotion signer root
+on a dedicated protected `release-publication` runner, outside both the
+documentation checkout and promoted bundle. Never build the privileged runtime
+from the checkout being published. `run-promoted` verifies the signed promotion,
+stages only authenticated runtime files in a private separate directory, copies
+the independent promotion root, executes the promoted engine and removes the
+stage. Candidate code, caller-selected signer roots and inherited .NET runtime
+injection settings cannot select the verifier.
+
+With the promoted bundle and existing `ISLAMU_RELEASE_*` verification variables
+configured in the protected final lane, invoke that installed launcher from the
+accepted documentation checkout:
+
+```bash
+"$RELEASE_TRUSTED_LAUNCHER" run-promoted sync-public-changelog \
+  --inventory /retained/authorized-inventory.v1.json \
+  --retained-evidence /retained \
+  --publication-base https://github.com/ISLAMU/Event/blob/ --check
+```
+
+Omit `--check` only when writing a reviewed proposal. The command updates the
+fixed `docs/public/changelog/README.md` and
+`docs/public/changelog/publication-manifest.v1.json`; it takes no output path.
+The manifest binds input-set and projection SHA-256, accepted identities and
+highest stable version. Missing bundle, signature, approval receipt, tag or
+accepted-history entry stops before any write.
+
+The projection includes stable and authorized pre-release entries across
+maintenance/mainline, ordered by descriptor date descending, parsed SemVer
+precedence descending, then ordinal version. Keep pre-releases after stable
+publication; latest dated entry is not highest stable version or support policy.
+Breaking/upgrade actions precede ordinary categories. Entries expose durable
+immutable references and authoritative-notes hashes without contributor identity
+or restricted prose. The 1 MiB UTF-8 page budget includes metadata and sentinels;
+exceeding it must fail, not truncate, split history or silently raise the cap.
+
+#### Establish protected acceptance and mirror separation
+
+1. Obtain operator approval and retain actual settings evidence for
+   `docs/publication`, holding the full existing `docs/public` tree. Require
+   independent review and checks; neither GitBook nor the publisher may bypass
+   acceptance protections. Exclude docs-only writes from deployment triggers.
+   Provision `docs/publication-receipts` separately for durable authenticated
+   append-only receipt history; prohibit deletion and history rewriting.
+2. Establish `docs/gitbook-sync` as the mutable publication mirror, with any
+   approved app bypass restricted to that ref. No automatic reverse merge into
+   acceptance, `develop`, candidate branches or stable `main` is permitted.
+3. Confirm live GitBook repository/ref, Project directory `docs/public`, initial
+   Git-to-GitBook direction, every section/space mapping and assets. Preserve
+   existing keys, especially Changelog `space-4`. Review a full-tree preview
+   before switching site-wide sync; record actual preview URLs only.
+4. Prove required checks execute on proposals from the selected bot identity.
+   A `GITHUB_TOKEN`-created event may not trigger downstream checks. Missing
+   checks leave publication pending until the reviewed credential/event or
+   explicit validation remedy executes them; never bypass protection.
+   Dispatch `validate` with the exact proposal PR number and full reviewed head
+   OID. Require its exact-head publication validation status on acceptance.
+   Dispatch `reconcile` only for that same accepted proposal/head; it rechecks
+   inventory freshness before mirror transport.
+5. Observe mirror and live site delivery for the accepted commit/digest.
+   Check routes, version anchors, callouts and desktop/mobile rendering at the
+   1 MiB bound. Safe contributor previews remain unprivileged and secret-free.
+
+#### Approval, concurrency and receipts
+
+Use one global publication concurrency group with no in-progress cancellation,
+plus expected-old-commit compare-and-swap for mutations. Serialization does not
+replace complete-inventory reconciliation. A stale proposal must be recomputed
+against the observed accepted head; retry at most three times before reporting
+pending/failure. A changed union/digest requires a new review, not stale approval.
+Reuse the proposal for the same pinned tag set and projection digest.
+
+Transport retries are distinct from stale-head CAS retries. Transient network
+and server failures use bounded backoff; rate-limit responses honor
+`Retry-After` within the bounded wait budget. Authentication, permission,
+disclosure and integrity failures stop immediately. After merge, reconciliation
+uses the exact retained PR head ref and accepted objects, so automatic deletion
+of the disposable proposal branch does not destroy recovery evidence.
+
+Retain the publication manifest, input-set/projection digests, expected/actual
+acceptance and mirror commits, attempt, bounded diagnostic and receipts outside
+expiring CI artifacts. The `publication-receipt.v1` states are `verified`,
+`pending`, `delivered` and `drift`. Transport or verification failures retain
+the `pending` state with a bounded `reason`; there is no separate `failed` state.
+Acceptance or mirror push alone is not delivery; delivery requires observation
+of the actual GitBook content. Receipts are non-authoritative publication
+metadata and contain no credentials, contributor identity or restricted prose.
+
+#### Reconciliation, rotation and recovery
+
+| Incident | Required response |
+| --- | --- |
+| Dispatch coalesced, absent or interrupted | Reconcile the complete retained inventory with accepted state, including every unpublished authorized release. |
+| Crash before acceptance | Inspect the acceptance ref before retry; reuse verified inputs and avoid duplicate proposals. |
+| Crash after acceptance but before receipt | Recover accepted commit/digests, compare mirror/site and record observed outcome without regenerating release identity. |
+| Mirror write-back or manual page mutation | Preserve drift evidence before repair; compare protected accepted digest, obtain explicit reviewed correction, and never reverse-merge or silently overwrite. |
+| Missing inventory, evidence mismatch, moved/deleted tag | Quarantine the proposal; restore independently verifiable inputs, never substitute a current tag or omit an accepted entry. |
+| Outage, revoked token, wrong branch or missing bot checks | Record bounded pending/failed diagnostics, repair settings or validation path, then reconcile without broader-permission fallback. |
+
+For credential rotation, pause publication writes, revoke the old transport
+credential in its approved authority, privately install the least-privilege
+replacement, verify ref scopes and bot check execution, and reconcile. Git Sync
+is the transport; no new forge/GitBook content API token is required. A trusted
+publisher upgrade requires independent bundle promotion, checksum verification
+and reviewed projection differences, never in-place mutation of a promoted
+bundle.
+
+For disable/recovery, suspend dispatch and mirror writes, preserve inventory,
+bundles, accepted manifests and receipts, and revoke the credential when needed.
+Resume only after settings/approval and verification are restored. Publication
+repair never retags, rebuilds binaries, moves stable `main`, changes notes at
+`B`, or invalidates a signed release. Corrections to signed release content use
+forward release correction; a dated public clarification remains visibly
+non-authoritative.
 
 ### Publication projection and drift reporting
 

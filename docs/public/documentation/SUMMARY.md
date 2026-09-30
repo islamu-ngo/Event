@@ -19,6 +19,7 @@
     * [Secrets](readme/configuration-and-operations/secrets.md)
     * [Infisical](readme/configuration-and-operations/infisical.md)
     * [Backup, Restore & Upgrade](readme/configuration-and-operations/backup-restore-upgrade.md)
+    * [Releases & Changelog](readme/configuration-and-operations/releases-and-changelog.md)
     * [Troubleshooting & Health](readme/configuration-and-operations/troubleshooting-and-health.md)
   * [Security & Identity](readme/security-and-identity/README.md)
     * [Authentication](readme/security-and-identity/authentication.md)

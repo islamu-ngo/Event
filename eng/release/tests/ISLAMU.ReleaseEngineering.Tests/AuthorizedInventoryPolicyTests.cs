@@ -13,10 +13,21 @@ public sealed class AuthorizedInventoryPolicyTests
     {
         using var fixture = new InventoryFixture();
         AuthorizedInventoryEntry entry = fixture.AddRelease("1.2.0", "v1.2");
-        string json = JsonSerializer.Serialize(new { schemaVersion = "authorized-inventory.v1", producer = "final-lane", completeSet = true, entries = new[] { entry } }, JsonOptions);
+        string json = JsonSerializer.Serialize(new
+        {
+            schemaVersion = "authorized-inventory.v1",
+            producer = "final-lane",
+            completeSet = true,
+            entries = new[] { entry },
+        }, JsonOptions);
         var authority = new DeadlineAuthority();
-        AuthorizedInventoryResult result = AuthorizedInventoryPolicy.Verify(
-            fixture.Repository, json, fixture.EvidenceRoot, authority, [], TimeSpan.FromMilliseconds(100));
+        using var cancellation = new CancellationTokenSource();
+        Task<AuthorizedInventoryResult> verification = Task.Run(() => AuthorizedInventoryPolicy.Verify(
+            fixture.Repository, json, fixture.EvidenceRoot, authority, [],
+            PublicationInventoryVerificationBudget.OverallTimeout, cancellation.Token));
+        await authority.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cancellation.Cancel();
+        AuthorizedInventoryResult result = await verification.WaitAsync(TimeSpan.FromSeconds(10));
         await Assert.That(authority.DeadlineObserved).IsTrue();
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Releases.Count).IsEqualTo(0);
@@ -24,13 +35,59 @@ public sealed class AuthorizedInventoryPolicyTests
 
     private sealed class DeadlineAuthority : IFinalLaneInventoryAuthority
     {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool DeadlineObserved { get; private set; }
 
         public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default)
         {
             if (!cancellationToken.CanBeCanceled) return true;
-            DeadlineObserved = cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(5));
+            Entered.SetResult();
+            DeadlineObserved = cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10));
             return true;
+        }
+    }
+
+    [Test]
+    public async Task MaximumRetainedInventoryReachesAuthorityWithinAlignedBudgets()
+    {
+        using var fixture = new InventoryFixture();
+        AuthorizedInventoryEntry template = fixture.AddRelease("1.0.0", "v1.0");
+        AuthorizedInventoryEntry[] entries = Enumerable.Range(0, PublicationInventoryVerificationBudget.MaximumEntries)
+            .Select(index => template with { Version = $"1.0.{index}" })
+            .ToArray();
+        var authority = new LargeInventoryAuthority();
+        string json = JsonSerializer.Serialize(new
+        {
+            schemaVersion = "authorized-inventory.v1",
+            producer = "final-lane",
+            completeSet = true,
+            entries,
+        }, JsonOptions);
+
+        AuthorizedInventoryResult result = AuthorizedInventoryPolicy.Verify(
+            fixture.Repository, json, fixture.EvidenceRoot, authority, [],
+            PublicationInventoryVerificationBudget.OverallTimeout);
+
+        await Assert.That(authority.ObservedEntries).IsEqualTo(PublicationInventoryVerificationBudget.MaximumEntries);
+        await Assert.That(authority.ObservedCancelableToken).IsTrue();
+        await Assert.That(result.Diagnostics.Single()).IsEqualTo("inventory_final_lane_authority_invalid");
+        await Assert.That(PublicationInventoryVerificationBudget.OverallTimeout)
+            .IsEqualTo(TimeSpan.FromMinutes(5));
+        await Assert.That(PublicationInventoryVerificationBudget.PromotedProcessTimeout)
+            .IsEqualTo(TimeSpan.FromMinutes(6));
+    }
+
+    private sealed class LargeInventoryAuthority : IFinalLaneInventoryAuthority
+    {
+        public int ObservedEntries { get; private set; }
+        public bool ObservedCancelableToken { get; private set; }
+
+        public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries,
+            CancellationToken cancellationToken = default)
+        {
+            ObservedEntries = entries.Count;
+            ObservedCancelableToken = cancellationToken.CanBeCanceled && !cancellationToken.IsCancellationRequested;
+            return false;
         }
     }
 
@@ -153,6 +210,20 @@ public sealed class AuthorizedInventoryPolicyTests
     }
 
     [Test]
+    public async Task CheckoutControlledGlobalGitConfigIsIgnored()
+    {
+        using var fixture = new InventoryFixture();
+        AuthorizedInventoryEntry entry = fixture.AddRelease("1.1.0", "v1.1");
+        File.WriteAllText(Path.Combine(fixture.Repository, ".inventory-no-global-config"),
+            "hostile checkout-controlled content that is not valid Git configuration");
+
+        AuthorizedInventoryResult result = fixture.Verify([entry]);
+
+        await Assert.That(string.Join(",", result.Diagnostics)).IsEqualTo("");
+        await Assert.That(result.IsValid).IsTrue();
+    }
+
+    [Test]
     public async Task WholeInventoryAuthorityBindsDisclosureProofAndCompleteSet()
     {
         using var fixture = new InventoryFixture();
@@ -171,7 +242,13 @@ public sealed class AuthorizedInventoryPolicyTests
         await Assert.That(Verify(original + "\n").Diagnostics.Single()).IsEqualTo("inventory_final_lane_authority_invalid");
 
         static string Serialize(AuthorizedInventoryEntry[] entries) => JsonSerializer.Serialize(
-            new { schemaVersion = "authorized-inventory.v1", producer = "final-lane", completeSet = true, entries }, JsonOptions);
+            new
+            {
+                schemaVersion = "authorized-inventory.v1",
+                producer = "final-lane",
+                completeSet = true,
+                entries,
+            }, JsonOptions);
     }
 
     [Test]
@@ -206,8 +283,13 @@ public sealed class AuthorizedInventoryPolicyTests
             Hash(evidenceBytes), true, Hash(Encoding.UTF8.GetBytes("retained test disclosure approval")), documents);
         AuthorizedInventoryResult Verify(AuthorizedInventoryEntry item)
         {
-            string json = JsonSerializer.Serialize(new { schemaVersion = "authorized-inventory.v1", producer = "final-lane", completeSet = true, entries = new[] { item } },
-                JsonOptions);
+            string json = JsonSerializer.Serialize(new
+            {
+                schemaVersion = "authorized-inventory.v1",
+                producer = "final-lane",
+                completeSet = true,
+                entries = new[] { item },
+            }, JsonOptions);
             return AuthorizedInventoryPolicy.Verify(fixture.RepositoryPath, json, fixture.RepositoryPath,
                 new PinnedTestAuthority(Hash(Encoding.UTF8.GetBytes(json))), [], TimeSpan.FromSeconds(5));
         }
@@ -272,8 +354,14 @@ public sealed class AuthorizedInventoryPolicyTests
             string tag = Git("rev-parse", $"refs/tags/v{version}").Trim();
             byte[] evidence = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
             {
-                schemaVersion = "release-evidence.v1", version, line, releaseDate = date,
-                tagName = $"v{version}", tagObjectId = tag, targetOid = target, candidateOid = target,
+                schemaVersion = "release-evidence.v1",
+                version,
+                line,
+                releaseDate = date,
+                tagName = $"v{version}",
+                tagObjectId = tag,
+                targetOid = target,
+                candidateOid = target,
                 releaseDescriptorSha256 = Hash(inputs["release.yaml"]),
                 releaseSummarySha256 = Hash(inputs["summary.md"]),
                 releaseContextSha256 = Hash(inputs["release-context.v1.json"]),
@@ -287,7 +375,13 @@ public sealed class AuthorizedInventoryPolicyTests
 
         public AuthorizedInventoryResult Verify(IReadOnlyList<AuthorizedInventoryEntry> entries, IReadOnlyList<AcceptedReleaseIdentity>? accepted = null, bool supplyAuthority = true, bool complete = true, bool trusted = true)
         {
-            string json = JsonSerializer.Serialize(new { schemaVersion = "authorized-inventory.v1", producer = "final-lane", completeSet = complete, entries }, JsonOptions);
+            string json = JsonSerializer.Serialize(new
+            {
+                schemaVersion = "authorized-inventory.v1",
+                producer = "final-lane",
+                completeSet = complete,
+                entries,
+            }, JsonOptions);
             authorizedDigest = trusted ? Hash(Encoding.UTF8.GetBytes(json)) : new string('0', 64);
             return AuthorizedInventoryPolicy.Verify(Repository, json, EvidenceRoot, supplyAuthority ? this : null, accepted ?? [], TimeSpan.FromSeconds(5));
         }
@@ -298,7 +392,13 @@ public sealed class AuthorizedInventoryPolicyTests
 
         public string Git(params string[] args)
         {
-            var info = new ProcessStartInfo("git") { WorkingDirectory = Repository, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            var info = new ProcessStartInfo(ReleaseToolPaths.Git)
+            {
+                WorkingDirectory = Repository,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
             foreach (string arg in args) info.ArgumentList.Add(arg);
             info.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
             info.Environment["GIT_CONFIG_GLOBAL"] = "/dev/null";

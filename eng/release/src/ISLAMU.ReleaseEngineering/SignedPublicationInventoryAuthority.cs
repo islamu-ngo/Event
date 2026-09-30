@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace ISLAMU.ReleaseEngineering;
@@ -12,7 +11,8 @@ namespace ISLAMU.ReleaseEngineering;
 /// </summary>
 internal sealed class SignedPublicationInventoryAuthority(
     string inventoryPath, string retainedEvidenceRoot, string trustedAllowedSignersPath,
-    string repositoryRoot, string trustedBundleRoot)
+    string repositoryRoot, string trustedBundleRoot,
+    Func<string, string, string, string, string, string, CancellationToken, bool>? releaseVerifier = null)
     : IFinalLaneInventoryAuthority
 {
     private const string Principal = "publication-approver";
@@ -21,7 +21,7 @@ internal sealed class SignedPublicationInventoryAuthority(
     public bool VerifyCompleteInventory(string inventorySha256, IReadOnlyList<AuthorizedInventoryEntry> entries, CancellationToken cancellationToken = default)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        deadline.CancelAfter(PublicationInventoryVerificationBudget.OverallTimeout);
         cancellationToken = deadline.Token;
         try
         {
@@ -43,7 +43,10 @@ internal sealed class SignedPublicationInventoryAuthority(
 
             foreach (AuthorizedInventoryEntry entry in entries)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                using var entryDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                entryDeadline.CancelAfter(PublicationInventoryVerificationBudget.PerEntryTimeout);
+                CancellationToken entryCancellationToken = entryDeadline.Token;
+                entryCancellationToken.ThrowIfCancellationRequested();
                 if (entry is null || !entry.DisclosureAuthorized ||
                     !IsSafeVersion(entry.Version) || string.IsNullOrEmpty(entry.EvidencePath) ||
                     Path.IsPathRooted(entry.EvidencePath) || entry.EvidencePath.Contains('\\', StringComparison.Ordinal) ||
@@ -60,7 +63,7 @@ internal sealed class SignedPublicationInventoryAuthority(
                     return false;
                 }
 
-                byte[] approval = File.ReadAllBytesAsync(approvalPath, cancellationToken).GetAwaiter().GetResult();
+                byte[] approval = File.ReadAllBytesAsync(approvalPath, entryCancellationToken).GetAwaiter().GetResult();
                 if (Convert.ToHexStringLower(SHA256.HashData(approval)) != entry.AuthorizationEvidenceSha256)
                 {
                     return false;
@@ -72,14 +75,14 @@ internal sealed class SignedPublicationInventoryAuthority(
                     root.GetProperty("version").GetString() != entry.Version ||
                     root.GetProperty("tagObjectId").GetString() != entry.TagObjectId ||
                     root.GetProperty("evidenceSha256").GetString() != entry.EvidenceSha256 ||
-                    root.GetProperty("disclosureAuthorized").GetBoolean() != true)
+                    !root.GetProperty("disclosureAuthorized").GetBoolean())
                 {
                     return false;
                 }
 
-                if (!TagCommand.IsSignedFinalRelease(
+                if (!(releaseVerifier ?? TagCommand.IsSignedFinalRelease)(
                     repositoryRoot, trustedBundleRoot, Path.Combine(retainedEvidenceRoot, entry.EvidencePath),
-                    entry.TagObjectId, entry.Version, entry.TargetOid, cancellationToken))
+                    entry.TagObjectId, entry.Version, entry.TargetOid, entryCancellationToken))
                 {
                     return false;
                 }
@@ -87,7 +90,7 @@ internal sealed class SignedPublicationInventoryAuthority(
 
             using var process = new Process
             {
-                StartInfo = new ProcessStartInfo("ssh-keygen")
+                StartInfo = new ProcessStartInfo(ReleaseToolPaths.SshKeygen)
                 {
                     UseShellExecute = false,
                     RedirectStandardInput = true,

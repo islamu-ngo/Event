@@ -13,7 +13,7 @@ public static class PromotedReleaseCommand
 {
     private const string Engine = "ISLAMU.ReleaseEngineering";
     private const string PromotionSigners = Engine + ".promotion-allowed-signers";
-    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ProcessTimeout = PublicationInventoryVerificationBudget.PromotedProcessTimeout;
 
     public static int Run(string[] args, TextWriter output, string repositoryRoot)
     {
@@ -80,9 +80,10 @@ public static class PromotedReleaseCommand
             string targetName = deps.RootElement.GetProperty("runtimeTarget").GetProperty("name").GetString()!;
             foreach (JsonProperty library in deps.RootElement.GetProperty("targets").GetProperty(targetName).EnumerateObject())
             {
-                foreach (string group in new[] { "runtime", "native", "resources", "runtimeTargets" })
+                foreach (string group in new[] { "runtime", "native", "resources", "runtimeTargets" }
+                    .Where(group => library.Value.TryGetProperty(group, out _)))
                 {
-                    if (!library.Value.TryGetProperty(group, out JsonElement assets)) continue;
+                    JsonElement assets = library.Value.GetProperty(group);
                     foreach (JsonProperty asset in assets.EnumerateObject())
                     {
                         string name = Path.GetFileName(asset.Name);
@@ -106,7 +107,7 @@ public static class PromotedReleaseCommand
 
             using var process = new Process
             {
-                StartInfo = new ProcessStartInfo("dotnet")
+                StartInfo = new ProcessStartInfo(ReleaseToolPaths.Dotnet)
                 {
                     WorkingDirectory = candidate,
                     UseShellExecute = false,
@@ -119,12 +120,12 @@ public static class PromotedReleaseCommand
             process.StartInfo.ArgumentList.Add(Path.Combine(stage, Engine + ".dll"));
             foreach (string argument in args.Skip(1)) process.StartInfo.ArgumentList.Add(argument);
             // Runtime injection must not load unauthenticated assemblies from inherited settings.
-            foreach (string name in process.StartInfo.Environment.Keys.ToArray())
+            foreach (string name in process.StartInfo.Environment.Keys.Where(name =>
+                name.StartsWith("DOTNET_", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("COMPlus_", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("CORECLR_", StringComparison.OrdinalIgnoreCase)).ToArray())
             {
-                if (name.StartsWith("DOTNET_", StringComparison.OrdinalIgnoreCase) ||
-                    name.StartsWith("COMPlus_", StringComparison.OrdinalIgnoreCase) ||
-                    name.StartsWith("CORECLR_", StringComparison.OrdinalIgnoreCase))
-                    process.StartInfo.Environment.Remove(name);
+                process.StartInfo.Environment.Remove(name);
             }
             process.Start();
             process.StandardInput.Close();

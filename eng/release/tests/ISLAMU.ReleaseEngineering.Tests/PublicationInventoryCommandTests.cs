@@ -280,10 +280,12 @@ public sealed class PublicationInventoryCommandTests
     {
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("git")
+            StartInfo = new ProcessStartInfo(ReleaseToolPaths.Git)
             {
-                WorkingDirectory = fixture.RepositoryPath, UseShellExecute = false,
-                RedirectStandardOutput = true, RedirectStandardError = true,
+                WorkingDirectory = fixture.RepositoryPath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
             },
         };
         foreach (string argument in arguments) process.StartInfo.ArgumentList.Add(argument);

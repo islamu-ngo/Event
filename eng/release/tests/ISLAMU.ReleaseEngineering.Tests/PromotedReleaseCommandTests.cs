@@ -112,9 +112,8 @@ public sealed class PromotedReleaseCommandTests
         {
             "ISLAMU.ReleaseEngineering.dll", "ISLAMU.ReleaseEngineering.deps.json",
             "ISLAMU.ReleaseEngineering.runtimeconfig.json", "YamlDotNet.dll",
-        })
+        }.Where(name => !omitDependency || name != "YamlDotNet.dll"))
         {
-            if (omitDependency && name == "YamlDotNet.dll") continue;
             File.Copy(Path.Combine(engineDirectory, name), Path.Combine(bin, name), overwrite: true);
         }
         string manifestPath = Path.Combine(bundle, "trusted-bundle.manifest.json");

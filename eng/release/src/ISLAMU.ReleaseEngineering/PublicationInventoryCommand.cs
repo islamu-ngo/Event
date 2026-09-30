@@ -86,14 +86,20 @@ public static class PublicationInventoryCommand
             if (!trusted.IsValid || trusted.Bundle is null)
                 return Reject(output, "release_trusted_bundle_invalid");
 
+            using var verificationDeadline =
+                new CancellationTokenSource(PublicationInventoryVerificationBudget.OverallTimeout);
             string tag = Text(fields, "tagObjectId");
             string target = Text(fields, "targetOid");
-            if (!TagCommand.IsSignedFinalRelease(repository, trusted.Bundle.Root, finalPath, tag, version, target))
+            if (!TagCommand.IsSignedFinalRelease(
+                repository, trusted.Bundle.Root, finalPath, tag, version, target, verificationDeadline.Token))
                 return Reject(output, "publication_inventory_release_signature_invalid");
             byte[] approval = Canonical(new
             {
-                schemaVersion = "publication-approval.v1", version, tagObjectId = tag,
-                evidenceSha256 = Digest(finalBytes), disclosureAuthorized = true,
+                schemaVersion = "publication-approval.v1",
+                version,
+                tagObjectId = tag,
+                evidenceSha256 = Digest(finalBytes),
+                disclosureAuthorized = true,
             });
             AuthorizedInventoryEntry? existing = previous.Entries.SingleOrDefault(item => item.Version == version);
             if (existing is not null)
@@ -131,7 +137,7 @@ public static class PublicationInventoryCommand
                 RelativePath(retained.EvidencePath);
                 if (!TagCommand.IsSignedFinalRelease(repository, trusted.Bundle.Root,
                     SafePath(evidenceRoot, retained.EvidencePath), retained.TagObjectId,
-                    retained.Version, retained.TargetOid))
+                    retained.Version, retained.TargetOid, verificationDeadline.Token))
                     return Reject(output, "publication_inventory_release_signature_invalid");
             }
             string approvalDirectory = SafePath(evidenceRoot, "publication-approvals");
@@ -149,7 +155,7 @@ public static class PublicationInventoryCommand
             AuthorizedInventoryResult verified = AuthorizedInventoryPolicy.Verify(repository, Utf8.GetString(proposed),
                 evidenceRoot, new ProposalValidation(Digest(proposed), union), previous.Entries.Select(item =>
                     new AcceptedReleaseIdentity(item.Version, item.TagObjectId, item.EvidenceSha256)).ToArray(),
-                TimeSpan.FromSeconds(30));
+                PublicationInventoryVerificationBudget.OverallTimeout, verificationDeadline.Token);
             if (!verified.IsValid) return Reject(output, verified.Diagnostics[0]);
 
             // Publish the unsigned directory as a unit. No existing directory or detached signature
@@ -206,16 +212,18 @@ public static class PublicationInventoryCommand
     {
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo("git")
+            StartInfo = new ProcessStartInfo(ReleaseToolPaths.Git)
             {
-                WorkingDirectory = repository, UseShellExecute = false,
-                RedirectStandardOutput = true, RedirectStandardError = true,
+                WorkingDirectory = repository,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
             },
         };
         foreach (string argument in arguments) process.StartInfo.ArgumentList.Add(argument);
         process.StartInfo.Environment["GIT_NO_REPLACE_OBJECTS"] = "1";
         process.StartInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
-        process.StartInfo.Environment["GIT_CONFIG_GLOBAL"] = "/dev/null";
+        process.StartInfo.Environment["GIT_CONFIG_GLOBAL"] = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
         process.StartInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
         process.Start();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));

@@ -27,6 +27,14 @@ public sealed record AuthorizedRelease(
 public sealed record AuthorizedInventoryResult(
     bool IsValid, IReadOnlyList<AuthorizedRelease> Releases, IReadOnlyList<string> Diagnostics);
 
+internal static class PublicationInventoryVerificationBudget
+{
+    public const int MaximumEntries = 1_024;
+    public static readonly TimeSpan PerEntryTimeout = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan OverallTimeout = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan PromotedProcessTimeout = TimeSpan.FromMinutes(6);
+}
+
 /// <summary>
 /// The final-lane adapter must verify an authorized final-lane SSH signature over the complete
 /// original inventory UTF-8 bytes. It must require ordinal equality between inventorySha256 and
@@ -51,7 +59,6 @@ public interface IFinalLaneInventoryAuthority
 public static class AuthorizedInventoryPolicy
 {
     private const int MaximumBytes = 1_048_576;
-    private const int MaximumEntries = 1_024;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private static readonly Regex Oid = new("^(?:[0-9a-f]{40}|[0-9a-f]{64})$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly Regex Digest = new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
@@ -83,7 +90,8 @@ public static class AuthorizedInventoryPolicy
             cancellationToken.ThrowIfCancellationRequested();
             byte[] inventoryBytes = Utf8.GetBytes(inventoryJson);
             if (inventoryBytes.Length > MaximumBytes) return Invalid("inventory_too_large");
-            if (timeout <= TimeSpan.Zero || acceptedHistory is null || acceptedHistory.Count > MaximumEntries)
+            if (timeout <= TimeSpan.Zero || acceptedHistory is null ||
+                acceptedHistory.Count > PublicationInventoryVerificationBudget.MaximumEntries)
                 return Invalid("inventory_request_invalid");
             ArtifactPolicyResult normalized = ReleaseArtifactPolicy.NormalizeJson(inventoryJson);
             if (!normalized.IsValid) return Invalid("inventory_json_invalid");
@@ -93,7 +101,8 @@ public static class AuthorizedInventoryPolicy
                 return Invalid("inventory_incomplete");
             AuthorizedInventoryEntry[] entries = inventory.Entries;
             if (entries.Length == 0) return Invalid("inventory_empty");
-            if (entries.Length > MaximumEntries) return Invalid("inventory_too_many_entries");
+            if (entries.Length > PublicationInventoryVerificationBudget.MaximumEntries)
+                return Invalid("inventory_too_many_entries");
             var versions = new HashSet<string>(StringComparer.Ordinal);
             foreach (AuthorizedInventoryEntry entry in entries)
             {
@@ -104,7 +113,8 @@ public static class AuthorizedInventoryPolicy
                 if (!entry.DisclosureAuthorized || !IsDigest(entry.AuthorizationEvidenceSha256))
                     return Invalid("inventory_disclosure_missing");
                 if (!IsDigest(entry.EvidenceSha256)) return Invalid("inventory_evidence_hash_invalid");
-                if (entry.SourceDocuments is null || entry.SourceDocuments.Count > MaximumEntries)
+                if (entry.SourceDocuments is null ||
+                    entry.SourceDocuments.Count > PublicationInventoryVerificationBudget.MaximumEntries)
                     return Invalid("inventory_source_documents_invalid");
             }
             foreach (AcceptedReleaseIdentity accepted in acceptedHistory)
@@ -124,23 +134,26 @@ public static class AuthorizedInventoryPolicy
             var releases = new List<AuthorizedRelease>();
             foreach (AuthorizedInventoryEntry entry in entries)
             {
+                using var entryDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                entryDeadline.CancelAfter(PublicationInventoryVerificationBudget.PerEntryTimeout);
+                CancellationToken entryCancellationToken = entryDeadline.Token;
                 string tagRef = $"refs/tags/v{entry.Version}";
-                if (GitText(repository, cancellationToken, "cat-file", "-t", entry.TagObjectId).Trim() != "tag")
+                if (GitText(repository, entryCancellationToken, "cat-file", "-t", entry.TagObjectId).Trim() != "tag")
                     return Invalid("inventory_tag_not_annotated");
-                if (GitText(repository, cancellationToken, "rev-parse", "--verify", tagRef).Trim() != entry.TagObjectId)
+                if (GitText(repository, entryCancellationToken, "rev-parse", "--verify", tagRef).Trim() != entry.TagObjectId)
                     return Invalid("inventory_tag_ref_mismatch");
-                string tag = GitText(repository, cancellationToken, "cat-file", "-p", entry.TagObjectId);
+                string tag = GitText(repository, entryCancellationToken, "cat-file", "-p", entry.TagObjectId);
                 string header = tag.Split("\n\n", 2, StringSplitOptions.None)[0];
                 if (!header.StartsWith($"object {entry.TargetOid}\ntype commit\n", StringComparison.Ordinal) ||
                     !header.Split('\n').Contains($"tag v{entry.Version}", StringComparer.Ordinal) ||
-                    GitText(repository, cancellationToken, "rev-parse", "--verify", $"{entry.TagObjectId}^{{commit}}").Trim() != entry.TargetOid)
+                    GitText(repository, entryCancellationToken, "rev-parse", "--verify", $"{entry.TagObjectId}^{{commit}}").Trim() != entry.TargetOid)
                     return Invalid("inventory_tag_target_mismatch");
 
                 string evidencePath = ResolveEvidencePath(evidenceRoot, entry.EvidencePath);
                 if (!File.Exists(evidencePath)) return Invalid("inventory_evidence_missing");
                 using var stream = new FileStream(evidencePath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 if (stream.Length > MaximumBytes) return Invalid("inventory_evidence_too_large");
-                byte[] evidenceBytes = ReadBounded(stream, cancellationToken).GetAwaiter().GetResult();
+                byte[] evidenceBytes = ReadBounded(stream, entryCancellationToken).GetAwaiter().GetResult();
                 if (Sha256(evidenceBytes) != entry.EvidenceSha256) return Invalid("inventory_evidence_hash_mismatch");
                 ArtifactPolicyResult evidenceNormalized = ReleaseArtifactPolicy.NormalizeJson(Utf8.GetString(evidenceBytes));
                 if (!evidenceNormalized.IsValid) return Invalid("inventory_evidence_invalid");
@@ -164,7 +177,7 @@ public static class AuthorizedInventoryPolicy
                 ReleaseContext? context = JsonSerializer.Deserialize<ReleaseContext>(contextBytes, JsonOptions);
                 if (context is null || context.SchemaVersion != 1 || context.Release is null ||
                     context.Changes is null || context.Evidence is null || context.Evidence.Objects is null ||
-                    context.Changes.Count > MaximumEntries ||
+                    context.Changes.Count > PublicationInventoryVerificationBudget.MaximumEntries ||
                     context.Release.Version != entry.Version || context.Release.Line != entry.Line ||
                     context.Release.ReleaseDate != entry.ReleaseDate)
                     return Invalid("inventory_context_invalid");
@@ -176,7 +189,7 @@ public static class AuthorizedInventoryPolicy
                 {
                     if (source is null || (source.Kind != "fragment" && source.Kind != "change-id-rename") || !sourcePaths.Add(source.Path))
                         return Invalid("inventory_source_documents_invalid");
-                    string sourceText = Utf8.GetString(CommittedBlob(repository, entry.TargetOid, source.Path, cancellationToken));
+                    string sourceText = Utf8.GetString(CommittedBlob(repository, entry.TargetOid, source.Path, entryCancellationToken));
                     ArtifactPolicyResult sourceNormalized = ReleaseArtifactPolicy.NormalizeText(sourceText);
                     if (!sourceNormalized.IsValid || sourceNormalized.Bytes is null) return Invalid("inventory_source_documents_invalid");
                     string normalizedText = Utf8.GetString(sourceNormalized.Bytes);
@@ -218,7 +231,7 @@ public static class AuthorizedInventoryPolicy
 
                 byte[] ReadInput(string name, string hashField, bool normalize = false)
                 {
-                    byte[] bytes = CommittedBlob(repository, entry.TargetOid, $"{entry.SourceDirectory}/{name}", cancellationToken);
+                    byte[] bytes = CommittedBlob(repository, entry.TargetOid, $"{entry.SourceDirectory}/{name}", entryCancellationToken);
                     if (normalize)
                     {
                         ArtifactPolicyResult text = ReleaseArtifactPolicy.NormalizeText(Utf8.GetString(bytes));
@@ -232,8 +245,12 @@ public static class AuthorizedInventoryPolicy
             }
             // Ref identity can change while artifacts are read; do not return a partial or stale set.
             foreach (AuthorizedInventoryEntry entry in entries)
-                if (GitText(repository, cancellationToken, "rev-parse", "--verify", $"refs/tags/v{entry.Version}").Trim() != entry.TagObjectId)
+            {
+                using var entryDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                entryDeadline.CancelAfter(PublicationInventoryVerificationBudget.PerEntryTimeout);
+                if (GitText(repository, entryDeadline.Token, "rev-parse", "--verify", $"refs/tags/v{entry.Version}").Trim() != entry.TagObjectId)
                     return Invalid("inventory_tag_ref_mismatch");
+            }
             cancellationToken.ThrowIfCancellationRequested();
             return new AuthorizedInventoryResult(true, releases.OrderBy(item => item.Version, StringComparer.Ordinal).ToArray(), []);
         }
@@ -259,10 +276,16 @@ public static class AuthorizedInventoryPolicy
     private static byte[] GitBytes(string repository, CancellationToken cancellationToken, params string[] args)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var info = new ProcessStartInfo("git") { WorkingDirectory = repository, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        var info = new ProcessStartInfo(ReleaseToolPaths.Git)
+        {
+            WorkingDirectory = repository,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
         foreach (string arg in args) info.ArgumentList.Add(arg);
         info.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
-        info.Environment["GIT_CONFIG_GLOBAL"] = Path.Combine(repository, ".inventory-no-global-config");
+        info.Environment["GIT_CONFIG_GLOBAL"] = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
         info.Environment["GIT_OPTIONAL_LOCKS"] = "0";
         info.Environment["GIT_TERMINAL_PROMPT"] = "0";
         info.Environment["GIT_NO_REPLACE_OBJECTS"] = "1";

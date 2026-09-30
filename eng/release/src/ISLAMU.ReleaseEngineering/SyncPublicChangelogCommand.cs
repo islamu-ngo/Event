@@ -128,7 +128,7 @@ public static class SyncPublicChangelogCommand
                 root, Utf8.GetString(inventoryBytes), evidenceRoot, authority,
                 accepted?.Releases.Select(release => new AcceptedReleaseIdentity(
                     release.Version, release.TagObjectId, release.EvidenceSha256)).ToArray() ?? [],
-                TimeSpan.FromSeconds(30));
+                PublicationInventoryVerificationBudget.OverallTimeout);
             if (!inventory.IsValid)
             {
                 return Reject(output, inventory.Diagnostics.Count == 0

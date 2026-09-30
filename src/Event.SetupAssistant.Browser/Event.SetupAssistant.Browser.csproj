@@ -16,5 +16,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <!-- Keep the implicit SDK pack independent of installed workload/runtime patches. -->
+    <KnownWebAssemblySdkPack Update="Microsoft.NET.Sdk.WebAssembly.Pack"
+                            WebAssemblySdkPackVersion="10.0.9" />
   </ItemGroup>
 </Project>

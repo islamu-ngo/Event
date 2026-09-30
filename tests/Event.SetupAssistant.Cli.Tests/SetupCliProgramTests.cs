@@ -238,6 +238,13 @@ public sealed class SetupCliProgramTests
             RedirectStandardError = true,
             UseShellExecute = false
         };
+        string[] hostVariables = ["PATH", "SystemRoot", "DOTNET_ROOT", "DOTNET_ROOT_X64",
+            "DOTNET_ROOT_ARM64", "TEMP", "TMP", "TMPDIR"];
+        foreach (string name in info.Environment.Keys.ToArray())
+        {
+            if (!hostVariables.Contains(name, StringComparer.OrdinalIgnoreCase))
+                info.Environment.Remove(name);
+        }
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
         if (environment is not null)
         {

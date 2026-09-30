@@ -51,6 +51,28 @@ its branch has moved and after it has been deleted.
 - [ ] Run all [explicit locked-renderer checks](../../eng/release/README.md#tests), including the clean-note tamper cases, with the existing tool-bundle variable and nonzero expected test count. Record actual selectors and results; ordinary-suite success or synthetic promotion evidence is not production activation.
 - [ ] Keep the [public changelog publication follow-up](../../dev/backlog/governed-changelog-publication.md) open until retained-authorization reconciliation, protected acceptance versus mutable sync mirror, stable space identity, and required-check triggering are proven. Categorized notes alone do not deliver the public ledger.
 
+## Prospective Changelog Publication Activation
+
+These gates require retained operator evidence; checked-in YAML and local test
+success do not establish activation. Use the
+[publication runbook](RELEASE_RUNBOOK.md#governed-changelog-publication-and-activation).
+
+- [ ] Record two-person trust bootstrap, immutable bundle promotion, approved signer roots and protected environment approval.
+- [ ] Retain complete finally verified, disclosure-authorized inventory before dispatch: full tag-object IDs, final evidence, authoritative bundles and notes hashes. Prove durable download beyond CI artifact expiry.
+- [ ] Verify a complete all-line rebuild against last accepted identities, including an unpublished middle release after coalesced/absent dispatch, maintenance releases and retained pre-releases.
+- [ ] Prove read-only projection validation, exact rerun idempotency, bounded page-size failure and rejection of missing evidence or moved/deleted tags.
+- [ ] Capture actual `docs/publication` review/check protections and no publisher/GitBook bypass; retain full public-tree preview and confirm no docs-only deployment.
+- [ ] Capture separate `docs/gitbook-sync` mirror rights and explicit operator approval for mirror-only app bypass; prohibit automatic reverse merge.
+- [ ] Verify live GitBook repository, mirror ref, Project directory `docs/public`, initial Git-to-GitBook direction and unchanged section/space keys, especially `space-4`.
+- [ ] Prove selected bot identity triggers required proposal checks. Missing checks remain pending; record the executed validation/event remedy without merge bypass.
+- [ ] Prove stale-CAS recomputation preserves the all-line union and changed output receives fresh review. Record bounded retry exhaustion and recovery.
+- [ ] Exercise crashes before acceptance and after acceptance/before receipt; reconcile observed accepted commits/digests without duplicate entries.
+- [ ] Preserve mirror write-back drift evidence and prove explicitly reviewed repair with no silent overwrite.
+- [ ] Retain distinct verified/pending/delivered/failed/drift receipts, accepted/input/projection digests and expected/actual commits without credentials or restricted prose.
+- [ ] Record observed live delivery, durable evidence links, version anchors and desktop/mobile rendering at the 1 MiB UTF-8 budget; do not infer delivery from acceptance alone.
+- [ ] Rehearse least-privilege token rotation, revoked-token remediation, publisher upgrade, disable and recovery without retagging, binary rebuild, stable-main movement or signed-note mutation.
+- [ ] Review [adopter help](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md) separately from the entries-only changelog. Keep publication prospective/unverified until these activation gates are evidenced.
+
 ## Release Evidence Bundle
 
 Before publishing a GitHub Release, download the retained CI/CD artifacts listed in this checklist into a local evidence directory. For governed release-mode bundles, the artifact tree must contain exactly one final authoritative manifest from `verify-tag`:

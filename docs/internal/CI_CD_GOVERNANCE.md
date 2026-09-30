@@ -168,6 +168,50 @@ and include the final/candidate manifests, release.yaml, summary, generated cont
 and notes, trusted tool promotion receipt/signature/manifest, signer/tag evidence,
 governance policy/config/trust files, and the existing evidence categories.
 
+### Prospective changelog acceptance and GitBook mirror
+
+The approved publication topology is not activated by workflow YAML alone.
+Retain actual operator settings and observed delivery evidence using the
+[publication checklist](RELEASE_CHECKLIST.md#prospective-changelog-publication-activation).
+Until then, public/internal documentation calls publication prospective and
+unverified.
+
+The trusted final lane records complete finally verified disclosure-authorized
+inventory before dispatch. The offline publisher consumes it read-only; the
+adapter owns transport and protected mutations. Reconcile all authorized
+records, including absent/coalesced dispatches, from durable evidence rather
+than one version directory. Preserve full tag-object IDs, bundle evidence and
+manifest/receipt digests beyond ordinary artifact retention.
+
+`docs/publication` contains the full public tree and is protected by independent
+review and required checks. No GitBook or publisher bypass is allowed there.
+`docs/gitbook-sync` is a separate mutable mirror with explicitly approved
+mirror-only app rights. No automatic reverse merge is allowed. Live GitBook
+settings must prove repository, mirror branch, Project directory `docs/public`,
+initial Git-to-GitBook direction and unchanged section/space keys (`space-4`
+for Changelog). Review the whole site's preview before changing sync branches.
+
+The publication lane requires one global non-cancelling concurrency group and
+expected-old-commit CAS. A stale proposal is recomputed from retained inventory;
+changed output requires fresh approval. Bound retries to three before recording
+pending/failure. Repeated identical inputs reuse a proposal, not new commits.
+
+Prove required checks execute for the actual bot identity and event strategy.
+Token-created proposals can suppress subsequent events; an absent check is
+pending validation, not permission to bypass protection. Keep contributor
+previews read-only, without secrets or privileged candidate execution. Use
+reviewed transport credentials only, with no new forge/GitBook content API
+token. Rotation must revoke old credentials, preserve least privilege, verify
+bot checks and resume through reconciliation.
+
+Keep accepted source commits/digests in protected evidence; the mutable mirror
+is not a trust root. Preserve write-back drift and require reviewed repair.
+Distinguish verified, pending, delivered, failed and drift receipts, and record
+delivered only after live observation. Docs-only transport must not trigger
+application deployment, add post-`B` docs commits to stable `main`, or rewrite
+signed releases. Disabling publication or SaaS failure leaves release identity
+valid.
+
 ## Required Repository Settings
 
 These controls cannot be fully enforced from workflow YAML and must be configured in GitHub repository or organization settings.

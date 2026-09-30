@@ -75,7 +75,39 @@ Policy or renderer changes require their own trusted-bundle promotion before the
 affect final attestation. Existing semantic-version documents remain a preserved
 pre-automation baseline until the prospective cutover is explicitly approved.
 
+### Governed changelog publication consequence
+
+The approved publication extension separates deterministic offline composition
+from credentialed adapter transport. Final verification and human disclosure
+authorization are retained before dispatch as a complete pinned inventory;
+reconciliation consumes that inventory across all release lines, including
+releases whose dispatch was absent or coalesced. A latest-version directory or
+mutable page cannot establish release authority.
+
+Protected `docs/publication` acceptance contains the full public tree and
+requires independent review/checks with CAS mutation preconditions. GitBook
+receives only a separate mutable `docs/gitbook-sync` mirror. App bypass is
+restricted to that mirror with operator approval, never the acceptance ref.
+This extra ref isolates SaaS write authority without a new content API/service.
+Changed unions require renewed review; write-back drift is retained for explicit
+reviewed repair, not reverse merge or silent overwrite.
+
+Accepted commits, pinned inputs, projection digests and distinct outcome
+receipts remain durable beyond expiring CI artifacts. Mirror mutation cannot
+replace protected acceptance evidence; observed GitBook delivery is separate
+from acceptance. Publication outages, rotation and recovery cannot invalidate
+signed releases. Adopter help stays outside the entries-only ledger.
+
+This is an approved architecture, **not activation evidence**. Branch protections,
+actual bot check execution, live GitBook mappings/direction and desktop/mobile
+rendering at the 1 MiB budget require operator evidence before publication is
+described as active.
+
 ## References
+
+- [Publication activation checklist](../RELEASE_CHECKLIST.md#prospective-changelog-publication-activation)
+- [Publication adapter contract](../../../.ci/release/adapter-contract.md)
+- [Adopter release guide](../../public/documentation/readme/configuration-and-operations/releases-and-changelog.md)
 
 - [Release Policy](../RELEASE_POLICY.md)
 - [Release Runbook](../RELEASE_RUNBOOK.md)

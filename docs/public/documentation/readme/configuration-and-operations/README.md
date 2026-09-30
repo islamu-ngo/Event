@@ -15,6 +15,7 @@ This section covers the operational contract after selecting a deployment topolo
 * **[Secrets Management](secrets.md)** — Select fail-closed secret authorities (Environment or Infisical) and rotate credentials safely.
 * **[Infisical Setup](infisical.md)** — Create the Infisical project, folder tree, machine identity, and bootstrap inputs the platform reads.
 * **[Backup, Restore & Upgrade](backup-restore-upgrade.md)** — Protect every durable authority and rehearse recovery procedures.
+* **[Releases & Changelog](releases-and-changelog.md)** — Read release entries, verify evidence offline, and prepare prospective publication controls and recovery.
 * **[Troubleshooting & Operational Health](troubleshooting-and-health.md)** — Step-by-step diagnostic recipes for startup, identity, policy, and provider issues.
 
 ---

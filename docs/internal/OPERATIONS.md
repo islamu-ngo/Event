@@ -1382,6 +1382,32 @@ For a provider incident:
 4. Repair or roll back the operator deployment, validate `/status`, benchmark,
    and update the activation/change record before re-enabling Photon.
 
+## Governed Changelog Publication Operations
+
+Publication remains **prospective/unverified** until the
+[activation checklist](RELEASE_CHECKLIST.md#prospective-changelog-publication-activation)
+has operator evidence of live branch protection and GitBook delivery. The
+[publication runbook](RELEASE_RUNBOOK.md#governed-changelog-publication-and-activation)
+owns the procedure; the [adopter guide](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md)
+owns reading, upgrade and offline verification help.
+
+Operate the complete retained authorization inventory, not the latest dispatch.
+Retain final evidence, immutable bundle/promotion data, tag-object IDs and
+publication manifests/receipts beyond provider artifact expiry. Before retry,
+inspect protected accepted commits/digests and mirror/site observations.
+Acceptance is `docs/publication`; GitBook writes only to the mutable
+`docs/gitbook-sync` mirror. Detect write-back divergence and retain drift before
+explicitly reviewed repair; never reverse-merge or silently overwrite.
+
+Pause publication writes for credential rotation, revocation or disable.
+Restore only the approved least-privilege transport scope, verify bot checks and
+branch mapping, then reconcile every authorized release, including omitted or
+coalesced dispatches. Missing checks, evidence or authorization fail closed.
+Observe the actual site before recording delivered status. A publication outage
+or repair cannot invalidate a signed release or authorize retagging, rebuilding
+binaries, moving stable `main` or changing notes at `B`. Docs-only transport
+must remain excluded from application deployment.
+
 ## Deployment Protection and Evidence
 
 GitHub Actions deploys use the `staging` and `production` environments. Configure environment rules in GitHub repository settings, not in application runtime configuration. Code scanning is owned by the `CodeQL Advanced` workflow; keep GitHub CodeQL default setup disabled so advanced SARIF uploads are accepted:

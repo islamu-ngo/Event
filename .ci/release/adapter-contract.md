@@ -73,12 +73,88 @@ Publishing a release page is **not** part of release identity. Each provider def
   (`adapter_publication_noop_evidence_required`). A missing release API or a forge outage is a
   recorded no-op with operator evidence, never a failed release.
 
+For GitHub's single-page changelog, the validator parses the real workflow
+rather than accepting prose declarations of these artifacts. It requires the
+protected self-hosted publication runner, configured trusted launcher, fixed
+page/manifest paths, complete inventory and retained-evidence arguments,
+generation followed by read-only verification, and mandatory receipt/manifest
+retention. Engine tests own the generated tag/notes attribution contract.
+The non-GitHub release-page adapters retain their separately declared asset
+requirements.
+
 `.ci/scripts/report-publication-drift.cs` consumes a bounded `release-publication-projection.v1`
 document and the release's own `release-evidence.v1.json`, then writes
 `publication-drift-report.v1.json` plus a Markdown summary. It **reports**: it never edits a page,
 never rewrites release bytes, and never invalidates a release. Its report always carries
 `autoRepair: false` and `releaseInvalidated: false`. Drift exits `0` by default; operators who want
 a blocking gate pass `--fail-on-drift`.
+
+## Prospective single-page changelog transport
+
+This approved contract remains prospective until operator evidence proves
+protected acceptance and live GitBook sync. The offline engine emits the
+entries-only `docs/public/changelog/README.md` projection and manifest; adapters
+own network credentials, proposals, protected writes and retained receipts.
+Exact CLI invocation and inventory serialization must follow the implemented,
+reviewed engine contract. The command is `sync-public-changelog --inventory
+<path> --retained-evidence <directory> --publication-base <https-root>
+[--check]`; both output paths are fixed under `docs/public/changelog/`.
+The normalized `authorized-inventory.v1` document carries the complete
+per-release version/line/date, full tag-object and B OIDs, retained final
+evidence path/digest, disclosure authorization/approval digest, and source
+document paths. Its exact bytes require a sibling detached SSH signature
+under the `islamu-publication` namespace. The promoted bundle owns
+`trust/publication-allowed-signers`, and retained
+`publication-approvals/<version>.json` files bind individual tag/evidence
+identities and disclosure decisions. The generator independently checks the
+original release-role tag signature. The resulting
+`publication-manifest.v1.json` binds input-set/projection SHA-256 and every
+accepted tag/evidence identity.
+
+The final lane retains complete human-authorized, finally verified inventory
+**before dispatch**. Each record must bind version, full annotated tag-object
+ID, final `release-evidence.v1.json`, disclosure authorization and authoritative
+notes/bundle evidence. Paths alone are not authorization. Retain inventory and
+evidence beyond expiring artifacts; the publisher consumes authorization and
+cannot grant it. Reconciliation includes every record, even if its dispatch was
+coalesced or never delivered, plus every previously accepted identity. Missing
+inputs or moved/deleted tag objects fail closed; no current-tag substitution.
+
+Transport requirements:
+
+- Propose the complete public tree to protected `docs/publication`; independent
+  review and required checks must execute, with no publisher or GitBook bypass.
+- Use one global non-cancelling publication concurrency group and expected-old
+  commit CAS. On a race, recompute the all-line union and renew review if the
+  input set/projection changes. Bound retries to three before pending/failure.
+  Identical pinned tag sets and projection digests reuse a proposal.
+- Transport only accepted public content to mutable `docs/gitbook-sync`.
+  Restrict any operator-approved GitBook app bypass to that mirror. Never
+  reverse-merge write-back; retain drift evidence before reviewed repair.
+- Retain accepted source commit, input-set/projection digests, expected/actual
+  docs and mirror commits, attempt and bounded diagnostic with distinct
+  verified/pending/delivered/failed/drift outcomes. Delivery requires observed
+  GitBook content, not a push. No credentials, contributor identity or
+  restricted prose belongs in receipts.
+- Recover before-acceptance crashes idempotently after inspecting refs;
+  recover after-acceptance/before-receipt crashes from accepted commit/digests
+  and observed mirror/site state. Retry never retags, rebuilds binaries, moves
+  stable `main` or changes notes at `B`.
+- Prove bot-generated proposal checks execute. Missing checks remain pending
+  with a reviewed validation/event remedy, never a merge bypass or broader
+  credential fallback. Contributor preview is unprivileged and secret-free.
+- Verify actual GitBook repository, mirror ref, Project directory `docs/public`,
+  initial Git-to-GitBook direction and stable section/space keys, especially
+  Changelog `space-4`. Record full-tree preview and live delivery evidence.
+- Keep docs-only publication outside application deployment. Rotate/revoke
+  transport credentials through their approved authority; disable/recovery
+  preserves inventory and accepted receipts without signed-release invalidation.
+
+Page-level accepted/mirror drift is distinct from the existing per-release
+forge projection reporter above. Neither report repairs content or invalidates
+release identity. See the
+[operator runbook](../../docs/internal/RELEASE_RUNBOOK.md#governed-changelog-publication-and-activation)
+and [activation checklist](../../docs/internal/RELEASE_CHECKLIST.md#prospective-changelog-publication-activation).
 
 ## Reserved Ref Namespace
 

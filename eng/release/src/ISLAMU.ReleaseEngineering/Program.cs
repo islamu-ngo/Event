@@ -81,7 +81,7 @@ public static class Program
             IFinalLaneInventoryAuthority? authority = inventoryPath is not null && retainedRoot is not null
                 ? new SignedPublicationInventoryAuthority(
                     inventoryPath, retainedRoot,
-                    Path.Combine(trusted.Bundle.Root, "trust", "publication-allowed-signers"),
+                    Path.Join(trusted.Bundle.Root, "trust", "publication-allowed-signers"),
                     Environment.CurrentDirectory, trusted.Bundle.Root)
                 : null;
             return SyncPublicChangelogCommand.Run(args, output, Environment.CurrentDirectory, authority);

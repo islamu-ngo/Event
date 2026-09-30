@@ -1,11 +1,80 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace ISLAMU.SetupAssistant.Cli.Tests;
 
 public sealed class SetupCliProgramTests
 {
+    [Test]
+    public async Task RestrictedEnvironmentCannotReachExecutableStandardOutput()
+    {
+        ProcessResult result = await ExecuteAsync(["env", "render", "--output", "-"]);
+
+        await Assert.That(Encoding.UTF8.GetString(result.StandardOutput)).DoesNotContain("SETUP_SECRET=");
+        await Assert.That(result.ExitCode).IsEqualTo(74);
+    }
+
+    [Test]
+    public async Task PublicCatalogueStillReachesStandardOutput()
+    {
+        ProcessResult result = await ExecuteAsync(["catalogue", "show", "--key", "API_HTTP_PORT", "--output", "-"]);
+        await Assert.That(result.ExitCode).IsEqualTo(0);
+        using JsonDocument catalogue = JsonDocument.Parse(result.StandardOutput);
+        await Assert.That(catalogue.RootElement.GetProperty("key").GetString()).IsEqualTo("API_HTTP_PORT");
+    }
+
+    [Test]
+    public async Task MachineValidationNeverReturnsInputValuesOrPaths()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "event-setup-input-" + Guid.NewGuid().ToString("N"));
+        string value = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await File.WriteAllTextAsync(path, "SETUP_SECRET=" + value + "\n");
+        try
+        {
+            ProcessResult result = await ExecuteAsync(["env", "validate", "--input", path, "--machine"]);
+            await Assert.That(result.ExitCode).IsEqualTo(0);
+            await Assert.That(result.StandardError).IsEmpty();
+            await Assert.That(SetupCliMachineContractVerifier.Validate(result.StandardOutput)).IsEmpty();
+            string output = Encoding.UTF8.GetString(result.StandardOutput);
+            await Assert.That(output).DoesNotContain(value);
+            await Assert.That(output).DoesNotContain(path);
+            using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
+            await Assert.That(document.RootElement.GetProperty("artifacts")[0].GetProperty("sensitivity").GetString())
+                .IsEqualTo("sensitive");
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Test]
+    public async Task RestrictedExecutableFileOutputRequiresProvedHostProtection()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "event-setup-output-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string target = Path.Combine(directory, "deployment.env");
+        try
+        {
+            ProcessResult result = await ExecuteAsync(["env", "render", "--output", target, "--machine"]);
+            await Assert.That(result.StandardError).IsEmpty();
+            await Assert.That(SetupCliMachineContractVerifier.Validate(result.StandardOutput)).IsEmpty();
+            await Assert.That(Encoding.UTF8.GetString(result.StandardOutput)).DoesNotContain("SETUP_SECRET=");
+            await Assert.That(result.ExitCode).IsEqualTo(OperatingSystem.IsLinux() ? 0 : 74);
+            if (OperatingSystem.IsLinux())
+            {
+                await Assert.That(File.GetUnixFileMode(target)).IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                byte[] original = await File.ReadAllBytesAsync(target);
+                ProcessResult overwrite = await ExecuteAsync(["env", "render", "--output", target, "--machine"]);
+                await Assert.That(overwrite.ExitCode).IsEqualTo(74);
+                await Assert.That(await File.ReadAllBytesAsync(target)).IsEquivalentTo(original);
+                await Assert.That(Directory.GetFileSystemEntries(directory)).IsEquivalentTo([target]);
+            }
+            else
+                await Assert.That(Directory.GetFileSystemEntries(directory)).IsEmpty();
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
     [Test]
     public async Task EmptyInvocationAndHelpShowAvailableCommands()
     {
@@ -82,7 +151,8 @@ public sealed class SetupCliProgramTests
 
     private static async Task<ProcessResult> ExecuteAsync(IReadOnlyList<string> arguments)
     {
-        var info = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "Event.SetupAssistant.Cli"))
+        var info = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory,
+            OperatingSystem.IsWindows() ? "Event.SetupAssistant.Cli.exe" : "Event.SetupAssistant.Cli"))
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,

@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Event.SetupAssistant\Event.SetupAssistant.csproj" />
     <ProjectReference Include="..\Event.Setup.Core\Event.Setup.Core.csproj" />
+    <ProjectReference Include="..\Event.Setup.Artifacts\Event.Setup.Artifacts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

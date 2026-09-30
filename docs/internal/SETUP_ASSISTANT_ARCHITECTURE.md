@@ -3,7 +3,7 @@
 > **Audience:** Contributors | Operators | AI agents
 > **Status:** Implemented
 > **Owner:** Platform/Ops
-> **Last Verified:** 2026-09-29
+> **Last Verified:** 2026-09-30
 > **Source Anchors:** `src/Event.SetupAssistant.Cli/`, `src/Event.Setup.Core/`, `src/Event.SetupAssistant.Terminal/`, `src/Event.SetupAssistant/SetupLive/`, `src/Explore.Application/Features/ConfigurationManifest/Importing/`, `eng/setup-assistant/SetupAssistant.Release.proj`, `.agents/skills/setup-assistant-cli/SKILL.md`, `tests/Event.Architecture.Tests/SetupAssistantReleaseTests.cs`
 
 The Setup Assistant separates deterministic offline configuration work,
@@ -15,8 +15,10 @@ The release artifact in this phase is the non-interactive CLI only.
 | Component | Responsibility | Outward dependencies |
 |---|---|---|
 | `Event.Setup.Core` | Bounded dotenv, composition, portability, readiness, and legal-document logic | BCL plus the approved syntax-only YAML dependency |
-| `Event.SetupAssistant.Cli` | Deterministic command parsing, explicit I/O, machine JSON, and exit codes | `Event.Setup.Core` |
-| `Event.SetupAssistant.Terminal` | Interactive operator workflow and protected secret entry | Shared presentation and Core |
+| `Event.Setup.Artifacts` | Classified public output and native create-only protected files | Core and OS APIs; no UI or network client |
+| `Event.SetupAssistant.Cli` | Deterministic command parsing, explicit I/O, machine JSON, and exit codes | Core and Artifacts |
+| `Event.SetupAssistant.Terminal` | Interactive operator workflow and protected secret entry | Shared presentation, Core and Artifacts |
+| `Event.SetupAssistant.Desktop` | Disabled contract shell; no separate writer implementation | Shared presentation and Artifacts |
 | `Event.SetupAssistant` | Framework-neutral presentation state | Core |
 | `Event.SetupAssistant.SetupLive` | Ephemeral transport adapter for server-issued live-control affordances | Generated client and Core contracts |
 | Configuration import application services | Protected upload, preview binding, validation, atomic apply, and rollback evidence | Domain and repository contracts |
@@ -25,6 +27,59 @@ The machine CLI does not reference the terminal, shared MVVM presentation,
 browser, desktop, persistence, live transport, telemetry, or hosting
 frameworks. That inward-only graph keeps the standalone closure small and makes
 headless automation independent from interactive UI dependencies.
+
+## Classified protected artifacts
+
+`SetupArtifactPolicy` in Core owns a closed kind-to-sensitivity mapping.
+Only `PublicCatalogue` and `PublicTemplate` permit a public byte projection;
+environment, configuration, operator identity, unknown and undefined kinds
+are restricted. The classifier does not inspect arbitrary payloads to guess
+their safety. Trusted producers select kinds; input-derived configuration
+must never be relabelled as a public template.
+
+CLI artifact producers call the classified `ISetupCliWriter.WriteArtifact`
+port. Restricted `--output -` fails before the first byte. Machine envelopes
+and human status are separate, value-free output; sensitive artifacts are
+represented only by metadata, never embedded payloads. The existing wire
+spelling `sensitive` maps to Core's restricted classification.
+
+All native file writes use `ProtectedArtifactWriter`. Linux prepares an
+anonymous `O_TMPFILE` inode in the selected directory with verified current
+UID and exact `0600` mode before staging bytes. Descriptor-relative
+`openat` traversal refuses symlinks and untrusted/writable directory chains
+(root-owned sticky ancestors such as `/tmp` are allowed, not final
+directories). After bounded write and flush, commit reopens and validates
+the directory chain, compares its device/inode identity, and uses `linkat`
+from the open descriptor through `/proc/self/fd` for atomic no-replace
+publication. `statx` verifies the installed inode, owner, mode and length.
+There is no named staging file to replace and no backup sidecar.
+
+An existing file is never overwritten, including the disabled Desktop
+shell's former overwrite option. Competing preparations have one winner;
+the loser cannot remove the winner. Cancellation or disposal closes the
+anonymous inode, leaving the prior output intact. Results are closed status
+codes, not OS exception messages or paths. Root, elevated administrators,
+and processes acting as the same OS account are outside the ordinary
+other-account confidentiality promise. Filesystems without anonymous-file
+and hard-link support, unavailable procfs, or unprovable permissions fail
+closed without a pathname-based fallback.
+
+Windows and macOS restricted Save are **disabled**. Windows must eventually
+prove a protected, non-inherited DACL established before staging, limited
+to the current user and justified OS principals, plus reparse, race and
+cleanup invariants. macOS requires its own native host evidence; Linux
+mode tests do not prove either platform. The host CI jobs currently test
+refusal and public output only; they are not permission-support evidence.
+Browser and Desktop activation remain separate work.
+
+The shared adapter's implementation is repository-native. Its externally
+constrained elements are only the Linux `openat`, `open` (`O_TMPFILE`),
+`statx`, `fchmod`, `geteuid` and `linkat` ABI identifiers and semantics
+(Linux man-pages API references: `man7.org/linux/man-pages/man2/`).
+No third-party implementation, snippet, package or source-derived structure
+was incorporated. The anonymous-inode/create-only design was selected over
+pathname snapshot-and-replace because a path comparison cannot make the
+subsequent overwrite atomic against a competing writer.
 
 ## Executable command contract
 
@@ -60,12 +115,12 @@ authority.
 `eng/setup-assistant/SetupAssistant.Release.proj` is the single release
 configuration for:
 
-| Runtime identifier | Platform |
-|---|---|
-| `linux-x64` | Linux x64 |
-| `linux-arm64` | Linux ARM64 |
-| `osx-arm64` | macOS Apple Silicon |
-| `win-x64` | Windows x64 |
+| Runtime identifier | Platform | Protected file output |
+|---|---|---|
+| `linux-x64` | Linux x64 | Linux native writer; filesystem protections required |
+| `linux-arm64` | Linux ARM64 | Same fixed Linux ABI; host verification required |
+| `osx-arm64` | macOS Apple Silicon | Disabled; no restricted-save package claim |
+| `win-x64` | Windows x64 | Disabled; no restricted-save package claim |
 
 The project invokes the CLI project with these fixed properties:
 
@@ -178,6 +233,13 @@ Phase verification also runs the release matrix evaluation, publishes and
 executes the host artifact, and inspects each non-host RID through MSBuild
 property evaluation. Cross-platform execution is not claimed from a different
 host.
+
+Phase 7 additionally runs `SetupArtifactSensitivityTests`, executable
+`SetupCliProgramTests`, the real-OS `Event.Setup.Artifacts.Tests` project,
+and migrated Terminal/Desktop integration checks. `_build-test.yml`
+includes the shared artifact project in the Linux setup gate and separate
+Windows/macOS refusal gates. Returning early from Linux-only cases on
+another host must not be reported as proof of native write protection.
 
 ## Related documentation
 

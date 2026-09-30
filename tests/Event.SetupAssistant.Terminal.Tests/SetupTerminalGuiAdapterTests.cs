@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Security.Cryptography;
 using CommunityToolkit.Mvvm.Messaging;
 using ISLAMU.Event.Setup.Core.Environment;
+using ISLAMU.Event.Setup.Artifacts;
 using ISLAMU.Event.SetupAssistant.Presentation;
 using ISLAMU.Event.SetupAssistant.Terminal;
 using global::Terminal.Gui.App;
@@ -17,7 +18,7 @@ public sealed class SetupTerminalGuiAdapterTests
     [Test]
     public async Task WorkspaceCommandWritesDeterministicCoreBytes()
     {
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-adapter-" + Guid.CreateVersion7());
@@ -29,7 +30,8 @@ public sealed class SetupTerminalGuiAdapterTests
             var operation = new SetupTerminalArtifactOperation(
                 () => "adapter.env",
                 secret,
-                new SetupTerminalProtectedWriter(directory));
+                new ProtectedArtifactWriter(),
+                directory);
             using var session = new SetupPresentationSession(new StrongReferenceMessenger());
             await Assert.That(SetupWorkspaceId.TryCreate("environment", out SetupWorkspaceId id)).IsTrue();
             using SetupPresentationWorkspace workspace = session.CreateWorkspace(id, operation);
@@ -120,7 +122,8 @@ public sealed class SetupTerminalGuiAdapterTests
         var operation = new SetupTerminalArtifactOperation(
             () => "layout.env",
             secret,
-            new SetupTerminalProtectedWriter(Path.GetTempPath()));
+            new ProtectedArtifactWriter(),
+            Path.GetTempPath());
         using var session = new SetupPresentationSession(new StrongReferenceMessenger());
         await Assert.That(SetupWorkspaceId.TryCreate("environment", out SetupWorkspaceId id)).IsTrue();
         using SetupPresentationWorkspace workspace = session.CreateWorkspace(id, operation);
@@ -161,7 +164,7 @@ public sealed class SetupTerminalGuiAdapterTests
     [NotInParallel]
     public async Task NativeSaveAcceptRoutesTypedKeysThroughWorkspaceCommand()
     {
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-native-" + Guid.CreateVersion7());
@@ -175,7 +178,8 @@ public sealed class SetupTerminalGuiAdapterTests
             var operation = new SetupTerminalArtifactOperation(
                 () => workspace?.PublicInput ?? string.Empty,
                 secret,
-                new SetupTerminalProtectedWriter(directory));
+                new ProtectedArtifactWriter(),
+                directory);
             using var session = new SetupPresentationSession(new StrongReferenceMessenger());
             await Assert.That(SetupWorkspaceId.TryCreate("environment", out SetupWorkspaceId id)).IsTrue();
             workspace = session.CreateWorkspace(id, operation);
@@ -195,7 +199,7 @@ public sealed class SetupTerminalGuiAdapterTests
             await Assert.That(output.SetFocus()).IsTrue();
             await Assert.That(window.AdvanceFocus(NavigationDirection.Forward, null)).IsTrue();
             await Assert.That(window.Focused).IsEqualTo(field);
-            const string value = "Abcdefghijklmnopqrstuvwxyz012345";
+            string value = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
             foreach (char character in value)
                 await Assert.That(field.NewKeyDownEvent(new Key(character))).IsTrue();
             var settled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -229,7 +233,7 @@ public sealed class SetupTerminalGuiAdapterTests
     [NotInParallel]
     public async Task NativeCloseAcceptCancelsInFlightWriteBeforeCommit()
     {
-        if (!(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD()))
+        if (!OperatingSystem.IsLinux())
             return;
 
         string directory = Path.Combine(Path.GetTempPath(), "islamu-terminal-native-cancel-" + Guid.CreateVersion7());
@@ -241,16 +245,17 @@ public sealed class SetupTerminalGuiAdapterTests
             application.Init("dotnet");
             using var secret = new SetupTerminalSecretBuffer();
             SetupPresentationWorkspace? workspace = null;
+            var resumeCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var operation = new SetupTerminalArtifactOperation(
                 () => workspace?.PublicInput ?? string.Empty,
                 secret,
-                new SetupTerminalProtectedWriter(
-                    directory,
-                    async token =>
-                    {
-                        reachedCommitBoundary.TrySetResult();
-                        await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, token);
-                    }));
+                new ProtectedArtifactWriter(),
+                directory,
+                async token =>
+                {
+                    reachedCommitBoundary.TrySetResult();
+                    await resumeCommit.Task.WaitAsync(token);
+                });
             using var session = new SetupPresentationSession(new StrongReferenceMessenger());
             await Assert.That(SetupWorkspaceId.TryCreate("environment", out SetupWorkspaceId id)).IsTrue();
             workspace = session.CreateWorkspace(id, operation);
@@ -263,7 +268,7 @@ public sealed class SetupTerminalGuiAdapterTests
                 protectedOutputAvailable: true);
             window.ApplyViewportPolicy(new Size(80, 24));
             SetupSecretTextField field = window.SubViews.OfType<SetupSecretTextField>().Single();
-            foreach (char character in "CancelSafeValue0123456789")
+            foreach (char character in Convert.ToHexString(RandomNumberGenerator.GetBytes(16)))
                 field.NewKeyDownEvent(new Key(character));
             window.SubViews.OfType<Button>().First().InvokeCommand(Command.Accept);
             await reachedCommitBoundary.Task.WaitAsync(TimeSpan.FromSeconds(5));

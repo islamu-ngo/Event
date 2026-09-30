@@ -1,4 +1,6 @@
 using ISLAMU.Event.SetupAssistant.Cli;
+using ISLAMU.Event.Setup.Artifacts;
+using ISLAMU.Event.Setup.Core;
 
 return SetupCliProgram.Run(args);
 
@@ -79,31 +81,10 @@ internal static class SetupCliProgram
                 standardOutput.Flush();
                 return;
             }
-            string destination = Path.GetFullPath(path);
-            string temporary = Path.Combine(Path.GetDirectoryName(destination)!, $".event-setup-{Guid.NewGuid():N}.tmp");
-            var options = new FileStreamOptions
-            {
-                Mode = FileMode.CreateNew,
-                Access = FileAccess.Write,
-                Share = FileShare.None
-            };
-            if (!OperatingSystem.IsWindows())
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            bool created = false;
-            try
-            {
-                using (var file = new FileStream(temporary, options))
-                {
-                    created = true;
-                    file.Write(bytes.Span);
-                    file.Flush(flushToDisk: true);
-                }
-                File.Move(temporary, destination, overwrite: false);
-            }
-            finally
-            {
-                if (created) File.Delete(temporary);
-            }
+            using ProtectedArtifactPreparation preparation = new ProtectedArtifactWriter()
+                .PrepareAsync(SetupArtifactKind.Unknown, path, bytes).GetAwaiter().GetResult();
+            if (preparation.CommitAsync().GetAwaiter().GetResult() != ProtectedArtifactStatus.Written)
+                throw new IOException("protected-output-unavailable");
         }
     }
 }

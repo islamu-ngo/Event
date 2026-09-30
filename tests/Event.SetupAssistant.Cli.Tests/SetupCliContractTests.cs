@@ -178,7 +178,7 @@ public sealed class SetupCliContractTests
     }
 
     [Test]
-    public async Task CliAssemblyIsExecutableAndPackageFreeWithOnlyCoreProjectDependency()
+    public async Task CliAssemblyIsExecutableAndPackageFreeWithCoreAndProtectedArtifacts()
     {
         System.Reflection.Assembly assembly = System.Reflection.Assembly.Load("Event.SetupAssistant.Cli");
         XDocument project = XDocument.Load(RepositoryPath("src", "Event.SetupAssistant.Cli", "Event.SetupAssistant.Cli.csproj"));
@@ -191,13 +191,15 @@ public sealed class SetupCliContractTests
             .Select(reference => reference.Name ?? string.Empty)
             .Where(name => name.StartsWith("Microsoft.Extensions.DependencyInjection", StringComparison.Ordinal) ||
                            name.StartsWith("System.CommandLine", StringComparison.Ordinal) ||
+                           name.Contains("SetupLive", StringComparison.Ordinal) ||
+                           name == "Explore.Blazor.Client" ||
                            name.Contains("Provider", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         await Assert.That(assembly.EntryPoint).IsNotNull();
         await Assert.That(project.Root?.Element("PropertyGroup")?.Element("OutputType")?.Value).IsEqualTo("Exe");
         await Assert.That(packageReferences).IsEmpty();
-        await Assert.That(projectReferences).IsEquivalentTo(["Event.Setup.Core"]);
+        await Assert.That(projectReferences).IsEquivalentTo(["Event.Setup.Core", "Event.Setup.Artifacts"]);
         await Assert.That(forbiddenReferences).IsEmpty();
     }
 

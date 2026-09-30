@@ -51,14 +51,16 @@ public sealed class SetupAssistantArchitectureTests
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Event.Setup.Core"] = ["Event.Wire.Contracts"],
+            ["Event.Setup.Artifacts"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant"] = ["Event.Setup.Core"],
             ["Event.SetupAssistant.SetupLive"] = ["Event.Setup.Core", "Explore.Blazor.Client"],
             ["Event.SetupAssistant.Browser"] = ["Event.SetupAssistant"],
-            ["Event.SetupAssistant.Desktop"] = ["Event.SetupAssistant"],
-            ["Event.SetupAssistant.Terminal"] = ["Event.SetupAssistant", "Event.Setup.Core"],
-            ["Event.SetupAssistant.Cli"] = ["Event.Setup.Core"],
+            ["Event.SetupAssistant.Desktop"] = ["Event.SetupAssistant", "Event.Setup.Artifacts"],
+            ["Event.SetupAssistant.Terminal"] = ["Event.SetupAssistant", "Event.Setup.Core", "Event.Setup.Artifacts"],
+            ["Event.SetupAssistant.Cli"] = ["Event.Setup.Core", "Event.Setup.Artifacts"],
             ["SetupCliCommandSchemaGenerator"] = ["Event.SetupAssistant.Cli"],
             ["Event.Setup.Core.Tests"] = ["Event.Setup.Core"],
+            ["Event.Setup.Artifacts.Tests"] = ["Event.Setup.Artifacts"],
             ["Event.SetupAssistant.Tests"] = ["Event.SetupAssistant", "Event.SetupAssistant.SetupLive"],
             ["Event.SetupAssistant.Browser.Tests"] = ["Event.SetupAssistant.Browser"],
             ["Event.SetupAssistant.Desktop.Tests"] = ["Event.SetupAssistant.Desktop"],
@@ -70,6 +72,7 @@ public sealed class SetupAssistantArchitectureTests
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Event.Setup.Core"] = "src/Event.Setup.Core/Event.Setup.Core.csproj",
+            ["Event.Setup.Artifacts"] = "src/Event.Setup.Artifacts/Event.Setup.Artifacts.csproj",
             ["Event.SetupAssistant"] = "src/Event.SetupAssistant/Event.SetupAssistant.csproj",
             ["Event.SetupAssistant.SetupLive"] = "src/Event.SetupAssistant/SetupLive/Event.SetupAssistant.SetupLive.csproj",
             ["Event.SetupAssistant.Browser"] = "src/Event.SetupAssistant.Browser/Event.SetupAssistant.Browser.csproj",
@@ -78,6 +81,7 @@ public sealed class SetupAssistantArchitectureTests
             ["Event.SetupAssistant.Cli"] = "src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj",
             ["SetupCliCommandSchemaGenerator"] = "eng/setup-assistant/SetupCliCommandSchemaGenerator/SetupCliCommandSchemaGenerator.csproj",
             ["Event.Setup.Core.Tests"] = "tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj",
+            ["Event.Setup.Artifacts.Tests"] = "tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj",
             ["Event.SetupAssistant.Tests"] = "tests/Event.SetupAssistant.Tests/Event.SetupAssistant.Tests.csproj",
             ["Event.SetupAssistant.Browser.Tests"] = "tests/Event.SetupAssistant.Browser.Tests/Event.SetupAssistant.Browser.Tests.csproj",
             ["Event.SetupAssistant.Desktop.Tests"] = "tests/Event.SetupAssistant.Desktop.Tests/Event.SetupAssistant.Desktop.Tests.csproj",

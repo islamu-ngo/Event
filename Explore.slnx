@@ -15,6 +15,7 @@
     <Project Path="src/Explore.Domain/Explore.Domain.csproj" />
   </Folder>
   <Folder Name="/Product/Setup Assistant/">
+    <Project Path="src/Event.Setup.Artifacts/Event.Setup.Artifacts.csproj" />
     <Project Path="src/Event.SetupAssistant/Event.SetupAssistant.csproj" />
     <Project Path="src/Event.SetupAssistant/SetupLive/Event.SetupAssistant.SetupLive.csproj" />
     <Project Path="src/Event.SetupAssistant.Cli/Event.SetupAssistant.Cli.csproj" />
@@ -57,6 +58,7 @@
     <Project Path="eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj" />
   </Folder>
   <Folder Name="/Test/Setup Assistant/">
+    <Project Path="tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj" />
     <Project Path="tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj" />
     <Project Path="tests/Event.SetupAssistant.Tests/Event.SetupAssistant.Tests.csproj" />
     <Project Path="tests/Event.SetupAssistant.Browser.Tests/Event.SetupAssistant.Browser.Tests.csproj" />

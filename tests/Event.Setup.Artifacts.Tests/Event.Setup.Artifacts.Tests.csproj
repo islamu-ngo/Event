@@ -4,11 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\Event.Setup.Core\Event.Setup.Core.csproj" />
-    <ProjectReference Include="..\Event.Setup.Artifacts\Event.Setup.Artifacts.csproj" />
+    <ProjectReference Include="..\..\src\Event.Setup.Artifacts\Event.Setup.Artifacts.csproj" />
+    <PackageReference Include="TUnit" />
   </ItemGroup>
 </Project>

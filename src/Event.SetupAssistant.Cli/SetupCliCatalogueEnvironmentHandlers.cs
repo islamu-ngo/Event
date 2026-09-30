@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ISLAMU.Event.Setup.Core.Environment;
+using ISLAMU.Event.Setup.Core;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;
 
@@ -19,7 +20,7 @@ internal static class SetupCliCatalogueEnvironmentHandlers
             if (command.Operation == "list") writer.WriteEndArray();
         }
         byte[] bytes = stream.ToArray();
-        Write(invocation, command, bytes);
+        Write(invocation, command, SetupArtifactKind.PublicCatalogue, bytes);
         return SetupCliResults.Success([SetupCliResults.Artifact("catalogue", "application/json", bytes, "public",
             SetupCliResults.PathIntent(command.Output), command.DryRun ? "planned" : "written")]);
     }
@@ -48,7 +49,7 @@ internal static class SetupCliCatalogueEnvironmentHandlers
         DotenvCompositionResult composition = DotenvComposer.ComposeNoSecrets(catalogue, context, []);
         DotenvRenderResult rendered = DotenvCodec.Render(composition.Document, true);
         if (!rendered.Succeeded) return SetupCliResults.EnvironmentFailure(rendered.Diagnostics, SetupCliExitCode.Validation);
-        Write(invocation, command, rendered.Bytes);
+        Write(invocation, command, SetupArtifactKind.Environment, rendered.Bytes);
         SetupCliMachineReadiness readiness = new(SetupCliResults.Lower(composition.Readiness.State),
             SetupCliResults.NormalizeKeys(composition.Readiness.Missing), SetupCliResults.NormalizeKeys(composition.Readiness.Blocked));
         SetupCliMachineCoverage coverage = new([], SetupCliResults.NormalizeKeys(composition.Readiness.Missing));
@@ -73,8 +74,8 @@ internal static class SetupCliCatalogueEnvironmentHandlers
         }
     }
 
-    private static void Write(SetupCliInvocation invocation, SetupCliCommand command, ReadOnlyMemory<byte> bytes)
+    private static void Write(SetupCliInvocation invocation, SetupCliCommand command, SetupArtifactKind kind, ReadOnlyMemory<byte> bytes)
     {
-        if (!command.DryRun) invocation.Io.Output.Write(command.Output!, bytes, invocation.Io.MaximumBytes);
+        if (!command.DryRun) invocation.Io.Output.WriteArtifact(command.Output!, kind, bytes, invocation.Io.MaximumBytes);
     }
 }

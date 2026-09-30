@@ -113,13 +113,6 @@
           "YamlDotNet": "[18.1.0, )"
         }
       },
-      "event.setupassistant.cli": {
-        "type": "Project",
-        "dependencies": {
-          "Event.Setup.Artifacts": "[1.0.0, )",
-          "Event.Setup.Core": "[1.0.0, )"
-        }
-      },
       "event.wire.contracts": {
         "type": "Project"
       },

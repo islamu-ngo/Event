@@ -157,6 +157,12 @@
         "resolved": "4.0.1",
         "contentHash": "PMU8u3pGf9nUkee39KMrB8qqId7u7kyGWaZpOh9E4Mal3xChq+relS/hHQOicGAswyzi7F5DjXjac0mTnRBX8Q=="
       },
+      "event.setup.artifacts": {
+        "type": "Project",
+        "dependencies": {
+          "Event.Setup.Core": "[1.0.0, )"
+        }
+      },
       "event.setup.core": {
         "type": "Project",
         "dependencies": {

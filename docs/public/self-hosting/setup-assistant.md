@@ -17,15 +17,20 @@ starts the interactive Terminal UI.
 
 ## Choose a release target
 
-| Host | Runtime identifier | Release executable |
-|---|---|---|
-| Linux x64 | `linux-x64` | `event-setup` |
-| Linux ARM64 | `linux-arm64` | `event-setup` |
-| macOS Apple Silicon | `osx-arm64` | `event-setup` |
-| Windows x64 | `win-x64` | `event-setup.exe` |
+| Host | Runtime identifier | Release executable | File export |
+|---|---|---|---|
+| Linux x64 | `linux-x64` | `event-setup` | Protected local filesystem required |
+| Linux ARM64 | `linux-arm64` | `event-setup` | Requires Linux host verification |
+| macOS Apple Silicon | `osx-arm64` | `event-setup` | Disabled pending native protection evidence |
+| Windows x64 | `win-x64` | `event-setup.exe` | Disabled pending native protection evidence |
 
 Each target is self-contained and published as one executable. The host does
 not need a separately installed .NET runtime.
+
+Windows and macOS packages can inspect public catalogue data and validate
+local input, but cannot save files. The Terminal's protected Save is
+unavailable on those hosts. Neither package currently promises protected
+dotenv or identity export. Browser and Desktop remain disabled shells.
 
 ## Publish from source
 
@@ -69,6 +74,22 @@ event-setup manifest create --output instance-manifest.json
 
 The manifest command creates a new file and rejects an existing destination.
 Use `--dry-run` to preview a write without producing the file.
+
+Only public catalogue output may use `--output -`. Environment files,
+configuration manifests, tenant packages and operator identity outputs
+require a protected native file, even when a particular template contains
+no secret. Redirecting restricted output to stdout fails with exit `74`
+without emitting artifact bytes.
+
+On Linux, choose a local directory owned by your account or root, with no
+group/other write access and no symlink components. The writer creates
+owner-only (`0600`) files atomically and never overwrites an existing file.
+Choose a fresh destination for each export; move or retire the previous
+file yourself after review. Cancellation discards private staging without
+leaving temporary files. Anonymous-file and hard-link support and mounted
+procfs are required; unsupported filesystems fail rather than fall back to
+an unprotected write. This protects against other ordinary local accounts,
+not root, elevated administrators, or processes running as your own account.
 
 Use machine mode for scripts and CI:
 

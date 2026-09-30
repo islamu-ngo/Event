@@ -48,6 +48,43 @@ on:
         default: "Release"
 
 jobs:
+  setup-unproved-hosts:
+    name: Setup restricted-save refusal (${{ matrix.os }})
+    if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Verify refusal without claiming native protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj --locked-mode
+          dotnet restore tests/Event.SetupAssistant.Cli.Tests/Event.SetupAssistant.Cli.Tests.csproj --locked-mode
+          dotnet test --project tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj \
+            --configuration Release --no-restore --verbosity quiet -- \
+            --treenode-filter "/*/*/*ProtectedArtifactWriterTests/(HostAvailabilityDoesNotInferWindowsOrMacProtection|RestrictedAndUnknownBytesNeverReachPublicStreams)" \
+            --minimum-expected-tests 2
+          dotnet test --project tests/Event.SetupAssistant.Cli.Tests/Event.SetupAssistant.Cli.Tests.csproj \
+            --configuration Release --no-restore --verbosity quiet -- \
+            --treenode-filter "/*/*/*SetupCliProgramTests/*" --minimum-expected-tests 8
+          {
+            echo "## Setup protected output remains disabled on this host"
+            echo "These checks prove refusal, not Windows DACL or macOS protected-write support."
+            echo "Do not advertise restricted Save until native permission, race and cleanup proofs replace this gate."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -178,6 +215,7 @@ jobs:
           set -euo pipefail
           for project in \
             tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj \
+            tests/Event.Setup.Artifacts.Tests/Event.Setup.Artifacts.Tests.csproj \
             tests/Event.SetupAssistant.Tests/Event.SetupAssistant.Tests.csproj \
             tests/Event.SetupAssistant.Browser.Tests/Event.SetupAssistant.Browser.Tests.csproj \
             tests/Event.SetupAssistant.Desktop.Tests/Event.SetupAssistant.Desktop.Tests.csproj \

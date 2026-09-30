@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
+using ISLAMU.Event.Setup.Core;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;
 
@@ -14,6 +15,13 @@ public interface ISetupCliInput
 public interface ISetupCliWriter
 {
     void Write(string path, ReadOnlyMemory<byte> bytes, int maximumBytes);
+
+    void WriteArtifact(string path, SetupArtifactKind kind, ReadOnlyMemory<byte> bytes, int maximumBytes)
+    {
+        if (path == "-" && !SetupArtifactPolicy.TryProjectPublic(kind, bytes, out _))
+            throw new IOException("protected-output-required");
+        Write(path, bytes, maximumBytes);
+    }
 }
 
 public sealed record SetupCliIo

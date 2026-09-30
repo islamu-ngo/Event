@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="ISLAMU.ReleaseEngineering.Tests" />
     <PackageReference Include="YamlDotNet" />
     <None Include="../../trust/promotion-allowed-signers"
           Link="ISLAMU.ReleaseEngineering.promotion-allowed-signers"

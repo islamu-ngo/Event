@@ -38,6 +38,50 @@ public static class Program
             return WriteUsage(output);
         }
 
+        if (string.Equals(args[0], "prepare-publication-inventory", StringComparison.Ordinal))
+        {
+            return PublicationInventoryCommand.Run(args, output, Environment.CurrentDirectory);
+        }
+
+        if (string.Equals(args[0], "sync-public-changelog", StringComparison.Ordinal))
+        {
+            string Required(string name) => Environment.GetEnvironmentVariable(name) ?? string.Empty;
+            TrustedBundleResult trusted = TrustedBundlePolicy.Verify(new TrustedBundleVerificationRequest(
+                Required("ISLAMU_RELEASE_TRUSTED_BUNDLE"),
+                Environment.CurrentDirectory,
+                new PromotionAuthorityInput(
+                    Required("ISLAMU_RELEASE_PROMOTION_RECEIPT"),
+                    Required("ISLAMU_RELEASE_PROMOTION_SIGNATURE"),
+                    Required("ISLAMU_RELEASE_PROMOTION_PRINCIPAL")),
+                Required("ISLAMU_RELEASE_BUNDLE_ID"),
+                Required("ISLAMU_RELEASE_BUNDLE_VERSION"),
+                Required("ISLAMU_RELEASE_POLICY_VERSION"),
+                Required("ISLAMU_RELEASE_CONFIG_VERSION"),
+                Required("ISLAMU_RELEASE_TRUST_VERSION"))
+            { ExpectedManifestDigest = Required("ISLAMU_RELEASE_MANIFEST_SHA256") });
+            if (!trusted.IsValid || trusted.Bundle is null)
+            {
+                output.WriteLine("changelog_trusted_bundle_invalid");
+                return ToolchainRejected;
+            }
+
+            string? inventoryPath = null;
+            string? retainedRoot = null;
+            for (int index = 1; index + 1 < args.Length; index++)
+            {
+                if (args[index] == "--inventory") inventoryPath = args[index + 1];
+                if (args[index] == "--retained-evidence") retainedRoot = args[index + 1];
+            }
+
+            IFinalLaneInventoryAuthority? authority = inventoryPath is not null && retainedRoot is not null
+                ? new SignedPublicationInventoryAuthority(
+                    inventoryPath, retainedRoot,
+                    Path.Combine(trusted.Bundle.Root, "trust", "publication-allowed-signers"),
+                    Environment.CurrentDirectory, trusted.Bundle.Root)
+                : null;
+            return SyncPublicChangelogCommand.Run(args, output, Environment.CurrentDirectory, authority);
+        }
+
         if (string.Equals(args[0], "prepare", StringComparison.Ordinal))
         {
             return PrepareCommand.Run(args, output, Environment.CurrentDirectory, GetPlatform(), ProcessTimeout);
@@ -254,7 +298,8 @@ public static class Program
 
     private static int WriteUsage(TextWriter output)
     {
-        output.WriteLine("usage: release-engine allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | rename-change --commit <oid> --from <id> [--to <id>] --reason <reason> | install-change-hooks [--target <ref>] | verify-tools | prepare <release-directory> | verify-candidate <release-directory> <candidate-oid> | tag-message <release-directory> | verify-tag <release-directory> <tag-name> | verify-main <release-directory> <expected-old-origin-main-oid> <tag-object-oid> | verify-baseline <baseline-ref> <target-oid> <tag-object-oid> | open-maintenance-line <release-directory> <tag-object-oid> | activate-trust --release-principal <name> --release-key <public-key> --promotion-principal <name> --promotion-key <public-key> --valid-from <yyyy-MM-dd> --valid-until <yyyy-MM-dd> --output <trust-directory> [--replace]");
+        output.WriteLine("publication preparation: prepare-publication-inventory --inventory <existing-inventory> --retained-evidence <directory> --release-evidence <relative-path> --release-directory <repository-relative-path> --disclosure-approved <version> --output-directory <new-directory>");
+        output.WriteLine("usage: release-engine allocate-change-id --target <ref> | create-change --type <type> --scope <scope> --title <title> --summary <summary> [--group <group>] [--target <ref>] | preflight-commit <message-file> [--target <ref>] | preflight-staged [--target <ref>] | preflight-range --target <ref> [--head <ref>] | rename-change --commit <oid> --from <id> [--to <id>] --reason <reason> | install-change-hooks [--target <ref>] | verify-tools | prepare <release-directory> | verify-candidate <release-directory> <candidate-oid> | tag-message <release-directory> | verify-tag <release-directory> <tag-name> | verify-main <release-directory> <expected-old-origin-main-oid> <tag-object-oid> | verify-baseline <baseline-ref> <target-oid> <tag-object-oid> | open-maintenance-line <release-directory> <tag-object-oid> | sync-public-changelog --inventory <signed-inventory> --retained-evidence <directory> --publication-base <https-url> [--check] | activate-trust --release-principal <name> --release-key <public-key> --promotion-principal <name> --promotion-key <public-key> --valid-from <yyyy-MM-dd> --valid-until <yyyy-MM-dd> --output <trust-directory> [--replace]");
         return UsageError;
     }
 

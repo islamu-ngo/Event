@@ -17,6 +17,74 @@ public static class TagCommand
     private static readonly Regex GoodSignaturePattern = new("Good \\\"git\\\" signature for (?<principal>[^\\s]+)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
+    /// <summary>
+    /// Rechecks the release-role SSH signature and signer policy for a retained final manifest
+    /// without writing evidence or relying on any branch head. Inventory approval cannot stand in
+    /// for a verified release tag.
+    /// </summary>
+    public static bool IsSignedFinalRelease(
+        string repositoryRoot, string trustedBundleRoot, string evidencePath,
+        string tagObjectId, string version, string targetOid)
+    {
+        try
+        {
+            byte[] evidence = ReadFileBounded(evidencePath);
+            using JsonDocument document = JsonDocument.Parse(evidence);
+            JsonElement root = document.RootElement;
+            if (root.GetProperty("schemaVersion").GetString() != "release-evidence.v1" ||
+                root.GetProperty("tagName").GetString() != $"v{version}" ||
+                root.GetProperty("tagObjectId").GetString() != tagObjectId ||
+                root.GetProperty("targetOid").GetString() != targetOid)
+            {
+                return false;
+            }
+
+            if (!FullOidPattern.IsMatch(tagObjectId) || !FullOidPattern.IsMatch(targetOid) ||
+                RunGit(repositoryRoot, "cat-file", "-t", tagObjectId).Trim() != "tag" ||
+                RunGit(repositoryRoot, "rev-parse", "--verify", $"refs/tags/v{version}").Trim() != tagObjectId)
+            {
+                return false;
+            }
+
+            TagObject tag = ParseTagObject(RunGit(repositoryRoot, "cat-file", "-p", tagObjectId));
+            string expectedMessage =
+                $"ISLAMU release tag v1\nTag: v{version}\nVersion: {version}\n" +
+                $"Line: {root.GetProperty("line").GetString()}\nCandidate-Oid: {targetOid}\n" +
+                $"Candidate-SHA256: {root.GetProperty("candidateManifestSha256").GetString()}\n" +
+                $"Release-Notes-SHA256: {root.GetProperty("releaseNotesSha256").GetString()}\n";
+            if (tag.TargetOid != targetOid || tag.Name != $"v{version}" ||
+                NormalizeTagMessage(tag.Message) != NormalizeTagMessage(expectedMessage))
+            {
+                return false;
+            }
+
+            DateOnly releaseDate = DateOnly.ParseExact(root.GetProperty("releaseDate").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            string allowedSigners = Path.Combine(trustedBundleRoot, "trust", "allowed-signers");
+            ReleaseSigningPolicy policy = ReadSigningPolicy(Path.Combine(trustedBundleRoot, "trust", "release-signing-policy.yaml"));
+            SshVerification signature = VerifyTagSignature(repositoryRoot, tagObjectId, allowedSigners);
+            if (!signature.Verified || signature.Principal != root.GetProperty("signerPrincipal").GetString())
+            {
+                return false;
+            }
+
+            TrustedSshSigner signer = ReadTrustedSigner(allowedSigners, policy, signature.Principal, releaseDate);
+            return root.GetProperty("signerRole").GetString() == signer.Role &&
+                root.GetProperty("signerKeyFingerprint").GetString() == signer.KeyFingerprint &&
+                root.GetProperty("signerAlgorithm").GetString() == signer.Algorithm &&
+                SshSignerPolicy.Authorize([signer], new SshTagAuthorizationRequest(
+                    IsAnnotatedTag: true, CryptographicSignatureVerified: true,
+                    Principal: signature.Principal, RequiredRole: "release",
+                    KeyFingerprint: signer.KeyFingerprint, Algorithm: signer.Algorithm,
+                    VerificationDate: releaseDate, ExpectedTagObjectId: tagObjectId,
+                    ObservedTagObjectId: tagObjectId, PreviouslyRecordedTagObjectId: tagObjectId)).IsValid;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+            InvalidOperationException or JsonException or ArgumentException or FormatException or KeyNotFoundException)
+        {
+            return false;
+        }
+    }
+
     public static int Run(string[] args, TextWriter output, string repositoryRoot, string platform, TimeSpan timeout)
     {
         if (args.Length > 0 && string.Equals(args[0], "tag-message", StringComparison.Ordinal))

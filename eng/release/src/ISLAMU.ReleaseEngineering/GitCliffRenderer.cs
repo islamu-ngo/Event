@@ -394,13 +394,12 @@ public static class GitCliffRenderer
     private static byte[] CreateRendererContext(ReleaseContext context)
     {
         RendererCommit[] commits = context.Changes
-            .GroupBy(change => change.Breaking
-                ? (Order: 0, Heading: "\u26a0\ufe0f Breaking Changes")
-                : change.Type switch
+            .GroupBy(change => ReleaseChangePresentation.Category(change) switch
                 {
-                    "feat" => (Order: 1, Heading: "\U0001f680 Features"),
-                    "fix" => (Order: 2, Heading: "\U0001f41b Bug Fixes"),
-                    "perf" => (Order: 3, Heading: "\u26a1 Performance"),
+                    0 => (Order: 0, Heading: "\u26a0\ufe0f Breaking Changes"),
+                    1 => (Order: 1, Heading: "\U0001f680 Features"),
+                    2 => (Order: 2, Heading: "\U0001f41b Bug Fixes"),
+                    3 => (Order: 3, Heading: "\u26a1 Performance"),
                     _ => (Order: 4, Heading: "\U0001f527 Other Improvements"),
                 })
             .OrderBy(group => group.Key.Order)

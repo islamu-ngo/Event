@@ -1,0 +1,85 @@
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using ISLAMU.ReleaseEngineering;
+
+namespace ISLAMU.ReleaseEngineering.Tests;
+
+public sealed class SignedPublicationInventoryAuthorityTests
+{
+    [Test]
+    [NotInParallel("RuntimePromotionTrustRoot")]
+    public async Task OperatorSignatureBindsCompleteInventoryAndDisclosureReceipt()
+    {
+        using GovernedReleaseFixture fixture = GovernedReleaseFixture.CreateSha1();
+        string version = GovernedReleaseFixture.FirstReleaseVersion;
+        (int candidateCode, string candidateOutput) = fixture.VerifyCandidate(version, fixture.B);
+        if (candidateCode != Program.Success) throw new InvalidOperationException(candidateOutput);
+        (int tagCode, string tagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
+        if (tagCode != Program.Success) throw new InvalidOperationException(tagOutput);
+        string evidencePath = $"docs/internal/releases/{version}/release-evidence.v1.json";
+        byte[] finalEvidence = File.ReadAllBytes(Path.Combine(fixture.RepositoryPath, evidencePath));
+        string root = Path.Combine(fixture.Root, "publication-authority");
+        string approvals = Path.Combine(fixture.RepositoryPath, "publication-approvals");
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(approvals);
+            string key = Path.Combine(root, "signer");
+            Run("ssh-keygen", "-q", "-t", "ed25519", "-N", string.Empty, "-f", key);
+            string publicKey = string.Join(' ', File.ReadAllText(key + ".pub")
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+            string signers = Path.Combine(root, "allowed-signers");
+            File.WriteAllText(signers, $"publication-approver namespaces=\"islamu-publication\" {publicKey}\n");
+
+            string tag = fixture.FirstTagObject;
+            string evidence = Digest(finalEvidence);
+            string approval = $$"""{"schemaVersion":"publication-approval.v1","version":"{{version}}","tagObjectId":"{{tag}}","evidenceSha256":"{{evidence}}","disclosureAuthorized":true}""";
+            string approvalPath = Path.Combine(approvals, version + ".json");
+            File.WriteAllText(approvalPath, approval);
+            var entry = new AuthorizedInventoryEntry(
+                version, "v1.1", "2026-08-14", tag, fixture.B,
+                $"docs/internal/releases/{version}", evidencePath, evidence,
+                true, Digest(Encoding.UTF8.GetBytes(approval)), []);
+            string inventoryPath = Path.Combine(root, "inventory.json");
+            byte[] original = "{\"completeSet\":true,\"entries\":[\"1.2.0\"]}"u8.ToArray();
+            File.WriteAllBytes(inventoryPath, original);
+            Run("ssh-keygen", "-Y", "sign", "-f", key, "-n", "islamu-publication", inventoryPath);
+            var authority = new SignedPublicationInventoryAuthority(
+                inventoryPath, fixture.RepositoryPath, signers, fixture.RepositoryPath, Path.Combine(fixture.Root, "bundle"));
+
+            await Assert.That(authority.VerifyCompleteInventory(Digest(original), [entry])).IsTrue();
+            string finalPath = Path.Combine(fixture.RepositoryPath, evidencePath);
+            File.WriteAllText(finalPath, Encoding.UTF8.GetString(finalEvidence)
+                .Replace("\"signerRole\": \"release\"", "\"signerRole\": \"tooling-promotion\"", StringComparison.Ordinal));
+            await Assert.That(authority.VerifyCompleteInventory(Digest(original), [entry])).IsFalse();
+            File.WriteAllBytes(finalPath, finalEvidence);
+            await Assert.That(authority.VerifyCompleteInventory(Digest(original), [entry with { DisclosureAuthorized = false }])).IsFalse();
+            File.WriteAllText(approvalPath, approval.Replace("\"disclosureAuthorized\":true", "\"disclosureAuthorized\":false", StringComparison.Ordinal));
+            await Assert.That(authority.VerifyCompleteInventory(Digest(original), [entry])).IsFalse();
+            File.WriteAllText(approvalPath, approval);
+            File.AppendAllText(inventoryPath, "mutation");
+            await Assert.That(authority.VerifyCompleteInventory(Digest(File.ReadAllBytes(inventoryPath)), [entry])).IsFalse();
+    }
+
+    private static string Digest(byte[] value) => Convert.ToHexStringLower(SHA256.HashData(value));
+
+    private static void Run(string executable, params string[] arguments)
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo(executable)
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            },
+        };
+        foreach (string argument in arguments) process.StartInfo.ArgumentList.Add(argument);
+        process.Start();
+        if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException("publication_signature_fixture_timeout");
+        }
+        if (process.ExitCode != 0) throw new InvalidOperationException("publication_signature_fixture_failed");
+    }
+}

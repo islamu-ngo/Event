@@ -2716,3 +2716,28 @@ References: `InstanceOnboardingGenerationReader`,
 - [x] Stays in journal only (the direct-host and persisted-policy integration regressions protect this boundary)
 
 ---
+
+## [2026-09-30 Europe/Brussels] Native setup release and UI cleanup need independent runtime gates
+
+**Context**: The offline Setup Assistant added a separately packaged Avalonia application alongside CLI, terminal and static browser targets.
+
+**Symptom / Observation**: A successful desktop project build and publish did not guarantee a working packaged application: startup failed with `No precompiled XAML found`. Separately, a headless control test completed every assertion but hung during session disposal.
+
+**Root Cause**: Avalonia's build integration must be an explicit dependency. The native release driver also reused restore/build evaluation and overrode `MSBuildProjectExtensionsPath` with a relative path, preventing the expected package build imports from reaching publication. In the headless case, continuation resumed on Avalonia's UI thread; disposing its session there attempted to join that same thread.
+
+**Resolution**: Keep SDK-default import paths and start a fresh `dotnet publish --no-restore` process after restore. Guard the published desktop's compiled XAML and actually launch its independent executable. Drive the real selected tab's controls in the headless test, assert input invalidation, and dispose the session from a worker thread with a non-UI continuation.
+
+**Why This Matters for Future Work**: CLI artifact checks alone cannot establish native UI readiness. Build imports, packaged resource compilation, real control wiring and dispatcher ownership are separate contracts; verify each instead of treating a green project build or completed assertions as sufficient evidence.
+
+**References**:
+- `eng/setup-assistant/SetupAssistant.Release.proj`
+- `src/Event.SetupAssistant.Desktop/Event.SetupAssistant.Desktop.csproj`
+- `src/Event.SetupAssistant.Desktop/Views/IdentityDraftView.axaml.cs`
+- `tests/Event.SetupAssistant.Desktop.Tests/DesktopApplicationTests.cs`
+- `tests/Event.Architecture.Tests/SetupAssistantReleaseTests.cs`
+- `80ff42d9f` — independently published desktop, protected output and regression gates
+
+**Promotion Consideration**:
+- [x] Stays in journal only; promote to operations guidance if another native UI workstream encounters the same lifecycle.
+
+---

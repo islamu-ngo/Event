@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Text;
+using ISLAMU.Event.SetupAssistant.Cli.Commands;
+using Spectre.Console;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;
 
@@ -7,44 +10,59 @@ public sealed class SetupCliApplication
     public SetupCliExitCode Run(SetupCliInvocation invocation)
     {
         ArgumentNullException.ThrowIfNull(invocation);
-        SetupCliCommand command = SetupCliParser.Parse(invocation);
-        SetupCliCommandResult result;
-        try
+        SetupCliPreflight preflight = SetupCliArgumentPreflight.Inspect(invocation);
+        using var text = new StringWriter(System.Globalization.CultureInfo.InvariantCulture);
+        IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
         {
-            result = command.Error is not null
-                ? SetupCliResults.Failure(SetupCliExitCode.Usage, command.Error)
-                : Dispatch(command, invocation);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            result = SetupCliResults.Failure(SetupCliExitCode.Io, "io-failed");
-        }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or JsonException)
-        {
-            result = SetupCliResults.Failure(SetupCliExitCode.Internal, "internal-failed");
-        }
+            Ansi = AnsiSupport.No,
+            ColorSystem = ColorSystemSupport.NoColors,
+            Interactive = InteractionSupport.No,
+            Out = new AnsiConsoleOutput(text)
+        });
+
+        if (preflight.Error is not null)
+            return Emit(invocation, preflight.Command, SetupCliResults.Failure(SetupCliExitCode.Usage, preflight.Error), console, text);
+        if (invocation.Environment.Names.Any(SetupCliArgumentPreflight.IsForbiddenName))
+            return Emit(invocation, preflight.Command,
+                SetupCliResults.Failure(SetupCliExitCode.Blocked, "environment-name-blocked"), console, text);
+        if (preflight.Command.Help && preflight.Command.Machine)
+            return Emit(invocation, preflight.Command, SetupCliResults.Success(), console, text);
 
         try
         {
-            SetupCliMachineOutput.Emit(invocation, command, result);
-            return result.Exit;
+            var runtime = new SetupCliCommandRuntime(this, invocation, console);
+            int exit = SetupCliCommandRegistry.Create(runtime, console).Run(preflight.Arguments);
+            FlushHuman(invocation, runtime.Command ?? preflight.Command, text);
+            return runtime.Exit ?? (SetupCliExitCode)exit;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return SetupCliExitCode.Io;
+            return Emit(invocation, preflight.Command, SetupCliResults.Failure(SetupCliExitCode.Io, "io-failed"), console, text);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or JsonException)
+        {
+            return Emit(invocation, preflight.Command, SetupCliResults.Failure(SetupCliExitCode.Internal, "internal-failed"), console, text);
+        }
+    }
+
+    internal SetupCliCommandResult Execute(SetupCliCommand command, SetupCliInvocation invocation)
+    {
+        try
+        {
+            return Dispatch(command, invocation);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return SetupCliResults.Failure(SetupCliExitCode.Io, "io-failed");
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or JsonException)
+        {
+            return SetupCliResults.Failure(SetupCliExitCode.Internal, "internal-failed");
         }
     }
 
     private SetupCliCommandResult Dispatch(SetupCliCommand command, SetupCliInvocation invocation)
     {
-        if (invocation.Environment.Names.Any(SetupCliParser.IsForbidden))
-            return SetupCliResults.Failure(SetupCliExitCode.Blocked, "environment-name-blocked");
-        if (command.Help) return SetupCliResults.Success();
-        if (RequiresOutput(command) && command.Output is null && !command.DryRun)
-            return SetupCliResults.Failure(SetupCliExitCode.Usage, "output-required");
-        if (RequiresInput(command) && command.Input is null)
-            return SetupCliResults.Failure(SetupCliExitCode.Usage, "input-required");
-
         return command.Family switch
         {
             "catalogue" => SetupCliCatalogueEnvironmentHandlers.Catalogue(command, invocation),
@@ -58,10 +76,48 @@ public sealed class SetupCliApplication
         };
     }
 
-    private static bool RequiresInput(SetupCliCommand command) => command.Operation is
-        "open" or "validate" or "format" or "diff" or "coverage" or "export" or "preview"
-        or "export-operator-identity" or "import-operator-identity";
-    private static bool RequiresOutput(SetupCliCommand command) => command.Operation is
-        "create" or "format" or "export" or "render" or "list" or "show" or "describe"
-        or "export-operator-identity" or "import-operator-identity";
+    private static SetupCliExitCode Emit(
+        SetupCliInvocation invocation,
+        SetupCliCommand command,
+        SetupCliCommandResult result,
+        IAnsiConsole console,
+        StringWriter text)
+    {
+        if (command.Machine)
+            SetupCliMachineOutput.Emit(invocation, command, result);
+        else
+            SetupCliHumanOutput.Render(console, result);
+        FlushHuman(invocation, command, text);
+        return result.Exit;
+    }
+
+    private static void FlushHuman(SetupCliInvocation invocation, SetupCliCommand command, StringWriter text)
+    {
+        if (command.Machine || text.GetStringBuilder().Length == 0)
+            return;
+        byte[] bytes = Encoding.UTF8.GetBytes(text.ToString());
+        ISetupCliWriter writer = command.Output == "-" ? invocation.Io.Error : invocation.Io.Output;
+        writer.Write("-", bytes, invocation.Io.MaximumCharacters);
+    }
+}
+
+internal sealed class SetupCliCommandRuntime(
+    SetupCliApplication application,
+    SetupCliInvocation invocation,
+    IAnsiConsole console)
+{
+    internal SetupCliExitCode? Exit { get; private set; }
+    internal SetupCliCommand? Command { get; private set; }
+
+    internal int Execute(string family, string operation, ISetupCliCommandSettings settings)
+    {
+        Command = settings.Bind(family, operation, invocation.Mode);
+        SetupCliCommandResult result = application.Execute(Command, invocation);
+        if (Command.Machine)
+            SetupCliMachineOutput.Emit(invocation, Command, result);
+        else
+            SetupCliHumanOutput.Render(console, result);
+        Exit = result.Exit;
+        return (int)result.Exit;
+    }
 }

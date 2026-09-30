@@ -16,7 +16,14 @@ internal static class SetupCliProgram
             var writer = new SystemWriter(standardOutput);
             var error = new SystemWriter(standardError);
             var io = new SetupCliIo(new SystemInput(), writer, error, 65_536, 4 * 1024 * 1024);
-            var invocation = new SetupCliInvocation(args, mode, io, new SetupCliEnvironmentPresence([]));
+            var invocation = new SetupCliInvocation(
+                args,
+                mode,
+                io,
+                new SetupCliEnvironmentPresence(
+                    Environment.GetEnvironmentVariables().Keys.Cast<object>()
+                        .Select(name => name.ToString()!)
+                        .Where(name => name.Length > 0)));
             return (int)new SetupCliApplication().Run(invocation);
         }
         catch (ArgumentException)

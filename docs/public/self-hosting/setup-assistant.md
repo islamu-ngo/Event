@@ -62,6 +62,11 @@ Command families are bare first arguments. Do not prefix them with `setup`.
 For example, `event-setup catalogue ...` is valid; `setup catalogue ...` is
 not an executable command.
 
+Human help and command results use Spectre.Console. Request help for a
+family or operation without supplying input files, output paths or revisions:
+`event-setup catalogue --help` or `event-setup manifest validate --help`.
+Machine mode remains a separate JSON contract rather than formatted text.
+
 Commands that produce an artifact require an explicit output destination.
 Use `--output -` to write public catalogue data to standard output. To try the
 three common commands from a terminal:

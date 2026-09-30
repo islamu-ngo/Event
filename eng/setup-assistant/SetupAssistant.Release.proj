@@ -72,11 +72,11 @@
     <MSBuild
       Projects="$(SetupAssistantProject)"
       Targets="Restore"
-      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);RestorePackagesWithLockFile=true;RestoreLockedMode=false;NuGetLockFilePath=obj/setup-assistant-release/$(SetupAssistantRid)/packages.lock.json" />
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);MSBuildProjectExtensionsPath=obj/setup-assistant-release/$(SetupAssistantRid)/;RestorePackagesWithLockFile=true;RestoreLockedMode=false;NuGetLockFilePath=obj/setup-assistant-release/$(SetupAssistantRid)/packages.lock.json" />
     <MSBuild
       Projects="$(SetupAssistantProject)"
       Targets="Publish"
-      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);EnableCompressionInSingleFile=$(EnableCompressionInSingleFile);IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract);UseAppHost=$(UseAppHost);DebugSymbols=$(DebugSymbols);DebugType=$(DebugType);PublishDir=$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/;NoRestore=true" />
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);MSBuildProjectExtensionsPath=obj/setup-assistant-release/$(SetupAssistantRid)/;PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);EnableCompressionInSingleFile=$(EnableCompressionInSingleFile);IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract);UseAppHost=$(UseAppHost);DebugSymbols=$(DebugSymbols);DebugType=$(DebugType);PublishDir=$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/;NoRestore=true" />
     <PropertyGroup>
       <_SetupAssistantExecutableExtension Condition="'$(SetupAssistantRid)' == 'win-x64'">.exe</_SetupAssistantExecutableExtension>
       <_SetupAssistantPublishedExecutable>$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/Event.SetupAssistant.Cli$(_SetupAssistantExecutableExtension)</_SetupAssistantPublishedExecutable>

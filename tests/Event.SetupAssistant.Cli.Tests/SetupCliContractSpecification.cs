@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text;
+using ISLAMU.Event.SetupAssistant.Cli;
 
 namespace ISLAMU.SetupAssistant.Cli.Tests;
 
@@ -12,16 +13,11 @@ internal static class SetupCliContractSpecification
 {
     internal static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> Operations =
         new ReadOnlyDictionary<string, IReadOnlySet<string>>(
-            new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
-            {
-                ["catalogue"] = Set("list", "show", "describe"),
-                ["manifest"] = Set("create", "open", "validate", "format", "diff", "coverage", "export"),
-                ["tenant-package"] = Set("create", "open", "validate", "format", "diff", "coverage", "export"),
-                ["portability"] = Set("export-operator-identity", "import-operator-identity"),
-                ["env"] = Set("render", "validate"),
-                ["legal"] = Set("validate", "preview"),
-                ["doctor"] = Set("doctor")
-            });
+            SetupCliCommandSchemaMetadata.Commands.ToDictionary(
+                command => command.Name,
+                command => (IReadOnlySet<string>)command.Operations.Select(operation => operation.Name)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.Ordinal));
 
     internal static readonly IReadOnlyDictionary<string, int> ExitCodes =
         new ReadOnlyDictionary<string, int>(new Dictionary<string, int>(StringComparer.Ordinal)
@@ -36,9 +32,6 @@ internal static class SetupCliContractSpecification
             ["io"] = 74
         });
 
-    private static readonly HashSet<string> Options = Set("--help", "--machine", "--text", "--dry-run", "--input", "--baseline", "--output", "--key", "--topology", "--capability", "--provider");
-    private static readonly HashSet<string> InputOperations = Set("open", "validate", "format", "diff", "coverage", "export", "preview");
-    private static readonly HashSet<string> OutputOperations = Set("create", "format", "export", "render", "list", "show", "describe");
     private static readonly string[] ForbiddenNames = ["secret", "password", "token", "credential", "private-key", "api-key", "connection-string"];
 
     internal static IReadOnlyList<string> Validate(CliVector vector)
@@ -63,6 +56,10 @@ internal static class SetupCliContractSpecification
         {
             errors.Add("usage-operation-unknown");
         }
+        IReadOnlySet<string> supportedOptions = SetupCliCommandSchemaMetadata.Commands
+            .FirstOrDefault(command => command.Name == family)?.Operations
+            .FirstOrDefault(item => item.Name == operation)?.Options.ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
 
         bool machine = false;
         bool text = false;
@@ -82,7 +79,7 @@ internal static class SetupCliContractSpecification
                 continue;
             }
 
-            if (!Options.Contains(token))
+            if (!supportedOptions.Contains(token))
             {
                 errors.Add(token.StartsWith('-') ? "usage-option-unknown" : "usage-argument-tail");
                 continue;
@@ -112,21 +109,18 @@ internal static class SetupCliContractSpecification
         {
             errors.Add("usage-mode-conflict");
         }
-        if (hasInput && !InputOperations.Contains(operation))
-        {
-            errors.Add("usage-input-not-supported");
-        }
-        if (hasOutput && !OutputOperations.Contains(operation)) errors.Add("usage-output-not-supported");
-        if (dryRun && !OutputOperations.Contains(operation)) errors.Add("usage-dry-run-not-supported");
+        if (hasInput && !supportedOptions.Contains("--input")) errors.Add("usage-input-not-supported");
+        if (hasOutput && !supportedOptions.Contains("--output")) errors.Add("usage-output-not-supported");
+        if (dryRun && !supportedOptions.Contains("--dry-run")) errors.Add("usage-dry-run-not-supported");
         if (hasBaseline != (operation == "diff")) errors.Add(hasBaseline ? "usage-baseline-not-supported" : "usage-baseline-required");
         if (hasKey != (operation is "show" or "describe")) errors.Add(hasKey ? "usage-key-not-supported" : "usage-key-required");
-        if ((family == "catalogue" && OutputOperations.Contains(operation)) && !hasOutput && !dryRun)
+        if (supportedOptions.Contains("--output") && !hasOutput && !dryRun)
             errors.Add("usage-output-required");
         if (machine && outputPath == "-")
         {
             errors.Add("usage-machine-artifact-stdout");
         }
-        if (vector.CapturedInput.Length > 0 && (inputPath != "-" || !InputOperations.Contains(operation)))
+        if (vector.CapturedInput.Length > 0 && (inputPath != "-" || !supportedOptions.Contains("--input")))
         {
             errors.Add("usage-stdin-not-explicit");
         }

@@ -83,8 +83,9 @@ subsequent overwrite atomic against a competing writer.
 
 ## Executable command contract
 
-`SetupCliParser` owns the executable grammar. Families are bare first
-arguments:
+`SetupCliCommandRegistry` owns one Spectre.Console.Cli command graph.
+Typed settings provide both binding and reflected schema option metadata;
+the handwritten parser is removed. Families are bare first arguments:
 
 - `catalogue`
 - `manifest`
@@ -100,6 +101,15 @@ There is no `setup` command family. Automation uses
 the checked schema at `schemas/event-setup-command-v1.schema.json`; the schema
 generator, CLI tests, agent skill, and operator documentation must converge on
 that compiled command metadata rather than plan prose.
+
+Bounded argument preflight rejects hostile values before framework
+diagnostics can echo them. Help does not require operational files,
+destinations or revision values, but still observes the confidentiality
+boundary. Human help and results use Spectre.Console without interactive
+prompts; machine serialization bypasses rich rendering entirely. The
+executable reads environment names only. The approved runtime package
+closure is Spectre.Console 0.57.2, Spectre.Console.Ansi 0.57.2,
+Spectre.Console.Cli 0.56.1, and Core's existing YamlDotNet dependency.
 
 The `portability` family owns
 `export-operator-identity` and `import-operator-identity`. Export accepts an

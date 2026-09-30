@@ -113,6 +113,22 @@ public sealed class SetupAssistantReleaseTests
             await Assert.That(files.Where(file => file.EndsWith(
                 ".dll", StringComparison.OrdinalIgnoreCase))).IsEmpty()
                 .Because("single-file publishing must not leave a managed assembly sidecar");
+
+            using JsonDocument dependencies = JsonDocument.Parse(await File.ReadAllBytesAsync(
+                ContextSystemHelpers.RepoPath("src", "Event.SetupAssistant.Cli", "bin", "Release",
+                    "net10.0", hostRuntimeIdentifier, "Event.SetupAssistant.Cli.deps.json")));
+            JsonProperty[] libraries = dependencies.RootElement.GetProperty("libraries")
+                .EnumerateObject().ToArray();
+            await Assert.That(libraries
+                .Where(library => library.Value.GetProperty("type").GetString() == "package")
+                .Select(library => library.Name)).IsEquivalentTo(
+                ["Spectre.Console/0.57.2", "Spectre.Console.Ansi/0.57.2",
+                 "Spectre.Console.Cli/0.56.1", "YamlDotNet/18.1.0"]);
+            await Assert.That(libraries
+                .Where(library => library.Value.GetProperty("type").GetString() == "project")
+                .Select(library => library.Name.Split('/')[0])).IsEquivalentTo(
+                ["Event.SetupAssistant.Cli", "Event.Setup.Core",
+                 "Event.Setup.Artifacts", "Event.Wire.Contracts"]);
         }
         finally
         {

@@ -11,4 +11,9 @@
     <ProjectReference Include="..\Event.Setup.Core\Event.Setup.Core.csproj" />
     <ProjectReference Include="..\Event.Setup.Artifacts\Event.Setup.Artifacts.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="Spectre.Console.Cli" />
+  </ItemGroup>
 </Project>

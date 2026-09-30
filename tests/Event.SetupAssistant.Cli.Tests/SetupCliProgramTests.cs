@@ -86,29 +86,47 @@ public sealed class SetupCliProgramTests
         string usage = Encoding.UTF8.GetString(empty.StandardOutput);
         foreach (string family in SetupCliContractSpecification.Operations.Keys)
             await Assert.That(usage).Contains(family);
-        await Assert.That(usage).Contains("event-setup doctor --machine");
         await Assert.That(help.ExitCode).IsEqualTo(0);
         await Assert.That(help.StandardOutput).IsEquivalentTo(empty.StandardOutput);
     }
 
     [Test]
-    public async Task IncompleteCommandsExplainRequiredOptionsWithoutChangingMachineDiagnostics()
+    [Arguments("catalogue", "")]
+    [Arguments("manifest", "validate")]
+    [Arguments("env", "render")]
+    [Arguments("portability", "import-operator-identity")]
+    public async Task HelpDoesNotRequireOperationalInputsOrOutput(string family, string operation)
     {
-        var cases = new (string[] Arguments, string Code, string Example)[]
+        string[] arguments = operation.Length == 0
+            ? [family, "--help"]
+            : [family, operation, "--help"];
+        ProcessResult human = await ExecuteAsync(arguments);
+        await Assert.That(human.ExitCode).IsEqualTo(0);
+        await Assert.That(human.StandardOutput.Length).IsGreaterThan(0);
+        await Assert.That(human.StandardError).IsEmpty();
+
+        ProcessResult machine = await ExecuteAsync([.. arguments, "--machine"]);
+        await Assert.That(machine.ExitCode).IsEqualTo(0);
+        await Assert.That(SetupCliMachineContractVerifier.Validate(machine.StandardOutput)).IsEmpty();
+    }
+
+    [Test]
+    public async Task IncompleteCommandsRenderHumanDiagnosticsWithoutChangingMachineDiagnostics()
+    {
+        var cases = new (string[] Arguments, string Code)[]
         {
-            (["catalogue", "list"], "output-required", "event-setup catalogue list --output -"),
-            (["catalogue", "show"], "key-required", "event-setup catalogue show --key API_HTTP_PORT --output -"),
-            (["manifest", "create"], "output-required", "event-setup manifest create --output instance-manifest.json")
+            (["catalogue", "list"], "output-required"),
+            (["catalogue", "show"], "key-required"),
+            (["manifest", "create"], "output-required")
         };
 
-        foreach ((string[] arguments, string code, string example) in cases)
+        foreach ((string[] arguments, string code) in cases)
         {
             ProcessResult text = await ExecuteAsync(arguments);
             await Assert.That(text.ExitCode).IsEqualTo(64);
             await Assert.That(text.StandardError).IsEmpty();
             string guidance = Encoding.UTF8.GetString(text.StandardOutput);
             await Assert.That(guidance).Contains(code);
-            await Assert.That(guidance).Contains(example);
 
             ProcessResult machine = await ExecuteAsync([.. arguments, "--machine"]);
             await Assert.That(machine.ExitCode).IsEqualTo(64);
@@ -135,6 +153,49 @@ public sealed class SetupCliProgramTests
     }
 
     [Test]
+    public async Task HostileArgumentsAreRejectedBeforeParserOutputCanRevealValues()
+    {
+        string value = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string path = Path.Combine(Path.GetTempPath(), "credential-" + Guid.NewGuid().ToString("N"));
+        var vectors = new[]
+        {
+            new[] { "doctor", "--machine", "--password", value },
+            new[] { "manifest", "validate", "--machine", "--input", path },
+            new[] { "doctor", "--machine", "\u001b]0;" + value + "\u0007" }
+        };
+
+        foreach (string[] arguments in vectors)
+        {
+            ProcessResult result = await ExecuteAsync(arguments);
+            await Assert.That(result.ExitCode).IsEqualTo(64);
+            await Assert.That(result.StandardError).IsEmpty();
+            await Assert.That(SetupCliMachineContractVerifier.Validate(result.StandardOutput)).IsEmpty();
+            string output = Encoding.UTF8.GetString(result.StandardOutput);
+            await Assert.That(output).DoesNotContain(value);
+            await Assert.That(output).DoesNotContain(path);
+        }
+    }
+
+    [Test]
+    public async Task ExecutableChecksEnvironmentNamesWithoutReadingTheirValues()
+    {
+        string suffix = Guid.NewGuid().ToString("N");
+        string name = "SERVICE_TOKEN_" + suffix;
+        string value = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        ProcessResult result = await ExecuteAsync(["doctor", "--machine"], new Dictionary<string, string>
+        {
+            [name] = value
+        });
+
+        await Assert.That(result.ExitCode).IsEqualTo(4);
+        await Assert.That(result.StandardError).IsEmpty();
+        await Assert.That(SetupCliMachineContractVerifier.Validate(result.StandardOutput)).IsEmpty();
+        string output = Encoding.UTF8.GetString(result.StandardOutput);
+        await Assert.That(output).DoesNotContain(name);
+        await Assert.That(output).DoesNotContain(value);
+    }
+
+    [Test]
     public async Task OversizedMachineArtifactProducesOneIoObjectWithoutStderr()
     {
         string path = Path.Combine(Path.GetTempPath(), "event-setup-bound-" + Guid.NewGuid().ToString("N"));
@@ -149,7 +210,9 @@ public sealed class SetupCliProgramTests
         finally { File.Delete(path); }
     }
 
-    private static async Task<ProcessResult> ExecuteAsync(IReadOnlyList<string> arguments)
+    private static async Task<ProcessResult> ExecuteAsync(
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         var info = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory,
             OperatingSystem.IsWindows() ? "Event.SetupAssistant.Cli.exe" : "Event.SetupAssistant.Cli"))
@@ -159,6 +222,11 @@ public sealed class SetupCliProgramTests
             UseShellExecute = false
         };
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
+        if (environment is not null)
+        {
+            foreach ((string name, string value) in environment)
+                info.Environment[name] = value;
+        }
         using var process = new Process { StartInfo = info, EnableRaisingEvents = true };
         var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         process.Exited += (_, _) => exited.TrySetResult();

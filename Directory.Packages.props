@@ -142,6 +142,8 @@
     <PackageVersion Include="SkiaSharp.HarfBuzz" Version="4.151.0" />
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.151.0" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.31.0.145097" />
+    <PackageVersion Include="Spectre.Console" Version="0.57.2" />
+    <PackageVersion Include="Spectre.Console.Cli" Version="0.56.1" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageVersion Include="Svix" Version="1.99.1" />
     <PackageVersion Include="Stripe.net" Version="52.3.0" />

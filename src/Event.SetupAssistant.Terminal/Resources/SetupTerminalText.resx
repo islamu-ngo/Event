@@ -64,7 +64,7 @@
   <data name="IdentityHeading" xml:space="preserve"><value>Validate a private operator-identity draft and save only through protected local output.</value></data>
   <data name="IdentityDocument" xml:space="preserve"><value>Identity JSON:</value></data>
   <data name="ValidateDraft" xml:space="preserve"><value>_Validate draft</value></data>
-  <data name="IdentityPrivateNotice" xml:space="preserve"><value>Private identity values are not repeated in status or logs.</value></data>
+  <data name="IdentityPrivateNotice" xml:space="preserve"><value>Private identity input is masked. Clipboard, context-menu and history commands are disabled; values are never repeated in status or logs.</value></data>
   <data name="IdentityValid" xml:space="preserve"><value>The identity draft is valid. Content digest:</value></data>
   <data name="IdentityInvalid" xml:space="preserve"><value>The identity draft is invalid.</value></data>
   <data name="InputFile" xml:space="preserve"><value>Input file:</value></data>

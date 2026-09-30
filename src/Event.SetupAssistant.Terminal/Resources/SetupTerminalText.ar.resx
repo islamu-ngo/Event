@@ -64,7 +64,7 @@
   <data name="IdentityHeading" xml:space="preserve"><value>تحقق من مسودة هوية مشغل خاصة واحفظها فقط عبر إخراج محلي محمي.</value></data>
   <data name="IdentityDocument" xml:space="preserve"><value>هوية JSON:</value></data>
   <data name="ValidateDraft" xml:space="preserve"><value>_تحقق من المسودة</value></data>
-  <data name="IdentityPrivateNotice" xml:space="preserve"><value>لا تكرر قيم الهوية الخاصة في الحالة أو السجلات.</value></data>
+  <data name="IdentityPrivateNotice" xml:space="preserve"><value>إدخال الهوية الخاصة محجوب. الحافظة والقائمة السياقية وسجل التراجع معطلة، ولا تُكرر القيم في الحالة أو السجلات.</value></data>
   <data name="IdentityValid" xml:space="preserve"><value>مسودة الهوية صالحة. بصمة المحتوى:</value></data>
   <data name="IdentityInvalid" xml:space="preserve"><value>مسودة الهوية غير صالحة.</value></data>
   <data name="InputFile" xml:space="preserve"><value>ملف الإدخال:</value></data>

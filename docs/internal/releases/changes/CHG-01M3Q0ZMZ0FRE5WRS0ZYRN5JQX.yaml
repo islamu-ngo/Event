@@ -12,7 +12,7 @@ Impacts:
   Security:
     Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
     Disposition: documented
-    Detail: Input edits invalidate prepared output; restricted exports use the shared protected writer and workspace changes clear private state.
+    Detail: Masked identity input blocks clipboard and history; focus follows navigation, which invalidates pending writes and clears private state.
   Migration:
     Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
     Disposition: not-applicable

@@ -231,7 +231,9 @@ public sealed class SetupTerminalGuiAdapterTests
 
     [Test]
     [NotInParallel]
-    public async Task NativeCloseAcceptCancelsInFlightWriteBeforeCommit()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NativeCloseOrNavigationCancelsInFlightWriteBeforeCommit(bool navigate)
     {
         if (!OperatingSystem.IsLinux())
             return;
@@ -280,7 +282,10 @@ public sealed class SetupTerminalGuiAdapterTests
                     cancelled.TrySetResult();
             };
 
-            await Assert.That(window.SubViews.OfType<Button>().Last().InvokeCommand(Command.Accept)).IsTrue();
+            if (navigate)
+                window.SelectWorkspace(SetupTerminalWorkspaceKind.Catalogue);
+            else
+                await Assert.That(window.SubViews.OfType<Button>().Last().InvokeCommand(Command.Accept)).IsTrue();
             await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             await Assert.That(secret.Count).IsEqualTo(0);

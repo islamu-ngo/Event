@@ -40,6 +40,7 @@ internal sealed class ManifestView : View
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _baseDirectory = baseDirectory ?? throw new ArgumentNullException(nameof(baseDirectory));
 
+        CanFocus = true;
         Width = Dim.Fill();
         Height = Dim.Fill();
 

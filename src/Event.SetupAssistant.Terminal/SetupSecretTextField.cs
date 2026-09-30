@@ -45,6 +45,15 @@ internal sealed class SetupSecretTextField : TextField
 
     internal event EventHandler? SensitiveCommandBlocked;
 
+    internal bool TryReplaceSensitiveInput(string value)
+    {
+        ClearSensitiveState();
+        if (!_secret.TryReplace(value))
+            return false;
+        RefreshMask();
+        return true;
+    }
+
     protected override bool OnKeyDownNotHandled(Key key)
     {
         if (key.IsCtrl || key.IsAlt || string.IsNullOrEmpty(key.AsGrapheme))

@@ -16,6 +16,7 @@ internal sealed class LegalDraftView : View
 
     internal LegalDraftView()
     {
+        CanFocus = true;
         Width = Dim.Fill();
         Height = Dim.Fill();
 

@@ -74,7 +74,9 @@ Run it in a real terminal at least 80 columns by 17 rows. Redirected input
 or output is rejected. Navigation separates environment editing, the
 catalogue, configuration manifests, tenant packages, legal previews and
 operator-identity drafts. Changing a form invalidates its prepared output;
-changing workspace clears private inputs and previews. Native exports use
+changing workspace clears private inputs and previews and cancels a pending
+environment write before publication. Identity input is masked; clipboard,
+context-menu and undo/redo history commands are disabled. Native exports use
 the protected, create-only file rules above. Exported drafts do not attest
 identity or apply anything to an instance.
 

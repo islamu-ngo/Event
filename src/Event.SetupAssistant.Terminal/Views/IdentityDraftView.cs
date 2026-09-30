@@ -1,7 +1,6 @@
 namespace ISLAMU.Event.SetupAssistant.Terminal.Views;
 
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using ISLAMU.Event.Setup.Artifacts;
 using ISLAMU.Event.Setup.Core;
@@ -13,7 +12,9 @@ using global::Terminal.Gui.Views;
 internal sealed class IdentityDraftView : View
 {
     private readonly string _baseDirectory;
-    private readonly TextField _document;
+    private readonly SetupTerminalSecretBuffer _identityInput =
+        new(OperatorIdentityManifestJson.MaximumBytes, urlSafeOnly: false);
+    private readonly SetupSecretTextField _document;
     private readonly TextField _fileName;
     private readonly Label _status;
     private readonly ProtectedArtifactWriter _writer;
@@ -24,6 +25,7 @@ internal sealed class IdentityDraftView : View
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _baseDirectory = baseDirectory ?? throw new ArgumentNullException(nameof(baseDirectory));
 
+        CanFocus = true;
         Width = Dim.Fill();
         Height = Dim.Fill();
 
@@ -41,12 +43,11 @@ internal sealed class IdentityDraftView : View
             Y = 3,
             Text = SetupTerminalText.Get("IdentityDocument")
         };
-        _document = new TextField
+        _document = new SetupSecretTextField(_identityInput)
         {
             X = 17,
             Y = 3,
-            Width = Dim.Fill(),
-            Text = "{}"
+            Width = Dim.Fill()
         };
         var fileLabel = new Label { X = 0, Y = 5, Text = SetupTerminalText.Get("OutputFile") };
         _fileName = new TextField
@@ -85,13 +86,24 @@ internal sealed class IdentityDraftView : View
             _status.Text = SetupTerminalText.Get("IdentityPrivateNotice");
             _status.SetNeedsDraw();
         };
+        _document.SensitiveCommandBlocked += (_, _) =>
+        {
+            _status.Text = SetupTerminalText.Get("IdentityPrivateNotice");
+            _status.SetNeedsDraw();
+        };
+        _document.InputRejected += (_, _) =>
+        {
+            ClearPreparedBytes();
+            _status.Text = SetupTerminalText.Get("IdentityInvalid");
+            _status.SetNeedsDraw();
+        };
         Add(heading, documentLabel, _document, fileLabel, _fileName, validate, save, _status);
     }
 
     internal string Document
     {
         get => _document.Text;
-        set => _document.Text = value;
+        set => _document.TryReplaceSensitiveInput(value);
     }
 
     internal string FileName
@@ -106,9 +118,15 @@ internal sealed class IdentityDraftView : View
     internal bool ValidateDraft()
     {
         ClearPreparedBytes();
+        if (_identityInput.Count == 0)
+        {
+            _status.Text = SetupTerminalText.Get("IdentityInvalid");
+            _status.SetNeedsDraw();
+            return false;
+        }
         try
         {
-            byte[] documentBytes = Encoding.UTF8.GetBytes(_document.Text);
+            byte[] documentBytes = _identityInput.CopyUtf8Bytes();
             try
             {
                 using JsonDocument parsed = JsonDocument.Parse(
@@ -162,7 +180,7 @@ internal sealed class IdentityDraftView : View
 
     internal void ClearPrivateState()
     {
-        _document.Text = string.Empty;
+        _document.ClearSensitiveState();
         ClearPreparedBytes();
         _status.Text = SetupTerminalText.Get("IdentityPrivateNotice");
         _status.SetNeedsDraw();
@@ -171,7 +189,10 @@ internal sealed class IdentityDraftView : View
     protected override void Dispose(bool disposing)
     {
         if (disposing)
+        {
             ClearPrivateState();
+            _identityInput.Dispose();
+        }
         base.Dispose(disposing);
     }
 

@@ -321,7 +321,13 @@ internal sealed class SetupTerminalWindow : Window
             return;
         ClearWorkspaceState(_activeWorkspace);
         _activeWorkspace = workspace;
+        if (workspace == SetupTerminalWorkspaceKind.Environment)
+            _workspace.Activate();
         ApplyViewportPolicy(Viewport.Size);
+        if (workspace == SetupTerminalWorkspaceKind.Environment)
+            _outputFileName.SetFocus();
+        else
+            _offlineViews[workspace].SetFocus();
     }
 
     private void ClearWorkspaceState(SetupTerminalWorkspaceKind workspace)
@@ -329,6 +335,7 @@ internal sealed class SetupTerminalWindow : Window
         switch (workspace)
         {
             case SetupTerminalWorkspaceKind.Environment:
+                _workspace.Deactivate();
                 ClearSecretField();
                 break;
             case SetupTerminalWorkspaceKind.Manifest:

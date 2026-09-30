@@ -18,6 +18,26 @@ using global::Terminal.Gui.Views;
 public sealed class SetupTerminalOfflineWorkflowTests
 {
     [Test]
+    public async Task IdentityInputIsMaskedAndCannotRestorePrivateHistory()
+    {
+        string marker = Guid.CreateVersion7().ToString("N");
+        using var view = new IdentityDraftView(new ProtectedArtifactWriter(), Path.GetTempPath())
+        {
+            Document = IdentityDocument(marker)
+        };
+        TextField input = view.SubViews.OfType<TextField>().First();
+        await Assert.That(input.Secret).IsTrue();
+        await Assert.That(input.Text).DoesNotContain(marker);
+        await Assert.That(view.ValidateDraft()).IsTrue();
+
+        foreach (Command command in new[] { Command.Copy, Command.Cut, Command.Paste, Command.Undo, Command.Redo, Command.Context })
+            await Assert.That(input.InvokeCommand(command)).IsTrue();
+        view.ClearPrivateState();
+        await Assert.That(input.InvokeCommand(Command.Undo)).IsTrue();
+        await Assert.That(input.Text).IsEmpty();
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task LocalFilesCanBeValidatedComparedAndPreparedForExport(bool tenant)
@@ -93,6 +113,10 @@ public sealed class SetupTerminalOfflineWorkflowTests
             || text.Contains("sign in", StringComparison.OrdinalIgnoreCase))).IsFalse();
         await Assert.That(typeof(SetupTerminalWindow).Assembly.GetReferencedAssemblies()
             .Any(reference => reference.Name?.Contains("SetupLive", StringComparison.Ordinal) == true)).IsFalse();
+        window.SelectWorkspace(SetupTerminalWorkspaceKind.IdentityDraft);
+        IdentityDraftView identity = Descendants(window).OfType<IdentityDraftView>().Single();
+        TextField input = identity.SubViews.OfType<TextField>().First();
+        await Assert.That(input.HasFocus).IsTrue();
     }
 
     [Test]

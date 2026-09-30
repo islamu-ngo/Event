@@ -14,6 +14,7 @@ internal sealed class CatalogueView : View
 
     internal CatalogueView()
     {
+        CanFocus = true;
         Width = Dim.Fill();
         Height = Dim.Fill();
 

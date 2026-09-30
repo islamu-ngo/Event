@@ -376,14 +376,14 @@ static void ValidateChangelogPublication(YamlMappingNode job, YamlSequenceNode s
     if (transportSteps.Length != 1 || PublicationNode(transportSteps[0], "if") is not null)
         throw new AdapterException("adapter_publication_inventory_contract_missing");
     string program = PublicationScalar(transportSteps[0], "run");
-    string[] commands = Regex.Replace(program, @"\\\r?\n\s*", " ").Split('\n')
+    string[] commands = Regex.Replace(program, @"\\\r?\n\s*", " ", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)).Split('\n')
         .Select(line => line.Trim()).Where(line =>
             line.StartsWith("\"$TRUSTED_LAUNCHER\" run-promoted sync-public-changelog ", StringComparison.Ordinal)).ToArray();
     if (commands.Length != 2 || commands.Any(command =>
             !command.Contains("--inventory \"$inputs/authorized-inventory.v1.json\"", StringComparison.Ordinal) ||
             !command.Contains("--retained-evidence \"$inputs/evidence\"", StringComparison.Ordinal) ||
             !command.Contains("--publication-base \"$PUBLICATION_BASE\"", StringComparison.Ordinal)) ||
-        commands.Count(command => Regex.IsMatch(command, @"(?:^|\s)--check(?:\s|$)")) != 1)
+        commands.Count(command => Regex.IsMatch(command, @"(?:^|\s)--check(?:\s|$)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) != 1)
         throw new AdapterException("adapter_publication_inventory_contract_missing");
 
     var retentionSteps = steps.Children.Cast<YamlMappingNode>()

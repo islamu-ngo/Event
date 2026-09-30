@@ -71,15 +71,13 @@ public sealed class ReleaseProviderAdapterScriptTests
         manifest.MutatePublicationWorkflow("github", yaml => yaml.Replace(
             "MANIFEST: docs/public/changelog/publication-manifest.v1.json", "MANIFEST: docs/public/changelog/unbound.json", StringComparison.Ordinal));
 
-        foreach (ProviderFixture fixture in new[] { inventory, evidence, check })
+        foreach (ScriptResult result in new[] { inventory, evidence, check }.Select(fixture => fixture.Run()))
         {
-            ScriptResult result = fixture.Run();
             await Assert.That(result.ExitCode).IsNotEqualTo(0);
             await Assert.That(result.Output).Contains("adapter_publication_inventory_contract_missing");
         }
-        foreach (ProviderFixture fixture in new[] { projection, manifest })
+        foreach (ScriptResult result in new[] { projection, manifest }.Select(fixture => fixture.Run()))
         {
-            ScriptResult result = fixture.Run();
             await Assert.That(result.ExitCode).IsNotEqualTo(0);
             await Assert.That(result.Output).Contains("adapter_publication_projection_paths_invalid");
         }
@@ -545,7 +543,8 @@ public sealed class ReleaseProviderAdapterScriptTests
             MutatePublicationWorkflow("github", yaml =>
             {
                 var stream = new YamlStream();
-                stream.Load(new StringReader(yaml));
+                using var reader = new StringReader(yaml);
+                stream.Load(reader);
                 var workflow = (YamlMappingNode)stream.Documents[0].RootNode;
                 var jobs = (YamlMappingNode)workflow.Children[new YamlScalarNode("jobs")];
                 mutate((YamlMappingNode)jobs.Children[new YamlScalarNode("release-publish")]);

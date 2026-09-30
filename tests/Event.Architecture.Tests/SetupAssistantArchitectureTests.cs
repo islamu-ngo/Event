@@ -94,6 +94,23 @@ public sealed class SetupAssistantArchitectureTests
 
     private static readonly string[] BlockedPackageTerms =
         ["TextMateSharp", "Avalonia", "Sharprompt"];
+    private static readonly HashSet<string> DesktopAvaloniaPackages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Avalonia", "Avalonia.Angle.Windows.Natives", "Avalonia.BuildServices",
+        "Avalonia.Desktop", "Avalonia.FreeDesktop", "Avalonia.FreeDesktop.AtSpi",
+        "Avalonia.FreeDesktop.DBus", "Avalonia.FreeDesktop.X11", "Avalonia.HarfBuzz",
+        "Avalonia.Native", "Avalonia.Remote.Protocol", "Avalonia.Skia",
+        "Avalonia.Themes.Fluent", "Avalonia.Win32", "Avalonia.X11"
+    };
+
+    private static bool IsApprovedDesktopPackage(string projectName, string packageName)
+    {
+        if (projectName is not ("Event.SetupAssistant.Desktop" or "Event.SetupAssistant.Desktop.Tests"))
+            return false;
+        return DesktopAvaloniaPackages.Contains(packageName)
+            || (projectName == "Event.SetupAssistant.Desktop.Tests"
+                && packageName is "Avalonia.Headless" or "Avalonia.Fonts.Inter");
+    }
 
     private static readonly string[] ForbiddenPresentationClosureTerms =
     [
@@ -171,10 +188,15 @@ public sealed class SetupAssistantArchitectureTests
             }
 
             string lockContent = await File.ReadAllTextAsync(lockPath);
-            violations.AddRange(BlockedPackageTerms
-                .Where(term => lockContent.Contains(term, StringComparison.OrdinalIgnoreCase))
-                .Select(term => $"blocked package term {term} in {relativeLockPath}"));
             using JsonDocument lockDocument = JsonDocument.Parse(lockContent);
+            string projectName = relativeLockPath.Split('/')[1];
+            foreach (JsonProperty framework in lockDocument.RootElement.GetProperty("dependencies").EnumerateObject())
+            foreach (JsonProperty package in framework.Value.EnumerateObject())
+            {
+                if (BlockedPackageTerms.Any(term => package.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    && !IsApprovedDesktopPackage(projectName, package.Name))
+                    violations.Add($"blocked package {package.Name} in {relativeLockPath}");
+            }
             if (FindJsonPropertyNames(lockDocument.RootElement).Contains(
                     "Terminal.Gui", StringComparer.OrdinalIgnoreCase))
                 violations.Add($"official Terminal.Gui package in {relativeLockPath}");
@@ -186,68 +208,22 @@ public sealed class SetupAssistantArchitectureTests
     }
 
     [Test]
-    public async Task UnreleasedDesktopMustRemainDisabledAndGraphAbsent()
+    public async Task DesktopTargetMustUseItsAuditedNativeBoundary()
     {
-        string[] disabledShells =
-        [
-            "src/Event.SetupAssistant.Desktop/Event.SetupAssistant.Desktop.csproj"
-        ];
-        var violations = new List<string>();
-        foreach (string relativePath in disabledShells)
-        {
-            string path = ContextSystemHelpers.RepoPath(
-                relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries));
-            XDocument project = XDocument.Load(path);
-            string? declared = project.Descendants()
-                .SingleOrDefault(element => element.Name.LocalName == "SetupTargetEnabled")?.Value;
-            if (!string.Equals(declared, "false", StringComparison.OrdinalIgnoreCase))
-                violations.Add($"SetupTargetEnabled is not false: {relativePath}");
-
-            ProcessResult evaluated = RunProcess(
-                "dotnet",
-                ["msbuild", path, "-getProperty:SetupTargetEnabled", "-nologo"],
-                ContextSystemHelpers.RepoPath());
-            if (evaluated.ExitCode != 0
-                || !string.Equals(evaluated.Output.Trim(), "false", StringComparison.OrdinalIgnoreCase))
-                violations.Add($"evaluated SetupTargetEnabled is not false: {relativePath}");
-        }
-
-        string sourceRoot = ContextSystemHelpers.RepoPath("src");
-        string[] targetProjectCanaries = ["Event.SetupAssistant.Avalonia"];
-        foreach (string target in targetProjectCanaries)
-        {
-            if (Directory.Exists(Path.Combine(sourceRoot, target)))
-                violations.Add($"disabled target project exists: {target}");
-        }
-
-        foreach (string projectPath in Directory.GetFiles(
-            sourceRoot,
-            "*.csproj",
-            SearchOption.AllDirectories).Where(path =>
-                Path.GetFileNameWithoutExtension(path).StartsWith(
-                    "Event.SetupAssistant",
-                    StringComparison.Ordinal)))
-        {
-            XDocument project = XDocument.Load(projectPath);
-            IEnumerable<string> graphIdentities = project.Descendants()
-                .Where(element => element.Name.LocalName is "PackageReference" or "ProjectReference")
-                .Select(element => element.Attribute("Include")?.Value ?? string.Empty);
-            violations.AddRange(graphIdentities
-                .Where(identity => BlockedPackageTerms.Skip(1).Any(term =>
-                    identity.Contains(term, StringComparison.OrdinalIgnoreCase)))
-                .Select(identity => $"disabled target reference exists: {identity}"));
-
-            string lockPath = Path.Combine(Path.GetDirectoryName(projectPath)!, "packages.lock.json");
-            using JsonDocument lockDocument = JsonDocument.Parse(File.ReadAllBytes(lockPath));
-            violations.AddRange(FindJsonPropertyNames(lockDocument.RootElement)
-                .Where(identity => BlockedPackageTerms.Skip(1).Any(term =>
-                    identity.Contains(term, StringComparison.OrdinalIgnoreCase)))
-                .Select(identity => $"disabled target lock node exists: {identity}"));
-        }
-
-        await Assert.That(violations).IsEmpty()
-            .Because("SA518-DISABLED-TARGET-BOUNDARY: Avalonia shared/browser/desktop targets must remain disabled, absent, and non-resolvable: "
-                + string.Join("; ", violations));
+        string path = ContextSystemHelpers.RepoPath(
+            "src", "Event.SetupAssistant.Desktop", "Event.SetupAssistant.Desktop.csproj");
+        XDocument project = XDocument.Load(path);
+        await Assert.That(project.Descendants("SetupTargetEnabled").Single().Value).IsEqualTo("true");
+        await Assert.That(project.Descendants("OutputType").Single().Value).IsEqualTo("WinExe");
+        await Assert.That(project.Descendants("SetupTargetRole").Single().Value).IsEqualTo("OfflineDesktop");
+        await Assert.That(project.Descendants("PackageReference")
+            .Select(element => element.Attribute("Include")!.Value)).IsEquivalentTo(
+            ["Avalonia", "Avalonia.Desktop", "Avalonia.Themes.Fluent"]);
+        ProcessResult evaluated = RunProcess(
+            "dotnet", ["msbuild", path, "-getProperty:SetupTargetEnabled", "-nologo"],
+            ContextSystemHelpers.RepoPath());
+        await Assert.That(evaluated.ExitCode).IsEqualTo(0);
+        await Assert.That(evaluated.Output.Trim()).IsEqualTo("true");
     }
 
     [Test]
@@ -720,9 +696,9 @@ public sealed class SetupAssistantArchitectureTests
         if (!enabledTargets.Select(Path.GetFileNameWithoutExtension)
                 .Order(StringComparer.Ordinal)
                 .SequenceEqual(
-                    new[] { "Event.SetupAssistant.Browser", "Event.SetupAssistant.Terminal" },
+                    new[] { "Event.SetupAssistant.Browser", "Event.SetupAssistant.Desktop", "Event.SetupAssistant.Terminal" },
                     StringComparer.Ordinal))
-            violations.Add("enabled human targets must be the public browser and offline terminal");
+            violations.Add("enabled human targets must be the public browser and independent native terminal and desktop");
         string? role = terminal.Descendants().SingleOrDefault(element =>
             element.Name.LocalName == "SetupTargetRole")?.Value;
         if (!string.Equals(role, "Terminal", StringComparison.Ordinal))
@@ -777,7 +753,8 @@ public sealed class SetupAssistantArchitectureTests
                 .ToArray();
             violations.AddRange(packages
                 .Where(package => BlockedPackageTerms.Any(term =>
-                    package.Contains(term, StringComparison.OrdinalIgnoreCase)))
+                    package.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    && !IsApprovedDesktopPackage(projectName, package))
                 .Select(package => $"blocked PackageReference {projectName}: {package}"));
             violations.AddRange(packages
                 .Where(package => string.Equals(
@@ -786,7 +763,8 @@ public sealed class SetupAssistantArchitectureTests
             if (projectName.EndsWith(".Tests", StringComparison.Ordinal))
             {
                 violations.AddRange(packages
-                    .Where(package => !ApprovedTestPackages.Contains(package, StringComparer.Ordinal))
+                    .Where(package => !ApprovedTestPackages.Contains(package, StringComparer.Ordinal)
+                        && !IsApprovedDesktopPackage(projectName, package))
                     .Select(package =>
                         $"unapproved test PackageReference {projectName}: {package}"));
             }

@@ -375,7 +375,7 @@ artifact validation, not deployment or external publication.
 
 All Setup lock files are tracked and discovered automatically by the
 recursive NuGet license-policy scan. Official `Terminal.Gui`, `TextMateSharp`,
-Avalonia, Sharprompt, and unapproved replacement GUI/TUI packages remain
+Sharprompt, and unapproved replacement GUI/TUI packages remain
 blocked. `ISLAMU.Terminal.Gui` `2.4.17-islamu.1` is the separately approved,
 MIT-preserving package built from the pinned official revision. CI verifies its
 recorded patch, package identity, final closure, SBOM, notices, and absence of
@@ -383,6 +383,14 @@ the grammar/editor graph. The exact
 YamlDotNet and CommunityToolkit graphs are pinned by architecture and lock-file
 ratchets. Every additional target requires its own dependency, behavior,
 publish and supported-host evidence.
+
+The audited Avalonia graph is admitted only in the desktop project and its
+focused tests. Headless test dependencies must remain absent from native
+published dependency manifests. The release-contract suite publishes each
+native target independently and checks project/package separation; desktop
+publication is restricted to the verified Linux x64 host. See
+[the dependency record](legal/dependencies/setup-assistant-ui.md) for the
+version-specific ANGLE file-license classification.
 
 `eng/setup-assistant/GenerateSetupAssistantRatchets.cs` owns the tracked browser
 capability, SetupLive capability, and frozen-contract JSON ratchets. CI runs only its non-mutating

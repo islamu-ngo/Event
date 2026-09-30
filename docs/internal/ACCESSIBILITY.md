@@ -54,6 +54,22 @@ uploads, file release, focus continuity and mobile RTL preview were exercised
 through the actual WebAssembly app. These checks do not certify every browser
 or assistive technology; retain the ordinary manual accessibility checklist.
 
+## Offline Setup Desktop
+
+The Avalonia shell uses named native controls, keyboard button access keys,
+polite status regions and a runtime RTL layout toggle. Its minimum window is
+720 by 520 device-independent units; scrollable content preserves access to
+larger forms. Private identity data stays in its input control and preparation
+buffer rather than public viewmodel properties.
+
+The packaged Linux x64 window, environment/manifest/identity tabs, protected
+Save, private-input clearing and minimum-size RTL layout were exercised on
+X11. A headless real-control test independently guards identity preparation
+and invalidation; its UI session is disposed off the UI thread to avoid
+joining that thread from itself. Headless assertions are not screen-reader
+certification. Arabic translation, braille and other native OS claims remain
+unverified and must not be inferred from the RTL toggle.
+
 ## Platform Rules
 
 ### PR-1: Page Shell Contract

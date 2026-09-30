@@ -31,7 +31,7 @@ Windows and macOS packages can inspect public catalogue data and validate
 local input, but cannot save files. The Terminal's protected Save is
 unavailable on those hosts. Neither package currently promises protected
 dotenv or identity export. The browser provides a smaller public-only
-workspace; the Desktop release is not yet enabled.
+workspace. The separate desktop release currently supports Linux x64 only.
 
 ## Publish from source
 
@@ -77,6 +77,40 @@ operator-identity drafts. Changing a form invalidates its prepared output;
 changing workspace clears private inputs and previews. Native exports use
 the protected, create-only file rules above. Exported drafts do not attest
 identity or apply anything to an instance.
+
+## Native desktop workspace
+
+Publish the independent Avalonia application for its verified host:
+
+```bash
+dotnet msbuild eng/setup-assistant/SetupAssistant.Release.proj \
+  -target:PublishSetupAssistant \
+  -property:SetupAssistantSurface=desktop \
+  -property:SetupAssistantRid=linux-x64 \
+  -property:SetupAssistantOutputRoot="$PWD/artifacts/setup-assistant"
+```
+
+Run `artifacts/setup-assistant/desktop/linux-x64/event-setup-desktop` from a
+private, owner-controlled working directory in an X11 or XWayland graphical
+session. Files are created in that launch directory and are never overwritten.
+The desktop release target refuses other RIDs until their native runtime and
+protected-output behavior have been verified.
+
+The three tabs prepare a standalone SQLite environment template, a local
+configuration manifest, or an operator-identity draft. Environment placeholders
+still require the operator's selected secret authority; preparation is not
+deployment readiness. Identity input is bounded to the shared 64 KiB UTF-8
+contract and is not copied into shared observable state.
+
+Prepare or validate before Save. Editing inputs invalidates prepared output;
+every save attempt consumes the preparation, including permission failures.
+Use **Clear private input** to clear an identity draft. Status text exposes
+codes and digests, not private content. The right-to-left layout toggle changes
+layout direction; it does not claim complete Arabic translation or
+assistive-technology certification.
+
+The desktop does not discover, authenticate to, or apply anything to an Event
+instance. Exported identities are local drafts, not verified identity assertions.
 
 ## Public browser workspace
 

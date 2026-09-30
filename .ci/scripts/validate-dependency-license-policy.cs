@@ -380,6 +380,11 @@ static class LicensePolicy
         ["Microsoft.VisualStudio.Azure.Containers.Tools.Targets"] = new("Microsoft-EULA", "build tooling exception; not shipped with runtime artifacts", true),
         ["NetArchTest.Rules"] = new("metadata-missing", "architecture-test dependency has no NuGet license metadata; keep visible until package metadata or replacement is chosen", true),
         ["Blazouter"] = new("MIT", "package uses license file metadata", false),
+        ["Avalonia.Angle.Windows.Natives"] = new(
+            "BSD-3-Clause",
+            "reviewed file-based license; preserve redistribution notices and non-endorsement terms; see docs/internal/legal/dependencies/setup-assistant-ui.md",
+            false,
+            "2.1.27548.20260419"),
         ["Blazouter.Server"] = new("MIT", "package uses license file metadata", false),
         ["Blazouter.WebAssembly"] = new("MIT", "package uses license file metadata", false),
         ["Bogus"] = new("MIT", "package uses license file metadata", false),

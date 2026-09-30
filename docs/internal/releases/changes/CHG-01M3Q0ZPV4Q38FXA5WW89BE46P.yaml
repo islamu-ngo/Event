@@ -1,0 +1,29 @@
+Change-Id: CHG-01M3Q0ZPV4Q38FXA5WW89BE46P
+Title: Offline native setup desktop
+Type: feat
+Scope: self-hosting
+Summary: A standalone Avalonia desktop prepares local environment, configuration and identity drafts with protected exports and no instance connection.
+Group: setup-assistant
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: documented
+    Detail: Bounded private identity input, generation-fenced single-use preparations and shared protected file output; no live client or public fallback.
+  Migration:
+    Reference: docs/internal/SETUP_ASSISTANT_ARCHITECTURE.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Desktop publishing selects an independent executable and admits only the host-proven linux-x64 RID.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/self-hosting/setup-assistant.md
+    Disposition: documented
+    Detail: Run in a private launch directory on a Linux graphical host; generated drafts require separate authorized platform administration.

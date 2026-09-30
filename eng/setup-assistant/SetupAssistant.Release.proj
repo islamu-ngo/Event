@@ -4,12 +4,15 @@
     <SetupAssistantSurface Condition="'$(SetupAssistantSurface)' == ''">cli</SetupAssistantSurface>
     <SetupAssistantAssemblyName Condition="'$(SetupAssistantSurface)' == 'cli'">Event.SetupAssistant.Cli</SetupAssistantAssemblyName>
     <SetupAssistantAssemblyName Condition="'$(SetupAssistantSurface)' == 'terminal'">Event.SetupAssistant.Terminal</SetupAssistantAssemblyName>
+    <SetupAssistantAssemblyName Condition="'$(SetupAssistantSurface)' == 'desktop'">Event.SetupAssistant.Desktop</SetupAssistantAssemblyName>
     <SetupAssistantProject>$(MSBuildThisFileDirectory)../../src/$(SetupAssistantAssemblyName)/$(SetupAssistantAssemblyName).csproj</SetupAssistantProject>
     <SetupAssistantOutputRoot Condition="'$(SetupAssistantOutputRoot)' == ''">$(MSBuildThisFileDirectory)../../artifacts/setup-assistant</SetupAssistantOutputRoot>
     <SetupAssistantExecutableName Condition="'$(SetupAssistantSurface)' == 'cli'">event-setup</SetupAssistantExecutableName>
     <SetupAssistantExecutableName Condition="'$(SetupAssistantSurface)' == 'terminal'">event-setup-terminal</SetupAssistantExecutableName>
+    <SetupAssistantExecutableName Condition="'$(SetupAssistantSurface)' == 'desktop'">event-setup-desktop</SetupAssistantExecutableName>
     <SetupAssistantPublishDirectory Condition="'$(SetupAssistantSurface)' == 'cli'">$(SetupAssistantOutputRoot)/$(SetupAssistantRid)/</SetupAssistantPublishDirectory>
     <SetupAssistantPublishDirectory Condition="'$(SetupAssistantSurface)' == 'terminal'">$(SetupAssistantOutputRoot)/terminal/$(SetupAssistantRid)/</SetupAssistantPublishDirectory>
+    <SetupAssistantPublishDirectory Condition="'$(SetupAssistantSurface)' == 'desktop'">$(SetupAssistantOutputRoot)/desktop/$(SetupAssistantRid)/</SetupAssistantPublishDirectory>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
@@ -22,18 +25,21 @@
 
   <ItemGroup>
     <SetupAssistantRuntimeIdentifier Include="linux-x64" />
-    <SetupAssistantRuntimeIdentifier Include="linux-arm64" />
-    <SetupAssistantRuntimeIdentifier Include="osx-arm64" />
-    <SetupAssistantRuntimeIdentifier Include="win-x64" />
+    <SetupAssistantRuntimeIdentifier Include="linux-arm64" Condition="'$(SetupAssistantSurface)' != 'desktop'" />
+    <SetupAssistantRuntimeIdentifier Include="osx-arm64" Condition="'$(SetupAssistantSurface)' != 'desktop'" />
+    <SetupAssistantRuntimeIdentifier Include="win-x64" Condition="'$(SetupAssistantSurface)' != 'desktop'" />
   </ItemGroup>
 
   <Target Name="ValidateSetupAssistantRelease">
     <Error
-      Condition="'$(SetupAssistantSurface)' != 'cli' and '$(SetupAssistantSurface)' != 'terminal'"
+      Condition="'$(SetupAssistantSurface)' != 'cli' and '$(SetupAssistantSurface)' != 'terminal' and '$(SetupAssistantSurface)' != 'desktop'"
       Text="Unsupported Setup Assistant surface '$(SetupAssistantSurface)'." />
     <Error
       Condition="'$(SetupAssistantRid)' != '' and '$(SetupAssistantRid)' != 'linux-x64' and '$(SetupAssistantRid)' != 'linux-arm64' and '$(SetupAssistantRid)' != 'osx-arm64' and '$(SetupAssistantRid)' != 'win-x64'"
       Text="Unsupported Setup Assistant runtime identifier '$(SetupAssistantRid)'." />
+    <Error
+      Condition="'$(SetupAssistantSurface)' == 'desktop' and '$(SetupAssistantRid)' != '' and '$(SetupAssistantRid)' != 'linux-x64'"
+      Text="Desktop releases are limited to the verified linux-x64 host." />
     <Error
       Condition="'$(SelfContained)' != 'true' or '$(PublishSingleFile)' != 'true' or '$(UseAppHost)' != 'true'"
       Text="Setup Assistant releases must be standalone single-file executables." />
@@ -41,7 +47,7 @@
       Condition="'$(PublishTrimmed)' != 'false'"
       Text="Setup Assistant trimming is disabled until the command surface has a dedicated trimming contract." />
     <Error
-      Condition="('$(SetupAssistantSurface)' == 'cli' and '$(SetupAssistantExecutableName)' != 'event-setup') or ('$(SetupAssistantSurface)' == 'terminal' and '$(SetupAssistantExecutableName)' != 'event-setup-terminal')"
+      Condition="('$(SetupAssistantSurface)' == 'cli' and '$(SetupAssistantExecutableName)' != 'event-setup') or ('$(SetupAssistantSurface)' == 'terminal' and '$(SetupAssistantExecutableName)' != 'event-setup-terminal') or ('$(SetupAssistantSurface)' == 'desktop' and '$(SetupAssistantExecutableName)' != 'event-setup-desktop')"
       Text="The Setup Assistant release executable name is part of the operator contract." />
   </Target>
 
@@ -81,11 +87,9 @@
     <MSBuild
       Projects="$(SetupAssistantProject)"
       Targets="Restore"
-      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);MSBuildProjectExtensionsPath=obj/setup-assistant-release/$(SetupAssistantRid)/;RestorePackagesWithLockFile=true;RestoreLockedMode=false;NuGetLockFilePath=obj/setup-assistant-release/$(SetupAssistantRid)/packages.lock.json" />
-    <MSBuild
-      Projects="$(SetupAssistantProject)"
-      Targets="Publish"
-      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);MSBuildProjectExtensionsPath=obj/setup-assistant-release/$(SetupAssistantRid)/;PublishSingleFile=$(PublishSingleFile);PublishTrimmed=$(PublishTrimmed);EnableCompressionInSingleFile=$(EnableCompressionInSingleFile);IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract);UseAppHost=$(UseAppHost);DebugSymbols=$(DebugSymbols);DebugType=$(DebugType);PublishDir=$(SetupAssistantPublishDirectory);NoRestore=true" />
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(SetupAssistantRid);SelfContained=$(SelfContained);RestorePackagesWithLockFile=true;RestoreLockedMode=false;NuGetLockFilePath=obj/setup-assistant-release/$(SetupAssistantRid)/packages.lock.json" />
+    <Exec
+      Command="dotnet publish &quot;$(SetupAssistantProject)&quot; --no-restore --configuration &quot;$(Configuration)&quot; --runtime &quot;$(SetupAssistantRid)&quot; --self-contained $(SelfContained) --output &quot;$(SetupAssistantPublishDirectory)&quot; -p:PublishSingleFile=$(PublishSingleFile) -p:PublishTrimmed=$(PublishTrimmed) -p:EnableCompressionInSingleFile=$(EnableCompressionInSingleFile) -p:IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract) -p:UseAppHost=$(UseAppHost) -p:DebugSymbols=$(DebugSymbols) -p:DebugType=$(DebugType)" />
     <PropertyGroup>
       <_SetupAssistantExecutableExtension Condition="'$(SetupAssistantRid)' == 'win-x64'">.exe</_SetupAssistantExecutableExtension>
       <_SetupAssistantPublishedExecutable>$(SetupAssistantPublishDirectory)$(SetupAssistantAssemblyName)$(_SetupAssistantExecutableExtension)</_SetupAssistantPublishedExecutable>

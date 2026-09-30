@@ -1,6 +1,8 @@
 namespace Event.Architecture.Tests;
 
 using System.Diagnostics;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
@@ -12,11 +14,13 @@ public sealed class SetupAssistantReleaseTests
     private static readonly string[] ForbiddenReleaseTerms =
         ["Avalonia", "Terminal.Gui", "CommunityToolkit.Mvvm", "OpenTelemetry",
             "ApplicationInsights", "Sentry", "NewRelic", "Datadog", "Telemetry",
-            "SetupLive", "Explore.Blazor", "Explore.API", "Refit", "RestSharp"];
+            "SetupLive", "Explore.Blazor", "Explore.API", "Refit", "RestSharp",
+            "Avalonia.Headless", "Avalonia.Fonts.Inter", "TUnit", "bunit"];
 
     [Test]
     [Arguments("cli", "event-setup")]
     [Arguments("terminal", "event-setup-terminal")]
+    [Arguments("desktop", "event-setup-desktop")]
     public async Task ReleaseProject_EvaluatesExactStandaloneRuntimeMatrix(string surface, string executable)
     {
         string contractPath = Path.Combine(
@@ -49,7 +53,7 @@ public sealed class SetupAssistantReleaseTests
                 .ToArray();
 
             await Assert.That(runtimeIdentifiers)
-                .IsEquivalentTo(ExpectedRuntimeIdentifiers);
+                .IsEquivalentTo(surface == "desktop" ? ["linux-x64"] : ExpectedRuntimeIdentifiers);
             await Assert.That(root.GetProperty("selfContained").GetBoolean()).IsTrue();
             await Assert.That(root.GetProperty("publishSingleFile").GetBoolean()).IsTrue();
             await Assert.That(root.GetProperty("publishTrimmed").GetBoolean()).IsFalse();
@@ -74,6 +78,7 @@ public sealed class SetupAssistantReleaseTests
     [NotInParallel]
     [Arguments("cli", "event-setup")]
     [Arguments("terminal", "event-setup-terminal")]
+    [Arguments("desktop", "event-setup-desktop")]
     public async Task HostPublish_ProducesIndependentOfflineNativeTarget(string surface, string executable)
     {
         string hostRuntimeIdentifier = RuntimeInformation.RuntimeIdentifier;
@@ -98,6 +103,12 @@ public sealed class SetupAssistantReleaseTests
                     "-nologo",
                     "-verbosity:minimal"
                 ]);
+            if (surface == "desktop" && hostRuntimeIdentifier != "linux-x64")
+            {
+                await Assert.That(result.ExitCode).IsNotEqualTo(0)
+                    .Because("desktop publication must refuse hosts without release evidence");
+                return;
+            }
             await Assert.That(result.ExitCode).IsEqualTo(0)
                 .Because(result.Output);
 
@@ -113,8 +124,12 @@ public sealed class SetupAssistantReleaseTests
                 .Where(name => name is not null)
                 .Cast<string>()
                 .ToArray();
-            IEnumerable<string> forbiddenTerms = surface == "cli" ? ForbiddenReleaseTerms
-                : ForbiddenReleaseTerms.Where(term => term is not "Terminal.Gui" and not "CommunityToolkit.Mvvm");
+            IEnumerable<string> forbiddenTerms = surface switch
+            {
+                "terminal" => ForbiddenReleaseTerms.Where(term => term is not "Terminal.Gui" and not "CommunityToolkit.Mvvm"),
+                "desktop" => ForbiddenReleaseTerms.Where(term => term is not "Avalonia" and not "CommunityToolkit.Mvvm"),
+                _ => ForbiddenReleaseTerms
+            };
             string[] forbidden = files.Where(file => forbiddenTerms.Any(term =>
                     file.Contains(term, StringComparison.OrdinalIgnoreCase)))
                 .ToArray();
@@ -123,7 +138,12 @@ public sealed class SetupAssistantReleaseTests
                 ".dll", StringComparison.OrdinalIgnoreCase))).IsEmpty()
                 .Because("single-file publishing must not leave a managed assembly sidecar");
 
-            string project = surface == "cli" ? "Event.SetupAssistant.Cli" : "Event.SetupAssistant.Terminal";
+            string project = surface switch
+            {
+                "desktop" => "Event.SetupAssistant.Desktop",
+                "terminal" => "Event.SetupAssistant.Terminal",
+                _ => "Event.SetupAssistant.Cli"
+            };
             using JsonDocument dependencies = JsonDocument.Parse(await File.ReadAllBytesAsync(
                 ContextSystemHelpers.RepoPath("src", project, "bin", "Release",
                     "net10.0", hostRuntimeIdentifier, project + ".deps.json")));
@@ -139,11 +159,26 @@ public sealed class SetupAssistantReleaseTests
                      "Spectre.Console.Cli/0.56.1", "YamlDotNet/18.1.0"]);
             string[] expectedProjects = surface == "cli"
                 ? ["Event.SetupAssistant.Cli", "Event.Setup.Core", "Event.Setup.Artifacts", "Event.Wire.Contracts"]
-                : ["Event.SetupAssistant.Terminal", "Event.SetupAssistant", "Event.Setup.Core",
+                : [project, "Event.SetupAssistant", "Event.Setup.Core",
                    "Event.Setup.Artifacts", "Event.Wire.Contracts"];
             await Assert.That(libraries
                 .Where(library => library.Value.GetProperty("type").GetString() == "project")
                 .Select(library => library.Name.Split('/')[0])).IsEquivalentTo(expectedProjects);
+            if (surface == "desktop")
+            {
+                using FileStream assembly = File.OpenRead(ContextSystemHelpers.RepoPath(
+                    "src", project, "bin", "Release", "net10.0", hostRuntimeIdentifier, project + ".dll"));
+                using var portableExecutable = new PEReader(assembly);
+                MetadataReader metadata = portableExecutable.GetMetadataReader();
+                TypeDefinition application = metadata.TypeDefinitions
+                    .Select(metadata.GetTypeDefinition)
+                    .Single(type => metadata.GetString(type.Name) == "App"
+                        && metadata.GetString(type.Namespace) == "ISLAMU.Event.SetupAssistant.Desktop");
+                await Assert.That(application.GetMethods()
+                    .Select(metadata.GetMethodDefinition)
+                    .Any(method => metadata.GetString(method.Name).Contains("XamlIl", StringComparison.Ordinal)))
+                    .IsTrue().Because("the published desktop must contain compiled application XAML");
+            }
         }
         finally
         {

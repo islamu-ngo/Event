@@ -20,7 +20,7 @@ backend capabilities; none is referenced by the offline product targets.
 | `Event.SetupAssistant.Cli` | Deterministic command parsing, explicit I/O, machine JSON, and exit codes | Core and Artifacts |
 | `Event.SetupAssistant.Terminal` | Interactive operator workflow and protected secret entry | Shared presentation, Core and Artifacts |
 | `Event.SetupAssistant.Browser` | Static public catalogue and closed public-template validation | Core and Blazor WebAssembly; no native writer |
-| `Event.SetupAssistant.Desktop` | Disabled contract shell; no separate writer implementation | Shared presentation and Artifacts |
+| `Event.SetupAssistant.Desktop` | Offline Avalonia environment, manifest and identity preparation | Shared presentation, Core and Artifacts |
 | `Event.SetupAssistant` | Framework-neutral presentation state | Core |
 | `Event.SetupAssistant.SetupLive` | Ephemeral transport adapter for server-issued live-control affordances | Generated client and Core contracts |
 | Configuration import application services | Protected upload, preview binding, validation, atomic apply, and rollback evidence | Domain and repository contracts |
@@ -72,8 +72,8 @@ to the current user and justified OS principals, plus reparse, race and
 cleanup invariants. macOS requires its own native host evidence; Linux
 mode tests do not prove either platform. The host CI jobs currently test
 refusal and public output only; they are not permission-support evidence.
-The public browser does not reference this adapter. Desktop activation
-remains separate work.
+The public browser does not reference this adapter. Native desktop Save uses
+the same adapter and never falls back to a public destination.
 
 The shared adapter's implementation is repository-native. Its externally
 constrained elements are only the Linux `openat`, `open` (`O_TMPFILE`),
@@ -109,6 +109,19 @@ Same-origin static boot acquisition is the only required network activity.
 There is no application HTTP client registration, API route, service worker,
 browser persistence or private identity export. First-load hosting and
 offline-relaunch limits belong to the public operator guide.
+
+The desktop keeps prepared bytes private to each workflow. Shared presentation
+generations and input revisions fence late completion; saves consume a
+preparation on both success and failure. Core supplies composition, manifest
+formatting and identity validation. The default desktop environment explicitly
+binds SQLite rather than relying on the catalogue's PostgreSQL safe default.
+The identity control and UTF-8 boundary both enforce the shared size limit.
+
+The desktop directly references Avalonia's XAML build integration, not just
+the runtime metapackage. Native publishing runs in a fresh process after
+restore and uses SDK-default absolute import paths. Its release contract
+currently admits only `linux-x64`. Test-only headless/font packages are
+excluded from the shipped graph.
 
 ## Executable command contract
 

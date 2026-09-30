@@ -158,6 +158,25 @@ public sealed class ReleaseArtifactPolicyTests
     }
 
     [Test]
+    public async Task MaximumLengthIdentifierDoesNotRescanEverySuffix()
+    {
+        string identifier = new('a', ReleaseArtifactPolicy.MaximumFieldUtf8Bytes);
+        UntrustedTextResult result = ReleaseArtifactPolicy.EscapeUntrustedMarkdown(identifier);
+
+        await Assert.That(result.IsValid).IsTrue();
+        await Assert.That(result.Text).IsEqualTo(identifier);
+    }
+
+    [Test]
+    public async Task MaximumLengthEmailLocalPartRemainsRejected()
+    {
+        const string domain = "@example.invalid";
+        string email = new string('a', ReleaseArtifactPolicy.MaximumFieldUtf8Bytes - domain.Length) + domain;
+
+        await Assert.That(ReleaseArtifactPolicy.EscapeUntrustedMarkdown(email).IsValid).IsFalse();
+    }
+
+    [Test]
     public async Task DeterministicEnvironmentIsExplicitAndDoesNotRepurposeHome()
     {
         IReadOnlyDictionary<string, string> environment = ReleaseArtifactPolicy.CreateDeterministicEnvironment("/isolated/release");

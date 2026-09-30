@@ -112,9 +112,8 @@ public sealed class ReleaseProviderAdapterScriptTests
         ScriptResult commandsResult = commentedCommands.Run();
         await Assert.That(commandsResult.ExitCode).IsNotEqualTo(0);
         await Assert.That(commandsResult.Output).Contains("adapter_publication_inventory_contract_missing");
-        foreach (ProviderFixture fixture in new[] { missingManifest, optionalRetention })
+        foreach (ScriptResult result in new[] { missingManifest, optionalRetention }.Select(fixture => fixture.Run()))
         {
-            ScriptResult result = fixture.Run();
             await Assert.That(result.ExitCode).IsNotEqualTo(0);
             await Assert.That(result.Output).Contains("adapter_publication_manifest_retention_missing");
         }
@@ -145,9 +144,8 @@ public sealed class ReleaseProviderAdapterScriptTests
             environment.Children[new YamlScalarNode("TRUSTED_LAUNCHER")] = new YamlScalarNode("${{ inputs.launcher }}");
         });
 
-        foreach (ProviderFixture fixture in new[] { inlineEvent, candidateRef })
+        foreach (ScriptResult result in new[] { inlineEvent, candidateRef }.Select(fixture => fixture.Run()))
         {
-            ScriptResult result = fixture.Run();
             await Assert.That(result.ExitCode).IsNotEqualTo(0);
             await Assert.That(result.Output).Contains("adapter_publication_untrusted_origin");
         }

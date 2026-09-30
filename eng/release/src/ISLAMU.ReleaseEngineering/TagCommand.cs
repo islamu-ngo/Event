@@ -537,7 +537,10 @@ public static class TagCommand
             deadline.Cancel();
             if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(); }
             try { Task.WhenAll(stdout, stderr).GetAwaiter().GetResult(); }
-            catch (Exception exception) when (exception is IOException or OperationCanceledException) { }
+            catch (Exception exception) when (exception is IOException or OperationCanceledException)
+            {
+                Trace.TraceWarning("release_tag_process_cleanup_interrupted:{0}", exception.GetType().Name);
+            }
         }
 
         async Task<string> ReadOutput(StreamReader reader)

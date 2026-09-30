@@ -220,13 +220,18 @@ public sealed class SyncPublicChangelogTests
             fixture.B, fixture.FirstTagObject, fixture.FirstReleaseDirectory);
         WriteInventory(inventoryPath, [first]);
         using var interruptedOutput = new StringWriter();
+        bool interrupted = false;
         try
         {
             SyncPublicChangelogCommand.Run(Arguments(inventoryPath, fixture.RepositoryPath), interruptedOutput,
                 fixture.RepositoryPath, new PinnedInventoryAuthority(Digest(File.ReadAllBytes(inventoryPath))),
                 _ => throw new PublicationInterruptedException());
         }
-        catch (PublicationInterruptedException) { }
+        catch (PublicationInterruptedException)
+        {
+            interrupted = true;
+        }
+        await Assert.That(interrupted).IsTrue();
         string transactionPath = Path.Combine(changelog, ".publication-transaction.v1.json");
         byte[] transaction = File.ReadAllBytes(transactionPath);
         string pagePath = Path.Combine(changelog, "README.md");

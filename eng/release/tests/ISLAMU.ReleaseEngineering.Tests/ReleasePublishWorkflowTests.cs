@@ -73,15 +73,14 @@ public sealed class ReleasePublishWorkflowTests
     [Test]
     public async Task EveryExecutedBashProgramHasValidSyntax()
     {
-        int checkedPrograms = 0;
-        foreach (YamlMappingNode step in Steps().Where(step => step.Children.ContainsKey(new YamlScalarNode("run"))))
+        ProcessResult[] results = await Task.WhenAll(Steps()
+            .Where(step => step.Children.ContainsKey(new YamlScalarNode("run")))
+            .Select(step => RunBash(Text(step, "run"), syntaxOnly: true)));
+        foreach (ProcessResult result in results)
         {
-            YamlNode node = step.Children[new YamlScalarNode("run")];
-            ProcessResult result = await RunBash(((YamlScalarNode)node).Value!, syntaxOnly: true);
             await Assert.That(result.ExitCode).IsEqualTo(0).Because(result.Error);
-            checkedPrograms++;
         }
-        await Assert.That(checkedPrograms).IsGreaterThanOrEqualTo(4);
+        await Assert.That(results.Length).IsGreaterThanOrEqualTo(4);
     }
 
     [Test]
@@ -578,7 +577,10 @@ public sealed class ReleasePublishWorkflowTests
             timeout.Cancel();
             listener.Stop();
             try { await server; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+            {
+                await Assert.That(server.IsCanceled).IsTrue();
+            }
             Directory.Delete(root, recursive: true);
         }
 

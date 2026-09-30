@@ -304,7 +304,10 @@ public static class AuthorizedInventoryPolicy
             cancellation.Cancel();
             if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(); }
             try { Task.WhenAll(output, error).GetAwaiter().GetResult(); }
-            catch (Exception exception) when (exception is IOException or OperationCanceledException or InventoryException) { }
+            catch (Exception exception) when (exception is IOException or OperationCanceledException or InventoryException)
+            {
+                Trace.TraceWarning("inventory_process_cleanup_interrupted:{0}", exception.GetType().Name);
+            }
         }
 
         async Task<byte[]> ReadOutput(Stream stream)
@@ -330,7 +333,7 @@ public static class AuthorizedInventoryPolicy
     private static string ResolveEvidencePath(string root, string relative)
     {
         ValidateRelativePath(relative);
-        string full = Path.GetFullPath(Path.Combine(root, relative));
+        string full = Path.GetFullPath(relative, root);
         for (string? current = full; current is not null; current = Path.GetDirectoryName(current))
         {
             if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)

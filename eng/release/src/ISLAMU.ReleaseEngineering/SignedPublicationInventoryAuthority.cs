@@ -134,7 +134,10 @@ internal sealed class SignedPublicationInventoryAuthority(
             deadline.Cancel();
             if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(); }
             try { Task.WhenAll(stdin, stdout, stderr).GetAwaiter().GetResult(); }
-            catch (Exception exception) when (exception is IOException or OperationCanceledException) { }
+            catch (Exception exception) when (exception is IOException or OperationCanceledException)
+            {
+                Trace.TraceWarning("publication_signature_cleanup_interrupted:{0}", exception.GetType().Name);
+            }
         }
 
         async Task WriteInput()

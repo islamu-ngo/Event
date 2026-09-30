@@ -35,6 +35,8 @@ internal static class SetupCliCommandRegistry
         app.Configure(configuration =>
         {
             configuration.SetApplicationName(SetupCliExecutableMarker.ExecutableName);
+            configuration.ConfigureConsole(console);
+            configuration.PropagateExceptions();
             foreach (SetupCliFamilyDescriptor family in Families)
             {
                 if (family.Name == "doctor")

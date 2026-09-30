@@ -8,6 +8,23 @@ namespace ISLAMU.SetupAssistant.Cli.Tests;
 public sealed class SetupCliProgramTests
 {
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task FrameworkParseFailureCannotDiscloseInputPaths(bool machine)
+    {
+        string marker = Guid.CreateVersion7().ToString("N");
+        ProcessResult result = await ExecuteAsync(
+            ["manifest", "diff", "--input", $"/synthetic/{marker}.json",
+             "--baseline", "-x", machine ? "--machine" : "--text"]);
+
+        await Assert.That(Encoding.UTF8.GetString(result.StandardOutput)).DoesNotContain(marker);
+        await Assert.That(Encoding.UTF8.GetString(result.StandardError)).DoesNotContain(marker);
+        await Assert.That(result.ExitCode).IsEqualTo(64);
+        if (machine)
+            await Assert.That(SetupCliMachineContractVerifier.Validate(result.StandardOutput)).IsEmpty();
+    }
+
+    [Test]
     public async Task RestrictedEnvironmentCannotReachExecutableStandardOutput()
     {
         ProcessResult result = await ExecuteAsync(["env", "render", "--output", "-"]);

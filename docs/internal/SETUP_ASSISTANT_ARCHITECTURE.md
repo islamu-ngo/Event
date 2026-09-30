@@ -144,8 +144,10 @@ the checked schema at `schemas/event-setup-command-v1.schema.json`; the schema
 generator, CLI tests, agent skill, and operator documentation must converge on
 that compiled command metadata rather than plan prose.
 
-Bounded argument preflight rejects hostile values before framework
-diagnostics can echo them. Help does not require operational files,
+Bounded argument preflight rejects hostile values. Spectre uses the owned
+console and propagates parser failures to a value-safe boundary; framework
+diagnostic buffers are discarded rather than forwarded. Parse failures
+preserve the single machine envelope and usage exit code. Help does not require operational files,
 destinations or revision values, but still observes the confidentiality
 boundary. Human help and results use Spectre.Console without interactive
 prompts; machine serialization bypasses rich rendering entirely. The

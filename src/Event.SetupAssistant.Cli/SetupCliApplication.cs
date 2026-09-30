@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text;
 using ISLAMU.Event.SetupAssistant.Cli.Commands;
 using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;
 
@@ -35,11 +36,16 @@ public sealed class SetupCliApplication
             FlushHuman(invocation, runtime.Command ?? preflight.Command, text);
             return runtime.Exit ?? (SetupCliExitCode)exit;
         }
+        catch (CommandParseException)
+        {
+            return Emit(invocation, preflight.Command,
+                SetupCliResults.Failure(SetupCliExitCode.Usage, "arguments-invalid"), console, text);
+        }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             return Emit(invocation, preflight.Command, SetupCliResults.Failure(SetupCliExitCode.Io, "io-failed"), console, text);
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or JsonException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or JsonException or CommandAppException)
         {
             return Emit(invocation, preflight.Command, SetupCliResults.Failure(SetupCliExitCode.Internal, "internal-failed"), console, text);
         }
@@ -83,6 +89,7 @@ public sealed class SetupCliApplication
         IAnsiConsole console,
         StringWriter text)
     {
+        text.GetStringBuilder().Clear();
         if (command.Machine)
             SetupCliMachineOutput.Emit(invocation, command, result);
         else

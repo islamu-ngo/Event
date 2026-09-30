@@ -460,6 +460,14 @@ The signature is a human authorization step, not a publisher-generated key.
 Initialize the first empty inventory explicitly during the reviewed trust
 bootstrap; an empty inventory is not publishable.
 
+Verification permits up to 1,024 retained entries, with a ten-second per-entry
+ceiling inside a five-minute complete-inventory deadline. The independently
+launched command is capped at six minutes. The publication job allows
+45 minutes for up to three fresh-snapshot attempts, each generating and
+checking the complete projection, plus bounded transport retries. Cancellation
+still propagates through signature verification, Git processes and file reads;
+larger inventories do not receive unbounded execution time.
+
 Use the independently promoted bundle to verify every pinned tag and retained
 evidence. Rebuild from the complete inventory and last accepted manifest;
 previously accepted identities cannot disappear. Missing authorization/evidence,
@@ -548,8 +556,9 @@ of the disposable proposal branch does not destroy recovery evidence.
 
 Retain the publication manifest, input-set/projection digests, expected/actual
 acceptance and mirror commits, attempt, bounded diagnostic and receipts outside
-expiring CI artifacts. Keep `verified`, `publication-pending`,
-`publication-delivered`, `publication-failed` and `publication-drift` distinct.
+expiring CI artifacts. The `publication-receipt.v1` states are `verified`,
+`pending`, `delivered` and `drift`. Transport or verification failures retain
+the `pending` state with a bounded `reason`; there is no separate `failed` state.
 Acceptance or mirror push alone is not delivery; delivery requires observation
 of the actual GitBook content. Receipts are non-authoritative publication
 metadata and contain no credentials, contributor identity or restricted prose.

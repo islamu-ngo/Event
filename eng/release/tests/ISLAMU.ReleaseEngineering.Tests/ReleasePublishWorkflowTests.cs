@@ -43,11 +43,20 @@ public sealed class ReleasePublishWorkflowTests
     }
 
     [Test]
+    public async Task WorkflowDeadlineAccommodatesAllProjectionAttempts()
+    {
+        int timeoutMinutes = int.Parse(Text(Job(), "timeout-minutes"), System.Globalization.CultureInfo.InvariantCulture);
+        TimeSpan maximumProjectionTime = PublicationInventoryVerificationBudget.PromotedProcessTimeout * 6;
+
+        await Assert.That(TimeSpan.FromMinutes(timeoutMinutes)).IsGreaterThan(maximumProjectionTime);
+    }
+
+    [Test]
     public async Task ExternalActionsArePinnedAndCheckoutNeverPersistsCredentials()
     {
-        foreach (YamlMappingNode step in Steps())
+        foreach (YamlMappingNode step in Steps().Where(step => step.Children.ContainsKey(new YamlScalarNode("uses"))))
         {
-            if (!step.Children.TryGetValue(new YamlScalarNode("uses"), out YamlNode? node)) continue;
+            YamlNode node = step.Children[new YamlScalarNode("uses")];
             string action = ((YamlScalarNode)node).Value!;
             string[] pieces = action.Split('@');
             await Assert.That(pieces.Length).IsEqualTo(2);
@@ -65,9 +74,9 @@ public sealed class ReleasePublishWorkflowTests
     public async Task EveryExecutedBashProgramHasValidSyntax()
     {
         int checkedPrograms = 0;
-        foreach (YamlMappingNode step in Steps())
+        foreach (YamlMappingNode step in Steps().Where(step => step.Children.ContainsKey(new YamlScalarNode("run"))))
         {
-            if (!step.Children.TryGetValue(new YamlScalarNode("run"), out YamlNode? node)) continue;
+            YamlNode node = step.Children[new YamlScalarNode("run")];
             ProcessResult result = await RunBash(((YamlScalarNode)node).Value!, syntaxOnly: true);
             await Assert.That(result.ExitCode).IsEqualTo(0).Because(result.Error);
             checkedPrograms++;
@@ -291,6 +300,26 @@ public sealed class ReleasePublishWorkflowTests
         ProcessResult repeatDelivery = await fixture.Reconcile();
         await Assert.That(repeatDelivery.ExitCode).IsEqualTo(0).Because(repeatDelivery.Output + repeatDelivery.Error);
         await Assert.That(await fixture.RemoteOid("docs/publication-receipts")).IsEqualTo(ledger);
+    }
+
+    [Test]
+    public async Task ClosedUnmergedProposalIsReplacedByAnOpenProposal()
+    {
+        using var fixture = await TransportFixture.Create(accepted: false);
+        string originalHead = fixture.ProposalHead;
+        string pullPath = Path.Combine(fixture.Root, "pull.json");
+        JsonNode closed = JsonNode.Parse(File.ReadAllText(pullPath))!;
+        closed["state"] = "closed";
+        File.WriteAllText(pullPath, closed.ToJsonString());
+
+        ProcessResult result = await fixture.Execute("propose");
+
+        await Assert.That(result.ExitCode).IsEqualTo(0).Because(result.Output + result.Error);
+        JsonNode reopened = JsonNode.Parse(File.ReadAllText(pullPath))!;
+        await Assert.That(reopened["state"]!.GetValue<string>()).IsEqualTo("open");
+        await Assert.That(reopened["merged"]!.GetValue<bool>()).IsFalse();
+        await Assert.That(await fixture.RemoteOid(fixture.ProposalBranch)).IsEqualTo(originalHead);
+        await Assert.That((await fixture.Execute("validate")).ExitCode).IsEqualTo(0);
     }
 
     [Test]
@@ -688,7 +717,7 @@ public sealed class ReleasePublishWorkflowTests
     private static async Task<ProcessResult> RunBash(string program, bool syntaxOnly = false,
         string? directory = null, IReadOnlyDictionary<string, string>? environment = null)
     {
-        var info = new ProcessStartInfo("bash")
+        var info = new ProcessStartInfo("/bin/bash")
         {
             WorkingDirectory = directory ?? RepositoryRoot(),
             RedirectStandardInput = true,
@@ -877,8 +906,11 @@ public sealed class ReleasePublishWorkflowTests
             Directory.CreateDirectory(Path.GetDirectoryName(approvalPath)!);
             byte[] approval = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = "publication-approval.v1", version, tagObjectId = tag,
-                evidenceSha256 = Digest(evidence), disclosureAuthorized = true,
+                schemaVersion = "publication-approval.v1",
+                version,
+                tagObjectId = tag,
+                evidenceSha256 = Digest(evidence),
+                disclosureAuthorized = true,
             });
             File.WriteAllBytes(approvalPath, approval);
             ReleaseContext context = JsonSerializer.Deserialize<ReleaseContext>(
@@ -897,7 +929,10 @@ public sealed class ReleasePublishWorkflowTests
             string inventory = Path.Combine(Retained, "authorized-inventory.v1.json");
             File.WriteAllBytes(inventory, JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = "authorized-inventory.v1", producer = "final-lane", completeSet = true, entries,
+                schemaVersion = "authorized-inventory.v1",
+                producer = "final-lane",
+                completeSet = true,
+                entries,
             }, JsonOptions));
             if (!File.Exists(Path.Combine(Root, "publication-key")))
                 RequireSuccess(await Git("ssh-keygen -q -t ed25519 -N '' -f \"$FIXTURE/publication-key\""));
@@ -908,12 +943,20 @@ public sealed class ReleasePublishWorkflowTests
         private async Task ProvisionRuntime()
         {
             Directory.CreateDirectory(Runtime);
-            string binaryDirectory = Path.Combine(RepositoryRoot(), "eng/release/src/ISLAMU.ReleaseEngineering/bin/Release/net10.0");
-            foreach (string file in Directory.EnumerateFiles(binaryDirectory))
+            string binaryDirectory = Path.GetDirectoryName(typeof(ISLAMU.ReleaseEngineering.Program).Assembly.Location)!;
+            string appHost = OperatingSystem.IsWindows() ? "ISLAMU.ReleaseEngineering.exe" : "ISLAMU.ReleaseEngineering";
+            foreach (string name in new[]
             {
-                File.Copy(file, Path.Combine(Runtime, Path.GetFileName(file)));
-                if (Path.GetFileName(file) != "ISLAMU.ReleaseEngineering.promotion-allowed-signers")
-                    File.Copy(file, Path.Combine(Bundle, "bin", Path.GetFileName(file)), overwrite: true);
+                appHost,
+                "ISLAMU.ReleaseEngineering.dll",
+                "ISLAMU.ReleaseEngineering.deps.json",
+                "ISLAMU.ReleaseEngineering.runtimeconfig.json",
+                "YamlDotNet.dll",
+            })
+            {
+                string file = Path.Combine(binaryDirectory, name);
+                File.Copy(file, Path.Combine(Runtime, name));
+                File.Copy(file, Path.Combine(Bundle, "bin", name), overwrite: true);
             }
             File.Copy(Path.Combine(Root, "authority/allowed-promoters"),
                 Path.Combine(Runtime, "ISLAMU.ReleaseEngineering.promotion-allowed-signers"), overwrite: true);
@@ -1000,14 +1043,21 @@ public sealed class ReleasePublishWorkflowTests
         {
             object Check(int id, string result) => new
             {
-                id, name = "GitBook", app = new { id = app }, head_sha = sha,
-                status = "completed", conclusion = result, check_suite = new { id = 123 },
+                id,
+                name = "GitBook",
+                app = new { id = app },
+                head_sha = sha,
+                status = "completed",
+                conclusion = result,
+                check_suite = new { id = 123 },
             };
             object[] checks = newerFailure ? [Check(1, conclusion), Check(2, "failure")] : [Check(1, conclusion)];
             File.WriteAllText(Path.Combine(Root, "checks.json"), JsonSerializer.Serialize(new { check_runs = checks }));
             File.WriteAllText(Path.Combine(Root, "suite.json"), JsonSerializer.Serialize(new
             {
-                head_branch = branch, head_sha = sha, app = new { id = app },
+                head_branch = branch,
+                head_sha = sha,
+                app = new { id = app },
             }));
         }
 
@@ -1058,7 +1108,8 @@ public sealed class ReleasePublishWorkflowTests
                 repos/islamu/event/pulls)
                   if [[ "$method" == GET ]]; then
                     if [[ -f "$FIXTURE/pull.json" ]]; then
-                      jq -s --arg head "${head#*:}" '[.[] | select(.head.ref == $head)]' "$FIXTURE/pull.json"
+                      jq -s --arg head "${head#*:}" --arg state "$state" \
+                        '[.[] | select(.head.ref == $head and ($state == "all" or .state == $state))]' "$FIXTURE/pull.json"
                     else printf '[]\n'; fi
                   else
                     sha=$(command git --git-dir="$FIXTURE/remote.git" rev-parse "refs/heads/$head")

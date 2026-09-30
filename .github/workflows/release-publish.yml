@@ -38,7 +38,7 @@ jobs:
     runs-on:
       group: release-publication
       labels: [self-hosted, linux, x64]
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: production
     permissions:
       contents: write
@@ -369,6 +369,7 @@ jobs:
           check_protection
           for attempt in 1 2 3; do
             source=$(fetch_branch "$DEFAULT_BRANCH")
+            printf 'Publication input commit: %s; attempt: %s\n' "$source" "$attempt"
             accepted=$(fetch_branch docs/publication)
             git_remote fetch --tags origin >/dev/null
             project "$accepted"
@@ -398,7 +399,7 @@ jobs:
             matches_projection "$commit"
             [[ -z "$(git diff --name-only "$accepted" "$commit" -- . ":(exclude)$PAGE" ":(exclude)$MANIFEST")" ]]
             fresh || continue
-            gh_api --method GET "repos/$GH_REPO/pulls" -f state=all \
+            gh_api --method GET "repos/$GH_REPO/pulls" -f state=open \
               -f head="${GH_REPO%%/*}:$proposal" -f base=docs/publication > "$STATE/pulls.json" 2>/dev/null
             [[ "$(jq 'length' "$STATE/pulls.json")" -le 1 ]]
             pr=$(jq -r '.[0].number // empty' "$STATE/pulls.json")
@@ -426,15 +427,20 @@ jobs:
           receipt pending validation-started
           status "$commit" pending release-publication/validation 'Rechecking exact proposal against current complete inventory'
           source=$(fetch_branch "$DEFAULT_BRANCH")
+          printf 'Validation input commit: %s\n' "$source"
           accepted=$(fetch_branch docs/publication)
           [[ "$base" == "$accepted" ]] || fail_pending acceptance-base-changed
           git_remote fetch --tags origin >/dev/null
           project "$accepted"
           matches_projection "$commit" || fail_pending stale-proposal-projection
-          fresh && [[ "$(remote_oid "$proposal")" == "$commit" ]] || fail_pending validation-snapshot-changed
+          if ! fresh || [[ "$(remote_oid "$proposal")" != "$commit" ]]; then
+            fail_pending validation-snapshot-changed
+          fi
           receipt verified exact-proposal-current-inventory
           # Receipt storage is part of validation, not a best-effort afterthought.
-          fresh && [[ "$(remote_oid "$proposal")" == "$commit" ]] || fail_pending validation-snapshot-changed
+          if ! fresh || [[ "$(remote_oid "$proposal")" != "$commit" ]]; then
+            fail_pending validation-snapshot-changed
+          fi
           status "$commit" success release-publication/validation 'Exact proposal matches current complete inventory and acceptance base'
 
       - name: Reconcile observed acceptance and mirror without repairing drift
@@ -452,13 +458,16 @@ jobs:
           merged=$(jq -er '.merge_commit_sha' "$STATE/proposal.json")
           for attempt in 1 2 3; do
             source=$(fetch_branch "$DEFAULT_BRANCH")
+            printf 'Reconciliation input commit: %s; attempt: %s\n' "$source" "$attempt"
             accepted=$(fetch_branch docs/publication)
             mirror=$(fetch_branch docs/gitbook-sync)
             [[ "$accepted" == "$merged" && "$(git rev-parse "$accepted^")" == "$base" ]] || fail_pending acceptance-changed
             [[ -z "$(git diff --name-only "$base" "$accepted" -- . ":(exclude)$PAGE" ":(exclude)$MANIFEST")" ]] || fail_pending acceptance-scope-changed
             git_remote fetch --tags origin >/dev/null
             project "$base"
-            matches_projection "$commit" && matches_projection "$accepted" || fail_pending stale-accepted-projection
+            if ! matches_projection "$commit" || ! matches_projection "$accepted"; then
+              fail_pending stale-accepted-projection
+            fi
             if ! git merge-base --is-ancestor "$mirror" "$accepted"; then
               receipt drift mirror-diverged-from-acceptance
               exit 1
@@ -472,7 +481,7 @@ jobs:
                 { code=$?; [[ "$code" == 75 ]] && continue; fail_pending mirror-write-failed; }
             fi
             mirror=$(remote_oid docs/gitbook-sync)
-            [[ "$mirror" == "$accepted" ]] && fresh || continue
+            if [[ "$mirror" != "$accepted" ]] || ! fresh; then continue; fi
             receipt pending gitbook-sync-not-observed
             status "$accepted" pending release-publication/delivery 'Accepted and mirrored; awaiting observed GitBook synchronization'
             # Request pages separately: gh --include --paginate --slurp interleaves
@@ -497,9 +506,9 @@ jobs:
               gh_api "repos/$GH_REPO/check-suites/$suite" > "$STATE/gitbook-suite.json"
               if jq -e --arg sha "$mirror" --argjson app "$GITBOOK_APP_ID" \
                 '.head_branch == "docs/gitbook-sync" and .head_sha == $sha and .app.id == $app' "$STATE/gitbook-suite.json" >/dev/null; then
-                [[ "$(remote_oid docs/gitbook-sync)" == "$mirror" ]] && fresh || continue
+                if [[ "$(remote_oid docs/gitbook-sync)" != "$mirror" ]] || ! fresh; then continue; fi
                 receipt delivered gitbook-sync-observed
-                [[ "$(remote_oid docs/gitbook-sync)" == "$mirror" ]] && fresh || continue
+                if [[ "$(remote_oid docs/gitbook-sync)" != "$mirror" ]] || ! fresh; then continue; fi
                 status "$accepted" success release-publication/delivery 'Protected acceptance mirrored and GitBook synchronization observed'
               fi
             fi

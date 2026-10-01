@@ -27,7 +27,7 @@ Impacts:
   OpenAPI:
     Reference: docs/internal/API_CHANGELOG.md
     Disposition: documented
-    Detail: Generated contracts expose instance Local account administration, safe operation status and reconciliation, and restricted first-use credential replacement.
+    Detail: Generated contracts expose instance Local account administration, safe operation status and reconciliation, and first-use credential replacement that grants no ordinary session.
   Operator:
     Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
     Disposition: documented

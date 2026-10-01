@@ -5,7 +5,7 @@ Title: make email an explicit scoped capability
 Type: feat
 Scope: notifications
 Summary: Default outbound delivery off and resolve coherent tenant transport ownership without exposing credentials or coupling external authentication to SMTP.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-notifications
 Supersedes: []
 Impacts:
   Breaking:

@@ -4,7 +4,7 @@ Title: "bind resource files to live access authority"
 Type: feat
 Scope: storage
 Summary: "Reserve, validate and attach private resource files atomically, close generic storage-owner bypasses and authorize each application stream from a fresh consistent snapshot."
-Group: event-resources
+Group: event-resources-storage
 Supersedes: []
 Impacts:
   Breaking:

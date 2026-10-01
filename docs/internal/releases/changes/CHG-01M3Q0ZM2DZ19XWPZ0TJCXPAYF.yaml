@@ -2,7 +2,7 @@ Change-Id: CHG-01M3Q0ZM2DZ19XWPZ0TJCXPAYF
 Title: Classified protected Setup Assistant artifacts
 Type: fix
 Scope: self-hosting
-Summary: Restricted setup output cannot reach stdout and Linux native exports share an atomic owner-only writer; unproved Windows and macOS file export stays disabled.
+Summary: Sensitive setup output cannot reach stdout and Linux native exports share an atomic owner-only writer; unproved Windows and macOS file export stays disabled.
 Group: setup-assistant
 Supersedes: []
 Impacts:

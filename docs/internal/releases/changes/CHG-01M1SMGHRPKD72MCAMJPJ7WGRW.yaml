@@ -5,7 +5,7 @@ Title: fence SMTP revocation and preserve core readiness
 Type: fix
 Scope: notifications
 Summary: Serialize delivery disable with send admission, suppress obsolete optional work, preserve uncertain handoffs, and report email failure without taking the directory offline.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-notifications
 Supersedes: []
 Impacts:
   Breaking:

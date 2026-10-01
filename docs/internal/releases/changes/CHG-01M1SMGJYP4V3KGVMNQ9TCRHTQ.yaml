@@ -5,7 +5,7 @@ Title: release free guest admission through safe cancellation
 Type: feat
 Scope: registration
 Summary: Atomically cancel eligible free anonymous confirmations, revoke admission, and release consumed capacity once without extending paid-order or checked-in authority.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-registration
 Supersedes: []
 Impacts:
   Breaking:

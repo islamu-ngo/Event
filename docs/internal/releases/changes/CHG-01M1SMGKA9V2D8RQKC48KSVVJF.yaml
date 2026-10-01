@@ -3,7 +3,7 @@ Title: ship the operational zero-email experience
 Type: feat
 Scope: self-hosting
 Summary: Complete standalone and setup integration with optional private mail testing and durable operator guidance.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-operations
 Supersedes: []
 Impacts:
   Breaking:

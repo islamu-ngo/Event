@@ -4,7 +4,7 @@ Title: "retain resource withdrawal through cleanup failures"
 Type: feat
 Scope: privacy
 Summary: "Keep deleted or moderated resources inaccessible while fenced storage deletion retries survive parent removal and privacy erasure."
-Group: event-resources
+Group: event-resources-privacy
 Supersedes: []
 Impacts:
   Breaking:

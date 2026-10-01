@@ -4,7 +4,7 @@ Title: "keep the sample object bucket private"
 Type: fix
 Scope: storage
 Summary: "Remove anonymous sample-bucket reads and document private storage requirements while retaining public image delivery through authorized application endpoints."
-Group: event-resources
+Group: event-resources-storage
 Supersedes: []
 Impacts:
   Breaking:

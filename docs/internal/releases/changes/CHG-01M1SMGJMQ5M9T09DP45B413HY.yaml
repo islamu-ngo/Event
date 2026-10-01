@@ -5,7 +5,7 @@ Title: bound anonymous intake and recover allocations safely
 Type: feat
 Scope: registration
 Summary: Bind native challenges to tenant event request and idempotency authority so response-loss retries reuse one order and cannot hoard additional seats through replay.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-registration
 Supersedes: []
 Impacts:
   Breaking:

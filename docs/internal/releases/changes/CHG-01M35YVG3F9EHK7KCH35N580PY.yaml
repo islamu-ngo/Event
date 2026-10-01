@@ -4,7 +4,7 @@ Title: "enforce live event resource entitlements"
 Type: feat
 Scope: access
 Summary: "Authorize each resource action from exact persisted event permissions and current subject and parent facts, with equivalent Cerbos and local decisions and a final revocation snapshot."
-Group: event-resources
+Group: event-resources-access
 Supersedes: []
 Impacts:
   Breaking:

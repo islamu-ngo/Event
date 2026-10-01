@@ -4,7 +4,7 @@ Title: "expose governed resource settings to operators"
 Type: feat
 Scope: access
 Summary: "Show native resource limits and effective locks without allowing tenant controls to widen instance policy."
-Group: event-resources
+Group: event-resources-access
 Supersedes: []
 Impacts:
   Breaking:

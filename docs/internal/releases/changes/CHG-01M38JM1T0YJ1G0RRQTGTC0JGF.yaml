@@ -4,7 +4,7 @@ Title: "Restore resource policy editor focus"
 Type: fix
 Scope: accessibility
 Summary: "Operators regain keyboard focus after a resource policy update refresh or denial."
-Group: event-resources
+Group: event-resources-accessibility
 Supersedes: []
 Impacts:
   Breaking:

@@ -3,7 +3,7 @@ Title: consolidate development migration history for email-optional hosting
 Type: fix
 Scope: self-hosting
 Summary: Retain current provider baselines and combine the unapplied email-optional application schema changes into one native integration tail while preserving independent identity and privacy authorities.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-operations
 Supersedes: []
 Impacts:
   Breaking:

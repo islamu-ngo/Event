@@ -5,7 +5,7 @@ Title: provide durable private guest status links
 Type: feat
 Scope: registration
 Summary: Keep confirmed guest status available beyond hold expiry through a limited capability and offer honest no-email guidance with public-data calendar export.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-registration
 Supersedes: []
 Impacts:
   Breaking:

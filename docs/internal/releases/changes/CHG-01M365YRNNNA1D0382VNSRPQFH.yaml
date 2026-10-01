@@ -4,7 +4,7 @@ Title: "bound resource policy by instance governance"
 Type: feat
 Scope: access
 Summary: "Apply native resource settings, non-widening instance ceilings and fresh policy checks to tenant mutation and manifest import before protected delivery is enabled."
-Group: event-resources
+Group: event-resources-access
 Supersedes: []
 Impacts:
   Breaking:

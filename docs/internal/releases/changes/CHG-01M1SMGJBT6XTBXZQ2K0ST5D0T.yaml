@@ -5,7 +5,7 @@ Title: bootstrap and link Local administrators without email
 Type: feat
 Scope: onboarding
 Summary: Use setup-finality and explicit Local identity references for initial and managed tenant administration while keeping temporary passwords out of durable application requests.
-Group: email-optional-self-hosting
+Group: email-optional-self-hosting-onboarding
 Supersedes: []
 Impacts:
   Breaking:

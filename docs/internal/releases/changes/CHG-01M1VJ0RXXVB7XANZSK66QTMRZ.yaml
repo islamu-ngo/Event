@@ -5,7 +5,7 @@ Title: "Release disposed host signal handlers"
 Type: fix
 Scope: self-hosting
 Summary: "Release process-wide callbacks when API or BFF hosts are disposed, including startup failures."
-Group: database-backed-atproto-auth
+Group: host-signal-lifetime
 Supersedes: []
 Impacts:
   Breaking:

@@ -27,6 +27,13 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
         bool tenantSurface = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
             || mcp.Enabled && !string.IsNullOrWhiteSpace(mcp.EndpointPath)
                 && context.Request.Path.StartsWithSegments(mcp.EndpointPath, StringComparison.OrdinalIgnoreCase);
+        bool privateSessionRead = IsPrivateAdministratorSessionRead(context.GetEndpoint());
+        if (privateSessionRead && !tenantContext.IsResolved)
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            await next(context);
+            return;
+        }
         if (!tenantSurface || ApiTenantResolutionMiddleware.IsTenantExemptPath(context.Request)
             || IsExistingAuthenticationOrSignedCallback(context)
             || HttpMethods.IsGet(context.Request.Method)
@@ -43,7 +50,7 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
             ? context.User.Identity?.IsAuthenticated == true
                 && await lifecycle.CanManageAsync(tenantContext.TenantId, context.RequestAborted)
             : await lifecycle.IsPublicAsync(tenantContext.TenantId, context.RequestAborted)
-                || IsPrivateAdministratorSessionRead(context.GetEndpoint())
+                || privateSessionRead
                     && context.User.Identity?.IsAuthenticated == true
                     && await lifecycle.CanManageAsync(tenantContext.TenantId, context.RequestAborted)
                 || IsUserSynchronization(context.GetEndpoint())
@@ -51,7 +58,7 @@ public sealed class TenantLifecycleAccessMiddleware(RequestDelegate next)
                     && await lifecycle.CanAttemptConfiguredAdministratorSyncAsync(tenantContext.TenantId, context.RequestAborted);
         if (allowed)
         {
-            if (management || IsPrivateAdministratorSessionRead(context.GetEndpoint()) || IsUserSynchronization(context.GetEndpoint()))
+            if (management || privateSessionRead || IsUserSynchronization(context.GetEndpoint()))
                 context.Response.Headers.CacheControl = "no-store";
             await next(context);
             return;

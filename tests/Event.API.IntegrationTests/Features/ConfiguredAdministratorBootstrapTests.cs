@@ -24,6 +24,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Explore.Application.Contracts.Operations;
+using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -35,6 +36,77 @@ public sealed class ConfiguredAdministratorBootstrapTests
     private const string ExpectedIssuer = "https://auth.example.test/realms/ISLAMU";
     private const string ExpectedSubject = "configured-admin-subject";
     private const string Fingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    [Test]
+    public async Task UnknownExplicitSessionTenantCannotFallThroughToActiveHost()
+    {
+        await using var factory = new ConfiguredClaimFactory(
+            PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(ExpectedIssuer, ExpectedSubject));
+        await SeedPendingAsync(factory, tenantStatus: TenantStatusEnum.Active);
+        var deploymentMode = Substitute.For<IDeploymentModeProvider>();
+        deploymentMode.IsSingleTenantAsync(Arg.Any<CancellationToken>()).Returns(false);
+        deploymentMode.GetCurrentModeAsync(Arg.Any<CancellationToken>()).Returns(DeploymentMode.MultiTenant);
+        var resolver = Substitute.For<IResolverConfigService>();
+        resolver.GetConfigurationAsync(Arg.Any<CancellationToken>()).Returns(
+            new ResolverConfigurationDto { CustomDomainEnabled = true });
+        var routingCache = Substitute.For<ITenantSlugCache>();
+        routingCache.GetTenantIdByDomainAsync("active.example.test", Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<Guid?>(Explore.Domain.Constants.PlatformDefaults.DefaultTenantId));
+        await using var hostFactory = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IDeploymentModeProvider>();
+            services.AddSingleton(deploymentMode);
+            services.RemoveAll<IResolverConfigService>();
+            services.AddSingleton(resolver);
+            services.RemoveAll<ITenantSlugCache>();
+            services.AddSingleton(routingCache);
+        }));
+        using var client = hostFactory.CreateClient();
+
+        foreach (string path in new[] { "/api/user", "/api/user/admin-authority" })
+        {
+            using var hostRequest = new HttpRequestMessage(HttpMethod.Get, path);
+            hostRequest.Headers.Host = "active.example.test";
+            using var hostResponse = await client.SendAsync(hostRequest);
+            await Assert.That(hostResponse.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+
+            using var selectedRequest = new HttpRequestMessage(HttpMethod.Get, path);
+            selectedRequest.Headers.Host = "active.example.test";
+            selectedRequest.Headers.Add("X-Tenant-Slug", "unknown-selected-tenant");
+            using var selectedResponse = await client.SendAsync(selectedRequest);
+            await Assert.That(selectedResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+            await Assert.That(selectedResponse.Headers.CacheControl?.NoStore).IsTrue();
+        }
+        await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(new DatabaseCounts(0, 0, 0, 0, 0, 0));
+    }
+
+    [Test]
+    [Arguments(TenantStatusEnum.Provisioning, false)]
+    [Arguments(TenantStatusEnum.Provisioning, true)]
+    [Arguments(TenantStatusEnum.Active, false)]
+    [Arguments(TenantStatusEnum.Active, true)]
+    public async Task PrivateSessionReadsConcealPrivateTenantsBeforeAuthentication(
+        TenantStatusEnum tenantStatus, bool invalidAuthentication)
+    {
+        await using var factory = new ConfiguredClaimFactory(
+            PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(ExpectedIssuer, ExpectedSubject));
+        using var client = factory.CreateClient();
+        await SeedPendingAsync(factory, tenantStatus: tenantStatus);
+
+        foreach (string path in new[] { "/api/user", "/api/user/admin-authority" })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.Add("X-Tenant-Slug", "configured-bootstrap");
+            if (invalidAuthentication)
+                request.Headers.Add(TestAuthHandler.AuthHeaderName, "invalid-authentication");
+            using var response = await client.SendAsync(request);
+
+            await Assert.That(response.StatusCode).IsEqualTo(tenantStatus == TenantStatusEnum.Active
+                ? HttpStatusCode.Unauthorized : HttpStatusCode.NotFound);
+            await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+        }
+        await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(new DatabaseCounts(0, 0, 0, 0, 0, 0));
+    }
 
     [Test]
     [Arguments(ExpectedIssuer, "keycloak", true)]
@@ -432,14 +504,15 @@ public sealed class ConfiguredAdministratorBootstrapTests
     }
 
     private static async Task SeedPendingAsync(ConfiguredClaimFactory factory,
-        AuthenticationProviderKind provider = AuthenticationProviderKind.Keycloak)
+        AuthenticationProviderKind provider = AuthenticationProviderKind.Keycloak,
+        TenantStatusEnum tenantStatus = TenantStatusEnum.Provisioning)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         db.Tenants.Add(new Event.Api.IntegrationTests.Builders.TenantBuilder()
             .WithId(Explore.Domain.Constants.PlatformDefaults.DefaultTenantId)
             .WithSlug("configured-bootstrap")
-            .WithStatus(TenantStatusEnum.Provisioning)
+            .WithStatus(tenantStatus)
             .Build());
         db.InstanceBootstrapStates.Add(InstanceBootstrapState.CreateConfiguredAdministratorPending(
             Guid.CreateVersion7(),

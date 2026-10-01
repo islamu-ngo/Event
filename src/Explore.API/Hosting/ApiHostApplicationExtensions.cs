@@ -106,8 +106,11 @@ public static class ApiHostApplicationExtensions
         pipeline.UseRequestLocalization();
         pipeline.UseWhen(context => !AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path),
             branch => branch.UseRateLimiter());
+        pipeline.UseWhen(context => TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint()),
+            branch => branch.UseMiddleware<TenantLifecycleAccessMiddleware>());
         pipeline.UseAuthorization();
-        pipeline.UseMiddleware<TenantLifecycleAccessMiddleware>();
+        pipeline.UseWhen(context => !TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint()),
+            branch => branch.UseMiddleware<TenantLifecycleAccessMiddleware>());
         pipeline.UseMiddleware<IdempotencyMiddleware>();
         pipeline.UseMiddleware<SupportAccessAuditMiddleware>();
     }

@@ -3,6 +3,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-10-01
+
+- **Private administrator sessions.** Current-user and administrator-authority
+  reads remain available as tenantless instance sessions when no directory is
+  selected. An explicitly selected private directory instead requires fresh
+  persisted administrator authority and returns 404 when unavailable; an
+  unknown explicit slug cannot fall through to another directory's host.
+  Session responses are no-store. For these two reads, lifecycle concealment runs after
+  authentication and trusted tenant binding, before authorization and response
+  replay. Anonymous active-directory requests retain 401, and credential
+  replacement retains its dedicated authentication scheme. Other endpoints
+  retain authorization before lifecycle enforcement, including anonymous writes.
+
 ## 2026-09-29
 
 - **SetupLive configuration imports.** Enrollment-bound tenant administrators

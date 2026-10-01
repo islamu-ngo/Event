@@ -32,6 +32,13 @@ Do not send both. Browser users normally reach the API through the BFF. Direct i
 
 Tenant context is resolved from the request host or `X-Tenant-Slug`; a scoped API key may finalize binding. The server validates this against trusted/persisted authority. Never put an authoritative user or tenant identity in a request body and expect it to override the authenticated context.
 
+Current-user and administrator-authority session reads may operate without a
+tenant selection. When selecting a private directory explicitly, the caller
+must have persisted administrator authority; unavailable access returns 404.
+An unknown explicit slug does not fall back to a different directory's host.
+These private session responses are no-store. For an active directory, missing
+authentication still returns 401.
+
 ## Settings scopes
 
 Personal preferences use the existing `/api/settings/user` routes. Tenant and

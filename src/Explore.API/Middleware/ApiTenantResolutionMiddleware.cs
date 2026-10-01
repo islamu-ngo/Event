@@ -67,13 +67,18 @@ public sealed class ApiTenantResolutionMiddleware
 
         var configuration = await resolverConfigService.GetConfigurationAsync(context.RequestAborted);
 
+        bool privateSessionRead = TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint());
+        string? requestedSlug = context.Request.Headers[TenantHeaderNames.TenantSlug].FirstOrDefault();
+        bool explicitlySelectedSessionTenant = privateSessionRead && !string.IsNullOrWhiteSpace(requestedSlug);
         var resolvedTenantId = await ResolveFromSlugHeaderAsync(context, tenantSlugCache);
-        resolvedTenantId ??= await ResolveFromHostAsync(context, configuration, tenantSlugCache);
+        if (!explicitlySelectedSessionTenant)
+        {
+            resolvedTenantId ??= await ResolveFromHostAsync(context, configuration, tenantSlugCache);
+        }
 
         var hasApiKeyHeader = ApiKeyHeaderReader.HasNonEmptyApiKey(context.Request);
         // The public routing cache intentionally excludes unpublished tenants. Bind only an
         // explicitly named bootstrap directory for these session endpoints; this grants no authority.
-        string? requestedSlug = context.Request.Headers[TenantHeaderNames.TenantSlug].FirstOrDefault();
         if (resolvedTenantId is null && !hasApiKeyHeader && !string.IsNullOrWhiteSpace(requestedSlug)
             && (TenantLifecycleAccessMiddleware.IsUserSynchronization(context.GetEndpoint())
                 || TenantLifecycleAccessMiddleware.IsPrivateAdministratorSessionRead(context.GetEndpoint())))
@@ -81,7 +86,8 @@ public sealed class ApiTenantResolutionMiddleware
             resolvedTenantId = await lifecycle.ResolveConfiguredAdministratorTenantAsync(requestedSlug, context.RequestAborted);
         }
 
-        if (hasApiKeyHeader && !isMcpPath)
+        bool unresolvedExplicitSessionTenant = explicitlySelectedSessionTenant && resolvedTenantId is null;
+        if (hasApiKeyHeader && !isMcpPath && !unresolvedExplicitSessionTenant)
         {
             if (resolvedTenantId is Guid requestedTenantId && requestedTenantId != Guid.Empty)
             {
@@ -104,7 +110,8 @@ public sealed class ApiTenantResolutionMiddleware
             return;
         }
 
-        if (hasApiKeyHeader && isMcpPath)
+        if (privateSessionRead && !explicitlySelectedSessionTenant && !hasApiKeyHeader
+            || hasApiKeyHeader && isMcpPath && !unresolvedExplicitSessionTenant)
         {
             await _next(context);
             return;
@@ -180,9 +187,6 @@ public sealed class ApiTenantResolutionMiddleware
         PathString path = request.Path;
         return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
             || path.Equals(new PathString("/api/auth/local/login"), StringComparison.OrdinalIgnoreCase)
-            || (HttpMethods.IsGet(request.Method)
-                && path.Equals(new PathString("/api/user"), StringComparison.OrdinalIgnoreCase))
-            || path.Equals(new PathString("/api/user/admin-authority"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
             || path.Equals(new PathString("/api/operator-identity-metadata"), StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/System", StringComparison.OrdinalIgnoreCase)

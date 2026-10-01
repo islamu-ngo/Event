@@ -365,7 +365,7 @@ public sealed partial class SetupLiveApplicationService(
         byte[]? capabilityBytes = null;
         try
         {
-            return await unitOfWork.ExecuteSerializableAsync(
+            return await unitOfWork.ExecuteBootstrapConvergenceAsync(
                 async token =>
                 {
                     SetupEnrollmentIssuanceClaim? existingClaim =

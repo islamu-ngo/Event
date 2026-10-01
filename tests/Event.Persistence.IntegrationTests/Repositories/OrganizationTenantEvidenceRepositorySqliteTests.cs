@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -128,8 +129,10 @@ public sealed class OrganizationTenantEvidenceRepositorySqliteTests
         var duplicate = OrganizationTenantEvidence.CreatePending(participation, document);
 
         var failure = await Assert.That(async () => await new EfCoreUnitOfWork(context)
-            .ExecuteSerializableAsync(_ => repository.Create(duplicate))).Throws<DbUpdateException>();
-        await Assert.That((failure?.InnerException as SqliteException)?.SqliteExtendedErrorCode).IsEqualTo(2067);
+            .ExecuteSerializableAsync(_ => repository.Create(duplicate))).Throws<ConcurrencyConflictException>();
+        await Assert.That(failure!.Code).IsEqualTo(ConcurrencyConflictException.ConcurrentUpdate);
+        await Assert.That(failure.InnerException).IsTypeOf<DbUpdateException>();
+        await Assert.That((failure.InnerException!.InnerException as SqliteException)?.SqliteExtendedErrorCode).IsEqualTo(2067);
         var evidence = await repository.ListByParticipationAsync(participation.Id, default);
         await Assert.That(evidence.Count).IsEqualTo(1);
         await Assert.That(evidence.Single().Id).IsEqualTo(retained.Id);

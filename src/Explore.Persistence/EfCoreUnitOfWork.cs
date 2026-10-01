@@ -14,6 +14,8 @@ namespace Explore.Persistence;
 public sealed class EfCoreUnitOfWork : IUnitOfWork
 {
     private const int BootstrapConvergenceAttemptLimit = 4;
+    private const int SqliteConstraintPrimaryKey = 1555;
+    private const int SqliteConstraintUnique = 2067;
     private readonly ExploreDbContext _dbContext;
     private readonly Func<IExecutionStrategy> _createExecutionStrategy;
     private readonly Func<CancellationToken, Task<IDbContextTransaction>> _beginTransaction;
@@ -200,7 +202,11 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)
         {
-            if (current is SqliteException { SqliteErrorCode: 5 or 6 or 19 }
+            if (current is SqliteException { SqliteErrorCode: 5 or 6 }
+                || current is SqliteException
+                {
+                    SqliteExtendedErrorCode: SqliteConstraintPrimaryKey or SqliteConstraintUnique
+                }
                 || current is PostgresException
                 {
                     SqlState: PostgresErrorCodes.SerializationFailure

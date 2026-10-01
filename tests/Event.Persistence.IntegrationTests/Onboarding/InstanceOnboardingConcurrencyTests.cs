@@ -320,7 +320,7 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
         var repository = new InstanceBootstrapStateRepository(context);
         var unitOfWork = new EfCoreUnitOfWork(context);
         int gateEntry = 0;
-        return await unitOfWork.ExecuteSerializableAsync(async token =>
+        return await unitOfWork.ExecuteBootstrapConvergenceAsync(async token =>
         {
             InstanceBootstrapState? state = await repository.GetCurrentForUpdate(token);
             if (Interlocked.Increment(ref gateEntry) == 1 && entered is not null)

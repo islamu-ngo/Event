@@ -174,8 +174,11 @@ public sealed class PaidEventPolicyMutationBoundary(
         IReadOnlyCollection<string> lockKeys,
         Func<CancellationToken, Task<PaidEventPolicyMutationResult>> operation,
         CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteSerializableAsync(
-            token => mutationLock.ExecuteManyAsync(lockKeys, operation, token),
+        mutationLock.ExecuteOrderedGroupsAsync(
+            [lockKeys],
+            token => unitOfWork.ExecuteSerializableAsync(
+                innerToken => mutationLock.ExecuteManyAsync(lockKeys, operation, innerToken),
+                token),
             cancellationToken);
 
     public async Task<PaidEventPolicyMutationResult> ReviseInstanceInCurrentTransactionAsync(

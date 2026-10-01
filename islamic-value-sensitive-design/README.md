@@ -80,6 +80,7 @@ Task-bound assessments generated during the execution of `.agents/skills/impleme
 | [`workstreams/i-vsd-database-backed-atproto-auth.md`](workstreams/i-vsd-database-backed-atproto-auth.md) | ATProtocol decentralized identity and database session persistence. |
 | [`workstreams/i-vsd-docs-quality-and-consolidation.md`](workstreams/i-vsd-docs-quality-and-consolidation.md) | Documentation architecture consolidation and verification rules. |
 | [`workstreams/i-vsd-efcore-first-persistence-hardening.md`](workstreams/i-vsd-efcore-first-persistence-hardening.md) | Multi-database EF Core configuration and portable constraints. |
+| [`workstreams/i-vsd-event-api-security-remediation.md`](workstreams/i-vsd-event-api-security-remediation.md) | Exhaustive pre-release API security remediation planning: credential custody, connection-bound egress, tenant isolation, disclosure, bounded consumption and candidate evidence. |
 | [`workstreams/i-vsd-event-resources.md`](workstreams/i-vsd-event-resources.md) | Governed event resource scheduling implementation. |
 | [`workstreams/i-vsd-governed-release-public-changelog.md`](workstreams/i-vsd-governed-release-public-changelog.md) | Automated changelog generator and release pipeline truth. |
 | [`workstreams/i-vsd-headless-instance-onboarding.md`](workstreams/i-vsd-headless-instance-onboarding.md) | CLI/headless first-time instance setup workflows. |
@@ -92,6 +93,7 @@ Task-bound assessments generated during the execution of `.agents/skills/impleme
 | [`workstreams/i-vsd-stateless-payment-checkout-tickets.md`](workstreams/i-vsd-stateless-payment-checkout-tickets.md) | Cryptographic checkout ticket tokens and stateless payment flows. |
 | [`workstreams/i-vsd-strong-typing-reflection-remediation.md`](workstreams/i-vsd-strong-typing-reflection-remediation.md) | Elimination of runtime reflection in CQRS/validation dispatch. |
 | [`workstreams/i-vsd-test-suite-health-remediation.md`](workstreams/i-vsd-test-suite-health-remediation.md) | Test suite flakiness quarantine and TUnit migration. |
+| [`workstreams/i-vsd-pre-release-contract-foundations.md`](workstreams/i-vsd-pre-release-contract-foundations.md) | Pre-v0.1 identity correlation, profile ownership, stable managed-file references, and shared-file disposal with scenario/task traceability. |
 | [`workstreams/i-vsd-test-suite-rationalization.md`](workstreams/i-vsd-test-suite-rationalization.md) | Test project consolidation and architecture test guardrails. |
 | [`workstreams/i-vsd-unicode-location-search-simplification.md`](workstreams/i-vsd-unicode-location-search-simplification.md) | Portable database search text normalization across providers. |
 

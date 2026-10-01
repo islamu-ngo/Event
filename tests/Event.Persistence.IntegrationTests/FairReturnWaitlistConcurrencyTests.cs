@@ -286,37 +286,45 @@ public sealed class FairReturnWaitlistConcurrencyTests(
                         UtcNow.AddMinutes(-1),
                         Guid.CreateVersion7()),
                 ]);
+        var fenceCommands =
+            new FairReturnFenceCommandObserver();
+        ExploreDbContext[] contexts =
+            Enumerable.Range(0, contenderCount)
+                .Select(_ =>
+                    fixture.CreateDbContext(
+                        fenceCommands))
+                .ToArray();
         using var timeout =
             new CancellationTokenSource(
                 TimeSpan.FromSeconds(60));
         var gate = new WaitlistRaceGate(
             contenderCount);
-        var fenceCommands =
-            new FairReturnFenceCommandObserver();
 
         async Task<FairReturnWaitlistResult>
-            AllocateAsync()
+            AllocateAsync(ExploreDbContext context)
         {
-            await using ExploreDbContext context =
-                fixture.CreateDbContext(fenceCommands);
-            await gate.ArriveAsync(timeout.Token);
-            return await new FairReturnWaitlistRepository(
-                    context)
-                .AllocateAsync(
-                    new FairReturnAllocationRequest(
-                        seed.TenantId,
-                        seed.EventId,
-                        seed.PolicyId,
-                        Guid.CreateVersion7(),
-                        Guid.CreateVersion7(),
-                        Guid.CreateVersion7(),
-                        UtcNow.AddMinutes(1)),
-                    timeout.Token);
+            await using (context)
+            {
+                await gate.ArriveAsync(timeout.Token);
+                return await new FairReturnWaitlistRepository(
+                        context)
+                    .AllocateAsync(
+                        new FairReturnAllocationRequest(
+                            seed.TenantId,
+                            seed.EventId,
+                            seed.PolicyId,
+                            Guid.CreateVersion7(),
+                            Guid.CreateVersion7(),
+                            Guid.CreateVersion7(),
+                            UtcNow.AddMinutes(1)),
+                        timeout.Token);
+            }
         }
 
         Task<FairReturnWaitlistResult>[] contenders =
             Enumerable.Range(0, contenderCount)
-                .Select(_ => AllocateAsync())
+                .Select(index =>
+                    AllocateAsync(contexts[index]))
                 .ToArray();
         await gate.AllArrived.WaitAsync(timeout.Token);
         gate.Release();

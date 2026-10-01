@@ -468,15 +468,23 @@ public sealed class AtprotoSoleProviderFixture : PostgreSqlApiFixtureBase
                 .Build());
         }
         // Provider selection alone does not establish usable public signup metadata.
-        dbContext.SystemSettings.Add(new SystemSetting
+        // Respawn preserves system settings, including metadata from earlier scenarios.
+        var publicUrl = await dbContext.SystemSettings.SingleOrDefaultAsync(setting =>
+            setting.SettingKey == GovernanceSettingKeys.Authentication.AtprotoPublicUrl);
+        if (publicUrl is null)
         {
-            Id = Guid.CreateVersion7(),
-            SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
-            Value = JsonSerializer.Serialize("https://events.example.test"),
-            ValueType = SettingValueType.String,
-            Category = "Authentication",
-            CreatedAt = DateTime.UtcNow
-        });
+            publicUrl = new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
+                Value = JsonSerializer.Serialize("https://events.example.test"),
+                ValueType = SettingValueType.String,
+                Category = "Authentication",
+                CreatedAt = DateTime.UtcNow
+            };
+            dbContext.SystemSettings.Add(publicUrl);
+        }
+        publicUrl.Value = JsonSerializer.Serialize("https://events.example.test");
         await dbContext.SaveChangesAsync();
     }
 

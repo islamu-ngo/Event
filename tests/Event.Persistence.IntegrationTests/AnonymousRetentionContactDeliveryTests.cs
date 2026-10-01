@@ -70,7 +70,7 @@ public sealed class AnonymousRetentionContactDeliveryTests
         var save = new SaveBoundary(clock);
         await using var smtp = scenario.StartsWith("smtp-", StringComparison.Ordinal)
             ? new AdmissionContactSmtpPeer(scenario, () => clock.Now = new DateTimeOffset(Deadline)) : null;
-        SmtpConfiguration? smtpConfiguration = smtp?.Start();
+        SmtpConfiguration? smtpConfiguration = null;
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services =>
         {
             services.AddSingleton<TimeProvider>(clock);
@@ -113,6 +113,8 @@ public sealed class AnonymousRetentionContactDeliveryTests
         DateTime includedDeadline = held ? Deadline.AddDays(1) : Deadline;
         clock.Now = new DateTimeOffset(includedDeadline.AddTicks(-1));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        // Database setup must not consume the SMTP peer's bounded handshake lifetime.
+        smtpConfiguration = smtp?.Start();
         var issuance = fixture.Services.GetRequiredService<IAdmissionIssuanceService>();
         Task pending;
         if (recovery)

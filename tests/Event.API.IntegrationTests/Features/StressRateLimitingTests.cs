@@ -76,10 +76,6 @@ public class StressRateLimitingTests(StressApiFixture fixture)
         }
     }
 
-    // TODO: Re-enable once OpenFeature SDK ChannelClosedException on shutdown is resolved.
-    // The test itself passes but WebApplicationFactory.DisposeAsync -> OpenFeature.Api.ShutdownAsync
-    // throws ChannelClosedException during teardown, causing TUnit to report the test as failed.
-    [Skip("Category: Stress. Removal: enable when OpenFeature SDK shutdown no longer throws ChannelClosedException during WebApplicationFactory disposal.")]
     [Test]
     public async Task RateLimited_ShouldReturnProblemDetailsBody()
     {
@@ -96,7 +92,7 @@ public class StressRateLimitingTests(StressApiFixture fixture)
 
         for (var i = 0; i < 10; i++)
         {
-            var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Get, url, userId);
+            using var request = _fixture.CreateAuthenticatedRequest(HttpMethod.Get, url, userId);
 
             var response = await _fixture.Client.SendAsync(request);
 
@@ -105,12 +101,19 @@ public class StressRateLimitingTests(StressApiFixture fixture)
                 rateLimitedResponse = response;
                 break;
             }
+
+            response.Dispose();
         }
 
-        if (rateLimitedResponse is not null)
+        if (rateLimitedResponse is null)
+        {
+            throw new InvalidOperationException("The configured authenticated request quota was not enforced.");
+        }
+
+        using (rateLimitedResponse)
         {
             var content = await rateLimitedResponse.Content.ReadAsStringAsync();
-            var json = JsonDocument.Parse(content);
+            using var json = JsonDocument.Parse(content);
 
             await Assert.That(json.RootElement.TryGetProperty("status", out var status)).IsTrue();
             await Assert.That(status.GetInt32()).IsEqualTo(429);

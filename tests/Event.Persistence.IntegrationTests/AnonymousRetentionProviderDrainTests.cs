@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
@@ -204,8 +205,10 @@ public sealed class AnonymousRetentionProviderDrainTests
     }
 
     [Test]
+    [Timeout(120_000)]
     public async Task CleanupDuringProviderHandoffPreservesTheAmbiguousOutcome()
     {
+        CancellationToken cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var harness = await Harness.CreateAsync(Now);
         var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
         await harness.AddAnswerAsync(graph, "name", Now.AddTicks(1));
@@ -215,31 +218,109 @@ public sealed class AnonymousRetentionProviderDrainTests
         Task<int> draining = harness.DrainAsync(async () =>
         {
             handedOff.SetResult();
-            await releaseProvider.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            // Cleanup owns this pause; its database work is not a provider signal deadline.
+            await releaseProvider.Task.WaitAsync(cancellationToken);
             throw new RegistrationProviderSubmissionDeliveryException(
                 RegistrationProviderSubmissionDeliveryFailureKind.AmbiguousAfterHandoff, "provider_handoff_uncertain");
         });
 
-        try
+        await RunDuringProviderHandoffAsync(handedOff.Task, releaseProvider, draining, async () =>
         {
-            await handedOff.Task.WaitAsync(TimeSpan.FromSeconds(10));
             harness.SetUtcNow(Now.AddTicks(1));
-            await Assert.That((await harness.CleanupAsync()).AnswersDeleted).IsEqualTo(1);
-            var inFlight = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+            await Assert.That((await harness.CleanupAsync(cancellationToken)).AnswersDeleted).IsEqualTo(1);
+            var inFlight = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync(cancellationToken);
             await Assert.That(inFlight.Status).IsEqualTo(OutboxMessageStatus.Processing);
             await Assert.That(inFlight.DeadLetteredAt).IsNull();
-        }
-        finally
-        {
-            releaseProvider.TrySetResult();
-            await draining.WaitAsync(TimeSpan.FromSeconds(10));
-        }
+        });
 
         var effect = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
         await Assert.That(effect.FailureCode).IsEqualTo("provider_handoff_uncertain");
         await Assert.That(effect.ParkedAt).IsEqualTo(Now.AddTicks(1));
         await Assert.That(effect.DeadLetteredAt).IsNull();
         await Assert.That(harness.StorageCalls).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ProviderHandoffCoordinationPreservesCleanupFailure(bool providerFails)
+    {
+        var handedOff = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProvider = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cleanupSuspended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cleanupFailure = new InvalidOperationException("controlled cleanup failure");
+        var providerFailure = new InvalidOperationException("controlled provider failure");
+        async Task DrainAsync()
+        {
+            handedOff.SetResult();
+            await releaseProvider.Task;
+            if (providerFails) throw providerFailure;
+        }
+
+        Task draining = DrainAsync();
+        Task coordinating = RunDuringProviderHandoffAsync(handedOff.Task, releaseProvider, draining, async () =>
+        {
+            cleanupSuspended.SetResult();
+            await resumeCleanup.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            throw cleanupFailure;
+        });
+        try
+        {
+            await cleanupSuspended.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await Assert.That(draining.IsCompleted).IsFalse();
+        }
+        finally
+        {
+            resumeCleanup.TrySetResult();
+        }
+
+        Exception? observed = null;
+        try { await coordinating.WaitAsync(TimeSpan.FromSeconds(10)); }
+        catch (Exception exception) { observed = exception; }
+        await Assert.That(releaseProvider.Task.IsCompletedSuccessfully).IsTrue();
+        if (providerFails)
+        {
+            await Assert.That(observed).IsTypeOf<AggregateException>();
+            var failures = ((AggregateException)observed!).InnerExceptions;
+            await Assert.That(failures.Count).IsEqualTo(2);
+            await Assert.That(failures[0]).IsSameReferenceAs(cleanupFailure);
+            await Assert.That(failures[1]).IsSameReferenceAs(providerFailure);
+        }
+        else
+        {
+            await Assert.That(observed).IsSameReferenceAs(cleanupFailure);
+        }
+    }
+
+    private static async Task RunDuringProviderHandoffAsync(
+        Task handedOff, TaskCompletionSource releaseProvider, Task draining, Func<Task> whileInFlight)
+    {
+        ExceptionDispatchInfo? inFlightFailure = null;
+        try
+        {
+            await handedOff.WaitAsync(TimeSpan.FromSeconds(10));
+            await whileInFlight();
+        }
+        catch (Exception exception)
+        {
+            inFlightFailure = ExceptionDispatchInfo.Capture(exception);
+        }
+        finally
+        {
+            releaseProvider.TrySetResult();
+        }
+
+        try
+        {
+            await draining.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception exception) when (inFlightFailure is not null)
+        {
+            throw new AggregateException(inFlightFailure.SourceException, exception);
+        }
+
+        inFlightFailure?.Throw();
     }
 
     [Test]
@@ -374,11 +455,11 @@ public sealed class AnonymousRetentionProviderDrainTests
             await Context.SaveChangesAsync();
         }
 
-        public async Task<RegistrationRetentionCleanupResult> CleanupAsync()
+        public async Task<RegistrationRetentionCleanupResult> CleanupAsync(CancellationToken cancellationToken = default)
         {
             await using var scope = fixture.CreateScope();
             return await scope.ServiceProvider.GetRequiredService<IRegistrationRetentionCleanupRepository>()
-                .CleanupTenantAsync(fixture.TenantId, clock.GetUtcNow().UtcDateTime, 1, CancellationToken.None);
+                .CleanupTenantAsync(fixture.TenantId, clock.GetUtcNow().UtcDateTime, 1, cancellationToken);
         }
 
         public void SetUtcNow(DateTime now) => clock.UtcNow = now;

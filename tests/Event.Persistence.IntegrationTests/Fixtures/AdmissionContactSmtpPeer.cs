@@ -10,7 +10,7 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 internal sealed class AdmissionContactSmtpPeer(string scenario, Action expire) : IAsyncDisposable
 {
     private readonly TcpListener listener = new(IPAddress.Loopback, 0);
-    private readonly CancellationTokenSource stop = new(TimeSpan.FromSeconds(60));
+    private readonly CancellationTokenSource stop = new();
     private Task run = Task.CompletedTask;
     internal bool Armed { get; set; }
     internal bool Crossed { get; private set; }
@@ -20,6 +20,7 @@ internal sealed class AdmissionContactSmtpPeer(string scenario, Action expire) :
 
     internal SmtpConfiguration Start()
     {
+        stop.CancelAfter(TimeSpan.FromSeconds(60));
         listener.Start();
         run = RunAsync();
         return new SmtpConfiguration

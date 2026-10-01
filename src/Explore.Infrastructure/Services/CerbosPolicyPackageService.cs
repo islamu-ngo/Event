@@ -469,7 +469,9 @@ public sealed class CerbosPolicyPackageService : IPolicyPackageService
             {
                 throw new CerbosAdminApiException(
                     PolicyPackageIssueCode.AdminApiUnavailable,
-                    $"Cerbos Admin API returned {(int)response.StatusCode} when listing policies.");
+                    response.StatusCode is { } statusCode
+                        ? $"Cerbos Admin API returned {(int)statusCode} when listing policies."
+                        : "Cerbos Admin API did not return an HTTP response when listing policies.");
             }
 
             return response.Content?.PolicyIds;

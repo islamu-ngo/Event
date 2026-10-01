@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -319,6 +320,29 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.AdminApiUnavailable);
         await Assert.That(handler.Requests).IsEmpty();
+    }
+
+    [Test]
+    public async Task GetStatusAsync_WhenPolicyListingTransportFails_PreservesUnknownStatusWithTypedFailure()
+    {
+        var policiesRoot = CreatePackageRoot();
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "islamuevent_event.yaml"), CreatePolicyYaml("islamuevent_event"));
+        await File.WriteAllTextAsync(Path.Combine(policiesRoot, "_schemas", "islamuevent_event.json"), "{\"type\":\"object\"}");
+        var handler = new RecordingMessageHandler(_ => throw new HttpRequestException("Test transport failure."));
+        var logger = new TestListLogger<CerbosPolicyPackageService>();
+        var service = CreateService(
+            policiesRoot,
+            handler: handler,
+            adminUsername: Guid.NewGuid().ToString("N"),
+            adminPassword: Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+            logger: logger);
+
+        var result = await service.GetStatusAsync();
+
+        await Assert.That(result.IssueCode).IsEqualTo(PolicyPackageIssueCode.PackageStatusUnknown);
+        object? failureType = logger.Entries.SelectMany(entry => entry.State)
+            .Single(property => property.Key == "FailureType").Value;
+        await Assert.That(failureType).IsEqualTo("CerbosAdminApiException");
     }
 
     [Test]
@@ -799,7 +823,8 @@ public class CerbosPolicyPackageServiceTests : IDisposable
         ICerbosConfigResolver? configResolver = null,
         ISecretResolver? secretResolver = null,
         string adminUsername = "admin",
-        string adminPassword = "secret")
+        string adminPassword = "secret",
+        ILogger<CerbosPolicyPackageService>? logger = null)
     {
         var options = Options.Create(new CerbosPolicyPackageOptions
         {
@@ -837,7 +862,7 @@ public class CerbosPolicyPackageServiceTests : IDisposable
             secretResolver,
             new CerbosAdminEndpointValidator(options),
             new StaticHttpClientFactory(new HttpClient(handler)),
-            Substitute.For<ILogger<CerbosPolicyPackageService>>(),
+            logger ?? Substitute.For<ILogger<CerbosPolicyPackageService>>(),
             Substitute.For<IEventResourcePolicyPublicationFence>(),
             Options.Create(new CerbosSettings { GrpcEndpoint = "https://instance-cerbos.example:3593" }));
     }

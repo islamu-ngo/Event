@@ -147,6 +147,48 @@ public sealed class SecretRotationReplicaConvergenceTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task FailedHttpCandidateValidationDisposesCandidateAndKeepsCurrentClient(bool cancelValidation)
+    {
+        using var cancellation = new CancellationTokenSource();
+        HttpClient? candidate = null;
+        using var factory = new RotationAwareHttpClientFactory(
+            Monitor(new HttpClientCredentialOptions()),
+            Monitor(new RotationOptions()),
+            NullLogger<RotationAwareHttpClientFactory>.Instance,
+            validateCandidate: (client, token) =>
+            {
+                candidate = client;
+                if (cancelValidation)
+                {
+                    cancellation.Cancel();
+                    return Task.FromCanceled<bool>(token);
+                }
+
+                return Task.FromException<bool>(new InvalidOperationException("Candidate validation failed."));
+            },
+            replicaId: "replica-a");
+        HttpClient current = factory.CreateClient("provider");
+
+        if (cancelValidation)
+        {
+            await Assert.That(() => factory.ForceRotateAsync("provider", cancellationToken: cancellation.Token))
+                .Throws<OperationCanceledException>();
+        }
+        else
+        {
+            var acknowledgement = await factory.ForceRotateAsync("provider");
+            await Assert.That(acknowledgement.Status).IsEqualTo(SecretRotationLocalStatus.Failed);
+        }
+
+        await Assert.That(factory.CreateClient("provider")).IsSameReferenceAs(current);
+        current.CancelPendingRequests();
+        HttpClient rejected = candidate ?? throw new InvalidOperationException("Validation did not run.");
+        await Assert.That(() => rejected.CancelPendingRequests()).Throws<ObjectDisposedException>();
+    }
+
+    [Test]
     public async Task RejectedDatabaseCandidateLeavesRotationCountUnchanged()
     {
         using var factory = new RotationAwareDbContextFactory<ReplicaTestDbContext>(

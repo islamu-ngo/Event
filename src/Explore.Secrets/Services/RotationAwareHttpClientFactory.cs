@@ -219,7 +219,18 @@ public sealed class RotationAwareHttpClientFactory : IHttpClientFactory, IDispos
 
         // Create new client with updated credentials
         var newEntry = CreateClientEntry(name, candidateOptions);
-        if (!await _validateCandidate(newEntry.Client, cancellationToken).ConfigureAwait(false))
+        bool candidateValid;
+        try
+        {
+            candidateValid = await _validateCandidate(newEntry.Client, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            newEntry.Client.Dispose();
+            throw;
+        }
+
+        if (!candidateValid)
         {
             newEntry.Client.Dispose();
             _logger.LogWarning("secret_rotation_candidate_rejected");

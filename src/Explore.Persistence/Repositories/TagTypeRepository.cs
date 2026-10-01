@@ -16,7 +16,7 @@ public class TagTypeRepository : GenericRepository<TagType, int>, ITagTypeReposi
         _dbContext = dbContext;
     }
 
-    public async Task<TagType> GetTagTypeWithDetails(int id)
+    public async Task<TagType?> GetTagTypeWithDetails(int id)
     {
         return await _dbContext.TagTypes
             .AsNoTracking()

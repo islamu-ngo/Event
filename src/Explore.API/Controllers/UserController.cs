@@ -25,7 +25,7 @@ namespace Explore.API.Controllers;
 public class UserController : EventControllerBase
 {
     private readonly ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> _syncUserCommandHandler;
-    private readonly IQueryHandler<GetUserRequest, UserDto> _getUserRequestHandler;
+    private readonly IQueryHandler<GetUserRequest, UserDto?> _getUserRequestHandler;
     private readonly IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto> _getAdminAuthorityRequestHandler;
     private readonly IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto> _resolveTenantRedirectionRequestHandler;
     private readonly ICommandHandler<UpdateUserLastActiveTenantCommand, bool> _updateLastActiveTenantCommandHandler;
@@ -51,7 +51,7 @@ public class UserController : EventControllerBase
 
     public UserController(
         ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler,
-        IQueryHandler<GetUserRequest, UserDto> getUserRequestHandler,
+        IQueryHandler<GetUserRequest, UserDto?> getUserRequestHandler,
         IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto> getAdminAuthorityRequestHandler,
         IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto> resolveTenantRedirectionRequestHandler,
         ICommandHandler<UpdateUserLastActiveTenantCommand, bool> updateLastActiveTenantCommandHandler,

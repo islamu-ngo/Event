@@ -16,7 +16,7 @@ public class TagRepository : GenericRepository<Tag, Guid>, ITagRepository
         _dbContext = dbContext;
     }
 
-    public async Task<Tag> GetTagWithDetails(Guid id)
+    public async Task<Tag?> GetTagWithDetails(Guid id)
     {
         return await _dbContext.Tags
             .AsNoTracking()

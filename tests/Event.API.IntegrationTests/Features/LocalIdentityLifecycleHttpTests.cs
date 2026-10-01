@@ -189,9 +189,10 @@ public sealed class LocalIdentityLifecycleHttpTests
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(verified: false, interceptor: failure);
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
         {
-            UserDto cached = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto>>().QueryAsync(
+            UserDto? cached = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto?>>().QueryAsync(
                 new GetUserRequest { UserId = fixture.Binding.LocalSubjectId }, CancellationToken);
-            await Assert.That(cached.EmailVerified).IsFalse();
+            await Assert.That(cached).IsNotNull();
+            await Assert.That(cached?.EmailVerified).IsEqualTo(false);
         }
         using (HttpResponseMessage accepted = await fixture.Client.PostAsJsonAsync(VerificationPath,
             new LocalEmailVerificationRequestDto { Identifier = fixture.Login.Identifier }, CancellationToken))
@@ -213,9 +214,10 @@ public sealed class LocalIdentityLifecycleHttpTests
                 .GetRequiredService<ICommandHandler<ReconcileLocalIdentityLifecycleMirrorCommand, BaseCommandResponse<Guid>>>()
                 .ExecuteAsync(new ReconcileLocalIdentityLifecycleMirrorCommand(handoff.Operation), CancellationToken);
             await Assert.That(repaired.IsSuccess).IsTrue();
-            UserDto refreshed = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto>>().QueryAsync(
+            UserDto? refreshed = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto?>>().QueryAsync(
                 new GetUserRequest { UserId = fixture.Binding.LocalSubjectId }, CancellationToken);
-            await Assert.That(refreshed.EmailVerified).IsTrue();
+            await Assert.That(refreshed).IsNotNull();
+            await Assert.That(refreshed?.EmailVerified).IsEqualTo(true);
         }
         await Assert.That(await fixture.ReadIdentityAsync()).IsEqualTo(identity);
         await Assert.That((await fixture.ReadMirrorAsync()).Verified).IsTrue();

@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Users.Handlers.Queries;
 
-public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto>
+public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto?>
 {
     private readonly IUserRepository _userRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -35,11 +35,11 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto>
         _privacyErasureStateRepository = privacyErasureStateRepository;
     }
 
-    public async Task<UserDto> QueryAsync(GetUserRequest request, CancellationToken cancellationToken = default)
+    public async Task<UserDto?> QueryAsync(GetUserRequest request, CancellationToken cancellationToken = default)
     {
         if (await _privacyErasureStateRepository.GetBySubjectAsync(request.UserId, cancellationToken) is not null)
         {
-            return null!;
+            return null;
         }
 
         var cacheKey = $"user:detail:{request.UserId}";
@@ -73,7 +73,7 @@ public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto>
         if (await _privacyErasureStateRepository.GetBySubjectAsync(request.UserId, cancellationToken) is not null)
         {
             await _cache.RemoveAsync(cacheKey, cancellationToken);
-            return null!;
+            return null;
         }
 
         if (userDto != null && !string.IsNullOrEmpty(userDto.ProfileImageUri))

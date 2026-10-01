@@ -23,7 +23,7 @@ public class AudienceGenderRepository : GenericRepository<AudienceGender, int>, 
         return audienceGenders;
     }
 
-    public async Task<AudienceGender> GetAudienceGenderWithDetails(int id)
+    public async Task<AudienceGender?> GetAudienceGenderWithDetails(int id)
     {
         var audienceGender = await _dbContext.AudienceGenders
             .AsNoTracking()

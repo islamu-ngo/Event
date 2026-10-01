@@ -23,7 +23,7 @@ public class CategoryRepository : GenericRepository<Category, Guid>, ICategoryRe
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
-    public async Task<Category> GetCategoryWithDetails(Guid id)
+    public async Task<Category?> GetCategoryWithDetails(Guid id)
     {
         return await _dbContext.Categories
             .AsNoTracking()

@@ -7,6 +7,6 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface ITagTypeRepository : IGenericRepository<TagType, int>
 {
-    Task<TagType> GetTagTypeWithDetails(int id);
+    Task<TagType?> GetTagTypeWithDetails(int id);
     Task<List<TagType>> GetTagTypesWithDetails();
 }

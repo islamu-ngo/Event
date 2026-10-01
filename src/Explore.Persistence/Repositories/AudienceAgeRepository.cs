@@ -23,7 +23,7 @@ public class AudienceAgeRepository : GenericRepository<AudienceAge, int>, IAudie
             .ToListAsync();
         return audienceAges;
     }
-    public async Task<AudienceAge> GetAudienceAgeWithDetails(int id)
+    public async Task<AudienceAge?> GetAudienceAgeWithDetails(int id)
     {
         var audienceAge = await _dbContext.AudienceAges
             .AsNoTracking()

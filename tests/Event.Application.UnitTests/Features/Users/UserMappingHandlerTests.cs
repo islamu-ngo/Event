@@ -111,9 +111,10 @@ public sealed class UserMappingHandlerTests
         var handler = new GetUserRequestHandler(repository, Substitute.For<IObjectStorageService>(),
             NullLogger<GetUserRequestHandler>.Instance, new InlineCache(), Substitute.For<IPrivacyErasureStateRepository>());
         var result = await handler.QueryAsync(new GetUserRequest(user.Id), CancellationToken.None);
-        await Assert.That(result.Email).IsEqualTo("private@example.invalid");
-        await Assert.That(result.ActorHandle).IsEqualTo("first.example.invalid");
-        await Assert.That(result.ProfileImageUri).IsEqualTo(expected);
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result?.Email).IsEqualTo("private@example.invalid");
+        await Assert.That(result?.ActorHandle).IsEqualTo("first.example.invalid");
+        await Assert.That(result?.ProfileImageUri).IsEqualTo(expected);
     }
 
     [Test]

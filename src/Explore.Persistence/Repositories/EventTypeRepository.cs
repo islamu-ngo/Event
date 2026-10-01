@@ -22,7 +22,7 @@ public class EventTypeRepository : GenericRepository<EventType, int>, IEventType
         return eventTypes;
     }
 
-    public async Task<EventType> GetEventTypeWithDetails(int id)
+    public async Task<EventType?> GetEventTypeWithDetails(int id)
     {
         var eventType = await _dbContext.EventTypes
             .AsNoTracking()

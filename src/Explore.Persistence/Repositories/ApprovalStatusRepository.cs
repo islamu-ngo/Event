@@ -21,7 +21,7 @@ public class ApprovalStatusRepository : GenericRepository<ApprovalStatus, int>, 
             .ToListAsync();
         return statusTypes;
     }
-    public async Task<ApprovalStatus> GetStatusTypeWithDetails(int id)
+    public async Task<ApprovalStatus?> GetStatusTypeWithDetails(int id)
     {
         var statusType = await _dbContext.ApprovalStatuses
             .AsNoTracking()

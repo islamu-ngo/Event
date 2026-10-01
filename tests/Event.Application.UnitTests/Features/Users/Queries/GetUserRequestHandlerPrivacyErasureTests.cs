@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Handlers.Queries;
@@ -35,14 +36,14 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
         IPrivacyErasureStateRepository stateRepository = Substitute.For<IPrivacyErasureStateRepository>();
         stateRepository.GetBySubjectAsync(userId, Arg.Any<CancellationToken>()).Returns(saga);
         var cache = new RecordingHybridCache();
-        var handler = new GetUserRequestHandler(
+        IQueryHandler<GetUserRequest, UserDto?> handler = new GetUserRequestHandler(
             Substitute.For<IUserRepository>(),
             Substitute.For<IObjectStorageService>(),
             Substitute.For<ILogger<GetUserRequestHandler>>(),
             cache,
             stateRepository);
 
-        UserDto result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
+        UserDto? result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(cache.WasRead).IsFalse();
@@ -85,14 +86,14 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
                 }
             });
         var cache = new RecordingHybridCache();
-        var handler = new GetUserRequestHandler(
+        IQueryHandler<GetUserRequest, UserDto?> handler = new GetUserRequestHandler(
             userRepository,
             Substitute.For<IObjectStorageService>(),
             Substitute.For<ILogger<GetUserRequestHandler>>(),
             cache,
             stateRepository);
 
-        UserDto result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
+        UserDto? result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(cache.RemovedKeys).Contains($"user:detail:{userId}");

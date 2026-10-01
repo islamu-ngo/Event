@@ -13,7 +13,7 @@ public class CategoryTypeRepository : GenericRepository<CategoryType, int>, ICat
         _dbContext = dbContext;
     }
 
-    public async Task<CategoryType> GetCategoryTypeWithDetails(int id)
+    public async Task<CategoryType?> GetCategoryTypeWithDetails(int id)
     {
         return await _dbContext.CategoryTypes
             .AsNoTracking()

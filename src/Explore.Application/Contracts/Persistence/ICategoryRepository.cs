@@ -7,7 +7,7 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface ICategoryRepository : IGenericRepository<Category, Guid>
 {
-    Task<Category> GetCategoryWithDetails(Guid id);
+    Task<Category?> GetCategoryWithDetails(Guid id);
     Task<List<Category>> GetCategoriesWithDetails();
     Task<(List<Category> Items, int TotalCount)> GetCategoriesWithDetailsPaged(int pageNumber, int pageSize);
 }

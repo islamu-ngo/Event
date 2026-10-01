@@ -320,7 +320,7 @@ public class UserControllerTests
             .Returns(expected);
         var controller = new UserController(
             Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>(),
-            Substitute.For<IQueryHandler<GetUserRequest, UserDto>>(),
+            Substitute.For<IQueryHandler<GetUserRequest, UserDto?>>(),
             Substitute.For<IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto>>(),
             Substitute.For<IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto>>(),
             Substitute.For<ICommandHandler<UpdateUserLastActiveTenantCommand, bool>>(),

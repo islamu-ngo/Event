@@ -62,7 +62,7 @@ public sealed class AdmissionRecoveryRequestOutboxHandler(
         {
             AdmissionRecoveryRequestPointer pointer =
                 JsonSerializer.Deserialize<AdmissionRecoveryRequestPointer>(
-                    message.Payload,
+                    message.Payload ?? throw new JsonException(),
                     StrictJson) ?? throw new JsonException();
             if (pointer.TenantId == Guid.Empty || pointer.RequestIntentId == Guid.Empty ||
                 pointer.RequestIntentId != message.Id ||

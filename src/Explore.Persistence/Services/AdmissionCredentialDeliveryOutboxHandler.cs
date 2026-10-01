@@ -92,7 +92,8 @@ public sealed class AdmissionCredentialDeliveryOutboxHandler(
         AdmissionCredentialDeliveryPointer pointer;
         try
         {
-            pointer = JsonSerializer.Deserialize<AdmissionCredentialDeliveryPointer>(message.Payload, StrictJson)
+            pointer = JsonSerializer.Deserialize<AdmissionCredentialDeliveryPointer>(
+                    message.Payload ?? throw new JsonException(), StrictJson)
                 ?? throw new JsonException();
         }
         catch (JsonException exception)

@@ -22,6 +22,7 @@ using Explore.Infrastructure.Services.Registration;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Persistence;
+using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
 using Explore.Tests.Shared.Telemetry;
 using Microsoft.AspNetCore.DataProtection;
@@ -36,6 +37,98 @@ namespace Explore.Infrastructure.Tests.Infrastructure;
 
 public sealed class AdmissionCompositeDispatchTests
 {
+    [Test]
+    [Arguments("credential", null)]
+    [Arguments("credential", "null")]
+    [Arguments("credential", "{")]
+    [Arguments("credential", "{\"Unexpected\":true}")]
+    [Arguments("recovery-request", null)]
+    [Arguments("recovery-request", "null")]
+    [Arguments("recovery-request", "{")]
+    [Arguments("recovery-request", "{\"Unexpected\":true}")]
+    [Arguments("recovery-delivery", null)]
+    [Arguments("recovery-delivery", "null")]
+    [Arguments("recovery-delivery", "{")]
+    [Arguments("recovery-delivery", "{\"Unexpected\":true}")]
+    public async Task PersistedMalformedAdmissionPointerFailsBeforeDelivery(string route, string? payload)
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+            .UseSqlite(connection)
+            .UseSnakeCaseNamingConvention()
+            .Options;
+        await using var context = new ExploreDbContext(options);
+        Guid tenantId = Guid.CreateVersion7();
+        context.TenantContext = new AdmissionTenantContext(tenantId);
+        await context.Database.EnsureCreatedAsync();
+        var message = new OutboxMessage
+        {
+            Id = Guid.CreateVersion7(),
+            AggregateType = nameof(AdmissionTicket),
+            AggregateId = Guid.CreateVersion7(),
+            EventType = route switch
+            {
+                "credential" => AdmissionDeliveryEvents.CredentialDeliveryRequested,
+                "recovery-request" => AdmissionRecoveryDeliveryEvents.RecoveryRequestProcessingRequested,
+                _ => AdmissionRecoveryDeliveryEvents.RecoveryDeliveryRequested
+            },
+            Payload = payload,
+            Status = OutboxMessageStatus.Pending,
+            CreatedAt = DateTime.UtcNow,
+            MaxRetries = 10
+        };
+        context.OutboxMessages.Add(message);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        OutboxMessage persisted = await context.OutboxMessages.SingleAsync();
+        await Assert.That(persisted.Payload).IsEqualTo(payload);
+        var unitOfWork = new EfCoreUnitOfWork(context);
+        var recoveryService = new AdmissionRecoveryService(
+            new AdmissionRecoveryRepository(context),
+            new AdmissionRecoveryIdentityResolver(context),
+            Substitute.For<IAdmissionRecoveryCapabilityService>(),
+            unitOfWork,
+            TimeProvider.System,
+            Substitute.For<IAdmissionRecoveryDeliveryStager>(),
+            Substitute.For<IAdmissionRecoveryAuditService>(),
+            Substitute.For<IAdmissionRecoveryRateLimiter>(),
+            Substitute.For<IAdmissionRecoveryRequestStager>(),
+            NullLogger<AdmissionRecoveryService>.Instance);
+        CompositeOutboxMessageDispatcher composite = CreateComposite(
+            new AdmissionCredentialDeliveryOutboxHandler(
+                context, Substitute.For<IAdmissionDeliveryEnvelopeProtector>(),
+                Substitute.For<IAdmissionCredentialDirectDeliveryChannel>(), TimeProvider.System),
+            new AdmissionRecoveryRequestOutboxHandler(
+                context, Substitute.For<IAdmissionRecoveryRequestEnvelopeProtector>(),
+                recoveryService, unitOfWork, TimeProvider.System),
+            new AdmissionRecoveryDeliveryOutboxHandler(
+                context, Substitute.For<IAdmissionRecoveryDeliveryEnvelopeProtector>(),
+                Substitute.For<IAdmissionRecoveryDirectDeliveryChannel>(), TimeProvider.System));
+
+        InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => composite.DispatchAsync(persisted));
+
+        string classification = route switch
+        {
+            "credential" => "Admission delivery pointer is malformed.",
+            "recovery-request" => "Recovery request pointer is malformed.",
+            _ => "Recovery delivery pointer is malformed."
+        };
+        await Assert.That(failure.Message).IsEqualTo(classification);
+        await Assert.That(failure.InnerException is JsonException).IsTrue();
+        await Assert.That(context.ChangeTracker.HasChanges()).IsFalse();
+        context.ChangeTracker.Clear();
+        OutboxMessage unchanged = await context.OutboxMessages.SingleAsync();
+        await Assert.That(unchanged.Status).IsEqualTo(OutboxMessageStatus.Pending);
+        await Assert.That(unchanged.RetryCount).IsEqualTo(0);
+        await Assert.That(unchanged.NextRetryAt).IsNull();
+        await Assert.That(unchanged.LastError).IsNull();
+        await Assert.That(await context.AdmissionRecoveryRequestIntents.CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.AdmissionRecoveryDeliveryIntents.CountAsync()).IsEqualTo(0);
+        await Assert.That(await context.AdmissionDeliveryIntents.CountAsync()).IsEqualTo(0);
+    }
+
     [Test]
     public async Task ProductionAdmissionDispatcherRoutesThroughCompositeAndRetiresOnlyAfterAcknowledgement()
     {
@@ -211,7 +304,9 @@ public sealed class AdmissionCompositeDispatchTests
     }
 
     private static CompositeOutboxMessageDispatcher CreateComposite(
-        IAdmissionCredentialDeliveryOutboxHandler admissionHandler)
+        IAdmissionCredentialDeliveryOutboxHandler admissionHandler,
+        IAdmissionRecoveryRequestOutboxHandler? recoveryRequestHandler = null,
+        IAdmissionRecoveryDeliveryOutboxHandler? recoveryDeliveryHandler = null)
     {
         HybridCache cache = new MinimalHybridCache();
         var correctionPlanner = Substitute.For<IAtprotoLocationPrivacyCorrectionPlanner>();
@@ -229,8 +324,8 @@ public sealed class AdmissionCompositeDispatchTests
             new LocationPrivacyCorrectionDispatcher(cache, correctionPlanner, EventLocationPrivacyMetricsFactory.Create()),
             new PrivacyErasureCacheInvalidationDispatcher(cache),
             admissionHandler,
-            Substitute.For<IAdmissionRecoveryRequestOutboxHandler>(),
-            Substitute.For<IAdmissionRecoveryDeliveryOutboxHandler>(),
+            recoveryRequestHandler ?? Substitute.For<IAdmissionRecoveryRequestOutboxHandler>(),
+            recoveryDeliveryHandler ?? Substitute.For<IAdmissionRecoveryDeliveryOutboxHandler>(),
             Substitute.For<IOutboxRepository>(),
             campaignRepository,
             new RefundCampaignProcessor(

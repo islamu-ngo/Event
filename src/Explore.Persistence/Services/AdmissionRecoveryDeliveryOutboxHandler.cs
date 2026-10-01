@@ -87,7 +87,7 @@ public sealed class AdmissionRecoveryDeliveryOutboxHandler(
         try
         {
             pointer = JsonSerializer.Deserialize<AdmissionRecoveryDeliveryPointer>(
-                    message.Payload,
+                    message.Payload ?? throw new JsonException(),
                     StrictJson)
                 ?? throw new JsonException();
         }

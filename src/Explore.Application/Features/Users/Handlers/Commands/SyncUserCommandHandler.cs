@@ -12,6 +12,7 @@ using Explore.Application.Contracts.Operations;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Identity;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +23,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
 {
     private readonly IUserRepository _userRepository;
     private readonly IUserExternalLoginRepository _userExternalLoginRepository;
+    private readonly IIdentityAccountResolver _identityAccountResolver;
     private readonly IActorRepository _actorRepository;
     private readonly ITenantContextAccessor _tenantContext;
     private readonly ITenantLifecycleAccessService _lifecycle;
@@ -34,6 +36,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     public SyncUserCommandHandler(
         IUserRepository userRepository,
         IUserExternalLoginRepository userExternalLoginRepository,
+        IIdentityAccountResolver identityAccountResolver,
         IActorRepository actorRepository,
         ITenantContextAccessor tenantContext,
         ITenantLifecycleAccessService lifecycle,
@@ -45,6 +48,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
     {
         _userRepository = userRepository;
         _userExternalLoginRepository = userExternalLoginRepository;
+        _identityAccountResolver = identityAccountResolver;
         _actorRepository = actorRepository;
         _tenantContext = tenantContext;
         _lifecycle = lifecycle;
@@ -64,6 +68,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
             ProviderAccountKey accountKey = request.AccountKey;
             AuthenticationProviderKind providerKind = accountKey.ProviderKind;
             if ((request.LocalLifecycleSynchronization is not null && providerKind != AuthenticationProviderKind.Local)
+                || (request.AuthorityEvidence is not null && request.AuthorityEvidence.AccountKey != accountKey)
                 || (!string.IsNullOrWhiteSpace(userDto.AuthProvider)
                     && userDto.AuthProvider.ParseAuthenticationProviderKind() != providerKind))
             {
@@ -72,8 +77,8 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                     "Provider account authority is invalid.");
             }
 
-            var supportsEmailAutoMatch = SupportsEmailAutoMatch(providerKind);
-            var email = NormalizeEmail(userDto.Email);
+            var email = NormalizeEmail(request.AuthorityEvidence?.Email ?? userDto.Email);
+            bool? emailVerified = request.AuthorityEvidence?.EmailVerified ?? userDto.EmailVerified;
 
             var existingLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
             if (providerKind == AuthenticationProviderKind.Local)
@@ -136,7 +141,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                         Email = email,
                         FirstName = userDto.FirstName,
                         LastName = userDto.LastName,
-                        EmailVerified = userDto.EmailVerified
+                        EmailVerified = emailVerified
                     },
                     cancellationToken);
                 if (bootstrap.Status == InstanceBootstrapStatus.Pending)
@@ -153,7 +158,10 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 }
             }
 
-            if (!supportsEmailAutoMatch && string.IsNullOrWhiteSpace(email))
+            if (providerKind != AuthenticationProviderKind.Local && request.AuthorityEvidence is null)
+                return ExplicitBindingRequired();
+
+            if (providerKind == AuthenticationProviderKind.Atproto && string.IsNullOrWhiteSpace(email))
             {
                 if (existingLogin == null)
                 {
@@ -163,58 +171,26 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                 }
             }
 
-            // Pre-reads for user resolution — outside transaction for fast rejection
-            User? user = null;
-
-            if (existingLogin != null)
-            {
-                user = await _userRepository.GetById(existingLogin.UserId);
-            }
-
-            if (user == null && userDto.Id != Guid.Empty)
-            {
-                user = await _userRepository.GetById(userDto.Id);
-            }
-
-            if (user == null
-                && supportsEmailAutoMatch
-                && userDto.EmailVerified == true
-                && !string.IsNullOrWhiteSpace(email))
-            {
-                IReadOnlyList<User> emailMatches =
-                    await _userRepository.GetUsersByNormalizedEmailAsync(email, cancellationToken);
-                if (emailMatches.Count > 1)
-                {
-                    const string message =
-                        "Verified email resolves to multiple user accounts; explicit linking is required.";
-                    return BaseCommandResponse.Validation<Guid>([message], message);
-                }
-
-                user = emailMatches.SingleOrDefault();
-                if (user is not null && await IsLocalOwnedAsync(user.Id, cancellationToken))
-                    user = null;
-            }
-
-
-            // Fast-rejection for missing email on new account creation — before any writes
-            string? safeEmail = null;
-            if (user == null)
-            {
-                safeEmail = ResolveEmailForCreation(providerKind, email);
-                if (string.IsNullOrWhiteSpace(safeEmail))
-                {
-                    return BaseCommandResponse.Validation<Guid>(
-                        ["Email is required to create a new account for this provider."],
-                        "Email is required to create a new account for this provider.");
-                }
-            }
+            IdentityAccountResolution resolution = await _identityAccountResolver.ResolveAsync(
+                accountKey, request.AuthorityEvidence, cancellationToken);
+            if (resolution.Decision == IdentityCorrelationDecision.RecoveryRequired)
+                return ExplicitBindingRequired();
+            User? user = resolution.User;
 
             // IDs generated before lambda — captured via closure for retry safety
-            var newUserId = userDto.Id != Guid.Empty ? userDto.Id : Guid.CreateVersion7();
+            var newUserId = Guid.CreateVersion7();
             var loginId = Guid.CreateVersion7();
 
             async Task<BaseCommandResponse<Guid>> SynchronizeAsync(CancellationToken ct)
             {
+                IdentityAccountResolution current = await _identityAccountResolver.ResolveAsync(
+                    accountKey, request.AuthorityEvidence, ct);
+                if (current.Decision == IdentityCorrelationDecision.RecoveryRequired
+                    || current.User?.Id != user?.Id
+                    || (resolution.Decision == IdentityCorrelationDecision.ExactBinding
+                        && current.Decision != IdentityCorrelationDecision.ExactBinding))
+                    return ExplicitBindingRequired();
+
                 UserExternalLogin? currentLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
                 ct.ThrowIfCancellationRequested();
                 if (providerKind == AuthenticationProviderKind.Local)
@@ -242,11 +218,11 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
                         Id = newUserId,
                         Pii = new UserPii
                         {
-                            Email = safeEmail!,
+                            Email = email,
                             FirstName = ResolveFirstName(userDto.FirstName),
                             LastName = ResolveLastName(userDto.LastName)
                         },
-                        EmailVerified = userDto.EmailVerified ?? supportsEmailAutoMatch
+                        EmailVerified = emailVerified ?? false
                     };
 
                     var createdUser = await _userRepository.Create(newUser);
@@ -277,9 +253,9 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
 
                     user.FirstName = ResolveFirstName(userDto.FirstName);
                     user.LastName = ResolveLastName(userDto.LastName);
-                    if (userDto.EmailVerified.HasValue)
+                    if (emailVerified.HasValue)
                     {
-                        user.EmailVerified = userDto.EmailVerified;
+                        user.EmailVerified = emailVerified;
                     }
 
                     var actor = await _actorRepository.GetActorByUserId(user.Id);
@@ -357,7 +333,7 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
 
     private static BaseCommandResponse<Guid> ExplicitBindingRequired()
     {
-        const string message = "Identity ownership requires an explicit account binding.";
+        const string message = "Account synchronization requires recovery through the original sign-in provider or operator support.";
         return BaseCommandResponse.Validation<Guid>(errors: [message], message: message);
     }
 
@@ -390,27 +366,11 @@ public class SyncUserCommandHandler : ICommandHandler<SyncUserCommand, BaseComma
         await _userExternalLoginRepository.Create(login);
     }
 
-    private static bool SupportsEmailAutoMatch(AuthenticationProviderKind provider)
-    {
-        return provider is AuthenticationProviderKind.Keycloak
-            or AuthenticationProviderKind.Google;
-    }
-
     private static string NormalizeEmail(string? email)
     {
         return string.IsNullOrWhiteSpace(email)
             ? string.Empty
             : email.Trim().ToLowerInvariant();
-    }
-
-    private static string ResolveEmailForCreation(AuthenticationProviderKind provider, string email)
-    {
-        if (!string.IsNullOrWhiteSpace(email))
-        {
-            return email;
-        }
-
-        return provider == AuthenticationProviderKind.Atproto ? string.Empty : email;
     }
 
     private static string ResolveFirstName(string? firstName)

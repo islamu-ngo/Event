@@ -86,6 +86,12 @@ public static class ApplicationServicesRegistration
         IConfiguration configuration)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddOptions<IdentityCorrelationOptions>()
+            .Bind(configuration.GetSection(IdentityCorrelationOptions.SectionName))
+            .Validate(IdentityCorrelationOptions.IsValid,
+                "Identity correlation issuers must be valid, distinct exact OIDC authorities.")
+            .ValidateOnStart();
+        services.AddScoped<IIdentityAccountResolver, IdentityAccountResolver>();
         PrivacyErasureDurabilityOptions erasureDurability =
             PrivacyErasureDurabilityOptions.FromConfiguration(configuration);
         services.AddOptions<PrivacyErasureDurabilityOptions>()

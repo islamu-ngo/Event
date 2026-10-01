@@ -9,6 +9,7 @@ using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Authentication;
 using Explore.API.Models;
 using Explore.Application.Authentication;
+using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Authentication.Atproto.Models;
@@ -21,6 +22,7 @@ using Explore.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Event.API.IntegrationTests.Features;
 
@@ -28,13 +30,19 @@ namespace Event.API.IntegrationTests.Features;
 public sealed class ExternalProviderEmailVerificationHttpTests
 {
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    [Arguments(null)]
-    public async Task InstanceEmailIntentCannotRewriteExternalVerificationEvidence(bool? verificationClaim)
+    [Arguments(true, true)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(false, false)]
+    [Arguments(null, true)]
+    [Arguments(null, false)]
+    public async Task InstanceEmailIntentCannotRewriteExternalVerificationEvidence(
+        bool? verificationClaim, bool correlationTrusted)
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(
             primaryProvider: AuthenticationProviderKind.Keycloak);
+        factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers =
+            correlationTrusted ? [factory.ExternalIssuer] : [];
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -78,6 +86,33 @@ public sealed class ExternalProviderEmailVerificationHttpTests
                 setting => setting.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled)).Value)
                 .IsEqualTo(enabled ? "true" : "false");
         }
+    }
+
+    [Test]
+    public async Task MissingEmailAllowsSafeOidcSignupWithoutInventingVerification()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync(
+            primaryProvider: AuthenticationProviderKind.Keycloak);
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
+        });
+        Guid subject = Guid.CreateVersion7();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            factory.CreateExternalProviderToken(subject, string.Empty, null));
+
+        using HttpResponseMessage response = await client.PostAsync("/api/User/sync", null);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await using ExploreDbContext database = factory.CreateDatabase();
+        string key = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            factory.ExternalIssuer, subject.ToString("D")).Value;
+        UserExternalLogin binding = await database.UserExternalLogins.Include(login => login.User)
+            .SingleAsync(login => login.ProviderKey == key);
+        await Assert.That(binding.User.Email).IsEqualTo(string.Empty);
+        await Assert.That(binding.User.EmailVerified).IsEqualTo(false);
+        await Assert.That(await database.LocalIdentityUsers.AnyAsync()).IsFalse();
     }
 
     [Test]

@@ -90,6 +90,7 @@ passwordless authority.
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `AUTHENTICATION_PROVIDER` | **Baseline** | `local` | Primary provider: `local`, `keycloak`, or `atproto`. |
+| `IDENTITYCORRELATION__TRUSTEDISSUERS__0` (and subsequent numeric indices) | Advanced | Empty allowlist | Exact OIDC issuers permitted to correlate verified email with an eligible existing account. Separate from login admission; process restart required. |
 | `AUTHENTICATION_LOCAL_JWT_KEY` | **Baseline (Secret)** | None | Base64-encoded Local JWT signing key of at least 256 bits; required when Local Identity is primary. |
 | `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | Advanced | `5` | Consecutive failed Local Identity attempts before lockout. |
 | `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | Advanced | `15` | Local Identity lockout duration. |
@@ -107,6 +108,26 @@ passwordless authority.
 | `IDENTITY_DATABASE_RUNTIME_PASSWORD` | External topology (Secret) | None | Least-privilege runtime credential password. |
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | External topology | None | Schema-owner/migrator credential username. |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | External topology (Secret) | None | Schema-owner/migrator credential password. |
+
+### Exact issuer trust for account matching
+
+Set one nonempty issuer per numeric index, for example
+`IDENTITYCORRELATION__TRUSTEDISSUERS__0=https://identity.example.org/realms/community`.
+Supply these variables to the API or Standalone process. With Docker Compose,
+explicitly forward the selected indexed variables in a service override; adding
+a key to Compose's interpolation `.env` alone does not inject it into a container.
+The equivalent application configuration is `IdentityCorrelation:TrustedIssuers`.
+Omit all members to disable automatic email matching; do not use an empty member
+as an empty-list marker.
+
+Only deployment operators own this allowlist. Tenant administrators cannot widen
+it. Values must be exact issuer authorities, with no wildcard, user information,
+query or fragment. Host/scheme case, default ports and trailing slashes normalize
+like provider account keys; realm/path case remains significant. Duplicate
+normalized authorities and malformed entries stop startup. Restart the process
+after changing trust. Existing exact account bindings and permitted safe signup
+do not depend on inclusion, and the allowlist does not change the provider's
+`email_verified` assertion.
 
 > [!WARNING]
 > **Do not blindly mirror `IDENTITY_DATABASE_TOPOLOGY` and `ERASURE_DATABASE_TOPOLOGY`.**
@@ -381,6 +402,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | required | process |
 | `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
 | `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
+| `IDENTITYCORRELATION__TRUSTEDISSUERS__0` | identity | public | None | optional | process |
 | `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
 | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |
 | `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | identity | sensitive | None | required | process |

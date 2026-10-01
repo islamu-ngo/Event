@@ -49,6 +49,14 @@ public static class DotenvComposer
         EnvironmentVariableDefinition[] relevant = catalogue.Relevant(context)
             .Where(item => item.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Dotenv))
             .ToArray();
+        if (relevant.Any(item => item.Key == IdentityCorrelationEnvironment.FirstKey))
+        {
+            relevant = relevant.Concat(supplied.Where(entry => entry is not null
+                    && IdentityCorrelationEnvironment.IsIssuerKey(entry.Key))
+                .Select(entry => catalogue.Lookup(entry!.Key)!)
+                .OrderBy(item => item.Key, StringComparer.Ordinal))
+                .DistinctBy(item => item.Key, StringComparer.Ordinal).ToArray();
+        }
         var relevantByKey = relevant.ToDictionary(item => item.Key, StringComparer.Ordinal);
         var diagnostics = new List<EnvironmentDiagnostic>();
         var groups = new Dictionary<string, List<DotenvEntry>>(StringComparer.OrdinalIgnoreCase);
@@ -101,6 +109,7 @@ public static class DotenvComposer
 
         ValidateConfiguredBootstrapMatrix(relevantByKey, suppliedByKey, diagnostics);
         var output = new List<DotenvEntry>();
+        var correlationIssuers = new HashSet<string>(StringComparer.Ordinal);
         foreach (EnvironmentVariableDefinition definition in relevant)
         {
             bool isProtected = definition.Sensitivity != EnvironmentVariableSensitivity.Public;
@@ -130,6 +139,17 @@ public static class DotenvComposer
                     if (definition.Requirement == EnvironmentVariableRequirement.Required)
                         output.Add(Placeholder(definition.Key, isProtected));
                     continue;
+                }
+                if (definition.ValidatorId == "identity-correlation-issuer")
+                {
+                    string? issuer = IdentityCorrelationEnvironment.NormalizeIssuer(suppliedEntry.Value);
+                    if (issuer is null || !correlationIssuers.Add(issuer))
+                    {
+                        Add(diagnostics, issuer is null
+                            ? "dotenv-input-value-invalid"
+                            : "dotenv-identity-issuer-duplicate", definition.Key);
+                        continue;
+                    }
                 }
                 if (!isProtected && definition.SafeDefault is not null
                     && string.Equals(suppliedEntry.Value, definition.SafeDefault, StringComparison.Ordinal))

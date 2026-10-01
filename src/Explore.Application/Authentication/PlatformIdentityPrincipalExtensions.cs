@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ISLAMU.Wire.Contracts.Identity;
 using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Domain;
@@ -148,7 +149,16 @@ public static class PlatformIdentityPrincipalExtensions
             Provider: provider,
             AccountKey: accountKey,
             Email: email,
-            EmailVerified: GetEmailVerified(identity));
+            EmailVerified: GetEmailVerified(identity))
+        {
+            AuthorityEvidence = new IdentityAuthorityEvidence(
+                accountKey,
+                accountKey.ProviderKind is AuthenticationProviderKind.Keycloak or AuthenticationProviderKind.Google
+                    ? OidcIssuerAuthority.Normalize(identity!.FindFirst("iss")!.Value)
+                    : null,
+                email,
+                accountKey.ProviderKind != AuthenticationProviderKind.Atproto && GetEmailVerified(identity))
+        };
     }
 
     /// <summary>
@@ -179,7 +189,7 @@ public static class PlatformIdentityPrincipalExtensions
 
         try
         {
-            return ClassifyOidcIssuer(NormalizeIssuerAuthority(identity?.FindFirst("iss")?.Value ?? string.Empty))
+            return ClassifyOidcIssuer(OidcIssuerAuthority.Normalize(identity?.FindFirst("iss")?.Value ?? string.Empty))
                 .ToAuthenticationProviderCode();
         }
         catch (ArgumentException)
@@ -196,7 +206,7 @@ public static class PlatformIdentityPrincipalExtensions
     public static ProviderAccountKey CreateOidcAccountKey(string issuer, string subject)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(subject);
-        string authority = NormalizeIssuerAuthority(issuer);
+        string authority = OidcIssuerAuthority.Normalize(issuer);
         string exactSubject = subject;
         return new ProviderAccountKey(
             ClassifyOidcIssuer(authority),
@@ -253,34 +263,6 @@ public static class PlatformIdentityPrincipalExtensions
         }
     }
 
-    private static string NormalizeIssuerAuthority(string issuer)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(issuer);
-        if (!Uri.TryCreate(issuer.Trim(), UriKind.Absolute, out Uri? uri)
-            || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
-            || !string.IsNullOrEmpty(uri.UserInfo)
-            || !string.IsNullOrEmpty(uri.Query)
-            || !string.IsNullOrEmpty(uri.Fragment))
-        {
-            throw new ArgumentException("OIDC issuer authority is invalid.", nameof(issuer));
-        }
-
-        var builder = new UriBuilder(uri)
-        {
-            Scheme = uri.Scheme.ToLowerInvariant(),
-            Host = uri.IdnHost.ToLowerInvariant(),
-            Path = uri.AbsolutePath.TrimEnd('/'),
-            Query = string.Empty,
-            Fragment = string.Empty
-        };
-        if (uri.IsDefaultPort)
-        {
-            builder.Port = -1;
-        }
-
-        return builder.Uri.AbsoluteUri.TrimEnd('/');
-    }
-
     /// <summary>
     /// Returns true only when the principal carries an explicit, parseable true <c>email_verified</c> claim.
     /// </summary>
@@ -315,4 +297,5 @@ public sealed record ProviderIdentity(
     bool EmailVerified)
 {
     public string ProviderId => AccountKey.Value;
+    public IdentityAuthorityEvidence? AuthorityEvidence { get; init; }
 }

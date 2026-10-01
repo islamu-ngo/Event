@@ -1,7 +1,10 @@
 
 using System.Data.Common;
+using System.Globalization;
+using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
+using Explore.Application.Configuration;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -151,7 +154,10 @@ public sealed class LocalIdentitySynchronizationTests
         var boundary = new TransactionBoundaryInterceptor(beforeStart: _ => AddLoginAsync(
             factory: factory, userId: existing.UserId, accountKey: LocalKey(existing.UserId)));
         await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton)));
+        {
+            services.Configure<IdentityCorrelationOptions>(options => options.TrustedIssuers = ["https://accounts.google.com"]);
+            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+        }));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>()
             .SetTenant(PlatformDefaults.DefaultTenantId);
@@ -230,6 +236,8 @@ public sealed class LocalIdentitySynchronizationTests
         Graph existing = await SeedGraphAsync(factory: factory, userId: Guid.CreateVersion7(), email: email,
             accountKey: ExternalKey(AuthenticationProviderKind.Keycloak));
         ProviderAccountKey incoming = ExternalKey(provider);
+        factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers =
+            ["https://accounts.google.com", "https://identity.example.test/realms/synchronization"];
 
         BaseCommandResponse<Guid> response = await SynchronizeAsync(factory,
             Command(accountKey: incoming, userId: Guid.Empty, email: email));
@@ -387,7 +395,10 @@ public sealed class LocalIdentitySynchronizationTests
         Counts before = await ReadCountsAsync(factory);
         var boundary = new TransactionBoundaryInterceptor(beforeStart: _ => Task.CompletedTask);
         await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton)));
+        {
+            services.Configure<IdentityCorrelationOptions>(options => options.TrustedIssuers = ["https://accounts.google.com"]);
+            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+        }));
         await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
         boundary.Enabled = true;
 
@@ -520,6 +531,145 @@ public sealed class LocalIdentitySynchronizationTests
             && login.UserId == existing.UserId && login.ProviderKey == incoming.Value, CancellationToken)).IsTrue();
     }
 
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task OnlyExactTrustedIssuerMayAdoptAnEligibleAccount(bool trustedIssuer)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        const string trusted = "https://identity.example.test/realms/synchronization";
+        factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers = [trusted];
+        string email = $"authority-{Guid.CreateVersion7():N}@example.test";
+        Graph target = await SeedGraphAsync(factory, Guid.CreateVersion7(), email,
+            ExternalKey(AuthenticationProviderKind.Keycloak));
+        Profile original = await ReadProfileAsync(factory, target.UserId);
+        Counts before = await ReadCountsAsync(factory);
+        ProviderAccountKey incoming = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            trustedIssuer ? trusted : "https://identity.example.test/realms/other",
+            Guid.CreateVersion7().ToString("D"));
+
+        BaseCommandResponse<Guid> result = await SynchronizeAsync(factory,
+            Command(incoming, Guid.Empty, email));
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id == target.UserId).IsEqualTo(trustedIssuer);
+        Counts after = await ReadCountsAsync(factory);
+        await Assert.That(after.Users).IsEqualTo(before.Users + (trustedIssuer ? 0 : 1));
+        await Assert.That(after.Logins).IsEqualTo(before.Logins + 1);
+        if (!trustedIssuer)
+            await Assert.That(await ReadProfileAsync(factory, target.UserId)).IsEqualTo(original);
+    }
+
+    [Test]
+    public async Task ExactBindingSurvivesTrustRemovalAndAnotherAccountsChangedEmail()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        ProviderAccountKey incoming = ExternalKey(AuthenticationProviderKind.Keycloak);
+        Graph bound = await SeedGraphAsync(factory, Guid.CreateVersion7(),
+            $"bound-{Guid.CreateVersion7():N}@example.test", incoming);
+        string changedEmail = $"other-{Guid.CreateVersion7():N}@example.test";
+        Graph other = await SeedGraphAsync(factory, Guid.CreateVersion7(), changedEmail,
+            ExternalKey(AuthenticationProviderKind.Keycloak));
+        Profile otherBefore = await ReadProfileAsync(factory, other.UserId);
+        Counts before = await ReadCountsAsync(factory);
+
+        BaseCommandResponse<Guid> result = await SynchronizeAsync(factory,
+            Command(incoming, other.UserId, changedEmail));
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id).IsEqualTo(bound.UserId);
+        await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before);
+        await Assert.That(await ReadProfileAsync(factory, other.UserId)).IsEqualTo(otherBefore);
+    }
+
+    [Test]
+    public async Task DtoEmailAndVerificationCannotReplacePrincipalEvidence()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        factory.Services.GetRequiredService<IOptions<IdentityCorrelationOptions>>().Value.TrustedIssuers =
+            ["https://identity.example.test/realms/synchronization"];
+        string targetEmail = $"target-{Guid.CreateVersion7():N}@example.test";
+        Graph target = await SeedGraphAsync(factory, Guid.CreateVersion7(), targetEmail,
+            ExternalKey(AuthenticationProviderKind.Keycloak));
+        Profile original = await ReadProfileAsync(factory, target.UserId);
+        ProviderAccountKey incoming = ExternalKey(AuthenticationProviderKind.Keycloak);
+        string principalEmail = $"unverified-{Guid.CreateVersion7():N}@example.test";
+        SyncUserCommand command = Command(incoming, target.UserId, targetEmail) with
+        {
+            AuthorityEvidence = Evidence(incoming, principalEmail, verified: false)
+        };
+
+        BaseCommandResponse<Guid> result = await SynchronizeAsync(factory, command);
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id == target.UserId).IsFalse();
+        Profile created = await ReadProfileAsync(factory, result.Id);
+        await Assert.That(created.Email).IsEqualTo(principalEmail);
+        await Assert.That(created.EmailVerified).IsEqualTo(false);
+        await Assert.That(await ReadProfileAsync(factory, target.UserId)).IsEqualTo(original);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingOrDifferentAccountEvidenceCannotSynchronize(bool differentAccount)
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        ProviderAccountKey incoming = ExternalKey(AuthenticationProviderKind.Keycloak);
+        string email = $"bound-{Guid.CreateVersion7():N}@example.test";
+        Graph target = await SeedGraphAsync(factory, Guid.CreateVersion7(), email, incoming);
+        Counts before = await ReadCountsAsync(factory);
+        Profile original = await ReadProfileAsync(factory, target.UserId);
+        SyncUserCommand command = Command(incoming, Guid.Empty, email) with
+        {
+            AuthorityEvidence = differentAccount
+                ? Evidence(ExternalKey(AuthenticationProviderKind.Keycloak), email)
+                : null
+        };
+
+        BaseCommandResponse<Guid> result = await SynchronizeAsync(factory, command);
+
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before);
+        await Assert.That(await ReadProfileAsync(factory, target.UserId)).IsEqualTo(original);
+    }
+
+    [Test]
+    public async Task NewlyAmbiguousEmailCannotUseAStaleAdoptionCandidate()
+    {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        string email = $"ambiguous-{Guid.CreateVersion7():N}@example.test";
+        Graph target = await SeedGraphAsync(factory, Guid.CreateVersion7(), email,
+            ExternalKey(AuthenticationProviderKind.Keycloak));
+        Profile original = await ReadProfileAsync(factory, target.UserId);
+        var boundary = new TransactionBoundaryInterceptor(async _ =>
+        {
+            await SeedGraphAsync(factory, Guid.CreateVersion7(), email,
+                ExternalKey(AuthenticationProviderKind.Keycloak));
+        });
+        await using var instrumented = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.Configure<IdentityCorrelationOptions>(options => options.TrustedIssuers =
+                ["https://identity.example.test/realms/synchronization"]);
+            services.ConfigureDbContext<ExploreDbContext>(options => options.AddInterceptors(boundary), ServiceLifetime.Singleton);
+        }));
+        await using AsyncServiceScope scope = instrumented.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
+        boundary.Enabled = true;
+        ProviderAccountKey incoming = ExternalKey(AuthenticationProviderKind.Keycloak);
+
+        BaseCommandResponse<Guid> result = await scope.ServiceProvider
+            .GetRequiredService<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>()
+            .ExecuteAsync(Command(incoming, Guid.Empty, email), CancellationToken);
+
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(boundary.TransactionsStarted).IsEqualTo(1);
+        await Assert.That(await ReadProfileAsync(factory, target.UserId)).IsEqualTo(original);
+        await using ExploreDbContext stored = factory.CreateDatabase();
+        await Assert.That(await stored.UserExternalLogins.AnyAsync(login =>
+            login.ProviderKey == incoming.Value, CancellationToken)).IsFalse();
+    }
+
     private static ProviderAccountKey ConfiguredKey(string subject)
     {
         ProviderAccountKey oidc = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
@@ -576,14 +726,17 @@ public sealed class LocalIdentitySynchronizationTests
 
     private static ProviderAccountKey ExternalKey(AuthenticationProviderKind provider)
     {
-        ProviderAccountKey oidc = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
-            issuer: "https://identity.example.test/realms/synchronization", subject: Guid.CreateVersion7().ToString("D"));
-        return new ProviderAccountKey(providerKind: provider, value: oidc.Value);
+        return PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            issuer: provider == AuthenticationProviderKind.Google
+                ? "https://accounts.google.com"
+                : "https://identity.example.test/realms/synchronization",
+            subject: Guid.CreateVersion7().ToString("D"));
     }
 
     private static SyncUserCommand Command(ProviderAccountKey accountKey, Guid userId, string email) => new()
     {
         AccountKey = accountKey,
+        AuthorityEvidence = Evidence(accountKey, email),
         UserDto = new UserDto
         {
             Id = userId,
@@ -595,6 +748,23 @@ public sealed class LocalIdentitySynchronizationTests
             EmailVerified = true
         }
     };
+
+    private static IdentityAuthorityEvidence? Evidence(
+        ProviderAccountKey accountKey, string email, bool verified = true)
+    {
+        if (accountKey.ProviderKind == AuthenticationProviderKind.Local)
+            return null;
+        int lengthEnd = accountKey.Value.IndexOf(':', 5);
+        int issuerLength = int.Parse(accountKey.Value.AsSpan(5, lengthEnd - 5), CultureInfo.InvariantCulture);
+        string issuer = accountKey.Value.Substring(lengthEnd + 1, issuerLength);
+        string subject = accountKey.Value[(lengthEnd + issuerLength + 2)..];
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("iss", issuer), new Claim("sub", subject), new Claim("email", email),
+            new Claim("email_verified", verified ? "true" : "false")
+        ], "ValidatedTestPrincipal"));
+        return principal.GetProviderIdentity()!.AuthorityEvidence;
+    }
 
     private static async Task<BaseCommandResponse<Guid>> SynchronizeAsync(
         LocalAdmissionWebApplicationFactory factory, SyncUserCommand command)

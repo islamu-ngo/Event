@@ -23,6 +23,29 @@ for the five supported states.
 
 ---
 
+## Account Matching and Recovery
+
+Accepting a sign-in provider does not automatically trust it to attach a new
+identity to an existing Event account by email. Automatic matching is disabled
+by default. A deployment operator may explicitly allow exact OIDC issuer
+addresses with `IdentityCorrelation:TrustedIssuers`; see the
+[environment reference](../configuration-and-operations/environment-variables.md#3-authentication-providers-and-local-identity).
+Only that issuer's verified email can match one eligible account. Local-owned
+accounts are never automatically adopted this way.
+
+An already linked issuer and subject always resolve the same Event account,
+even if the email changes or the operator removes the issuer from matching
+trust. Removing trust stops new email-based matches; it does not unlink users.
+Ordinary permitted first signup remains available without matching trust,
+including unverified or absent email. AT Protocol continues to support
+email-free signup through a verified DID. Mail settings do not manufacture or
+erase a provider's verification statement.
+
+An ambiguous or conflicting identity is not silently merged or used to select
+another account. Recover access through the original sign-in provider or
+contact the instance operator. Event does not currently offer a general
+self-service account-merge or explicit-linking screen.
+
 ## Browser Authentication Flow
 
 The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of the selected provider:

@@ -131,7 +131,7 @@
         var dialog = await DialogService.ShowAsync<TemplateSyncConfirmationDialog>("Confirm Sync", parameters, DialogOptionsFactory.Confirmation());
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             var plan = new TemplateSyncPlanDto
             {

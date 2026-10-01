@@ -358,6 +358,68 @@ public sealed class TenantFooterSectionTests : IDisposable
         cut.Dispose();
     }
 
+    [Test]
+    [Arguments("OpenCreateGroupDialog", false)]
+    [Arguments("OpenEditGroupDialog", false)]
+    [Arguments("OpenCreateLinkDialog", false)]
+    [Arguments("OpenEditLinkDialog", false)]
+    [Arguments("OpenCreateGroupDialog", true)]
+    [Arguments("OpenEditGroupDialog", true)]
+    [Arguments("OpenCreateLinkDialog", true)]
+    [Arguments("OpenEditLinkDialog", true)]
+    public async Task DialogCompletion_MutatesOnlyOnTypedSuccess(string callback, bool success)
+    {
+        var group = new FooterLinkGroupListDto { Id = Guid.NewGuid(), Title = "Original group", Order = 1 };
+        var link = new FooterLinkItemDto { Id = Guid.NewGuid(), Label = "Original link", Url = "/original", Order = 1 };
+        var persisted = false;
+        _footerService.GetLinkGroupsAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            new[] { persisted ? new FooterLinkGroupListDto { Id = group.Id, Title = "Changed group", Order = 1 } : group });
+        _footerService.GetLinkGroupAsync(group.Id.Value, Arg.Any<CancellationToken>()).Returns(_ =>
+            new FooterLinkGroupDetailsDto
+            {
+                Id = group.Id, Title = group.Title,
+                Links = [persisted ? new FooterLinkItemDto { Id = link.Id, Label = "Changed link", Url = "/changed" } : link]
+            });
+        object payload = callback switch
+        {
+            "OpenCreateGroupDialog" => new CreateFooterLinkGroupRequest { Title = "Changed group" },
+            "OpenEditGroupDialog" => new PatchFooterLinkGroupDto { Title = new() { Value = "Changed group" } },
+            "OpenCreateLinkDialog" => new CreateFooterLinkRequest { Label = "Changed link", Url = "/changed" },
+            _ => new PatchFooterLinkDto { Label = new() { Value = "Changed link" }, Url = new() { Value = "/changed" } }
+        };
+        _footerService.CreateLinkGroupAsync(Arg.Any<CreateFooterLinkGroupRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => { persisted = ReferenceEquals(call.Arg<CreateFooterLinkGroupRequest>(), payload); return new BaseCommandResponseOfGuid { Success = true }; });
+        _footerService.UpdateLinkGroupAsync(group.Id.Value, Arg.Any<PatchFooterLinkGroupDto>(), Arg.Any<CancellationToken>())
+            .Returns(call => { persisted = ReferenceEquals(call.Arg<PatchFooterLinkGroupDto>(), payload); return new BaseCommandResponseOfGuid { Success = true }; });
+        _footerService.CreateLinkAsync(group.Id.Value, Arg.Any<CreateFooterLinkRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => { persisted = ReferenceEquals(call.Arg<CreateFooterLinkRequest>(), payload); return new BaseCommandResponseOfGuid { Success = true }; });
+        _footerService.UpdateLinkAsync(link.Id.Value, Arg.Any<PatchFooterLinkDto>(), Arg.Any<CancellationToken>())
+            .Returns(call => { persisted = ReferenceEquals(call.Arg<PatchFooterLinkDto>(), payload); return new BaseCommandResponseOfGuid { Success = true }; });
+        var dialogs = Substitute.For<IDialogService>();
+        var dialog = Substitute.For<IDialogReference>();
+        dialog.Result.Returns(Task.FromResult<DialogResult?>(success ? DialogResult.Ok(payload) : null));
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Admin.Components.FooterLinkGroupDialog>(
+            Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(dialog);
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Admin.Components.FooterLinkDialog>(
+            Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(dialog);
+        _ctx.Services.AddSingleton(dialogs);
+        var cut = RenderComponent();
+        await cut.Find("button[title='Manage Links']").ClickAsync(new());
+
+        await (callback switch
+        {
+            "OpenCreateGroupDialog" => Button(cut, "Create Group"),
+            "OpenEditGroupDialog" => cut.FindAll("button[title='Edit']")[0],
+            "OpenCreateLinkDialog" => Button(cut, "Add Link"),
+            _ => cut.FindAll("button[title='Edit']")[1]
+        }).ClickAsync(new());
+
+        await Assert.That(persisted).IsEqualTo(success);
+        await Assert.That(cut.Markup).Contains(success
+            ? callback.Contains("Group", StringComparison.Ordinal) ? "Changed group" : "Changed link"
+            : "Original link");
+    }
+
     private IRenderedComponent<TenantFooterSection> RenderComponent()
     {
         var cut = _ctx.RenderMudComponent<TenantFooterSection>();

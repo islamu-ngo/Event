@@ -59,7 +59,7 @@ public class EventAgendaGridTests : IDisposable
 
     private IRenderedComponent<EventAgendaGridComponent> Render(
         List<EventDayListDto>? days = null, List<EventAgendaItemListDto>? items = null,
-        List<LocationRoomListDto>? rooms = null, bool canManage = true)
+        List<LocationRoomListDto>? rooms = null, bool canManage = true, IDialogService? dialogs = null)
     {
         var testDays = days ?? CreateTestDays();
         var testItems = items ?? CreateTestItems();
@@ -70,7 +70,7 @@ public class EventAgendaGridTests : IDisposable
             .Returns(Task.FromResult<ICollection<EventAgendaItemListDto>>(testItems));
 
         _ctx.Services.AddScoped(_ => agendaService);
-        _ctx.Services.AddScoped(_ => Substitute.For<IDialogService>());
+        _ctx.Services.AddScoped(_ => dialogs ?? Substitute.For<IDialogService>());
         _ctx.Services.AddScoped(_ => Substitute.For<ISnackbar>());
         _ctx.Services.AddScoped(_ => Substitute.For<ILogger<EventAgendaGridComponent>>());
 
@@ -79,6 +79,34 @@ public class EventAgendaGridTests : IDisposable
             .Add(x => x.Days, testDays)
             .Add(x => x.Rooms, testRooms)
             .Add(x => x.CanManage, canManage));
+    }
+
+    [Test]
+    public async Task GridEditClickWaitsForDialogOpening()
+    {
+        var dialogs = Substitute.For<IDialogService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var opened = new TaskCompletionSource<IDialogReference>(TaskCreationOptions.RunContinuationsAsynchronously);
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Events.Components.EventAgendaItemEditorDialog>(
+                Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>())
+            .Returns(_ =>
+            {
+                entered.TrySetResult();
+                return opened.Task;
+            });
+        var cut = Render(rooms: CreateTestRooms(), dialogs: dialogs);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        Task click = cut.Find(".event-agenda-grid__item").TriggerEventAsync(
+            "onclick", new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        await entered.Task.WaitAsync(timeout.Token);
+        bool completedBeforeOpening = click.IsCompleted;
+        var reference = Substitute.For<IDialogReference>();
+        reference.Result.Returns(Task.FromResult<DialogResult?>(DialogResult.Cancel()));
+        opened.SetResult(reference);
+        await click.WaitAsync(timeout.Token);
+
+        await Assert.That(completedBeforeOpening).IsFalse();
     }
 
     [Test]

@@ -84,7 +84,7 @@
                         <div class="event-agenda-grid__cell @(item != null ? "event-agenda-grid__cell--filled" : "")">
                             @if (item != null)
                             {
-                                <div class="event-agenda-grid__item" @onclick="@(() => { if (CanManage) OpenEditDialog(item); })">
+                                <div class="event-agenda-grid__item" @onclick="@(async () => { if (CanManage) await OpenEditDialog(item); })">
                                     <MudText Typo="Typo.caption" Style="font-weight: 600;">@item.Title</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
                                         @FormatTime(item.StartTime) &ndash; @FormatTime(item.EndTime)

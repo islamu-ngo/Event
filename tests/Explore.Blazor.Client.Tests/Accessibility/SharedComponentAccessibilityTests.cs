@@ -73,7 +73,6 @@ public class SharedComponentAccessibilityTests : IDisposable
     }
 
     [Test]
-    [Skip("Category: Component accessibility. Removal: enable after the AppButton wrapper handles OnClick as EventCallback<MouseEventArgs> under MudBlazor v9.")]
     public async Task ErrorState_RendersRetryButton_WhenOnRetryProvided()
     {
         // Arrange & Act
@@ -84,6 +83,15 @@ public class SharedComponentAccessibilityTests : IDisposable
 
         // Assert — retry button must be present and accessible
         await Assert.That(cut.Markup).Contains("Try Again");
+        var retryButton = cut.FindAll("button")
+            .Single(button => button.TextContent.Trim() == "Try Again");
+        await Assert.That(retryButton.GetAttribute("type")).IsEqualTo("button");
+        await Assert.That(retryButton.HasAttribute("disabled")).IsFalse();
+        await Assert.That(retryClicked).IsFalse();
+
+        // Act & Assert — activate the rendered button, not the component callback directly
+        retryButton.Click();
+        await Assert.That(retryClicked).IsTrue();
     }
 
     [Test]

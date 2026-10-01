@@ -31,7 +31,8 @@ public sealed class TicketRecoveryTests : IDisposable
         IRenderedComponent<TicketRecovery> cut =
             _context.RenderMudComponent<TicketRecovery>();
 
-        _ = cut.Find("[data-testid='ticket-recovery-email']");
+        var emailInput = cut.Find("input[data-testid='ticket-recovery-email']");
+        await Assert.That(emailInput.GetAttribute("autocomplete")).IsEqualTo("email");
         await Assert.That(cut.FindAll("[data-testid='admission-ticket-bearer']").Count)
             .IsEqualTo(0);
         await _service.DidNotReceiveWithAnyArgs()

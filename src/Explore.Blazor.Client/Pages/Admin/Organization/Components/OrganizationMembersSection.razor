@@ -182,7 +182,7 @@
         var dialog = await InviteMemberDialog.ShowAsync(DialogService, "Invite Member", parameters);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             Snackbar.Add("Member invited.", Severity.Success);
             await LoadMembers();
@@ -204,7 +204,7 @@
         var dialog = await EditMemberRoleDialog.ShowAsync(DialogService, "Change Role", parameters);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             Snackbar.Add("Member role updated.", Severity.Success);
             await LoadMembers();

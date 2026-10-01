@@ -168,7 +168,7 @@
         var dialog = await CreateApiKeyDialog.ShowAsync(DialogService, "Create API Key", parameters);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             Snackbar.Add("API key created.", Severity.Success);
             await LoadKeysAsync();

@@ -6,6 +6,7 @@ using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.JSInterop;
+using MudBlazor;
 using NSubstitute;
 using System.Globalization;
 using System.Reflection;
@@ -338,6 +339,43 @@ public sealed class PaymentStatusPanelTests : IDisposable
         await Assert.That(_announcer.AssertiveMessages.Count).IsEqualTo(1);
         await Assert.That(_announcer.PoliteMessages).IsEmpty();
         await Assert.That(_focus.Selectors).IsEmpty();
+    }
+
+    [Test]
+    public async Task ConfirmedRefundRetainsTheHandlerSelectedBeforeDialogSuspension()
+    {
+        var payment = CreatePayment("Succeeded", "payment-status", "request-refund");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reply = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogs = _ctx.AddMockService<IDialogService>();
+        dialogs.ShowMessageBoxAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DialogOptions>())
+            .Returns(_ => { entered.TrySetResult(); return reply.Task; });
+        HalResourceOfRegistrationPaymentDto? requestedPayment = null;
+        var cut = _ctx.RenderMudComponent<PaymentStatusPanel>(parameters => parameters
+            .Add(component => component.Load, _ => Task.FromResult<HalResourceOfRegistrationPaymentDto?>(payment))
+            .Add(component => component.RequestRefund, (value, _) =>
+            {
+                requestedPayment = value;
+                return Task.FromResult<HalResourceOfRegistrationPaymentDto?>(value);
+            }));
+
+        Task confirming = cut.Find("[data-testid='request-refund']").ClickAsync(new());
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cut.Render(parameters => parameters.Add(component => component.RequestRefund,
+                (Func<HalResourceOfRegistrationPaymentDto, CancellationToken,
+                    Task<HalResourceOfRegistrationPaymentDto?>>?)null));
+        }
+        finally
+        {
+            reply.TrySetResult(true);
+            await confirming.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        await Assert.That(requestedPayment).IsSameReferenceAs(payment);
     }
 
     [Test]

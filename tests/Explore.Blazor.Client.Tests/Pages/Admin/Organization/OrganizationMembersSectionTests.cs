@@ -76,6 +76,46 @@ public sealed class OrganizationMembersSectionTests : IDisposable
         await Assert.That(cut.FindAll("button.mud-menu-icon-button-activator").Count).IsEqualTo(1);
     }
 
+    [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public async Task DialogCompletion_RefreshesMembersOnlyOnSuccess(bool edit, bool success)
+    {
+        var organizationId = Guid.NewGuid();
+        var member = CreateMember(RoleHelper.OrgAdmin, true, true);
+        _memberService.GetMembersWithAffordancesAsync(organizationId).Returns(
+            new OrganizationMembersResult([member], CanCreate: true),
+            new OrganizationMembersResult([], CanCreate: true));
+        var dialogs = _ctx.Services.GetRequiredService<IDialogService>();
+        var dialog = Substitute.For<IDialogReference>();
+        dialog.Result.Returns(Task.FromResult<DialogResult?>(success ? DialogResult.Ok(true) : null));
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Organizations.Dialogs.InviteMemberDialog>(
+            Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(dialog);
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Organizations.Dialogs.EditMemberRoleDialog>(
+            Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(dialog);
+        var cut = Render(organizationId);
+
+        if (edit)
+        {
+            await cut.InvokeAsync(() => EventCallback.Factory.Create(cut.Instance, async () =>
+            {
+                var method = typeof(OrganizationMembersSection).GetMethod(
+                    "OpenEditRoleDialog",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                await (Task)method.Invoke(cut.Instance, [member])!;
+            }).InvokeAsync());
+        }
+        else
+        {
+            await cut.FindAll("button").Single(button => button.TextContent.Contains("Invite Member")).ClickAsync(new());
+        }
+
+        await Assert.That(cut.Markup.Contains("Member User", StringComparison.Ordinal)).IsEqualTo(!success);
+        await Assert.That(cut.Markup.Contains("No members found", StringComparison.Ordinal)).IsEqualTo(success);
+    }
+
     private IRenderedComponent<OrganizationMembersSection> Render(Guid organizationId)
     {
         return _ctx.RenderMudComponent<OrganizationMembersSection>(parameters => parameters

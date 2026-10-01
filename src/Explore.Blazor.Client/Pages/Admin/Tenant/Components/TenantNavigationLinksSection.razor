@@ -141,7 +141,7 @@
         var dialog = await TenantNavigationDialog.ShowAsync(DialogService, "Create Navigation Link");
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is CreateTenantNavigationLinkDto createDto)
+        if (result is { Canceled: false, Data: CreateTenantNavigationLinkDto createDto })
         {
             await CreateLink(createDto);
         }
@@ -157,7 +157,7 @@
         var dialog = await TenantNavigationDialog.ShowAsync(DialogService, "Edit Navigation Link", parameters);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is UpdateTenantNavigationLinkDto updateDto)
+        if (result is { Canceled: false, Data: UpdateTenantNavigationLinkDto updateDto })
         {
             await UpdateLink(link.Id!.Value, updateDto);
         }

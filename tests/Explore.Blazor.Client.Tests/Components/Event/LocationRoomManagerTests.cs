@@ -28,7 +28,8 @@ public class LocationRoomManagerTests : IDisposable
     ];
 
     private IRenderedComponent<LocationRoomManagerComponent> Render(
-        List<LocationRoomListDto>? rooms = null, bool canManage = true, Guid? locationId = null)
+        List<LocationRoomListDto>? rooms = null, bool canManage = true, Guid? locationId = null,
+        IDialogService? dialogs = null)
     {
         var locId = locationId ?? TestLocationId;
         var roomService = Substitute.For<ILocationRoomService>();
@@ -36,13 +37,69 @@ public class LocationRoomManagerTests : IDisposable
             .Returns(Task.FromResult<ICollection<LocationRoomListDto>>(rooms ?? CreateTestRooms()));
 
         _ctx.Services.AddScoped(_ => roomService);
-        _ctx.Services.AddScoped(_ => Substitute.For<IDialogService>());
+        _ctx.Services.AddScoped(_ => dialogs ?? Substitute.For<IDialogService>());
         _ctx.Services.AddScoped(_ => Substitute.For<ISnackbar>());
         _ctx.Services.AddScoped(_ => Substitute.For<ILogger<LocationRoomManagerComponent>>());
 
         return _ctx.RenderMudComponent<LocationRoomManagerComponent>(p => p
             .Add(x => x.LocationId, locId)
             .Add(x => x.CanManage, canManage));
+    }
+
+    [Test]
+    public async Task RoomEditCallbackWaitsForDialogOpening()
+    {
+        var dialogs = Substitute.For<IDialogService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var opened = new TaskCompletionSource<IDialogReference>(TaskCreationOptions.RunContinuationsAsynchronously);
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Events.Components.LocationRoomEditorDialog>(
+                Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>())
+            .Returns(_ =>
+            {
+                entered.TrySetResult();
+                return opened.Task;
+            });
+        var cut = Render(dialogs: dialogs);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        Task click = cut.InvokeAsync(() => cut.FindComponent<MudChip<string>>().Instance.OnClick.InvokeAsync(
+            new Microsoft.AspNetCore.Components.Web.MouseEventArgs()));
+        await entered.Task.WaitAsync(timeout.Token);
+        bool completedBeforeOpening = click.IsCompleted;
+        var reference = Substitute.For<IDialogReference>();
+        reference.Result.Returns(Task.FromResult<DialogResult?>(DialogResult.Cancel()));
+        opened.SetResult(reference);
+        await click.WaitAsync(timeout.Token);
+
+        await Assert.That(completedBeforeOpening).IsFalse();
+    }
+
+    [Test]
+    [Arguments(null, 1)]
+    [Arguments(2, 3)]
+    public async Task AddRoomClickOpensDialogWithConcreteSortOrder(int? existingOrder, int expectedOrder)
+    {
+        var dialogs = Substitute.For<IDialogService>();
+        var reference = Substitute.For<IDialogReference>();
+        reference.Result.Returns(Task.FromResult<DialogResult?>(DialogResult.Cancel()));
+        DialogParameters? parameters = null;
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Events.Components.LocationRoomEditorDialog>(
+                Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>())
+            .Returns(call =>
+            {
+                parameters = call.ArgAt<DialogParameters>(1);
+                return Task.FromResult(reference);
+            });
+        var cut = Render(rooms:
+        [
+            new() { Id = Guid.NewGuid(), LocationId = TestLocationId, Name = "Main Hall", SortOrder = existingOrder }
+        ], dialogs: dialogs);
+
+        await cut.Find("button").TriggerEventAsync(
+            "onclick", new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+
+        await Assert.That(parameters).IsNotNull();
+        await Assert.That(parameters!.Get<int>("InitialSortOrder")).IsEqualTo(expectedOrder);
     }
 
     [Test]

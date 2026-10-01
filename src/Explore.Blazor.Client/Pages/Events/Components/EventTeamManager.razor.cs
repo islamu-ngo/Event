@@ -111,7 +111,7 @@ public partial class EventTeamManager
         var result = await dialog.Result;
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadTeamMembers();
         }

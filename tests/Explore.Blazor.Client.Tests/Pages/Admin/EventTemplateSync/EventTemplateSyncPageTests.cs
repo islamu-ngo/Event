@@ -185,6 +185,27 @@ public sealed class EventTemplateSyncPageTests : IDisposable
         await Assert.That(cut.Markup).Contains("Template has been modified by another operator.");
     }
 
+    [Test]
+    public async Task NullDialogCompletion_PreservesSelectionWithoutApplying()
+    {
+        var eventId = Guid.NewGuid();
+        _templateSyncService.GetDiffAsync(eventId, 0).Returns(CreateDiff(canApply: true));
+        var applied = false;
+        _templateSyncService.ApplySyncAsync(eventId, Arg.Any<EventTemplateSyncApplyRequest>())
+            .Returns(_ => { applied = true; return new TemplateSyncOutcomeDto(); });
+        var dialog = Substitute.For<IDialogReference>();
+        dialog.Result.Returns(Task.FromResult<DialogResult?>(null));
+        _dialogService.ShowAsync<TemplateSyncConfirmationDialog>(
+            Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(dialog);
+        var cut = RenderPage(eventId);
+        await cut.InvokeAsync(() => cut.FindComponent<TemplateDiffRow>().Instance.IsSelectedChanged.InvokeAsync(true));
+
+        await cut.Find("button.template-sync-page__apply-button").ClickAsync(new());
+
+        await Assert.That(applied).IsFalse();
+        await Assert.That(cut.Markup).Contains("Apply Sync (1 changes)");
+    }
+
     private static HalResourceOfTemplateDiffDto CreateDiff(
         bool canApply = false,
         bool includeUntouched = false) => new()

@@ -796,7 +796,7 @@
         var dialog = await FooterLinkGroupDialog.ShowAsync(DialogService, "Create Link Group");
         var result = await dialog.Result;
 
-        if (!_disposed && CanManageLinkGroups && !result.Canceled && result.Data is CreateFooterLinkGroupRequest createModel)
+        if (!_disposed && CanManageLinkGroups && result is { Canceled: false, Data: CreateFooterLinkGroupRequest createModel })
         {
             await CreateGroupAsync(createModel);
         }
@@ -819,7 +819,7 @@
         var dialog = await FooterLinkGroupDialog.ShowAsync(DialogService, "Edit Link Group", parameters);
         var result = await dialog.Result;
 
-        if (!_disposed && CanManageLinkGroups && !result.Canceled && result.Data is PatchFooterLinkGroupDto updateModel)
+        if (!_disposed && CanManageLinkGroups && result is { Canceled: false, Data: PatchFooterLinkGroupDto updateModel })
         {
             await UpdateGroupAsync(groupId, updateModel);
         }
@@ -1085,7 +1085,7 @@
         var dialog = await FooterLinkDialog.ShowAsync(DialogService, "Add Link");
         var result = await dialog.Result;
 
-        if (!_disposed && CanManageLinkGroups && !result.Canceled && result.Data is CreateFooterLinkRequest createModel)
+        if (!_disposed && CanManageLinkGroups && result is { Canceled: false, Data: CreateFooterLinkRequest createModel })
         {
             await CreateLinkAsync(createModel);
         }
@@ -1108,7 +1108,7 @@
         var dialog = await FooterLinkDialog.ShowAsync(DialogService, "Edit Link", parameters);
         var result = await dialog.Result;
 
-        if (!_disposed && CanManageLinkGroups && !result.Canceled && result.Data is PatchFooterLinkDto updateModel)
+        if (!_disposed && CanManageLinkGroups && result is { Canceled: false, Data: PatchFooterLinkDto updateModel })
         {
             await UpdateLinkAsync(linkId, updateModel);
         }

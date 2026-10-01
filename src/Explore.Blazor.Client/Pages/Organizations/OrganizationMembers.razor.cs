@@ -96,7 +96,7 @@ public partial class OrganizationMembers
         var result = await dialog.Result;
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadMembers();
         }
@@ -115,7 +115,7 @@ public partial class OrganizationMembers
         var result = await dialog.Result;
         await AccessibilityFocusService.RestoreFocusAsync();
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadMembers();
         }

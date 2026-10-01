@@ -352,7 +352,7 @@
 
     private async Task RequestRefundAsync()
     {
-        if (!CanRequestRefund || _payment is null)
+        if (!CanRequestRefund || _payment is not { } payment || RequestRefund is not { } requestRefund)
         {
             return;
         }
@@ -364,7 +364,7 @@
             cancelText: T("common.cancel", "Cancel"));
         if (confirmed == true)
         {
-            await ExecuteAsync(cancellationToken => RequestRefund(_payment, cancellationToken));
+            await ExecuteAsync(cancellationToken => requestRefund(payment, cancellationToken));
         }
     }
 

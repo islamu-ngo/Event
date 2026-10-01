@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using MudBlazor;
 
@@ -29,17 +31,18 @@ internal static partial class VisualEvidenceDocument
             "wwwroot",
             "css",
             "tokens.css");
-        string scopedCssPath = Directory
-            .GetFiles(
-                Path.Combine(
-                    repositoryRoot,
-                    "src",
-                    "Explore.Blazor.Client",
-                    "obj",
-                    "Release"),
-                "Explore.Blazor.Client.bundle.scp.css",
-                SearchOption.AllDirectories)
-            .Single();
+        string targetVersion = new FrameworkName(typeof(VisualEvidenceDocument).Assembly
+            .GetCustomAttribute<TargetFrameworkAttribute>()!.FrameworkName).Version.ToString(2);
+        string scopedCssPath = Path.Combine(
+            repositoryRoot,
+            "src",
+            "Explore.Blazor.Client",
+            "obj",
+            "Release",
+            $"net{targetVersion}",
+            "scopedcss",
+            "projectbundle",
+            "Explore.Blazor.Client.bundle.scp.css");
 
         string document = $$"""
             <!doctype html>

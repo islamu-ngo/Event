@@ -94,6 +94,40 @@ public sealed class EventTeamManagerTests : IDisposable
         await Assert.That(cut.FindComponents<MudMenu>().Count).IsEqualTo(2);
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task AssignmentCompletion_RestoresFocusAndRefreshesOnlyOnSuccess(bool success)
+    {
+        var eventId = Guid.NewGuid();
+        var service = Substitute.For<IEventTeamService>();
+        service.GetTeamMembersAsync(eventId, false).Returns(
+            TeamCollection([Member()], true),
+            TeamCollection([Member(email: "assigned@example.test")], true));
+        service.GetAssignablePresetsAsync(eventId).Returns(new List<EventRolePresetDto>
+        {
+            new() { RoleId = RoleHelper.RegistrationManager, FullName = "Registration Manager" }
+        });
+        var dialogs = Substitute.For<IDialogService>();
+        var dialog = Substitute.For<IDialogReference>();
+        dialog.Result.Returns(Task.FromResult<DialogResult?>(success ? DialogResult.Ok(true) : null));
+        dialogs.ShowAsync<Explore.Blazor.Client.Pages.Events.Dialogs.AssignEventTeamRoleDialog>(
+            Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(dialog);
+        var focus = Substitute.For<Explore.Blazor.Client.Contracts.Services.Accessibility.IAccessibilityFocusService>();
+        var restored = false;
+        focus.RestoreFocusAsync().Returns(_ => { restored = true; return Task.CompletedTask; });
+        _ctx.Services.AddSingleton(service);
+        _ctx.Services.AddSingleton(dialogs);
+        _ctx.Services.AddSingleton(focus);
+        var cut = _ctx.RenderMudComponent<EventTeamManager>(p => p.Add(x => x.EventId, eventId));
+
+        await cut.FindAll("button").Single(button => button.TextContent.Contains("Assign Role")).ClickAsync(new());
+
+        await Assert.That(restored).IsTrue();
+        await Assert.That(cut.Markup.Contains("assigned@example.test", StringComparison.Ordinal)).IsEqualTo(success);
+        await Assert.That(cut.Markup.Contains("manager@example.test", StringComparison.Ordinal)).IsEqualTo(!success);
+    }
+
     private static HalCollectionResourceOfEventTeamMemberDto TeamCollection(
         params HalResourceOfEventTeamMemberDto[] members)
         => TeamCollection(members, withAssignLink: false);

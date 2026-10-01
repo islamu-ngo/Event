@@ -84,6 +84,18 @@ public sealed class ReleasePublishWorkflowTests
     }
 
     [Test]
+    public async Task BashEarlyExitPreservesExitCodeAndDiagnostics()
+    {
+        string program = "printf 'early-exit\\n' >&2\nexit 23\n#" + new string('x', 65536);
+
+        ProcessResult result = await RunBash(program);
+
+        await Assert.That(result.ExitCode).IsEqualTo(23);
+        await Assert.That(result.Output).IsEmpty();
+        await Assert.That(result.Error).IsEqualTo("early-exit\n");
+    }
+
+    [Test]
     public async Task ProposalAndReconciliationAreSeparateExplicitDispatchOperations()
     {
         await Assert.That(Text(Step("propose"), "if")).IsEqualTo("${{ inputs.mode == 'propose' }}");
@@ -728,7 +740,8 @@ public sealed class ReleasePublishWorkflowTests
             UseShellExecute = false,
         };
         if (syntaxOnly) info.ArgumentList.Add("-n");
-        info.ArgumentList.Add("-s");
+        info.ArgumentList.Add("-c");
+        info.ArgumentList.Add(program);
         if (environment is not null)
             foreach ((string key, string value) in environment) info.Environment[key] = value;
         using Process process = Process.Start(info)!;
@@ -737,7 +750,6 @@ public sealed class ReleasePublishWorkflowTests
         Task<string> error = process.StandardError.ReadToEndAsync(cancellation.Token);
         try
         {
-            await process.StandardInput.WriteAsync(program.AsMemory(), cancellation.Token);
             process.StandardInput.Close();
             await process.WaitForExitAsync(cancellation.Token);
             return new ProcessResult(process.ExitCode, await output, await error);

@@ -16,7 +16,7 @@ public sealed class BusinessMetricsStorageTests
 
         metrics.RecordStorageUploadSession(StorageProviders.Local, "create", "succeeded");
 
-        var measurement = await metricsCapture.SingleAsync("explore.storage.upload_sessions");
+        var measurement = metricsCapture.Single("explore.storage.upload_sessions");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags["provider"]?.ToString()).IsEqualTo(StorageProviders.Local);
@@ -35,9 +35,9 @@ public sealed class BusinessMetricsStorageTests
         metrics.RecordStorageQuotaBytes(4096, StorageProviders.S3Compatible, "reserve", "succeeded");
         metrics.RecordStorageReadBytes(4096, StorageProviders.S3Compatible, "succeeded", StorageObjectVisibilities.PublicImage);
 
-        var uploadBytes = await metricsCapture.SingleAsync("explore.storage.upload_bytes");
-        var quotaBytes = await metricsCapture.SingleAsync("explore.storage.quota_bytes");
-        var readBytes = await metricsCapture.SingleAsync("explore.storage.read_bytes");
+        var uploadBytes = metricsCapture.Single("explore.storage.upload_bytes");
+        var quotaBytes = metricsCapture.Single("explore.storage.quota_bytes");
+        var readBytes = metricsCapture.Single("explore.storage.read_bytes");
 
         await Assert.That(uploadBytes.Value).IsEqualTo(4096);
         await Assert.That(uploadBytes.Tags["provider"]?.ToString()).IsEqualTo(StorageProviders.S3Compatible);
@@ -59,7 +59,7 @@ public sealed class BusinessMetricsStorageTests
 
         metrics.RecordStorageProviderTest(StorageProviders.S3Compatible, "failed", "s3_not_configured");
 
-        var measurement = await metricsCapture.SingleAsync("explore.storage.provider_tests");
+        var measurement = metricsCapture.Single("explore.storage.provider_tests");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags["provider"]?.ToString()).IsEqualTo(StorageProviders.S3Compatible);
@@ -82,7 +82,8 @@ public sealed class BusinessMetricsStorageTests
         metrics.RecordStorageDelete($"bucket-{rawIdentifier}", "failed", $"access-key-{rawIdentifier}");
         metrics.RecordStorageProviderTest(StorageProviders.Local, "succeeded");
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 3);
+        var measurements = metricsCapture.All();
+        await Assert.That(measurements).Count().IsEqualTo(3);
         var tagKeys = measurements.SelectMany(measurement => measurement.Tags.Keys).ToArray();
         var tagValues = string.Join(" ", measurements.SelectMany(measurement => measurement.Tags.Values.Select(value => value?.ToString())));
 
@@ -143,42 +144,14 @@ public sealed class BusinessMetricsStorageTests
             _listener.Start();
         }
 
-        public async Task<Measurement> SingleAsync(string instrumentName)
+        public Measurement Single(string instrumentName)
         {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                var matches = Snapshot()
-                    .Where(measurement => measurement.InstrumentName == instrumentName)
-                    .ToList();
-
-                if (matches.Count > 0)
-                {
-                    return matches.Single();
-                }
-
-                await Task.Delay(10);
-            }
-
             return Snapshot()
                 .Where(measurement => measurement.InstrumentName == instrumentName)
                 .Single();
         }
 
-        public async Task<IReadOnlyList<Measurement>> AllAsync(int expectedCount)
-        {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                var snapshot = Snapshot();
-                if (snapshot.Length >= expectedCount)
-                {
-                    return snapshot;
-                }
-
-                await Task.Delay(10);
-            }
-
-            return Snapshot();
-        }
+        public IReadOnlyList<Measurement> All() => Snapshot();
 
         public void Dispose()
         {

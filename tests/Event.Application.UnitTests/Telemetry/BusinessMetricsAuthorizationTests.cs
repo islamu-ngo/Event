@@ -32,7 +32,7 @@ public sealed class BusinessMetricsAuthorizationTests
             providerId: "cerbos",
             durationMs: 12.5);
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 2);
+        var measurements = metricsCapture.All();
         var counter = measurements.Single(measurement => measurement.InstrumentName == CounterName);
 
         await Assert.That(counter.Value).IsEqualTo(1d);
@@ -56,7 +56,7 @@ public sealed class BusinessMetricsAuthorizationTests
         metrics.RecordAuthorizationDecision(
             "islamuevent_event", "view", "allowed", "allowed", "local", durationMs: 42.5);
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 2);
+        var measurements = metricsCapture.All();
         var counter = measurements.Single(measurement => measurement.InstrumentName == CounterName);
         var duration = measurements.Single(measurement => measurement.InstrumentName == HistogramName);
 
@@ -78,7 +78,7 @@ public sealed class BusinessMetricsAuthorizationTests
         metrics.RecordAuthorizationDecision(
             "islamuevent_event", "view", "allowed", "allowed", "local", durationMs: -5);
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 2);
+        var measurements = metricsCapture.All();
         var duration = measurements.Single(measurement => measurement.InstrumentName == HistogramName);
 
         await Assert.That(duration.Value).IsEqualTo(0d);
@@ -98,7 +98,8 @@ public sealed class BusinessMetricsAuthorizationTests
         metrics.RecordAuthorizationDecision(
             "islamuevent_event", "update", "denied", "denied", "cerbos", durationMs: 1);
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 2);
+        var measurements = metricsCapture.All();
+        await Assert.That(measurements).Count().IsEqualTo(2);
 
         foreach (var measurement in measurements)
         {
@@ -157,21 +158,7 @@ public sealed class BusinessMetricsAuthorizationTests
             _listener.Start();
         }
 
-        public async Task<IReadOnlyList<Measurement>> AllAsync(int expectedCount)
-        {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                var snapshot = Snapshot();
-                if (snapshot.Length >= expectedCount)
-                {
-                    return snapshot;
-                }
-
-                await Task.Delay(10);
-            }
-
-            return Snapshot();
-        }
+        public IReadOnlyList<Measurement> All() => Snapshot();
 
         public void Dispose() => _listener.Dispose();
 

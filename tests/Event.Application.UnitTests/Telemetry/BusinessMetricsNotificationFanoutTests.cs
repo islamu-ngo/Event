@@ -16,7 +16,7 @@ public sealed class BusinessMetricsNotificationFanoutTests
 
         metrics.RecordNotificationFanoutRun(EventPublishedNotificationFanoutService.FanoutKind, EventPublishedNotificationFanoutService.OutcomeCompleted);
 
-        var measurement = await metricsCapture.SingleAsync("explore.notifications.fanout_runs");
+        var measurement = metricsCapture.Single("explore.notifications.fanout_runs");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
@@ -32,7 +32,7 @@ public sealed class BusinessMetricsNotificationFanoutTests
 
         metrics.RecordNotificationFanoutSubscribers(7, EventPublishedNotificationFanoutService.FanoutKind, EventPublishedNotificationFanoutService.OutcomeNotificationCreated);
 
-        var measurement = await metricsCapture.SingleAsync("explore.notifications.fanout_subscribers");
+        var measurement = metricsCapture.Single("explore.notifications.fanout_subscribers");
 
         await Assert.That(measurement.Value).IsEqualTo(7);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
@@ -48,7 +48,7 @@ public sealed class BusinessMetricsNotificationFanoutTests
 
         metrics.RecordNotificationFanoutRun(EventPublishedNotificationFanoutService.FanoutKind, EventPublishedNotificationFanoutService.OutcomeFailed);
 
-        var measurement = await metricsCapture.SingleAsync("explore.notifications.fanout_runs");
+        var measurement = metricsCapture.Single("explore.notifications.fanout_runs");
 
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags.Keys).DoesNotContain("event_id");
@@ -99,28 +99,8 @@ public sealed class BusinessMetricsNotificationFanoutTests
             _listener.Start();
         }
 
-        public async Task<Measurement> SingleAsync(string instrumentName)
+        public Measurement Single(string instrumentName)
         {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                Measurement[] snapshot;
-                lock (_measurementsLock)
-                {
-                    snapshot = [.. _measurements];
-                }
-
-                var matches = snapshot
-                    .Where(measurement => measurement.InstrumentName == instrumentName)
-                    .ToList();
-
-                if (matches.Count > 0)
-                {
-                    return matches.Single();
-                }
-
-                await Task.Delay(10);
-            }
-
             lock (_measurementsLock)
             {
                 return _measurements

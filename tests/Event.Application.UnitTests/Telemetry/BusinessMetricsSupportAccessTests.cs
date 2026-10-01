@@ -26,7 +26,7 @@ public sealed class BusinessMetricsSupportAccessTests
             "create",
             "ReadOnly");
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 4);
+        var measurements = metricsCapture.All();
         var lifecycle = measurements.Single(measurement =>
             measurement.InstrumentName == "explore.support_access.lifecycle_events");
         var requestAudit = measurements.Single(measurement =>
@@ -66,7 +66,8 @@ public sealed class BusinessMetricsSupportAccessTests
         metrics.RecordSupportAccessSessionValidationDenial($"session-{rawIdentifier}", $"actor-{rawIdentifier}");
         metrics.RecordSupportAccessBoundaryDenial($"mismatch-{rawIdentifier}", $"custom-{rawIdentifier}", $"tenant-{rawIdentifier}");
 
-        var measurements = await metricsCapture.AllAsync(expectedCount: 4);
+        var measurements = metricsCapture.All();
+        await Assert.That(measurements).Count().IsEqualTo(4);
         var tagKeys = measurements.SelectMany(measurement => measurement.Tags.Keys).ToArray();
         var tagValues = string.Join(" ", measurements.SelectMany(measurement => measurement.Tags.Values.Select(value => value?.ToString())));
 
@@ -127,21 +128,7 @@ public sealed class BusinessMetricsSupportAccessTests
             _listener.Start();
         }
 
-        public async Task<IReadOnlyList<Measurement>> AllAsync(int expectedCount)
-        {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                var snapshot = Snapshot();
-                if (snapshot.Length >= expectedCount)
-                {
-                    return snapshot;
-                }
-
-                await Task.Delay(10);
-            }
-
-            return Snapshot();
-        }
+        public IReadOnlyList<Measurement> All() => Snapshot();
 
         public void Dispose()
         {

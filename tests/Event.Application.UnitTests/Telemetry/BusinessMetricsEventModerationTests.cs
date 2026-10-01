@@ -20,7 +20,7 @@ public sealed class BusinessMetricsEventModerationTests
             "storage_deletion_pending",
             irreversible: true);
 
-        var measurement = await metricsCapture.SingleAsync("explore.events.moderation_actions");
+        var measurement = metricsCapture.Single("explore.events.moderation_actions");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags["tenant_id"]?.ToString()).IsEqualTo("tenant-a");
@@ -44,7 +44,7 @@ public sealed class BusinessMetricsEventModerationTests
             $"case-{rawIdentifier}",
             irreversible: null);
 
-        var measurement = await metricsCapture.SingleAsync("explore.events.moderation_actions");
+        var measurement = metricsCapture.Single("explore.events.moderation_actions");
         var tagKeys = measurement.Tags.Keys.ToArray();
         var tagValues = string.Join(" ", measurement.Tags.Values.Select(value => value?.ToString()));
 
@@ -81,7 +81,7 @@ public sealed class BusinessMetricsEventModerationTests
             "failed",
             "decision_execution_failed");
 
-        var measurement = await metricsCapture.SingleAsync("explore.event_reports.workflow_actions");
+        var measurement = metricsCapture.Single("explore.event_reports.workflow_actions");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags["tenant_id"]?.ToString()).IsEqualTo("tenant-a");
@@ -102,7 +102,7 @@ public sealed class BusinessMetricsEventModerationTests
             "retryable_failure",
             "coop_timeout");
 
-        var measurement = await metricsCapture.SingleAsync("explore.event_reports.provider_syncs");
+        var measurement = metricsCapture.Single("explore.event_reports.provider_syncs");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags["tenant_id"]?.ToString()).IsEqualTo("tenant-a");
@@ -121,7 +121,7 @@ public sealed class BusinessMetricsEventModerationTests
             "osprey",
             "succeeded");
 
-        var measurement = await metricsCapture.SingleAsync("explore.event_reports.provider_callbacks");
+        var measurement = metricsCapture.Single("explore.event_reports.provider_callbacks");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
@@ -142,7 +142,7 @@ public sealed class BusinessMetricsEventModerationTests
             $"reporter text {rawIdentifier}",
             $"raw provider payload {rawIdentifier}");
 
-        var measurement = await metricsCapture.SingleAsync("explore.event_reports.provider_callbacks");
+        var measurement = metricsCapture.Single("explore.event_reports.provider_callbacks");
         var tagKeys = measurement.Tags.Keys.ToArray();
         var tagValues = string.Join(" ", measurement.Tags.Values.Select(value => value?.ToString()));
 
@@ -200,22 +200,8 @@ public sealed class BusinessMetricsEventModerationTests
             _listener.Start();
         }
 
-        public async Task<Measurement> SingleAsync(string instrumentName)
+        public Measurement Single(string instrumentName)
         {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                var matches = Snapshot()
-                    .Where(measurement => measurement.InstrumentName == instrumentName)
-                    .ToList();
-
-                if (matches.Count > 0)
-                {
-                    return matches.Single();
-                }
-
-                await Task.Delay(10);
-            }
-
             return Snapshot()
                 .Where(measurement => measurement.InstrumentName == instrumentName)
                 .Single();

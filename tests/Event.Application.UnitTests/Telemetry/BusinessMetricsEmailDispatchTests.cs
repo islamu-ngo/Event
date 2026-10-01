@@ -22,7 +22,7 @@ public sealed class BusinessMetricsEmailDispatchTests
 
         metrics.RecordEmailDispatchAttempt(outcome);
 
-        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.attempts");
+        var measurement = metricsCapture.Single("explore.email_dispatch.attempts");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo(expectedOutcome);
@@ -38,7 +38,7 @@ public sealed class BusinessMetricsEmailDispatchTests
 
         metrics.RecordEmailDispatchAttempt(EmailDispatchDrainOutcome.Sent);
 
-        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.attempts");
+        var measurement = metricsCapture.Single("explore.email_dispatch.attempts");
 
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags.Keys).DoesNotContain("recipient");
@@ -65,7 +65,7 @@ public sealed class BusinessMetricsEmailDispatchTests
         using var metrics = CreateMetrics();
         metrics.RecordEmailDispatchRabbitMqPublish(outcome);
 
-        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.publishes");
+        var measurement = metricsCapture.Single("explore.email_dispatch.rabbitmq.publishes");
         await Assert.That(measurement.Tags["outcome"]).IsEqualTo(expectedLabel);
         await Assert.That(measurement.Tags["failure_category"]).IsEqualTo("none");
     }
@@ -84,7 +84,7 @@ public sealed class BusinessMetricsEmailDispatchTests
 
         metrics.RecordEmailDispatchRabbitMqConsume(outcome, "none");
 
-        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.consumes");
+        var measurement = metricsCapture.Single("explore.email_dispatch.rabbitmq.consumes");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
@@ -100,7 +100,7 @@ public sealed class BusinessMetricsEmailDispatchTests
 
         metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Rejected, "missing_outbox");
 
-        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.consumes");
+        var measurement = metricsCapture.Single("explore.email_dispatch.rabbitmq.consumes");
 
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags.Keys).DoesNotContain("recipient");
@@ -128,7 +128,7 @@ public sealed class BusinessMetricsEmailDispatchTests
 
         metrics.RecordEmailDispatchOperationalOutcome(outcome, reason);
 
-        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.operational_outcomes");
+        var measurement = metricsCapture.Single("explore.email_dispatch.operational_outcomes");
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).IsEquivalentTo(["outcome", "reason"]);
         await Assert.That(measurement.Tags["outcome"]).IsEqualTo(expectedOutcome);
@@ -146,9 +146,9 @@ public sealed class BusinessMetricsEmailDispatchTests
         metrics.RecordEmailDispatchOptionalReminderDeferral(true);
         metricsCapture.Observe();
 
-        var backlog = await metricsCapture.SingleAsync("explore.email_dispatch.tenant_backlog");
-        var oldest = await metricsCapture.SingleAsync("explore.email_dispatch.oldest_pending_age");
-        var deferral = await metricsCapture.SingleAsync("explore.email_dispatch.optional_reminder_deferral");
+        var backlog = metricsCapture.Single("explore.email_dispatch.tenant_backlog");
+        var oldest = metricsCapture.Single("explore.email_dispatch.oldest_pending_age");
+        var deferral = metricsCapture.Single("explore.email_dispatch.optional_reminder_deferral");
 
         await Assert.That(backlog.Value).IsEqualTo(17);
         await Assert.That(backlog.Tags.Keys).IsEquivalentTo(["sample_rank"]);
@@ -186,10 +186,10 @@ public sealed class BusinessMetricsEmailDispatchTests
         metrics.RecordEmailDispatchRabbitMqPublish((EmailDispatchPublishOutcome)int.MaxValue, "provider-message-456");
         metrics.RecordEmailDispatchRabbitMqConsume((EmailDispatchConsumeOutcome)int.MaxValue, "delivery-456");
 
-        var attempt = await metricsCapture.SingleAsync("explore.email_dispatch.attempts");
-        var operational = await metricsCapture.SingleAsync("explore.email_dispatch.operational_outcomes");
-        var publish = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.publishes");
-        var consume = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.consumes");
+        var attempt = metricsCapture.Single("explore.email_dispatch.attempts");
+        var operational = metricsCapture.Single("explore.email_dispatch.operational_outcomes");
+        var publish = metricsCapture.Single("explore.email_dispatch.rabbitmq.publishes");
+        var consume = metricsCapture.Single("explore.email_dispatch.rabbitmq.consumes");
 
         await Assert.That(attempt.Tags["outcome"]).IsEqualTo("other");
         await Assert.That(attempt.Tags["failure_category"]).IsEqualTo("other");
@@ -265,25 +265,11 @@ public sealed class BusinessMetricsEmailDispatchTests
             }
         }
 
-        public async Task<Measurement> SingleAsync(string instrumentName)
+        public Measurement Single(string instrumentName)
         {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                lock (_measurementsLock)
-                {
-                    var match = _measurements.LastOrDefault(value => value.InstrumentName == instrumentName);
-                    if (match is not null)
-                    {
-                        return match;
-                    }
-                }
-
-                await Task.Delay(10);
-            }
-
             lock (_measurementsLock)
             {
-                return _measurements.Last(value => value.InstrumentName == instrumentName);
+                return _measurements.Single(value => value.InstrumentName == instrumentName);
             }
         }
 

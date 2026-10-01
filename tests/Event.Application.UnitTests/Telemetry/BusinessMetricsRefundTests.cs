@@ -16,8 +16,8 @@ public sealed class BusinessMetricsRefundTests
         metrics.RecordRefundOperation("buyer@example.test", "Succeeded", "secret-value");
         metrics.RecordRefundCampaignOperation("EventCancellation", "RequiresOperator", "completed");
 
-        Measurement refund = await capture.SingleAsync("explore.refunds.operations");
-        Measurement campaign = await capture.SingleAsync("explore.refunds.campaign_operations");
+        Measurement refund = capture.Single("explore.refunds.operations");
+        Measurement campaign = capture.Single("explore.refunds.campaign_operations");
 
         await Assert.That(refund.Tags.Keys).IsEquivalentTo(["operation", "status", "outcome"]);
         await Assert.That(refund.Tags["operation"]?.ToString()).IsEqualTo("unknown");
@@ -54,19 +54,8 @@ public sealed class BusinessMetricsRefundTests
             _listener.Start();
         }
 
-        public async Task<Measurement> SingleAsync(string instrumentName)
-        {
-            for (int attempt = 0; attempt < 20; attempt++)
-            {
-                Measurement? measurement = _measurements.SingleOrDefault(value => value.InstrumentName == instrumentName);
-                if (measurement is not null)
-                {
-                    return measurement;
-                }
-                await Task.Delay(10);
-            }
-            throw new InvalidOperationException($"No measurement was recorded for {instrumentName}.");
-        }
+        public Measurement Single(string instrumentName) =>
+            _measurements.Single(value => value.InstrumentName == instrumentName);
 
         public void Dispose() => _listener.Dispose();
     }

@@ -18,7 +18,7 @@ public sealed class BusinessMetricsWebhookTests
             "retry_scheduled",
             "http_non_success");
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.delivery_failure");
+        var measurement = metricsCapture.Single("explore.webhooks.delivery_failure");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
@@ -38,7 +38,7 @@ public sealed class BusinessMetricsWebhookTests
             "abandoned",
             "private_network_blocked");
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.delivery_failure");
+        var measurement = metricsCapture.Single("explore.webhooks.delivery_failure");
 
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags.Keys).DoesNotContain("endpoint_id");
@@ -65,7 +65,7 @@ public sealed class BusinessMetricsWebhookTests
             "operator typed this",
             "raw exception with endpoint https://example.test");
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.manual_retries");
+        var measurement = metricsCapture.Single("explore.webhooks.manual_retries");
 
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
         await Assert.That(measurement.Tags["event_type"]?.ToString()).IsEqualTo("unknown");
@@ -84,7 +84,7 @@ public sealed class BusinessMetricsWebhookTests
             "Svix",
             "svix_provider_unavailable");
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.provider_publish_failure");
+        var measurement = metricsCapture.Single("explore.webhooks.provider_publish_failure");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
@@ -108,7 +108,7 @@ public sealed class BusinessMetricsWebhookTests
             WebhookTelemetryOperation.Delivery,
             TimeSpan.FromSeconds(12.5));
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.claim_lag");
+        var measurement = metricsCapture.Single("explore.webhooks.claim_lag");
 
         await Assert.That(measurement.Value).IsEqualTo(12.5);
         await Assert.That(measurement.Tags.Keys).IsEquivalentTo(["provider", "operation"]);
@@ -127,7 +127,7 @@ public sealed class BusinessMetricsWebhookTests
             WebhookTelemetryOperation.Reconciliation,
             WebhookTelemetryOutcome.ManualReconciliation);
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.processing_outcomes");
+        var measurement = metricsCapture.Single("explore.webhooks.processing_outcomes");
 
         await Assert.That(measurement.Tags.Keys).IsEquivalentTo(["provider", "operation", "outcome"]);
         await Assert.That(measurement.Tags["provider"]?.ToString()).IsEqualTo("svix");
@@ -146,7 +146,7 @@ public sealed class BusinessMetricsWebhookTests
             WebhookTelemetryOperation.IncomingEffect,
             WebhookTelemetryOutcome.DeadLettered);
 
-        var measurement = await metricsCapture.SingleAsync("explore.webhooks.processing_outcomes");
+        var measurement = metricsCapture.Single("explore.webhooks.processing_outcomes");
 
         await Assert.That(measurement.Tags.Keys).IsEquivalentTo(["provider", "operation", "outcome"]);
         await Assert.That(measurement.Tags["provider"]?.ToString()).IsEqualTo("coop");
@@ -176,12 +176,12 @@ public sealed class BusinessMetricsWebhookTests
             WebhookTelemetryProvider.Svix,
             TimeSpan.FromMinutes(3));
 
-        var retry = await metricsCapture.SingleAsync("explore.webhooks.retries_scheduled");
-        var deadLetter = await metricsCapture.SingleAsync("explore.webhooks.dead_letters");
-        var reconciliation = await metricsCapture.SingleAsync("explore.webhooks.manual_reconciliations");
-        var autoPause = await metricsCapture.SingleAsync("explore.webhooks.endpoint_auto_pauses");
-        var providerHealth = await metricsCapture.SingleAsync("explore.webhooks.provider_health_checks");
-        var unknownAge = await metricsCapture.SingleAsync("explore.webhooks.publication_unknown_age");
+        var retry = metricsCapture.Single("explore.webhooks.retries_scheduled");
+        var deadLetter = metricsCapture.Single("explore.webhooks.dead_letters");
+        var reconciliation = metricsCapture.Single("explore.webhooks.manual_reconciliations");
+        var autoPause = metricsCapture.Single("explore.webhooks.endpoint_auto_pauses");
+        var providerHealth = metricsCapture.Single("explore.webhooks.provider_health_checks");
+        var unknownAge = metricsCapture.Single("explore.webhooks.publication_unknown_age");
 
         await Assert.That(retry.Tags.Keys).IsEquivalentTo(["provider", "operation"]);
         await Assert.That(deadLetter.Tags.Keys).IsEquivalentTo(["provider", "operation"]);
@@ -293,28 +293,8 @@ public sealed class BusinessMetricsWebhookTests
             _listener.Start();
         }
 
-        public async Task<Measurement> SingleAsync(string instrumentName)
+        public Measurement Single(string instrumentName)
         {
-            for (var attempt = 0; attempt < 20; attempt++)
-            {
-                Measurement[] snapshot;
-                lock (_measurementsLock)
-                {
-                    snapshot = [.. _measurements];
-                }
-
-                var matches = snapshot
-                    .Where(measurement => measurement.InstrumentName == instrumentName)
-                    .ToList();
-
-                if (matches.Count > 0)
-                {
-                    return matches.Single();
-                }
-
-                await Task.Delay(10);
-            }
-
             lock (_measurementsLock)
             {
                 return _measurements

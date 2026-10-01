@@ -110,6 +110,10 @@ public class OrganizationMemberController : EventControllerBase
 
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPost(Name = RouteNames.AddOrganizationMember)]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Post([FromBody] AddOrganizationMemberDto dto, CancellationToken cancellationToken = default)
     {
         var userId = CurrentUserId?.ToString();
@@ -130,6 +134,10 @@ public class OrganizationMemberController : EventControllerBase
 
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPut("role", Name = RouteNames.UpdateOrganizationMemberRole)]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateRole([FromBody] UpdateOrganizationMemberRoleDto dto, CancellationToken cancellationToken = default)
     {
         var userId = CurrentUserId?.ToString();
@@ -145,6 +153,9 @@ public class OrganizationMemberController : EventControllerBase
 
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpGet("invitations", Name = RouteNames.GetMyOrganizationInvitations)]
+    [ProducesResponseType<List<OrganizationInvitationDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<List<OrganizationInvitationDto>>> GetMyInvitations(CancellationToken cancellationToken = default)
     {
         var email = User.GetEmail();
@@ -161,6 +172,9 @@ public class OrganizationMemberController : EventControllerBase
 
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPost("invitations/{id:guid}/accept", Name = RouteNames.AcceptOrganizationInvitation)]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> AcceptInvitation(Guid id, CancellationToken cancellationToken = default)
     {
         var userGuid = CurrentUserId;
@@ -176,6 +190,9 @@ public class OrganizationMemberController : EventControllerBase
 
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPost("invitations/{id:guid}/decline", Name = RouteNames.DeclineOrganizationInvitation)]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> DeclineInvitation(Guid id, CancellationToken cancellationToken = default)
     {
         var userGuid = CurrentUserId;
@@ -190,6 +207,10 @@ public class OrganizationMemberController : EventControllerBase
 
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpDelete("{id:guid}", Name = RouteNames.DeleteOrganizationMember)]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var userId = CurrentUserId?.ToString();

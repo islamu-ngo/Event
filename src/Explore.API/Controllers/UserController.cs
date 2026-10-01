@@ -83,6 +83,9 @@ public class UserController : EventControllerBase
     [SuppressIdempotencyResponseStorage]
     [EndpointSummary("Sync user from identity provider")]
     [EndpointDescription("Creates or updates the user in the local database and ensures external provider linkage. Also creates the user's personal Actor if new user. Call this after login/registration.")]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> SyncUser(CancellationToken cancellationToken = default)
     {
         var providerIdentity = User.GetProviderIdentity();
@@ -155,6 +158,9 @@ public class UserController : EventControllerBase
     [Authorize]
     [EndpointSummary("Get current user's admin authority")]
     [EndpointDescription("Returns instance, tenant, organization, and group admin status for the authenticated user. Consumed by BFF and route authorization.")]
+    [ProducesResponseType<AdminAuthorityDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<AdminAuthorityDto>> GetAdminAuthority(CancellationToken cancellationToken = default)
     {
         var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);

@@ -110,6 +110,8 @@ public class EventSessionAgendaItemController : ControllerBase
     [HttpGet("by-session/{sessionId}", Name = RouteNames.GetEventSessionAgendaItemsBySession)]
     [EndpointSummary("Get Agenda Items by Session")]
     [EndpointDescription("Get all agenda items for a specific event session")]
+    [ProducesResponseType<List<EventSessionAgendaItemListDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<EventSessionAgendaItemListDto>>> GetBySession(Guid sessionId, CancellationToken cancellationToken = default)
     {
         var agendaItems = await _getBySessionHandler.QueryAsync(new GetAgendaItemsBySessionRequest { EventSessionId = sessionId }, cancellationToken);
@@ -207,6 +209,10 @@ public class EventSessionAgendaItemController : ControllerBase
     [HttpDelete("{id}", Name = RouteNames.DeleteEventSessionAgendaItem)]
     [EndpointSummary("Delete Agenda Item")]
     [EndpointDescription("Delete an agenda item")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventSessionAgendaItemCommand { Id = id };

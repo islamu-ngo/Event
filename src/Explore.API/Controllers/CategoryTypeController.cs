@@ -25,6 +25,8 @@ public class CategoryTypeController(
     [HttpGet(Name = RouteNames.GetCategoryTypeOptions)]
     [AllowAnonymous]
     [OutputCache(PolicyName = "LookupData")]
+    [ProducesResponseType<List<CategoryTypeListDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<CategoryTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
         var result = await categoryTypes.QueryAsync(new GetCategoryTypeListRequest(), cancellationToken);
@@ -35,6 +37,9 @@ public class CategoryTypeController(
     [HttpGet("{id}", Name = RouteNames.GetCategoryTypeOptionById)]
     [AllowAnonymous]
     [OutputCache(PolicyName = "DetailData")]
+    [ProducesResponseType<CategoryTypeDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CategoryTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
         var categoryType = await categoryTypeDetails.QueryAsync(new GetCategoryTypeDetailsRequest { Id = id }, cancellationToken);

@@ -66,6 +66,12 @@ public sealed class RegistrationOrderAddOnController(
     [RequireIdempotencyKey]
     [ProtectIdempotencyReplay]
     [EndpointClassification(EndpointClass.Authenticated)]
+    [ProducesResponseType<HalResource<RegistrationOrderAddOnSummaryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public Task<ActionResult<HalResource<RegistrationOrderAddOnSummaryDto>>> Reserve(
         Guid eventId,
         Guid registrationOrderId,
@@ -95,6 +101,12 @@ public sealed class RegistrationOrderAddOnController(
     [RequireIdempotencyKey]
     [ProtectIdempotencyReplay]
     [EndpointClassification(EndpointClass.Authenticated)]
+    [ProducesResponseType<HalResource<RegistrationOrderAddOnSummaryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public Task<ActionResult<HalResource<RegistrationOrderAddOnSummaryDto>>> Fulfill(
         Guid eventId,
         Guid registrationOrderId,
@@ -120,6 +132,12 @@ public sealed class RegistrationOrderAddOnController(
     [RequireIdempotencyKey]
     [ProtectIdempotencyReplay]
     [EndpointClassification(EndpointClass.Authenticated)]
+    [ProducesResponseType<HalResource<RegistrationOrderAddOnSummaryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public Task<ActionResult<HalResource<RegistrationOrderAddOnSummaryDto>>> Refund(
         Guid eventId,
         Guid registrationOrderId,

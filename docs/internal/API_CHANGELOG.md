@@ -15,6 +15,21 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
   replay. Anonymous active-directory requests retain 401, and credential
   replacement retains its dedicated authentication scheme. Other endpoints
   retain authorization before lifecycle enforcement, including anonymous writes.
+- **Response metadata completeness.** Explicit action-level response metadata
+  now describes 29 existing lookup, feature-flag, agenda, organization, user,
+  and add-on operations. Routes, operation IDs, authorization and runtime
+  payloads are unchanged. Add-on mutations return 200 HAL resources, not 201
+  command envelopes; session-agenda deletion returns empty 204. Category-type,
+  language and tag-type detail reads declare their existing empty 204 outcome
+  when no lookup exists. Organization member commands continue to return their
+  command envelope at 200, including application-level failure results.
+  Non-success HTTP responses are described as ProblemDetails, with the user
+  synchronization validation response typed as ValidationProblemDetails.
+  OpenAPI and the C# client are regenerated through the build pipeline.
+- **Organization member authorization errors.** Create, role-update and delete
+  operations explicitly declare their existing 403 ProblemDetails response
+  from resource authorization. Generated clients now deserialize those denials
+  as typed errors; permissions and runtime status codes are unchanged.
 
 ## 2026-09-29
 

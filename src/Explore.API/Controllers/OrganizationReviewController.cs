@@ -55,6 +55,8 @@ public class OrganizationReviewController : EventControllerBase
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("{organizationId:guid}", Name = RouteNames.GetOrganizationReviewsByOrganization)]
+    [ProducesResponseType<List<OrganizationReviewDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [OutputCache(PolicyName = "ListData")]
     public async Task<ActionResult<List<OrganizationReviewDto>>> Get(Guid organizationId, CancellationToken cancellationToken = default)
     {
@@ -65,6 +67,8 @@ public class OrganizationReviewController : EventControllerBase
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("user/{userId:guid}", Name = RouteNames.GetOrganizationReviewsByUser)]
+    [ProducesResponseType<List<OrganizationReviewDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<OrganizationReviewDto>>> GetByUserId(Guid userId, CancellationToken cancellationToken = default)
     {
         var reviews = await _userReviews.QueryAsync(new GetMyReviewsQuery { UserId = userId }, cancellationToken);
@@ -74,6 +78,10 @@ public class OrganizationReviewController : EventControllerBase
     [Authorize]
     [EndpointClassification(EndpointClass.Authenticated)]
     [HttpPost(Name = RouteNames.CreateOrganizationReview)]
+    [ProducesResponseType<BaseCommandResponse<Guid>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Post([FromBody] CreateOrganizationReviewDto createOrganizationReviewDto, CancellationToken cancellationToken = default)
     {
         var command = new CreateOrganizationReviewCommand

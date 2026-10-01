@@ -23,6 +23,8 @@ public class ApprovalStatusController(
     [EndpointDescription("Get A List of all the Status Type Options")]
     [AllowAnonymous]
     [OutputCache(PolicyName = "LookupData")]
+    [ProducesResponseType<List<StatusTypeListDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<StatusTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
         var statusTypes = await approvalStatuses.QueryAsync(new GetStatusTypeListRequest(), cancellationToken);

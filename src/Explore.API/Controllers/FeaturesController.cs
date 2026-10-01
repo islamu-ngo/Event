@@ -22,6 +22,9 @@ public class FeaturesController : ControllerBase
     }
 
     [HttpGet("my-flags", Name = RouteNames.GetMyFeatureFlags)]
+    [ProducesResponseType<Dictionary<string, bool>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<Dictionary<string, bool>>> GetMyFlags(CancellationToken ct)
     {
         var flags = await _featureFlagService.GetClientFlagsAsync(ct: ct);

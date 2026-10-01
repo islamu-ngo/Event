@@ -25,6 +25,8 @@ public class LanguageController(
     [EndpointDescription("Get a list of all available languages (lookup table)")]
     [AllowAnonymous]
     [OutputCache(PolicyName = "LookupData")]
+    [ProducesResponseType<List<LanguageListDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<LanguageListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
         var languages = await listQuery.QueryAsync(new GetLanguageListRequest(), cancellationToken);
@@ -37,6 +39,9 @@ public class LanguageController(
     [EndpointDescription("Get detailed information about a specific language")]
     [AllowAnonymous]
     [OutputCache(PolicyName = "DetailData")]
+    [ProducesResponseType<LanguageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LanguageDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
         var language = await detailQuery.QueryAsync(new GetLanguageDetailsRequest { Id = id }, cancellationToken);

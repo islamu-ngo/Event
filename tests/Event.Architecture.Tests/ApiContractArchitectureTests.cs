@@ -2,6 +2,7 @@ namespace Event.Architecture.Tests;
 
 using System.Linq;
 using System.Reflection;
+using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Features.Events.Requests.Queries;
@@ -191,7 +192,6 @@ public class ApiContractArchitectureTests
     }
 
     [Test]
-    [Skip("Category: API contract. Removal: enable after every public operation declares explicit response metadata.")]
     [DisplayName("Every non-hidden [Http*] action must declare response metadata")]
     public async Task EveryNonHiddenAction_MustDeclare_ResponseMetadata()
     {
@@ -239,7 +239,22 @@ public class ApiContractArchitectureTests
         }
 
         await Assert.That(violations).IsEmpty()
-            .Because("every public API operation must declare explicit response metadata for generated clients and ProblemDetails contracts.");
+            .Because($"every public API operation must declare explicit response metadata for generated clients and ProblemDetails contracts. Missing metadata: {string.Join(", ", violations)}");
+    }
+
+    [Test]
+    [Arguments(nameof(OrganizationMemberController.Post))]
+    [Arguments(nameof(OrganizationMemberController.UpdateRole))]
+    [Arguments(nameof(OrganizationMemberController.Delete))]
+    public async Task OrganizationMemberWrites_DeclareForbiddenProblemDetails(string actionName)
+    {
+        MethodInfo action = typeof(OrganizationMemberController).GetMethod(actionName)
+            ?? throw new InvalidOperationException($"Action {actionName} was not found.");
+        var metadata = action.GetCustomAttributes<ProducesResponseTypeAttribute>(inherit: true)
+            .SingleOrDefault(response => response.StatusCode == StatusCodes.Status403Forbidden);
+
+        await Assert.That(metadata).IsNotNull();
+        await Assert.That(metadata!.Type).IsEqualTo(typeof(ProblemDetails));
     }
 
     [Test]

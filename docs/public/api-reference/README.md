@@ -12,6 +12,21 @@ Development/Testing commonly uses `https://localhost:7039`. Docker Compose runs 
 
 Swagger, Scalar, and `/openapi/islamu-event.json` are Development/Testing descriptions. They are not exposed by default in Production Compose and must not be presented as an unrestricted public integrator contract.
 
+## Response contracts
+
+The generated contract now explicitly describes existing lookup, feature-flag,
+session-agenda, organization, user and add-on response outcomes. Add-on writes
+return a HAL resource at 200; session-agenda deletion returns empty 204.
+Category-type, language and tag-type detail reads return empty 204 when the
+lookup does not exist. Organization member command envelopes remain 200 even
+when their application-level result reports failure; inspect the envelope.
+HTTP errors use ProblemDetails. These metadata corrections do not change
+routes, operation IDs, permissions or runtime payloads.
+
+Organization member create, role-update and delete operations declare 403
+ProblemDetails when an authenticated caller lacks permission for the resource.
+Treat 401 as an authentication failure and 403 as a permission denial.
+
 ## Authentication
 
 Use exactly one mechanism:

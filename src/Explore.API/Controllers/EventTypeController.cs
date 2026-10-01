@@ -23,6 +23,8 @@ public class EventTypeController(
     [EndpointDescription("Get A List of all the Event Type Options")]
     [AllowAnonymous]
     [OutputCache(PolicyName = "LookupData")]
+    [ProducesResponseType<List<EventTypeListDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<EventTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
         var eventTypes = await eventTypeList.QueryAsync(new GetEventTypeListRequest(), cancellationToken);

@@ -25,6 +25,8 @@ public class TagTypeController(
     [HttpGet(Name = RouteNames.GetTagTypes)]
     [AllowAnonymous]
     [OutputCache(PolicyName = "LookupData")]
+    [ProducesResponseType<List<TagTypeListDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<TagTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
         var tagTypes = await tagTypeList.QueryAsync(new GetTagTypeListRequest(), cancellationToken);
@@ -35,6 +37,9 @@ public class TagTypeController(
     [HttpGet("{id}", Name = RouteNames.GetTagTypeById)]
     [AllowAnonymous]
     [OutputCache(PolicyName = "DetailData")]
+    [ProducesResponseType<TagTypeDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<TagTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
         var tagType = await tagTypeDetails.QueryAsync(new GetTagTypeDetailsRequest { Id = id }, cancellationToken);

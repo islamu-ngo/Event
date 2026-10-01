@@ -105,7 +105,7 @@ public sealed class IncomingWebhookProcessingService(
         }
         catch (IncomingWebhookClaimLostException)
         {
-            return IncomingWebhookClaimExecutionResult.LeaseLost();
+            return await RecoverConcurrentReceiptAsync(claim, cancellationToken);
         }
         catch (IncomingWebhookEffectReceiptConflictException)
         {
@@ -265,7 +265,11 @@ public sealed class IncomingWebhookProcessingService(
                 claim.TenantId,
                 claim.IncomingWebhookMessageId,
                 token);
-            if (message is null || message.ProcessingGeneration != claim.ProcessingGeneration)
+            if (message is null ||
+                message.Status != IncomingWebhookMessageStatus.Processed ||
+                message.SettledByEffectReceiptId is null ||
+                message.ProcessingFence != claim.ProcessingFence ||
+                message.ProcessingGeneration != claim.ProcessingGeneration)
             {
                 return IncomingWebhookClaimExecutionResult.LeaseLost();
             }

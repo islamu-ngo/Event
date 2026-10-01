@@ -88,18 +88,34 @@ public sealed class IncomingWebhookAtomicEffectTests(PostgreSqlContainerFixture 
     }
 
     [Test]
-    public async Task ConcurrentExecutors_CommitOneEffectAndRecordBothExecutions()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ConcurrentExecutors_CommitOneEffectAndRecordBothExecutions(bool firstExecutionCompletesBeforeSecondRefresh)
     {
         var seeded = await SeedAndClaimAsync("atomic-concurrent-receipt");
         var synchronization = new ConcurrentEffectSynchronization(2);
         await using var contextA = fixture.CreateDbContext();
         await using var contextB = fixture.CreateDbContext();
         var serviceA = CreateConcurrentService(contextA, seeded.Claim, synchronization, seeded.ObservedAt);
-        var serviceB = CreateConcurrentService(contextB, seeded.Claim, synchronization, seeded.ObservedAt.AddMilliseconds(1));
+        var serviceB = CreateConcurrentService(
+            contextB, seeded.Claim, synchronization, seeded.ObservedAt.AddMilliseconds(1),
+            firstExecutionCompletesBeforeSecondRefresh);
 
         var results = await Task.WhenAll(
-            serviceA.ProcessAsync(seeded.Claim, CancellationToken.None),
+            RunFirstExecutionAsync(),
             serviceB.ProcessAsync(seeded.Claim, CancellationToken.None));
+
+        async Task<IncomingWebhookClaimExecutionResult> RunFirstExecutionAsync()
+        {
+            try
+            {
+                return await serviceA.ProcessAsync(seeded.Claim, CancellationToken.None);
+            }
+            finally
+            {
+                synchronization.CompleteFirstExecution();
+            }
+        }
 
         await using var verificationContext = fixture.CreateDbContext();
         var message = await verificationContext.IncomingWebhookMessages
@@ -113,6 +129,11 @@ public sealed class IncomingWebhookAtomicEffectTests(PostgreSqlContainerFixture 
         var outboxCount = await verificationContext.OutboxMessages
             .CountAsync(candidate => candidate.AggregateId == message.Id);
 
+        await Assert.That(results.Select(result => result.Outcome)).IsEquivalentTo(new[]
+        {
+            IncomingWebhookClaimExecutionOutcome.Completed,
+            IncomingWebhookClaimExecutionOutcome.Completed
+        });
         await Assert.That(results.All(result => result.Outcome == IncomingWebhookClaimExecutionOutcome.Completed)).IsTrue();
         await Assert.That(message.Status).IsEqualTo(IncomingWebhookMessageStatus.Processed);
         await Assert.That(receiptCount).IsEqualTo(1);
@@ -186,12 +207,13 @@ public sealed class IncomingWebhookAtomicEffectTests(PostgreSqlContainerFixture 
         ExploreDbContext dbContext,
         IncomingWebhookClaim claim,
         ConcurrentEffectSynchronization synchronization,
-        DateTime observedAt) =>
+        DateTime observedAt,
+        bool waitForFirstExecution = false) =>
         new(
             new IncomingWebhookMessageRepository(dbContext),
             new IncomingWebhookEffectReceiptRepository(dbContext),
             new EfCoreUnitOfWork(dbContext),
-            [new ConcurrentEffectHandler(dbContext, claim, synchronization)],
+            [new ConcurrentEffectHandler(dbContext, claim, synchronization, waitForFirstExecution)],
             Options.Create(new IncomingWebhookProcessingSettings()),
             new FixedTimeProvider(observedAt));
 
@@ -277,7 +299,8 @@ public sealed class IncomingWebhookAtomicEffectTests(PostgreSqlContainerFixture 
     private sealed class ConcurrentEffectHandler(
         ExploreDbContext dbContext,
         IncomingWebhookClaim claim,
-        ConcurrentEffectSynchronization synchronization) : IIncomingWebhookHandler
+        ConcurrentEffectSynchronization synchronization,
+        bool waitForFirstExecution) : IIncomingWebhookHandler
     {
         public string EffectKind => AtomicEffectHandler.StableEffectKind;
 
@@ -298,7 +321,7 @@ public sealed class IncomingWebhookAtomicEffectTests(PostgreSqlContainerFixture 
                 CreatedAt = DateTime.UtcNow,
                 MaxRetries = 8
             });
-            await synchronization.ArriveAsync(cancellationToken);
+            await synchronization.ArriveAsync(waitForFirstExecution, cancellationToken);
             return IncomingWebhookProcessingResult.Processed("outbox:" + claim.IncomingWebhookMessageId.ToString("N"));
         }
     }
@@ -306,16 +329,23 @@ public sealed class IncomingWebhookAtomicEffectTests(PostgreSqlContainerFixture 
     private sealed class ConcurrentEffectSynchronization(int participantCount)
     {
         private readonly TaskCompletionSource _allArrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _firstExecutionCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _arrived;
 
-        public async Task ArriveAsync(CancellationToken cancellationToken)
+        public void CompleteFirstExecution() => _firstExecutionCompleted.TrySetResult();
+
+        public async Task ArriveAsync(bool waitForFirstExecution, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref _arrived) == participantCount)
             {
                 _allArrived.TrySetResult();
             }
 
-            await _allArrived.Task.WaitAsync(cancellationToken);
+            await _allArrived.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            if (waitForFirstExecution)
+            {
+                await _firstExecutionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            }
         }
     }
 

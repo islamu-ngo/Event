@@ -51,9 +51,10 @@ public sealed class TriggerManagedControlPlaneRegistrationCommandHandler(
         }
 
         var secrets = await ResolveSecretsAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(secrets.ControlPlaneToEventSecret))
+        if (string.IsNullOrWhiteSpace(secrets.ControlPlaneToEventSecret)
+            || string.IsNullOrWhiteSpace(secrets.EventToControlPlaneSecret))
         {
-            return Failure("Pending", "registration_secret_unavailable", registration.Id);
+            return Failure("Pending", "registration_secret_unavailable", registration?.Id);
         }
 
         registration ??= await CreatePendingRegistrationAsync(settings, secrets, cancellationToken);

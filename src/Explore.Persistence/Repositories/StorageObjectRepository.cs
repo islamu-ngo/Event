@@ -79,6 +79,9 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
         _dbContext.Set<StorageProducerOperation>().Remove(producer);
         await _dbContext.StorageObjects.AddAsync(storageObject, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await new StorageUsageCounterRepository(_dbContext)
+            .RecalculateScopeAsync(storageObject.TenantId, storageObject.Provider, DateTime.UtcNow, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RetireProducerAsync(Guid id, Guid tenantId, DateTime utcNow, CancellationToken cancellationToken)

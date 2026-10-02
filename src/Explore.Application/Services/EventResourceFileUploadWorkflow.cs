@@ -235,8 +235,6 @@ public sealed class EventResourceFileUploadWorkflow(
                 {
                     await lifecycle.RetireAsync(current.TenantId, [], [previous.Id], now, ct);
                 }
-                counter.FinalizeReservation(current.ReservedBytes);
-                await counters.Update(counter);
                 if (lease.Snapshot.Facts.Access.GovernancePolicy!.AuditRetentionDays > 0)
                     await resources.AddAuditEntryAsync(EventResourceAuditEntry.Create(current.TenantId, resource.Id, user.UserId,
                         EventResourceAuditAction.ConfigureDelivery, EventResourceAuditOutcome.Succeeded,
@@ -245,6 +243,8 @@ public sealed class EventResourceFileUploadWorkflow(
                 current.Finalize(stagedObject.Id, current.ObjectKey!, checksum, now);
                 current.RecordFinalizedResourceVersion(resource.ConcurrencyStamp);
                 await sessions.Update(current);
+                counter = await counters.RecalculateScopeAsync(current.TenantId, current.Provider, now, ct);
+                await counters.Update(counter);
                 return Success(current, latestPolicy, counter);
             }, cancellationToken);
         }

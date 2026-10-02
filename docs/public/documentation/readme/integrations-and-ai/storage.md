@@ -99,6 +99,13 @@ Local files use application content links; they do not advertise S3 presigned
 downloads. S3 downloads retain the saved object version rather than selecting a
 newer object at the same key.
 
+Usage includes activated generated CSVs and imported files as well as user
+uploads. Replacement and retirement rebuild the affected tenant/provider usage
+from retained metadata and upload reservations; cleanup retries do not release
+the same charge twice. Hiding or soft-deleting an owner does not itself release
+its file charge. A durable cleanup handoff can release the charge while physical
+deletion remains pending, so usage totals are not proof of provider absence.
+
 A missing historical binding is an error, not permission to try today's backend.
 Before upgrading development data, inventory the original bytes and verify their
 target, relative keys and checksums. Use an explicitly reviewed historical mapping

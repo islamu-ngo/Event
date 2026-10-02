@@ -395,12 +395,12 @@ public class FinalizeStorageUploadSessionCommandHandler
             ActorId = null
         };
         storageObject = await _storageObjectRepository.Create(storageObject);
-        counter.FinalizeReservation(writeResult.SizeBytes);
-        await _usageCounterRepository.Update(counter);
-
-        session.Finalize(storageObject.Id, writeResult.ObjectKey, writeResult.Sha256Checksum!, DateTime.UtcNow);
+        var utcNow = DateTime.UtcNow;
+        session.Finalize(storageObject.Id, writeResult.ObjectKey, writeResult.Sha256Checksum!, utcNow);
         session.StorageObject = storageObject;
         await _uploadSessionRepository.Update(session);
+        counter = await _usageCounterRepository.RecalculateScopeAsync(tenantId, session.Provider, utcNow, cancellationToken);
+        await _usageCounterRepository.Update(counter);
 
         return Success(session, counter, "Upload session finalized successfully.");
     }

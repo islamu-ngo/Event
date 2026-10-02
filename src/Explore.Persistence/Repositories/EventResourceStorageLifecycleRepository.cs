@@ -91,22 +91,9 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
             await FenceAsync(source, cancellationToken);
             var producers = sessions.Where(item => item.StorageObjectId == source.Id).ToArray();
             bool settled = producers.Length > 0 && producers.All(item => item.ProducerSettled);
-            // Parent redaction may already have saved DeleteRequested. Its still-finalized
-            // session is the accounting witness until this handoff closes it atomically.
-            bool charged = source.LifecycleState == StorageObjectLifecycleStates.Active
-                || producers.Any(item => item.Status == StorageUploadSessionStates.Finalized);
             settled |= source.LifecycleState == StorageObjectLifecycleStates.Active;
             database.StorageObjectDeletionTombstones.Add(StorageObjectDeletionTombstone.Create(source.Id,
                 tenantId, source.Provider, bindingId, source.ObjectKey, source.ProviderVersionId, settled, utcNow));
-            if (charged)
-            {
-                var counter = await CounterAsync(tenantId, source.Provider, cancellationToken);
-                if (counter is not null)
-                {
-                    counter.UsedBytes = Math.Max(0, counter.UsedBytes - source.Size);
-                    counter.ObjectCount = Math.Max(0, counter.ObjectCount - 1);
-                }
-            }
             source.RequestDelete();
             database.StorageObjects.Update(source);
         }
@@ -116,14 +103,14 @@ public sealed class EventResourceStorageLifecycleRepository(ExploreDbContext dat
                 && await database.OrganizationTenantEvidence.IgnoreQueryFilters([QueryFilterNames.Tenant])
                     .AnyAsync(item => item.TenantId == tenantId
                         && item.DocumentStorageObjectId == objectId, cancellationToken)) continue;
-            if (session.Status is StorageUploadSessionStates.Reserved or StorageUploadSessionStates.Uploading)
-            {
-                var counter = await CounterAsync(tenantId, session.Provider, cancellationToken);
-                counter?.ReleaseReservation(session.ReservedBytes);
-            }
             if (session.Status is StorageUploadSessionStates.Reserved or StorageUploadSessionStates.Uploading or StorageUploadSessionStates.Finalized)
                 session.Fail("resource_storage_retired", null, utcNow);
         }
+        await database.SaveChangesAsync(cancellationToken);
+        var counters = new StorageUsageCounterRepository(database);
+        foreach (string provider in sources.Select(source => source.Provider)
+            .Concat(sessions.Select(session => session.Provider)).Distinct().Order(StringComparer.Ordinal))
+            await counters.RecalculateScopeAsync(tenantId, provider, utcNow, cancellationToken);
         await database.SaveChangesAsync(cancellationToken);
     }
 

@@ -65,6 +65,10 @@ public sealed class ManagedStorageBindingTests
         }, default);
         await Assert.That(finalized.IsSuccess).IsTrue();
         var metadata = (await env.Objects.GetForGenericAccessAsync(finalized.Id!.StorageObjectId!.Value, default))!;
+        var quota = await env.Counters.GetByTenantAndProviderAsync(metadata.TenantId, metadata.Provider, default);
+        await Assert.That(quota!.UsedBytes).IsEqualTo((long)Png.Length);
+        await Assert.That(quota.ReservedBytes).IsEqualTo(0L);
+        await Assert.That(quota.ObjectCount).IsEqualTo(1L);
         await Assert.That(metadata.StorageProviderBindingId).IsEqualTo(original);
         await Assert.That(File.Exists(Path.Combine(env.Root, metadata.ObjectKey!))).IsTrue();
         await Assert.That(File.Exists(Path.Combine(env.OtherRoot, metadata.ObjectKey!))).IsFalse();
@@ -94,6 +98,10 @@ public sealed class ManagedStorageBindingTests
         await sink.AcceptAsync(request, default);
         env.Options.RootPath = env.OtherRoot;
         var stored = (await env.Objects.GetAll()).Single();
+        var quota = await env.Counters.GetByTenantAndProviderAsync(stored.TenantId, stored.Provider, default);
+        await Assert.That(quota).IsNotNull();
+        await Assert.That(quota!.UsedBytes).IsEqualTo(stored.Size);
+        await Assert.That(quota.ObjectCount).IsEqualTo(1L);
         await Assert.That(stored.StorageProviderBindingId).IsNotNull();
         await Assert.That(stored.CreatedBy).IsNull();
         await Assert.That(stored.OwningResourceId).IsEqualTo(request.RegistrationSubmissionId);

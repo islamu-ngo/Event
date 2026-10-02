@@ -194,6 +194,18 @@ A tracked `DeleteRequested` to `Active` change is not activation proof.
 Resource activation records its existing successful settled-session CAS in the
 owning transaction before the attachment save may accept that transition.
 
+Usage is a tenant/provider materialized projection, not a historical charge flag
+on active metadata. `StorageUsageCounterRepository.RecalculateScopeAsync` CAS
+fences the scope counter before reading persisted cohorts in the caller's
+transaction. Activated metadata remains counted through hidden/soft-deleted
+owners until tombstone custody transfers; never-finalized resource staging is
+excluded. Reserved/uploading sessions supply reservation bytes. Resource
+retirement, session finalization, non-session producer activation and operator
+recalculation use this same projection. Worker retries do not debit usage.
+In particular, retiring a previously uncounted CSV or imported file cannot
+subtract another file's charge, and replacement finalization cannot add bytes
+already counted by the retirement projection.
+
 The producer port is not the shared-reference retirement API. Explicit bulk and
 indirect-hold writer enrollment, generalized source retirement and runtime wiring
 remain separate work.

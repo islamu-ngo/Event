@@ -976,6 +976,9 @@ public sealed class EventResourceFileUploadTests(EventResourceFileUploadTests.Da
         await using var seeder = EventResourcePersistenceTests.TestDatabase.CreateProvider(() => database.CreateContext());
         var scope = await seeder.SeedScopeAsync();
         await using var context = database.CreateContext();
+        // The relational-model fixture's large, unattached local document is not
+        // part of this upload-only quota fixture. Keep the foreign-tenant document.
+        await context.StorageObjects.Where(value => value.Id == scope.StorageAId).ExecuteDeleteAsync();
         var actor = (await context.Actors.SingleAsync(value => value.Id == scope.ActorId)).UserId!.Value;
         (await context.Events.SingleAsync(value => value.Id == scope.EventAId)).OrganizerActorId = scope.ActorId;
         context.TenantUsers.Add(new TenantUser

@@ -168,41 +168,15 @@ public class InstanceStorageSettingService : IInstanceStorageSettingService
         {
             var objects = await _storageObjectRepository.GetAllForInstanceStorageReportAsync(ct);
             var counters = await _usageCounterRepository.GetAllTrackedForInstanceStorageRecalculationAsync(ct);
-            var countersByScope = counters
-                .GroupBy(counter => (counter.TenantId, Provider: NormalizeProvider(counter.Provider)))
-                .ToDictionary(group => group.Key, group => group.First());
-            var groupedObjects = objects
-                .GroupBy(storageObject => (storageObject.TenantId, Provider: NormalizeProvider(storageObject.Provider)))
-                .ToDictionary(group => group.Key, group => group.ToList());
+            var scopes = counters.Select(counter => (counter.TenantId, Provider: NormalizeProvider(counter.Provider)))
+                .Concat(objects.Select(storageObject =>
+                    (storageObject.TenantId, Provider: NormalizeProvider(storageObject.Provider))))
+                .Distinct().OrderBy(scope => scope.TenantId).ThenBy(scope => scope.Provider, StringComparer.Ordinal);
             var utcNow = DateTime.UtcNow;
-
-            foreach (var group in groupedObjects)
+            foreach (var scope in scopes)
             {
-                if (!countersByScope.TryGetValue(group.Key, out var counter))
-                {
-                    counter = new StorageUsageCounter
-                    {
-                        TenantId = group.Key.TenantId,
-                        Provider = group.Key.Provider
-                    };
-                    countersByScope[group.Key] = counter;
-                    await _usageCounterRepository.Create(counter);
-                }
-
-                var quarantinedBytes = group.Value
-                    .Where(storageObject => storageObject.LifecycleState == StorageObjectLifecycleStates.Quarantined)
-                    .Sum(storageObject => storageObject.Size);
-                var usedBytes = group.Value
-                    .Where(storageObject => storageObject.LifecycleState != StorageObjectLifecycleStates.Quarantined)
-                    .Sum(storageObject => storageObject.Size);
-
-                counter.Recalculate(usedBytes, counter.ReservedBytes, quarantinedBytes, group.Value.Count, utcNow);
-                await _usageCounterRepository.Update(counter);
-            }
-
-            foreach (var counter in counters.Where(counter => !groupedObjects.ContainsKey((counter.TenantId, NormalizeProvider(counter.Provider)))))
-            {
-                counter.Recalculate(0, counter.ReservedBytes, 0, 0, utcNow);
+                var counter = await _usageCounterRepository.RecalculateScopeAsync(
+                    scope.TenantId, scope.Provider, utcNow, ct);
                 await _usageCounterRepository.Update(counter);
             }
 
